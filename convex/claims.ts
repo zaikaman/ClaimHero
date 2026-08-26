@@ -1,9 +1,10 @@
 import { mutation, query } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 
 /**
- * List all claims with optional status and payer filters, joined with patient data
+ * List all claims with optional status and payer filters, scoped to the authenticated user
  */
 export const list = query({
   args: {
@@ -12,15 +13,32 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
     let claims: Doc<"claims">[];
 
-    if (args.status && args.status !== "all") {
-      claims = (await ctx.db
-        .query("claims")
-        .withIndex("by_status", (q: any) => q.eq("status", args.status))
-        .collect()) as Doc<"claims">[];
+    if (userId) {
+      if (args.status && args.status !== "all") {
+        claims = (await ctx.db
+          .query("claims")
+          .withIndex("by_user_status", (q: any) =>
+            q.eq("userId", userId).eq("status", args.status)
+          )
+          .collect()) as Doc<"claims">[];
+      } else {
+        claims = (await ctx.db
+          .query("claims")
+          .withIndex("by_user", (q: any) => q.eq("userId", userId))
+          .collect()) as Doc<"claims">[];
+      }
     } else {
-      claims = (await ctx.db.query("claims").collect()) as Doc<"claims">[];
+      if (args.status && args.status !== "all") {
+        claims = (await ctx.db
+          .query("claims")
+          .withIndex("by_status", (q: any) => q.eq("status", args.status))
+          .collect()) as Doc<"claims">[];
+      } else {
+        claims = (await ctx.db.query("claims").collect()) as Doc<"claims">[];
+      }
     }
 
     // Join with patient details
@@ -107,12 +125,14 @@ export const create = mutation({
     denialLetterStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
     const now = Date.now();
     const deadlineDays = args.appealFilingDeadlineDays || 180;
     const statutoryDeadline = now + deadlineDays * 86400000;
     const assignedAgentEmail = `appeal-claim-${args.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
 
     const claimId = await ctx.db.insert("claims", {
+      userId: userId ?? undefined,
       patientId: args.patientId,
       claimNumber: args.claimNumber,
       serviceDate: args.serviceDate,
@@ -169,6 +189,7 @@ export const createWithPatient = mutation({
     denialLetterStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
     const now = Date.now();
 
     // Check if patient already exists by memberId or email
@@ -183,6 +204,7 @@ export const createWithPatient = mutation({
       patientId = existingPatients[0]._id;
     } else {
       patientId = await ctx.db.insert("patients", {
+        userId: userId ?? undefined,
         name: args.patientName,
         email: args.patientEmail,
         memberId: args.memberId,
@@ -198,6 +220,7 @@ export const createWithPatient = mutation({
     const assignedAgentEmail = `appeal-${args.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
 
     const claimId = await ctx.db.insert("claims", {
+      userId: userId ?? undefined,
       patientId,
       claimNumber: args.claimNumber,
       serviceDate: args.serviceDate,
@@ -327,7 +350,18 @@ export const sweepDeadlines = mutation({
 export const getPortfolioStats = query({
   args: {},
   handler: async (ctx) => {
-    const claims = await ctx.db.query("claims").collect();
+    const userId = await getAuthUserId(ctx);
+    let claims: Doc<"claims">[];
+
+    if (userId) {
+      claims = (await ctx.db
+        .query("claims")
+        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .collect()) as Doc<"claims">[];
+    } else {
+      claims = (await ctx.db.query("claims").collect()) as Doc<"claims">[];
+    }
+
     const patients = await ctx.db.query("patients").collect();
     const patientMap = new Map(patients.map((p) => [p._id, p]));
 
@@ -418,7 +452,7 @@ export const getPortfolioStats = query({
       }
     }
 
-    const averageWinScore = scoredCount > 0 ? Math.round(totalScoreSum / scoredCount) : 89;
+    const averageWinScore = scoredCount > 0 ? Math.round(totalScoreSum / scoredCount) : 0;
     const recoveryRatePercent = totalDisputedAmount > 0 ? Math.round((overturnedWonAmount / totalDisputedAmount) * 100) : 0;
 
     const payerBreakdown = Object.values(payerStatsMap).map((p) => ({
@@ -427,7 +461,7 @@ export const getPortfolioStats = query({
       totalDisputed: p.totalDisputed,
       wonCount: p.wonCount,
       wonAmount: p.wonAmount,
-      averageScore: p.scoredCount > 0 ? Math.round(p.scoreSum / p.scoredCount) : 85,
+      averageScore: p.scoredCount > 0 ? Math.round(p.scoreSum / p.scoredCount) : 0,
     }));
 
     return {
@@ -445,5 +479,43 @@ export const getPortfolioStats = query({
     };
   },
 });
+
+/**
+ * Assign all unassigned legacy claims created prior to auth to the currently logged in user
+ */
+export const claimLegacyCases = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Must be authenticated to claim legacy records");
+
+    const allClaims = await ctx.db.query("claims").collect();
+    const unassigned = allClaims.filter((c) => !c.userId);
+
+    for (const c of unassigned) {
+      await ctx.db.patch(c._id, { userId });
+    }
+
+    return unassigned.length;
+  },
+});
+
+/**
+ * Delete any unassigned demo claims created prior to auth
+ */
+export const clearUnassignedDemoCases = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const allClaims = await ctx.db.query("claims").collect();
+    const unassigned = allClaims.filter((c) => !c.userId);
+
+    for (const c of unassigned) {
+      await ctx.db.delete(c._id);
+    }
+
+    return unassigned.length;
+  },
+});
+
 
 

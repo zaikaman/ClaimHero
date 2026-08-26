@@ -1,0 +1,557 @@
+import React, { useState } from "react";
+import {
+  Shield,
+  Scale,
+  User,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle2,
+  Sparkles,
+  Zap,
+  UploadCloud,
+  Check,
+  Loader2,
+  Stethoscope,
+} from "lucide-react";
+import confetti from "canvas-confetti";
+import { DenialExtractionResult } from "../../types";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../ui/dialog";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Card } from "../ui/card";
+
+interface OnboardingWizardProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onParseText: (
+    text: string,
+    patientState?: string
+  ) => Promise<DenialExtractionResult & { claimId: string }>;
+  onOpenIngestionModal: () => void;
+  onSuccess: (claimId: string) => void;
+}
+
+const ROLES = [
+  {
+    id: "provider",
+    title: "Healthcare Provider / Medical Practice",
+    description: "Hospitals, orthopedic clinics, surgical centers, and healthcare billing departments.",
+    icon: Stethoscope,
+  },
+  {
+    id: "advocate",
+    title: "Patient Advocate / ERISA Legal Counsel",
+    description: "Healthcare law firms, statutory ERISA litigators, and claims advocacy specialists.",
+    icon: Scale,
+  },
+  {
+    id: "individual",
+    title: "Independent Patient / Healthcare Consumer",
+    description: "Self-advocates seeking to overturn surprise out-of-pocket medical bills and adverse determinations.",
+    icon: User,
+  },
+];
+
+const JURISDICTIONS = [
+  { code: "CA", label: "California — DMHC / CDI & Knox-Keene Standards" },
+  { code: "NY", label: "New York — DFS Independent Dispute Resolution" },
+  { code: "TX", label: "Texas — TDI Standard Review Guidelines" },
+  { code: "FL", label: "Florida — OIR External Grievance Rules" },
+  { code: "IL", label: "Illinois — DOI Consumer Protections" },
+  { code: "FED", label: "Federal ERISA 29 CFR § 2560.503-1 Universal" },
+];
+
+const TARGET_PAYERS = [
+  "UnitedHealthcare",
+  "Aetna",
+  "Cigna",
+  "Blue Cross Blue Shield",
+  "Humana",
+  "Kaiser Permanente",
+];
+
+const STARTER_CASES = [
+  {
+    id: "uhc_knee",
+    title: "UnitedHealthcare — Total Knee Arthroplasty",
+    payer: "UnitedHealthcare",
+    amount: "$24,500.00",
+    cpt: "CPT 27447",
+    carc: "CO-50 (Not Medically Necessary)",
+    badge: "Recommended",
+    content: `UNITEDHEALTHCARE COMMERCIAL PLAN
+EXPLANATION OF BENEFITS / ADVERSE BENEFIT DETERMINATION
+Claim ID: CLM-8942-UHC
+Member ID: UHC-982341-01
+Patient Name: Eleanor Vance
+Date of Birth: 1968-04-14
+Date of Service: 06/12/2026
+Treating Provider: Dr. Robert Langston, MD (Advanced Orthopedic Institute)
+Facility: Pacific Surgical Center
+
+Services Rendered:
+- CPT Code 27447: Total Knee Arthroplasty (TKA), right knee
+- ICD-10 Code M17.11: Primary osteoarthritis, right knee
+- Total Billed Amount: $24,500.00
+- Plan Allowance / Paid: $0.00
+- Denied Amount: $24,500.00
+- Patient Financial Liability: $24,500.00
+
+Adjudication & Claim Denial Reason:
+Code CO-50: These are non-covered services because this is not deemed a medical necessity by the payer.
+Clinical Rationale: Under UnitedHealthcare Clinical Policy Bulletin 2024T001, total knee arthroplasty requires documented failure of at least 6 months of non-surgical conservative therapy (including formal physical therapy, intra-articular corticosteroid injections, and prescription NSAIDs). Clinical records submitted fail to establish 6 consecutive months of supervised physical therapy.
+
+Statutory Notice of Appeal Rights:
+You have the right to an internal appeal pursuant to ERISA 29 CFR § 2560.503-1. You must submit your written appeal within 180 calendar days from the date of this determination notice.`,
+  },
+  {
+    id: "aetna_spine",
+    title: "Aetna — Lumbar Decompression & Laminectomy",
+    payer: "Aetna",
+    amount: "$18,200.00",
+    cpt: "CPT 63047",
+    carc: "CO-197 (Prior Auth Lacking)",
+    badge: "High Value",
+    content: `AETNA HEALTH INSURANCE
+NOTICE OF CLAIM ADVERSE DETERMINATION
+Claim Reference: CLM-6104-AET
+Member ID: AET-554210-99
+Patient Name: Marcus Sterling
+Date of Service: 07/04/2026
+Provider: Dr. Sarah Chen, MD (Spine & Neurosurgery Associates)
+
+Procedure & Clinical Codes:
+- CPT 63047: Laminectomy, facetectomy and foraminotomy with decompression of spinal cord, single segment lumbar
+- ICD-10 M51.26: Other intervertebral disc displacement, lumbar region
+- Total Billed: $18,200.00
+- Amount Denied: $18,200.00
+- Patient Responsibility: $18,200.00
+
+Denial Adjudication Reason:
+Code CO-197: Precertification / prior authorization / notification absent or lacking.
+Description: Surgical treatment for lumbar spinal stenosis was performed without securing prior authorization from Aetna Clinical Review Department prior to the date of service.
+
+Appeals Procedure:
+In accordance with federal regulations under 29 CFR § 2560.503-1, you or your authorized representative have 180 days from receipt of this notice to file a Level 1 appeal demonstrating emergency medical necessity or retroactive pre-authorization criteria.`,
+  },
+];
+
+export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
+  isOpen,
+  onClose,
+  onParseText,
+  onOpenIngestionModal,
+  onSuccess,
+}) => {
+  const [step, setStep] = useState<number>(1);
+  const [selectedRole, setSelectedRole] = useState<string>("provider");
+  const [selectedJurisdiction, setSelectedJurisdiction] = useState<string>("CA");
+  const [selectedPayers, setSelectedPayers] = useState<string[]>([
+    "UnitedHealthcare",
+    "Aetna",
+    "Cigna",
+  ]);
+  const [selectedCaseId, setSelectedCaseId] = useState<string>("uhc_knee");
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+
+  const togglePayer = (payer: string) => {
+    setSelectedPayers((prev) =>
+      prev.includes(payer) ? prev.filter((p) => p !== payer) : [...prev, payer]
+    );
+  };
+
+  const fireSuccessConfetti = () => {
+    confetti({
+      particleCount: 75,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ["#00e5ff", "#10b981", "#ffffff"],
+    });
+  };
+
+  const handleFinish = async () => {
+    localStorage.setItem("claimhero_onboarding_completed", "true");
+    localStorage.setItem(
+      "claimhero_user_profile",
+      JSON.stringify({
+        role: selectedRole,
+        jurisdiction: selectedJurisdiction,
+        payers: selectedPayers,
+      })
+    );
+
+    if (selectedCaseId === "custom") {
+      onClose();
+      onOpenIngestionModal();
+      return;
+    }
+
+    const preset = STARTER_CASES.find((c) => c.id === selectedCaseId) || STARTER_CASES[0];
+    setIsProcessing(true);
+
+    try {
+      const result = await onParseText(preset.content, selectedJurisdiction);
+      setIsProcessing(false);
+      fireSuccessConfetti();
+      onSuccess(result.claimId);
+      onClose();
+    } catch (err) {
+      setIsProcessing(false);
+      console.error("Error loading onboarding starter case:", err);
+      fireSuccessConfetti();
+      onClose();
+    }
+  };
+
+  const handleSkip = () => {
+    localStorage.setItem("claimhero_onboarding_completed", "true");
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-2xl p-0 gap-0 border-border bg-card shadow-2xl overflow-hidden"
+      >
+        {/* Header & Step Progress Bar */}
+        <div className="p-5 sm:p-6 pb-4 border-b border-border/80 bg-muted/20">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-lg bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs">
+                <Shield className="size-4.5" />
+              </div>
+              <DialogHeader className="space-y-0.5 text-left">
+                <div className="flex items-center gap-2">
+                  <DialogTitle className="text-base font-semibold">
+                    ClaimHero Sentinel Setup Guide
+                  </DialogTitle>
+                  <Badge variant="secondary" className="font-mono text-[10px] uppercase">
+                    Onboarding
+                  </Badge>
+                </div>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  Configure your adjudication parameters and initialize your first clinical appeal.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSkip}
+              className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
+            >
+              Skip Setup
+            </Button>
+          </div>
+
+          {/* Step Indicator Progress Bar */}
+          <div className="grid grid-cols-3 gap-2 pt-2">
+            {[
+              { num: 1, label: "Role & Practice" },
+              { num: 2, label: "Jurisdiction & Payers" },
+              { num: 3, label: "Starter Appeal Case" },
+            ].map((s) => (
+              <div key={s.num} className="space-y-1.5">
+                <div
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    step >= s.num
+                      ? "bg-primary shadow-[0_0_8px_rgba(0,229,255,0.3)]"
+                      : "bg-muted"
+                  }`}
+                />
+                <div className="text-[11px] font-mono flex items-center justify-between text-muted-foreground">
+                  <span className={step === s.num ? "text-foreground font-semibold" : ""}>
+                    Step {s.num}
+                  </span>
+                  <span className="hidden sm:inline text-[10px] opacity-75 truncate max-w-[100px]">
+                    {s.label}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Scrollable Modal Content */}
+        <div className="p-5 sm:p-6 space-y-4 max-h-[60vh] overflow-y-auto text-left">
+          
+          {/* ================= STEP 1: Role Selection ================= */}
+          {step === 1 && (
+            <div className="space-y-3.5 animate-fadeIn">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Select Your Adjudication Role</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This tailors your appeal brief arguments, statutory citations, and clinical evidence parameters.
+                </p>
+              </div>
+
+              <div className="space-y-2.5">
+                {ROLES.map((r) => {
+                  const Icon = r.icon;
+                  const isSelected = selectedRole === r.id;
+                  return (
+                    <Card
+                      key={r.id}
+                      onClick={() => setSelectedRole(r.id)}
+                      className={`p-3.5 transition-all cursor-pointer flex items-start gap-3 border ${
+                        isSelected
+                          ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary/20"
+                          : "bg-muted/30 border-border hover:bg-muted/60 hover:border-border/80"
+                      }`}
+                    >
+                      <div
+                        className={`size-9 rounded-lg flex items-center justify-center shrink-0 border ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted text-muted-foreground border-border"
+                        }`}
+                      >
+                        <Icon className="size-4.5" />
+                      </div>
+                      <div className="flex-1 space-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs sm:text-sm font-medium text-foreground">
+                            {r.title}
+                          </span>
+                          {isSelected && (
+                            <CheckCircle2 className="size-4 text-primary shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground font-light leading-relaxed">
+                          {r.description}
+                        </p>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ================= STEP 2: Jurisdiction & Payers ================= */}
+          {step === 2 && (
+            <div className="space-y-4 animate-fadeIn">
+              <div className="space-y-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Primary State Jurisdiction</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Governs statutory review timelines (ERISA 180-day clock vs. California DMHC/CDI standards).
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {JURISDICTIONS.map((j) => {
+                    const isSelected = selectedJurisdiction === j.code;
+                    return (
+                      <div
+                        key={j.code}
+                        onClick={() => setSelectedJurisdiction(j.code)}
+                        className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex items-center gap-2.5 ${
+                          isSelected
+                            ? "bg-primary/10 border-primary text-foreground ring-1 ring-primary/20"
+                            : "bg-muted/30 border-border text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        }`}
+                      >
+                        <div
+                          className={`size-6 rounded font-mono text-[10px] font-bold flex items-center justify-center shrink-0 ${
+                            isSelected
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground border border-border"
+                          }`}
+                        >
+                          {j.code}
+                        </div>
+                        <span className="text-xs font-medium truncate">{j.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-3 border-t border-border/60">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Frequently Targeted Payers</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Pre-indexes insurer Clinical Policy Bulletins (CPBs) and overturn precedents.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {TARGET_PAYERS.map((payer) => {
+                    const isSelected = selectedPayers.includes(payer);
+                    return (
+                      <Button
+                        key={payer}
+                        type="button"
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => togglePayer(payer)}
+                        className={`h-7 px-3 rounded-full text-xs font-medium gap-1.5 transition-all ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted/40 text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {isSelected && <Check className="size-3" />}
+                        <span>{payer}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= STEP 3: Starter Appeal Case ================= */}
+          {step === 3 && (
+            <div className="space-y-3.5 animate-fadeIn">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Initialize Your First Sentinel Case</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Load a verified high-value denial letter to instantly experience the full AI defense workflow.
+                </p>
+              </div>
+
+              <div className="space-y-2.5">
+                {STARTER_CASES.map((c) => {
+                  const isSelected = selectedCaseId === c.id;
+                  return (
+                    <Card
+                      key={c.id}
+                      onClick={() => setSelectedCaseId(c.id)}
+                      className={`p-3.5 transition-all cursor-pointer flex items-start gap-3 border ${
+                        isSelected
+                          ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary/20"
+                          : "bg-muted/30 border-border hover:bg-muted/60 hover:border-border/80"
+                      }`}
+                    >
+                      <div
+                        className={`size-9 rounded-lg flex items-center justify-center shrink-0 border ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted text-muted-foreground border-border"
+                        }`}
+                      >
+                        <Zap className="size-4.5" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs sm:text-sm font-medium text-foreground">
+                            {c.title}
+                          </span>
+                          <Badge variant="outline" className="font-mono text-[10px]">
+                            {c.badge}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
+                          <span className="text-emerald-500 font-semibold">{c.amount}</span>
+                          <span>•</span>
+                          <span>{c.cpt}</span>
+                          <span>•</span>
+                          <span className="text-rose-500">{c.carc}</span>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+
+                {/* Option to Upload Custom PDF */}
+                <Card
+                  onClick={() => setSelectedCaseId("custom")}
+                  className={`p-3.5 transition-all cursor-pointer flex items-center gap-3 border ${
+                    selectedCaseId === "custom"
+                      ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary/20"
+                      : "bg-muted/30 border-border hover:bg-muted/60 hover:border-border/80"
+                  }`}
+                >
+                  <div className="size-9 rounded-lg bg-muted text-muted-foreground border border-border flex items-center justify-center shrink-0">
+                    <UploadCloud className="size-4.5" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-xs sm:text-sm font-medium text-foreground">
+                      Upload Custom Denial Notice (PDF / Image)
+                    </span>
+                    <p className="text-xs text-muted-foreground font-light">
+                      Use your own real adverse determination letter or explanation of benefits document.
+                    </p>
+                  </div>
+                  {selectedCaseId === "custom" && (
+                    <CheckCircle2 className="size-4 text-primary shrink-0" />
+                  )}
+                </Card>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer Controls */}
+        <div className="p-4 sm:p-5 border-t border-border/80 bg-muted/20 flex items-center justify-between">
+          <div>
+            {step > 1 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setStep((s) => s - 1)}
+                className="gap-1.5 text-xs"
+              >
+                <ArrowLeft className="size-3.5" />
+                <span>Previous</span>
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSkip}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                I&apos;ll configure later
+              </Button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {step < 3 ? (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setStep((s) => s + 1)}
+                className="gap-1.5 text-xs"
+              >
+                <span>Continue</span>
+                <ArrowRight className="size-3.5" />
+              </Button>
+            ) : (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleFinish}
+                disabled={isProcessing}
+                className="gap-2 text-xs font-semibold px-4 shadow-sm"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    <span>Ingesting & Parsing Case...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="size-3.5" />
+                    <span>Complete Setup & Launch Sentinel</span>
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};

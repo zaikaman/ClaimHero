@@ -7,6 +7,7 @@ export default defineSchema({
 
   // Patients / Insured Policyholders
   patients: defineTable({
+    userId: v.optional(v.id("users")),
     name: v.string(),
     email: v.string(),
     memberId: v.string(),
@@ -15,11 +16,13 @@ export default defineSchema({
     state: v.string(),
     createdAt: v.number(),
   })
+    .index("by_user", ["userId"])
     .index("by_email", ["email"])
     .index("by_payer", ["insurancePayer"]),
 
   // Core Medical Appeal Claims
   claims: defineTable({
+    userId: v.optional(v.id("users")),
     patientId: v.id("patients"),
     claimNumber: v.string(),
     serviceDate: v.string(),
@@ -40,6 +43,8 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
     .index("by_status", ["status"])
     .index("by_patient", ["patientId"])
     .index("by_deadline", ["statutoryDeadline"])

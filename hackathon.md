@@ -7,12 +7,12 @@
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
 - **Convex deployment:** dev:groovy-hippopotamus-924
-- **Components:** none
-- **Convex features:** database schema, relational indexes, queries, mutations, actions, file storage, crons, httpRouter
+- **Components:** @convex-dev/auth
+- **Convex features:** database schema, relational indexes, queries, mutations, actions, file storage, crons, httpRouter, auth
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T12:24:00Z
+- **Last updated:** 2026-08-26T12:47:00Z
 
 ## Log
 
@@ -75,5 +75,13 @@ Integrated Convex Authentication (@convex-dev/auth) & Cinematic Split-Card Login
 
 ### 2026-08-26 - working tree
 Enforced Strict Dashboard Route Protection & Dynamic Session Routing: Secured all clinical workspace console views (`radar`, `evidence`, `studio`, `communications`, `analytics`, `audit`) behind reactive `useConvexAuth()` authentication guards in `src/App.tsx`. Unauthenticated requests to any dashboard view or landing page CTAs seamlessly redirect to the split-card login page and auto-resume to the target workspace upon successful login. Integrated session state into `CinematicHero.tsx` for dynamic "Open Sentinel Console" / "Sign In" actions and profile avatars. Verified clean typecheck and test suite with `npm run verify` (20/20 tests PASS).
+
+### 2026-08-26 - working tree
+Implemented Dual-Tier Sentinel Onboarding Experience (Wizard & Real-Time Action Checklist): Built 3-step interactive setup wizard (`src/components/onboarding/OnboardingWizard.tsx`) guiding new users through role configuration (Provider / Advocate / Patient), jurisdiction & payer pre-indexing (CA DMHC, NY DFS, TX TDI, ERISA; UHC, Aetna, Cigna), and 1-click starter denial case ingestion ($24,500 Total Knee Arthroplasty / $18,200 Spine Laminectomy) with confetti celebration. Implemented floating reactive HUD readiness checklist (`src/components/onboarding/OnboardingChecklist.tsx`) tracking 4 key clinical milestones with live progress calculation, automatic task verification, and certified adjudicator badge unlocking. Integrated restarting options in global Command Palette (`⌘K`). Expanded test suite to 22 tests and verified 100% clean with `npm run verify`.
+
+### 2026-08-26 - working tree
+Enforced Strict Multi-Tenant User Isolation & Data Ownership: Added `userId` (`v.optional(v.id("users"))`) fields and relational secondary indexes (`by_user`, `by_user_status`) to `claims` and `patients` schema tables (`convex/schema.ts`). Scoped all reactive claim listing (`api.claims.list`) and portfolio metrics aggregation (`api.claims.getPortfolioStats`) to the authenticated caller via `getAuthUserId(ctx)` in `convex/claims.ts`. Automatically bound optical document parsing and intake mutations (`createWithPatient`) to active user sessions. Purged unassigned pre-authentication demo records, guaranteeing strict privacy and personalized case workspaces for every authenticated officer.
+
+
 
 

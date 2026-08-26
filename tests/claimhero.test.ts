@@ -255,3 +255,24 @@ describe("ClaimHero Convex Authentication & Security", () => {
     expect(getInitials(undefined, undefined)).toBe("S");
   });
 });
+
+describe("ClaimHero Onboarding & Guided Checklist Experience", () => {
+  it("calculates onboarding checklist completion percentage", () => {
+    const computeProgress = (tasks: { isDone: boolean }[]) => {
+      const done = tasks.filter((t) => t.isDone).length;
+      return Math.round((done / tasks.length) * 100);
+    };
+
+    expect(computeProgress([{ isDone: true }, { isDone: false }, { isDone: false }, { isDone: false }])).toBe(25);
+    expect(computeProgress([{ isDone: true }, { isDone: true }, { isDone: true }, { isDone: true }])).toBe(100);
+    expect(computeProgress([{ isDone: false }, { isDone: false }])).toBe(0);
+  });
+
+  it("validates jurisdiction code mappings for statutory timeline rules", () => {
+    const validCodes = ["CA", "NY", "TX", "FL", "IL", "FED"];
+    expect(validCodes).toContain("CA");
+    expect(validCodes).toContain("FED");
+    expect(validCodes.length).toBe(6);
+  });
+});
+

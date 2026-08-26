@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Shell } from "./components/layout/Shell";
 
 import { CaseRadar } from "./components/radar/CaseRadar";
@@ -16,6 +16,8 @@ import { useRouterView } from "./hooks/useRouterView";
 import { useConvexAuth } from "convex/react";
 import { CinematicHero } from "./components/landing/CinematicHero";
 import { AuthPage } from "./components/auth/AuthPage";
+import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
+import { OnboardingChecklist } from "./components/onboarding/OnboardingChecklist";
 import { Card } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { ArrowRight, Loader2, Shield } from "lucide-react";
@@ -25,6 +27,7 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [payerFilter, setPayerFilter] = useState<string>("all");
   const [isIngestionOpen, setIsIngestionOpen] = useState<boolean>(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -111,22 +114,22 @@ export default function App() {
 
   const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
 
-  // Watch for auth state transition: if user becomes authenticated (login / oauth completion), route straight to radar (/app)!
-  const prevAuthRef = useRef(isAuthenticated);
-  useEffect(() => {
-    if (!prevAuthRef.current && isAuthenticated) {
-      // User just logged in! Navigate straight to dashboard console
-      setCurrentView("radar");
-    }
-    prevAuthRef.current = isAuthenticated;
-  }, [isAuthenticated, setCurrentView]);
-
-  // Automatic redirect if on login page while already authenticated
+  // Automatic redirect only if user is actively on the login page while authenticated
   useEffect(() => {
     if (currentView === "login" && isAuthenticated) {
       setCurrentView("radar");
     }
   }, [currentView, isAuthenticated, setCurrentView]);
+
+  // Open Sentinel Setup Guide (Onboarding) for new users on initial login
+  useEffect(() => {
+    if (isAuthenticated && typeof window !== "undefined") {
+      const completed = localStorage.getItem("claimhero_onboarding_completed");
+      if (!completed) {
+        setIsOnboardingOpen(true);
+      }
+    }
+  }, [isAuthenticated]);
 
   if (currentView === "landing") {
     return (
@@ -352,6 +355,24 @@ export default function App() {
         onOpenIngestion={handleOpenIngestion}
         onToggleTheme={handleToggleTheme}
         isDark={isDark}
+        onOpenOnboarding={() => setIsOnboardingOpen(true)}
+      />
+
+      {/* Interactive 3-Step Sentinel Setup Wizard (Onboarding) */}
+      <OnboardingWizard
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        onParseText={parseDocumentText}
+        onOpenIngestionModal={handleOpenIngestion}
+        onSuccess={handleIngestionSuccess}
+      />
+
+      {/* Floating HUD Sentinel Readiness Checklist */}
+      <OnboardingChecklist
+        currentView={currentView}
+        onNavigate={setCurrentView}
+        claims={claims}
+        onOpenIngestion={handleOpenIngestion}
       />
     </Shell>
   );

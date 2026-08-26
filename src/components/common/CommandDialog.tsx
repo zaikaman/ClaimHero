@@ -31,6 +31,7 @@ interface CommandDialogProps {
   onOpenIngestion: () => void;
   onToggleTheme: () => void;
   isDark: boolean;
+  onOpenOnboarding?: () => void;
 }
 
 export const CommandDialog: React.FC<CommandDialogProps> = ({
@@ -42,6 +43,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   onOpenIngestion,
   onToggleTheme,
   isDark,
+  onOpenOnboarding,
 }) => {
   const [query, setQuery] = useState("");
   const [copiedEmail, setCopiedEmail] = useState(false);
@@ -261,6 +263,24 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                   <span>Toggle {isDark ? "Light" : "Dark"} Mode</span>
                 </div>
               </button>
+
+              {onOpenOnboarding && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenOnboarding();
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Shield className="size-3.5 text-primary" />
+                    <span>Restart Sentinel Setup Guide (Onboarding)</span>
+                  </div>
+                  <Badge variant="outline" size="sm" className="font-mono text-[9px]">
+                    Setup
+                  </Badge>
+                </button>
+              )}
             </div>
           </div>
         </div>
