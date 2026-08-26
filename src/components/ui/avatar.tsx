@@ -38,4 +38,17 @@ function AvatarFallback({
   );
 }
 
-export { Avatar, AvatarFallback };
+function AvatarImage({
+  className,
+  ...props
+}: React.ImgHTMLAttributes<HTMLImageElement>) {
+  return (
+    <img
+      data-slot="avatar-image"
+      className={cn("aspect-square size-full object-cover", className)}
+      {...props}
+    />
+  );
+}
+
+export { Avatar, AvatarFallback, AvatarImage };

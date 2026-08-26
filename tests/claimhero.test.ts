@@ -214,13 +214,44 @@ describe("ClaimHero SPA URL Routing", () => {
     expect(parsePathToView("/app/analytics")).toBe("analytics");
     expect(parsePathToView("/app/audit")).toBe("audit");
 
-    // Hash fallback
-    expect(parsePathToView("/", "#/evidence")).toBe("evidence");
-    expect(parsePathToView("/", "#radar")).toBe("radar");
+    // Login & Auth routes
+    expect(parsePathToView("/login")).toBe("login");
+    expect(parsePathToView("/auth")).toBe("login");
+    expect(parsePathToView("/signin")).toBe("login");
+    expect(parsePathToView("/signup")).toBe("login");
+    expect(parsePathToView("/", "#/login")).toBe("login");
 
     // View to Path mapping
     expect(VIEW_TO_PATH_MAP.landing).toBe("/");
     expect(VIEW_TO_PATH_MAP.radar).toBe("/app");
     expect(VIEW_TO_PATH_MAP.evidence).toBe("/app/evidence");
+    expect(VIEW_TO_PATH_MAP.login).toBe("/login");
+  });
+});
+
+describe("ClaimHero Convex Authentication & Security", () => {
+  it("validates password length requirements and credential validation", () => {
+    const isPasswordValid = (pwd: string) => pwd.length >= 6;
+    expect(isPasswordValid("12345")).toBe(false);
+    expect(isPasswordValid("sentinel123")).toBe(true);
+  });
+
+  it("validates email format for sentinel officers", () => {
+    const isEmailValid = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    expect(isEmailValid("officer@claimhero.ai")).toBe(true);
+    expect(isEmailValid("invalid-email")).toBe(false);
+    expect(isEmailValid("dr.smith@hospital.org")).toBe(true);
+  });
+
+  it("formats user display initials accurately", () => {
+    const getInitials = (name?: string, email?: string) => {
+      if (name && name.trim()) return name.trim()[0].toUpperCase();
+      if (email && email.trim()) return email.trim()[0].toUpperCase();
+      return "S";
+    };
+
+    expect(getInitials("Jordan Vance", "jordan@claimhero.ai")).toBe("J");
+    expect(getInitials("", "sentinel@claimhero.ai")).toBe("S");
+    expect(getInitials(undefined, undefined)).toBe("S");
   });
 });

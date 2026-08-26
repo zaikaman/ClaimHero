@@ -9,10 +9,10 @@
 - **Convex deployment:** dev:groovy-hippopotamus-924
 - **Components:** none
 - **Convex features:** database schema, relational indexes, queries, mutations, actions, file storage, crons, httpRouter
-- **Auth:** none
+- **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T12:05:00Z
+- **Last updated:** 2026-08-26T12:24:00Z
 
 ## Log
 
@@ -69,3 +69,11 @@ Integrated Dynamic SPA URL Routing for Homepage & Dashboard: Implemented reactiv
 
 ### 2026-08-26 - working tree
 Refined Homepage as Pure Cinematic Showcase: Streamlined Homepage interface (`src/components/landing/CinematicHero.tsx`) to act strictly as a product showcase without embedding functional workspace modals. Configured all landing CTAs ("Launch Sentinel", "Inspect Evidence Matrix", "Launch Console") to navigate directly to the respective console routes (`/app`), keeping the landing viewport pristine and dedicated to presentation. Verified cleanly with `npm run verify` (17/17 tests PASS).
+
+### 2026-08-26 - working tree
+Integrated Convex Authentication (@convex-dev/auth) & Cinematic Split-Card Login Interface: Configured Convex Auth backend (`convex/auth.ts`, `convex/auth.config.ts`, `convex/http.ts`, `convex/schema.ts: ...authTables`) supporting both 1-click Google OAuth (`@auth/core/providers/google`) and Email & Password authentication (`@convex-dev/auth/providers/Password`). Set deterministic RS256 JWT keypairs and `SITE_URL` on Convex Cloud deployment. Implemented viewer session query (`convex/users.ts`). Built responsive split-card login interface (`src/components/auth/AuthPage.tsx`) featuring ambient looping video hero background, serif typography, Google sign-in integration with fixed icon dimensions, password visibility toggle, remember-me persistence, and seamless SPA routing (`/login`, `/auth`). Connected authenticated user profile and sign-out controls to `Sidebar.tsx` and `Header.tsx`. Added unit tests (`tests/claimhero.test.ts`) and verified with `npm run verify` (20/20 tests PASS, 100% clean).
+
+### 2026-08-26 - working tree
+Enforced Strict Dashboard Route Protection & Dynamic Session Routing: Secured all clinical workspace console views (`radar`, `evidence`, `studio`, `communications`, `analytics`, `audit`) behind reactive `useConvexAuth()` authentication guards in `src/App.tsx`. Unauthenticated requests to any dashboard view or landing page CTAs seamlessly redirect to the split-card login page and auto-resume to the target workspace upon successful login. Integrated session state into `CinematicHero.tsx` for dynamic "Open Sentinel Console" / "Sign In" actions and profile avatars. Verified clean typecheck and test suite with `npm run verify` (20/20 tests PASS).
+
+

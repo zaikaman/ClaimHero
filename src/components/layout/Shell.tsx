@@ -47,6 +47,7 @@ export const Shell: React.FC<ShellProps> = ({
     <div className="flex h-screen w-full flex-col bg-background text-foreground antialiased overflow-hidden">
       {/* Top Header */}
       <Header
+        onSelectView={onSelectView}
         onOpenIngestion={onOpenIngestion}
         onToggleSidebar={onToggleSidebar}
         onOpenCommandPalette={onOpenCommandPalette}

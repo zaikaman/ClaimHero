@@ -32,6 +32,7 @@ specs/001-appeal-sentinel/plan.md
 - Use the impeccable skill when you're working with UI tasks, and make sure your UI work stays consistent with the rest of the app's design.
 - All relevant docs should be available in the docs folder, use the find-docs skill if you need anything else.
 - When you're done with your tasks, remember to run npm run verify to make sure everything is clean, and only run this when it's actually necessary, like large refactors, big code work, don't run it when you only updated docs for example.
+- Do not use the browser agent to verify the UI, the user will do that himself.
 
 <!-- convex-ai-start -->
 

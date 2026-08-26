@@ -20,6 +20,10 @@ export const PATH_TO_VIEW_MAP: Record<string, NavigationView> = {
   "/app/analytics": "analytics",
   "/audit": "audit",
   "/app/audit": "audit",
+  "/login": "login",
+  "/auth": "login",
+  "/signin": "login",
+  "/signup": "login",
 };
 
 export const VIEW_TO_PATH_MAP: Record<NavigationView, string> = {
@@ -30,10 +34,11 @@ export const VIEW_TO_PATH_MAP: Record<NavigationView, string> = {
   communications: "/app/inbox",
   analytics: "/app/analytics",
   audit: "/app/audit",
+  login: "/login",
 };
 
 export function parsePathToView(pathname: string, hash: string = ""): NavigationView {
-  // 1. Check Hash routing fallback (#/evidence, #evidence, #radar)
+  // 1. Check Hash routing fallback (#/evidence, #evidence, #radar, #login)
   if (hash) {
     const cleanHash = hash.replace(/^#\/?/, "/");
     if (PATH_TO_VIEW_MAP[cleanHash]) {
@@ -51,7 +56,12 @@ export function parsePathToView(pathname: string, hash: string = ""): Navigation
     return PATH_TO_VIEW_MAP[normalized];
   }
 
-  // 3. Fallback for subpaths under /app or /dashboard
+  // 3. Fallback for login / auth routes
+  if (normalized.startsWith("/login") || normalized.startsWith("/auth") || normalized.startsWith("/signin")) {
+    return "login";
+  }
+
+  // 4. Fallback for subpaths under /app or /dashboard
   if (normalized.startsWith("/app") || normalized.startsWith("/dashboard")) {
     return "radar";
   }

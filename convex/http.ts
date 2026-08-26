@@ -1,8 +1,12 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { api } from "./_generated/api";
+import { auth } from "./auth";
 
 const http = httpRouter();
+
+// Convex Auth endpoints (/api/auth/...)
+auth.addHttpRoutes(http);
 
 /**
  * Inbound AgentMail Webhook Endpoint:

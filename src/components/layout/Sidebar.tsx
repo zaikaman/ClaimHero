@@ -1,4 +1,7 @@
 import React from "react";
+import { useQuery } from "convex/react";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { api } from "../../../convex/_generated/api";
 import {
   Radar,
   FileSearch,
@@ -21,10 +24,12 @@ import {
   Check,
   BookOpen,
   RotateCcw,
+  LogOut,
+  LogIn,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { Avatar, AvatarFallback } from "../ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,7 +48,8 @@ export type NavigationView =
   | "studio"
   | "communications"
   | "audit"
-  | "analytics";
+  | "analytics"
+  | "login";
 
 interface SidebarProps {
   currentView: NavigationView;
@@ -73,6 +79,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isDark = true,
   onToggleTheme,
 }) => {
+  const viewer = useQuery((api as any).users?.viewer);
+  const { signOut } = useAuthActions();
+
+  const isAuthenticated = Boolean(viewer);
+  const userName = viewer?.name || viewer?.email?.split("@")[0] || (viewer === null ? "Guest Officer" : "Sentinel Officer");
+  const userEmail = viewer?.email || (viewer === null ? "Sign In to sync cases" : "sentinel@claimhero.ai");
+  const userInitial = (viewer?.name?.[0] || viewer?.email?.[0] || "S").toUpperCase();
+
   const [copiedEmail, setCopiedEmail] = React.useState(false);
 
   const handleCopyEmail = () => {
@@ -336,18 +350,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* User Info Row with Dropdown Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className={cn("w-full flex items-center justify-between p-1.5 rounded-lg hover:bg-muted/60 transition-colors text-left", isCollapsed && "justify-center p-1")}>
+            <button
+              className={cn(
+                "w-full flex items-center justify-between p-1.5 rounded-lg hover:bg-muted/60 transition-colors text-left cursor-pointer",
+                isCollapsed && "justify-center p-1"
+              )}
+            >
               <div className="flex items-center gap-2">
                 <Avatar size="sm" className="bg-primary text-primary-foreground font-semibold">
-                  <AvatarFallback>CH</AvatarFallback>
+                  {viewer?.image ? (
+                    <AvatarImage src={viewer.image} alt={userName} />
+                  ) : null}
+                  <AvatarFallback>{userInitial}</AvatarFallback>
                 </Avatar>
                 {!isCollapsed && (
                   <div className="text-left">
-                    <div className="font-semibold text-xs text-foreground leading-tight">
-                      Sentinel Officer
+                    <div className="font-semibold text-xs text-foreground leading-tight truncate max-w-[130px]">
+                      {userName}
                     </div>
-                    <div className="text-[10px] text-muted-foreground leading-tight truncate max-w-[110px]">
-                      sentinel@claimhero.ai
+                    <div className="text-[10px] text-muted-foreground leading-tight truncate max-w-[130px]">
+                      {userEmail}
                     </div>
                   </div>
                 )}
@@ -358,8 +380,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Sentinel Workspace</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuLabel className="flex flex-col gap-0.5">
+              <span className="font-semibold text-xs text-foreground">{userName}</span>
+              <span className="text-[10px] text-muted-foreground font-normal truncate">{userEmail}</span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {isAuthenticated ? (
+              <DropdownMenuItem onClick={() => signOut()} className="gap-2 text-destructive focus:text-destructive">
+                <LogOut className="size-3.5" />
+                <span>Sign Out of Sentinel</span>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => onSelectView("login")} className="gap-2 font-medium text-primary">
+                <LogIn className="size-3.5" />
+                <span>Sign In / Create Account</span>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onOpenIngestion?.()} className="gap-2">
               <UploadCloud className="size-3.5" />

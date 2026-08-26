@@ -1,4 +1,6 @@
 import React from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import {
   PanelLeft,
   Search,
@@ -7,13 +9,16 @@ import {
   Sun,
   Github,
   Activity,
+  LogIn,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
-import { Avatar, AvatarFallback } from "../ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { formatCurrency } from "../../lib/utils";
+import { NavigationView } from "./Sidebar";
 
 interface HeaderProps {
+  onSelectView?: (view: NavigationView) => void;
   onOpenIngestion: () => void;
   onToggleSidebar?: () => void;
   onOpenCommandPalette?: () => void;
@@ -26,6 +31,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
+  onSelectView,
   onOpenIngestion,
   onToggleSidebar,
   onOpenCommandPalette,
@@ -36,6 +42,9 @@ export const Header: React.FC<HeaderProps> = ({
   winRate = 0,
   criticalDeadlinesCount = 0,
 }) => {
+  const viewer = useQuery((api as any).users?.viewer);
+  const userName = viewer?.name || viewer?.email?.split("@")[0] || "Officer";
+  const userInitial = (viewer?.name?.[0] || viewer?.email?.[0] || "S").toUpperCase();
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-md">
       <div className="flex h-12 items-center justify-between px-4 lg:px-6">
@@ -128,12 +137,34 @@ export const Header: React.FC<HeaderProps> = ({
               <Github className="size-4" />
             </a>
 
-            {/* Profile Avatar */}
-            <Avatar size="sm" className="size-7 ml-1">
-              <AvatarFallback className="bg-muted text-foreground text-xs font-semibold">
-                CH
-              </AvatarFallback>
-            </Avatar>
+            {/* Profile Avatar / Sign In Link */}
+            {viewer ? (
+              <button
+                onClick={() => onSelectView?.("radar")}
+                className="focus:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-full"
+                title={`Signed in as ${userName} (${viewer.email || ""})`}
+              >
+                <Avatar size="sm" className="size-7 ml-1 border border-border">
+                  {viewer.image ? (
+                    <AvatarImage src={viewer.image} alt={userName} />
+                  ) : null}
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                    {userInitial}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onSelectView?.("login")}
+                className="h-7 px-2.5 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                title="Sign In / Create Account"
+              >
+                <LogIn className="size-3.5" />
+                <span className="hidden sm:inline">Sign In</span>
+              </Button>
+            )}
           </div>
         </div>
       </div>

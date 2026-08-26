@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Shell } from "./components/layout/Shell";
 
 import { CaseRadar } from "./components/radar/CaseRadar";
@@ -13,10 +13,12 @@ import { useClaims } from "./hooks/useClaims";
 import { useEvidence } from "./hooks/useEvidence";
 import { useCommunications } from "./hooks/useCommunications";
 import { useRouterView } from "./hooks/useRouterView";
+import { useConvexAuth } from "convex/react";
 import { CinematicHero } from "./components/landing/CinematicHero";
+import { AuthPage } from "./components/auth/AuthPage";
 import { Card } from "./components/ui/card";
 import { Button } from "./components/ui/button";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Shield } from "lucide-react";
 
 export default function App() {
   const { currentView, setCurrentView } = useRouterView();
@@ -107,10 +109,71 @@ export default function App() {
     setCurrentView("radar");
   };
 
+  const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
+
+  // Watch for auth state transition: if user becomes authenticated (login / oauth completion), route straight to radar (/app)!
+  const prevAuthRef = useRef(isAuthenticated);
+  useEffect(() => {
+    if (!prevAuthRef.current && isAuthenticated) {
+      // User just logged in! Navigate straight to dashboard console
+      setCurrentView("radar");
+    }
+    prevAuthRef.current = isAuthenticated;
+  }, [isAuthenticated, setCurrentView]);
+
+  // Automatic redirect if on login page while already authenticated
+  useEffect(() => {
+    if (currentView === "login" && isAuthenticated) {
+      setCurrentView("radar");
+    }
+  }, [currentView, isAuthenticated, setCurrentView]);
+
   if (currentView === "landing") {
     return (
       <CinematicHero
-        onEnterConsole={(view) => setCurrentView(view || "radar")}
+        onEnterConsole={(view) => {
+          if (!isAuthenticated) {
+            setCurrentView("login");
+          } else {
+            setCurrentView(view || "radar");
+          }
+        }}
+      />
+    );
+  }
+
+  if (currentView === "login") {
+    return (
+      <AuthPage
+        onNavigate={setCurrentView}
+        onSuccess={() => setCurrentView("radar")}
+      />
+    );
+  }
+
+  // Protected Routes Guard (radar, evidence, studio, communications, analytics, audit)
+  if (isAuthLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-black text-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="size-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shadow-lg animate-pulse">
+            <Shield className="size-6 text-white" />
+          </div>
+          <div className="flex flex-col items-center gap-1.5">
+            <span className="text-sm font-semibold text-white tracking-tight">ClaimHero Sentinel</span>
+            <span className="text-xs font-mono text-gray-400">Verifying session credentials...</span>
+          </div>
+          <Loader2 className="size-4 animate-spin text-white/60 mt-1" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <AuthPage
+        onNavigate={setCurrentView}
+        onSuccess={() => setCurrentView(currentView || "radar")}
       />
     );
   }

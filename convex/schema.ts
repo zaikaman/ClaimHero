@@ -1,7 +1,10 @@
 import { defineSchema, defineTable } from "convex/server";
+import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  ...authTables,
+
   // Patients / Insured Policyholders
   patients: defineTable({
     name: v.string(),

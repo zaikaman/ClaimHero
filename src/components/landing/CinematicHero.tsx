@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useConvexAuth, useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import {
   Shield,
   Star,
@@ -72,6 +74,11 @@ const HERO_SLIDES: HeroSlide[] = [
 export const CinematicHero: React.FC<CinematicHeroProps> = ({
   onEnterConsole,
 }) => {
+  const { isAuthenticated } = useConvexAuth();
+  const viewer = useQuery((api as any).users?.viewer);
+  const userName = viewer?.name || viewer?.email?.split("@")[0] || "Officer";
+  const userInitial = (viewer?.name?.[0] || viewer?.email?.[0] || "S").toUpperCase();
+
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -177,25 +184,55 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
 
         {/* Right: Console Launch Actions */}
         <div className="flex items-center gap-3">
-          {/* Enter Console Pill Button (visible on sm and up) */}
-          <button
-            onClick={() => onEnterConsole("radar")}
-            className="hidden sm:flex animate-blur-fade-up liquid-glass items-center gap-2 rounded-full px-4 md:px-6 py-2 text-sm text-white/90 hover:text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95"
-            style={{ animationDelay: "350ms" }}
-          >
-            <span>Launch Console</span>
-            <Compass className="size-[18px] text-white/80" />
-          </button>
+          {isAuthenticated ? (
+            <>
+              {/* Open Console Pill Button */}
+              <button
+                onClick={() => onEnterConsole("radar")}
+                className="hidden sm:flex animate-blur-fade-up liquid-glass items-center gap-2 rounded-full px-4 md:px-5 py-2 text-sm text-white/90 hover:text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95"
+                style={{ animationDelay: "350ms" }}
+              >
+                <span>Sentinel Console</span>
+                <Compass className="size-[18px] text-white/80" />
+              </button>
 
-          {/* User/Officer Profile Button (visible on sm and up) */}
-          <button
-            onClick={() => onEnterConsole("radar")}
-            className="hidden sm:flex animate-blur-fade-up liquid-glass w-10 h-10 rounded-full items-center justify-center text-white/90 hover:text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95"
-            style={{ animationDelay: "400ms" }}
-            title="Launch Sentinel Console"
-          >
-            <User className="size-[18px]" />
-          </button>
+              {/* User Profile Avatar */}
+              <button
+                onClick={() => onEnterConsole("radar")}
+                className="hidden sm:flex animate-blur-fade-up size-10 rounded-full border border-white/20 items-center justify-center text-white/90 hover:text-white transition-all cursor-pointer overflow-hidden active:scale-95 bg-white/10"
+                style={{ animationDelay: "400ms" }}
+                title={`Signed in as ${userName}`}
+              >
+                {viewer?.image ? (
+                  <img src={viewer.image} alt={userName} className="size-full object-cover" />
+                ) : (
+                  <span className="text-xs font-semibold">{userInitial}</span>
+                )}
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Sign In Pill Button */}
+              <button
+                onClick={() => onEnterConsole("login")}
+                className="hidden sm:flex animate-blur-fade-up liquid-glass items-center gap-1.5 rounded-full px-4 py-2 text-sm text-white/90 hover:text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95"
+                style={{ animationDelay: "320ms" }}
+              >
+                <User className="size-4 text-white/80" />
+                <span>Sign In</span>
+              </button>
+
+              {/* Enter Console Pill Button */}
+              <button
+                onClick={() => onEnterConsole("login")}
+                className="hidden sm:flex animate-blur-fade-up bg-white text-black hover:bg-gray-200 transition-all rounded-full font-medium px-4 md:px-5 py-2 text-sm flex items-center gap-2 shadow-lg active:scale-95 cursor-pointer"
+                style={{ animationDelay: "350ms" }}
+              >
+                <span>Launch Sentinel</span>
+                <Compass className="size-4" />
+              </button>
+            </>
+          )}
 
           {/* Hamburger Menu Button (visible only below lg) */}
           <button
@@ -250,17 +287,27 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
             </button>
           ))}
 
-          {/* Below sm Launch Console button in dropdown */}
-          <div className="sm:hidden pt-3 mt-2 border-t border-gray-800 flex items-center gap-2">
+          {/* Below sm Launch Console & Sign In button in dropdown */}
+          <div className="sm:hidden pt-3 mt-2 border-t border-gray-800 flex flex-col gap-2">
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
                 onEnterConsole("radar");
               }}
-              className="flex-1 liquid-glass rounded-full py-2.5 px-4 text-xs font-medium flex items-center justify-center gap-2 text-white hover:bg-white/5"
+              className="w-full liquid-glass rounded-full py-2.5 px-4 text-xs font-medium flex items-center justify-center gap-2 text-white hover:bg-white/5"
             >
               <Compass className="size-4" />
               <span>Launch Sentinel Console</span>
+            </button>
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                onEnterConsole("login");
+              }}
+              className="w-full bg-white text-black rounded-full py-2.5 px-4 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-gray-200"
+            >
+              <User className="size-4 text-black" />
+              <span>Sign In / Create Account</span>
             </button>
           </div>
         </div>
