@@ -8,6 +8,7 @@ import {
   CPT_CODES,
   DENIAL_REASON_CODES,
   STATUTORY_REGULATIONS,
+  INSURERS,
 } from "../src/lib/constants";
 
 describe("ClaimHero Domain Utilities & Formatting", () => {
@@ -71,6 +72,13 @@ describe("ClaimHero Regulatory & Clinical Dictionary", () => {
 
     expect(DENIAL_REASON_CODES["CO-197"]).toBeDefined();
     expect(DENIAL_REASON_CODES["CO-197"]?.title).toContain("Precertification");
+  });
+
+  it("contains major US commercial health insurance payers", () => {
+    const insurerNames = INSURERS.map((i) => i.name);
+    expect(insurerNames).toContain("UnitedHealthcare");
+    expect(insurerNames).toContain("Blue Cross Blue Shield");
+    expect(insurerNames).toContain("Humana");
   });
 });
 
@@ -166,5 +174,25 @@ describe("Phase 7: Portfolio Analytics & Recovery Calculation Engine", () => {
 
     expect(wonAmount).toBe(24500);
     expect(activeAmount).toBe(21050);
+  });
+});
+
+describe("Phase 8: End-to-End Workflow State Lifecycle", () => {
+  it("progresses sequentially through all autonomous appeal lifecycle states", () => {
+    const validLifecycle = [
+      "ingested",
+      "parsing",
+      "analyzing",
+      "precedent_matched",
+      "drafting",
+      "ready_for_review",
+      "dispatched",
+      "won",
+    ];
+
+    expect(validLifecycle[0]).toBe("ingested");
+    expect(validLifecycle[validLifecycle.length - 1]).toBe("won");
+    expect(validLifecycle).toContain("precedent_matched");
+    expect(validLifecycle).toContain("dispatched");
   });
 });

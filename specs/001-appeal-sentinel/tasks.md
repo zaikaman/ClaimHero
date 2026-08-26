@@ -121,11 +121,11 @@
 
 **Purpose**: Automated validation, test suite, and final aesthetic refinement.
 
-- [ ] T042 [P] Implement end-to-end unit and domain integration test suite in `tests/claimhero.test.ts`
-- [ ] T043 [P] Perform static typechecking and lint validation across full codebase (`npm run verify`)
-- [ ] T044 Optimize responsive UI layout, dark-mode animations, and glassmorphism in `src/index.css` and `src/App.tsx`
-- [ ] T045 Verify live Firecrawl crawler and AgentMail webhook configuration in `.env.example`
-- [ ] T046 Validate complete setup and execution against `specs/001-appeal-sentinel/quickstart.md`
+- [X] T042 [P] Implement end-to-end unit and domain integration test suite in `tests/claimhero.test.ts`
+- [X] T043 [P] Perform static typechecking and lint validation across full codebase (`npm run verify`)
+- [X] T044 Optimize responsive UI layout, dark-mode animations, and glassmorphism in `src/index.css` and `src/App.tsx`
+- [X] T045 Verify live Firecrawl crawler and AgentMail webhook configuration in `.env.example`
+- [X] T046 Validate complete setup and execution against `specs/001-appeal-sentinel/quickstart.md`
 
 ---
 

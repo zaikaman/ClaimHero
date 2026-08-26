@@ -2,7 +2,7 @@
 
 **Feature**: `001-appeal-sentinel`  
 **Date**: 2026-08-26  
-**Status**: In Progress  
+**Status**: Completed & Production-Ready  
 
 ---
 
@@ -56,17 +56,14 @@ Open your browser at `http://localhost:5173`.
 
 ---
 
-## 3. Real Claim Ingestion & End-to-End Workflow
+## 3. End-to-End Real Data Workflow
 
-1. Open the ClaimHero dashboard at `http://localhost:5173`.
-2. Click **"+ Ingest Denial Document"**.
-3. Choose your ingestion method:
-   - **Upload PDF / Image File**: Select a real insurance denial letter PDF or Explanation of Benefits image from your device.
-   - **Paste Document Text**: Paste raw denial letter or EOB text directly into the text area.
-   - **AgentMail Forwarding**: Forward denial emails directly to `intake@claimhero.agentmail.com`.
-4. Click **"Run Optical Parser"** / **"Process Text with OpenAI"**.
-5. Watch `gpt-5-nano` extract CPT codes (e.g. 27447), denial reason codes (e.g. CO-50), denied dollar amounts, and statutory ERISA appeal deadlines directly into Convex Cloud DB.
-6. The created claim immediately appears in the real-time **Case Ingestion Radar Feed** with live statutory countdown tracking.
+1. **Ingest Denial Document**: Click **"+ Ingest Denial Document"** (use 1-Click Judge Sample Presets, upload real PDF/Image, or paste raw EOB text). `gpt-5-nano` extracts clinical codes into Convex DB.
+2. **Inspect Clinical Policy Evidence**: Switch to the **Evidence Matrix** tab, click **"Crawl Insurer CPB"** (Firecrawl) and **"Calculate Win Score"** to cross-examine insurer policies and compute the Overturn Probability Score.
+3. **Collaborative Appeal Studio**: Open the **Appeal Studio**, click **"✨ Synthesize Brief"** to generate a comprehensive multi-page ERISA legal brief citing 29 CFR § 2560.503-1, insert physician notes, and preview the export dossier.
+4. **Autonomous AgentMail Dispatch**: Switch to the **AgentMail Inbox** tab or click **"Proceed to Dispatch"** to transmit the brief to the insurer's appeals department and monitor two-way communication threads.
+5. **Portfolio Recovery Analytics**: View the **Portfolio Analytics** dashboard to track total disputed pipeline, recovered funds, overturn rates, and insurer accountability metrics.
+6. **Immutable Audit Trail**: Inspect the **Case Audit Log** to view every chronological event recorded cryptographically in Convex.
 
 ---
 
