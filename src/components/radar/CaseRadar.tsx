@@ -186,7 +186,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
       {/* 1. Top 4 Macro Financial & Risk Metrics */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Disputed Portfolio */}
-        <Card className="shadow-xs bg-card">
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle>
               <div className="flex size-7 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
@@ -211,7 +211,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
         </Card>
 
         {/* Card 2: High Win-Probability */}
-        <Card className="shadow-xs bg-card">
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle>
               <div className="flex size-7 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -236,7 +236,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
         </Card>
 
         {/* Card 3: Recovered Funds */}
-        <Card className="shadow-xs bg-card">
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle>
               <div className="flex size-7 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
@@ -261,7 +261,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
         </Card>
 
         {/* Card 4: Urgent Alarms */}
-        <Card className="shadow-xs bg-card">
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle>
               <div className="flex size-7 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
@@ -295,7 +295,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
       </div>
 
       {/* 2. Main Claims Table & Integrated Radar Control Hub */}
-      <Card className="bg-card shadow-xs">
+      <Card>
         <CardHeader className="pb-3 space-y-3 border-b border-border/60">
           {/* Header Action Row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">

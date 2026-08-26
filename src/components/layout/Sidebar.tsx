@@ -13,8 +13,6 @@ import {
   PlusCircle,
   DotsThreeVertical,
   CloudArrowUp,
-  Moon,
-  Sun,
   Copy,
   Check,
   BookOpen,
@@ -57,8 +55,6 @@ interface SidebarProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onOpenIngestion?: () => void;
-  isDark?: boolean;
-  onToggleTheme?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -69,8 +65,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectClaim,
   isCollapsed = false,
   onOpenIngestion,
-  isDark = true,
-  onToggleTheme,
 }) => {
   const viewer = useQuery((api as any).users?.viewer);
   const { signOut } = useAuthActions();
@@ -145,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={cn(
-        "shrink-0 border-r border-border bg-sidebar text-sidebar-foreground flex flex-col justify-between p-3 font-sans select-none overflow-y-auto transition-all duration-200",
+        "shrink-0 border-r border-border/50 bg-sidebar/65 backdrop-blur-xl text-sidebar-foreground flex flex-col justify-between p-3 font-sans select-none overflow-y-auto transition-all duration-200",
         isCollapsed ? "w-16 items-center px-2" : "w-64"
       )}
     >
@@ -272,7 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
-                      className="w-full flex items-center justify-between p-2 rounded-lg border border-border/80 bg-muted/40 hover:bg-muted/70 transition-colors text-left group cursor-pointer shadow-2xs"
+                      className="w-full flex items-center justify-between p-2 rounded-lg border border-border/70 bg-card/60 backdrop-blur-md hover:bg-card/90 transition-colors text-left group cursor-pointer shadow-2xs"
                       title="Click to switch active claim"
                     >
                       <div className="flex items-center gap-2 min-w-0">
@@ -337,7 +331,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ) : (
                 <button
                   onClick={() => onSelectView("radar")}
-                  className="w-full flex items-center justify-between p-2 rounded-lg border border-dashed border-border bg-muted/20 hover:bg-muted/40 transition-colors text-left text-xs text-muted-foreground cursor-pointer"
+                  className="w-full flex items-center justify-between p-2 rounded-lg border border-dashed border-border/70 bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-colors text-left text-xs text-muted-foreground cursor-pointer"
                 >
                   <div className="flex items-center gap-1.5">
                     <User className="size-3.5" />
@@ -363,7 +357,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     "w-full flex items-center rounded-lg text-xs font-medium transition-colors text-left group cursor-pointer",
                     isCollapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-1.5",
                     isActive
-                      ? "bg-secondary text-foreground font-semibold shadow-xs"
+                      ? "bg-secondary/90 text-foreground font-semibold shadow-xs backdrop-blur-sm"
                       : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                   )}
                 >
@@ -386,9 +380,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Footer Support Card & User Profile Dropdown */}
-      <div className="space-y-3 pt-3 border-t border-border w-full">
+      <div className="space-y-3 pt-3 border-t border-border/60 w-full">
         {!isCollapsed && (
-          <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-1.5 text-xs">
+          <div className="rounded-xl border border-border/60 bg-card/60 backdrop-blur-md p-3 space-y-1.5 text-xs shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-foreground text-xs">
                 ERISA Sentinel
@@ -466,10 +460,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <DropdownMenuItem onClick={handleCopyEmail} className="gap-2 cursor-pointer">
               {copiedEmail ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
               <span>{copiedEmail ? "Address Copied!" : "Copy Inbound Mail Webhook"}</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onToggleTheme?.()} className="gap-2 cursor-pointer">
-              {isDark ? <Sun className="size-3.5 text-amber-500" /> : <Moon className="size-3.5" />}
-              <span>Toggle {isDark ? "Light" : "Dark"} Mode</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

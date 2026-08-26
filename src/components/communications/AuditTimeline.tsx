@@ -77,7 +77,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
   return (
     <div className="space-y-4 animate-fadeIn">
       {/* Header Banner */}
-      <Card className="p-4 bg-card border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
             <Clock className="size-5" />
@@ -113,7 +113,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
       </Card>
 
       {/* Timeline Stream */}
-      <Card className="p-6 bg-card border-border">
+      <Card className="p-6">
         {isLoading ? (
           <div className="p-8 text-center text-xs font-mono text-muted-foreground animate-pulse">
             Loading audit logs from Convex...

@@ -9,8 +9,6 @@ import {
   Clock,
   Shield,
   CloudArrowUp,
-  Moon,
-  Sun,
   Copy,
   Check,
   User,
@@ -28,8 +26,6 @@ interface CommandDialogProps {
   onSelectClaim: (claimId: string) => void;
   onNavigateView: (view: NavigationView) => void;
   onOpenIngestion: () => void;
-  onToggleTheme: () => void;
-  isDark: boolean;
   onOpenOnboarding?: () => void;
 }
 
@@ -40,8 +36,6 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   onSelectClaim,
   onNavigateView,
   onOpenIngestion,
-  onToggleTheme,
-  isDark,
   onOpenOnboarding,
 }) => {
   const [query, setQuery] = useState("");
@@ -274,22 +268,6 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                 ) : (
                   <Copy className="size-3 text-muted-foreground" />
                 )}
-              </button>
-
-              <button
-                onClick={() => {
-                  onToggleTheme();
-                }}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  {isDark ? (
-                    <Sun className="size-3.5 text-amber-500" />
-                  ) : (
-                    <Moon className="size-3.5 text-primary" />
-                  )}
-                  <span>Toggle {isDark ? "Light" : "Dark"} Mode</span>
-                </div>
               </button>
 
               {onOpenOnboarding && (

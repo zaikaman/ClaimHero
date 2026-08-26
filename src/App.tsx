@@ -27,12 +27,6 @@ export default function App() {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    if (typeof document !== "undefined") {
-      return document.documentElement.classList.contains("dark");
-    }
-    return true;
-  });
 
   const {
     claims,
@@ -63,17 +57,6 @@ export default function App() {
     sendMessage,
     dispatchAppeal,
   } = useCommunications(selectedClaim);
-
-  const handleToggleTheme = useCallback(() => {
-    const root = document.documentElement;
-    if (root.classList.contains("dark")) {
-      root.classList.remove("dark");
-      setIsDark(false);
-    } else {
-      root.classList.add("dark");
-      setIsDark(true);
-    }
-  }, []);
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarCollapsed((prev) => !prev);
@@ -185,8 +168,6 @@ export default function App() {
       isSidebarCollapsed={isSidebarCollapsed}
       onToggleSidebar={handleToggleSidebar}
       onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-      isDark={isDark}
-      onToggleTheme={handleToggleTheme}
       totalDisputedAmount={stats.activeDisputedAmount + stats.overturnedWonAmount}
       totalWonAmount={stats.overturnedWonAmount}
       winRate={stats.averageWinScore}
@@ -313,8 +294,6 @@ export default function App() {
         onSelectClaim={setSelectedClaimId}
         onNavigateView={setCurrentView}
         onOpenIngestion={handleOpenIngestion}
-        onToggleTheme={handleToggleTheme}
-        isDark={isDark}
         onOpenOnboarding={() => setIsOnboardingOpen(true)}
       />
 

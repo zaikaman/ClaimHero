@@ -80,7 +80,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   return (
     <div className="space-y-4 animate-fadeIn">
       {/* Inbox Header Card */}
-      <Card className="p-4 bg-card border-border">
+      <Card className="p-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
@@ -184,7 +184,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         </div>
 
         {/* Right Column: Live Message Feed & Reply Composer (8 Cols) */}
-        <Card className="lg:col-span-8 flex flex-col p-0 overflow-hidden bg-card border-border">
+        <Card className="lg:col-span-8 flex flex-col p-0 overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-4 py-2.5 bg-muted/30 shrink-0">
             <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
               <Tray className="size-4 text-muted-foreground" />

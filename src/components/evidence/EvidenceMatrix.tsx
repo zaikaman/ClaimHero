@@ -84,7 +84,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   return (
     <div className="space-y-4 animate-fadeIn">
       {/* Header & Main Control Toolbar */}
-      <Card className="p-4 bg-card border-border">
+      <Card className="p-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">

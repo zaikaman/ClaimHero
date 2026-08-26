@@ -57,7 +57,7 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
   return (
     <div className="space-y-6 max-w-5xl mx-auto py-6 animate-fadeIn font-sans">
       {/* Header Banner */}
-      <Card className="p-6 bg-card border-border shadow-xs text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-4">
+      <Card className="p-6 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm shrink-0">
             <IconComponent className="size-6" />

@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T13:20:00Z
+- **Last updated:** 2026-08-26T14:48:00Z
 
 ## Log
 
@@ -90,3 +90,9 @@ Optimized Case Ingestion Radar Table Layout & Eliminated Horizontal Overflow: Re
 
 ### 2026-08-26 - working tree
 Restructured Dashboard Sidebar & Workspace Navigation Architecture: Re-architected sidebar navigation (`src/components/layout/Sidebar.tsx`, `Shell.tsx`, `App.tsx`, `CommandDialog.tsx`) into a clean, focused hierarchy separating global platform views (`Case Radar`, `Portfolio Analytics`, `Audit Timeline`) from contextual case workflows (`Evidence Matrix`, `Appeal Studio`, `AgentMail Inbox`). Added an interactive Active Case context card in the sidebar with an inline dropdown switcher to switch active claims directly from any view. Moved all lifecycle status tabs and target payer filters directly into the `CaseRadar` page toolbar (`src/components/radar/CaseRadar.tsx`) with real-time counts, search, and reset triggers. Created an interactive in-view Case Picker empty state (`src/components/common/CasePickerEmptyState.tsx`) eliminating duplicate placeholder cards when navigating without an active claim. Verified with `npm run build` and `npx tsc --noEmit` (100% PASS).
+
+### 2026-08-26 - working tree
+Elevated Dashboard Aesthetic with Ambient Silk WebGL Shader Canvas & Glass Cards: Replaced monochromatic flat black styling with a dynamic ambient WebGL Silk shader background (`src/components/ui/Silk.tsx`, `Shell.tsx`) featuring undulating fluid waves (`#59677b` slate, speed: 4.4, scale: 0.9, noise: 1.0) and high-contrast radial vignette overlays. Overhauled UI theme tokens in `tailwind.config.js` and `src/index.css` to support opacity alpha values across all semantic variables, adopting deep slate-zinc dark neutrals. Re-engineered `Card` (`src/components/ui/card.tsx`), `Tabs` (`tabs.tsx`), `Table` (`table.tsx`), `Header` (`Header.tsx`), and `Sidebar` (`Sidebar.tsx`) into glassmorphic cards (`backdrop-blur-md`, `bg-card/75`, translucent borders, subtle specular top highlights). Verified clean typecheck, linting, and 22/22 unit tests with `npm run verify`.
+
+### 2026-08-26 - working tree
+Enforced Strict Precision Medical Dark Mode & Purged Light Mode Toggles: Consolidated `:root` CSS custom properties directly to the deep slate-zinc dark palette in `src/index.css`, permanently locking the application into high-contrast clinical dark mode. Purged legacy theme toggling logic, state hooks, and UI controls across `src/App.tsx`, `Header.tsx`, `Sidebar.tsx`, `Shell.tsx`, and `CommandDialog.tsx`. Verified 100% clean typecheck and test suite (22/22 PASS).

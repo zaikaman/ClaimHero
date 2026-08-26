@@ -71,7 +71,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
   return (
     <div className="space-y-4 animate-fadeIn font-sans">
       {/* Analytics Header */}
-      <Card className="p-4 bg-card border-border">
+      <Card className="p-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
@@ -109,7 +109,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
       {/* Top 4 KPI Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Total Disputed Pipeline */}
-        <Card className="p-4 space-y-2 bg-card">
+        <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-[11px] font-medium uppercase tracking-wider">Total Disputed</span>
             <CurrencyDollar className="size-4" />
@@ -126,7 +126,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         </Card>
 
         {/* Recovered & Won Funds */}
-        <Card className="p-4 space-y-2 bg-card">
+        <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
             <span className="text-[11px] font-medium uppercase tracking-wider">Recovered Funds</span>
             <CheckCircle className="size-4" />
@@ -143,7 +143,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         </Card>
 
         {/* Average Overturn Probability */}
-        <Card className="p-4 space-y-2 bg-card">
+        <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between text-foreground">
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               Avg Win Probability
@@ -159,7 +159,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         </Card>
 
         {/* Critical ERISA Alarms */}
-        <Card className="p-4 space-y-2 bg-card">
+        <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-[11px] font-medium uppercase tracking-wider">
               Urgent Alarms
@@ -188,7 +188,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
       {/* Two-Column Middle Section: Insurer Performance Table & Risk Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Insurer Performance Breakdown Table (8 Cols) */}
-        <Card className="lg:col-span-8 p-4 space-y-3 bg-card">
+        <Card className="lg:col-span-8 p-4 space-y-3">
           <div className="flex items-center justify-between border-b border-border pb-2.5">
             <div className="flex items-center gap-2">
               <Buildings className="size-4 text-muted-foreground" />
@@ -242,7 +242,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         </Card>
 
         {/* Risk & Precedent Confidence Breakdown (4 Cols) */}
-        <Card className="lg:col-span-4 p-4 space-y-4 bg-card">
+        <Card className="lg:col-span-4 p-4 space-y-4">
           <div className="flex items-center justify-between border-b border-border pb-2.5">
             <div className="flex items-center gap-2">
               <Pulse className="size-4 text-muted-foreground" />

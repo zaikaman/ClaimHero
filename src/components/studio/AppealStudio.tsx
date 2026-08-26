@@ -65,7 +65,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   return (
     <div className="space-y-3 animate-fadeIn h-[calc(100vh-6.5rem)] flex flex-col">
       {/* Studio Header Toolbar */}
-      <Card className="p-3.5 bg-card border-border shrink-0">
+      <Card className="p-3.5 shrink-0">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
@@ -191,7 +191,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       {/* Main Studio Dual Pane Editor & Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 overflow-hidden">
         {/* Left 8 Cols: Markdown Editor & Live Preview */}
-        <Card className="lg:col-span-8 flex flex-col overflow-hidden p-0 bg-card border-border">
+        <Card className="lg:col-span-8 flex flex-col overflow-hidden p-0">
           {/* Sub-view Viewport Switcher */}
           <div className="flex items-center justify-between border-b border-border px-3 py-1.5 bg-muted/30 shrink-0">
             <div className="flex items-center gap-1">
@@ -272,7 +272,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         </Card>
 
         {/* Right 4 Cols: Citation Sidebar */}
-        <Card className="lg:col-span-4 p-4 overflow-y-auto bg-card border-border">
+        <Card className="lg:col-span-4 p-4 overflow-y-auto">
           <CitationSidebar
             evidences={evidences}
             onInsertSnippet={insertTextAtCursor}

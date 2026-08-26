@@ -5,8 +5,6 @@ import {
   Sidebar,
   MagnifyingGlass,
   CloudArrowUp,
-  Moon,
-  Sun,
   GithubLogo,
   Pulse,
   SignIn,
@@ -22,8 +20,6 @@ interface HeaderProps {
   onOpenIngestion: () => void;
   onToggleSidebar?: () => void;
   onOpenCommandPalette?: () => void;
-  isDark?: boolean;
-  onToggleTheme?: () => void;
   totalDisputedAmount: number;
   totalWonAmount: number;
   winRate: number;
@@ -35,8 +31,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenIngestion,
   onToggleSidebar,
   onOpenCommandPalette,
-  isDark = true,
-  onToggleTheme,
   totalDisputedAmount = 0,
   totalWonAmount = 0,
   winRate = 0,
@@ -46,7 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
   const userName = viewer?.name || viewer?.email?.split("@")[0] || "Officer";
   const userInitial = (viewer?.name?.[0] || viewer?.email?.[0] || "S").toUpperCase();
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/60 backdrop-blur-xl">
       <div className="flex h-12 items-center justify-between px-4 lg:px-6">
         {/* Left: Sidebar trigger, separator & search input */}
         <div className="flex items-center gap-2">
@@ -59,15 +53,15 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Sidebar className="size-4" />
           </Button>
-          <Separator orientation="vertical" className="h-4 mx-1" />
+          <Separator orientation="vertical" className="h-4 mx-1 border-border/50" />
           <button
             onClick={onOpenCommandPalette}
-            className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors w-48 sm:w-64"
+            className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 backdrop-blur-sm px-3 py-1 text-xs text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors w-48 sm:w-64"
             title="Quick search across claims and actions (⌘K / Ctrl+K)"
           >
             <MagnifyingGlass className="size-3.5" />
             <span className="flex-1 text-left">Search claims, CPT, payers...</span>
-            <kbd className="pointer-events-none hidden sm:inline-flex h-4 items-center gap-0.5 rounded border border-border bg-muted px-1.5 font-mono text-[9px] font-medium text-muted-foreground">
+            <kbd className="pointer-events-none hidden sm:inline-flex h-4 items-center gap-0.5 rounded border border-border/60 bg-muted/60 px-1.5 font-mono text-[9px] font-medium text-muted-foreground">
               ⌘K
             </kbd>
           </button>
@@ -113,17 +107,6 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <CloudArrowUp className="size-3.5" />
               <span className="hidden sm:inline">Ingest Denial</span>
-            </Button>
-
-            {/* Theme Toggle */}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onToggleTheme}
-              className="text-muted-foreground"
-              title="Toggle dark / light theme"
-            >
-              {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </Button>
 
             {/* GitHub Repo */}

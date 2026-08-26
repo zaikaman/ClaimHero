@@ -14,4 +14,7 @@ export default defineConfig({
     port: 5173,
     host: true,
   },
+  optimizeDeps: {
+    include: ["three", "@react-three/fiber"],
+  },
 });

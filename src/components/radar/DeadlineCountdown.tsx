@@ -46,12 +46,12 @@ export const DeadlineCountdown: React.FC<DeadlineCountdownProps> = ({
   return (
     <div
       className={cn(
-        "rounded-xl border p-3.5 space-y-2.5 transition-all bg-card text-card-foreground",
+        "rounded-xl border p-3.5 space-y-2.5 transition-all bg-card/50 backdrop-blur-xl text-card-foreground shadow-sm shadow-black/20",
         isCritical
-          ? "border-destructive/40 bg-destructive/5"
+          ? "border-destructive/40 bg-destructive/10"
           : isUrgent
-          ? "border-amber-500/30 bg-amber-500/5"
-          : "border-border"
+          ? "border-amber-500/30 bg-amber-500/10"
+          : "border-white/[0.08]"
       )}
     >
       <div className="flex items-center justify-between">
