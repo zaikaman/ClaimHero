@@ -8,9 +8,14 @@
  * @module
  */
 
+import type * as actions_appealSynthesizer from "../actions/appealSynthesizer.js";
 import type * as actions_opticalParser from "../actions/opticalParser.js";
+import type * as actions_policyCrawler from "../actions/policyCrawler.js";
+import type * as actions_precedentMatcher from "../actions/precedentMatcher.js";
+import type * as appeals from "../appeals.js";
 import type * as auditLogs from "../auditLogs.js";
 import type * as claims from "../claims.js";
+import type * as clinicalEvidences from "../clinicalEvidences.js";
 import type * as lib_openai from "../lib/openai.js";
 
 import type {
@@ -20,9 +25,14 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "actions/appealSynthesizer": typeof actions_appealSynthesizer;
   "actions/opticalParser": typeof actions_opticalParser;
+  "actions/policyCrawler": typeof actions_policyCrawler;
+  "actions/precedentMatcher": typeof actions_precedentMatcher;
+  appeals: typeof appeals;
   auditLogs: typeof auditLogs;
   claims: typeof claims;
+  clinicalEvidences: typeof clinicalEvidences;
   "lib/openai": typeof lib_openai;
 }>;
 

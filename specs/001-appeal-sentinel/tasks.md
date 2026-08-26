@@ -57,12 +57,12 @@
 
 **Independent Test**: Trigger policy analysis on an ingested claim; verify that matching insurer policy clauses and clinical citations are displayed in a side-by-side policy matrix alongside an Overturn Probability Score.
 
-- [ ] T020 [P] [US2] Implement evidence persistence queries and mutations in `convex/clinicalEvidences.ts`
-- [ ] T021 [US2] Implement Firecrawl scraper action with resilient clinical guideline fallback in `convex/actions/policyCrawler.ts`
-- [ ] T022 [US2] Implement clinical precedent evaluation and Overturn Probability scoring action using `gpt-5-nano` in `convex/actions/precedentMatcher.ts`
-- [ ] T023 [P] [US2] Implement side-by-side Denial vs Insurer CPB inspector in `src/components/evidence/EvidenceMatrix.tsx`
-- [ ] T024 [P] [US2] Implement CPB Clause & Medical Criteria Viewer with highlighted contradictions in `src/components/evidence/PolicyViewer.tsx`
-- [ ] T025 [US2] Implement Precedent Feed displaying historical winning cases in `src/components/evidence/PrecedentFeed.tsx`
+- [X] T020 [P] [US2] Implement evidence persistence queries and mutations in `convex/clinicalEvidences.ts`
+- [X] T021 [US2] Implement Firecrawl scraper action with resilient clinical guideline fallback in `convex/actions/policyCrawler.ts`
+- [X] T022 [US2] Implement clinical precedent evaluation and Overturn Probability scoring action using `gpt-5-nano` in `convex/actions/precedentMatcher.ts`
+- [X] T023 [P] [US2] Implement side-by-side Denial vs Insurer CPB inspector in `src/components/evidence/EvidenceMatrix.tsx`
+- [X] T024 [P] [US2] Implement CPB Clause & Medical Criteria Viewer with highlighted contradictions in `src/components/evidence/PolicyViewer.tsx`
+- [X] T025 [US2] Implement Precedent Feed displaying historical winning cases in `src/components/evidence/PrecedentFeed.tsx`
 
 **Checkpoint**: User Stories 1 and 2 functional — claims now have automated clinical policy evidence and win scoring.
 
@@ -74,12 +74,12 @@
 
 **Independent Test**: Open an assembled appeal brief in the studio, insert an additional clinical study reference or physician note, and verify that the formatted document updates in real time with intact legal citations.
 
-- [ ] T026 [P] [US3] Implement appeal brief queries and draft auto-save mutations in `convex/appeals.ts`
-- [ ] T027 [US3] Implement cited appeal brief generation action using `gpt-5-nano` in `convex/actions/appealSynthesizer.ts`
-- [ ] T028 [P] [US3] Implement live studio state management hook in `src/hooks/useAppealStudio.ts`
-- [ ] T029 [US3] Implement Collaborative Live Appeal Studio document editor in `src/components/studio/AppealStudio.tsx`
-- [ ] T030 [P] [US3] Implement Citation & Evidence Footnote Sidebar in `src/components/studio/CitationSidebar.tsx`
-- [ ] T031 [US3] Implement PDF Dossier Preview & Export Drawer in `src/components/studio/ExportDrawer.tsx`
+- [X] T026 [P] [US3] Implement appeal brief queries and draft auto-save mutations in `convex/appeals.ts`
+- [X] T027 [US3] Implement cited appeal brief generation action using `gpt-5-nano` in `convex/actions/appealSynthesizer.ts`
+- [X] T028 [P] [US3] Implement live studio state management hook in `src/hooks/useAppealStudio.ts`
+- [X] T029 [US3] Implement Collaborative Live Appeal Studio document editor in `src/components/studio/AppealStudio.tsx`
+- [X] T030 [P] [US3] Implement Citation & Evidence Footnote Sidebar in `src/components/studio/CitationSidebar.tsx`
+- [X] T031 [US3] Implement PDF Dossier Preview & Export Drawer in `src/components/studio/ExportDrawer.tsx`
 
 **Checkpoint**: User Stories 1, 2, and 3 functional — complete appeal dossier generation and live editing enabled.
 

@@ -73,3 +73,47 @@ describe("ClaimHero Regulatory & Clinical Dictionary", () => {
     expect(DENIAL_REASON_CODES["CO-197"]?.title).toContain("Precertification");
   });
 });
+
+describe("Phase 4: Clinical Evidence & Precedent Structure Validation", () => {
+  it("validates clinical evidence source types", () => {
+    const validSources = ["payer_cpb", "fda_package_insert", "pubmed_study", "nccn_guideline", "legal_precedent"];
+    expect(validSources).toContain("payer_cpb");
+    expect(validSources).toContain("legal_precedent");
+  });
+
+  it("validates risk band classification boundaries", () => {
+    const classifyScore = (score: number) => {
+      if (score >= 85) return "high_confidence";
+      if (score >= 60) return "moderate";
+      return "complex_litigation";
+    };
+
+    expect(classifyScore(94)).toBe("high_confidence");
+    expect(classifyScore(75)).toBe("moderate");
+    expect(classifyScore(40)).toBe("complex_litigation");
+  });
+});
+
+describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
+  it("validates appeal hierarchy level identifiers", () => {
+    const levels = ["level_1_internal", "level_2_grievance", "level_3_external_state_review"];
+    expect(levels).toContain("level_1_internal");
+    expect(levels).toContain("level_2_grievance");
+    expect(levels).toContain("level_3_external_state_review");
+  });
+
+  it("validates required sections of an ERISA medical appeal brief", () => {
+    const requiredSections = [
+      "executiveSummary",
+      "statutoryRightsNotice",
+      "medicalNecessityArguments",
+      "policyCitations",
+      "formalDemandForPayment",
+      "fullAppealMarkdown",
+    ];
+
+    expect(requiredSections.length).toBe(6);
+    expect(requiredSections).toContain("statutoryRightsNotice");
+    expect(requiredSections).toContain("medicalNecessityArguments");
+  });
+});

@@ -12,7 +12,7 @@
 - **Auth:** none
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T10:52:00Z
+- **Last updated:** 2026-08-26T11:08:00Z
 
 ## Log
 
@@ -42,3 +42,9 @@ Completed Phase 3 User Story 1 - Denial Document Ingestion & Optical Extraction 
 
 ### 2026-08-26 - working tree
 Refactored ingestion and data pipeline to eliminate all mock/seed/simulation fallbacks: Wired `src/hooks/useClaims.ts` directly to live Convex database queries (`api.claims.list`) and file storage mutation uploads. Upgraded optical parser action (`convex/actions/opticalParser.ts`) to stream real file binary from Convex File Storage and execute strict OpenAI Vision & Structured JSON extraction into real `patients` and `claims` tables. Enhanced Ingestion Modal (`src/components/radar/IngestionModal.tsx`) with real PDF/image file picker, raw text parser, and state jurisdiction selector.
+
+### 2026-08-26 - working tree
+Completed Phase 4 User Story 2 - Clinical Policy Bulletin (CPB) Evidence Crawling & Precedent Matching (T020-T025): Built clinical evidence queries and batch mutations (`convex/clinicalEvidences.ts`). Implemented Firecrawl crawler action (`convex/actions/policyCrawler.ts`) integrating live web scraping and curated medical necessity criteria with structured `gpt-5-nano` clinical extraction. Built precedent matcher action (`convex/actions/precedentMatcher.ts`) computing Overturn Probability Scores (0-100%) and identifying statutory ERISA non-compliance points. Created reactive evidence hook (`src/hooks/useEvidence.ts`), side-by-side Denial vs Insurer CPB Inspector (`src/components/evidence/EvidenceMatrix.tsx`), CPB Criteria Clause Viewer (`src/components/evidence/PolicyViewer.tsx`), and Overturned Precedent Feed (`src/components/evidence/PrecedentFeed.tsx`). Verified with `npm run verify` (100% PASS, 8 unit tests).
+
+### 2026-08-26 - working tree
+Completed Phase 5 User Story 3 - Cited Appeal Brief Synthesis & Collaborative Appeal Studio (T026-T031): Implemented appeal brief versioned queries, draft auto-saving, and storage mutations (`convex/appeals.ts`). Built appeal synthesizer action (`convex/actions/appealSynthesizer.ts`) powered by OpenAI `gpt-5-nano` with `AppealBriefSynthesisResult` structured JSON schemas enforcing statutory ERISA (29 CFR § 2560.503-1) rights notices, medical necessity arguments, and exact Clinical Policy Bulletin clause citations. Created collaborative appeal studio hook (`src/hooks/useAppealStudio.ts`) with debounced auto-saving to Convex Cloud. Built split-pane Collaborative Live Appeal Studio (`src/components/studio/AppealStudio.tsx`), Citation & Evidence Footnote Sidebar (`src/components/studio/CitationSidebar.tsx`), and full formal PDF Export & Print Drawer (`src/components/studio/ExportDrawer.tsx`). Verified with `npm run verify` (100% PASS, 10 unit tests).

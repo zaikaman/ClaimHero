@@ -3,11 +3,12 @@ import { Shell } from "./components/layout/Shell";
 import { NavigationView } from "./components/layout/Sidebar";
 import { CaseRadar } from "./components/radar/CaseRadar";
 import { IngestionModal } from "./components/radar/IngestionModal";
+import { EvidenceMatrix } from "./components/evidence/EvidenceMatrix";
+import { AppealStudio } from "./components/studio/AppealStudio";
 import { useClaims } from "./hooks/useClaims";
+import { useEvidence } from "./hooks/useEvidence";
 import {
   ArrowRight,
-  FileSearch,
-  FileText,
   Mail,
   Clock,
   Loader2,
@@ -33,6 +34,13 @@ export default function App() {
     statusFilter,
     payerFilter,
   });
+
+  const {
+    evidences,
+    isLoadingEvidences,
+    crawlPolicy,
+    computeOverturnScore,
+  } = useEvidence(selectedClaim);
 
   const handleOpenIngestion = () => {
     setIsIngestionOpen(true);
@@ -67,7 +75,7 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* Primary Dynamic Content Views */}
+          {/* 1. Case Ingestion Radar View */}
           {currentView === "radar" && (
             <CaseRadar
               claims={claims}
@@ -78,64 +86,61 @@ export default function App() {
             />
           )}
 
+          {/* 2. Clinical Policy Evidence Matrix & Inspector */}
           {currentView === "evidence" && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center space-y-4">
-              <div className="inline-flex p-3 rounded-2xl bg-cyan-950/60 border border-cyan-500/40 shadow-cyan-glow">
-                <FileSearch className="h-8 w-8 text-cyan-400" />
+            selectedClaim ? (
+              <EvidenceMatrix
+                claim={selectedClaim}
+                evidences={evidences}
+                isLoadingEvidences={isLoadingEvidences}
+                onCrawlPolicy={crawlPolicy}
+                onComputeScore={computeOverturnScore}
+                onNavigateToStudio={() => setCurrentView("studio")}
+              />
+            ) : (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center space-y-4">
+                <div className="text-sm font-semibold text-slate-300">No Claim Selected</div>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Please select a claim from the Case Radar Feed to inspect its Clinical Policy Bulletin evidence and calculate its win probability.
+                </p>
+                <button
+                  onClick={() => setCurrentView("radar")}
+                  className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-mono"
+                >
+                  <span>Go to Case Radar</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <h2 className="text-xl font-bold text-white">Clinical Policy Evidence Matrix</h2>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                {selectedClaim ? (
-                  <>
-                    Selected Claim:{" "}
-                    <span className="text-cyan-300 font-mono font-semibold">
-                      {selectedClaim.claimNumber}
-                    </span>{" "}
-                    ({selectedClaim.patient?.name || "Patient"}) — Ready for CPB Firecrawl policy crawling & win probability calculation.
-                  </>
-                ) : (
-                  "No claim selected. Please select a claim from the Case Radar."
-                )}
-              </p>
-              <button
-                onClick={() => setCurrentView("radar")}
-                className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-mono"
-              >
-                <span>Back to Case Radar Feed</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
+            )
           )}
 
+          {/* 3. Collaborative Appeal Studio */}
           {currentView === "studio" && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center space-y-4">
-              <div className="inline-flex p-3 rounded-2xl bg-cyan-950/60 border border-cyan-500/40 shadow-cyan-glow">
-                <FileText className="h-8 w-8 text-cyan-400" />
+            selectedClaim ? (
+              <AppealStudio
+                claim={selectedClaim}
+                evidences={evidences}
+                onNavigateToDispatch={() => setCurrentView("communications")}
+                onNavigateToEvidence={() => setCurrentView("evidence")}
+              />
+            ) : (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center space-y-4">
+                <div className="text-sm font-semibold text-slate-300">No Claim Selected</div>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Please select a claim from the Case Radar Feed to synthesize and collaboratively edit an ERISA appeal brief.
+                </p>
+                <button
+                  onClick={() => setCurrentView("radar")}
+                  className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-mono"
+                >
+                  <span>Go to Case Radar</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <h2 className="text-xl font-bold text-white">Live Collaborative Appeal Studio</h2>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                {selectedClaim ? (
-                  <>
-                    Selected Claim:{" "}
-                    <span className="text-cyan-300 font-mono font-semibold">
-                      {selectedClaim.claimNumber}
-                    </span>{" "}
-                    — Ready for ERISA brief synthesis & live collaborative editing.
-                  </>
-                ) : (
-                  "No claim selected. Please select a claim from the Case Radar."
-                )}
-              </p>
-              <button
-                onClick={() => setCurrentView("radar")}
-                className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-mono"
-              >
-                <span>Back to Case Radar Feed</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
+            )
           )}
 
+          {/* 4. Dedicated AgentMail Claim Inbox */}
           {currentView === "communications" && (
             <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center space-y-4">
               <div className="inline-flex p-3 rounded-2xl bg-cyan-950/60 border border-cyan-500/40 shadow-cyan-glow">
@@ -164,6 +169,7 @@ export default function App() {
             </div>
           )}
 
+          {/* 5. Immutable Case Audit Timeline */}
           {currentView === "audit" && (
             <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center space-y-4">
               <div className="inline-flex p-3 rounded-2xl bg-cyan-950/60 border border-cyan-500/40 shadow-cyan-glow">
@@ -185,7 +191,7 @@ export default function App() {
         </>
       )}
 
-      {/* Real Ingestion Modal (File Upload + Text Paste + AgentMail) */}
+      {/* Real Ingestion Modal (File Upload + Text Paste + Presets + AgentMail) */}
       <IngestionModal
         isOpen={isIngestionOpen}
         onClose={() => setIsIngestionOpen(false)}
