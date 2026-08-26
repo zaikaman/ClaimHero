@@ -8,11 +8,11 @@
 - **Frontend:** Convex static hosting
 - **Convex deployment:** not deployed
 - **Components:** none
-- **Convex features:** none yet
+- **Convex features:** database schema, relational indexes, queries, mutations
 - **Auth:** none
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T10:30:00Z
+- **Last updated:** 2026-08-26T10:35:00Z
 
 ## Log
 
@@ -33,3 +33,6 @@ Generated actionable, dependency-ordered task breakdown (`specs/001-appeal-senti
 
 ### 2026-08-26 - working tree
 Completed Phase 1 Setup & Environment Initialization (T001-T005): Initialized React TypeScript build pipeline with Vite, installed dependencies including Convex, OpenAI, Firecrawl, Radix UI primitives, Lucide icons, and canvas-confetti (`package.json`). Configured Tailwind CSS with Precision Medical Dark-Mode theme tokens (`#0b0f17` canvas, `#00e5ff` cyan, `#10b981` emerald, `#f43f5e` crimson, `#f59e0b` amber) in `tailwind.config.js` and `src/index.css`. Configured strict TypeScript compiler options (`tsconfig.json`), Vite alias resolution (`vite.config.ts`), and established domain constants and regulatory rules (`src/lib/constants.ts`, `.env.example`).
+
+### 2026-08-26 - working tree
+Completed Phase 2 Foundational Infrastructure (T006-T013): Defined complete reactive Convex schema (`convex/schema.ts`) covering 7 core relational tables (`patients`, `claims`, `clinicalEvidences`, `appeals`, `emailThreads`, `emailMessages`, `appealAuditLogs`) and secondary indexes. Implemented unified OpenAI client wrapper (`convex/lib/openai.ts`) supporting `gpt-5-nano`, structured JSON completions, and custom endpoints. Created domain TypeScript interfaces (`src/types/index.ts`), healthcare formatting utilities (`src/lib/utils.ts`), and immutable audit logging mutations/queries (`convex/auditLogs.ts`). Implemented core UI shell layout (`src/components/layout/Shell.tsx`, `Header.tsx`, `Sidebar.tsx`, `src/App.tsx`) with live pipeline metric counters and 1-Click Simulation trigger CTA.

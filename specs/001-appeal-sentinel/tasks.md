@@ -21,14 +21,14 @@
 
 **Purpose**: Core Convex database schema, unified OpenAI client, type definitions, and application layout shell.
 
-- [ ] T006 Define complete Convex database schema with tables (`patients`, `claims`, `clinicalEvidences`, `appeals`, `emailThreads`, `emailMessages`, `appealAuditLogs`) and relational indexes in `convex/schema.ts`
-- [ ] T007 Implement OpenAI client wrapper supporting `OPENAI_API_KEY`, `OPENAI_MODEL` (`gpt-5-nano`), and `OPENAI_BASE_URL` with structured output helpers in `convex/lib/openai.ts`
-- [ ] T008 [P] Implement core domain TypeScript interfaces and type definitions in `src/types/index.ts`
-- [ ] T009 [P] Implement UI styling utilities, badge helpers, and currency/date formatters in `src/lib/utils.ts`
-- [ ] T010 [P] Implement audit logging mutations and query helpers in `convex/auditLogs.ts`
-- [ ] T011 Setup React application root with `ConvexProvider` and base shell layout in `src/main.tsx` and `src/components/layout/Shell.tsx`
-- [ ] T012 [P] Implement Top Navigation Header with live statistics and simulation trigger button in `src/components/layout/Header.tsx`
-- [ ] T013 [P] Implement Sidebar Navigation with status filtering in `src/components/layout/Sidebar.tsx`
+- [X] T006 Define complete Convex database schema with tables (`patients`, `claims`, `clinicalEvidences`, `appeals`, `emailThreads`, `emailMessages`, `appealAuditLogs`) and relational indexes in `convex/schema.ts`
+- [X] T007 Implement OpenAI client wrapper supporting `OPENAI_API_KEY`, `OPENAI_MODEL` (`gpt-5-nano`), and `OPENAI_BASE_URL` with structured output helpers in `convex/lib/openai.ts`
+- [X] T008 [P] Implement core domain TypeScript interfaces and type definitions in `src/types/index.ts`
+- [X] T009 [P] Implement UI styling utilities, badge helpers, and currency/date formatters in `src/lib/utils.ts`
+- [X] T010 [P] Implement audit logging mutations and query helpers in `convex/auditLogs.ts`
+- [X] T011 Setup React application root with `ConvexProvider` and base shell layout in `src/main.tsx` and `src/components/layout/Shell.tsx`
+- [X] T012 [P] Implement Top Navigation Header with live statistics and simulation trigger button in `src/components/layout/Header.tsx`
+- [X] T013 [P] Implement Sidebar Navigation with status filtering in `src/components/layout/Sidebar.tsx`
 
 **Checkpoint**: Foundational database schema and UI shell ready. User story implementation can proceed.
 
