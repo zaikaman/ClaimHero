@@ -9,9 +9,7 @@ interface ShellProps {
   onSelectStatusFilter: (status: string) => void;
   selectedPayerFilter: string;
   onSelectPayerFilter: (payer: string) => void;
-  onRunSimulation: () => void;
   onOpenIngestion: () => void;
-  isSimulating: boolean;
   totalDisputedAmount?: number;
   totalWonAmount?: number;
   winRate?: number;
@@ -27,13 +25,11 @@ export const Shell: React.FC<ShellProps> = ({
   onSelectStatusFilter,
   selectedPayerFilter,
   onSelectPayerFilter,
-  onRunSimulation,
   onOpenIngestion,
-  isSimulating,
-  totalDisputedAmount,
-  totalWonAmount,
-  winRate,
-  criticalDeadlinesCount,
+  totalDisputedAmount = 0,
+  totalWonAmount = 0,
+  winRate = 0,
+  criticalDeadlinesCount = 0,
   claimCountsByStatus,
   children,
 }) => {
@@ -41,9 +37,7 @@ export const Shell: React.FC<ShellProps> = ({
     <div className="flex h-screen w-full flex-col bg-[#0b0f17] text-slate-100 antialiased overflow-hidden selection:bg-cyan-500/30 selection:text-cyan-300">
       {/* Top Fixed Header */}
       <Header
-        onRunSimulation={onRunSimulation}
         onOpenIngestion={onOpenIngestion}
-        isSimulating={isSimulating}
         totalDisputedAmount={totalDisputedAmount}
         totalWonAmount={totalWonAmount}
         winRate={winRate}

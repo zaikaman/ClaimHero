@@ -1,5 +1,6 @@
-import { mutation, query, internalMutation, type Doc } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 
 /**
  * List chronological audit trail events for a specific claim

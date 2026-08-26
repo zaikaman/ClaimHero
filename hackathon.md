@@ -6,13 +6,13 @@
 - **Live app:** not deployed
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
-- **Convex deployment:** not deployed
+- **Convex deployment:** dev:groovy-hippopotamus-924
 - **Components:** none
-- **Convex features:** database schema, relational indexes, queries, mutations
+- **Convex features:** database schema, relational indexes, queries, mutations, actions, file storage upload URL
 - **Auth:** none
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T10:35:00Z
+- **Last updated:** 2026-08-26T10:52:00Z
 
 ## Log
 
@@ -36,3 +36,9 @@ Completed Phase 1 Setup & Environment Initialization (T001-T005): Initialized Re
 
 ### 2026-08-26 - working tree
 Completed Phase 2 Foundational Infrastructure (T006-T013): Defined complete reactive Convex schema (`convex/schema.ts`) covering 7 core relational tables (`patients`, `claims`, `clinicalEvidences`, `appeals`, `emailThreads`, `emailMessages`, `appealAuditLogs`) and secondary indexes. Implemented unified OpenAI client wrapper (`convex/lib/openai.ts`) supporting `gpt-5-nano`, structured JSON completions, and custom endpoints. Created domain TypeScript interfaces (`src/types/index.ts`), healthcare formatting utilities (`src/lib/utils.ts`), and immutable audit logging mutations/queries (`convex/auditLogs.ts`). Implemented core UI shell layout (`src/components/layout/Shell.tsx`, `Header.tsx`, `Sidebar.tsx`, `src/App.tsx`) with live pipeline metric counters and 1-Click Simulation trigger CTA.
+
+### 2026-08-26 - working tree
+Completed Phase 3 User Story 1 - Denial Document Ingestion & Optical Extraction (T014-T019, MVP): Implemented patient and claim query/mutation endpoints (`convex/claims.ts`) supporting atomic case initialization and storage upload URLs. Built optical parser action (`convex/actions/opticalParser.ts`) powered by OpenAI `gpt-5-nano` with `DenialExtractionResult` structured JSON schemas extracting CPT codes (e.g., 27447), denial reason codes (CO-50), disputed amounts ($24,500), and statutory appeal deadlines. Created reactive claim subscription hook (`src/hooks/useClaims.ts`) with live aggregate financial metrics and search filtering. Built real-time Case Ingestion Radar feed (`src/components/radar/CaseRadar.tsx`) with animated scanning radar pulse, and drag-and-drop ingestion modal (`src/components/radar/IngestionModal.tsx`) with instant sample case presets and AgentMail inbound forwarding instructions.
+
+### 2026-08-26 - working tree
+Refactored ingestion and data pipeline to eliminate all mock/seed/simulation fallbacks: Wired `src/hooks/useClaims.ts` directly to live Convex database queries (`api.claims.list`) and file storage mutation uploads. Upgraded optical parser action (`convex/actions/opticalParser.ts`) to stream real file binary from Convex File Storage and execute strict OpenAI Vision & Structured JSON extraction into real `patients` and `claims` tables. Enhanced Ingestion Modal (`src/components/radar/IngestionModal.tsx`) with real PDF/image file picker, raw text parser, and state jurisdiction selector.

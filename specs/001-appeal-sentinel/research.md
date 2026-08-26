@@ -61,6 +61,6 @@
 ### Decision 5: Frontend Experience & Precision Medical Dark-Mode (React + Tailwind CSS)
 - **Decision**: Build a high-performance single-page web application using Vite, React 18+, TypeScript, Tailwind CSS, Lucide React icons, and Radix UI primitives, styled with the "Precision Medical Dark-Mode" design system.
 - **Palette**: Deep slate-charcoal canvas (`#0b0f17`), Cyber Cyan accents (`#00e5ff`), Medical Emerald victory highlights (`#10b981`), Statutory Crimson countdowns (`#f43f5e`), and Amber badges (`#f59e0b`).
-- **Demo Mode**: Top-bar **1-Click Live Judge Simulation** executing an end-to-end $24,500 knee surgery denial appeal in under 15 seconds with animated stage transitions.
+- **Interactive UI**: Real-time **Case Ingestion Radar**, drag-and-drop PDF/image optical parser with OpenAI `gpt-5-nano`, and live ERISA deadline countdown dials.
 - **Rationale**:
   - Meets hackathon judging criteria for visual excellence, cognitive clarity, and immediate responsiveness.

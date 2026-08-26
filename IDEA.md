@@ -121,8 +121,8 @@ flowchart TD
    * Two-way chronological message feed tracking outbound appeal packets and inbound insurer acknowledgment/response letters.
 5. **Interactive Bid/Appeal Studio**:
    * Real-time collaborative document editor with AI assistant ("Add FDA Clinical Trial Precedent", "Insert Physician Letter of Medical Necessity", "Cite ERISA 29 CFR § 2560.503-1").
-6. **✨ 1-Click Live Judge Simulation Mode**:
-   * Top-bar button: Simulates a patient forwarding a **$24,500 Denied Knee Replacement Surgery** &rarr; Firecrawl crawls UnitedHealthcare Policy 2024T001 &rarr; Convex vector matches medical necessity precedent &rarr; OpenAI drafts a 4-page cited appeal &rarr; AgentMail delivers test dispatch in 12 seconds.
+6. **Real-time Case Analytics & Portfolio Oversight**:
+   * Unified dashboard computing total disputed pipeline, won/recovered amounts, average overturn probabilities, and critical statutory deadline alerts across all live claims with zero hardcoded values.
 
 ---
 

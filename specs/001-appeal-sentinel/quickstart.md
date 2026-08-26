@@ -2,7 +2,7 @@
 
 **Feature**: `001-appeal-sentinel`  
 **Date**: 2026-08-26  
-**Status**: Ready for Implementation  
+**Status**: In Progress  
 
 ---
 
@@ -17,8 +17,8 @@ Configure the following in `.env.local` for the Vite frontend and Convex backend
 
 ```env
 # 1. Convex Backend Deployment
-CONVEX_DEPLOYMENT=dev:your-convex-deployment-url
-VITE_CONVEX_URL=https://your-convex-deployment-url.convex.cloud
+CONVEX_DEPLOYMENT=dev:groovy-hippopotamus-924
+VITE_CONVEX_URL=https://groovy-hippopotamus-924.convex.cloud
 
 # 2. OpenAI AI Client (3 Core Variables)
 OPENAI_API_KEY=sk-proj-your-openai-api-key
@@ -56,26 +56,28 @@ Open your browser at `http://localhost:5173`.
 
 ---
 
-## 3. Running the 1-Click Live Judge Simulation
+## 3. Real Claim Ingestion & End-to-End Workflow
 
-1. Open the ClaimHero dashboard.
-2. In the top navigation bar, click **"✨ Run Live Simulation"**.
-3. Watch the autonomous pipeline execute across 5 sequential stages in under 15 seconds:
-   - **Stage 1 (0-3s)**: Ingests a simulated **$24,500 Knee Replacement Surgery Denial (CPT 27447, Code CO-50)** from UnitedHealthcare.
-   - **Stage 2 (3-6s)**: Firecrawl crawls UnitedHealthcare Policy 2024T001 and detects a medical necessity contradiction.
-   - **Stage 3 (6-9s)**: Convex vector search matches 3 winning precedents, calculating a **91% Overturn Probability Score**.
-   - **Stage 4 (9-12s)**: OpenAI synthesizes a cited 4-page medical appeal brief citing ERISA 29 CFR § 2560.503-1.
-   - **Stage 5 (12-15s)**: AgentMail transmits the appeal packet and initiates the 30-day statutory response clock.
-4. The finalized case dossier opens automatically in the **Collaborative Appeal Studio**.
+1. Open the ClaimHero dashboard at `http://localhost:5173`.
+2. Click **"+ Ingest Denial Document"**.
+3. Choose your ingestion method:
+   - **Upload PDF / Image File**: Select a real insurance denial letter PDF or Explanation of Benefits image from your device.
+   - **Paste Document Text**: Paste raw denial letter or EOB text directly into the text area.
+   - **AgentMail Forwarding**: Forward denial emails directly to `intake@claimhero.agentmail.com`.
+4. Click **"Run Optical Parser"** / **"Process Text with OpenAI"**.
+5. Watch `gpt-5-nano` extract CPT codes (e.g. 27447), denial reason codes (e.g. CO-50), denied dollar amounts, and statutory ERISA appeal deadlines directly into Convex Cloud DB.
+6. The created claim immediately appears in the real-time **Case Ingestion Radar Feed** with live statutory countdown tracking.
 
 ---
 
-## 4. Verification & Testing
+## 4. Verification & Continuous Validation
 
+Run the complete verification pipeline at any time:
 ```bash
-# Type check TypeScript codebase
-npm run typecheck   # or npx tsc --noEmit
-
-# Run unit & contract tests
-npm run test
+npm run verify
 ```
+This runs in sequence:
+- `npm run typecheck` (`tsc --noEmit`)
+- `npm run lint` (`eslint src convex`)
+- `npm run test` (`vitest run tests`)
+- `npm run build` (`vite build`)

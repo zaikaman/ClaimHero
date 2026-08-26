@@ -27,7 +27,7 @@
 - [X] T009 [P] Implement UI styling utilities, badge helpers, and currency/date formatters in `src/lib/utils.ts`
 - [X] T010 [P] Implement audit logging mutations and query helpers in `convex/auditLogs.ts`
 - [X] T011 Setup React application root with `ConvexProvider` and base shell layout in `src/main.tsx` and `src/components/layout/Shell.tsx`
-- [X] T012 [P] Implement Top Navigation Header with live statistics and simulation trigger button in `src/components/layout/Header.tsx`
+- [X] T012 [P] Implement Top Navigation Header with live statistics and ingestion trigger button in `src/components/layout/Header.tsx`
 - [X] T013 [P] Implement Sidebar Navigation with status filtering in `src/components/layout/Sidebar.tsx`
 
 **Checkpoint**: Foundational database schema and UI shell ready. User story implementation can proceed.
@@ -36,24 +36,24 @@
 
 ## Phase 3: User Story 1 - Denial Document Ingestion & Optical Extraction (Priority: P1) 🎯 MVP
 
-**Goal**: Ingest denial letters/EOBs via direct upload or email, extract metadata using `gpt-5-nano` Vision/Structured Outputs, and create reactive claim cases.
+**Goal**: Ingest real denial letters/EOBs via direct upload, text paste, or email, extract metadata using `gpt-5-nano` Vision/Structured Outputs, and create reactive claim cases.
 
-**Independent Test**: Upload a sample denial letter PDF and verify that a new claim is created in the dashboard with extracted CPT code (27447), denial reason code (CO-50), denied amount ($24,500), and patient liability ($24,500).
+**Independent Test**: Upload a real denial letter PDF or paste raw text and verify that a new claim is created in the dashboard with extracted CPT codes, denial reason codes, denied amounts, and patient liability.
 
-- [ ] T014 [P] [US1] Implement patient & claim creation and query mutations in `convex/claims.ts`
-- [ ] T015 [US1] Implement optical extraction action using `gpt-5-nano` with `DenialExtractionResult` schema in `convex/actions/opticalParser.ts`
-- [ ] T016 [P] [US1] Implement real-time claim subscription hook in `src/hooks/useClaims.ts`
-- [ ] T017 [P] [US1] Implement Live Case Ingestion Radar feed showing incoming claim status in `src/components/radar/CaseRadar.tsx`
-- [ ] T018 [US1] Implement Drag-and-Drop Denial Upload & Email Forwarding modal in `src/components/radar/IngestionModal.tsx`
-- [ ] T019 [US1] Integrate IngestionModal with Convex File Storage and `opticalParser` action in `src/App.tsx`
+- [X] T014 [P] [US1] Implement patient & claim creation and query mutations in `convex/claims.ts`
+- [X] T015 [US1] Implement optical extraction action using `gpt-5-nano` with `DenialExtractionResult` schema in `convex/actions/opticalParser.ts`
+- [X] T016 [P] [US1] Implement real-time claim subscription hook in `src/hooks/useClaims.ts`
+- [X] T017 [P] [US1] Implement Live Case Ingestion Radar feed showing incoming claim status in `src/components/radar/CaseRadar.tsx`
+- [X] T018 [US1] Implement Drag-and-Drop Denial Upload, Text Parser, & Email Forwarding modal in `src/components/radar/IngestionModal.tsx`
+- [X] T019 [US1] Integrate IngestionModal with Convex File Storage and `opticalParser` action in `src/App.tsx`
 
-**Checkpoint**: User Story 1 functional — users can upload denial documents and see parsed claims appear in real time.
+**Checkpoint**: User Story 1 functional — users can upload real denial documents and see parsed claims appear in real time.
 
 ---
 
 ## Phase 4: User Story 2 - Clinical Policy Bulletin (CPB) Evidence Crawling & Precedent Matching (Priority: P2)
 
-**Goal**: Crawl insurer CPBs via Firecrawl (with fallback guideline database) and use `gpt-5-nano` to cross-examine criteria and compute Overturn Probability Score.
+**Goal**: Crawl insurer CPBs live via Firecrawl (with clinical guideline fallback) and use `gpt-5-nano` to cross-examine criteria and compute Overturn Probability Score.
 
 **Independent Test**: Trigger policy analysis on an ingested claim; verify that matching insurer policy clauses and clinical citations are displayed in a side-by-side policy matrix alongside an Overturn Probability Score.
 
@@ -103,28 +103,28 @@
 
 ---
 
-## Phase 7: User Story 5 - 1-Click Interactive Live Judge Simulation Mode (Priority: P5)
+## Phase 7: User Story 5 - Real-time Case Analytics, Win Probability Dashboard & Audit Timeline (Priority: P5)
 
-**Goal**: Enable hackathon judges to trigger an end-to-end simulated appeal journey ($24,500 Knee Replacement denial -> policy crawl -> score calculation -> appeal brief synthesis -> test dispatch) in under 15 seconds with animated stage transitions.
+**Goal**: Provide portfolio-wide financial recovery metrics, win likelihood distributions, statutory alarm aggregation, and immutable case audit tracking computed dynamically on Convex.
 
-**Independent Test**: Click "Run Live Simulation" and verify all 5 stages execute with real-time visual progress and load the finalized case dossier.
+**Independent Test**: Ingest multiple claims and verify that the portfolio metrics, win score distribution, and audit trail update reactively with zero hardcoded numbers.
 
-- [ ] T039 [US5] Implement seed simulation scenario data and 15-second orchestrator action in `convex/actions/simulationRunner.ts`
-- [ ] T040 [US5] Implement animated multi-stage simulation overlay with stage progression in `src/components/simulation/SimulationOverlay.tsx`
-- [ ] T041 [US5] Connect 1-Click Simulation CTA in Header to SimulationOverlay and workspace in `src/App.tsx`
+- [ ] T039 [US5] Implement portfolio financial aggregation query and statutory deadline health metrics in `convex/claims.ts`
+- [ ] T040 [US5] Implement portfolio analytics panel with win likelihood distribution in `src/components/analytics/AnalyticsMetrics.tsx`
+- [ ] T041 [US5] Connect real-time analytics view into navigation sidebar and workspace in `src/App.tsx`
 
-**Checkpoint**: All 5 user stories complete — application features a frictionless 1-Click demonstration flow.
+**Checkpoint**: All 5 user stories complete — application provides end-to-end real data workflow from ingestion to dispatch and analytics.
 
 ---
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-**Purpose**: Validation, initial seeding, and final aesthetic refinement.
+**Purpose**: Automated validation, test suite, and final aesthetic refinement.
 
-- [ ] T042 [P] Implement end-to-end integration and simulation test suite in `tests/simulation.test.ts`
-- [ ] T043 [P] Perform static typechecking validation across full codebase (`tsc --noEmit`)
-- [ ] T044 Optimize responsive UI layout, keyboard navigation, and transitions in `src/index.css` and `src/App.tsx`
-- [ ] T045 Seed initial curated clinical policy bulletins and overturned precedents for immediate out-of-the-box evaluation in `convex/seed.ts`
+- [ ] T042 [P] Implement end-to-end unit and domain integration test suite in `tests/claimhero.test.ts`
+- [ ] T043 [P] Perform static typechecking and lint validation across full codebase (`npm run verify`)
+- [ ] T044 Optimize responsive UI layout, dark-mode animations, and glassmorphism in `src/index.css` and `src/App.tsx`
+- [ ] T045 Verify live Firecrawl crawler and AgentMail webhook configuration in `.env.example`
 - [ ] T046 Validate complete setup and execution against `specs/001-appeal-sentinel/quickstart.md`
 
 ---
@@ -139,7 +139,7 @@
 - **User Story 2 (Phase 4 - P2)**: Depends on Phase 3 completion (requires claim data from US1).
 - **User Story 3 (Phase 5 - P3)**: Depends on Phase 4 completion (requires clinical evidence from US2).
 - **User Story 4 (Phase 6 - P4)**: Depends on Phase 5 completion (requires appeal draft from US3).
-- **User Story 5 (Phase 7 - P5)**: Integrates all preceding pipeline actions into an orchestrated simulation flow.
+- **User Story 5 (Phase 7 - P5)**: Aggregates real-time portfolio metrics across all preceding user stories.
 - **Polish (Phase 8)**: Depends on all user stories being complete.
 
 ---
@@ -149,12 +149,12 @@
 ### MVP First (User Story 1 Only)
 1. Complete Phase 1: Setup
 2. Complete Phase 2: Foundational Schema & Shell
-3. Complete Phase 3: User Story 1 (Denial Ingestion & Extraction)
-4. Validate User Story 1 independently with sample PDF upload
+3. Complete Phase 3: User Story 1 (Real Denial Ingestion & Extraction)
+4. Validate User Story 1 independently with real file upload or text paste
 
 ### Incremental Feature Delivery
-1. Add User Story 2 &rarr; CPB policy crawler & Overturn Probability score calculation
+1. Add User Story 2 &rarr; Live CPB policy crawler & Overturn Probability score calculation
 2. Add User Story 3 &rarr; Cited appeal brief synthesis & live collaborative studio
 3. Add User Story 4 &rarr; Statutory deadline alarm cron & AgentMail dispatch
-4. Add User Story 5 &rarr; 1-Click Live Judge Simulation mode
-5. Execute Polish & Testing &rarr; Submission-ready demo
+4. Add User Story 5 &rarr; Real-time portfolio analytics & audit timeline
+5. Execute Polish & Testing &rarr; Verification via `npm run verify`

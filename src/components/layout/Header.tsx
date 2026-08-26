@@ -1,34 +1,28 @@
 import React from "react";
 import {
   Shield,
-  Zap,
   UploadCloud,
   Activity,
   AlertTriangle,
   CheckCircle2,
   DollarSign,
-  Sparkles,
 } from "lucide-react";
 import { formatCurrency } from "../../lib/utils";
 
 interface HeaderProps {
-  onRunSimulation?: () => void;
-  onOpenIngestion?: () => void;
-  totalDisputedAmount?: number;
-  totalWonAmount?: number;
-  winRate?: number;
-  criticalDeadlinesCount?: number;
-  isSimulating?: boolean;
+  onOpenIngestion: () => void;
+  totalDisputedAmount: number;
+  totalWonAmount: number;
+  winRate: number;
+  criticalDeadlinesCount: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  onRunSimulation,
   onOpenIngestion,
-  totalDisputedAmount = 184500,
-  totalWonAmount = 126000,
-  winRate = 89.2,
-  criticalDeadlinesCount = 2,
-  isSimulating = false,
+  totalDisputedAmount = 0,
+  totalWonAmount = 0,
+  winRate = 0,
+  criticalDeadlinesCount = 0,
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-[#0b0f17]/90 backdrop-blur-xl">
@@ -58,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Center: Live Sentinel Metrics & Ticker */}
+        {/* Center: Live Real Sentinel Metrics from Convex */}
         <div className="hidden lg:flex items-center gap-4 text-xs font-mono">
           {/* Disputed Volume */}
           <div className="flex items-center gap-2 rounded-lg bg-slate-900/80 border border-slate-800 px-3 py-1.5">
@@ -74,16 +68,20 @@ export const Header: React.FC<HeaderProps> = ({
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
             <div>
               <span className="text-emerald-400/80 text-[10px] block leading-none">Recovered / Won</span>
-              <span className="font-semibold text-emerald-300">{formatCurrency(totalWonAmount)} ({winRate}%)</span>
+              <span className="font-semibold text-emerald-300">
+                {formatCurrency(totalWonAmount)} {winRate > 0 ? `(${winRate}%)` : ""}
+              </span>
             </div>
           </div>
 
           {/* Critical Statutory Alarms */}
           <div className="flex items-center gap-2 rounded-lg bg-rose-950/30 border border-rose-500/30 px-3 py-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 text-rose-400 animate-pulse" />
+            <AlertTriangle className={`h-3.5 w-3.5 text-rose-400 ${criticalDeadlinesCount > 0 ? "animate-pulse" : ""}`} />
             <div>
               <span className="text-rose-400/80 text-[10px] block leading-none">Statutory Alarms</span>
-              <span className="font-semibold text-rose-300">{criticalDeadlinesCount} Critical (&lt;14d)</span>
+              <span className="font-semibold text-rose-300">
+                {criticalDeadlinesCount > 0 ? `${criticalDeadlinesCount} Critical (<14d)` : "0 Pending"}
+              </span>
             </div>
           </div>
 
@@ -95,38 +93,15 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Right: Actions & 1-Click Simulation CTA */}
+        {/* Right: Actions */}
         <div className="flex items-center gap-2.5">
-          {/* Direct Ingestion CTA */}
+          {/* Primary Ingestion CTA */}
           <button
             onClick={onOpenIngestion}
-            className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs font-medium text-slate-200 transition-all hover:border-slate-600 hover:bg-slate-800 hover:text-white"
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 px-4 py-2 text-xs font-bold text-slate-950 shadow-cyan-glow hover:scale-105 active:scale-95 transition-all"
           >
-            <UploadCloud className="h-4 w-4 text-cyan-400" />
-            <span>Ingest Denial</span>
-          </button>
-
-          {/* Primary 1-Click Judge Simulation Button */}
-          <button
-            onClick={onRunSimulation}
-            disabled={isSimulating}
-            className={`relative group inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold tracking-wide transition-all duration-300 ${
-              isSimulating
-                ? "bg-cyan-950 text-cyan-300 border border-cyan-500/40 cursor-wait"
-                : "bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 text-slate-950 font-bold hover:shadow-cyan-glow hover:scale-[1.02] active:scale-[0.98] border border-cyan-300/30"
-            }`}
-          >
-            {isSimulating ? (
-              <>
-                <Zap className="h-4 w-4 text-cyan-400 animate-spin" />
-                <span>Simulating Appeal...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 text-slate-950 fill-slate-950" />
-                <span>⚡ Run Live Simulation</span>
-              </>
-            )}
+            <UploadCloud className="h-4 w-4 fill-slate-950" />
+            <span>+ Ingest Denial Document</span>
           </button>
         </div>
       </div>
