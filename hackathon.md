@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T13:05:00Z
+- **Last updated:** 2026-08-26T13:20:00Z
 
 ## Log
 
@@ -88,6 +88,5 @@ Migrated Full Project Iconography to Phosphor Icons (@phosphor-icons/react): Rep
 ### 2026-08-26 - working tree
 Optimized Case Ingestion Radar Table Layout & Eliminated Horizontal Overflow: Restructured the claims radar table (`src/components/radar/CaseRadar.tsx`) by merging the standalone avatar into the Claim & Patient column, introducing smart payer name normalization (`formatPayerName`), truncating overly verbose CPB/denial titles, streamlining action triggers, and tightening row padding. The entire data table now fits 100% within the container card without triggering undesirable horizontal scrollbars. Verified clean with `npm run verify`.
 
-
-
-
+### 2026-08-26 - working tree
+Restructured Dashboard Sidebar & Workspace Navigation Architecture: Re-architected sidebar navigation (`src/components/layout/Sidebar.tsx`, `Shell.tsx`, `App.tsx`, `CommandDialog.tsx`) into a clean, focused hierarchy separating global platform views (`Case Radar`, `Portfolio Analytics`, `Audit Timeline`) from contextual case workflows (`Evidence Matrix`, `Appeal Studio`, `AgentMail Inbox`). Added an interactive Active Case context card in the sidebar with an inline dropdown switcher to switch active claims directly from any view. Moved all lifecycle status tabs and target payer filters directly into the `CaseRadar` page toolbar (`src/components/radar/CaseRadar.tsx`) with real-time counts, search, and reset triggers. Created an interactive in-view Case Picker empty state (`src/components/common/CasePickerEmptyState.tsx`) eliminating duplicate placeholder cards when navigating without an active claim. Verified with `npm run build` and `npx tsc --noEmit` (100% PASS).

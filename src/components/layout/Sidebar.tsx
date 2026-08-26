@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../../convex/_generated/api";
@@ -9,10 +9,6 @@ import {
   Envelope,
   Clock,
   ChartPieSlice,
-  CheckCircle,
-  WarningCircle,
-  GitFork,
-  Buildings,
   Shield,
   PlusCircle,
   DotsThreeVertical,
@@ -22,10 +18,13 @@ import {
   Copy,
   Check,
   BookOpen,
-  ArrowCounterClockwise,
   SignOut,
   SignIn,
+  User,
+  CaretUpDown,
 } from "@phosphor-icons/react";
+import { Claim } from "../../types";
+import { formatCurrency } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
@@ -37,7 +36,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { INSURERS } from "../../lib/constants";
 import { cn } from "../../lib/utils";
 
 export type NavigationView =
@@ -53,11 +51,9 @@ export type NavigationView =
 interface SidebarProps {
   currentView: NavigationView;
   onSelectView: (view: NavigationView) => void;
-  selectedStatusFilter?: string;
-  onSelectStatusFilter?: (status: string) => void;
-  selectedPayerFilter?: string;
-  onSelectPayerFilter?: (payer: string) => void;
-  claimCountsByStatus?: Record<string, number>;
+  claims?: Claim[];
+  selectedClaim?: Claim | null;
+  onSelectClaim?: (claimId: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onOpenIngestion?: () => void;
@@ -68,11 +64,9 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   currentView,
   onSelectView,
-  selectedStatusFilter = "all",
-  onSelectStatusFilter,
-  selectedPayerFilter = "all",
-  onSelectPayerFilter,
-  claimCountsByStatus = {},
+  claims = [],
+  selectedClaim,
+  onSelectClaim,
   isCollapsed = false,
   onOpenIngestion,
   isDark = true,
@@ -82,11 +76,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { signOut } = useAuthActions();
 
   const isAuthenticated = Boolean(viewer);
-  const userName = viewer?.name || viewer?.email?.split("@")[0] || (viewer === null ? "Guest Officer" : "Sentinel Officer");
-  const userEmail = viewer?.email || (viewer === null ? "Sign In to sync cases" : "sentinel@claimhero.ai");
-  const userInitial = (viewer?.name?.[0] || viewer?.email?.[0] || "S").toUpperCase();
+  const userName =
+    viewer?.name ||
+    viewer?.email?.split("@")[0] ||
+    (viewer === null ? "Guest Officer" : "Sentinel Officer");
+  const userEmail =
+    viewer?.email ||
+    (viewer === null ? "Sign In to sync cases" : "sentinel@claimhero.ai");
+  const userInitial = (
+    viewer?.name?.[0] ||
+    viewer?.email?.[0] ||
+    "S"
+  ).toUpperCase();
 
-  const [copiedEmail, setCopiedEmail] = React.useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText("intake@claimhero.agentmail.com");
@@ -94,47 +97,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setTimeout(() => setCopiedEmail(false), 2000);
   };
 
-  const navItems = [
+  // Group 1: Platform Command & Macro Intelligence
+  const platformNavItems = [
     {
       id: "radar" as NavigationView,
       label: "Case Radar",
+      badge: claims.length > 0 ? `${claims.length}` : undefined,
+      description: "Claims Ingestion & Statutory Alarms",
       icon: Broadcast,
-    },
-    {
-      id: "evidence" as NavigationView,
-      label: "Evidence Matrix",
-      icon: FileMagnifyingGlass,
-    },
-    {
-      id: "studio" as NavigationView,
-      label: "Appeal Studio",
-      icon: FileText,
-    },
-    {
-      id: "communications" as NavigationView,
-      label: "AgentMail Inbox",
-      icon: Envelope,
     },
     {
       id: "analytics" as NavigationView,
       label: "Portfolio Analytics",
+      description: "Recovery Yield & Payer Win Rates",
       icon: ChartPieSlice,
     },
     {
       id: "audit" as NavigationView,
       label: "Audit Timeline",
+      description: "ERISA 29 CFR Immutable Ledger",
       icon: Clock,
     },
   ];
 
-  const statusFilters = [
-    { id: "all", label: "All Cases", icon: GitFork },
-    { id: "ingested", label: "Intake / OCR", icon: Broadcast },
-    { id: "analyzing", label: "CPB Evidence Crawl", icon: FileMagnifyingGlass },
-    { id: "ready_for_review", label: "Ready for Dispatch", icon: FileText },
-    { id: "dispatched", label: "Transmitted to Payer", icon: Envelope },
-    { id: "won", label: "Overturned & Won", icon: CheckCircle },
-    { id: "critical_deadline", label: "Urgent Alarms (<14d)", icon: WarningCircle },
+  // Group 2: Contextual Case Workspace Tools
+  const caseWorkspaceItems = [
+    {
+      id: "evidence" as NavigationView,
+      label: "Evidence Matrix",
+      description: "CPB Guidelines & Overturn Probability",
+      icon: FileMagnifyingGlass,
+    },
+    {
+      id: "studio" as NavigationView,
+      label: "Appeal Studio",
+      description: "AI Legal Brief & Cited Arguments",
+      icon: FileText,
+    },
+    {
+      id: "communications" as NavigationView,
+      label: "AgentMail Inbox",
+      description: "Two-way Payer Transmissions",
+      icon: Envelope,
+    },
   ];
 
   return (
@@ -154,7 +159,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
           title="Open Cinematic Landing Hero"
         >
-          <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0 group-hover:scale-105 transition-transform">
+          <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0 group-hover:scale-105 transition-transform shadow-xs">
             <Shield className="size-4" />
           </div>
           {!isCollapsed && (
@@ -163,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 ClaimHero
               </span>
               <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-muted text-muted-foreground border border-border">
-                Hero
+                Sentinel
               </span>
             </div>
           )}
@@ -174,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center gap-1.5 px-1">
             <button
               onClick={() => onOpenIngestion?.()}
-              className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground h-9 px-3 text-xs font-medium hover:bg-primary/90 transition-colors shadow-xs"
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground h-9 px-3 text-xs font-medium hover:bg-primary/90 transition-colors shadow-xs cursor-pointer"
             >
               <PlusCircle className="size-4" />
               <span>Quick Ingest</span>
@@ -184,7 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               size="icon"
               onClick={() => onSelectView("communications")}
               className="size-9 shrink-0 border-border"
-              title="AgentMail Inbox"
+              title="AgentMail Inbound Gateway"
             >
               <Envelope className="size-4" />
               <span className="sr-only">Inbox</span>
@@ -195,7 +200,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Button
               size="icon"
               onClick={() => onOpenIngestion?.()}
-              className="size-9 rounded-lg"
+              className="size-9 rounded-lg shadow-xs"
               title="Quick Ingest Denial"
             >
               <PlusCircle className="size-4" />
@@ -203,24 +208,159 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Navigation Group: Dashboards */}
+        {/* Group 1: Sentinel Platform (Global Views) */}
         <div className="space-y-1">
           {!isCollapsed && (
-            <div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-              Dashboards
+            <div className="px-2 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+              Sentinel Platform
             </div>
           )}
           <nav className="space-y-0.5">
-            {navItems.map((item) => {
+            {platformNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => onSelectView(item.id)}
-                  title={isCollapsed ? item.label : undefined}
+                  title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
                   className={cn(
-                    "w-full flex items-center rounded-lg text-xs font-medium transition-colors text-left",
+                    "w-full flex items-center rounded-lg text-xs font-medium transition-colors text-left group cursor-pointer",
+                    isCollapsed ? "justify-center p-2" : "justify-between px-2.5 py-1.5",
+                    isActive
+                      ? "bg-secondary text-foreground font-semibold shadow-xs"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  )}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <Icon
+                      className={cn(
+                        "size-4 shrink-0",
+                        isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                      )}
+                    />
+                    {!isCollapsed && <span className="truncate">{item.label}</span>}
+                  </div>
+                  {!isCollapsed && item.badge && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-muted text-muted-foreground font-medium">
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Group 2: Active Case Workspace (Contextual Investigation & Generation) */}
+        <div className="space-y-1.5 pt-1">
+          {!isCollapsed && (
+            <div className="px-2 flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+              <span>Case Workspace</span>
+              {selectedClaim && (
+                <Badge variant="outline" className="text-[9px] font-mono h-4 px-1 border-primary/30 text-primary">
+                  Active
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Active Claim Context Selector Card (Expanded only) */}
+          {!isCollapsed && (
+            <div className="px-1">
+              {selectedClaim ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="w-full flex items-center justify-between p-2 rounded-lg border border-border/80 bg-muted/40 hover:bg-muted/70 transition-colors text-left group cursor-pointer shadow-2xs"
+                      title="Click to switch active claim"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Avatar size="sm" className="size-6 bg-primary/10 text-primary text-[10px] font-bold shrink-0">
+                          <AvatarFallback>
+                            {selectedClaim.patient?.name ? selectedClaim.patient.name.slice(0, 2).toUpperCase() : "PT"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-xs text-foreground truncate max-w-[125px]">
+                            {selectedClaim.patient?.name || "Patient Record"}
+                          </div>
+                          <div className="text-[10px] font-mono text-muted-foreground truncate max-w-[125px]">
+                            #{selectedClaim.claimNumber} • {formatCurrency(selectedClaim.deniedAmount)}
+                          </div>
+                        </div>
+                      </div>
+                      <CaretUpDown className="size-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
+                    </button>
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent align="start" className="w-64 max-h-64 overflow-y-auto">
+                    <DropdownMenuLabel className="text-[10px] font-mono uppercase text-muted-foreground">
+                      Switch Active Claim ({claims.length})
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {claims.map((c) => {
+                      const isCurrent = c._id === selectedClaim._id;
+                      return (
+                        <DropdownMenuItem
+                          key={c._id}
+                          onClick={() => onSelectClaim?.(c._id)}
+                          className={cn(
+                            "flex items-center justify-between gap-2 text-xs py-1.5 cursor-pointer",
+                            isCurrent && "bg-secondary font-semibold"
+                          )}
+                        >
+                          <div className="truncate">
+                            <div className="truncate text-xs text-foreground">
+                              {c.patient?.name || "Patient Record"}
+                            </div>
+                            <div className="text-[10px] font-mono text-muted-foreground">
+                              #{c.claimNumber} • {c.patient?.insurancePayer}
+                            </div>
+                          </div>
+                          <span className="font-mono text-[10px] font-bold text-destructive shrink-0">
+                            {formatCurrency(c.deniedAmount)}
+                          </span>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => onOpenIngestion?.()}
+                      className="gap-2 text-primary font-medium cursor-pointer"
+                    >
+                      <PlusCircle className="size-3.5" />
+                      <span>+ Ingest New Case</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <button
+                  onClick={() => onSelectView("radar")}
+                  className="w-full flex items-center justify-between p-2 rounded-lg border border-dashed border-border bg-muted/20 hover:bg-muted/40 transition-colors text-left text-xs text-muted-foreground cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <User className="size-3.5" />
+                    <span>Select Active Case</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-primary">&rarr;</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Contextual Action Tools */}
+          <nav className="space-y-0.5">
+            {caseWorkspaceItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentView === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectView(item.id)}
+                  title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
+                  className={cn(
+                    "w-full flex items-center rounded-lg text-xs font-medium transition-colors text-left group cursor-pointer",
                     isCollapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-1.5",
                     isActive
                       ? "bg-secondary text-foreground font-semibold shadow-xs"
@@ -230,102 +370,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Icon
                     className={cn(
                       "size-4 shrink-0",
-                      isActive ? "text-foreground" : "text-muted-foreground"
+                      isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
                     )}
                   />
-                  {!isCollapsed && <span>{item.label}</span>}
+                  {!isCollapsed && (
+                    <div className="flex items-center justify-between flex-1 truncate">
+                      <span className="truncate">{item.label}</span>
+                    </div>
+                  )}
                 </button>
               );
             })}
           </nav>
         </div>
-
-        {/* Claim Lifecycle Filters (Expanded only) */}
-        {!isCollapsed && (
-          <>
-            <div className="space-y-1">
-              <div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-                <span>Lifecycle Status</span>
-              </div>
-              <div className="space-y-0.5">
-                {statusFilters.map((filter) => {
-                  const Icon = filter.icon;
-                  const isSelected = selectedStatusFilter === filter.id;
-                  const count =
-                    claimCountsByStatus[filter.id] ??
-                    (filter.id === "all" ? 5 : filter.id === "won" ? 2 : 1);
-
-                  return (
-                    <button
-                      key={filter.id}
-                      onClick={() => onSelectStatusFilter?.(filter.id)}
-                      className={cn(
-                        "w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors text-left",
-                        isSelected
-                          ? "bg-secondary text-foreground font-medium"
-                          : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-                      )}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <Icon className="size-3.5 shrink-0" />
-                        <span className="truncate text-xs">{filter.label}</span>
-                      </div>
-                      {count > 0 && (
-                        <span
-                          className={cn(
-                            "text-[10px] font-mono px-1.5 py-0.2 rounded font-medium",
-                            filter.id === "critical_deadline"
-                              ? "bg-destructive/10 text-destructive"
-                              : filter.id === "won"
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                              : "bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Target Insurer Payers */}
-            <div className="space-y-1">
-              <div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <Buildings className="size-3.5" />
-                <span>Target Payers</span>
-              </div>
-              <div className="flex flex-wrap gap-1 px-1">
-                <button
-                  onClick={() => onSelectPayerFilter?.("all")}
-                  className={cn(
-                    "rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors border",
-                    selectedPayerFilter === "all"
-                      ? "bg-primary text-primary-foreground border-transparent font-semibold"
-                      : "bg-background text-muted-foreground border-border hover:text-foreground"
-                  )}
-                >
-                  All
-                </button>
-                {INSURERS.slice(0, 4).map((ins: (typeof INSURERS)[number]) => (
-                  <button
-                    key={ins.id}
-                    onClick={() => onSelectPayerFilter?.(ins.name)}
-                    className={cn(
-                      "rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors border",
-                      selectedPayerFilter === ins.name
-                        ? "bg-primary text-primary-foreground border-transparent font-semibold"
-                        : "bg-background text-muted-foreground border-border hover:text-foreground"
-                    )}
-                  >
-                    {ins.name.split(" ")[0]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
       </div>
 
       {/* Footer Support Card & User Profile Dropdown */}
@@ -336,7 +393,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="font-semibold text-foreground text-xs">
                 ERISA Sentinel
               </span>
-              <Badge variant="outline" size="sm" className="h-4 px-1.5 text-[9px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+              <Badge
+                variant="outline"
+                size="sm"
+                className="h-4 px-1.5 text-[9px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono"
+              >
                 Active
               </Badge>
             </div>
@@ -387,45 +448,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {isAuthenticated ? (
-              <DropdownMenuItem onClick={() => signOut()} className="gap-2 text-destructive focus:text-destructive">
+              <DropdownMenuItem onClick={() => signOut()} className="gap-2 text-destructive focus:text-destructive cursor-pointer">
                 <SignOut className="size-3.5" />
                 <span>Sign Out of Sentinel</span>
               </DropdownMenuItem>
             ) : (
-              <DropdownMenuItem onClick={() => onSelectView("login")} className="gap-2 font-medium text-primary">
+              <DropdownMenuItem onClick={() => onSelectView("login")} className="gap-2 font-medium text-primary cursor-pointer">
                 <SignIn className="size-3.5" />
                 <span>Sign In / Create Account</span>
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onOpenIngestion?.()} className="gap-2">
+            <DropdownMenuItem onClick={() => onOpenIngestion?.()} className="gap-2 cursor-pointer">
               <CloudArrowUp className="size-3.5" />
               <span>Ingest Denial Notice</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleCopyEmail} className="gap-2">
+            <DropdownMenuItem onClick={handleCopyEmail} className="gap-2 cursor-pointer">
               {copiedEmail ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
               <span>{copiedEmail ? "Address Copied!" : "Copy Inbound Mail Webhook"}</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onToggleTheme?.()} className="gap-2">
+            <DropdownMenuItem onClick={() => onToggleTheme?.()} className="gap-2 cursor-pointer">
               {isDark ? <Sun className="size-3.5 text-amber-500" /> : <Moon className="size-3.5" />}
               <span>Toggle {isDark ? "Light" : "Dark"} Mode</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
-                onSelectStatusFilter?.("all");
-                onSelectPayerFilter?.("all");
-              }}
-              className="gap-2"
-            >
-              <ArrowCounterClockwise className="size-3.5" />
-              <span>Reset Case Filters</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
                 window.open("https://www.dol.gov/agencies/ebsa/about-ebsa/our-activities/resource-center/fact-sheets/claims-procedure-rule", "_blank");
               }}
-              className="gap-2"
+              className="gap-2 cursor-pointer"
             >
               <BookOpen className="size-3.5" />
               <span>ERISA 29 CFR § 2560.503-1</span>

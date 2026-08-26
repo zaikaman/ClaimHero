@@ -13,7 +13,6 @@ import {
   Sun,
   Copy,
   Check,
-  ArrowRight,
   User,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
@@ -86,6 +85,18 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
     }, 1500);
   };
 
+  const platformViews = [
+    { id: "radar" as NavigationView, label: "Case Radar Feed", icon: Broadcast, desc: "Intake & Alarms" },
+    { id: "analytics" as NavigationView, label: "Portfolio Analytics", icon: ChartPieSlice, desc: "Recovery Yield" },
+    { id: "audit" as NavigationView, label: "Audit Timeline", icon: Clock, desc: "ERISA 29 CFR Ledger" },
+  ];
+
+  const caseTools = [
+    { id: "evidence" as NavigationView, label: "Evidence Matrix", icon: FileMagnifyingGlass, desc: "CPBs & Win Score" },
+    { id: "studio" as NavigationView, label: "Appeal Studio", icon: FileText, desc: "AI Brief Synthesis" },
+    { id: "communications" as NavigationView, label: "AgentMail Inbox", icon: Envelope, desc: "Payer Transmissions" },
+  ];
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -112,11 +123,11 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
           </button>
         </div>
 
-        <div className="max-h-[380px] overflow-y-auto p-2 space-y-3">
+        <div className="max-h-[420px] overflow-y-auto p-2 space-y-3">
           {/* Claims Matching Section */}
           <div className="space-y-1">
-            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Denial Claims ({filteredClaims.length})
+            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+              Medical Denial Claims ({filteredClaims.length})
             </div>
 
             {filteredClaims.length === 0 ? (
@@ -124,7 +135,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                 No matching claims found.
               </div>
             ) : (
-              filteredClaims.slice(0, 5).map((claim) => (
+              filteredClaims.slice(0, 4).map((claim) => (
                 <div
                   key={claim._id}
                   onClick={() => handleSelectClaim(claim._id, "radar")}
@@ -178,33 +189,50 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
             )}
           </div>
 
-          {/* Quick Views Navigation */}
+          {/* Platform Dashboards */}
           <div className="space-y-1 border-t border-border/60 pt-2">
-            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Workspace Views
+            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+              Platform Command
             </div>
-            <div className="grid grid-cols-2 gap-1">
-              {[
-                { id: "landing" as NavigationView, label: "Cinematic Landing", icon: Shield },
-                { id: "radar" as NavigationView, label: "Case Radar Feed", icon: Broadcast },
-                { id: "evidence" as NavigationView, label: "Evidence Matrix", icon: FileMagnifyingGlass },
-                { id: "studio" as NavigationView, label: "Appeal Studio", icon: FileText },
-                { id: "communications" as NavigationView, label: "AgentMail Inbox", icon: Envelope },
-                { id: "analytics" as NavigationView, label: "Portfolio Analytics", icon: ChartPieSlice },
-                { id: "audit" as NavigationView, label: "Audit Timeline", icon: Clock },
-              ].map((view) => {
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1">
+              {platformViews.map((view) => {
                 const Icon = view.icon;
                 return (
                   <button
                     key={view.id}
                     onClick={() => handleNavigate(view.id)}
-                    className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-muted-foreground hover:text-foreground text-left transition-colors"
+                    className="flex flex-col px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-muted-foreground hover:text-foreground text-left transition-colors border border-transparent hover:border-border"
                   >
-                    <div className="flex items-center gap-2">
-                      <Icon className="size-3.5" />
+                    <div className="flex items-center gap-1.5 font-medium text-foreground">
+                      <Icon className="size-3.5 text-primary" />
                       <span>{view.label}</span>
                     </div>
-                    <ArrowRight className="size-3 opacity-40" />
+                    <span className="text-[10px] text-muted-foreground truncate">{view.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active Case Workspace Tools */}
+          <div className="space-y-1 border-t border-border/60 pt-2">
+            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+              Active Case Workspace
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1">
+              {caseTools.map((view) => {
+                const Icon = view.icon;
+                return (
+                  <button
+                    key={view.id}
+                    onClick={() => handleNavigate(view.id)}
+                    className="flex flex-col px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-muted-foreground hover:text-foreground text-left transition-colors border border-transparent hover:border-border"
+                  >
+                    <div className="flex items-center gap-1.5 font-medium text-foreground">
+                      <Icon className="size-3.5 text-emerald-500" />
+                      <span>{view.label}</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground truncate">{view.desc}</span>
                   </button>
                 );
               })}
@@ -213,7 +241,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
 
           {/* Quick Sentinel Actions */}
           <div className="space-y-1 border-t border-border/60 pt-2">
-            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
               Quick Sentinel Actions
             </div>
             <div className="space-y-0.5">
@@ -222,7 +250,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                   onClose();
                   onOpenIngestion();
                 }}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors"
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-2">
                   <CloudArrowUp className="size-3.5 text-primary" />
@@ -235,11 +263,11 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
 
               <button
                 onClick={handleCopyEmail}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors"
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-2">
                   <Envelope className="size-3.5 text-emerald-500" />
-                  <span>Copy AgentMail Ingestion Address (intake@claimhero.agentmail.com)</span>
+                  <span>Copy AgentMail Gateway (intake@claimhero.agentmail.com)</span>
                 </div>
                 {copiedEmail ? (
                   <Check className="size-3 text-emerald-500" />
@@ -252,7 +280,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                 onClick={() => {
                   onToggleTheme();
                 }}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors"
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-2">
                   {isDark ? (
@@ -270,7 +298,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                     onClose();
                     onOpenOnboarding();
                   }}
-                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors"
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
                     <Shield className="size-3.5 text-primary" />

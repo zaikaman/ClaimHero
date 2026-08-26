@@ -1,14 +1,14 @@
 import React from "react";
 import { Header } from "./Header";
 import { Sidebar, NavigationView } from "./Sidebar";
+import { Claim } from "../../types";
 
 interface ShellProps {
   currentView: NavigationView;
   onSelectView: (view: NavigationView) => void;
-  selectedStatusFilter: string;
-  onSelectStatusFilter: (status: string) => void;
-  selectedPayerFilter: string;
-  onSelectPayerFilter: (payer: string) => void;
+  claims?: Claim[];
+  selectedClaim?: Claim | null;
+  onSelectClaim?: (claimId: string) => void;
   onOpenIngestion: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
@@ -19,17 +19,15 @@ interface ShellProps {
   totalWonAmount?: number;
   winRate?: number;
   criticalDeadlinesCount?: number;
-  claimCountsByStatus?: Record<string, number>;
   children: React.ReactNode;
 }
 
 export const Shell: React.FC<ShellProps> = ({
   currentView,
   onSelectView,
-  selectedStatusFilter,
-  onSelectStatusFilter,
-  selectedPayerFilter,
-  onSelectPayerFilter,
+  claims = [],
+  selectedClaim,
+  onSelectClaim,
   onOpenIngestion,
   isSidebarCollapsed = false,
   onToggleSidebar,
@@ -40,7 +38,6 @@ export const Shell: React.FC<ShellProps> = ({
   totalWonAmount = 0,
   winRate = 0,
   criticalDeadlinesCount = 0,
-  claimCountsByStatus,
   children,
 }) => {
   return (
@@ -64,11 +61,9 @@ export const Shell: React.FC<ShellProps> = ({
         <Sidebar
           currentView={currentView}
           onSelectView={onSelectView}
-          selectedStatusFilter={selectedStatusFilter}
-          onSelectStatusFilter={onSelectStatusFilter}
-          selectedPayerFilter={selectedPayerFilter}
-          onSelectPayerFilter={onSelectPayerFilter}
-          claimCountsByStatus={claimCountsByStatus}
+          claims={claims}
+          selectedClaim={selectedClaim}
+          onSelectClaim={onSelectClaim}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={onToggleSidebar}
           onOpenIngestion={onOpenIngestion}

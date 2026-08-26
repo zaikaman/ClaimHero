@@ -1,21 +1,23 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   CurrencyDollar,
   TrendUp,
   UserCheck,
   ShieldWarning,
   MagnifyingGlass,
-  Users,
   Buildings,
   DownloadSimple,
   Pulse,
   FileText,
   Clock,
   ArrowUpRight,
+  PlusCircle,
+  Funnel,
+  ArrowCounterClockwise,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
-import { CPT_CODES, DENIAL_REASON_CODES } from "../../lib/constants";
+import { CPT_CODES, DENIAL_REASON_CODES, INSURERS } from "../../lib/constants";
 import { DeadlineCountdown } from "./DeadlineCountdown";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -30,6 +32,7 @@ import {
   TableHead,
   TableCell,
 } from "../ui/table";
+import { cn } from "../../lib/utils";
 
 interface CaseRadarProps {
   claims: Claim[];
@@ -79,25 +82,108 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
       c.overturnProbabilityScore !== undefined &&
       c.overturnProbabilityScore >= 80
   ).length;
-  const criticalCount = claims.filter((c) => c.daysRemaining <= 14).length;
+  const criticalCount = claims.filter(
+    (c) => c.daysRemaining <= 14 && c.status !== "won"
+  ).length;
 
-  const filtered = claims.filter((c) => {
-    if (statusFilter !== "all" && c.status !== statusFilter) return false;
-    if (payerFilter !== "all" && c.patient?.insurancePayer !== payerFilter) return false;
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      c.claimNumber.toLowerCase().includes(q) ||
-      (c.patient?.name && c.patient.name.toLowerCase().includes(q)) ||
-      c.cptCodes.some((code) => code.toLowerCase().includes(q)) ||
-      c.denialReasonCode.toLowerCase().includes(q) ||
-      (c.patient?.insurancePayer && c.patient.insurancePayer.toLowerCase().includes(q))
-    );
-  });
+  // Compute status breakdown counts for filter tabs
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: claims.length,
+      critical_deadline: 0,
+      ingested: 0,
+      analyzing: 0,
+      ready_for_review: 0,
+      dispatched: 0,
+      won: 0,
+    };
+
+    for (const c of claims) {
+      if (counts[c.status] !== undefined) {
+        counts[c.status]++;
+      }
+      if (c.daysRemaining <= 14 && c.status !== "won") {
+        counts.critical_deadline++;
+      }
+    }
+
+    return counts;
+  }, [claims]);
+
+  const filtered = useMemo(() => {
+    return claims.filter((c) => {
+      // 1. Status / Alarm filter
+      if (statusFilter === "critical_deadline") {
+        if (c.daysRemaining > 14 || c.status === "won") return false;
+      } else if (statusFilter !== "all" && c.status !== statusFilter) {
+        return false;
+      }
+
+      // 2. Payer filter
+      if (payerFilter !== "all") {
+        const p = c.patient?.insurancePayer || "";
+        if (!p.toLowerCase().includes(payerFilter.toLowerCase())) {
+          return false;
+        }
+      }
+
+      // 3. Search query filter
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchClaim = c.claimNumber.toLowerCase().includes(q);
+        const matchPatient = c.patient?.name?.toLowerCase().includes(q);
+        const matchCpt = c.cptCodes.some((code) => code.toLowerCase().includes(q));
+        const matchReason = c.denialReasonCode.toLowerCase().includes(q);
+        const matchPayer = c.patient?.insurancePayer?.toLowerCase().includes(q);
+        const matchProvider = c.providerName.toLowerCase().includes(q);
+
+        if (
+          !matchClaim &&
+          !matchPatient &&
+          !matchCpt &&
+          !matchReason &&
+          !matchPayer &&
+          !matchProvider
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [claims, statusFilter, payerFilter, searchQuery]);
+
+  const hasActiveFilters =
+    statusFilter !== "all" || payerFilter !== "all" || Boolean(searchQuery);
+
+  const handleResetFilters = () => {
+    setStatusFilter("all");
+    setPayerFilter("all");
+    setSearchQuery("");
+  };
+
+  const statusTabs = [
+    { id: "all", label: "All Cases", count: statusCounts.all },
+    {
+      id: "critical_deadline",
+      label: "Urgent Alarms (<14d)",
+      count: statusCounts.critical_deadline,
+      isUrgent: true,
+    },
+    { id: "ingested", label: "Intake / OCR", count: statusCounts.ingested },
+    { id: "analyzing", label: "Evidence Crawl", count: statusCounts.analyzing },
+    {
+      id: "ready_for_review",
+      label: "Ready for Dispatch",
+      count: statusCounts.ready_for_review,
+    },
+    { id: "dispatched", label: "Transmitted", count: statusCounts.dispatched },
+    { id: "won", label: "Won / Overturned", count: statusCounts.won, isWon: true },
+  ];
 
   return (
     <div className="space-y-4 animate-fadeIn font-sans">
-      {/* 1. Top 4 Metric Cards */}
+      {/* 1. Top 4 Macro Financial & Risk Metrics */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Disputed Portfolio */}
         <Card className="shadow-xs bg-card">
@@ -136,7 +222,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
           </CardHeader>
           <CardContent className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="font-medium text-2xl sm:text-3xl tabular-nums leading-none tracking-tight text-emerald-600 dark:text-emerald-400">
+              <div className="font-medium text-2xl sm:text-3xl tabular-nums leading-none tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
                 {highRiskCount} Cases
               </div>
               <Badge variant="outline" className="text-[10px] font-mono text-emerald-600 border-emerald-500/30">
@@ -192,7 +278,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <div
                 className={`font-medium text-2xl sm:text-3xl tabular-nums leading-none tracking-tight ${
-                  criticalCount > 0 ? "text-destructive" : "text-foreground"
+                  criticalCount > 0 ? "text-destructive font-mono" : "text-foreground font-mono"
                 }`}
               >
                 {criticalCount} Urgent
@@ -208,16 +294,22 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
         </Card>
       </div>
 
-      {/* 2. Main Claims Table & Toolbar Section */}
+      {/* 2. Main Claims Table & Integrated Radar Control Hub */}
       <Card className="bg-card shadow-xs">
-        <CardHeader className="pb-3 border-b border-border/60">
+        <CardHeader className="pb-3 space-y-3 border-b border-border/60">
+          {/* Header Action Row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-base font-semibold text-foreground">
-                {claims.length} Active Medical Denial Claims
-              </CardTitle>
-              <CardDescription>
-                Recent medical denial records with plan, CPT codes, CARC reason, and statutory countdown.
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base font-semibold text-foreground">
+                  Case Ingestion & Adjudication Radar
+                </CardTitle>
+                <Badge variant="outline" className="font-mono text-[10px]">
+                  {filtered.length} of {claims.length} Cases
+                </Badge>
+              </div>
+              <CardDescription className="text-xs mt-0.5">
+                Active medical denial records with plan coverage, CPT codes, CARC reason, and statutory ERISA clock.
               </CardDescription>
             </div>
 
@@ -226,7 +318,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const csv = claims
+                  const csv = filtered
                     .map(
                       (c) =>
                         `${c.claimNumber},${c.patient?.name},${c.patient?.insurancePayer},${c.deniedAmount},${c.denialReasonCode},${c.daysRemaining}`
@@ -239,70 +331,107 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                   a.download = "claims-export.csv";
                   a.click();
                 }}
-                className="gap-1.5"
+                className="gap-1.5 text-xs h-8"
               >
                 <DownloadSimple className="size-3.5" />
-                <span>Export</span>
+                <span>Export CSV</span>
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={onOpenIngestion}
+                className="gap-1.5 text-xs h-8 shadow-xs"
+              >
+                <PlusCircle className="size-3.5" />
+                <span>Ingest Denial</span>
               </Button>
             </div>
           </div>
 
-          {/* Table Toolbar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2">
+          {/* Integrated Status Tabs Filter Strip */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1">
+            {statusTabs.map((tab) => {
+              const isSelected = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer border",
+                    isSelected
+                      ? "bg-primary text-primary-foreground border-transparent font-semibold shadow-2xs"
+                      : "bg-muted/30 hover:bg-muted/70 text-muted-foreground hover:text-foreground border-border/70"
+                  )}
+                >
+                  <span>{tab.label}</span>
+                  {tab.count > 0 && (
+                    <span
+                      className={cn(
+                        "text-[10px] font-mono px-1.5 py-0.2 rounded-md font-semibold",
+                        isSelected
+                          ? "bg-primary-foreground/20 text-primary-foreground"
+                          : tab.isUrgent
+                          ? "bg-destructive/15 text-destructive"
+                          : tab.isWon
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Table Search & Payer Filter Toolbar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {/* Search Bar */}
               <div className="relative w-full sm:w-64">
                 <MagnifyingGlass className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  className="h-8 pl-8 text-xs"
-                  placeholder="Search claims, patient, CPT..."
+                  className="h-8 pl-8 text-xs bg-background"
+                  placeholder="Search claim, patient, CPT, insurer..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
 
-              {/* Status Filter */}
-              <div className="flex items-center gap-1">
-                <Users className="size-3.5 text-muted-foreground hidden sm:inline" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-8"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="ingested">Ingested / OCR</option>
-                  <option value="analyzing">Evidence Crawl</option>
-                  <option value="ready_for_review">Ready for Review</option>
-                  <option value="dispatched">Dispatched</option>
-                  <option value="won">Won / Overturned</option>
-                </select>
-              </div>
-
-              {/* Payer Filter */}
-              <div className="flex items-center gap-1">
+              {/* Insurer Payer Filter */}
+              <div className="flex items-center gap-1.5">
                 <Buildings className="size-3.5 text-muted-foreground hidden sm:inline" />
                 <select
                   value={payerFilter}
                   onChange={(e) => setPayerFilter(e.target.value)}
-                  className="rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-8"
+                  className="rounded-lg border border-input bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-8"
                 >
-                  <option value="all">All Payers</option>
-                  <option value="UnitedHealthcare">UnitedHealthcare</option>
-                  <option value="Aetna">Aetna</option>
-                  <option value="Cigna">Cigna</option>
-                  <option value="Elevance Health">Elevance Health</option>
+                  <option value="all">All Insurers</option>
+                  {INSURERS.map((ins) => (
+                    <option key={ins.id} value={ins.name}>
+                      {ins.name}
+                    </option>
+                  ))}
                 </select>
               </div>
+
+              {/* Reset Filters CTA if active */}
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResetFilters}
+                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                >
+                  <ArrowCounterClockwise className="size-3" />
+                  <span>Reset</span>
+                </Button>
+              )}
             </div>
 
-            <div className="flex items-center gap-2 self-end sm:self-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onOpenIngestion}
-                className="gap-1.5"
-              >
-                <span>+ Ingest Denial</span>
-              </Button>
+            <div className="text-[11px] font-mono text-muted-foreground self-end sm:self-auto">
+              Showing {filtered.length} claims
             </div>
           </div>
         </CardHeader>
@@ -325,8 +454,26 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
-                    No matching claims found.
+                  <TableCell colSpan={8} className="h-36 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center space-y-2 py-4">
+                      <Funnel className="size-6 text-muted-foreground/60" />
+                      <div className="text-xs font-semibold text-foreground">
+                        No claims match your current filter
+                      </div>
+                      <p className="text-[11px] text-muted-foreground max-w-xs">
+                        Try resetting your search query or switching to &quot;All Cases&quot;.
+                      </p>
+                      {hasActiveFilters && (
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={handleResetFilters}
+                          className="mt-1"
+                        >
+                          Clear Filters
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (

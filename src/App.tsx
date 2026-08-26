@@ -9,6 +9,7 @@ import { AgentMailDrawer } from "./components/communications/AgentMailDrawer";
 import { AuditTimeline } from "./components/communications/AuditTimeline";
 import { AnalyticsMetrics } from "./components/analytics/AnalyticsMetrics";
 import { CommandDialog } from "./components/common/CommandDialog";
+import { CasePickerEmptyState } from "./components/common/CasePickerEmptyState";
 import { useClaims } from "./hooks/useClaims";
 import { useEvidence } from "./hooks/useEvidence";
 import { useCommunications } from "./hooks/useCommunications";
@@ -18,14 +19,10 @@ import { CinematicHero } from "./components/landing/CinematicHero";
 import { AuthPage } from "./components/auth/AuthPage";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
 import { OnboardingChecklist } from "./components/onboarding/OnboardingChecklist";
-import { Card } from "./components/ui/card";
-import { Button } from "./components/ui/button";
-import { ArrowRight, CircleNotch, Shield } from "@phosphor-icons/react";
+import { CircleNotch, Shield } from "@phosphor-icons/react";
 
 export default function App() {
   const { currentView, setCurrentView } = useRouterView();
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [payerFilter, setPayerFilter] = useState<string>("all");
   const [isIngestionOpen, setIsIngestionOpen] = useState<boolean>(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
@@ -46,13 +43,9 @@ export default function App() {
     selectedClaimId,
     setSelectedClaimId,
     stats,
-    claimCountsByStatus,
     uploadAndParseDocument,
     parseDocumentText,
-  } = useClaims({
-    statusFilter,
-    payerFilter,
-  });
+  } = useClaims({});
 
   const {
     evidences,
@@ -185,10 +178,9 @@ export default function App() {
     <Shell
       currentView={currentView}
       onSelectView={setCurrentView}
-      selectedStatusFilter={statusFilter}
-      onSelectStatusFilter={setStatusFilter}
-      selectedPayerFilter={payerFilter}
-      onSelectPayerFilter={setPayerFilter}
+      claims={claims}
+      selectedClaim={selectedClaim}
+      onSelectClaim={setSelectedClaimId}
       onOpenIngestion={handleOpenIngestion}
       isSidebarCollapsed={isSidebarCollapsed}
       onToggleSidebar={handleToggleSidebar}
@@ -199,7 +191,6 @@ export default function App() {
       totalWonAmount={stats.overturnedWonAmount}
       winRate={stats.averageWinScore}
       criticalDeadlinesCount={stats.criticalDeadlinesCount}
-      claimCountsByStatus={claimCountsByStatus}
     >
       {isLoading ? (
         <div className="flex h-full items-center justify-center space-y-3 flex-col">
@@ -210,7 +201,7 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* 1. Case Ingestion Radar View */}
+          {/* 1. Case Ingestion Radar View (Platform) */}
           {currentView === "radar" && (
             <CaseRadar
               claims={claims}
@@ -221,7 +212,7 @@ export default function App() {
             />
           )}
 
-          {/* 2. Clinical Policy Evidence Matrix & Inspector */}
+          {/* 2. Clinical Policy Evidence Matrix & Inspector (Active Case Workspace) */}
           {currentView === "evidence" &&
             (selectedClaim ? (
               <EvidenceMatrix
@@ -233,26 +224,16 @@ export default function App() {
                 onNavigateToStudio={() => setCurrentView("studio")}
               />
             ) : (
-              <Card className="p-12 text-center items-center justify-center space-y-3 bg-muted/20 border-dashed">
-                <div className="text-sm font-semibold text-foreground">
-                  No Claim Selected
-                </div>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  Please select a claim from the Case Radar Feed to inspect its Clinical Policy Bulletin evidence and calculate its win probability.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentView("radar")}
-                  className="gap-1"
-                >
-                  <span>Go to Case Radar</span>
-                  <ArrowRight className="size-3" />
-                </Button>
-              </Card>
+              <CasePickerEmptyState
+                viewType="evidence"
+                claims={claims}
+                onSelectClaim={setSelectedClaimId}
+                onOpenIngestion={handleOpenIngestion}
+                onNavigateToRadar={() => setCurrentView("radar")}
+              />
             ))}
 
-          {/* 3. Collaborative Appeal Studio */}
+          {/* 3. Collaborative Appeal Studio (Active Case Workspace) */}
           {currentView === "studio" &&
             (selectedClaim ? (
               <AppealStudio
@@ -262,26 +243,16 @@ export default function App() {
                 onNavigateToEvidence={() => setCurrentView("evidence")}
               />
             ) : (
-              <Card className="p-12 text-center items-center justify-center space-y-3 bg-muted/20 border-dashed">
-                <div className="text-sm font-semibold text-foreground">
-                  No Claim Selected
-                </div>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  Please select a claim from the Case Radar Feed to synthesize and collaboratively edit an ERISA appeal brief.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentView("radar")}
-                  className="gap-1"
-                >
-                  <span>Go to Case Radar</span>
-                  <ArrowRight className="size-3" />
-                </Button>
-              </Card>
+              <CasePickerEmptyState
+                viewType="studio"
+                claims={claims}
+                onSelectClaim={setSelectedClaimId}
+                onOpenIngestion={handleOpenIngestion}
+                onNavigateToRadar={() => setCurrentView("radar")}
+              />
             ))}
 
-          {/* 4. Dedicated AgentMail Claim Inbox */}
+          {/* 4. Dedicated AgentMail Claim Inbox (Active Case Workspace) */}
           {currentView === "communications" &&
             (selectedClaim ? (
               <AgentMailDrawer
@@ -293,39 +264,28 @@ export default function App() {
                 onDispatchAppeal={dispatchAppeal}
               />
             ) : (
-              <Card className="p-12 text-center items-center justify-center space-y-3 bg-muted/20 border-dashed">
-                <div className="text-sm font-semibold text-foreground">
-                  No Claim Selected
-                </div>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  Please select a claim from the Case Radar to view its dedicated AgentMail inbox and transmission history.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentView("radar")}
-                  className="gap-1"
-                >
-                  <span>Go to Case Radar</span>
-                  <ArrowRight className="size-3" />
-                </Button>
-              </Card>
+              <CasePickerEmptyState
+                viewType="communications"
+                claims={claims}
+                onSelectClaim={setSelectedClaimId}
+                onOpenIngestion={handleOpenIngestion}
+                onNavigateToRadar={() => setCurrentView("radar")}
+              />
             ))}
 
-          {/* 5. Portfolio Recovery & Overturn Analytics */}
+          {/* 5. Portfolio Recovery & Overturn Analytics (Platform) */}
           {currentView === "analytics" && (
             <AnalyticsMetrics
               stats={portfolioStats}
               isLoading={isLoadingPortfolioStats}
-              onSelectPayerFilter={(payer) => {
-                setPayerFilter(payer);
+              onSelectPayerFilter={() => {
                 setCurrentView("radar");
               }}
               onNavigateToRadar={() => setCurrentView("radar")}
             />
           )}
 
-          {/* 6. Immutable Case Audit Timeline */}
+          {/* 6. Immutable Case Audit Timeline (Platform) */}
           {currentView === "audit" && (
             <AuditTimeline
               claim={selectedClaim}
