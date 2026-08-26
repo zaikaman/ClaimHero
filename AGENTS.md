@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-constitution principles, and architectural requirements, read:
-.specify/memory/constitution.md
+constitution principles, and architectural requirements, read the current plan:
+specs/001-appeal-sentinel/plan.md
 <!-- SPECKIT END -->
 
 # Agent Behavior & Project Guidelines
