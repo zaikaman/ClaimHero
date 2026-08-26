@@ -163,7 +163,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
         <Card className="p-4 border-emerald-500/30 bg-emerald-500/5 space-y-3">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border/60 pb-3">
             <div className="flex items-center gap-3.5">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-bold text-xl">
+              <div className="flex h-12 min-w-[4.5rem] shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 font-mono text-lg font-bold tracking-tight tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-xl">
                 {scoringResult
                   ? scoringResult.overturnProbabilityScore
                   : claim.overturnProbabilityScore}
