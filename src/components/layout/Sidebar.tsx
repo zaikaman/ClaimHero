@@ -37,6 +37,7 @@ import { INSURERS } from "../../lib/constants";
 import { cn } from "../../lib/utils";
 
 export type NavigationView =
+  | "landing"
   | "radar"
   | "evidence"
   | "studio"
@@ -132,8 +133,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       <div className="space-y-4 w-full">
         {/* Brand Header */}
-        <div className={cn("flex items-center gap-2.5 px-2 py-1", isCollapsed && "justify-center px-0")}>
-          <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0">
+        <button
+          onClick={() => onSelectView("landing")}
+          className={cn(
+            "w-full flex items-center gap-2.5 px-2 py-1 rounded-lg hover:bg-muted/60 transition-colors text-left group cursor-pointer",
+            isCollapsed && "justify-center px-0"
+          )}
+          title="Open Cinematic Landing Hero"
+        >
+          <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0 group-hover:scale-105 transition-transform">
             <Shield className="size-4" />
           </div>
           {!isCollapsed && (
@@ -141,9 +149,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="font-semibold text-base tracking-tight text-foreground">
                 ClaimHero
               </span>
+              <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-muted text-muted-foreground border border-border">
+                Hero
+              </span>
             </div>
           )}
-        </div>
+        </button>
 
         {/* Quick Ingest Row */}
         {!isCollapsed ? (

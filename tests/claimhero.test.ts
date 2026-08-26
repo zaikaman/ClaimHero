@@ -196,3 +196,31 @@ describe("Phase 8: End-to-End Workflow State Lifecycle", () => {
     expect(validLifecycle).toContain("dispatched");
   });
 });
+
+describe("ClaimHero SPA URL Routing", () => {
+  it("resolves homepage and distinct dashboard routes accurately", async () => {
+    const { parsePathToView, VIEW_TO_PATH_MAP } = await import("../src/hooks/useRouterView");
+
+    // Homepage
+    expect(parsePathToView("/")).toBe("landing");
+    expect(parsePathToView("")).toBe("landing");
+
+    // Main Dashboard & Sub-routes
+    expect(parsePathToView("/app")).toBe("radar");
+    expect(parsePathToView("/dashboard")).toBe("radar");
+    expect(parsePathToView("/app/evidence")).toBe("evidence");
+    expect(parsePathToView("/app/studio")).toBe("studio");
+    expect(parsePathToView("/app/inbox")).toBe("communications");
+    expect(parsePathToView("/app/analytics")).toBe("analytics");
+    expect(parsePathToView("/app/audit")).toBe("audit");
+
+    // Hash fallback
+    expect(parsePathToView("/", "#/evidence")).toBe("evidence");
+    expect(parsePathToView("/", "#radar")).toBe("radar");
+
+    // View to Path mapping
+    expect(VIEW_TO_PATH_MAP.landing).toBe("/");
+    expect(VIEW_TO_PATH_MAP.radar).toBe("/app");
+    expect(VIEW_TO_PATH_MAP.evidence).toBe("/app/evidence");
+  });
+});

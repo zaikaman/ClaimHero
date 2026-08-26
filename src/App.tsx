@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Shell } from "./components/layout/Shell";
-import { NavigationView } from "./components/layout/Sidebar";
+
 import { CaseRadar } from "./components/radar/CaseRadar";
 import { IngestionModal } from "./components/radar/IngestionModal";
 import { EvidenceMatrix } from "./components/evidence/EvidenceMatrix";
@@ -12,12 +12,14 @@ import { CommandDialog } from "./components/common/CommandDialog";
 import { useClaims } from "./hooks/useClaims";
 import { useEvidence } from "./hooks/useEvidence";
 import { useCommunications } from "./hooks/useCommunications";
+import { useRouterView } from "./hooks/useRouterView";
+import { CinematicHero } from "./components/landing/CinematicHero";
 import { Card } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { ArrowRight, Loader2 } from "lucide-react";
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<NavigationView>("radar");
+  const { currentView, setCurrentView } = useRouterView();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [payerFilter, setPayerFilter] = useState<string>("all");
   const [isIngestionOpen, setIsIngestionOpen] = useState<boolean>(false);
@@ -104,6 +106,14 @@ export default function App() {
     setSelectedClaimId(claimId);
     setCurrentView("radar");
   };
+
+  if (currentView === "landing") {
+    return (
+      <CinematicHero
+        onEnterConsole={(view) => setCurrentView(view || "radar")}
+      />
+    );
+  }
 
   return (
     <Shell

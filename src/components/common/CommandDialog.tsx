@@ -7,6 +7,7 @@ import {
   Mail,
   PieChart,
   Clock,
+  Shield,
   UploadCloud,
   Moon,
   Sun,
@@ -182,6 +183,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
             </div>
             <div className="grid grid-cols-2 gap-1">
               {[
+                { id: "landing" as NavigationView, label: "Cinematic Landing", icon: Shield },
                 { id: "radar" as NavigationView, label: "Case Radar Feed", icon: Radar },
                 { id: "evidence" as NavigationView, label: "Evidence Matrix", icon: FileSearch },
                 { id: "studio" as NavigationView, label: "Appeal Studio", icon: FileText },

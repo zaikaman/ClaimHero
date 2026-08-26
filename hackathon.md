@@ -12,7 +12,7 @@
 - **Auth:** none
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T11:45:00Z
+- **Last updated:** 2026-08-26T12:05:00Z
 
 ## Log
 
@@ -60,3 +60,12 @@ Completed Phase 8 Polish & Cross-Cutting Concerns (T042-T046): Expanded unit and
 
 ### 2026-08-26 - working tree
 Completed Comprehensive UI & Design System Revamp: Re-architected frontend presentation layer with modern UI primitives (`src/components/ui/` including Button, Badge, Card, Tabs, Table, Dialog, Separator, Progress, Alert, Input, Textarea, Avatar) and refined theme tokens (`tailwind.config.js`, `src/index.css`). Redesigned all major sentinel interfaces including the Case Ingestion Radar (`CaseRadar.tsx`), Clinical Evidence Matrix (`EvidenceMatrix.tsx`, `PolicyViewer.tsx`, `PrecedentFeed.tsx`), Collaborative Appeal Studio (`AppealStudio.tsx`, `CitationSidebar.tsx`, `ExportDrawer.tsx`), Dedicated AgentMail Inbox (`AgentMailDrawer.tsx`), Portfolio Financial Analytics (`AnalyticsMetrics.tsx`), and Case Audit Timeline (`AuditTimeline.tsx`). Verified complete test suite and production build cleanly with `npm run verify`.
+
+### 2026-08-26 - working tree
+Built Full-Viewport Cinematic Landing Hero for ClaimHero: Implemented standalone, non-scrolling cinematic hero section (`src/components/landing/CinematicHero.tsx`) featuring looping full-screen ambient video background, CSS gradient masked bottom blur overlay (`.bottom-blur-mask`), reusable liquid glass UI primitives (`.liquid-glass` with border-only pseudo-element mask gradient), and staggered blur-fade-up entry transitions (`.animate-blur-fade-up`). Crafted high-conviction clinical defense copy tailored to ClaimHero's autonomous appeal mission with interactive multi-slide feature spotlights (Autonomous Appeal Sentinel, Clinical Policy Bulletin Precedent Crawling, Direct AgentMail Payer Gateway). Seamlessly connected landing CTAs with live case radar, ingestion modal, and global command search. Verified 100% build health and 16 unit tests with `npm run verify`.
+
+### 2026-08-26 - working tree
+Integrated Dynamic SPA URL Routing for Homepage & Dashboard: Implemented reactive URL synchronization hook (`src/hooks/useRouterView.ts`) providing distinct browser URLs for the Cinematic Homepage (`/`) and Console Dashboard views (`/app`, `/app/evidence`, `/app/studio`, `/app/inbox`, `/app/analytics`, `/app/audit`). Added full browser History API integration (`pushState`, `replaceState`, and `popstate` Back/Forward listener) alongside hash-routing fallback (`#/evidence`, `#/radar`). Added comprehensive router unit tests (`tests/claimhero.test.ts`) and verified cleanly with `npm run verify` (17/17 tests PASS).
+
+### 2026-08-26 - working tree
+Refined Homepage as Pure Cinematic Showcase: Streamlined Homepage interface (`src/components/landing/CinematicHero.tsx`) to act strictly as a product showcase without embedding functional workspace modals. Configured all landing CTAs ("Launch Sentinel", "Inspect Evidence Matrix", "Launch Console") to navigate directly to the respective console routes (`/app`), keeping the landing viewport pristine and dedicated to presentation. Verified cleanly with `npm run verify` (17/17 tests PASS).
