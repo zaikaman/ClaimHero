@@ -10,6 +10,11 @@ interface ShellProps {
   selectedPayerFilter: string;
   onSelectPayerFilter: (payer: string) => void;
   onOpenIngestion: () => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
+  onOpenCommandPalette?: () => void;
+  isDark?: boolean;
+  onToggleTheme?: () => void;
   totalDisputedAmount?: number;
   totalWonAmount?: number;
   winRate?: number;
@@ -26,6 +31,11 @@ export const Shell: React.FC<ShellProps> = ({
   selectedPayerFilter,
   onSelectPayerFilter,
   onOpenIngestion,
+  isSidebarCollapsed = false,
+  onToggleSidebar,
+  onOpenCommandPalette,
+  isDark = true,
+  onToggleTheme,
   totalDisputedAmount = 0,
   totalWonAmount = 0,
   winRate = 0,
@@ -34,17 +44,21 @@ export const Shell: React.FC<ShellProps> = ({
   children,
 }) => {
   return (
-    <div className="flex h-screen w-full flex-col bg-[#0b0f17] text-slate-100 antialiased overflow-hidden selection:bg-cyan-500/30 selection:text-cyan-300">
-      {/* Top Fixed Header */}
+    <div className="flex h-screen w-full flex-col bg-background text-foreground antialiased overflow-hidden">
+      {/* Top Header */}
       <Header
         onOpenIngestion={onOpenIngestion}
+        onToggleSidebar={onToggleSidebar}
+        onOpenCommandPalette={onOpenCommandPalette}
+        isDark={isDark}
+        onToggleTheme={onToggleTheme}
         totalDisputedAmount={totalDisputedAmount}
         totalWonAmount={totalWonAmount}
         winRate={winRate}
         criticalDeadlinesCount={criticalDeadlinesCount}
       />
 
-      {/* Main Workspace: Sidebar + Dynamic Main Pane */}
+      {/* Main Workspace Layout */}
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           currentView={currentView}
@@ -54,9 +68,14 @@ export const Shell: React.FC<ShellProps> = ({
           selectedPayerFilter={selectedPayerFilter}
           onSelectPayerFilter={onSelectPayerFilter}
           claimCountsByStatus={claimCountsByStatus}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={onToggleSidebar}
+          onOpenIngestion={onOpenIngestion}
+          isDark={isDark}
+          onToggleTheme={onToggleTheme}
         />
 
-        <main className="flex-1 overflow-y-auto bg-[#0b0f17]/60 bg-grid-pattern p-4 lg:p-6">
+        <main className="flex-1 overflow-y-auto bg-background/50 p-4 md:p-6">
           <div className="mx-auto max-w-7xl h-full flex flex-col">{children}</div>
         </main>
       </div>

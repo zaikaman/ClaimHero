@@ -14,7 +14,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { Claim, EmailMessage, EmailThread } from "../../types";
-import { formatDate } from "../../lib/utils";
+import { formatDate, cn } from "../../lib/utils";
+import { Card } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 
 interface AgentMailDrawerProps {
   claim: Claim;
@@ -74,127 +78,135 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-4 animate-fadeIn">
       {/* Inbox Header Card */}
-      <div className="rounded-2xl border border-cyan-500/30 bg-slate-950/95 p-5 shadow-glass-panel">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-950/60 border border-cyan-500/40 shadow-cyan-glow">
-              <Mail className="h-6 w-6 text-cyan-400" />
+      <Card className="p-4 bg-card border-border">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
+              <Mail className="size-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-white font-sans">
-                  Autonomous AgentMail Claim Inbox
+                <h2 className="text-base font-semibold text-foreground font-sans">
+                  AgentMail Claim Inbox
                 </h2>
-                <span className="rounded-full bg-cyan-950/60 border border-cyan-500/40 px-2 py-0.5 text-[10px] font-mono text-cyan-300 font-semibold uppercase">
-                  Active Thread
-                </span>
+                <Badge variant="outline" className="font-mono text-[10px]">
+                  Claim #{claim.claimNumber}
+                </Badge>
               </div>
-              <p className="text-xs text-slate-400">
-                Autonomous two-way dedicated transmission channel for Claim #{claim.claimNumber}
+              <p className="text-xs text-muted-foreground">
+                Autonomous two-way dedicated transmission channel
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {claim.status !== "dispatched" && claim.status !== "won" && onDispatchAppeal && (
-              <button
-                onClick={handleRunDispatch}
-                disabled={isDispatching}
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 px-4 py-2 text-xs font-bold text-slate-950 shadow-cyan-glow hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-              >
-                {isDispatching ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin text-slate-950" />
-                    <span>Dispatching via AgentMail...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 fill-slate-950" />
-                    <span>Dispatch Appeal Packet Now</span>
-                  </>
-                )}
-              </button>
-            )}
+          <div className="flex items-center gap-2">
+            {claim.status !== "dispatched" &&
+              claim.status !== "won" &&
+              onDispatchAppeal && (
+                <Button
+                  size="sm"
+                  onClick={handleRunDispatch}
+                  disabled={isDispatching}
+                  className="gap-1.5"
+                >
+                  {isDispatching ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      <span>Dispatching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="size-3.5" />
+                      <span>Dispatch Appeal Packet</span>
+                    </>
+                  )}
+                </Button>
+              )}
           </div>
         </div>
 
         {/* Assigned Email Address Banner */}
-        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-3 text-xs">
+        <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2.5 rounded-lg border border-border bg-muted/40 p-2.5 text-xs">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-slate-400">Assigned Case Inbox:</span>
-            <span className="font-mono font-bold text-cyan-300">{assignedEmail}</span>
+            <span className="text-[11px] text-muted-foreground">Case Inbox:</span>
+            <span className="font-mono font-semibold text-foreground">{assignedEmail}</span>
           </div>
 
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={handleCopyEmail}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-850 bg-slate-950 px-2.5 py-1 text-xs text-slate-300 hover:text-white transition-colors"
+            className="gap-1"
           >
-            {copiedEmail ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+            {copiedEmail ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
             <span>{copiedEmail ? "Copied" : "Copy Address"}</span>
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       {/* Two-Column Communication Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left Column: Payer Information & Thread Summary (4 Cols) */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
-            <span className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
-              <Building2 className="h-4 w-4 text-cyan-400" />
-              Recipient Insurer Contact
-            </span>
+        <div className="lg:col-span-4 space-y-3">
+          <Card className="p-4 space-y-3">
+            <div className="text-xs font-semibold text-foreground flex items-center gap-1.5 border-b border-border pb-2.5">
+              <Building2 className="size-4 text-muted-foreground" />
+              <span>Recipient Insurer Contact</span>
+            </div>
 
-            <div className="space-y-2 text-xs">
+            <div className="space-y-2.5 text-xs">
               <div>
-                <span className="text-[10px] font-mono text-slate-500 block">Payer</span>
-                <span className="font-semibold text-white">{payer} (Grievance & Appeals)</span>
+                <span className="text-[10px] font-mono text-muted-foreground block">Payer</span>
+                <span className="font-semibold text-foreground">{payer} (Grievance & Appeals)</span>
               </div>
 
               <div>
-                <span className="text-[10px] font-mono text-slate-500 block">Payer Intake Gateway</span>
-                <span className="font-mono text-cyan-300">
-                  {threads[0]?.payerEmail || `appeals-department@${payer.toLowerCase().replace(/[^a-z]/g, "")}.com`}
+                <span className="text-[10px] font-mono text-muted-foreground block">Intake Gateway</span>
+                <span className="font-mono text-foreground">
+                  {threads[0]?.payerEmail ||
+                    `appeals-department@${payer.toLowerCase().replace(/[^a-z]/g, "")}.com`}
                 </span>
               </div>
 
               <div>
-                <span className="text-[10px] font-mono text-slate-500 block">Transmission Status</span>
-                <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  {claim.status === "dispatched" || claim.status === "won" ? "Dispatched & Logged" : "Drafting in Progress"}
+                <span className="text-[10px] font-mono text-muted-foreground block">Status</span>
+                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                  <CheckCircle2 className="size-3.5" />
+                  {claim.status === "dispatched" || claim.status === "won"
+                    ? "Dispatched & Logged"
+                    : "Drafting in Progress"}
                 </span>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
 
         {/* Right Column: Live Message Feed & Reply Composer (8 Cols) */}
-        <div className="lg:col-span-8 flex flex-col rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden shadow-glass-panel">
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 bg-slate-900/60 shrink-0">
-            <span className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Inbox className="h-4 w-4 text-cyan-400" />
-              Two-Way Transmission History ({messages.length})
-            </span>
-            <span className="text-[11px] font-mono text-slate-400">
-              Webhook: Active
-            </span>
+        <Card className="lg:col-span-8 flex flex-col p-0 overflow-hidden bg-card border-border">
+          <div className="flex items-center justify-between border-b border-border px-4 py-2.5 bg-muted/30 shrink-0">
+            <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Inbox className="size-4 text-muted-foreground" />
+              <span>Transmission History ({messages.length})</span>
+            </div>
+            <Badge variant="outline" size="sm" className="text-[10px]">
+              Webhook Active
+            </Badge>
           </div>
 
           {/* Messages Container */}
-          <div className="flex-1 p-4 space-y-4 overflow-y-auto max-h-[480px]">
+          <div className="flex-1 p-4 space-y-3 overflow-y-auto max-h-[440px]">
             {isLoading ? (
-              <div className="p-8 text-center text-xs font-mono text-slate-400 animate-pulse">
+              <div className="p-8 text-center text-xs font-mono text-muted-foreground animate-pulse">
                 Loading communication history...
               </div>
             ) : messages.length === 0 ? (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-8 text-center space-y-2">
-                <Mail className="mx-auto h-8 w-8 text-slate-600" />
-                <div className="text-xs font-semibold text-slate-300">No transmissions sent or received yet</div>
-                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                  Click &quot;Dispatch Appeal Packet Now&quot; to send the complete synthesized ERISA brief directly to the insurer via AgentMail.
+              <div className="p-8 text-center items-center justify-center space-y-2 text-muted-foreground">
+                <Mail className="size-8 mx-auto text-muted-foreground/60" />
+                <div className="text-xs font-medium text-foreground">No transmissions yet</div>
+                <p className="text-[11px] max-w-sm mx-auto">
+                  Click &quot;Dispatch Appeal Packet&quot; above to transmit the synthesized ERISA brief to the insurer via AgentMail.
                 </p>
               </div>
             ) : (
@@ -204,47 +216,49 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 return (
                   <div
                     key={msg._id}
-                    className={`rounded-xl border p-4 space-y-2.5 transition-all ${
+                    className={cn(
+                      "rounded-xl border p-3.5 space-y-2 transition-all",
                       isOutbound
-                        ? "border-cyan-500/30 bg-cyan-950/20 ml-6"
-                        : "border-emerald-500/40 bg-emerald-950/20 mr-6"
-                    }`}
+                        ? "border-border bg-muted/30 ml-4"
+                        : "border-emerald-500/20 bg-emerald-500/5 mr-4"
+                    )}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span
-                          className={`rounded px-2 py-0.5 text-[10px] font-mono font-bold uppercase flex items-center gap-1 border ${
-                            isOutbound
-                              ? "bg-cyan-950 text-cyan-300 border-cyan-500/40"
-                              : "bg-emerald-950 text-emerald-300 border-emerald-500/40"
-                          }`}
+                        <Badge
+                          variant={isOutbound ? "secondary" : "default"}
+                          className="font-mono text-[10px] gap-1"
                         >
-                          {isOutbound ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownLeft className="h-3 w-3" />}
-                          {isOutbound ? "Outbound Dispatch" : "Inbound Response"}
-                        </span>
-                        <span className="font-mono text-xs font-bold text-white">
+                          {isOutbound ? (
+                            <ArrowUpRight className="size-3" />
+                          ) : (
+                            <ArrowDownLeft className="size-3" />
+                          )}
+                          <span>{isOutbound ? "Outbound" : "Inbound"}</span>
+                        </Badge>
+                        <span className="font-mono text-xs font-semibold text-foreground">
                           {isOutbound ? msg.recipient : msg.sender}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
-                        <Clock className="h-3 w-3" />
+                      <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
+                        <Clock className="size-3" />
                         <span>{formatDate(msg.receivedAt)}</span>
                       </div>
                     </div>
 
-                    <div className="text-xs font-semibold text-slate-200">
+                    <div className="text-xs font-semibold text-foreground">
                       Subject: {msg.subject}
                     </div>
 
-                    <div className="rounded-lg bg-slate-950/80 border border-slate-800 p-3 text-xs text-slate-300 font-mono whitespace-pre-line leading-relaxed">
+                    <div className="rounded-lg bg-background border border-border p-3 text-xs text-foreground/90 font-mono whitespace-pre-line leading-relaxed">
                       {msg.bodyText}
                     </div>
 
                     {msg.hasAttachments && (
-                      <div className="flex items-center gap-1 text-[11px] font-mono text-cyan-300 pt-1">
-                        <Paperclip className="h-3.5 w-3.5" />
-                        <span>Attached: Formal ERISA Appeal Brief & Clinical Policy Exhibits (PDF/Markdown)</span>
+                      <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground pt-0.5">
+                        <Paperclip className="size-3" />
+                        <span>Attached: ERISA Appeal Packet & Clinical Policy Exhibits (PDF/MD)</span>
                       </div>
                     )}
                   </div>
@@ -253,25 +267,33 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             )}
           </div>
 
-          {/* Quick Message Composer */}
-          <form onSubmit={handleSendReply} className="p-3 bg-slate-900/80 border-t border-slate-800 flex items-center gap-2">
-            <input
+          {/* Reply Composer */}
+          <form
+            onSubmit={handleSendReply}
+            className="p-3 bg-muted/20 border-t border-border flex items-center gap-2"
+          >
+            <Input
               type="text"
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Type addendum or reply to payer grievance department..."
-              className="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-200 placeholder-slate-600 focus:border-cyan-400 focus:outline-none font-sans"
+              placeholder="Type addendum or reply to payer..."
+              className="flex-1 bg-background"
             />
-            <button
+            <Button
               type="submit"
+              size="sm"
               disabled={isSending || !replyText.trim()}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-cyan-400 transition-colors disabled:opacity-50"
+              className="gap-1"
             >
-              {isSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              {isSending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Send className="size-3.5" />
+              )}
               <span>Send</span>
-            </button>
+            </Button>
           </form>
-        </div>
+        </Card>
       </div>
     </div>
   );

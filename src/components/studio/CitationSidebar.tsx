@@ -8,6 +8,9 @@ import {
   Shield,
 } from "lucide-react";
 import { ClinicalEvidence } from "../../types";
+import { Card } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 
 interface CitationSidebarProps {
   evidences: ClinicalEvidence[];
@@ -47,114 +50,119 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div className="flex items-center justify-between border-b border-border pb-2.5">
         <div className="flex items-center gap-2">
-          <BookOpen className="h-4 w-4 text-cyan-400" />
-          <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-            Evidence & Citation Vault
+          <BookOpen className="size-4 text-muted-foreground" />
+          <span className="text-xs font-semibold text-foreground">
+            Citation Vault
           </span>
         </div>
-        <span className="rounded bg-cyan-950/60 border border-cyan-500/40 px-1.5 py-0.5 text-[10px] font-mono text-cyan-300">
+        <Badge variant="outline" className="font-mono text-[10px]">
           {evidences.length} Clauses
-        </span>
+        </Badge>
       </div>
 
-      {/* 1. Quick Statutory Law Snippets */}
+      {/* 1. Statutory ERISA Templates */}
       <div className="space-y-2">
-        <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-          <Scale className="h-3 w-3 text-cyan-400" />
+        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+          <Scale className="size-3" />
           <span>Statutory ERISA Templates</span>
-        </span>
+        </div>
 
         <div className="space-y-2">
           {QUICK_LEGAL_SNIPPETS.map((snippet, idx) => (
-            <div
+            <Card
               key={idx}
-              className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-2 hover:border-cyan-500/40 transition-colors group"
+              className="p-3 space-y-2 bg-card hover:bg-muted/30 transition-colors"
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-xs font-bold text-cyan-300">
+                <span className="font-mono text-xs font-medium text-foreground">
                   {snippet.title}
                 </span>
-                <button
+                <Button
+                  variant="outline"
+                  size="xs"
                   onClick={() => onInsertSnippet(snippet.snippet)}
-                  className="inline-flex items-center gap-1 rounded bg-cyan-950 border border-cyan-500/40 px-2 py-0.5 text-[10px] font-mono font-semibold text-cyan-300 hover:bg-cyan-900 transition-colors"
+                  className="gap-1"
                 >
-                  <Plus className="h-3 w-3" />
+                  <Plus className="size-3" />
                   <span>Insert</span>
-                </button>
+                </Button>
               </div>
-              <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+              <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
                 {snippet.snippet.replace(/^> \*\*.*?\*\*: /, "")}
               </p>
-            </div>
+            </Card>
           ))}
         </div>
       </div>
 
       {/* 2. Indexed CPB Evidences */}
       <div className="space-y-2 flex-1 overflow-y-auto">
-        <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-          <Shield className="h-3 w-3 text-emerald-400" />
-          <span>Retrieved CPB Citations ({evidences.length})</span>
-        </span>
+        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+          <Shield className="size-3" />
+          <span>CPB Citations ({evidences.length})</span>
+        </div>
 
         {evidences.length === 0 ? (
-          <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-4 text-center text-xs text-slate-500">
+          <Card className="p-4 text-center text-xs text-muted-foreground bg-muted/20 border-dashed">
             No policy clauses indexed yet. Run policy crawl in the Evidence Matrix tab.
-          </div>
+          </Card>
         ) : (
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {evidences.map((item, idx) => (
-              <div
+              <Card
                 key={item._id}
-                className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-2 hover:border-emerald-500/40 transition-colors group"
+                className="p-3 space-y-2 bg-card hover:bg-muted/30 transition-colors"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className="font-mono text-[11px] font-bold text-emerald-300 block">
+                    <span className="font-mono text-xs font-semibold text-foreground block">
                       {item.citationClause}
                     </span>
-                    <span className="text-[11px] text-white font-medium line-clamp-1">
+                    <span className="text-[11px] text-muted-foreground line-clamp-1">
                       {item.title}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
                       onClick={() =>
                         handleCopy(
                           idx,
                           `> **Policy Citation (${item.citationClause})**: ${item.extractedEvidenceMarkdown}`
                         )
                       }
-                      className="p-1 rounded text-slate-500 hover:text-slate-200"
                       title="Copy to clipboard"
                     >
                       {copiedIndex === idx ? (
-                        <Check className="h-3 w-3 text-emerald-400" />
+                        <Check className="size-3 text-emerald-500" />
                       ) : (
-                        <Copy className="h-3 w-3" />
+                        <Copy className="size-3" />
                       )}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="xs"
                       onClick={() =>
                         onInsertSnippet(
                           `\n> **${item.title} (${item.citationClause})**:\n> ${item.extractedEvidenceMarkdown}\n`
                         )
                       }
-                      className="inline-flex items-center gap-1 rounded bg-emerald-950 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-300 hover:bg-emerald-900 transition-colors"
+                      className="gap-1"
                     >
-                      <Plus className="h-3 w-3" />
+                      <Plus className="size-3" />
                       <span>Insert</span>
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
-                <p className="text-[11px] text-slate-400 line-clamp-3 leading-relaxed">
+                <p className="text-[11px] text-muted-foreground line-clamp-3 leading-relaxed">
                   {item.extractedEvidenceMarkdown}
                 </p>
-              </div>
+              </Card>
             ))}
           </div>
         )}

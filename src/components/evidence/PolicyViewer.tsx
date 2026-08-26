@@ -9,46 +9,46 @@ import {
   Search,
 } from "lucide-react";
 import { ClinicalEvidence, EvidenceSourceType } from "../../types";
+import { Card } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 
 interface PolicyViewerProps {
   evidences: ClinicalEvidence[];
   isLoading?: boolean;
 }
 
-const SOURCE_TYPE_LABELS: Record<EvidenceSourceType, { label: string; color: string; border: string; bg: string }> = {
+const SOURCE_TYPE_LABELS: Record<
+  EvidenceSourceType,
+  { label: string; badgeVariant: "default" | "secondary" | "outline" | "destructive" }
+> = {
   payer_cpb: {
     label: "Insurer Policy Bulletin",
-    color: "text-cyan-400",
-    border: "border-cyan-500/40",
-    bg: "bg-cyan-950/40",
+    badgeVariant: "default",
   },
   pubmed_study: {
     label: "PubMed Clinical Trial",
-    color: "text-emerald-400",
-    border: "border-emerald-500/40",
-    bg: "bg-emerald-950/40",
+    badgeVariant: "secondary",
   },
   fda_package_insert: {
     label: "FDA Label / Indication",
-    color: "text-amber-400",
-    border: "border-amber-500/40",
-    bg: "bg-amber-950/40",
+    badgeVariant: "outline",
   },
   nccn_guideline: {
     label: "NCCN Guideline",
-    color: "text-purple-400",
-    border: "border-purple-500/40",
-    bg: "bg-purple-950/40",
+    badgeVariant: "secondary",
   },
   legal_precedent: {
     label: "Statutory Law / Precedent",
-    color: "text-rose-400",
-    border: "border-rose-500/40",
-    bg: "bg-rose-950/40",
+    badgeVariant: "outline",
   },
 };
 
-export const PolicyViewer: React.FC<PolicyViewerProps> = ({ evidences, isLoading }) => {
+export const PolicyViewer: React.FC<PolicyViewerProps> = ({
+  evidences,
+  isLoading,
+}) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterSource, setFilterSource] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -73,32 +73,32 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({ evidences, isLoading
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Search & Filter Header */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/60 border border-slate-800 p-3 rounded-xl">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-card border border-border p-2.5 rounded-xl">
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <BookOpen className="h-4 w-4 text-cyan-400 shrink-0" />
-          <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+          <BookOpen className="size-4 text-muted-foreground shrink-0" />
+          <span className="text-xs font-semibold text-foreground">
             Indexed Clinical Clauses ({filtered.length})
           </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-48">
-            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-500" />
-            <input
+            <Search className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
+            <Input
               type="text"
-              placeholder="Search clause or criteria..."
+              placeholder="Search clause..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 pl-8 pr-2.5 py-1 text-xs text-slate-200 placeholder-slate-600 focus:border-cyan-400 focus:outline-none font-mono"
+              className="pl-8 h-7 text-xs"
             />
           </div>
 
           <select
             value={filterSource}
             onChange={(e) => setFilterSource(e.target.value)}
-            className="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1 text-xs text-slate-300 focus:border-cyan-400 focus:outline-none font-mono"
+            className="rounded-lg border border-input bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-7"
           >
             <option value="all">All Sources</option>
             <option value="payer_cpb">Insurer CPB</option>
@@ -109,88 +109,96 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({ evidences, isLoading
         </div>
       </div>
 
-      {/* Evidence Cards */}
+      {/* Evidence Cards List */}
       {isLoading ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-8 text-center text-xs font-mono text-slate-400 animate-pulse">
+        <Card className="p-8 text-center text-xs font-mono text-muted-foreground animate-pulse bg-muted/20">
           Crawling Clinical Policy Bulletins with Firecrawl & extracting medical criteria...
-        </div>
+        </Card>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-8 text-center space-y-2">
-          <FileText className="mx-auto h-8 w-8 text-slate-600" />
-          <div className="text-xs font-semibold text-slate-300">No clinical policy clauses indexed yet</div>
-          <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-            Click &quot;Run Live Policy Crawl&quot; to fetch official insurer Clinical Policy Bulletins and medical necessity guidelines.
+        <Card className="p-8 text-center items-center justify-center space-y-2 bg-muted/20 border-dashed">
+          <FileText className="size-8 text-muted-foreground" />
+          <div className="text-xs font-semibold text-foreground">
+            No clinical policy clauses indexed yet
+          </div>
+          <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
+            Click &quot;Crawl Insurer CPB&quot; above to fetch official Clinical Policy Bulletins and guidelines.
           </p>
-        </div>
+        </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {filtered.map((item) => {
-            const config = SOURCE_TYPE_LABELS[item.sourceType] || SOURCE_TYPE_LABELS.payer_cpb;
+            const config =
+              SOURCE_TYPE_LABELS[item.sourceType] ||
+              SOURCE_TYPE_LABELS.payer_cpb;
             const isCopied = copiedId === item._id;
 
             return (
-              <div
+              <Card
                 key={item._id}
-                className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3 hover:border-slate-700 transition-all group"
+                className="p-3.5 space-y-2.5 bg-card hover:bg-muted/20 transition-all"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded px-2 py-0.5 text-[10px] font-mono font-bold uppercase border ${config.bg} ${config.border} ${config.color}`}
-                      >
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant={config.badgeVariant} size="sm">
                         {config.label}
-                      </span>
-                      <span className="font-mono text-xs font-bold text-cyan-300">
+                      </Badge>
+                      <Badge variant="outline" className="font-mono text-xs">
                         {item.citationClause}
-                      </span>
-                      <span className="rounded-full bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.2 text-[10px] font-mono text-emerald-300">
+                      </Badge>
+                      <Badge variant="secondary" className="font-mono text-[10px]">
                         {item.relevanceScore}% Match
-                      </span>
+                      </Badge>
                     </div>
 
-                    <h4 className="text-xs font-bold text-white group-hover:text-cyan-200 transition-colors">
+                    <h4 className="text-xs font-semibold text-foreground pt-0.5">
                       {item.title}
                     </h4>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => handleCopyCitation(item._id, `${item.title} (${item.citationClause})`)}
-                      className="rounded-lg border border-slate-800 bg-slate-950 p-1.5 text-slate-400 hover:text-cyan-300 hover:border-cyan-500/40 transition-colors"
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() =>
+                        handleCopyCitation(
+                          item._id,
+                          `${item.title} (${item.citationClause})`
+                        )
+                      }
                       title="Copy citation reference"
                     >
                       {isCopied ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        <Check className="size-3 text-emerald-500" />
                       ) : (
-                        <Copy className="h-3.5 w-3.5" />
+                        <Copy className="size-3" />
                       )}
-                    </button>
+                    </Button>
 
                     {item.sourceUrl && (
                       <a
                         href={item.sourceUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded-lg border border-slate-800 bg-slate-950 p-1.5 text-slate-400 hover:text-cyan-300 hover:border-cyan-500/40 transition-colors"
+                        className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                         title="Open policy source URL"
                       >
-                        <ExternalLink className="h-3.5 w-3.5" />
+                        <ExternalLink className="size-3" />
                       </a>
                     )}
                   </div>
                 </div>
 
-                <div className="rounded-lg bg-slate-950/80 border border-slate-800/80 p-3 text-xs text-slate-300 leading-relaxed font-sans prose prose-invert max-w-none">
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-cyan-400/80 mb-1">
-                    <Sparkles className="h-3 w-3" />
-                    <span>Medical Necessity Criteria & Contradiction Rule:</span>
+                <div className="rounded-lg bg-muted/40 border border-border p-3 text-xs text-muted-foreground leading-relaxed font-sans">
+                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground mb-1">
+                    <Sparkles className="size-3 text-primary" />
+                    <span>Medical Necessity Criteria & Policy Rule:</span>
                   </div>
-                  <p className="whitespace-pre-line text-[11px] text-slate-300">
+                  <p className="whitespace-pre-line text-xs text-foreground/90">
                     {item.extractedEvidenceMarkdown}
                   </p>
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>

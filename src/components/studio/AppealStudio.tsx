@@ -13,6 +13,11 @@ import { Claim, ClinicalEvidence, AppealLevel } from "../../types";
 import { useAppealStudio } from "../../hooks/useAppealStudio";
 import { CitationSidebar } from "./CitationSidebar";
 import { ExportDrawer } from "./ExportDrawer";
+import { Card } from "../ui/card";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Alert, AlertDescription } from "../ui/alert";
+import { Textarea } from "../ui/textarea";
 
 interface AppealStudioProps {
   claim: Claim;
@@ -51,43 +56,45 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     try {
       await synthesizeAppeal(appealLevel, physicianNotes);
     } catch (err: any) {
-      setSynthesisError(err?.message || "Failed to synthesize appeal brief with OpenAI.");
+      setSynthesisError(
+        err?.message || "Failed to synthesize appeal brief with OpenAI."
+      );
     }
   };
 
   return (
-    <div className="space-y-4 animate-fadeIn h-[calc(100vh-6.5rem)] flex flex-col">
+    <div className="space-y-3 animate-fadeIn h-[calc(100vh-6.5rem)] flex flex-col">
       {/* Studio Header Toolbar */}
-      <div className="rounded-2xl border border-cyan-500/30 bg-slate-950/95 p-4 shadow-glass-panel shrink-0">
+      <Card className="p-3.5 bg-card border-border shrink-0">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-950/60 border border-cyan-500/40 shadow-cyan-glow">
-              <FileText className="h-5 w-5 text-cyan-400" />
+            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+              <FileText className="size-4.5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white font-sans">
+                <h2 className="text-sm font-semibold text-foreground font-sans">
                   Collaborative Appeal Studio
                 </h2>
-                <span className="rounded-md border border-cyan-500/40 bg-cyan-950/60 px-2 py-0.5 text-[10px] font-mono text-cyan-300 font-bold uppercase">
+                <Badge variant="outline" className="font-mono text-[10px]">
                   Claim #{claim.claimNumber}
-                </span>
+                </Badge>
                 {saveStatus === "saving" && (
-                  <span className="flex items-center gap-1 text-[11px] font-mono text-amber-400 animate-pulse">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    <span>Saving to Convex...</span>
+                  <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground animate-pulse">
+                    <Loader2 className="size-3 animate-spin" />
+                    <span>Saving...</span>
                   </span>
                 )}
                 {saveStatus === "saved" && (
-                  <span className="flex items-center gap-1 text-[11px] font-mono text-emerald-400">
-                    <Check className="h-3 w-3" />
+                  <span className="flex items-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
+                    <Check className="size-3" />
                     <span>Synced (v{appeal?.version || 1})</span>
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400">
-                Patient: <span className="text-slate-200 font-semibold">{claim.patient?.name}</span> • Payer:{" "}
-                <span className="text-cyan-300">{claim.patient?.insurancePayer}</span>
+              <p className="text-xs text-muted-foreground">
+                Patient: <span className="text-foreground font-medium">{claim.patient?.name}</span> • Payer:{" "}
+                <span className="text-foreground font-medium">{claim.patient?.insurancePayer}</span>
               </p>
             </div>
           </div>
@@ -97,7 +104,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             <select
               value={appealLevel}
               onChange={(e) => setAppealLevel(e.target.value as AppealLevel)}
-              className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 focus:border-cyan-400 focus:outline-none font-mono"
+              className="rounded-lg border border-input bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-8"
             >
               <option value="level_1_internal">Level 1: Internal Appeal (ERISA 180d)</option>
               <option value="level_2_grievance">Level 2: Formal Grievance Review</option>
@@ -105,117 +112,118 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             </select>
 
             {/* Treating Physician Notes Toggle */}
-            <button
+            <Button
+              variant={showNotesDrawer || physicianNotes ? "secondary" : "outline"}
+              size="sm"
               onClick={() => setShowNotesDrawer(!showNotesDrawer)}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all ${
-                showNotesDrawer || physicianNotes
-                  ? "border-amber-500/50 bg-amber-950/30 text-amber-300"
-                  : "border-slate-800 bg-slate-900 text-slate-300 hover:text-white"
-              }`}
+              className="gap-1.5"
             >
-              <Stethoscope className="h-3.5 w-3.5" />
+              <Stethoscope className="size-3.5" />
               <span>Physician Notes {physicianNotes ? "✓" : ""}</span>
-            </button>
+            </Button>
 
             {/* Synthesize Appeal with gpt-5-nano */}
-            <button
+            <Button
+              size="sm"
               onClick={handleRunSynthesis}
               disabled={isSynthesizing || isSaving}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 px-4 py-1.5 text-xs font-bold text-slate-950 shadow-cyan-glow hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+              className="gap-1.5"
             >
               {isSynthesizing ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-950" />
-                  <span>Synthesizing with gpt-5-nano...</span>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  <span>Synthesizing...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-3.5 w-3.5 fill-slate-950" />
+                  <Sparkles className="size-3.5" />
                   <span>Synthesize Brief</span>
                 </>
               )}
-            </button>
+            </Button>
 
             {/* Export & Preview Trigger */}
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setIsExportOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-850 hover:text-white transition-colors"
+              className="gap-1.5"
             >
-              <Printer className="h-3.5 w-3.5 text-cyan-400" />
+              <Printer className="size-3.5" />
               <span>Export Dossier</span>
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Synthesis Error Alert */}
         {synthesisError && (
-          <div className="mt-3 rounded-lg border border-rose-500/40 bg-rose-950/40 p-2.5 text-xs text-rose-300">
-            {synthesisError}
-          </div>
+          <Alert variant="destructive" className="mt-3">
+            <AlertDescription>{synthesisError}</AlertDescription>
+          </Alert>
         )}
 
         {/* Optional Physician Notes Panel */}
         {showNotesDrawer && (
-          <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 space-y-2 animate-fadeIn">
-            <div className="flex items-center justify-between text-xs font-mono text-amber-300">
-              <span className="flex items-center gap-1.5 font-bold">
-                <Stethoscope className="h-3.5 w-3.5" />
+          <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 space-y-2 animate-fadeIn">
+            <div className="flex items-center justify-between text-xs text-foreground">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <Stethoscope className="size-3.5 text-muted-foreground" />
                 Treating Physician Clinical Addendum & Conservative Therapy Record
               </span>
               <button
                 onClick={() => setShowNotesDrawer(false)}
-                className="text-[11px] text-slate-400 hover:text-slate-200"
+                className="text-[11px] text-muted-foreground hover:text-foreground"
               >
                 Hide
               </button>
             </div>
-            <textarea
+            <Textarea
               rows={3}
               value={physicianNotes}
               onChange={(e) => setPhysicianNotes(e.target.value)}
-              placeholder="Paste specific physician clinical addendum, e.g.: Patient completed 14 weeks of formal physical therapy with Dr. Miller and underwent right knee cortisone injection on 03/10/2026 with no functional relief..."
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 p-2.5 text-xs text-slate-200 placeholder-slate-600 focus:border-amber-400 focus:outline-none font-sans"
+              placeholder="Paste physician clinical notes, e.g.: Patient completed 14 weeks of formal physical therapy with Dr. Miller and underwent right knee cortisone injection on 03/10/2026 with no functional relief..."
+              className="bg-background text-xs"
             />
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Main Studio Dual Pane Editor & Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 overflow-hidden">
         {/* Left 8 Cols: Markdown Editor & Live Preview */}
-        <div className="lg:col-span-8 flex flex-col rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden shadow-glass-panel">
+        <Card className="lg:col-span-8 flex flex-col overflow-hidden p-0 bg-card border-border">
           {/* Sub-view Viewport Switcher */}
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2 bg-slate-900/60 shrink-0">
-            <div className="flex items-center gap-1 text-xs font-mono">
-              <button
+          <div className="flex items-center justify-between border-b border-border px-3 py-1.5 bg-muted/30 shrink-0">
+            <div className="flex items-center gap-1">
+              <Button
+                variant={activeTab === "edit" ? "secondary" : "ghost"}
+                size="xs"
                 onClick={() => setActiveTab("edit")}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg transition-colors ${
-                  activeTab === "edit" ? "bg-cyan-950 text-cyan-300 border border-cyan-500/40" : "text-slate-400 hover:text-slate-200"
-                }`}
+                className="gap-1"
               >
-                <Edit3 className="h-3.5 w-3.5" />
-                <span>Editor Only</span>
-              </button>
-              <button
+                <Edit3 className="size-3" />
+                <span>Editor</span>
+              </Button>
+              <Button
+                variant={activeTab === "split" ? "secondary" : "ghost"}
+                size="xs"
                 onClick={() => setActiveTab("split")}
-                className={`hidden md:flex items-center gap-1.5 px-3 py-1 rounded-lg transition-colors ${
-                  activeTab === "split" ? "bg-cyan-950 text-cyan-300 border border-cyan-500/40" : "text-slate-400 hover:text-slate-200"
-                }`}
+                className="hidden md:inline-flex"
               >
                 <span>Split View</span>
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={activeTab === "preview" ? "secondary" : "ghost"}
+                size="xs"
                 onClick={() => setActiveTab("preview")}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg transition-colors ${
-                  activeTab === "preview" ? "bg-cyan-950 text-cyan-300 border border-cyan-500/40" : "text-slate-400 hover:text-slate-200"
-                }`}
+                className="gap-1"
               >
-                <Eye className="h-3.5 w-3.5" />
-                <span>Formatted Preview</span>
-              </button>
+                <Eye className="size-3" />
+                <span>Preview</span>
+              </Button>
             </div>
 
-            <div className="text-[11px] font-mono text-slate-500">
+            <div className="text-[11px] font-mono text-muted-foreground">
               {markdownContent.length} chars • {markdownContent.split(/\s+/).filter(Boolean).length} words
             </div>
           </div>
@@ -224,41 +232,52 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-2">
             {/* Editor Pane */}
             {(activeTab === "edit" || activeTab === "split") && (
-              <div className={`h-full overflow-hidden p-3 ${activeTab === "split" ? "border-r border-slate-800" : "col-span-2"}`}>
+              <div
+                className={`h-full overflow-hidden p-3 ${
+                  activeTab === "split" ? "border-r border-border" : "col-span-2"
+                }`}
+              >
                 <textarea
                   value={markdownContent}
                   onChange={(e) => setMarkdownContent(e.target.value)}
-                  placeholder="The full appeal brief will appear here once synthesized, or you can begin writing manually..."
-                  className="w-full h-full bg-transparent text-slate-200 text-xs font-mono resize-none focus:outline-none leading-relaxed p-2"
+                  placeholder="The appeal brief will appear here once synthesized, or write manually..."
+                  className="w-full h-full bg-transparent text-foreground text-xs font-mono resize-none focus:outline-none leading-relaxed p-1 placeholder:text-muted-foreground"
                 />
               </div>
             )}
 
             {/* Rendered Markdown Preview Pane */}
             {(activeTab === "preview" || activeTab === "split") && (
-              <div className={`h-full overflow-y-auto p-4 bg-slate-900/30 ${activeTab === "preview" ? "col-span-2" : ""}`}>
+              <div
+                className={`h-full overflow-y-auto p-4 bg-muted/10 ${
+                  activeTab === "preview" ? "col-span-2" : ""
+                }`}
+              >
                 {markdownContent ? (
-                  <div className="prose prose-invert max-w-none text-xs leading-relaxed font-sans space-y-3 whitespace-pre-line text-slate-300">
+                  <div className="prose dark:prose-invert max-w-none text-xs leading-relaxed whitespace-pre-line text-foreground/90 font-sans">
                     {markdownContent}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-3">
-                    <Sparkles className="h-8 w-8 text-cyan-400/60" />
-                    <div className="text-xs font-semibold text-slate-300">No Appeal Brief Draft Yet</div>
-                    <p className="text-[11px] text-slate-500 max-w-xs">
-                      Click &quot;Synthesize Brief&quot; above to have gpt-5-nano automatically generate a multi-page ERISA & clinical appeal packet citing all policy clauses.
+                  <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-2 text-muted-foreground">
+                    <Sparkles className="size-6 text-muted-foreground/60" />
+                    <div className="text-xs font-medium text-foreground">No Brief Drafted Yet</div>
+                    <p className="text-[11px] max-w-xs">
+                      Click &quot;Synthesize Brief&quot; above to have gpt-5-nano generate an ERISA appeal brief citing policy clauses.
                     </p>
                   </div>
                 )}
               </div>
             )}
           </div>
-        </div>
+        </Card>
 
-        {/* Right 4 Cols: Citation & Footnote Sidebar */}
-        <div className="lg:col-span-4 rounded-2xl border border-slate-800 bg-slate-950 p-4 overflow-y-auto shadow-glass-panel">
-          <CitationSidebar evidences={evidences} onInsertSnippet={insertTextAtCursor} />
-        </div>
+        {/* Right 4 Cols: Citation Sidebar */}
+        <Card className="lg:col-span-4 p-4 overflow-y-auto bg-card border-border">
+          <CitationSidebar
+            evidences={evidences}
+            onInsertSnippet={insertTextAtCursor}
+          />
+        </Card>
       </div>
 
       {/* Export & Print Preview Drawer Modal */}

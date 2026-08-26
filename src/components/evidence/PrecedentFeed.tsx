@@ -8,6 +8,9 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Claim } from "../../types";
+import { Card } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 
 interface PrecedentFeedProps {
   claim: Claim;
@@ -83,11 +86,15 @@ const HISTORICAL_PRECEDENTS: Record<string, HistoricalPrecedent[]> = {
   ],
 };
 
-export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim, onApplyPrecedent }) => {
+export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
+  claim,
+  onApplyPrecedent,
+}) => {
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
   const primaryCpt = claim.cptCodes[0] || "27447";
-  const precedents = HISTORICAL_PRECEDENTS[primaryCpt] || HISTORICAL_PRECEDENTS["27447"] || [];
+  const precedents =
+    HISTORICAL_PRECEDENTS[primaryCpt] || HISTORICAL_PRECEDENTS["27447"] || [];
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -96,75 +103,85 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim, onApplyPrec
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-3 rounded-xl">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between bg-card border border-border p-2.5 rounded-xl">
         <div className="flex items-center gap-2">
-          <Award className="h-4 w-4 text-emerald-400" />
-          <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+          <Award className="size-4 text-emerald-500" />
+          <span className="text-xs font-semibold text-foreground">
             Matching Overturned Precedents ({precedents.length})
           </span>
         </div>
-        <span className="text-[11px] text-slate-400 font-mono">
-          CPT {primaryCpt} • Denial {claim.denialReasonCode}
-        </span>
+        <Badge variant="outline" className="font-mono text-[10px]">
+          CPT {primaryCpt} • {claim.denialReasonCode}
+        </Badge>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {precedents.map((item) => {
           const isCopied = copiedId === item.id;
 
           return (
-            <div
+            <Card
               key={item.id}
-              className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3 hover:border-emerald-500/40 transition-all group"
+              className="p-3.5 space-y-2.5 bg-card hover:bg-muted/20 transition-all"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="rounded bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-300 flex items-center gap-1">
-                      <TrendingUp className="h-3 w-3" />
-                      {item.overturnRate}% Win Rate
-                    </span>
-                    <span className="font-mono text-xs font-bold text-slate-200">
+                    <Badge variant="secondary" className="gap-1 font-mono text-xs text-emerald-600 dark:text-emerald-400">
+                      <TrendingUp className="size-3" />
+                      <span>{item.overturnRate}% Win Rate</span>
+                    </Badge>
+                    <span className="font-mono text-xs font-semibold text-foreground">
                       Recovered {item.recoveredAmount}
                     </span>
                   </div>
-                  <h4 className="text-xs font-bold text-white mt-1 group-hover:text-emerald-300 transition-colors">
+                  <h4 className="text-xs font-semibold text-foreground mt-1">
                     {item.caseTitle}
                   </h4>
                 </div>
 
-                <button
-                  onClick={() => handleCopy(item.id, `${item.caseTitle} — ${item.citation}: ${item.winningArgument}`)}
-                  className="rounded-lg border border-slate-800 bg-slate-950 p-1.5 text-slate-400 hover:text-emerald-300 hover:border-emerald-500/40 transition-colors shrink-0"
-                  title="Copy winning argument citation"
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() =>
+                    handleCopy(
+                      item.id,
+                      `${item.caseTitle} — ${item.citation}: ${item.winningArgument}`
+                    )
+                  }
+                  title="Copy citation"
                 >
-                  {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                </button>
+                  {isCopied ? (
+                    <Check className="size-3 text-emerald-500" />
+                  ) : (
+                    <Copy className="size-3" />
+                  )}
+                </Button>
               </div>
 
-              <div className="rounded-lg bg-slate-950/80 border border-slate-800 p-2.5 space-y-1.5 text-xs text-slate-300">
-                <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400">
-                  <Scale className="h-3 w-3" />
-                  <span>Statutory Citation: {item.citation}</span>
+              <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1.5 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-[11px] font-mono text-foreground font-medium">
+                  <Scale className="size-3 text-muted-foreground" />
+                  <span>Citation: {item.citation}</span>
                 </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed font-sans">
+                <p className="text-xs text-foreground/90 leading-relaxed font-sans">
                   {item.winningArgument}
                 </p>
               </div>
 
               {onApplyPrecedent && (
-                <div className="flex justify-end pt-1">
+                <div className="flex justify-end pt-0.5">
                   <button
                     onClick={() => onApplyPrecedent(item.winningArgument)}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 font-mono transition-colors"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline transition-colors"
                   >
                     <span>Insert into Appeal Arguments</span>
-                    <ChevronRight className="h-3.5 w-3.5" />
+                    <ChevronRight className="size-3" />
                   </button>
                 </div>
               )}
-            </div>
+            </Card>
           );
         })}
       </div>

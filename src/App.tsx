@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Shell } from "./components/layout/Shell";
 import { NavigationView } from "./components/layout/Sidebar";
 import { CaseRadar } from "./components/radar/CaseRadar";
@@ -8,19 +8,27 @@ import { AppealStudio } from "./components/studio/AppealStudio";
 import { AgentMailDrawer } from "./components/communications/AgentMailDrawer";
 import { AuditTimeline } from "./components/communications/AuditTimeline";
 import { AnalyticsMetrics } from "./components/analytics/AnalyticsMetrics";
+import { CommandDialog } from "./components/common/CommandDialog";
 import { useClaims } from "./hooks/useClaims";
 import { useEvidence } from "./hooks/useEvidence";
 import { useCommunications } from "./hooks/useCommunications";
-import {
-  ArrowRight,
-  Loader2,
-} from "lucide-react";
+import { Card } from "./components/ui/card";
+import { Button } from "./components/ui/button";
+import { ArrowRight, Loader2 } from "lucide-react";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<NavigationView>("radar");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [payerFilter, setPayerFilter] = useState<string>("all");
   const [isIngestionOpen, setIsIngestionOpen] = useState<boolean>(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    if (typeof document !== "undefined") {
+      return document.documentElement.classList.contains("dark");
+    }
+    return true;
+  });
 
   const {
     claims,
@@ -56,6 +64,38 @@ export default function App() {
     dispatchAppeal,
   } = useCommunications(selectedClaim);
 
+  const handleToggleTheme = useCallback(() => {
+    const root = document.documentElement;
+    if (root.classList.contains("dark")) {
+      root.classList.remove("dark");
+      setIsDark(false);
+    } else {
+      root.classList.add("dark");
+      setIsDark(true);
+    }
+  }, []);
+
+  const handleToggleSidebar = useCallback(() => {
+    setIsSidebarCollapsed((prev) => !prev);
+  }, []);
+
+  // Global Keyboard Shortcuts (Cmd+K / Ctrl+K, Cmd+B / Ctrl+B)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setIsSidebarCollapsed((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const handleOpenIngestion = () => {
     setIsIngestionOpen(true);
   };
@@ -74,6 +114,11 @@ export default function App() {
       selectedPayerFilter={payerFilter}
       onSelectPayerFilter={setPayerFilter}
       onOpenIngestion={handleOpenIngestion}
+      isSidebarCollapsed={isSidebarCollapsed}
+      onToggleSidebar={handleToggleSidebar}
+      onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+      isDark={isDark}
+      onToggleTheme={handleToggleTheme}
       totalDisputedAmount={stats.activeDisputedAmount + stats.overturnedWonAmount}
       totalWonAmount={stats.overturnedWonAmount}
       winRate={stats.averageWinScore}
@@ -82,8 +127,8 @@ export default function App() {
     >
       {isLoading ? (
         <div className="flex h-full items-center justify-center space-y-3 flex-col">
-          <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
-          <span className="text-xs font-mono text-slate-400">
+          <Loader2 className="size-6 text-foreground animate-spin" />
+          <span className="text-xs font-mono text-muted-foreground">
             Connecting to Convex Cloud Database...
           </span>
         </div>
@@ -101,8 +146,8 @@ export default function App() {
           )}
 
           {/* 2. Clinical Policy Evidence Matrix & Inspector */}
-          {currentView === "evidence" && (
-            selectedClaim ? (
+          {currentView === "evidence" &&
+            (selectedClaim ? (
               <EvidenceMatrix
                 claim={selectedClaim}
                 evidences={evidences}
@@ -112,25 +157,28 @@ export default function App() {
                 onNavigateToStudio={() => setCurrentView("studio")}
               />
             ) : (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center space-y-4">
-                <div className="text-sm font-semibold text-slate-300">No Claim Selected</div>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              <Card className="p-12 text-center items-center justify-center space-y-3 bg-muted/20 border-dashed">
+                <div className="text-sm font-semibold text-foreground">
+                  No Claim Selected
+                </div>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                   Please select a claim from the Case Radar Feed to inspect its Clinical Policy Bulletin evidence and calculate its win probability.
                 </p>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setCurrentView("radar")}
-                  className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-mono"
+                  className="gap-1"
                 >
                   <span>Go to Case Radar</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )
-          )}
+                  <ArrowRight className="size-3" />
+                </Button>
+              </Card>
+            ))}
 
           {/* 3. Collaborative Appeal Studio */}
-          {currentView === "studio" && (
-            selectedClaim ? (
+          {currentView === "studio" &&
+            (selectedClaim ? (
               <AppealStudio
                 claim={selectedClaim}
                 evidences={evidences}
@@ -138,25 +186,28 @@ export default function App() {
                 onNavigateToEvidence={() => setCurrentView("evidence")}
               />
             ) : (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center space-y-4">
-                <div className="text-sm font-semibold text-slate-300">No Claim Selected</div>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              <Card className="p-12 text-center items-center justify-center space-y-3 bg-muted/20 border-dashed">
+                <div className="text-sm font-semibold text-foreground">
+                  No Claim Selected
+                </div>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                   Please select a claim from the Case Radar Feed to synthesize and collaboratively edit an ERISA appeal brief.
                 </p>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setCurrentView("radar")}
-                  className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-mono"
+                  className="gap-1"
                 >
                   <span>Go to Case Radar</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )
-          )}
+                  <ArrowRight className="size-3" />
+                </Button>
+              </Card>
+            ))}
 
           {/* 4. Dedicated AgentMail Claim Inbox */}
-          {currentView === "communications" && (
-            selectedClaim ? (
+          {currentView === "communications" &&
+            (selectedClaim ? (
               <AgentMailDrawer
                 claim={selectedClaim}
                 threads={threads}
@@ -166,21 +217,24 @@ export default function App() {
                 onDispatchAppeal={dispatchAppeal}
               />
             ) : (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center space-y-4">
-                <div className="text-sm font-semibold text-slate-300">No Claim Selected</div>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              <Card className="p-12 text-center items-center justify-center space-y-3 bg-muted/20 border-dashed">
+                <div className="text-sm font-semibold text-foreground">
+                  No Claim Selected
+                </div>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                   Please select a claim from the Case Radar to view its dedicated AgentMail inbox and transmission history.
                 </p>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setCurrentView("radar")}
-                  className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-mono"
+                  className="gap-1"
                 >
                   <span>Go to Case Radar</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )
-          )}
+                  <ArrowRight className="size-3" />
+                </Button>
+              </Card>
+            ))}
 
           {/* 5. Portfolio Recovery & Overturn Analytics */}
           {currentView === "analytics" && (
@@ -213,6 +267,18 @@ export default function App() {
         onUploadFile={uploadAndParseDocument}
         onParseText={parseDocumentText}
         onSuccess={handleIngestionSuccess}
+      />
+
+      {/* Global Interactive Command Palette (⌘K / Ctrl+K) */}
+      <CommandDialog
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        claims={claims}
+        onSelectClaim={setSelectedClaimId}
+        onNavigateView={setCurrentView}
+        onOpenIngestion={handleOpenIngestion}
+        onToggleTheme={handleToggleTheme}
+        isDark={isDark}
       />
     </Shell>
   );

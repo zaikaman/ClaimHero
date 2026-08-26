@@ -1,16 +1,24 @@
 import React from "react";
 import {
-  Shield,
+  PanelLeft,
+  Search,
   UploadCloud,
+  Moon,
+  Sun,
+  Github,
   Activity,
-  AlertTriangle,
-  CheckCircle2,
-  DollarSign,
 } from "lucide-react";
+import { Button } from "../ui/button";
+import { Separator } from "../ui/separator";
+import { Avatar, AvatarFallback } from "../ui/avatar";
 import { formatCurrency } from "../../lib/utils";
 
 interface HeaderProps {
   onOpenIngestion: () => void;
+  onToggleSidebar?: () => void;
+  onOpenCommandPalette?: () => void;
+  isDark?: boolean;
+  onToggleTheme?: () => void;
   totalDisputedAmount: number;
   totalWonAmount: number;
   winRate: number;
@@ -19,90 +27,114 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenIngestion,
+  onToggleSidebar,
+  onOpenCommandPalette,
+  isDark = true,
+  onToggleTheme,
   totalDisputedAmount = 0,
   totalWonAmount = 0,
   winRate = 0,
   criticalDeadlinesCount = 0,
 }) => {
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-[#0b0f17]/90 backdrop-blur-xl">
-      <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-        {/* Left: Brand Identity */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 via-slate-900 to-emerald-500/20 p-0.5 border border-cyan-500/40 shadow-cyan-glow">
-            <Shield className="h-5 w-5 text-cyan-400" />
-            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-            </span>
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-bold tracking-tight text-white font-sans">
-                Claim<span className="text-cyan-400">Hero</span>
-              </span>
-              <span className="rounded-md border border-cyan-500/30 bg-cyan-950/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300 uppercase tracking-wider font-mono">
-                Sentinel v1.0
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 hidden md:block">
-              Autonomous Medical & Health Insurance Appeal Engine
-            </p>
-          </div>
-        </div>
-
-        {/* Center: Live Real Sentinel Metrics from Convex */}
-        <div className="hidden lg:flex items-center gap-4 text-xs font-mono">
-          {/* Disputed Volume */}
-          <div className="flex items-center gap-2 rounded-lg bg-slate-900/80 border border-slate-800 px-3 py-1.5">
-            <DollarSign className="h-3.5 w-3.5 text-cyan-400" />
-            <div>
-              <span className="text-slate-400 text-[10px] block leading-none">Disputed Pipeline</span>
-              <span className="font-semibold text-slate-100">{formatCurrency(totalDisputedAmount)}</span>
-            </div>
-          </div>
-
-          {/* Overturn Recovered */}
-          <div className="flex items-center gap-2 rounded-lg bg-emerald-950/30 border border-emerald-500/30 px-3 py-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-            <div>
-              <span className="text-emerald-400/80 text-[10px] block leading-none">Recovered / Won</span>
-              <span className="font-semibold text-emerald-300">
-                {formatCurrency(totalWonAmount)} {winRate > 0 ? `(${winRate}%)` : ""}
-              </span>
-            </div>
-          </div>
-
-          {/* Critical Statutory Alarms */}
-          <div className="flex items-center gap-2 rounded-lg bg-rose-950/30 border border-rose-500/30 px-3 py-1.5">
-            <AlertTriangle className={`h-3.5 w-3.5 text-rose-400 ${criticalDeadlinesCount > 0 ? "animate-pulse" : ""}`} />
-            <div>
-              <span className="text-rose-400/80 text-[10px] block leading-none">Statutory Alarms</span>
-              <span className="font-semibold text-rose-300">
-                {criticalDeadlinesCount > 0 ? `${criticalDeadlinesCount} Critical (<14d)` : "0 Pending"}
-              </span>
-            </div>
-          </div>
-
-          {/* AI Reasoning Sentinel Status */}
-          <div className="flex items-center gap-1.5 rounded-lg bg-slate-900/60 border border-slate-800 px-2.5 py-1.5 text-slate-400">
-            <Activity className="h-3 w-3 text-cyan-400" />
-            <span className="text-[11px] text-slate-300">gpt-5-nano</span>
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-          </div>
-        </div>
-
-        {/* Right: Actions */}
-        <div className="flex items-center gap-2.5">
-          {/* Primary Ingestion CTA */}
-          <button
-            onClick={onOpenIngestion}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 px-4 py-2 text-xs font-bold text-slate-950 shadow-cyan-glow hover:scale-105 active:scale-95 transition-all"
+    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-md">
+      <div className="flex h-12 items-center justify-between px-4 lg:px-6">
+        {/* Left: Sidebar trigger, separator & search input */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onToggleSidebar}
+            className="text-muted-foreground hover:text-foreground"
+            title="Toggle sidebar (⌘B / Ctrl+B)"
           >
-            <UploadCloud className="h-4 w-4 fill-slate-950" />
-            <span>+ Ingest Denial Document</span>
+            <PanelLeft className="size-4" />
+          </Button>
+          <Separator orientation="vertical" className="h-4 mx-1" />
+          <button
+            onClick={onOpenCommandPalette}
+            className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors w-48 sm:w-64"
+            title="Quick search across claims and actions (⌘K / Ctrl+K)"
+          >
+            <Search className="size-3.5" />
+            <span className="flex-1 text-left">Search claims, CPT, payers...</span>
+            <kbd className="pointer-events-none hidden sm:inline-flex h-4 items-center gap-0.5 rounded border border-border bg-muted px-1.5 font-mono text-[9px] font-medium text-muted-foreground">
+              ⌘K
+            </kbd>
           </button>
+        </div>
+
+        {/* Center/Right: Live metrics & actions */}
+        <div className="flex items-center gap-2">
+          {/* Subtle Live Stats on Header */}
+          <div className="hidden xl:flex items-center gap-3 text-xs text-muted-foreground pr-2">
+            <div className="flex items-center gap-1.5">
+              <span>Pipeline:</span>
+              <strong className="text-foreground font-mono">{formatCurrency(totalDisputedAmount)}</strong>
+            </div>
+            <Separator orientation="vertical" className="h-3" />
+            <div className="flex items-center gap-1.5">
+              <span>Recovered:</span>
+              <strong className="text-emerald-600 dark:text-emerald-400 font-mono">
+                {formatCurrency(totalWonAmount)} ({winRate}%)
+              </strong>
+            </div>
+            {criticalDeadlinesCount > 0 && (
+              <>
+                <Separator orientation="vertical" className="h-3" />
+                <div className="flex items-center gap-1 text-destructive font-semibold">
+                  <span>{criticalDeadlinesCount} Urgent Alarms</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1">
+            <div className="hidden sm:flex items-center gap-1.5 rounded-lg border border-border bg-muted/30 px-2.5 py-1 text-[11px] text-muted-foreground font-mono mr-1">
+              <Activity className="size-3 text-foreground" />
+              <span>gpt-5-nano</span>
+              <span className="size-1.5 rounded-full bg-emerald-500"></span>
+            </div>
+
+            {/* Quick Ingest Button */}
+            <Button
+              size="sm"
+              onClick={onOpenIngestion}
+              className="gap-1.5"
+            >
+              <UploadCloud className="size-3.5" />
+              <span className="hidden sm:inline">Ingest Denial</span>
+            </Button>
+
+            {/* Theme Toggle */}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onToggleTheme}
+              className="text-muted-foreground"
+              title="Toggle dark / light theme"
+            >
+              {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </Button>
+
+            {/* GitHub Repo */}
+            <a
+              href="https://github.com/zaikaman/ClaimHero"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="GitHub Repository"
+            >
+              <Github className="size-4" />
+            </a>
+
+            {/* Profile Avatar */}
+            <Avatar size="sm" className="size-7 ml-1">
+              <AvatarFallback className="bg-muted text-foreground text-xs font-semibold">
+                CH
+              </AvatarFallback>
+            </Avatar>
+          </div>
         </div>
       </div>
     </header>

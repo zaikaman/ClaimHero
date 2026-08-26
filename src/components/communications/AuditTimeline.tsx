@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { AuditLog, Claim } from "../../types";
 import { formatDate } from "../../lib/utils";
+import { Card } from "../ui/card";
+import { Badge } from "../ui/badge";
 
 interface AuditTimelineProps {
   claim?: Claim | null;
@@ -19,59 +21,52 @@ interface AuditTimelineProps {
   isLoading?: boolean;
 }
 
-const EVENT_CONFIGS: Record<string, { label: string; color: string; border: string; bg: string; icon: any }> = {
+const EVENT_CONFIGS: Record<
+  string,
+  { label: string; badgeVariant: "default" | "secondary" | "destructive" | "outline"; icon: any }
+> = {
   denial_ingested: {
     label: "Denial Ingested",
-    color: "text-cyan-400",
-    border: "border-cyan-500/40",
-    bg: "bg-cyan-950/40",
+    badgeVariant: "default",
     icon: FileSearch,
   },
   policy_crawled: {
     label: "Policy Crawled",
-    color: "text-purple-400",
-    border: "border-purple-500/40",
-    bg: "bg-purple-950/40",
+    badgeVariant: "secondary",
     icon: Sparkles,
   },
   status_changed_to_precedent_matched: {
-    label: "Win Score Evaluated",
-    color: "text-emerald-400",
-    border: "border-emerald-500/40",
-    bg: "bg-emerald-950/40",
+    label: "Win Score Computed",
+    badgeVariant: "default",
     icon: Award,
   },
   appeal_draft_updated: {
-    label: "Appeal Brief Drafted",
-    color: "text-blue-400",
-    border: "border-blue-500/40",
-    bg: "bg-blue-950/40",
+    label: "Appeal Drafted",
+    badgeVariant: "secondary",
     icon: Shield,
   },
   appeal_dispatched: {
     label: "Appeal Dispatched",
-    color: "text-amber-400",
-    border: "border-amber-500/40",
-    bg: "bg-amber-950/40",
+    badgeVariant: "default",
     icon: Send,
   },
   payer_response_received: {
     label: "Payer Reply Received",
-    color: "text-teal-400",
-    border: "border-teal-500/40",
-    bg: "bg-teal-950/40",
+    badgeVariant: "secondary",
     icon: Mail,
   },
   statutory_alarm_critical: {
     label: "Statutory Alarm",
-    color: "text-rose-400",
-    border: "border-rose-500/40",
-    bg: "bg-rose-950/40",
+    badgeVariant: "destructive",
     icon: AlertTriangle,
   },
 };
 
-export const AuditTimeline: React.FC<AuditTimelineProps> = ({ claim, logs, isLoading }) => {
+export const AuditTimeline: React.FC<AuditTimelineProps> = ({
+  claim,
+  logs,
+  isLoading,
+}) => {
   const [filterType, setFilterType] = useState<string>("all");
 
   const filteredLogs = logs.filter((log) => {
@@ -80,32 +75,32 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({ claim, logs, isLoa
   });
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-4 animate-fadeIn">
       {/* Header Banner */}
-      <div className="rounded-2xl border border-cyan-500/30 bg-slate-950/95 p-5 shadow-glass-panel flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-950/60 border border-cyan-500/40 shadow-cyan-glow">
-            <Clock className="h-6 w-6 text-cyan-400" />
+      <Card className="p-4 bg-card border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
+            <Clock className="size-5" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white font-sans">
-              Immutable Case Audit Timeline
+            <h2 className="text-base font-semibold text-foreground font-sans">
+              Case Audit Timeline
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               {claim
                 ? `Cryptographic event trail for Claim #${claim.claimNumber} (${claim.patient?.name})`
-                : "Live portfolio audit trail across all medical appeal claims"}
+                : "Live portfolio audit trail across medical appeal claims"}
             </p>
           </div>
         </div>
 
-        {/* Filter Dropdown */}
+        {/* Filter Selector */}
         <div className="flex items-center gap-2">
-          <Filter className="h-3.5 w-3.5 text-slate-500" />
+          <Filter className="size-3.5 text-muted-foreground" />
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-300 focus:border-cyan-400 focus:outline-none font-mono"
+            className="rounded-lg border border-input bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-8"
           >
             <option value="all">All Events ({logs.length})</option>
             <option value="denial_ingested">Denial Ingested</option>
@@ -115,26 +110,24 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({ claim, logs, isLoa
             <option value="statutory_alarm_critical">Statutory Alarms</option>
           </select>
         </div>
-      </div>
+      </Card>
 
       {/* Timeline Stream */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-6 shadow-glass-panel">
+      <Card className="p-6 bg-card border-border">
         {isLoading ? (
-          <div className="p-8 text-center text-xs font-mono text-slate-400 animate-pulse">
-            Loading immutable audit logs from Convex...
+          <div className="p-8 text-center text-xs font-mono text-muted-foreground animate-pulse">
+            Loading audit logs from Convex...
           </div>
         ) : filteredLogs.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-500 font-mono">
+          <div className="p-8 text-center text-xs text-muted-foreground">
             No audit log events found for this filter.
           </div>
         ) : (
-          <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
+          <div className="relative pl-6 space-y-5 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-px before:bg-border">
             {filteredLogs.map((log) => {
               const config = EVENT_CONFIGS[log.eventType] || {
                 label: log.eventType.replace(/_/g, " ").toUpperCase(),
-                color: "text-slate-300",
-                border: "border-slate-700",
-                bg: "bg-slate-900",
+                badgeVariant: "outline" as const,
                 icon: Clock,
               };
 
@@ -143,40 +136,40 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({ claim, logs, isLoa
               return (
                 <div key={log._id} className="relative group">
                   {/* Timeline Dot */}
-                  <div
-                    className={`absolute -left-6 top-1 flex h-5 w-5 items-center justify-center rounded-full border ${config.border} ${config.bg} shadow-cyan-glow`}
-                  >
-                    <IconComponent className={`h-2.5 w-2.5 ${config.color}`} />
+                  <div className="absolute -left-6 top-1 flex size-5 items-center justify-center rounded-full border border-border bg-card shadow-xs">
+                    <IconComponent className="size-2.5 text-foreground" />
                   </div>
 
-                  <div className="rounded-xl border border-slate-800/80 bg-slate-900/60 p-4 space-y-2 group-hover:border-slate-700 transition-colors">
+                  <Card className="p-3.5 space-y-1.5 bg-card hover:bg-muted/30 transition-colors">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span
-                          className={`rounded px-2 py-0.5 text-[10px] font-mono font-bold uppercase border ${config.bg} ${config.border} ${config.color}`}
+                        <Badge
+                          variant={config.badgeVariant}
+                          size="sm"
+                          className="font-mono text-[10px]"
                         >
                           {config.label}
-                        </span>
-                        <span className="font-mono text-xs font-semibold text-slate-300">
-                          Actor: {log.actor}
+                        </Badge>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          Actor: <strong className="text-foreground">{log.actor}</strong>
                         </span>
                       </div>
 
-                      <span className="text-[10px] font-mono text-slate-500">
+                      <span className="text-[11px] font-mono text-muted-foreground">
                         {formatDate(log.timestamp)}
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                    <p className="text-xs text-foreground/90 leading-relaxed font-sans">
                       {log.details}
                     </p>
-                  </div>
+                  </Card>
                 </div>
               );
             })}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 };

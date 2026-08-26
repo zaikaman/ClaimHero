@@ -1,32 +1,44 @@
 import React, { useState } from "react";
 import {
-  Radar,
-  Search,
-  UploadCloud,
-  FileText,
-  User,
-  Activity,
-  ArrowUpRight,
-  Stethoscope,
   DollarSign,
   TrendingUp,
+  UserCheck,
+  ShieldAlert,
+  Search,
+  UsersRound,
+  Building2,
+  Download,
+  Activity,
+  FileText,
+  Clock,
+  ArrowUpRight,
 } from "lucide-react";
 import { Claim } from "../../types";
-import {
-  formatCurrency,
-  formatDate,
-  getStatusConfig,
-  getScoreColor,
-} from "../../lib/utils";
+import { formatCurrency } from "../../lib/utils";
 import { CPT_CODES, DENIAL_REASON_CODES } from "../../lib/constants";
 import { DeadlineCountdown } from "./DeadlineCountdown";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Input } from "../ui/input";
+import { Avatar, AvatarFallback } from "../ui/avatar";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "../ui/table";
 
 interface CaseRadarProps {
   claims: Claim[];
   selectedClaimId: string;
   onSelectClaim: (claimId: string) => void;
   onOpenIngestion: () => void;
-  onNavigateView: (view: "radar" | "evidence" | "studio" | "communications" | "audit") => void;
+  onNavigateView: (
+    view: "radar" | "evidence" | "studio" | "communications" | "audit"
+  ) => void;
 }
 
 export const CaseRadar: React.FC<CaseRadarProps> = ({
@@ -37,8 +49,23 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   onNavigateView,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [payerFilter, setPayerFilter] = useState("all");
+
+  const totalDisputed = claims.reduce((acc, c) => acc + c.deniedAmount, 0);
+  const wonClaims = claims.filter((c) => c.status === "won");
+  const totalWon = wonClaims.reduce((acc, c) => acc + c.deniedAmount, 0);
+  const avgScore = claims.length
+    ? Math.round(
+        claims.reduce((acc, c) => acc + (c.overturnProbabilityScore || 0), 0) /
+          claims.length
+      )
+    : 0;
+  const criticalCount = claims.filter((c) => c.daysRemaining <= 14).length;
 
   const filtered = claims.filter((c) => {
+    if (statusFilter !== "all" && c.status !== statusFilter) return false;
+    if (payerFilter !== "all" && c.patient?.insurancePayer !== payerFilter) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -51,244 +78,384 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   });
 
   return (
-    <div className="space-y-6 animate-fadeIn">
-      {/* Radar Control Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-slate-900/90 via-[#0b1526]/80 to-slate-900/90 p-5 shadow-glass-panel">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            {/* Animated Radar Pulse Icon */}
-            <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-950/60 border border-cyan-500/40 shadow-cyan-glow">
-              <Radar className="h-6 w-6 text-cyan-400 animate-spin" style={{ animationDuration: "6s" }} />
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
-              </span>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold tracking-tight text-white font-sans">
-                  Live Case Ingestion Radar
-                </h2>
-                <span className="rounded-full bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-mono text-emerald-300 font-semibold flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  SCANNING
-                </span>
+    <div className="space-y-4 animate-fadeIn font-sans">
+      {/* 1. Top 4 Metric Cards (Matching screenshot) */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+        {/* Card 1: Total Disputed */}
+        <Card className="shadow-xs bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle>
+              <div className="flex size-7 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                <DollarSign className="size-4" />
               </div>
-              <p className="text-xs text-slate-400">
-                Real-time optical parsing of EOBs, Clinical Policy Bulletin cross-examinations, and statutory countdown tracking
-              </p>
+            </CardTitle>
+            <CardDescription className="text-xs">Total Disputed Pipeline</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="font-medium text-2xl sm:text-3xl tabular-nums leading-none tracking-tight text-foreground">
+                {formatCurrency(totalDisputed)}
+              </div>
+              <Badge variant="secondary" className="gap-1 text-[11px] font-mono">
+                {claims.length} Cases
+              </Badge>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search CPT, Denial Code, Patient..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-56 sm:w-64 rounded-xl border border-slate-800 bg-slate-950/80 pl-9 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 font-sans"
-              />
-            </div>
-
-            {/* Ingestion Trigger Button */}
-            <button
-              onClick={onOpenIngestion}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-4 py-2 text-xs font-bold text-slate-950 shadow-cyan-glow transition-all hover:scale-105 active:scale-95"
-            >
-              <UploadCloud className="h-4 w-4 fill-slate-950" />
-              <span>+ Ingest Denial PDF</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Case Radar Feed Grid */}
-      <div className="grid grid-cols-1 gap-4">
-        {filtered.length === 0 ? (
-          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-12 text-center space-y-3">
-            <Radar className="mx-auto h-8 w-8 text-slate-600 animate-pulse" />
-            <div className="text-sm font-semibold text-slate-300">No matching denial cases found</div>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Upload a new denial letter or forward an Explanation of Benefits to your assigned claim inbox.
+            <p className="text-muted-foreground text-xs">
+              Under active ERISA statutory review
             </p>
-            <button
-              onClick={onOpenIngestion}
-              className="inline-flex items-center gap-2 rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-xs font-medium text-cyan-300 hover:bg-slate-700"
-            >
-              <UploadCloud className="h-3.5 w-3.5" />
-              <span>+ Ingest Denial Document</span>
-            </button>
-          </div>
-        ) : (
-          filtered.map((claim) => {
-            const isSelected = claim._id === selectedClaimId;
-            const statusConfig = getStatusConfig(claim.status);
-            const scoreMetrics = claim.overturnProbabilityScore
-              ? getScoreColor(claim.overturnProbabilityScore)
-              : null;
-            const denialReason = DENIAL_REASON_CODES[claim.denialReasonCode];
+          </CardContent>
+        </Card>
 
-            return (
+        {/* Card 2: Recovered Funds */}
+        <Card className="shadow-xs bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle>
+              <div className="flex size-7 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                <UserCheck className="size-4" />
+              </div>
+            </CardTitle>
+            <CardDescription className="text-xs">Recovered Viable Funds</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="font-medium text-2xl sm:text-3xl tabular-nums leading-none tracking-tight text-emerald-600 dark:text-emerald-400">
+                {formatCurrency(totalWon)}
+              </div>
+              <Badge variant="secondary" className="gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
+                <TrendingUp className="size-3" />
+                94% Won
+              </Badge>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Overturned via clinical policy citations
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Average Win Likelihood */}
+        <Card className="shadow-xs bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle>
+              <div className="flex size-7 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                <TrendingUp className="size-4" />
+              </div>
+            </CardTitle>
+            <CardDescription className="text-xs">Average Win Likelihood</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="font-medium text-2xl sm:text-3xl tabular-nums leading-none tracking-tight text-foreground">
+                {avgScore}%
+              </div>
+              <Badge variant="secondary" className="text-[11px] font-mono">
+                High Precedent
+              </Badge>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Across {claims.length} cross-examined CPBs
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Urgent Alarms */}
+        <Card className="shadow-xs bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle>
+              <div className="flex size-7 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                {criticalCount > 0 ? (
+                  <ShieldAlert className="size-4 text-destructive" />
+                ) : (
+                  <Clock className="size-4" />
+                )}
+              </div>
+            </CardTitle>
+            <CardDescription className="text-xs">Statutory Alarms (&lt;14d)</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
               <div
-                key={claim._id}
-                onClick={() => onSelectClaim(claim._id)}
-                className={`relative rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden p-5 ${
-                  isSelected
-                    ? "border-cyan-500/60 bg-gradient-to-br from-slate-900/90 via-[#0d1c2e]/90 to-slate-900/90 shadow-cyan-glow"
-                    : "border-slate-800/90 bg-slate-900/50 hover:border-slate-700 hover:bg-slate-900/80"
+                className={`font-medium text-2xl sm:text-3xl tabular-nums leading-none tracking-tight ${
+                  criticalCount > 0 ? "text-destructive" : "text-foreground"
                 }`}
               >
-                {/* Accent top stripe */}
-                {isSelected && (
-                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400"></div>
-                )}
+                {criticalCount} Urgent
+              </div>
+              <Badge variant="outline" className="text-[10px] font-mono">
+                29 CFR § 2560.503-1
+              </Badge>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Deadlines expiring within statutory window
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  {/* Left Column: Patient & Payer Case Details */}
-                  <div className="space-y-2.5 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md border border-cyan-500/30 bg-cyan-950/40 px-2 py-0.5 text-xs font-mono font-bold text-cyan-300">
-                        {claim.claimNumber}
-                      </span>
-                      <span className="rounded-md border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-xs font-medium text-slate-300">
-                        {claim.patient?.insurancePayer || "Health Insurer"}
-                      </span>
-                      <span
-                        className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold flex items-center gap-1.5 ${statusConfig.border} ${statusConfig.bg} ${statusConfig.color}`}
-                      >
-                        <span className="h-1.5 w-1.5 rounded-full bg-current"></span>
-                        {statusConfig.label}
-                      </span>
-                    </div>
+      {/* 2. Main Claims Table & Toolbar Section (Matching screenshot) */}
+      <Card className="bg-card shadow-xs">
+        <CardHeader className="pb-3 border-b border-border/60">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base font-semibold text-foreground">
+                {claims.length} Active Medical Denial Claims
+              </CardTitle>
+              <CardDescription>
+                Recent medical denial records with plan, CPT codes, CARC reason, and statutory countdown.
+              </CardDescription>
+            </div>
 
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300">
-                      <div className="flex items-center gap-1.5 font-medium">
-                        <User className="h-3.5 w-3.5 text-cyan-400" />
-                        <span>{claim.patient?.name || "Patient Record"}</span>
-                        <span className="text-slate-500 font-mono text-[11px]">
-                          ({claim.patient?.memberId})
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-slate-400 text-[11px]">
-                        <Stethoscope className="h-3.5 w-3.5 text-slate-500" />
-                        <span>{claim.providerName}</span>
-                      </div>
-                      <div className="text-slate-500 text-[11px] font-mono">
-                        DOS: {formatDate(claim.serviceDate)}
-                      </div>
-                    </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const csv = claims
+                    .map(
+                      (c) =>
+                        `${c.claimNumber},${c.patient?.name},${c.patient?.insurancePayer},${c.deniedAmount},${c.denialReasonCode},${c.daysRemaining}`
+                    )
+                    .join("\n");
+                  const blob = new Blob([csv], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "claims-export.csv";
+                  a.click();
+                }}
+                className="gap-1.5"
+              >
+                <Download className="size-3.5" />
+                <span>Export</span>
+              </Button>
+            </div>
+          </div>
 
-                    {/* CPT & Denial Reason Badges */}
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      {claim.cptCodes.map((code) => {
-                        const cptInfo = CPT_CODES[code];
-                        return (
-                          <div
-                            key={code}
-                            className="inline-flex items-center gap-1.5 rounded-md border border-slate-700/80 bg-slate-950/60 px-2 py-1 text-xs font-mono"
-                          >
-                            <span className="font-bold text-cyan-300">CPT {code}</span>
-                            {cptInfo && (
-                              <span className="text-[11px] text-slate-400 font-sans">
-                                — {cptInfo.name}
-                              </span>
-                            )}
+          {/* Table Toolbar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="h-8 pl-8 text-xs"
+                  placeholder="Search claims, patient, CPT..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex items-center gap-1">
+                <UsersRound className="size-3.5 text-muted-foreground hidden sm:inline" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-8"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="ingested">Ingested / OCR</option>
+                  <option value="analyzing">Evidence Crawl</option>
+                  <option value="ready_for_review">Ready for Review</option>
+                  <option value="dispatched">Dispatched</option>
+                  <option value="won">Won / Overturned</option>
+                </select>
+              </div>
+
+              {/* Payer Filter */}
+              <div className="flex items-center gap-1">
+                <Building2 className="size-3.5 text-muted-foreground hidden sm:inline" />
+                <select
+                  value={payerFilter}
+                  onChange={(e) => setPayerFilter(e.target.value)}
+                  className="rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-8"
+                >
+                  <option value="all">All Payers</option>
+                  <option value="UnitedHealthcare">UnitedHealthcare</option>
+                  <option value="Aetna">Aetna</option>
+                  <option value="Cigna">Cigna</option>
+                  <option value="Elevance Health">Elevance Health</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onOpenIngestion}
+                className="gap-1.5"
+              >
+                <span>+ Ingest Denial</span>
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+
+        {/* Data Table */}
+        <div className="overflow-hidden">
+          <Table>
+            <TableHeader className="bg-muted/30">
+              <TableRow>
+                <TableHead className="w-10"></TableHead>
+                <TableHead>Claim & Patient</TableHead>
+                <TableHead>Payer</TableHead>
+                <TableHead>CPT Procedure</TableHead>
+                <TableHead>Denial Code</TableHead>
+                <TableHead>Disputed Amount</TableHead>
+                <TableHead>Win Likelihood</TableHead>
+                <TableHead>Statutory Clock</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                    No matching claims found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((claim) => {
+                  const isSelected = claim._id === selectedClaimId;
+                  const denialReason = DENIAL_REASON_CODES[claim.denialReasonCode];
+                  const primaryCpt = claim.cptCodes[0] || "27447";
+                  const cptInfo = CPT_CODES[primaryCpt];
+
+                  return (
+                    <TableRow
+                      key={claim._id}
+                      onClick={() => onSelectClaim(claim._id)}
+                      data-state={isSelected ? "selected" : undefined}
+                      className="cursor-pointer hover:bg-muted/40 transition-colors"
+                    >
+                      <TableCell className="w-10">
+                        <Avatar size="sm" className="bg-muted text-foreground font-semibold">
+                          <AvatarFallback>
+                            {claim.patient?.name ? claim.patient.name.slice(0, 2).toUpperCase() : "PT"}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-foreground text-xs">
+                            {claim.patient?.name || "Patient Record"}
+                          </span>
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {claim.claimNumber} • {claim.patient?.memberId}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <Badge variant="outline" className="font-medium">
+                          {claim.patient?.insurancePayer || "Insurer"}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <Badge variant="secondary" className="font-mono text-xs w-fit">
+                            CPT {primaryCpt}
+                          </Badge>
+                          {cptInfo && (
+                            <span className="text-[11px] text-muted-foreground truncate max-w-[140px] mt-0.5">
+                              {cptInfo.name}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <Badge variant="destructive" className="font-mono text-[10px] w-fit">
+                            {claim.denialReasonCode}
+                          </Badge>
+                          {denialReason && (
+                            <span className="text-[11px] text-muted-foreground truncate max-w-[140px] mt-0.5">
+                              {denialReason.title}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-mono font-bold text-destructive text-xs">
+                            {formatCurrency(claim.deniedAmount)}
+                          </span>
+                          <span className="font-mono text-[10px] text-muted-foreground">
+                            Owes: {formatCurrency(claim.patientOwedAmount)}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        {claim.overturnProbabilityScore !== undefined ? (
+                          <div className="flex items-center gap-1.5 font-mono">
+                            <span className="font-bold text-xs text-foreground">
+                              {claim.overturnProbabilityScore}%
+                            </span>
+                            <Badge
+                              variant="secondary"
+                              className={`text-[10px] ${
+                                claim.overturnProbabilityScore >= 80
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-amber-500"
+                              }`}
+                            >
+                              {claim.riskLevel === "high_confidence" ? "High" : "Moderate"}
+                            </Badge>
                           </div>
-                        );
-                      })}
-
-                      <div className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/40 bg-rose-950/30 px-2 py-1 text-xs font-mono">
-                        <span className="font-bold text-rose-400">{claim.denialReasonCode}</span>
-                        {denialReason && (
-                          <span className="text-[11px] text-rose-300/80 font-sans truncate max-w-xs">
-                            — {denialReason.title}
+                        ) : (
+                          <span className="text-xs text-muted-foreground font-mono">
+                            Pending
                           </span>
                         )}
-                      </div>
-                    </div>
-                  </div>
+                      </TableCell>
 
-                  {/* Middle Column: Financials & Win Score Matrix */}
-                  <div className="flex flex-wrap lg:flex-nowrap items-center gap-4 lg:gap-6 border-t lg:border-t-0 lg:border-l border-slate-800/80 pt-3 lg:pt-0 lg:pl-6">
-                    {/* Disputed Amount */}
-                    <div className="text-left">
-                      <div className="text-[10px] uppercase font-mono tracking-wider text-slate-400 flex items-center gap-1">
-                        <DollarSign className="h-3 w-3 text-rose-400" />
-                        <span>Denied Amount</span>
-                      </div>
-                      <div className="text-xl font-bold font-mono text-white">
-                        {formatCurrency(claim.deniedAmount)}
-                      </div>
-                      <div className="text-[10px] text-rose-400">
-                        Patient Owes: {formatCurrency(claim.patientOwedAmount)}
-                      </div>
-                    </div>
+                      <TableCell>
+                        <DeadlineCountdown
+                          daysRemaining={claim.daysRemaining}
+                          statutoryDeadline={claim.statutoryDeadline}
+                          size="sm"
+                        />
+                      </TableCell>
 
-                    {/* Overturn Probability Win Score */}
-                    {claim.overturnProbabilityScore !== undefined && scoreMetrics && (
-                      <div className="text-left">
-                        <div className="text-[10px] uppercase font-mono tracking-wider text-slate-400 flex items-center gap-1">
-                          <TrendingUp className="h-3 w-3 text-emerald-400" />
-                          <span>Win Likelihood</span>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="outline"
+                            size="xs"
+                            onClick={() => {
+                              onSelectClaim(claim._id);
+                              onNavigateView("evidence");
+                            }}
+                          >
+                            <Activity className="size-3 text-muted-foreground" />
+                            <span>Evidence</span>
+                          </Button>
+                          <Button
+                            variant="default"
+                            size="xs"
+                            onClick={() => {
+                              onSelectClaim(claim._id);
+                              onNavigateView("studio");
+                            }}
+                          >
+                            <FileText className="size-3" />
+                            <span>Appeal Brief</span>
+                            <ArrowUpRight className="size-2.5 opacity-60" />
+                          </Button>
                         </div>
-                        <div className={`text-xl font-bold font-mono ${scoreMetrics.text}`}>
-                          {claim.overturnProbabilityScore}%
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono">
-                          {claim.riskLevel === "high_confidence"
-                            ? "High Precedent"
-                            : "Evaluating"}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Statutory Deadline Alarm */}
-                    <div className="text-left min-w-[130px]">
-                      <DeadlineCountdown
-                        daysRemaining={claim.daysRemaining}
-                        statutoryDeadline={claim.statutoryDeadline}
-                        size="sm"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Right Column: Quick Case Action Buttons */}
-                  <div className="flex items-center gap-2 pt-2 lg:pt-0">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectClaim(claim._id);
-                        onNavigateView("evidence");
-                      }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-cyan-500/50 hover:bg-slate-700 hover:text-cyan-300 transition-all"
-                    >
-                      <Activity className="h-3.5 w-3.5 text-cyan-400" />
-                      <span>Evidence</span>
-                    </button>
-
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectClaim(claim._id);
-                        onNavigateView("studio");
-                      }}
-                      className="inline-flex items-center gap-1 rounded-lg bg-cyan-500/20 border border-cyan-500/40 px-3 py-1.5 text-xs font-semibold text-cyan-300 hover:bg-cyan-500/30 hover:shadow-cyan-glow transition-all"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      <span>Appeal Studio</span>
-                      <ArrowUpRight className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
     </div>
   );
 };
