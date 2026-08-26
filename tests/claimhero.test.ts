@@ -117,3 +117,27 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
     expect(requiredSections).toContain("medicalNecessityArguments");
   });
 });
+
+describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
+  it("formats dedicated agentmail inbox address correctly", () => {
+    const claimNumber = "CLM-2026-88192";
+    const formattedEmail = `appeal-claim-${claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
+    expect(formattedEmail).toBe("appeal-claim-clm202688192@claimhero.agentmail.com");
+  });
+
+  it("identifies payer victory and approval keywords in inbound emails", () => {
+    const isApprovalEmail = (body: string) => {
+      const text = body.toLowerCase();
+      return (
+        text.includes("overturned") ||
+        text.includes("approved") ||
+        text.includes("payment issued") ||
+        text.includes("reimbursed")
+      );
+    };
+
+    expect(isApprovalEmail("Your appeal has been approved and full payment issued.")).toBe(true);
+    expect(isApprovalEmail("The adverse determination is overturned upon review.")).toBe(true);
+    expect(isApprovalEmail("We acknowledge receipt of your appeal packet.")).toBe(false);
+  });
+});

@@ -4,8 +4,6 @@ import {
   Search,
   UploadCloud,
   FileText,
-  AlertTriangle,
-  Clock,
   User,
   Activity,
   ArrowUpRight,
@@ -17,11 +15,11 @@ import { Claim } from "../../types";
 import {
   formatCurrency,
   formatDate,
-  formatDeadlineRemaining,
   getStatusConfig,
   getScoreColor,
 } from "../../lib/utils";
 import { CPT_CODES, DENIAL_REASON_CODES } from "../../lib/constants";
+import { DeadlineCountdown } from "./DeadlineCountdown";
 
 interface CaseRadarProps {
   claims: Claim[];
@@ -129,7 +127,6 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
           filtered.map((claim) => {
             const isSelected = claim._id === selectedClaimId;
             const statusConfig = getStatusConfig(claim.status);
-            const deadline = formatDeadlineRemaining(claim.daysRemaining);
             const scoreMetrics = claim.overturnProbabilityScore
               ? getScoreColor(claim.overturnProbabilityScore)
               : null;
@@ -251,19 +248,11 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
 
                     {/* Statutory Deadline Alarm */}
                     <div className="text-left min-w-[130px]">
-                      <div className="text-[10px] uppercase font-mono tracking-wider text-slate-400 flex items-center gap-1">
-                        {deadline.isCritical ? (
-                          <AlertTriangle className="h-3 w-3 text-rose-400 animate-pulse" />
-                        ) : (
-                          <Clock className="h-3 w-3 text-slate-400" />
-                        )}
-                        <span>ERISA Clock</span>
-                      </div>
-                      <div
-                        className={`inline-flex items-center mt-0.5 rounded px-2 py-0.5 text-xs font-mono font-semibold border ${deadline.badgeClass}`}
-                      >
-                        {deadline.text}
-                      </div>
+                      <DeadlineCountdown
+                        daysRemaining={claim.daysRemaining}
+                        statutoryDeadline={claim.statutoryDeadline}
+                        size="sm"
+                      />
                     </div>
                   </div>
 

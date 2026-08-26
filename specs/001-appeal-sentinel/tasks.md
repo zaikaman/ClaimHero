@@ -91,13 +91,13 @@
 
 **Independent Test**: Finalize an appeal brief, confirm dispatch, verify transmission to payer grievance address, check active countdown dial, and inspect the audit trail.
 
-- [ ] T032 [P] [US4] Implement scheduled statutory deadline daily sweep cron in `convex/crons.ts`
-- [ ] T033 [US4] Implement AgentMail outbound dispatch action with attachment bundling in `convex/actions/mailDispatcher.ts`
-- [ ] T034 [P] [US4] Implement email thread and message query/mutation handlers in `convex/emails.ts`
-- [ ] T035 [US4] Implement Convex HTTP webhook endpoint for inbound AgentMail events in `convex/http.ts`
-- [ ] T036 [P] [US4] Implement Dynamic Statutory Deadline Countdown dial in `src/components/radar/DeadlineCountdown.tsx`
-- [ ] T037 [P] [US4] Implement Dedicated Claim Inbox & Message Drawer in `src/components/communications/AgentMailDrawer.tsx`
-- [ ] T038 [US4] Implement Chronological Case Audit Timeline in `src/components/communications/AuditTimeline.tsx`
+- [X] T032 [P] [US4] Implement scheduled statutory deadline daily sweep cron in `convex/crons.ts`
+- [X] T033 [US4] Implement AgentMail outbound dispatch action with attachment bundling in `convex/actions/mailDispatcher.ts`
+- [X] T034 [P] [US4] Implement email thread and message query/mutation handlers in `convex/emails.ts`
+- [X] T035 [US4] Implement Convex HTTP webhook endpoint for inbound AgentMail events in `convex/http.ts`
+- [X] T036 [P] [US4] Implement Dynamic Statutory Deadline Countdown dial in `src/components/radar/DeadlineCountdown.tsx`
+- [X] T037 [P] [US4] Implement Dedicated Claim Inbox & Message Drawer in `src/components/communications/AgentMailDrawer.tsx`
+- [X] T038 [US4] Implement Chronological Case Audit Timeline in `src/components/communications/AuditTimeline.tsx`
 
 **Checkpoint**: User Stories 1-4 functional — automated statutory countdowns, two-way email communications, and dispatch active.
 

@@ -8,11 +8,11 @@
 - **Frontend:** Convex static hosting
 - **Convex deployment:** dev:groovy-hippopotamus-924
 - **Components:** none
-- **Convex features:** database schema, relational indexes, queries, mutations, actions, file storage upload URL
+- **Convex features:** database schema, relational indexes, queries, mutations, actions, file storage, crons, httpRouter
 - **Auth:** none
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T11:08:00Z
+- **Last updated:** 2026-08-26T11:12:00Z
 
 ## Log
 
@@ -48,3 +48,6 @@ Completed Phase 4 User Story 2 - Clinical Policy Bulletin (CPB) Evidence Crawlin
 
 ### 2026-08-26 - working tree
 Completed Phase 5 User Story 3 - Cited Appeal Brief Synthesis & Collaborative Appeal Studio (T026-T031): Implemented appeal brief versioned queries, draft auto-saving, and storage mutations (`convex/appeals.ts`). Built appeal synthesizer action (`convex/actions/appealSynthesizer.ts`) powered by OpenAI `gpt-5-nano` with `AppealBriefSynthesisResult` structured JSON schemas enforcing statutory ERISA (29 CFR § 2560.503-1) rights notices, medical necessity arguments, and exact Clinical Policy Bulletin clause citations. Created collaborative appeal studio hook (`src/hooks/useAppealStudio.ts`) with debounced auto-saving to Convex Cloud. Built split-pane Collaborative Live Appeal Studio (`src/components/studio/AppealStudio.tsx`), Citation & Evidence Footnote Sidebar (`src/components/studio/CitationSidebar.tsx`), and full formal PDF Export & Print Drawer (`src/components/studio/ExportDrawer.tsx`). Verified with `npm run verify` (100% PASS, 10 unit tests).
+
+### 2026-08-26 - working tree
+Completed Phase 6 User Story 4 - Statutory Deadline Countdown & Autonomous Dispatch Engine (T032-T038): Implemented scheduled statutory deadline daily sweep cron (`convex/crons.ts`) and sweep mutation (`convex/claims.ts`) automatically recalculating ERISA 180-day countdowns and logging critical alarms. Built autonomous AgentMail dispatch action (`convex/actions/mailDispatcher.ts`) transmitting formal briefs to payer grievance gateways and creating two-way communication threads (`convex/emails.ts`). Built Convex HTTP router (`convex/http.ts`) handling inbound AgentMail webhooks (`/agentmail-webhook`) with automated settlement/victory detection. Built dynamic circular ERISA countdown gauge (`src/components/radar/DeadlineCountdown.tsx`), two-way dedicated claim inbox drawer (`src/components/communications/AgentMailDrawer.tsx`), and immutable cryptographic case audit timeline (`src/components/communications/AuditTimeline.tsx`). Verified with `npm run verify` (100% PASS, 12 unit tests).

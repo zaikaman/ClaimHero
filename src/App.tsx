@@ -5,12 +5,13 @@ import { CaseRadar } from "./components/radar/CaseRadar";
 import { IngestionModal } from "./components/radar/IngestionModal";
 import { EvidenceMatrix } from "./components/evidence/EvidenceMatrix";
 import { AppealStudio } from "./components/studio/AppealStudio";
+import { AgentMailDrawer } from "./components/communications/AgentMailDrawer";
+import { AuditTimeline } from "./components/communications/AuditTimeline";
 import { useClaims } from "./hooks/useClaims";
 import { useEvidence } from "./hooks/useEvidence";
+import { useCommunications } from "./hooks/useCommunications";
 import {
   ArrowRight,
-  Mail,
-  Clock,
   Loader2,
 } from "lucide-react";
 
@@ -41,6 +42,16 @@ export default function App() {
     crawlPolicy,
     computeOverturnScore,
   } = useEvidence(selectedClaim);
+
+  const {
+    threads,
+    messages,
+    auditLogs,
+    isLoadingCommunications,
+    isLoadingAudit,
+    sendMessage,
+    dispatchAppeal,
+  } = useCommunications(selectedClaim);
 
   const handleOpenIngestion = () => {
     setIsIngestionOpen(true);
@@ -142,51 +153,39 @@ export default function App() {
 
           {/* 4. Dedicated AgentMail Claim Inbox */}
           {currentView === "communications" && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center space-y-4">
-              <div className="inline-flex p-3 rounded-2xl bg-cyan-950/60 border border-cyan-500/40 shadow-cyan-glow">
-                <Mail className="h-8 w-8 text-cyan-400" />
+            selectedClaim ? (
+              <AgentMailDrawer
+                claim={selectedClaim}
+                threads={threads}
+                messages={messages}
+                isLoading={isLoadingCommunications}
+                onSendMessage={sendMessage}
+                onDispatchAppeal={dispatchAppeal}
+              />
+            ) : (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center space-y-4">
+                <div className="text-sm font-semibold text-slate-300">No Claim Selected</div>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Please select a claim from the Case Radar to view its dedicated AgentMail inbox and transmission history.
+                </p>
+                <button
+                  onClick={() => setCurrentView("radar")}
+                  className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-mono"
+                >
+                  <span>Go to Case Radar</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <h2 className="text-xl font-bold text-white">Dedicated AgentMail Claim Inbox</h2>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                {selectedClaim ? (
-                  <>
-                    Assigned Claim Inbox:{" "}
-                    <span className="text-cyan-300 font-mono font-semibold">
-                      {selectedClaim.assignedAgentEmail}
-                    </span>
-                  </>
-                ) : (
-                  "Universal Ingestion Address: intake@claimhero.agentmail.com"
-                )}
-              </p>
-              <button
-                onClick={() => setCurrentView("radar")}
-                className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-mono"
-              >
-                <span>Back to Case Radar Feed</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
+            )
           )}
 
           {/* 5. Immutable Case Audit Timeline */}
           {currentView === "audit" && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center space-y-4">
-              <div className="inline-flex p-3 rounded-2xl bg-cyan-950/60 border border-cyan-500/40 shadow-cyan-glow">
-                <Clock className="h-8 w-8 text-cyan-400" />
-              </div>
-              <h2 className="text-xl font-bold text-white">Immutable Case Audit Timeline</h2>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                Tracking chronological case milestones, optical extractions, policy scrapes, and dispatch receipts directly on Convex.
-              </p>
-              <button
-                onClick={() => setCurrentView("radar")}
-                className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-mono"
-              >
-                <span>Back to Case Radar Feed</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
+            <AuditTimeline
+              claim={selectedClaim}
+              logs={auditLogs}
+              isLoading={isLoadingAudit}
+            />
           )}
         </>
       )}

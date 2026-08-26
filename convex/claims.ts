@@ -280,3 +280,44 @@ export const generateUploadUrl = mutation({
     return await ctx.storage.generateUploadUrl();
   },
 });
+
+/**
+ * Sweep and recalculate statutory deadlines across all open claims
+ */
+export const sweepDeadlines = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const openClaims = await ctx.db.query("claims").collect();
+    let updatedCount = 0;
+    let criticalCount = 0;
+
+    for (const claim of openClaims) {
+      if (claim.status === "won" || claim.status === "lost") continue;
+
+      const exactRemaining = Math.max(0, Math.ceil((claim.statutoryDeadline - now) / 86400000));
+
+      if (exactRemaining !== claim.daysRemaining) {
+        await ctx.db.patch(claim._id, {
+          daysRemaining: exactRemaining,
+          updatedAt: now,
+        });
+        updatedCount++;
+
+        if (exactRemaining <= 14 && claim.daysRemaining > 14) {
+          criticalCount++;
+          await ctx.db.insert("appealAuditLogs", {
+            claimId: claim._id,
+            eventType: "statutory_alarm_critical",
+            actor: "Statutory Deadline Sentinel",
+            details: `CRITICAL ALARM: Only ${exactRemaining} days remaining before statutory ERISA appeal clock expires for claim ${claim.claimNumber}.`,
+            timestamp: now,
+          });
+        }
+      }
+    }
+
+    return { updatedCount, criticalCount };
+  },
+});
+

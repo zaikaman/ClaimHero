@@ -116,17 +116,13 @@ export interface EmailMessage {
 export interface AppealAuditLog {
   _id: string;
   claimId: string;
-  eventType:
-    | "denial_ingested"
-    | "policy_crawled"
-    | "overturn_score_computed"
-    | "appeal_edited"
-    | "appeal_dispatched"
-    | "decision_recorded";
+  eventType: string;
   actor: string;
   details: string;
   timestamp: number;
 }
+
+export type AuditLog = AppealAuditLog;
 
 // LLM Output Structured Schemas
 export interface DenialExtractionResult {
