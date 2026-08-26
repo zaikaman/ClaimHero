@@ -1,17 +1,17 @@
 import React, { useState, useRef } from "react";
 import {
-  UploadCloud,
+  CloudArrowUp,
   FileText,
-  Mail,
-  CheckCircle2,
+  Envelope,
+  CheckCircle,
   Copy,
   Check,
   Shield,
-  Loader2,
-  FileCheck,
-  AlertCircle,
-  Sparkles,
-} from "lucide-react";
+  CircleNotch,
+  FileDoc,
+  WarningCircle,
+  Sparkle,
+} from "@phosphor-icons/react";
 import { DenialExtractionResult } from "../../types";
 import { formatCurrency } from "../../lib/utils";
 import {
@@ -105,32 +105,32 @@ In accordance with federal regulations under 29 CFR § 2560.503-1, you or your a
   },
   {
     id: "cigna_mri",
-    title: "Cigna — Diagnostic Knee MRI",
+    title: "Cigna — Knee MRI Scan",
     payer: "Cigna",
     amount: "$2,850",
     cpt: "73721",
-    carc: "CO-16 (Missing Records)",
-    content: `CIGNA HEALTH AND LIFE INSURANCE COMPANY
-EXPLANATION OF BENEFITS
-Claim #: CLM-3319-CIG
-Member ID: CIG-773190-44
-Patient: David Chen
-Date of Service: 07/28/2026
-Facility: Metro Advanced Imaging Center
+    carc: "CO-16 (Missing Plain Radiographs)",
+    content: `CIGNA HEALTHCARE
+ADVERSE CLAIM ADJUDICATION NOTICE
+Claim Number: CLM-3912-CIG
+Member: Michael Patel (ID: CIG-773419-02)
+Date of Service: 07/18/2026
+Provider: Metro Diagnostic Imaging Group
 
-Service Detail:
-- CPT 73721: Magnetic resonance imaging, any joint of lower extremity; without contrast material
+Services:
+- CPT 73721: Magnetic resonance imaging, any joint of lower extremity; without contrast material (Knee MRI)
 - ICD-10 M23.22: Derangement of meniscus due to old tear or injury, right knee
-- Billed Charge: $2,850.00
+- Billed: $2,850.00
+- Paid: $0.00
 - Denied: $2,850.00
-- Patient Owes: $2,850.00
+- Patient Due: $2,850.00
 
-Denial Code & Description:
-Code CO-16: Claim/service lacks information or has submission/billing error(s) which is needed for adjudication.
-Remarks: Prior 4-week weight-bearing X-ray reports and clinical examination notes ruling out conservative management were not attached to the imaging claim submission.
+Denial Rationale:
+Code CO-16: Claim lacks information or has submission error.
+Coverage Policy 0122 requires documented weight-bearing plain radiographs performed within the preceding 6 months prior to approval of magnetic resonance imaging for non-acute knee pain.
 
-Statutory Appeal Window:
-Under ERISA § 503 regulations, you have 180 days to appeal this determination with complete diagnostic documentation.`,
+Statutory Rights:
+You have 180 days to request an administrative ERISA reconsideration under 29 CFR § 2560.503-1.`,
   },
 ];
 
@@ -141,10 +141,10 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   onParseText,
   onSuccess,
 }) => {
-  const [activeTab, setActiveTab] = useState<string>("presets");
-  const [pastedText, setPastedText] = useState("");
+  const [activeTab, setActiveTab] = useState("presets");
   const [patientState, setPatientState] = useState("California");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [pastedText, setPastedText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState(
     "Processing with OpenAI..."
@@ -250,7 +250,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <UploadCloud className="size-4.5" />
+              <CloudArrowUp className="size-4.5" />
             </div>
             <div>
               <DialogTitle>Ingest Denial Document</DialogTitle>
@@ -281,7 +281,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
         {/* Error Alert */}
         {errorMessage && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 flex items-center gap-2 text-xs text-destructive">
-            <AlertCircle className="size-4 shrink-0" />
+            <WarningCircle className="size-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
@@ -290,11 +290,11 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList variant="line" className="w-full">
               <TabsTrigger value="presets" className="gap-1.5">
-                <Sparkles className="size-3.5" />
+                <Sparkle className="size-3.5" />
                 <span>1-Click Presets</span>
               </TabsTrigger>
               <TabsTrigger value="upload" className="gap-1.5">
-                <UploadCloud className="size-3.5" />
+                <CloudArrowUp className="size-3.5" />
                 <span>File Upload</span>
               </TabsTrigger>
               <TabsTrigger value="paste" className="gap-1.5">
@@ -302,7 +302,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 <span>Paste Text</span>
               </TabsTrigger>
               <TabsTrigger value="email" className="gap-1.5">
-                <Mail className="size-3.5" />
+                <Envelope className="size-3.5" />
                 <span>AgentMail</span>
               </TabsTrigger>
             </TabsList>
@@ -346,7 +346,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
               {isProcessing && (
                 <div className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground animate-pulse">
-                  <Loader2 className="size-4 animate-spin text-primary" />
+                  <CircleNotch className="size-4 animate-spin text-primary" />
                   <span>{processingMessage}</span>
                 </div>
               )}
@@ -366,7 +366,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 onClick={() => fileInputRef.current?.click()}
                 className="cursor-pointer rounded-xl border-2 border-dashed border-border hover:border-foreground/30 bg-muted/20 hover:bg-muted/40 p-8 text-center transition-all"
               >
-                <UploadCloud className="mx-auto size-10 text-muted-foreground" />
+                <CloudArrowUp className="mx-auto size-10 text-muted-foreground" />
                 <div className="mt-2 text-xs font-semibold text-foreground">
                   {selectedFile
                     ? selectedFile.name
@@ -397,12 +397,12 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   >
                     {isProcessing ? (
                       <>
-                        <Loader2 className="size-3.5 animate-spin" />
+                        <CircleNotch className="size-3.5 animate-spin" />
                         <span>{processingMessage}</span>
                       </>
                     ) : (
                       <>
-                        <FileCheck className="size-3.5" />
+                        <FileDoc className="size-3.5" />
                         <span>Run Optical Parser</span>
                       </>
                     )}
@@ -430,12 +430,12 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 >
                   {isProcessing ? (
                     <>
-                      <Loader2 className="size-3.5 animate-spin" />
+                      <CircleNotch className="size-3.5 animate-spin" />
                       <span>{processingMessage}</span>
                     </>
                   ) : (
                     <>
-                      <FileCheck className="size-3.5" />
+                      <FileDoc className="size-3.5" />
                       <span>Extract with gpt-5-nano</span>
                     </>
                   )}
@@ -450,7 +450,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   <span className="text-xs font-semibold text-foreground">
                     Dedicated AgentMail Ingestion Address
                   </span>
-                  <Badge variant="outline" size="sm" className="gap-1 text-emerald-600 border-emerald-500/30">
+                  <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-500/30">
                     <span className="size-1.5 rounded-full bg-emerald-500"></span>
                     Webhook Active
                   </Badge>
@@ -501,7 +501,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           <Card className="p-4 space-y-4 border-emerald-500/30 bg-emerald-500/5">
             <div className="flex items-center justify-between border-b border-border/60 pb-2">
               <div className="flex items-center gap-1.5 font-semibold text-xs text-emerald-600 dark:text-emerald-400">
-                <FileCheck className="size-4" />
+                <CheckCircle className="size-4" />
                 <span>Case Initialized in Convex DB</span>
               </div>
               <Badge variant="outline" className="font-mono text-xs">
@@ -562,7 +562,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 onClick={handleDone}
                 className="gap-1.5"
               >
-                <CheckCircle2 className="size-3.5" />
+                <CheckCircle className="size-3.5" />
                 <span>View in Case Radar</span>
               </Button>
             </div>

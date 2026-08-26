@@ -1,5 +1,5 @@
 import React from "react";
-import { Clock, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Clock, Warning, ShieldWarning } from "@phosphor-icons/react";
 import { formatDeadlineRemaining, formatDate, cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Progress } from "../ui/progress";
@@ -32,9 +32,9 @@ export const DeadlineCountdown: React.FC<DeadlineCountdownProps> = ({
         )}
       >
         {isCritical ? (
-          <ShieldAlert className="size-3 animate-pulse" />
+          <ShieldWarning className="size-3 animate-pulse" />
         ) : isUrgent ? (
-          <AlertTriangle className="size-3" />
+          <Warning className="size-3" />
         ) : (
           <Clock className="size-3" />
         )}
@@ -67,9 +67,9 @@ export const DeadlineCountdown: React.FC<DeadlineCountdownProps> = ({
             )}
           >
             {isCritical ? (
-              <ShieldAlert className="size-3.5" />
+              <ShieldWarning className="size-3.5" />
             ) : isUrgent ? (
-              <AlertTriangle className="size-3.5" />
+              <Warning className="size-3.5" />
             ) : (
               <Clock className="size-3.5" />
             )}

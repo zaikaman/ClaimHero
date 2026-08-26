@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from "react";
 import {
-  Search,
-  Radar,
-  FileSearch,
+  MagnifyingGlass,
+  Broadcast,
+  FileMagnifyingGlass,
   FileText,
-  Mail,
-  PieChart,
+  Envelope,
+  ChartPieSlice,
   Clock,
   Shield,
-  UploadCloud,
+  CloudArrowUp,
   Moon,
   Sun,
   Copy,
   Check,
   ArrowRight,
   User,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
 import { Dialog, DialogContent } from "../ui/dialog";
@@ -94,7 +94,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       >
         {/* Search Input Bar */}
         <div className="flex items-center border-b border-border px-3 py-2.5">
-          <Search className="size-4 text-muted-foreground mr-2 shrink-0" />
+          <MagnifyingGlass className="size-4 text-muted-foreground mr-2 shrink-0" />
           <input
             autoFocus
             type="text"
@@ -186,11 +186,11 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
             <div className="grid grid-cols-2 gap-1">
               {[
                 { id: "landing" as NavigationView, label: "Cinematic Landing", icon: Shield },
-                { id: "radar" as NavigationView, label: "Case Radar Feed", icon: Radar },
-                { id: "evidence" as NavigationView, label: "Evidence Matrix", icon: FileSearch },
+                { id: "radar" as NavigationView, label: "Case Radar Feed", icon: Broadcast },
+                { id: "evidence" as NavigationView, label: "Evidence Matrix", icon: FileMagnifyingGlass },
                 { id: "studio" as NavigationView, label: "Appeal Studio", icon: FileText },
-                { id: "communications" as NavigationView, label: "AgentMail Inbox", icon: Mail },
-                { id: "analytics" as NavigationView, label: "Portfolio Analytics", icon: PieChart },
+                { id: "communications" as NavigationView, label: "AgentMail Inbox", icon: Envelope },
+                { id: "analytics" as NavigationView, label: "Portfolio Analytics", icon: ChartPieSlice },
                 { id: "audit" as NavigationView, label: "Audit Timeline", icon: Clock },
               ].map((view) => {
                 const Icon = view.icon;
@@ -225,7 +225,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                 className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <UploadCloud className="size-3.5 text-primary" />
+                  <CloudArrowUp className="size-3.5 text-primary" />
                   <span className="font-medium">+ Ingest Denial Document (File, Text, Presets)</span>
                 </div>
                 <Badge variant="outline" size="sm" className="font-mono text-[9px]">
@@ -238,7 +238,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                 className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <Mail className="size-3.5 text-emerald-500" />
+                  <Envelope className="size-3.5 text-emerald-500" />
                   <span>Copy AgentMail Ingestion Address (intake@claimhero.agentmail.com)</span>
                 </div>
                 {copiedEmail ? (

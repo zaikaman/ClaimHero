@@ -1,12 +1,12 @@
 import React from "react";
 import {
-  Award,
-  TrendingUp,
-  Scale,
+  Medal,
+  TrendUp,
+  Scales,
   Copy,
   Check,
-  ChevronRight,
-} from "lucide-react";
+  CaretRight,
+} from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -106,7 +106,7 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between bg-card border border-border p-2.5 rounded-xl">
         <div className="flex items-center gap-2">
-          <Award className="size-4 text-emerald-500" />
+          <Medal className="size-4 text-emerald-500" />
           <span className="text-xs font-semibold text-foreground">
             Matching Overturned Precedents ({precedents.length})
           </span>
@@ -129,7 +129,7 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="gap-1 font-mono text-xs text-emerald-600 dark:text-emerald-400">
-                      <TrendingUp className="size-3" />
+                      <TrendUp className="size-3" />
                       <span>{item.overturnRate}% Win Rate</span>
                     </Badge>
                     <span className="font-mono text-xs font-semibold text-foreground">
@@ -162,7 +162,7 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
 
               <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1.5 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1.5 text-[11px] font-mono text-foreground font-medium">
-                  <Scale className="size-3 text-muted-foreground" />
+                  <Scales className="size-3 text-muted-foreground" />
                   <span>Citation: {item.citation}</span>
                 </div>
                 <p className="text-xs text-foreground/90 leading-relaxed font-sans">
@@ -177,7 +177,7 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
                     className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline transition-colors"
                   >
                     <span>Insert into Appeal Arguments</span>
-                    <ChevronRight className="size-3" />
+                    <CaretRight className="size-3" />
                   </button>
                 </div>
               )}

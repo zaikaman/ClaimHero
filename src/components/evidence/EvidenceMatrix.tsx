@@ -1,19 +1,19 @@
 import React, { useState } from "react";
 import {
-  FileSearch,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle2,
-  Sparkles,
-  Loader2,
-  RefreshCw,
+  FileMagnifyingGlass,
+  TrendUp,
+  Warning,
+  CheckCircle,
+  Sparkle,
+  CircleNotch,
+  ArrowsClockwise,
   Shield,
   ArrowRight,
   Stethoscope,
   FileText,
   BookOpen,
-  Award,
-} from "lucide-react";
+  Medal,
+} from "@phosphor-icons/react";
 import { Claim, ClinicalEvidence, OverturnScoringResult } from "../../types";
 import { PolicyViewer } from "./PolicyViewer";
 import { PrecedentFeed } from "./PrecedentFeed";
@@ -88,7 +88,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
-              <FileSearch className="size-5" />
+              <FileMagnifyingGlass className="size-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -116,12 +116,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             >
               {isCrawling ? (
                 <>
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <CircleNotch className="size-3.5 animate-spin" />
                   <span>Crawling Policy...</span>
                 </>
               ) : (
                 <>
-                  <RefreshCw className="size-3.5" />
+                  <ArrowsClockwise className="size-3.5" />
                   <span>Crawl Insurer CPB</span>
                 </>
               )}
@@ -136,12 +136,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             >
               {isScoring ? (
                 <>
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <CircleNotch className="size-3.5 animate-spin" />
                   <span>Evaluating...</span>
                 </>
               ) : (
                 <>
-                  <TrendingUp className="size-3.5" />
+                  <TrendUp className="size-3.5" />
                   <span>Calculate Win Score</span>
                 </>
               )}
@@ -153,7 +153,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       {/* Error Alert */}
       {errorMessage && (
         <Alert variant="destructive">
-          <AlertTriangle className="size-4" />
+          <Warning className="size-4" />
           <AlertDescription>{errorMessage}</AlertDescription>
         </Alert>
       )}
@@ -202,7 +202,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             scoringResult.keyPolicyContradictions.length > 0 && (
               <div className="space-y-2 pt-1">
                 <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Sparkles className="size-3.5 text-primary" />
+                  <Sparkle className="size-3.5 text-primary" />
                   Key Insurer Contradictions Identified:
                 </span>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -211,7 +211,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                       key={idx}
                       className="flex items-start gap-2 rounded-lg bg-card border border-border p-2.5 text-xs text-foreground/90"
                     >
-                      <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                      <CheckCircle className="size-3.5 text-emerald-500 shrink-0 mt-0.5" />
                       <span className="leading-snug">{contra}</span>
                     </div>
                   ))}
@@ -228,7 +228,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           <Card className="p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <AlertTriangle className="size-3.5 text-destructive" />
+                <Warning className="size-3.5 text-destructive" />
                 Original Denial Baseline
               </span>
               <Badge variant="outline" className="font-mono">
@@ -330,7 +330,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 <span>Clinical Policy Bulletins ({evidences.length})</span>
               </TabsTrigger>
               <TabsTrigger value="precedents" className="gap-1.5">
-                <Award className="size-3.5" />
+                <Medal className="size-3.5" />
                 <span>Overturned Precedents</span>
               </TabsTrigger>
             </TabsList>

@@ -1,16 +1,16 @@
 import React, { useState } from "react";
 import {
   Printer,
-  Download,
+  DownloadSimple,
   Copy,
   Check,
-  Send,
-  FileCheck,
-  Building2,
+  PaperPlaneTilt,
+  FileDoc,
+  Buildings,
   Calendar,
-  DollarSign,
+  CurrencyDollar,
   User,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import { Claim, Appeal } from "../../types";
 import { formatCurrency, formatDate } from "../../lib/utils";
 import {
@@ -70,7 +70,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <FileCheck className="size-4.5" />
+                <FileDoc className="size-4.5" />
               </div>
               <div>
                 <DialogTitle>Formal Appeal Dossier Export</DialogTitle>
@@ -97,7 +97,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 onClick={handleDownload}
                 className="gap-1"
               >
-                <Download className="size-3" />
+                <DownloadSimple className="size-3" />
                 <span>Download .MD</span>
               </Button>
 
@@ -116,7 +116,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 onClick={onProceedToDispatch}
                 className="gap-1"
               >
-                <Send className="size-3" />
+                <PaperPlaneTilt className="size-3" />
                 <span>Proceed to Dispatch</span>
               </Button>
             </div>
@@ -156,7 +156,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
 
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <Building2 className="size-3.5 text-slate-600" />
+                  <Buildings className="size-3.5 text-slate-600" />
                   <span><strong>Health Plan:</strong> {claim.patient?.insurancePayer}</span>
                 </div>
                 <div><strong>Claim Number:</strong> {claim.claimNumber}</div>
@@ -165,7 +165,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                   <span><strong>Date of Service:</strong> {formatDate(claim.serviceDate)}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-rose-700 font-bold">
-                  <DollarSign className="size-3.5" />
+                  <CurrencyDollar className="size-3.5" />
                   <span>Disputed Amount: {formatCurrency(claim.deniedAmount)}</span>
                 </div>
               </div>

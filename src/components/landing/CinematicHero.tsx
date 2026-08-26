@@ -5,19 +5,19 @@ import {
   Shield,
   Star,
   Clock,
-  Building2,
+  Buildings,
   Play,
   ArrowRight,
-  ChevronLeft,
-  ChevronRight,
+  CaretLeft,
+  CaretRight,
   User,
-  Menu,
+  List,
   X,
   ShieldCheck,
-  Mail,
-  CheckCircle2,
+  Envelope,
+  CheckCircle,
   Compass,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
 
 interface CinematicHeroProps {
@@ -39,7 +39,7 @@ const HERO_SLIDES: HeroSlide[] = [
   {
     badge1: { icon: Star, label: "94.8% Overturn Rate" },
     badge2: { icon: Clock, label: "24/7 Autonomous Sentinel" },
-    badge3: { icon: Building2, label: "500+ Payers Indexed" },
+    badge3: { icon: Buildings, label: "500+ Payers Indexed" },
     title: "Step Through. Defend Every Claim.",
     description:
       "AI-powered clinical intelligence citing insurer policy bulletins and medical guidelines in real time to overturn health insurance denials autonomously.",
@@ -50,7 +50,7 @@ const HERO_SLIDES: HeroSlide[] = [
   {
     badge1: { icon: ShieldCheck, label: "ERISA 29 CFR § 2560.503-1" },
     badge2: { icon: Clock, label: "< 14-Day Alarm Sweep" },
-    badge3: { icon: Building2, label: "Aetna · UHC · Cigna · BCBS" },
+    badge3: { icon: Buildings, label: "Aetna · UHC · Cigna · BCBS" },
     title: "Clinical Precedent. Zero Hallucination.",
     description:
       "Deep Firecrawl ingestion indexes payer bulletins, CPT codes, and LCD precedent rulings to construct unassailable, cited appeal dossiers.",
@@ -59,9 +59,9 @@ const HERO_SLIDES: HeroSlide[] = [
     targetView: "evidence",
   },
   {
-    badge1: { icon: Mail, label: "Direct Payer Gateway" },
+    badge1: { icon: Envelope, label: "Direct Payer Gateway" },
     badge2: { icon: Clock, label: "Sub-50ms Reactive State" },
-    badge3: { icon: CheckCircle2, label: "$1.4M+ Recovered" },
+    badge3: { icon: CheckCircle, label: "$1.4M+ Recovered" },
     title: "Autonomous Dispatch. Rapid Settlement.",
     description:
       "Dedicated AgentMail inboxes automatically transmit cited briefs to grievance portals and parse incoming payer determinations in real-time.",
@@ -242,7 +242,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
             aria-label="Toggle Menu"
           >
             <div className="relative size-[18px] flex items-center justify-center">
-              <Menu
+              <List
                 className={`size-[18px] absolute transition-all duration-500 ease-out ${
                   isMobileMenuOpen
                     ? "rotate-180 opacity-0 scale-50"
@@ -417,7 +417,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
                 style={{ animationDelay: "800ms" }}
                 aria-label="Previous Slide"
               >
-                <ChevronLeft className="size-4" />
+                <CaretLeft className="size-4" />
                 <span>Previous</span>
               </button>
 
@@ -428,7 +428,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
                 aria-label="Next Slide"
               >
                 <span>Next</span>
-                <ChevronRight className="size-4" />
+                <CaretRight className="size-4" />
               </button>
             </div>
           </div>

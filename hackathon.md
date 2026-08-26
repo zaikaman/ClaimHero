@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T12:47:00Z
+- **Last updated:** 2026-08-26T13:05:00Z
 
 ## Log
 
@@ -81,6 +81,12 @@ Implemented Dual-Tier Sentinel Onboarding Experience (Wizard & Real-Time Action 
 
 ### 2026-08-26 - working tree
 Enforced Strict Multi-Tenant User Isolation & Data Ownership: Added `userId` (`v.optional(v.id("users"))`) fields and relational secondary indexes (`by_user`, `by_user_status`) to `claims` and `patients` schema tables (`convex/schema.ts`). Scoped all reactive claim listing (`api.claims.list`) and portfolio metrics aggregation (`api.claims.getPortfolioStats`) to the authenticated caller via `getAuthUserId(ctx)` in `convex/claims.ts`. Automatically bound optical document parsing and intake mutations (`createWithPatient`) to active user sessions. Purged unassigned pre-authentication demo records, guaranteeing strict privacy and personalized case workspaces for every authenticated officer.
+
+### 2026-08-26 - working tree
+Migrated Full Project Iconography to Phosphor Icons (@phosphor-icons/react): Replaced all legacy `lucide-react` icons across the entire codebase (22 components including `App.tsx`, `Header.tsx`, `Sidebar.tsx`, `CinematicHero.tsx`, `AuthPage.tsx`, `CaseRadar.tsx`, `IngestionModal.tsx`, `DeadlineCountdown.tsx`, `EvidenceMatrix.tsx`, `PolicyViewer.tsx`, `PrecedentFeed.tsx`, `AppealStudio.tsx`, `CitationSidebar.tsx`, `ExportDrawer.tsx`, `AgentMailDrawer.tsx`, `AuditTimeline.tsx`, `AnalyticsMetrics.tsx`, `OnboardingWizard.tsx`, `OnboardingChecklist.tsx`, `CommandDialog.tsx`, `dialog.tsx`, and `dropdown-menu.tsx`) with cohesive, precision-crafted Phosphor Icons. Uninstalled `lucide-react` dependency and verified 100% clean typechecking, linting, production Vite build, and 22/22 unit tests with `npm run verify`.
+
+### 2026-08-26 - working tree
+Optimized Case Ingestion Radar Table Layout & Eliminated Horizontal Overflow: Restructured the claims radar table (`src/components/radar/CaseRadar.tsx`) by merging the standalone avatar into the Claim & Patient column, introducing smart payer name normalization (`formatPayerName`), truncating overly verbose CPB/denial titles, streamlining action triggers, and tightening row padding. The entire data table now fits 100% within the container card without triggering undesirable horizontal scrollbars. Verified clean with `npm run verify`.
 
 
 

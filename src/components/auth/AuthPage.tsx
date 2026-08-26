@@ -3,11 +3,11 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import {
   Shield,
   Eye,
-  EyeOff,
+  EyeSlash,
   ArrowLeft,
-  Loader2,
-  AlertCircle,
-} from "lucide-react";
+  CircleNotch,
+  WarningCircle,
+} from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
 
 interface AuthPageProps {
@@ -197,7 +197,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
             {/* Error Banner */}
             {error && (
               <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm flex items-start gap-2.5 animate-fadeIn">
-                <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+                <WarningCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
                 <div className="space-y-1">
                   <p>{error}</p>
                   {googleHint && (
@@ -257,7 +257,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
                     title={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
+                      <EyeSlash className="w-4 h-4" />
                     ) : (
                       <Eye className="w-4 h-4" />
                     )}
@@ -298,7 +298,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <CircleNotch className="w-4 h-4 animate-spin text-white" />
                     <span>Signing in...</span>
                   </>
                 ) : (
@@ -314,7 +314,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
                 className="w-full h-11 sm:h-12 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-medium text-sm transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 {isGoogleLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-zinc-700" />
+                  <CircleNotch className="w-4 h-4 animate-spin text-zinc-700" />
                 ) : (
                   /* Fixed dimension official Google 'G' Logo */
                   <svg

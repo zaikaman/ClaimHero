@@ -1,18 +1,18 @@
 import React, { useState } from "react";
 import {
-  Mail,
-  Send,
-  Inbox,
+  Envelope,
+  PaperPlaneTilt,
+  Tray,
   ArrowUpRight,
   ArrowDownLeft,
-  CheckCircle2,
+  CheckCircle,
   Clock,
   Copy,
   Check,
-  Building2,
+  Buildings,
   Paperclip,
-  Loader2,
-} from "lucide-react";
+  CircleNotch,
+} from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
 import { Card } from "../ui/card";
@@ -84,7 +84,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
-              <Mail className="size-5" />
+              <Envelope className="size-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -113,12 +113,12 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 >
                   {isDispatching ? (
                     <>
-                      <Loader2 className="size-3.5 animate-spin" />
+                      <CircleNotch className="size-3.5 animate-spin" />
                       <span>Dispatching...</span>
                     </>
                   ) : (
                     <>
-                      <Send className="size-3.5" />
+                      <PaperPlaneTilt className="size-3.5" />
                       <span>Dispatch Appeal Packet</span>
                     </>
                   )}
@@ -152,7 +152,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         <div className="lg:col-span-4 space-y-3">
           <Card className="p-4 space-y-3">
             <div className="text-xs font-semibold text-foreground flex items-center gap-1.5 border-b border-border pb-2.5">
-              <Building2 className="size-4 text-muted-foreground" />
+              <Buildings className="size-4 text-muted-foreground" />
               <span>Recipient Insurer Contact</span>
             </div>
 
@@ -173,7 +173,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               <div>
                 <span className="text-[10px] font-mono text-muted-foreground block">Status</span>
                 <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                  <CheckCircle2 className="size-3.5" />
+                  <CheckCircle className="size-3.5" />
                   {claim.status === "dispatched" || claim.status === "won"
                     ? "Dispatched & Logged"
                     : "Drafting in Progress"}
@@ -187,7 +187,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         <Card className="lg:col-span-8 flex flex-col p-0 overflow-hidden bg-card border-border">
           <div className="flex items-center justify-between border-b border-border px-4 py-2.5 bg-muted/30 shrink-0">
             <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-              <Inbox className="size-4 text-muted-foreground" />
+              <Tray className="size-4 text-muted-foreground" />
               <span>Transmission History ({messages.length})</span>
             </div>
             <Badge variant="outline" size="sm" className="text-[10px]">
@@ -203,7 +203,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               </div>
             ) : messages.length === 0 ? (
               <div className="p-8 text-center items-center justify-center space-y-2 text-muted-foreground">
-                <Mail className="size-8 mx-auto text-muted-foreground/60" />
+                <Envelope className="size-8 mx-auto text-muted-foreground/60" />
                 <div className="text-xs font-medium text-foreground">No transmissions yet</div>
                 <p className="text-[11px] max-w-sm mx-auto">
                   Click &quot;Dispatch Appeal Packet&quot; above to transmit the synthesized ERISA brief to the insurer via AgentMail.
@@ -286,9 +286,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               className="gap-1"
             >
               {isSending ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <CircleNotch className="size-3.5 animate-spin" />
               ) : (
-                <Send className="size-3.5" />
+                <PaperPlaneTilt className="size-3.5" />
               )}
               <span>Send</span>
             </Button>

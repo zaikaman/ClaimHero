@@ -3,30 +3,29 @@ import { useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../../convex/_generated/api";
 import {
-  Radar,
-  FileSearch,
+  Broadcast,
+  FileMagnifyingGlass,
   FileText,
-  Mail,
+  Envelope,
   Clock,
-  PieChart,
+  ChartPieSlice,
   CheckCircle,
-  AlertCircle,
-  FolderGit2,
-  Building2,
+  WarningCircle,
+  GitFork,
+  Buildings,
   Shield,
   PlusCircle,
-  MailIcon,
-  MoreVertical,
-  UploadCloud,
+  DotsThreeVertical,
+  CloudArrowUp,
   Moon,
   Sun,
   Copy,
   Check,
   BookOpen,
-  RotateCcw,
-  LogOut,
-  LogIn,
-} from "lucide-react";
+  ArrowCounterClockwise,
+  SignOut,
+  SignIn,
+} from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
@@ -99,12 +98,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: "radar" as NavigationView,
       label: "Case Radar",
-      icon: Radar,
+      icon: Broadcast,
     },
     {
       id: "evidence" as NavigationView,
       label: "Evidence Matrix",
-      icon: FileSearch,
+      icon: FileMagnifyingGlass,
     },
     {
       id: "studio" as NavigationView,
@@ -114,12 +113,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: "communications" as NavigationView,
       label: "AgentMail Inbox",
-      icon: Mail,
+      icon: Envelope,
     },
     {
       id: "analytics" as NavigationView,
       label: "Portfolio Analytics",
-      icon: PieChart,
+      icon: ChartPieSlice,
     },
     {
       id: "audit" as NavigationView,
@@ -129,13 +128,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const statusFilters = [
-    { id: "all", label: "All Cases", icon: FolderGit2 },
-    { id: "ingested", label: "Intake / OCR", icon: Radar },
-    { id: "analyzing", label: "CPB Evidence Crawl", icon: FileSearch },
+    { id: "all", label: "All Cases", icon: GitFork },
+    { id: "ingested", label: "Intake / OCR", icon: Broadcast },
+    { id: "analyzing", label: "CPB Evidence Crawl", icon: FileMagnifyingGlass },
     { id: "ready_for_review", label: "Ready for Dispatch", icon: FileText },
-    { id: "dispatched", label: "Transmitted to Payer", icon: Mail },
+    { id: "dispatched", label: "Transmitted to Payer", icon: Envelope },
     { id: "won", label: "Overturned & Won", icon: CheckCircle },
-    { id: "critical_deadline", label: "Urgent Alarms (<14d)", icon: AlertCircle },
+    { id: "critical_deadline", label: "Urgent Alarms (<14d)", icon: WarningCircle },
   ];
 
   return (
@@ -187,7 +186,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="size-9 shrink-0 border-border"
               title="AgentMail Inbox"
             >
-              <MailIcon className="size-4" />
+              <Envelope className="size-4" />
               <span className="sr-only">Inbox</span>
             </Button>
           </div>
@@ -294,7 +293,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Target Insurer Payers */}
             <div className="space-y-1">
               <div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <Building2 className="size-3.5" />
+                <Buildings className="size-3.5" />
                 <span>Target Payers</span>
               </div>
               <div className="flex flex-wrap gap-1 px-1">
@@ -376,7 +375,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
               </div>
               {!isCollapsed && (
-                <MoreVertical className="size-3.5 text-muted-foreground" />
+                <DotsThreeVertical className="size-3.5 text-muted-foreground" />
               )}
             </button>
           </DropdownMenuTrigger>
@@ -389,18 +388,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <DropdownMenuSeparator />
             {isAuthenticated ? (
               <DropdownMenuItem onClick={() => signOut()} className="gap-2 text-destructive focus:text-destructive">
-                <LogOut className="size-3.5" />
+                <SignOut className="size-3.5" />
                 <span>Sign Out of Sentinel</span>
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem onClick={() => onSelectView("login")} className="gap-2 font-medium text-primary">
-                <LogIn className="size-3.5" />
+                <SignIn className="size-3.5" />
                 <span>Sign In / Create Account</span>
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onOpenIngestion?.()} className="gap-2">
-              <UploadCloud className="size-3.5" />
+              <CloudArrowUp className="size-3.5" />
               <span>Ingest Denial Notice</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleCopyEmail} className="gap-2">
@@ -419,7 +418,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
               className="gap-2"
             >
-              <RotateCcw className="size-3.5" />
+              <ArrowCounterClockwise className="size-3.5" />
               <span>Reset Case Filters</span>
             </DropdownMenuItem>
             <DropdownMenuItem

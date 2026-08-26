@@ -2,14 +2,14 @@ import React, { useState } from "react";
 import {
   Clock,
   Shield,
-  FileSearch,
-  Sparkles,
-  Send,
-  Mail,
-  AlertTriangle,
-  Award,
-  Filter,
-} from "lucide-react";
+  FileMagnifyingGlass,
+  Sparkle,
+  PaperPlaneTilt,
+  Envelope,
+  Warning,
+  Medal,
+  Funnel,
+} from "@phosphor-icons/react";
 import { AuditLog, Claim } from "../../types";
 import { formatDate } from "../../lib/utils";
 import { Card } from "../ui/card";
@@ -28,17 +28,17 @@ const EVENT_CONFIGS: Record<
   denial_ingested: {
     label: "Denial Ingested",
     badgeVariant: "default",
-    icon: FileSearch,
+    icon: FileMagnifyingGlass,
   },
   policy_crawled: {
     label: "Policy Crawled",
     badgeVariant: "secondary",
-    icon: Sparkles,
+    icon: Sparkle,
   },
   status_changed_to_precedent_matched: {
     label: "Win Score Computed",
     badgeVariant: "default",
-    icon: Award,
+    icon: Medal,
   },
   appeal_draft_updated: {
     label: "Appeal Drafted",
@@ -48,17 +48,17 @@ const EVENT_CONFIGS: Record<
   appeal_dispatched: {
     label: "Appeal Dispatched",
     badgeVariant: "default",
-    icon: Send,
+    icon: PaperPlaneTilt,
   },
   payer_response_received: {
     label: "Payer Reply Received",
     badgeVariant: "secondary",
-    icon: Mail,
+    icon: Envelope,
   },
   statutory_alarm_critical: {
     label: "Statutory Alarm",
     badgeVariant: "destructive",
-    icon: AlertTriangle,
+    icon: Warning,
   },
 };
 
@@ -96,7 +96,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
 
         {/* Filter Selector */}
         <div className="flex items-center gap-2">
-          <Filter className="size-3.5 text-muted-foreground" />
+          <Funnel className="size-3.5 text-muted-foreground" />
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}

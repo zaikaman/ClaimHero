@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from "react";
 import {
   Shield,
-  CheckCircle2,
+  CheckCircle,
   Circle,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
+  CaretDown,
+  CaretUp,
+  Sparkle,
   ArrowRight,
   X,
-  FileSearch,
+  FileMagnifyingGlass,
   FileText,
-  Mail,
-  Zap,
-  Award,
-} from "lucide-react";
+  Envelope,
+  Lightning,
+  Medal,
+} from "@phosphor-icons/react";
 import confetti from "canvas-confetti";
 import { NavigationView } from "../layout/Sidebar";
 import { Claim } from "../../types";
@@ -87,7 +87,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
       title: "Ingest First Denial Letter",
       description: "Upload a PDF or load a high-value sample case into Radar.",
       isDone: claims.length > 0,
-      icon: Zap,
+      icon: Lightning,
       actionLabel: "Ingest Case",
       onClick: onOpenIngestion,
     },
@@ -96,7 +96,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
       title: "Inspect Clinical Policy Precedents",
       description: "Review crawled insurer CPB clauses and calculate overturn score.",
       isDone: hasVisitedEvidence,
-      icon: FileSearch,
+      icon: FileMagnifyingGlass,
       actionLabel: "View Matrix",
       onClick: () => onNavigate("evidence"),
     },
@@ -114,7 +114,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
       title: "Review AgentMail Payer Inbox",
       description: "Inspect dedicated claim email gateway and audit timeline.",
       isDone: hasVisitedCommunications,
-      icon: Mail,
+      icon: Envelope,
       actionLabel: "Open Inbox",
       onClick: () => onNavigate("communications"),
     },
@@ -149,14 +149,14 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
           onClick={() => setIsMinimized(false)}
           className="shadow-xl bg-card/95 border-border backdrop-blur-md gap-2 h-9 px-3 text-xs"
         >
-          <Sparkles className="size-3.5 text-primary" />
+          <Sparkle className="size-3.5 text-primary" />
           <span className="font-medium text-foreground">
             Sentinel Checklist
           </span>
           <Badge variant="secondary" className="font-mono text-[10px] h-4.5 px-1.5">
             {completedCount}/{tasks.length}
           </Badge>
-          <ChevronUp className="size-3.5 text-muted-foreground ml-0.5" />
+          <CaretUp className="size-3.5 text-muted-foreground ml-0.5" />
         </Button>
       </div>
     );
@@ -170,7 +170,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
         <div className="flex items-center gap-2.5">
           <div className="size-6 rounded-md bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
             {isAllDone ? (
-              <Award className="size-3.5 text-amber-500" />
+              <Medal className="size-3.5 text-amber-500" />
             ) : (
               <Shield className="size-3.5" />
             )}
@@ -193,7 +193,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
             className="text-muted-foreground hover:text-foreground"
             title="Minimize checklist"
           >
-            <ChevronDown className="size-3.5" />
+            <CaretDown className="size-3.5" />
           </Button>
           <Button
             variant="ghost"
@@ -232,7 +232,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
                 <div className="flex items-start gap-2.5">
                   <div className="mt-0.5 shrink-0">
                     {task.isDone ? (
-                      <CheckCircle2 className="size-4 text-emerald-500" />
+                      <CheckCircle className="size-4 text-emerald-500" />
                     ) : (
                       <Circle className="size-4 text-muted-foreground/60" />
                     )}
@@ -273,7 +273,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
       {isAllDone && (
         <div className="p-3 bg-emerald-500/10 border-t border-emerald-500/20 text-center space-y-1">
           <div className="text-xs font-semibold text-emerald-500 flex items-center justify-center gap-1.5">
-            <Sparkles className="size-3.5 text-amber-500" />
+            <Sparkle className="size-3.5 text-amber-500" />
             <span>Sentinel Readiness: 100% Certified</span>
           </div>
           <p className="text-[10px] text-muted-foreground">

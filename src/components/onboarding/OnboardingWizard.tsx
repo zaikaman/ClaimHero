@@ -1,18 +1,18 @@
 import React, { useState } from "react";
 import {
   Shield,
-  Scale,
+  Scales,
   User,
   ArrowRight,
   ArrowLeft,
-  CheckCircle2,
-  Sparkles,
-  Zap,
-  UploadCloud,
+  CheckCircle,
+  Sparkle,
+  Lightning,
+  CloudArrowUp,
   Check,
-  Loader2,
+  CircleNotch,
   Stethoscope,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import confetti from "canvas-confetti";
 import { DenialExtractionResult } from "../../types";
 import {
@@ -48,7 +48,7 @@ const ROLES = [
     id: "advocate",
     title: "Patient Advocate / ERISA Legal Counsel",
     description: "Healthcare law firms, statutory ERISA litigators, and claims advocacy specialists.",
-    icon: Scale,
+    icon: Scales,
   },
   {
     id: "individual",
@@ -322,7 +322,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                             {r.title}
                           </span>
                           {isSelected && (
-                            <CheckCircle2 className="size-4 text-primary shrink-0" />
+                            <CheckCircle className="size-4 text-primary shrink-0" />
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground font-light leading-relaxed">
@@ -440,7 +440,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                             : "bg-muted text-muted-foreground border-border"
                         }`}
                       >
-                        <Zap className="size-4.5" />
+                        <Lightning className="size-4.5" />
                       </div>
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center justify-between">
@@ -473,7 +473,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   }`}
                 >
                   <div className="size-9 rounded-lg bg-muted text-muted-foreground border border-border flex items-center justify-center shrink-0">
-                    <UploadCloud className="size-4.5" />
+                    <CloudArrowUp className="size-4.5" />
                   </div>
                   <div className="flex-1">
                     <span className="text-xs sm:text-sm font-medium text-foreground">
@@ -484,7 +484,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     </p>
                   </div>
                   {selectedCaseId === "custom" && (
-                    <CheckCircle2 className="size-4 text-primary shrink-0" />
+                    <CheckCircle className="size-4 text-primary shrink-0" />
                   )}
                 </Card>
               </div>
@@ -538,12 +538,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               >
                 {isProcessing ? (
                   <>
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <CircleNotch className="size-3.5 animate-spin" />
                     <span>Ingesting & Parsing Case...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="size-3.5" />
+                    <Sparkle className="size-3.5" />
                     <span>Complete Setup & Launch Sentinel</span>
                   </>
                 )}

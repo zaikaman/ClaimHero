@@ -1,15 +1,15 @@
 import React from "react";
 import {
-  TrendingUp,
-  DollarSign,
-  Building2,
-  PieChart,
-  Activity,
-  CheckCircle2,
+  TrendUp,
+  CurrencyDollar,
+  Buildings,
+  ChartPieSlice,
+  Pulse,
+  CheckCircle,
   Clock,
   ArrowUpRight,
-  ShieldAlert,
-} from "lucide-react";
+  ShieldWarning,
+} from "@phosphor-icons/react";
 import { formatCurrency } from "../../lib/utils";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
@@ -75,7 +75,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
-              <PieChart className="size-5" />
+              <ChartPieSlice className="size-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -112,7 +112,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         <Card className="p-4 space-y-2 bg-card">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-[11px] font-medium uppercase tracking-wider">Total Disputed</span>
-            <DollarSign className="size-4" />
+            <CurrencyDollar className="size-4" />
           </div>
           <div className="text-2xl font-bold font-mono text-foreground">
             {formatCurrency(stats.totalDisputedAmount)}
@@ -129,7 +129,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         <Card className="p-4 space-y-2 bg-card">
           <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
             <span className="text-[11px] font-medium uppercase tracking-wider">Recovered Funds</span>
-            <CheckCircle2 className="size-4" />
+            <CheckCircle className="size-4" />
           </div>
           <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
             {formatCurrency(stats.overturnedWonAmount)}
@@ -148,7 +148,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               Avg Win Probability
             </span>
-            <TrendingUp className="size-4 text-muted-foreground" />
+            <TrendUp className="size-4 text-muted-foreground" />
           </div>
           <div className="text-2xl font-bold font-mono text-foreground">
             {stats.averageWinScore}%
@@ -165,7 +165,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
               Urgent Alarms
             </span>
             {stats.criticalDeadlinesCount > 0 ? (
-              <ShieldAlert className="size-4 text-destructive" />
+              <ShieldWarning className="size-4 text-destructive" />
             ) : (
               <Clock className="size-4" />
             )}
@@ -191,7 +191,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         <Card className="lg:col-span-8 p-4 space-y-3 bg-card">
           <div className="flex items-center justify-between border-b border-border pb-2.5">
             <div className="flex items-center gap-2">
-              <Building2 className="size-4 text-muted-foreground" />
+              <Buildings className="size-4 text-muted-foreground" />
               <h3 className="text-xs font-semibold text-foreground">
                 Insurer Denial & Recovery Accountability Matrix
               </h3>
@@ -245,7 +245,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         <Card className="lg:col-span-4 p-4 space-y-4 bg-card">
           <div className="flex items-center justify-between border-b border-border pb-2.5">
             <div className="flex items-center gap-2">
-              <Activity className="size-4 text-muted-foreground" />
+              <Pulse className="size-4 text-muted-foreground" />
               <h3 className="text-xs font-semibold text-foreground">
                 Precedent Confidence Bands
               </h3>

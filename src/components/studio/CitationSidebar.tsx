@@ -1,12 +1,12 @@
 import React from "react";
 import {
-  Scale,
+  Scales,
   BookOpen,
   Plus,
   Copy,
   Check,
   Shield,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import { ClinicalEvidence } from "../../types";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -65,7 +65,7 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
       {/* 1. Statutory ERISA Templates */}
       <div className="space-y-2">
         <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-          <Scale className="size-3" />
+          <Scales className="size-3" />
           <span>Statutory ERISA Templates</span>
         </div>
 

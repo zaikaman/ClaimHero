@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import {
   FileText,
-  ExternalLink,
+  ArrowSquareOut,
   Copy,
   Check,
   BookOpen,
-  Sparkles,
-  Search,
-} from "lucide-react";
+  Sparkle,
+  MagnifyingGlass,
+} from "@phosphor-icons/react";
 import { ClinicalEvidence, EvidenceSourceType } from "../../types";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -85,7 +85,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-48">
-            <Search className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
+            <MagnifyingGlass className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
             <Input
               type="text"
               placeholder="Search clause..."
@@ -183,7 +183,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
                         className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                         title="Open policy source URL"
                       >
-                        <ExternalLink className="size-3" />
+                        <ArrowSquareOut className="size-3" />
                       </a>
                     )}
                   </div>
@@ -191,7 +191,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
 
                 <div className="rounded-lg bg-muted/40 border border-border p-3 text-xs text-muted-foreground leading-relaxed font-sans">
                   <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground mb-1">
-                    <Sparkles className="size-3 text-primary" />
+                    <Sparkle className="size-3 text-primary" />
                     <span>Medical Necessity Criteria & Policy Rule:</span>
                   </div>
                   <p className="whitespace-pre-line text-xs text-foreground/90">

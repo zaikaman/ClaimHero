@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import {
   FileText,
-  Sparkles,
-  Loader2,
+  Sparkle,
+  CircleNotch,
   Check,
   Eye,
-  Edit3,
+  PencilSimpleLine,
   Stethoscope,
   Printer,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import { Claim, ClinicalEvidence, AppealLevel } from "../../types";
 import { useAppealStudio } from "../../hooks/useAppealStudio";
 import { CitationSidebar } from "./CitationSidebar";
@@ -81,7 +81,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 </Badge>
                 {saveStatus === "saving" && (
                   <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground animate-pulse">
-                    <Loader2 className="size-3 animate-spin" />
+                    <CircleNotch className="size-3 animate-spin" />
                     <span>Saving...</span>
                   </span>
                 )}
@@ -131,12 +131,12 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             >
               {isSynthesizing ? (
                 <>
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <CircleNotch className="size-3.5 animate-spin" />
                   <span>Synthesizing...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="size-3.5" />
+                  <Sparkle className="size-3.5" />
                   <span>Synthesize Brief</span>
                 </>
               )}
@@ -201,7 +201,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 onClick={() => setActiveTab("edit")}
                 className="gap-1"
               >
-                <Edit3 className="size-3" />
+                <PencilSimpleLine className="size-3" />
                 <span>Editor</span>
               </Button>
               <Button
@@ -259,7 +259,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-2 text-muted-foreground">
-                    <Sparkles className="size-6 text-muted-foreground/60" />
+                    <Sparkle className="size-6 text-muted-foreground/60" />
                     <div className="text-xs font-medium text-foreground">No Brief Drafted Yet</div>
                     <p className="text-[11px] max-w-xs">
                       Click &quot;Synthesize Brief&quot; above to have gpt-5-nano generate an ERISA appeal brief citing policy clauses.

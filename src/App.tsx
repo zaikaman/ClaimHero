@@ -20,7 +20,7 @@ import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
 import { OnboardingChecklist } from "./components/onboarding/OnboardingChecklist";
 import { Card } from "./components/ui/card";
 import { Button } from "./components/ui/button";
-import { ArrowRight, Loader2, Shield } from "lucide-react";
+import { ArrowRight, CircleNotch, Shield } from "@phosphor-icons/react";
 
 export default function App() {
   const { currentView, setCurrentView } = useRouterView();
@@ -166,7 +166,7 @@ export default function App() {
             <span className="text-sm font-semibold text-white tracking-tight">ClaimHero Sentinel</span>
             <span className="text-xs font-mono text-gray-400">Verifying session credentials...</span>
           </div>
-          <Loader2 className="size-4 animate-spin text-white/60 mt-1" />
+          <CircleNotch className="size-4 animate-spin text-white/60 mt-1" />
         </div>
       </div>
     );
@@ -203,7 +203,7 @@ export default function App() {
     >
       {isLoading ? (
         <div className="flex h-full items-center justify-center space-y-3 flex-col">
-          <Loader2 className="size-6 text-foreground animate-spin" />
+          <CircleNotch className="size-6 text-foreground animate-spin" />
           <span className="text-xs font-mono text-muted-foreground">
             Connecting to Convex Cloud Database...
           </span>

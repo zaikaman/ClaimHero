@@ -2,15 +2,15 @@ import React from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import {
-  PanelLeft,
-  Search,
-  UploadCloud,
+  Sidebar,
+  MagnifyingGlass,
+  CloudArrowUp,
   Moon,
   Sun,
-  Github,
-  Activity,
-  LogIn,
-} from "lucide-react";
+  GithubLogo,
+  Pulse,
+  SignIn,
+} from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
@@ -57,7 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="text-muted-foreground hover:text-foreground"
             title="Toggle sidebar (⌘B / Ctrl+B)"
           >
-            <PanelLeft className="size-4" />
+            <Sidebar className="size-4" />
           </Button>
           <Separator orientation="vertical" className="h-4 mx-1" />
           <button
@@ -65,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors w-48 sm:w-64"
             title="Quick search across claims and actions (⌘K / Ctrl+K)"
           >
-            <Search className="size-3.5" />
+            <MagnifyingGlass className="size-3.5" />
             <span className="flex-1 text-left">Search claims, CPT, payers...</span>
             <kbd className="pointer-events-none hidden sm:inline-flex h-4 items-center gap-0.5 rounded border border-border bg-muted px-1.5 font-mono text-[9px] font-medium text-muted-foreground">
               ⌘K
@@ -100,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div className="flex items-center gap-1">
             <div className="hidden sm:flex items-center gap-1.5 rounded-lg border border-border bg-muted/30 px-2.5 py-1 text-[11px] text-muted-foreground font-mono mr-1">
-              <Activity className="size-3 text-foreground" />
+              <Pulse className="size-3 text-foreground" />
               <span>gpt-5-nano</span>
               <span className="size-1.5 rounded-full bg-emerald-500"></span>
             </div>
@@ -111,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onOpenIngestion}
               className="gap-1.5"
             >
-              <UploadCloud className="size-3.5" />
+              <CloudArrowUp className="size-3.5" />
               <span className="hidden sm:inline">Ingest Denial</span>
             </Button>
 
@@ -134,7 +134,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               title="GitHub Repository"
             >
-              <Github className="size-4" />
+              <GithubLogo className="size-4" />
             </a>
 
             {/* Profile Avatar / Sign In Link */}
@@ -162,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="h-7 px-2.5 text-xs gap-1 text-muted-foreground hover:text-foreground"
                 title="Sign In / Create Account"
               >
-                <LogIn className="size-3.5" />
+                <SignIn className="size-3.5" />
                 <span className="hidden sm:inline">Sign In</span>
               </Button>
             )}
