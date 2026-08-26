@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T15:03:00Z
+- **Last updated:** 2026-08-26T15:21:30Z
 
 ## Log
 
@@ -99,4 +99,8 @@ Enforced Strict Precision Medical Dark Mode & Purged Light Mode Toggles: Consoli
 
 ### 2026-08-26 - working tree
 Engineered Ultra-Minimalist Monochrome Brand Identity & Timeless Geometric Wordmark: Transformed the ClaimHero brand identity (`src/components/common/BrandLogo.tsx`) into an ultra-minimalist, pure monochrome vector mark adhering to the design principles of Vercel, Linear, and Google. Eliminated all colored gradients, neon halo effects, cartoonish radar pulse dots, and decorative status pills. Designed a solid geometric defense shield silhouette featuring a clean negative-space medical cross cutout (`fill="currentColor"`, `fillRule="evenodd"`), guaranteeing mathematical crispness across light and dark modes. Streamlined typography into a pure, confident wordmark (`ClaimHero` with `font-semibold` / `font-bold` tracking). Integrated seamlessly across the Collapsible Sidebar (`Sidebar.tsx`), Cinematic Homepage (`CinematicHero.tsx`), Split-Card Auth Page (`AuthPage.tsx`), App Loading Splash (`App.tsx`), Onboarding Guide (`OnboardingWizard.tsx`), Command Palette (`CommandDialog.tsx`), and SVG Favicon (`public/favicon.svg`). Verified cleanly with `npm run verify` (100% typecheck, lint, 22 unit tests, production build).
+
+### 2026-08-26 - working tree
+Refined High-Contrast Medical Alert & Destructive Tokens for Dark Theme: Upgraded `--destructive` CSS token in `src/index.css` from legacy low-luminance dark red (`0 62.8% 30.6%`) to vibrant, high-contrast clinical coral red (`0 84.2% 60.2%` / `#f87171`), achieving AAA accessibility contrast against deep slate backgrounds. Polished `Badge` (`src/components/ui/badge.tsx`) destructive variant with translucent tinted background (`bg-destructive/15`), crisp border (`border-destructive/30`), and legible coral text. Redesigned the Denial Reason (CARC) card in the Clinical Evidence Matrix (`src/components/evidence/EvidenceMatrix.tsx`) to feature high-contrast header codes with warning iconography and readable high-legibility body text. Verified 100% clean typecheck, linting, production build, and 22/22 unit tests with `npm run verify`.
+
 

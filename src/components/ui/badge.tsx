@@ -27,7 +27,7 @@ export function Badge({
     secondary:
       "bg-secondary text-secondary-foreground",
     destructive:
-      "bg-destructive/15 text-destructive border-destructive/20 dark:bg-destructive/20 dark:text-destructive",
+      "bg-destructive/15 text-destructive border-destructive/30 font-medium",
     outline:
       "border-border text-foreground bg-transparent",
     ghost:

@@ -292,9 +292,17 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                   <span className="text-[10px] text-muted-foreground font-mono block mb-1">
                     Denial Reason (CARC):
                   </span>
-                  <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-2.5 text-xs text-destructive">
-                    <span className="font-mono font-bold block">{claim.denialReasonCode}</span>
-                    <p className="text-[11px] mt-0.5 leading-relaxed opacity-90">
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-mono font-bold text-destructive text-xs">
+                      <Warning className="size-3.5 shrink-0" />
+                      <span>{claim.denialReasonCode}</span>
+                      {denialReason?.title && (
+                        <span className="font-normal text-muted-foreground font-sans truncate">
+                          — {denialReason.title}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-foreground/90 font-sans">
                       {claim.denialReasonDescription || denialReason?.description}
                     </p>
                   </div>
