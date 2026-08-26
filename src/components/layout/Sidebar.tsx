@@ -357,11 +357,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             >
               <div className="flex items-center gap-2">
-                <Avatar size="sm" className="bg-primary text-primary-foreground font-semibold">
+                <Avatar size="sm" className="size-7 shrink-0 bg-primary text-primary-foreground font-semibold">
                   {viewer?.image ? (
                     <AvatarImage src={viewer.image} alt={userName} />
-                  ) : null}
-                  <AvatarFallback>{userInitial}</AvatarFallback>
+                  ) : (
+                    <AvatarFallback>{userInitial}</AvatarFallback>
+                  )}
                 </Avatar>
                 {!isCollapsed && (
                   <div className="text-left">

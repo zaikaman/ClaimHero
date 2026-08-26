@@ -40,12 +40,21 @@ function AvatarFallback({
 
 function AvatarImage({
   className,
+  src,
+  alt = "User avatar",
   ...props
 }: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const [hasError, setHasError] = React.useState(false);
+
+  if (!src || hasError) return null;
+
   return (
     <img
+      src={src}
+      alt={alt}
       data-slot="avatar-image"
-      className={cn("aspect-square size-full object-cover", className)}
+      onError={() => setHasError(true)}
+      className={cn("absolute inset-0 size-full object-cover", className)}
       {...props}
     />
   );

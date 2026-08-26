@@ -144,13 +144,14 @@ export const Header: React.FC<HeaderProps> = ({
                 className="focus:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-full"
                 title={`Signed in as ${userName} (${viewer.email || ""})`}
               >
-                <Avatar size="sm" className="size-7 ml-1 border border-border">
+                <Avatar size="sm" className="size-7 ml-1 border border-border shrink-0">
                   {viewer.image ? (
                     <AvatarImage src={viewer.image} alt={userName} />
-                  ) : null}
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                    {userInitial}
-                  </AvatarFallback>
+                  ) : (
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                      {userInitial}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
               </button>
             ) : (
