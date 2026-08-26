@@ -26,6 +26,8 @@ export function useClaims(options?: {
     payer: payerArg,
   }) as Claim[] | undefined;
 
+  const rawPortfolioStats = useQuery(convexApi.claims.getPortfolioStats, {});
+
   const searchQuery = options?.searchQuery?.toLowerCase().trim() || "";
 
   // Filter claims (search and critical deadline logic)
@@ -201,6 +203,20 @@ export function useClaims(options?: {
     claims,
     rawClaims: rawClaims || [],
     isLoading: rawClaims === undefined,
+    portfolioStats: rawPortfolioStats || {
+      totalClaims: 0,
+      totalDisputedAmount: 0,
+      activeDisputedAmount: 0,
+      overturnedWonAmount: 0,
+      averageWinScore: 0,
+      recoveryRatePercent: 0,
+      criticalDeadlinesCount: 0,
+      urgentDeadlinesCount: 0,
+      claimsByStatus: {},
+      claimsByRisk: {},
+      payerBreakdown: [],
+    },
+    isLoadingPortfolioStats: rawPortfolioStats === undefined,
     selectedClaim,
     selectedClaimId: selectedClaimId || (rawClaims?.[0]?._id ?? ""),
     setSelectedClaimId,

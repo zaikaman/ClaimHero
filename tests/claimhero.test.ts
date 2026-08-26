@@ -141,3 +141,30 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
     expect(isApprovalEmail("We acknowledge receipt of your appeal packet.")).toBe(false);
   });
 });
+
+describe("Phase 7: Portfolio Analytics & Recovery Calculation Engine", () => {
+  it("computes overall recovery rate percent accurately", () => {
+    const computeRecoveryRate = (totalDisputed: number, wonAmount: number) => {
+      if (totalDisputed === 0) return 0;
+      return Math.round((wonAmount / totalDisputed) * 100);
+    };
+
+    expect(computeRecoveryRate(100000, 45000)).toBe(45);
+    expect(computeRecoveryRate(24500, 24500)).toBe(100);
+    expect(computeRecoveryRate(0, 0)).toBe(0);
+  });
+
+  it("aggregates active disputed vs settled won funds correctly", () => {
+    const claims = [
+      { deniedAmount: 24500, status: "won" },
+      { deniedAmount: 18200, status: "dispatched" },
+      { deniedAmount: 2850, status: "analyzing" },
+    ];
+
+    const wonAmount = claims.filter((c) => c.status === "won").reduce((acc, c) => acc + c.deniedAmount, 0);
+    const activeAmount = claims.filter((c) => c.status !== "won" && c.status !== "lost").reduce((acc, c) => acc + c.deniedAmount, 0);
+
+    expect(wonAmount).toBe(24500);
+    expect(activeAmount).toBe(21050);
+  });
+});

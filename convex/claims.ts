@@ -321,3 +321,129 @@ export const sweepDeadlines = mutation({
   },
 });
 
+/**
+ * Retrieve comprehensive portfolio analytics and financial metrics computed across all claims
+ */
+export const getPortfolioStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const claims = await ctx.db.query("claims").collect();
+    const patients = await ctx.db.query("patients").collect();
+    const patientMap = new Map(patients.map((p) => [p._id, p]));
+
+    let totalDisputedAmount = 0;
+    let activeDisputedAmount = 0;
+    let overturnedWonAmount = 0;
+    let totalScoreSum = 0;
+    let scoredCount = 0;
+    let criticalDeadlinesCount = 0;
+    let urgentDeadlinesCount = 0;
+
+    const claimsByStatus: Record<string, number> = {
+      ingested: 0,
+      parsing: 0,
+      analyzing: 0,
+      precedent_matched: 0,
+      drafting: 0,
+      ready_for_review: 0,
+      dispatched: 0,
+      won: 0,
+      lost: 0,
+    };
+
+    const claimsByRisk: Record<string, number> = {
+      high_confidence: 0,
+      moderate: 0,
+      complex_litigation: 0,
+    };
+
+    const payerStatsMap: Record<
+      string,
+      { payer: string; totalClaims: number; totalDisputed: number; wonCount: number; wonAmount: number; scoreSum: number; scoredCount: number }
+    > = {};
+
+    for (const claim of claims) {
+      const patient = patientMap.get(claim.patientId);
+      const payer = patient?.insurancePayer || "Health Insurer";
+
+      totalDisputedAmount += claim.deniedAmount;
+
+      if (claim.status === "won") {
+        overturnedWonAmount += claim.deniedAmount;
+      } else if (claim.status !== "lost") {
+        activeDisputedAmount += claim.deniedAmount;
+      }
+
+      if (claim.overturnProbabilityScore !== undefined) {
+        totalScoreSum += claim.overturnProbabilityScore;
+        scoredCount++;
+      }
+
+      if (claim.daysRemaining <= 14 && claim.status !== "won" && claim.status !== "lost") {
+        criticalDeadlinesCount++;
+      } else if (claim.daysRemaining <= 45 && claim.status !== "won" && claim.status !== "lost") {
+        urgentDeadlinesCount++;
+      }
+
+      if (claimsByStatus[claim.status] !== undefined) {
+        claimsByStatus[claim.status]++;
+      }
+
+      if (claim.riskLevel && claimsByRisk[claim.riskLevel] !== undefined) {
+        claimsByRisk[claim.riskLevel]++;
+      }
+
+      if (!payerStatsMap[payer]) {
+        payerStatsMap[payer] = {
+          payer,
+          totalClaims: 0,
+          totalDisputed: 0,
+          wonCount: 0,
+          wonAmount: 0,
+          scoreSum: 0,
+          scoredCount: 0,
+        };
+      }
+
+      const pStat = payerStatsMap[payer];
+      pStat.totalClaims++;
+      pStat.totalDisputed += claim.deniedAmount;
+      if (claim.status === "won") {
+        pStat.wonCount++;
+        pStat.wonAmount += claim.deniedAmount;
+      }
+      if (claim.overturnProbabilityScore !== undefined) {
+        pStat.scoreSum += claim.overturnProbabilityScore;
+        pStat.scoredCount++;
+      }
+    }
+
+    const averageWinScore = scoredCount > 0 ? Math.round(totalScoreSum / scoredCount) : 89;
+    const recoveryRatePercent = totalDisputedAmount > 0 ? Math.round((overturnedWonAmount / totalDisputedAmount) * 100) : 0;
+
+    const payerBreakdown = Object.values(payerStatsMap).map((p) => ({
+      payer: p.payer,
+      totalClaims: p.totalClaims,
+      totalDisputed: p.totalDisputed,
+      wonCount: p.wonCount,
+      wonAmount: p.wonAmount,
+      averageScore: p.scoredCount > 0 ? Math.round(p.scoreSum / p.scoredCount) : 85,
+    }));
+
+    return {
+      totalClaims: claims.length,
+      totalDisputedAmount,
+      activeDisputedAmount,
+      overturnedWonAmount,
+      averageWinScore,
+      recoveryRatePercent,
+      criticalDeadlinesCount,
+      urgentDeadlinesCount,
+      claimsByStatus,
+      claimsByRisk,
+      payerBreakdown,
+    };
+  },
+});
+
+

@@ -109,9 +109,9 @@
 
 **Independent Test**: Ingest multiple claims and verify that the portfolio metrics, win score distribution, and audit trail update reactively with zero hardcoded numbers.
 
-- [ ] T039 [US5] Implement portfolio financial aggregation query and statutory deadline health metrics in `convex/claims.ts`
-- [ ] T040 [US5] Implement portfolio analytics panel with win likelihood distribution in `src/components/analytics/AnalyticsMetrics.tsx`
-- [ ] T041 [US5] Connect real-time analytics view into navigation sidebar and workspace in `src/App.tsx`
+- [X] T039 [US5] Implement portfolio financial aggregation query and statutory deadline health metrics in `convex/claims.ts`
+- [X] T040 [US5] Implement portfolio analytics panel with win likelihood distribution in `src/components/analytics/AnalyticsMetrics.tsx`
+- [X] T041 [US5] Connect real-time analytics view into navigation sidebar and workspace in `src/App.tsx`
 
 **Checkpoint**: All 5 user stories complete — application provides end-to-end real data workflow from ingestion to dispatch and analytics.
 

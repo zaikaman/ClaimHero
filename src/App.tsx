@@ -7,6 +7,7 @@ import { EvidenceMatrix } from "./components/evidence/EvidenceMatrix";
 import { AppealStudio } from "./components/studio/AppealStudio";
 import { AgentMailDrawer } from "./components/communications/AgentMailDrawer";
 import { AuditTimeline } from "./components/communications/AuditTimeline";
+import { AnalyticsMetrics } from "./components/analytics/AnalyticsMetrics";
 import { useClaims } from "./hooks/useClaims";
 import { useEvidence } from "./hooks/useEvidence";
 import { useCommunications } from "./hooks/useCommunications";
@@ -24,6 +25,8 @@ export default function App() {
   const {
     claims,
     isLoading,
+    portfolioStats,
+    isLoadingPortfolioStats,
     selectedClaim,
     selectedClaimId,
     setSelectedClaimId,
@@ -179,7 +182,20 @@ export default function App() {
             )
           )}
 
-          {/* 5. Immutable Case Audit Timeline */}
+          {/* 5. Portfolio Recovery & Overturn Analytics */}
+          {currentView === "analytics" && (
+            <AnalyticsMetrics
+              stats={portfolioStats}
+              isLoading={isLoadingPortfolioStats}
+              onSelectPayerFilter={(payer) => {
+                setPayerFilter(payer);
+                setCurrentView("radar");
+              }}
+              onNavigateToRadar={() => setCurrentView("radar")}
+            />
+          )}
+
+          {/* 6. Immutable Case Audit Timeline */}
           {currentView === "audit" && (
             <AuditTimeline
               claim={selectedClaim}

@@ -5,6 +5,7 @@ import {
   FileText,
   Mail,
   Clock,
+  PieChart,
   CheckCircle,
   AlertCircle,
   FolderGit2,
@@ -12,7 +13,7 @@ import {
 } from "lucide-react";
 import { INSURERS } from "../../lib/constants";
 
-export type NavigationView = "radar" | "evidence" | "studio" | "communications" | "audit";
+export type NavigationView = "radar" | "evidence" | "studio" | "communications" | "audit" | "analytics";
 
 interface SidebarProps {
   currentView: NavigationView;
@@ -57,6 +58,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: "AgentMail Inbox",
       icon: Mail,
       description: "Payer grievance threads",
+    },
+    {
+      id: "analytics" as NavigationView,
+      label: "Portfolio Analytics",
+      icon: PieChart,
+      description: "Recovery & win metrics",
     },
     {
       id: "audit" as NavigationView,
