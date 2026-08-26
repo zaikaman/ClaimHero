@@ -19,7 +19,8 @@ import { CinematicHero } from "./components/landing/CinematicHero";
 import { AuthPage } from "./components/auth/AuthPage";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
 import { OnboardingChecklist } from "./components/onboarding/OnboardingChecklist";
-import { CircleNotch, Shield } from "@phosphor-icons/react";
+import { BrandIcon, BrandWordmark } from "./components/common/BrandLogo";
+import { CircleNotch } from "@phosphor-icons/react";
 
 export default function App() {
   const { currentView, setCurrentView } = useRouterView();
@@ -133,16 +134,14 @@ export default function App() {
   // Protected Routes Guard (radar, evidence, studio, communications, analytics, audit)
   if (isAuthLoading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-black text-white">
+      <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
         <div className="flex flex-col items-center gap-4">
-          <div className="size-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shadow-lg animate-pulse">
-            <Shield className="size-6 text-white" />
-          </div>
+          <BrandIcon size="xl" />
           <div className="flex flex-col items-center gap-1.5">
-            <span className="text-sm font-semibold text-white tracking-tight">ClaimHero Sentinel</span>
-            <span className="text-xs font-mono text-gray-400">Verifying session credentials...</span>
+            <BrandWordmark size="md" />
+            <span className="text-xs font-mono text-muted-foreground">Verifying session...</span>
           </div>
-          <CircleNotch className="size-4 animate-spin text-white/60 mt-1" />
+          <CircleNotch className="size-4 animate-spin text-muted-foreground mt-1" />
         </div>
       </div>
     );

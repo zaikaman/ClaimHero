@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  Shield,
   Scales,
   User,
   ArrowRight,
@@ -14,6 +13,7 @@ import {
   Stethoscope,
 } from "@phosphor-icons/react";
 import confetti from "canvas-confetti";
+import { BrandIcon } from "../common/BrandLogo";
 import { DenialExtractionResult } from "../../types";
 import {
   Dialog,
@@ -224,9 +224,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         <div className="p-5 sm:p-6 pb-4 border-b border-border/80 bg-muted/20">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <div className="size-9 rounded-lg bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs">
-                <Shield className="size-4.5" />
-              </div>
+              <BrandIcon size="sm" glow interactive />
               <DialogHeader className="space-y-0.5 text-left">
                 <div className="flex items-center gap-2">
                   <DialogTitle className="text-base font-semibold">

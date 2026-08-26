@@ -9,7 +9,6 @@ import {
   Envelope,
   Clock,
   ChartPieSlice,
-  Shield,
   PlusCircle,
   DotsThreeVertical,
   CloudArrowUp,
@@ -34,6 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { BrandLogo, BrandIcon } from "../common/BrandLogo";
 import { cn } from "../../lib/utils";
 
 export type NavigationView =
@@ -148,23 +148,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={() => onSelectView("landing")}
           className={cn(
-            "w-full flex items-center gap-2.5 px-2 py-1 rounded-lg hover:bg-muted/60 transition-colors text-left group cursor-pointer",
+            "w-full flex items-center gap-2.5 px-2 py-1 rounded-xl hover:bg-muted/60 transition-all text-left group cursor-pointer",
             isCollapsed && "justify-center px-0"
           )}
           title="Open Cinematic Landing Hero"
         >
-          <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0 group-hover:scale-105 transition-transform shadow-xs">
-            <Shield className="size-4" />
-          </div>
-          {!isCollapsed && (
-            <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-base tracking-tight text-foreground">
-                ClaimHero
-              </span>
-              <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-muted text-muted-foreground border border-border">
-                Sentinel
-              </span>
-            </div>
+          {isCollapsed ? (
+            <BrandIcon size="sm" glow interactive />
+          ) : (
+            <BrandLogo size="md" glow interactive />
           )}
         </button>
 

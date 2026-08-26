@@ -7,7 +7,6 @@ import {
   Envelope,
   ChartPieSlice,
   Clock,
-  Shield,
   CloudArrowUp,
   Copy,
   Check,
@@ -18,6 +17,7 @@ import { formatCurrency } from "../../lib/utils";
 import { Dialog, DialogContent } from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import { NavigationView } from "../layout/Sidebar";
+import { BrandIcon } from "./BrandLogo";
 
 interface CommandDialogProps {
   isOpen: boolean;
@@ -279,7 +279,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                   className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
-                    <Shield className="size-3.5 text-primary" />
+                    <BrandIcon size="xs" glow={false} className="size-4" />
                     <span>Restart Sentinel Setup Guide (Onboarding)</span>
                   </div>
                   <Badge variant="outline" size="sm" className="font-mono text-[9px]">

@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T14:48:00Z
+- **Last updated:** 2026-08-26T15:03:00Z
 
 ## Log
 
@@ -96,3 +96,7 @@ Elevated Dashboard Aesthetic with Ambient Silk WebGL Shader Canvas & Glass Cards
 
 ### 2026-08-26 - working tree
 Enforced Strict Precision Medical Dark Mode & Purged Light Mode Toggles: Consolidated `:root` CSS custom properties directly to the deep slate-zinc dark palette in `src/index.css`, permanently locking the application into high-contrast clinical dark mode. Purged legacy theme toggling logic, state hooks, and UI controls across `src/App.tsx`, `Header.tsx`, `Sidebar.tsx`, `Shell.tsx`, and `CommandDialog.tsx`. Verified 100% clean typecheck and test suite (22/22 PASS).
+
+### 2026-08-26 - working tree
+Engineered Ultra-Minimalist Monochrome Brand Identity & Timeless Geometric Wordmark: Transformed the ClaimHero brand identity (`src/components/common/BrandLogo.tsx`) into an ultra-minimalist, pure monochrome vector mark adhering to the design principles of Vercel, Linear, and Google. Eliminated all colored gradients, neon halo effects, cartoonish radar pulse dots, and decorative status pills. Designed a solid geometric defense shield silhouette featuring a clean negative-space medical cross cutout (`fill="currentColor"`, `fillRule="evenodd"`), guaranteeing mathematical crispness across light and dark modes. Streamlined typography into a pure, confident wordmark (`ClaimHero` with `font-semibold` / `font-bold` tracking). Integrated seamlessly across the Collapsible Sidebar (`Sidebar.tsx`), Cinematic Homepage (`CinematicHero.tsx`), Split-Card Auth Page (`AuthPage.tsx`), App Loading Splash (`App.tsx`), Onboarding Guide (`OnboardingWizard.tsx`), Command Palette (`CommandDialog.tsx`), and SVG Favicon (`public/favicon.svg`). Verified cleanly with `npm run verify` (100% typecheck, lint, 22 unit tests, production build).
+

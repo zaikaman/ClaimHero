@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import {
-  Shield,
   Eye,
   EyeSlash,
   ArrowLeft,
@@ -9,6 +8,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
+import { BrandLogo } from "../common/BrandLogo";
 
 interface AuthPageProps {
   onNavigate: (view: NavigationView) => void;
@@ -170,16 +170,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
           <div className="space-y-6 max-w-sm lg:max-w-md mx-auto w-full my-auto">
             
             {/* Top Brand Logo */}
-            <div
-              className="flex items-center justify-center gap-2 cursor-pointer group"
-              onClick={() => onNavigate("landing")}
-            >
-              <div className="size-7 rounded-xl bg-zinc-900 text-white flex items-center justify-center font-bold shadow-xs transition-transform group-hover:scale-105">
-                <Shield className="w-4 h-4 text-white" />
-              </div>
-              <span className="font-semibold text-lg tracking-tight text-zinc-900">
-                ClaimHero
-              </span>
+            <div className="flex items-center justify-center">
+              <BrandLogo
+                size="md"
+                theme="light"
+                glow={false}
+                interactive={true}
+                onClick={() => onNavigate("landing")}
+              />
             </div>
 
             {/* Header Title & Subtitle */}

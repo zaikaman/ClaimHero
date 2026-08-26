@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import {
-  Shield,
   Star,
   Clock,
   Buildings,
@@ -19,6 +18,7 @@ import {
   Compass,
 } from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
+import { BrandLogo } from "../common/BrandLogo";
 
 interface CinematicHeroProps {
   onEnterConsole: (view?: NavigationView) => void;
@@ -151,21 +151,11 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
       <header className="relative z-50 px-4 sm:px-6 md:px-12 py-4 md:py-6 flex items-center justify-between">
         {/* Left: Brand Showcase Logo */}
         <div
-          className="animate-blur-fade-up flex items-center gap-3 cursor-pointer group"
+          className="animate-blur-fade-up cursor-pointer"
           style={{ animationDelay: "0ms" }}
           onClick={() => onEnterConsole("radar")}
         >
-          <div className="size-8 md:size-10 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg transition-transform group-hover:scale-105">
-            <Shield className="size-4 md:size-5 text-white" />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-lg md:text-xl tracking-tight text-white flex items-center gap-1.5">
-              ClaimHero
-              <span className="text-[10px] uppercase font-mono tracking-widest px-1.5 py-0.5 rounded bg-white/10 text-white/80 border border-white/10">
-                Sentinel
-              </span>
-            </span>
-          </div>
+          <BrandLogo size="lg" glow interactive />
         </div>
 
         {/* Center: Showcase Navigation Links (hidden below lg) */}
