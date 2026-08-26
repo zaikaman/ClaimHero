@@ -1,0 +1,248 @@
+# AgentMail | Documentation
+
+> AgentMail is an email API built for AI agents. Create inboxes, send and receive messages, manage threads, and handle webhooks programmatically.
+
+## Instructions for AI Agents
+
+- For clean Markdown of any page, append `.md` to the page URL
+- For section-specific indexes, append `/llms.txt` to any section URL
+- For AI client integration (Claude Code, Cursor, etc.), connect to the MCP server at https://agentmail.to/_mcp/server
+
+## Docs
+
+- [Welcome](https://agentmail.to/docs/welcome.md): Your starting point for building with the AgentMail API.
+- [Introduction](https://agentmail.to/docs/introduction.md): Give AI agents email inboxes
+- [Quickstart](https://agentmail.to/docs/quickstart.md): Follow this guide to make your first AgentMail API request and create a new email inbox.
+- [Inboxes](https://agentmail.to/docs/inboxes.md): Learn how AgentMail Inboxes act as scalable, API-first email accounts for your agents.
+- [Messages](https://agentmail.to/docs/messages.md): Learn how to send, receive, and manage emails as Message objects with the AgentMail API.
+- [Threads](https://agentmail.to/docs/threads.md): Learn how AgentMail Threads group messages into conversations and how to query them across your entire organization.
+- [Drafts](https://agentmail.to/docs/drafts.md): Learn how to create, manage, and send Drafts to enable advanced agent workflows like human-in-the-loop review and scheduled sending.
+- [Labels](https://agentmail.to/docs/labels.md): Learn how to use Labels to manage state, track campaigns, and filter messages for powerful agentic workflows.
+- [Lists](https://agentmail.to/docs/lists.md): Learn how to use Lists to control which email addresses and domains your agents can send to or receive from.
+- [Attachments](https://agentmail.to/docs/attachments.md): Learn how to send files as attachments, and download incoming attachments from both messages and threads.
+- [Pods](https://agentmail.to/docs/documentation/core-concepts/pods.md): Learn how to use pods for multi-tenant email management
+- [Permissions](https://agentmail.to/docs/permissions.md): Learn how to configure fine-grained permissions on API keys to restrict access to specific resources and operations.
+- [Agent Onboarding](https://agentmail.to/docs/agent-onboarding.md): Resources for AI coding assistants, MCP servers, skills, and agent-friendly documentation.
+- [Skills](https://agentmail.to/docs/integrations/skills.md): AgentMail's official skill for OpenClaw, Claude Code, Cursor, and other AI assistants
+- [MCP](https://agentmail.to/docs/integrations/mcp.md): Connect AgentMail to Claude, Cursor, and other MCP clients
+- [CLI](https://agentmail.to/docs/integrations/cli.md): AgentMail's official command-line interface
+- [Google ADK](https://agentmail.to/docs/integrations/google-adk.md): AgentMail's Google Agent Development Kit (ADK) integration
+- [LangChain](https://agentmail.to/docs/integrations/langchain.md): AgentMail's LangChain integration
+- [OpenClaw](https://agentmail.to/docs/integrations/openclaw.md): Install AgentMail as an official OpenClaw plugin with one command. Your agent gets its own inbox plus an allowlisted email channel it can be reached at.
+- [Grok Bot](https://agentmail.to/docs/integrations/grokbot.md): AgentMail's Grok Bot, Grok Build, and Grok API integration
+- [Replit](https://agentmail.to/docs/integrations/replit.md): AgentMail's Replit integration
+- [x402](https://agentmail.to/docs/integrations/x402.md): AgentMail's x402 integration for HTTP-native payments
+- [MPP](https://agentmail.to/docs/integrations/mpp.md): AgentMail's MPP integration for machine-to-machine payments via Stripe
+- [Integrate LiveKit Agents](https://agentmail.to/docs/integrate-livekit-agents.md): A step-by-step guide to integrate with the LiveKit Agents SDK.
+- [Sim.ai](https://agentmail.to/docs/integrations/sim.md): AgentMail's Sim.ai integration
+- [AgentID Public-Key Authentication](https://agentmail.to/docs/agentid-public-key-authentication.md): Generate and store a P-256 key, register its public JWK, and submit a strict signed AgentID approval.
+- [Guide: Sending & Receiving Email](https://agentmail.to/docs/sending-receiving-email.md): A step-by-step guide to the practical workflow of sending initial emails and handling replies to have a full conversation.
+- [IMAP & SMTP](https://agentmail.to/docs/imap-smtp.md): Configure IMAP and SMTP to access your AgentMail inboxes using email clients or programmatic access.
+- [Guide: Multi-Tenancy](https://agentmail.to/docs/multi-tenancy.md): How to use pods, scoped API keys, and webhook filtering to build multi-tenant email on AgentMail.
+- [Using Custom Domains](https://agentmail.to/docs/custom-domains.md): A step-by-step guide to configuring your custom domain with AgentMail for enhanced branding and trust.
+- [Managing Your Domains](https://agentmail.to/docs/managing-domains.md): Learn how to manage your custom domains effectively using AgentMail's API for enhanced deliverability and reputation management.
+- [Webhooks Overview](https://agentmail.to/docs/webhooks-overview.md): Learn how to use Webhooks to build responsive, event-driven email agents with AgentMail.
+- [Webhook Events](https://agentmail.to/docs/events.md)
+- [Webhook Setup Guide](https://agentmail.to/docs/webhook-setup.md): A comprehensive guide to setting up webhooks with ngrok and AgentMail, including account creation, inbox setup, and code examples.
+- [Verifying Webhooks](https://agentmail.to/docs/webhook-verification.md): Learn how to verify webhook signatures to secure your webhook endpoints and prevent spoofed requests.
+- [WebSockets](https://agentmail.to/docs/websockets.md): Learn how to use WebSockets for instant email notifications without webhooks or polling.
+- [WebSockets Quickstart](https://agentmail.to/docs/websockets/quickstart.md): Get started with real-time email event streaming
+- [Email Deliverability](https://agentmail.to/docs/email-deliverability.md): Learn the strategies and best practices for maximizing your email deliverability with AgentMail.
+- [Idempotent Requests](https://agentmail.to/docs/idempotency.md): A guide to preventing duplicate resources with client_id and preventing duplicate email sends with the Idempotency-Key header.
+- [Example: Event-Driven Agent](https://agentmail.to/docs/webhook-agent.md): A step-by-step guide to building a sophisticated agent that performs proactive outreach and uses webhooks for inbound message processing.
+- [Auto-Reply Email Agent](https://agentmail.to/docs/documentation/examples/auto-reply-agent.md): Build a simple agent that automatically responds to incoming emails with personalized messages
+- [Smart Email Labeling Agent](https://agentmail.to/docs/documentation/examples/smart-labeling-agent.md): Build an AI-powered agent that automatically classifies and labels incoming emails across multiple dimensions
+- [Sales Agent with WebSocket](https://agentmail.to/docs/sales-agent-websocket.md): A step-by-step guide to building an AI-powered sales agent that uses WebSocket for real-time email processing without polling or webhooks.
+- [Live AgentMail Examples](https://agentmail.to/docs/documentation/examples/live-agent-mail-examples.md)
+- [Frequently Asked Questions (FAQ)](https://agentmail.to/docs/faq.md): Find answers to common questions about AgentMail, from core concepts to best practices and security.
+- [Error Reference](https://agentmail.to/docs/errors.md): Every AgentMail API error code, what it means, and how to fix it.
+- [Email Reply Extraction with Talon](https://agentmail.to/docs/talon-reply-extraction.md): Learn how to use Talon to extract new content from email replies, removing quoted text with 93.8% accuracy.
+- [Join the AgentMail Community](https://agentmail.to/docs/community.md): Connect with the AgentMail team and developers, share what you're building, and get support.
+- [Support](https://agentmail.to/docs/support.md): Get help with AgentMail through our support channels.
+- [Understanding Email Authentication (SPF, DKIM, DMARC)](https://agentmail.to/docs/email-protocols.md): Learn why we ask for DNS records and what SPF, DKIM, and DMARC are.
+- [SOC 2 Compliance](https://agentmail.to/docs/documentation/resources/security-privacy/soc-2-compliance.md): AgentMail's SOC 2 Type I and Type II compliance.
+- [Spam & Virus Detection](https://agentmail.to/docs/spam-virus-detection.md): How AgentMail automatically scans incoming emails for spam and viruses.
+- [API Welcome](https://agentmail.to/docs/api-reference.md): Quick overview of the AgentMail SDK
+- [Knowledge Base](https://agentmail.to/docs/knowledge-base.md): A collection of answers to frequently asked questions.
+- [What is AgentMail and how is it different?](https://agentmail.to/docs/knowledge-base/what-is-agentmail.md): Understand how AgentMail compares to traditional email providers.
+- [What can I do with an AgentMail inbox?](https://agentmail.to/docs/knowledge-base/inbox-capabilities.md): A complete overview of inbox capabilities for AI agents.
+- [How do I create my first inbox?](https://agentmail.to/docs/knowledge-base/creating-first-inbox.md): Get up and running with your first AgentMail inbox.
+- [How do I get my API key?](https://agentmail.to/docs/knowledge-base/getting-api-key.md): Create and manage your AgentMail API keys.
+- [How do I handle inbound emails with my agent?](https://agentmail.to/docs/knowledge-base/handling-inbound-emails.md): Compare Webhooks and WebSockets for processing incoming emails.
+- [How do I set up allowlists and blocklists?](https://agentmail.to/docs/knowledge-base/allowlists-blocklists.md): Control who your AI agent can send to and receive from.
+- [How do I manage threaded conversations?](https://agentmail.to/docs/knowledge-base/threaded-conversations.md): Maintain context across multi-turn email conversations with your agent.
+- [How do I build a human-in-the-loop workflow?](https://agentmail.to/docs/knowledge-base/human-in-the-loop.md): Keep humans in control of your agent's email communications.
+- [How do I use Pods for multi-tenant email?](https://agentmail.to/docs/knowledge-base/pods-multi-tenant.md): Isolate inboxes, domains, and data across tenants with Pods.
+- [How do I use labels to track email state?](https://agentmail.to/docs/knowledge-base/labels-track-state.md): Use labels to manage agent workflow state on emails and threads.
+- [How do I set up a custom domain?](https://agentmail.to/docs/knowledge-base/custom-domain-setup.md): Send emails from your own domain instead of @agentmail.to.
+- [How do I set up SPF, DKIM, and DMARC?](https://agentmail.to/docs/knowledge-base/spf-dkim-dmarc.md): Authenticate your domain for reliable email deliverability.
+- [Why are my emails going to spam?](https://agentmail.to/docs/knowledge-base/emails-going-to-spam.md): Troubleshoot and fix spam folder placement issues.
+- [Warming Up](https://agentmail.to/docs/knowledge-base/domain-warming.md): Gradually build sending reputation on a new domain or inbox.
+- [How do I avoid MX record conflicts?](https://agentmail.to/docs/knowledge-base/mx-record-conflicts.md): Add AgentMail DNS records without breaking existing email.
+- [What does a 403 error mean?](https://agentmail.to/docs/knowledge-base/api-403-error.md): Common causes of API 403 Forbidden errors and how to fix them.
+- [What are the rate limits?](https://agentmail.to/docs/knowledge-base/rate-limits.md): Understand AgentMail's rate limits and how to work within them.
+- [How do I prevent duplicate sends?](https://agentmail.to/docs/knowledge-base/preventing-duplicate-sends.md): Use idempotency to avoid sending the same email twice.
+- [Why is my domain not verifying?](https://agentmail.to/docs/knowledge-base/domain-not-verifying.md): What to do when your domain verification is stuck.
+- [Why are my emails bouncing?](https://agentmail.to/docs/knowledge-base/emails-bouncing.md): Diagnose and resolve email bounce issues.
+- [Why are my emails not showing up?](https://agentmail.to/docs/knowledge-base/inbound-emails-missing.md): The most common reason inbound emails go missing is that the sender's domain failed authentication.
+- [DNS Guide: Cloudflare](https://agentmail.to/docs/knowledge-base/dns-cloudflare.md): Step-by-step instructions for adding AgentMail DNS records in Cloudflare.
+- [DNS Guide: GoDaddy](https://agentmail.to/docs/knowledge-base/dns-godaddy.md): Step-by-step instructions for adding AgentMail DNS records in GoDaddy.
+- [DNS Guide: Route 53 (AWS)](https://agentmail.to/docs/knowledge-base/dns-route53.md): Step-by-step instructions for adding AgentMail DNS records in AWS Route 53.
+- [DNS Guide: Namecheap](https://agentmail.to/docs/knowledge-base/dns-namecheap.md): Step-by-step instructions for adding AgentMail DNS records in Namecheap.
+- [Changelog](https://agentmail.to/docs/changelog.md)
+- [Changelog (all entries)](https://agentmail.to/docs/changelog/llms.txt)
+
+## API Docs
+
+- API Reference > Agent [Sign Up](https://agentmail.to/docs/api-reference/agent/sign-up.md)
+- API Reference > Agent [Verify](https://agentmail.to/docs/api-reference/agent/verify.md)
+- API Reference > Inboxes [List Inboxes](https://agentmail.to/docs/api-reference/inboxes/list.md)
+- API Reference > Inboxes [Get Inbox](https://agentmail.to/docs/api-reference/inboxes/get.md)
+- API Reference > Inboxes [Create Inbox](https://agentmail.to/docs/api-reference/inboxes/create.md)
+- API Reference > Inboxes [Update Inbox](https://agentmail.to/docs/api-reference/inboxes/update.md)
+- API Reference > Inboxes [Delete Inbox](https://agentmail.to/docs/api-reference/inboxes/delete.md)
+- API Reference > Inboxes > Threads [List Threads](https://agentmail.to/docs/api-reference/inboxes/threads/list.md)
+- API Reference > Inboxes > Threads [Search Threads](https://agentmail.to/docs/api-reference/inboxes/threads/search.md)
+- API Reference > Inboxes > Threads [Get Thread](https://agentmail.to/docs/api-reference/inboxes/threads/get.md)
+- API Reference > Inboxes > Threads [Get Attachment](https://agentmail.to/docs/api-reference/inboxes/threads/get-attachment.md)
+- API Reference > Inboxes > Threads [Update Thread](https://agentmail.to/docs/api-reference/inboxes/threads/update.md)
+- API Reference > Inboxes > Threads [Delete Thread](https://agentmail.to/docs/api-reference/inboxes/threads/delete.md)
+- API Reference > Inboxes > Messages [List Messages](https://agentmail.to/docs/api-reference/inboxes/messages/list.md)
+- API Reference > Inboxes > Messages [Search Messages](https://agentmail.to/docs/api-reference/inboxes/messages/search.md)
+- API Reference > Inboxes > Messages [Get Message](https://agentmail.to/docs/api-reference/inboxes/messages/get.md)
+- API Reference > Inboxes > Messages [Batch Get Messages](https://agentmail.to/docs/api-reference/inboxes/messages/batch-get.md)
+- API Reference > Inboxes > Messages [Batch Update Messages](https://agentmail.to/docs/api-reference/inboxes/messages/batch-update.md)
+- API Reference > Inboxes > Messages [Get Attachment](https://agentmail.to/docs/api-reference/inboxes/messages/get-attachment.md)
+- API Reference > Inboxes > Messages [Get Raw Message](https://agentmail.to/docs/api-reference/inboxes/messages/get-raw.md)
+- API Reference > Inboxes > Messages [Update Message](https://agentmail.to/docs/api-reference/inboxes/messages/update.md)
+- API Reference > Inboxes > Messages [Delete Message](https://agentmail.to/docs/api-reference/inboxes/messages/delete.md)
+- API Reference > Inboxes > Messages [Send Message](https://agentmail.to/docs/api-reference/inboxes/messages/send.md)
+- API Reference > Inboxes > Messages [Reply To Message](https://agentmail.to/docs/api-reference/inboxes/messages/reply.md)
+- API Reference > Inboxes > Messages [Reply All Message](https://agentmail.to/docs/api-reference/inboxes/messages/reply-all.md)
+- API Reference > Inboxes > Messages [Forward Message](https://agentmail.to/docs/api-reference/inboxes/messages/forward.md)
+- API Reference > Inboxes > Drafts [List Drafts](https://agentmail.to/docs/api-reference/inboxes/drafts/list.md)
+- API Reference > Inboxes > Drafts [Get Draft](https://agentmail.to/docs/api-reference/inboxes/drafts/get.md)
+- API Reference > Inboxes > Drafts [Get Attachment](https://agentmail.to/docs/api-reference/inboxes/drafts/get-attachment.md)
+- API Reference > Inboxes > Drafts [Create Draft](https://agentmail.to/docs/api-reference/inboxes/drafts/create.md)
+- API Reference > Inboxes > Drafts [Update Draft](https://agentmail.to/docs/api-reference/inboxes/drafts/update.md)
+- API Reference > Inboxes > Drafts [Delete Draft](https://agentmail.to/docs/api-reference/inboxes/drafts/delete.md)
+- API Reference > Inboxes > Drafts [Send Draft](https://agentmail.to/docs/api-reference/inboxes/drafts/send.md)
+- API Reference > Inboxes > Webhooks [List Webhooks](https://agentmail.to/docs/api-reference/inboxes/webhooks/list.md)
+- API Reference > Inboxes > Webhooks [Get Webhook](https://agentmail.to/docs/api-reference/inboxes/webhooks/get.md)
+- API Reference > Inboxes > Webhooks [Get Webhook Headers](https://agentmail.to/docs/api-reference/inboxes/webhooks/get-headers.md)
+- API Reference > Inboxes > Webhooks [Create Webhook](https://agentmail.to/docs/api-reference/inboxes/webhooks/create.md)
+- API Reference > Inboxes > Webhooks [Update Webhook](https://agentmail.to/docs/api-reference/inboxes/webhooks/update.md)
+- API Reference > Inboxes > Webhooks [Update Webhook Headers](https://agentmail.to/docs/api-reference/inboxes/webhooks/update-headers.md)
+- API Reference > Inboxes > Webhooks [Delete Webhook](https://agentmail.to/docs/api-reference/inboxes/webhooks/delete.md)
+- API Reference > Inboxes > Lists [List Entries](https://agentmail.to/docs/api-reference/inboxes/lists/list.md)
+- API Reference > Inboxes > Lists [Get List Entry](https://agentmail.to/docs/api-reference/inboxes/lists/get.md)
+- API Reference > Inboxes > Lists [Create List Entry](https://agentmail.to/docs/api-reference/inboxes/lists/create.md)
+- API Reference > Inboxes > Lists [Delete List Entry](https://agentmail.to/docs/api-reference/inboxes/lists/delete.md)
+- API Reference > Inboxes > Metrics [Query Events](https://agentmail.to/docs/api-reference/inboxes/metrics/query-events.md)
+- API Reference > Inboxes > Metrics [Query Usage](https://agentmail.to/docs/api-reference/inboxes/metrics/query-usage.md)
+- API Reference > Inboxes > Events [List Inbox Events](https://agentmail.to/docs/api-reference/inboxes/events/list.md)
+- API Reference > Inboxes > API Keys [List API Keys](https://agentmail.to/docs/api-reference/inboxes/api-keys/list.md)
+- API Reference > Inboxes > API Keys [Create API Key](https://agentmail.to/docs/api-reference/inboxes/api-keys/create.md)
+- API Reference > Inboxes > API Keys [Delete API Key](https://agentmail.to/docs/api-reference/inboxes/api-keys/delete.md)
+- API Reference > Threads [List Threads](https://agentmail.to/docs/api-reference/threads/list.md)
+- API Reference > Threads [Search Threads](https://agentmail.to/docs/api-reference/threads/search.md)
+- API Reference > Threads [Get Thread](https://agentmail.to/docs/api-reference/threads/get.md)
+- API Reference > Threads [Get Attachment](https://agentmail.to/docs/api-reference/threads/get-attachment.md)
+- API Reference > Threads [Update Thread](https://agentmail.to/docs/api-reference/threads/update.md)
+- API Reference > Threads [Delete Thread](https://agentmail.to/docs/api-reference/threads/delete.md)
+- API Reference > Drafts [List Drafts](https://agentmail.to/docs/api-reference/drafts/list.md)
+- API Reference > Drafts [Get Draft](https://agentmail.to/docs/api-reference/drafts/get.md)
+- API Reference > Drafts [Get Attachment](https://agentmail.to/docs/api-reference/drafts/get-attachment.md)
+- API Reference > Webhooks [List Webhooks](https://agentmail.to/docs/api-reference/webhooks/list.md)
+- API Reference > Webhooks [Get Webhook](https://agentmail.to/docs/api-reference/webhooks/get.md)
+- API Reference > Webhooks [Get Webhook Headers](https://agentmail.to/docs/api-reference/webhooks/get-headers.md)
+- API Reference > Webhooks [Create Webhook](https://agentmail.to/docs/api-reference/webhooks/create.md)
+- API Reference > Webhooks [Update Webhook](https://agentmail.to/docs/api-reference/webhooks/update.md)
+- API Reference > Webhooks [Update Webhook Headers](https://agentmail.to/docs/api-reference/webhooks/update-headers.md)
+- API Reference > Webhooks [Delete Webhook](https://agentmail.to/docs/api-reference/webhooks/delete.md)
+- API Reference > Webhooks > Events [Message Received](https://agentmail.to/docs/api-reference/webhooks/events/message-received.md)
+- API Reference > Webhooks > Events [Message Sent](https://agentmail.to/docs/api-reference/webhooks/events/message-sent.md)
+- API Reference > Webhooks > Events [Message Delivered](https://agentmail.to/docs/api-reference/webhooks/events/message-delivered.md)
+- API Reference > Webhooks > Events [Message Bounced](https://agentmail.to/docs/api-reference/webhooks/events/message-bounced.md)
+- API Reference > Webhooks > Events [Message Complained](https://agentmail.to/docs/api-reference/webhooks/events/message-complained.md)
+- API Reference > Webhooks > Events [Message Rejected](https://agentmail.to/docs/api-reference/webhooks/events/message-rejected.md)
+- API Reference > Webhooks > Events [Message Opened](https://agentmail.to/docs/api-reference/webhooks/events/message-opened.md)
+- API Reference > Webhooks > Events [Domain Verified](https://agentmail.to/docs/api-reference/webhooks/events/domain-verified.md)
+- API Reference > Websockets [Connect](https://agentmail.to/docs/api-reference/websockets/websockets.md)
+- API Reference > Domains [List Domains](https://agentmail.to/docs/api-reference/domains/list.md)
+- API Reference > Domains [Get Domain](https://agentmail.to/docs/api-reference/domains/get.md)
+- API Reference > Domains [Get Zone File](https://agentmail.to/docs/api-reference/domains/get-zone-file.md)
+- API Reference > Domains [Create Domain](https://agentmail.to/docs/api-reference/domains/create.md)
+- API Reference > Domains [Update Domain](https://agentmail.to/docs/api-reference/domains/update.md)
+- API Reference > Domains [Delete Domain](https://agentmail.to/docs/api-reference/domains/delete.md)
+- API Reference > Domains [Verify Domain](https://agentmail.to/docs/api-reference/domains/verify.md)
+- API Reference > Lists [List Entries](https://agentmail.to/docs/api-reference/lists/list.md)
+- API Reference > Lists [Get List Entry](https://agentmail.to/docs/api-reference/lists/get.md)
+- API Reference > Lists [Create List Entry](https://agentmail.to/docs/api-reference/lists/create.md)
+- API Reference > Lists [Delete List Entry](https://agentmail.to/docs/api-reference/lists/delete.md)
+- API Reference > Metrics [Query Events](https://agentmail.to/docs/api-reference/metrics/query-events.md)
+- API Reference > Metrics [Query Usage](https://agentmail.to/docs/api-reference/metrics/query-usage.md)
+- API Reference > API Keys [List API Keys](https://agentmail.to/docs/api-reference/api-keys/list.md)
+- API Reference > API Keys [Create API Key](https://agentmail.to/docs/api-reference/api-keys/create.md)
+- API Reference > API Keys [Delete API Key](https://agentmail.to/docs/api-reference/api-keys/delete.md)
+- API Reference > API Keys [List Public-Key Credentials](https://agentmail.to/docs/api-reference/api-keys/list-public-keys.md)
+- API Reference > API Keys [Register Public-Key Credential](https://agentmail.to/docs/api-reference/api-keys/create-public-key.md)
+- API Reference > API Keys [Rename Public-Key Credential](https://agentmail.to/docs/api-reference/api-keys/update-public-key-name.md)
+- API Reference > API Keys [Revoke Public-Key Credential](https://agentmail.to/docs/api-reference/api-keys/revoke-public-key.md)
+- API Reference > API Keys [Revoke All AgentID Sign-In Keys](https://agentmail.to/docs/api-reference/api-keys/revoke-all-agent-id-sign-in-keys.md)
+- API Reference > Pods [List Pods](https://agentmail.to/docs/api-reference/pods/list.md)
+- API Reference > Pods [Get Pod](https://agentmail.to/docs/api-reference/pods/get.md)
+- API Reference > Pods [Create Pod](https://agentmail.to/docs/api-reference/pods/create.md)
+- API Reference > Pods [Delete Pod](https://agentmail.to/docs/api-reference/pods/delete.md)
+- API Reference > Pods > Inboxes [List Inboxes](https://agentmail.to/docs/api-reference/pods/inboxes/list.md)
+- API Reference > Pods > Inboxes [Get Inbox](https://agentmail.to/docs/api-reference/pods/inboxes/get.md)
+- API Reference > Pods > Inboxes [Create Inbox](https://agentmail.to/docs/api-reference/pods/inboxes/create.md)
+- API Reference > Pods > Inboxes [Update Inbox](https://agentmail.to/docs/api-reference/pods/inboxes/update.md)
+- API Reference > Pods > Inboxes [Delete Inbox](https://agentmail.to/docs/api-reference/pods/inboxes/delete.md)
+- API Reference > Pods > Threads [List Threads](https://agentmail.to/docs/api-reference/pods/threads/list.md)
+- API Reference > Pods > Threads [Search Threads](https://agentmail.to/docs/api-reference/pods/threads/search.md)
+- API Reference > Pods > Threads [Get Thread](https://agentmail.to/docs/api-reference/pods/threads/get.md)
+- API Reference > Pods > Threads [Get Attachment](https://agentmail.to/docs/api-reference/pods/threads/get-attachment.md)
+- API Reference > Pods > Threads [Update Thread](https://agentmail.to/docs/api-reference/pods/threads/update.md)
+- API Reference > Pods > Threads [Delete Thread](https://agentmail.to/docs/api-reference/pods/threads/delete.md)
+- API Reference > Pods > Drafts [List Drafts](https://agentmail.to/docs/api-reference/pods/drafts/list.md)
+- API Reference > Pods > Drafts [Get Draft](https://agentmail.to/docs/api-reference/pods/drafts/get.md)
+- API Reference > Pods > Drafts [Get Attachment](https://agentmail.to/docs/api-reference/pods/drafts/get-attachment.md)
+- API Reference > Pods > Webhooks [List Webhooks](https://agentmail.to/docs/api-reference/pods/webhooks/list.md)
+- API Reference > Pods > Webhooks [Get Webhook](https://agentmail.to/docs/api-reference/pods/webhooks/get.md)
+- API Reference > Pods > Webhooks [Get Webhook Headers](https://agentmail.to/docs/api-reference/pods/webhooks/get-headers.md)
+- API Reference > Pods > Webhooks [Create Webhook](https://agentmail.to/docs/api-reference/pods/webhooks/create.md)
+- API Reference > Pods > Webhooks [Update Webhook](https://agentmail.to/docs/api-reference/pods/webhooks/update.md)
+- API Reference > Pods > Webhooks [Update Webhook Headers](https://agentmail.to/docs/api-reference/pods/webhooks/update-headers.md)
+- API Reference > Pods > Webhooks [Delete Webhook](https://agentmail.to/docs/api-reference/pods/webhooks/delete.md)
+- API Reference > Pods > Domains [List Domains](https://agentmail.to/docs/api-reference/pods/domains/list.md)
+- API Reference > Pods > Domains [Get Domain](https://agentmail.to/docs/api-reference/pods/domains/get.md)
+- API Reference > Pods > Domains [Get Zone File](https://agentmail.to/docs/api-reference/pods/domains/get-zone-file.md)
+- API Reference > Pods > Domains [Create Domain](https://agentmail.to/docs/api-reference/pods/domains/create.md)
+- API Reference > Pods > Domains [Update Domain](https://agentmail.to/docs/api-reference/pods/domains/update.md)
+- API Reference > Pods > Domains [Delete Domain](https://agentmail.to/docs/api-reference/pods/domains/delete.md)
+- API Reference > Pods > Domains [Verify Domain](https://agentmail.to/docs/api-reference/pods/domains/verify.md)
+- API Reference > Pods > Lists [List Entries](https://agentmail.to/docs/api-reference/pods/lists/list.md)
+- API Reference > Pods > Lists [Get List Entry](https://agentmail.to/docs/api-reference/pods/lists/get.md)
+- API Reference > Pods > Lists [Create List Entry](https://agentmail.to/docs/api-reference/pods/lists/create.md)
+- API Reference > Pods > Lists [Delete List Entry](https://agentmail.to/docs/api-reference/pods/lists/delete.md)
+- API Reference > Pods > Metrics [Query Events](https://agentmail.to/docs/api-reference/pods/metrics/query-events.md)
+- API Reference > Pods > Metrics [Query Usage](https://agentmail.to/docs/api-reference/pods/metrics/query-usage.md)
+- API Reference > Pods > API Keys [List API Keys](https://agentmail.to/docs/api-reference/pods/api-keys/list.md)
+- API Reference > Pods > API Keys [Create API Key](https://agentmail.to/docs/api-reference/pods/api-keys/create.md)
+- API Reference > Pods > API Keys [Delete API Key](https://agentmail.to/docs/api-reference/pods/api-keys/delete.md)
+- API Reference > Organizations [Get Organization](https://agentmail.to/docs/api-reference/organizations/get.md)
+- API Reference > Auth [Who Am I](https://agentmail.to/docs/api-reference/auth/me.md)
+
+## OpenAPI Specification
+
+The raw OpenAPI 3.1 specification for this API is available at:
+- [OpenAPI JSON](https://agentmail.to/openapi.json)
+- [OpenAPI YAML](https://agentmail.to/openapi.yaml)
+
+
+## AsyncAPI Specification
+
+The raw AsyncAPI 2.6.0 specification for the WebSocket channels is available at:
+- [AsyncAPI JSON](https://agentmail.to/asyncapi.json)
+- [AsyncAPI YAML](https://agentmail.to/asyncapi.yaml)
