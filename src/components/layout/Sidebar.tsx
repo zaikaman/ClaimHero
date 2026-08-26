@@ -19,6 +19,7 @@ import {
   SignIn,
   User,
   CaretUpDown,
+  Trash,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -33,6 +34,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { DeleteCaseModal } from "../common/DeleteCaseModal";
 import { BrandLogo, BrandIcon } from "../common/BrandLogo";
 import { cn } from "../../lib/utils";
 
@@ -55,6 +57,7 @@ interface SidebarProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onOpenIngestion?: () => void;
+  onDeleteCase?: (claimId: string) => Promise<any>;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -65,6 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectClaim,
   isCollapsed = false,
   onOpenIngestion,
+  onDeleteCase,
 }) => {
   const viewer = useQuery((api as any).users?.viewer);
   const { signOut } = useAuthActions();
@@ -84,6 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ).toUpperCase();
 
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText("intake@claimhero.agentmail.com");
@@ -318,6 +323,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <PlusCircle className="size-3.5" />
                       <span>+ Ingest New Case</span>
                     </DropdownMenuItem>
+                    {selectedClaim && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setCaseToDelete(selectedClaim)}
+                          className="gap-2 text-destructive focus:text-destructive cursor-pointer text-xs font-medium"
+                        >
+                          <Trash className="size-3.5" />
+                          <span>Delete Current Case</span>
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
@@ -466,6 +483,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Delete Case Confirmation Modal */}
+      <DeleteCaseModal
+        isOpen={Boolean(caseToDelete)}
+        claim={caseToDelete}
+        onClose={() => setCaseToDelete(null)}
+        onConfirmDelete={onDeleteCase || (async () => {})}
+      />
     </aside>
   );
 };

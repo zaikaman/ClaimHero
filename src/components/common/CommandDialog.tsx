@@ -11,6 +11,7 @@ import {
   Copy,
   Check,
   User,
+  Trash,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -18,6 +19,7 @@ import { Dialog, DialogContent } from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import { NavigationView } from "../layout/Sidebar";
 import { BrandIcon } from "./BrandLogo";
+import { DeleteCaseModal } from "./DeleteCaseModal";
 
 interface CommandDialogProps {
   isOpen: boolean;
@@ -27,6 +29,7 @@ interface CommandDialogProps {
   onNavigateView: (view: NavigationView) => void;
   onOpenIngestion: () => void;
   onOpenOnboarding?: () => void;
+  onDeleteCase?: (claimId: string) => Promise<any>;
 }
 
 export const CommandDialog: React.FC<CommandDialogProps> = ({
@@ -37,9 +40,11 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   onNavigateView,
   onOpenIngestion,
   onOpenOnboarding,
+  onDeleteCase,
 }) => {
   const [query, setQuery] = useState("");
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -162,9 +167,19 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        setCaseToDelete(claim);
+                      }}
+                      className="p-1.5 text-[10px] rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                      title="Delete this case"
+                    >
+                      <Trash className="size-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         handleSelectClaim(claim._id, "evidence");
                       }}
-                      className="px-2 py-1 text-[10px] rounded bg-muted hover:bg-secondary text-foreground font-mono"
+                      className="px-2 py-1 text-[10px] rounded bg-muted hover:bg-secondary text-foreground font-mono cursor-pointer"
                     >
                       Evidence
                     </button>
@@ -173,7 +188,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                         e.stopPropagation();
                         handleSelectClaim(claim._id, "studio");
                       }}
-                      className="px-2 py-1 text-[10px] rounded bg-primary text-primary-foreground font-mono"
+                      className="px-2 py-1 text-[10px] rounded bg-primary text-primary-foreground font-mono cursor-pointer"
                     >
                       Studio &rarr;
                     </button>
@@ -297,6 +312,17 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
           <span>OpenAI gpt-5-nano</span>
         </div>
       </DialogContent>
+
+      {/* Delete Case Confirmation Modal */}
+      <DeleteCaseModal
+        isOpen={Boolean(caseToDelete)}
+        claim={caseToDelete}
+        onClose={() => setCaseToDelete(null)}
+        onConfirmDelete={onDeleteCase || (async () => {})}
+        onSuccess={() => {
+          setCaseToDelete(null);
+        }}
+      />
     </Dialog>
   );
 };

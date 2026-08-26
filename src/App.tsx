@@ -40,6 +40,7 @@ export default function App() {
     stats,
     uploadAndParseDocument,
     parseDocumentText,
+    deleteCase,
   } = useClaims({});
 
   const {
@@ -164,6 +165,7 @@ export default function App() {
       selectedClaim={selectedClaim}
       onSelectClaim={setSelectedClaimId}
       onOpenIngestion={handleOpenIngestion}
+      onDeleteCase={deleteCase}
       isSidebarCollapsed={isSidebarCollapsed}
       onToggleSidebar={handleToggleSidebar}
       onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
@@ -189,6 +191,7 @@ export default function App() {
               onSelectClaim={setSelectedClaimId}
               onOpenIngestion={handleOpenIngestion}
               onNavigateView={setCurrentView}
+              onDeleteCase={deleteCase}
             />
           )}
 
@@ -294,6 +297,7 @@ export default function App() {
         onNavigateView={setCurrentView}
         onOpenIngestion={handleOpenIngestion}
         onOpenOnboarding={() => setIsOnboardingOpen(true)}
+        onDeleteCase={deleteCase}
       />
 
       {/* Interactive 3-Step Sentinel Setup Wizard (Onboarding) */}

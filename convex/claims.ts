@@ -517,5 +517,98 @@ export const clearUnassignedDemoCases = mutation({
   },
 });
 
+/**
+ * Permanently delete a claim case and all associated artifacts (clinical evidences,
+ * synthesized appeals, AgentMail threads/messages, audit logs, and stored PDF attachments)
+ */
+export const deleteCase = mutation({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const claim = (await ctx.db.get(args.claimId)) as Doc<"claims"> | null;
+    if (!claim) {
+      throw new Error("Case not found or already deleted");
+    }
 
+    // Ownership verification: user can only delete their own cases (or unassigned demo cases)
+    if (claim.userId && userId && claim.userId !== userId) {
+      throw new Error("Unauthorized: You do not have permission to delete this case");
+    }
 
+    // 1. Cascade delete associated clinical evidences
+    const evidences = await ctx.db
+      .query("clinicalEvidences")
+      .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+      .collect();
+    for (const ev of evidences) {
+      await ctx.db.delete(ev._id);
+    }
+
+    // 2. Cascade delete associated appeal drafts & clean up exported PDFs from storage
+    const appeals = await ctx.db
+      .query("appeals")
+      .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+      .collect();
+    for (const ap of appeals) {
+      if (ap.pdfExportStorageId) {
+        try {
+          await ctx.storage.delete(ap.pdfExportStorageId);
+        } catch {
+          // File may already have been removed
+        }
+      }
+      await ctx.db.delete(ap._id);
+    }
+
+    // 3. Cascade delete associated AgentMail messages & communication threads
+    const messages = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+      .collect();
+    for (const msg of messages) {
+      await ctx.db.delete(msg._id);
+    }
+
+    const threads = await ctx.db
+      .query("emailThreads")
+      .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+      .collect();
+    for (const thr of threads) {
+      await ctx.db.delete(thr._id);
+    }
+
+    // 4. Cascade delete associated audit trail logs
+    const auditLogs = await ctx.db
+      .query("appealAuditLogs")
+      .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+      .collect();
+    for (const log of auditLogs) {
+      await ctx.db.delete(log._id);
+    }
+
+    // 5. Delete denial letter file attachment from Convex Storage
+    if (claim.denialLetterStorageId) {
+      try {
+        await ctx.storage.delete(claim.denialLetterStorageId);
+      } catch {
+        // File may already have been removed
+      }
+    }
+
+    // 6. Delete the core claim record
+    await ctx.db.delete(args.claimId);
+
+    return {
+      success: true,
+      deletedClaimId: args.claimId,
+      claimNumber: claim.claimNumber,
+      deletedEvidenceCount: evidences.length,
+      deletedAppealsCount: appeals.length,
+      deletedMessagesCount: messages.length,
+      deletedThreadsCount: threads.length,
+      deletedAuditLogsCount: auditLogs.length,
+    };
+  },
+});

@@ -14,6 +14,9 @@ import {
   PlusCircle,
   Funnel,
   ArrowCounterClockwise,
+  Trash,
+  DotsThreeVertical,
+  Envelope,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -32,6 +35,15 @@ import {
   TableHead,
   TableCell,
 } from "../ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "../ui/dropdown-menu";
+import { DeleteCaseModal } from "../common/DeleteCaseModal";
 import { cn } from "../../lib/utils";
 
 interface CaseRadarProps {
@@ -42,6 +54,7 @@ interface CaseRadarProps {
   onNavigateView: (
     view: "radar" | "evidence" | "studio" | "communications" | "audit"
   ) => void;
+  onDeleteCase?: (claimId: string) => Promise<any>;
 }
 
 const formatPayerName = (payer: string | undefined): string => {
@@ -63,10 +76,12 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   onSelectClaim,
   onOpenIngestion,
   onNavigateView,
+  onDeleteCase,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [payerFilter, setPayerFilter] = useState("all");
+  const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
 
   const totalDisputed = claims.reduce((acc, c) => acc + c.deniedAmount, 0);
   const wonClaims = claims.filter((c) => c.status === "won");
@@ -625,6 +640,73 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                             <span>Studio</span>
                             <ArrowUpRight className="size-2.5 opacity-60" />
                           </Button>
+
+                          {/* Row Context Menu */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                className="size-7 text-muted-foreground hover:text-foreground"
+                                title="Case actions"
+                              >
+                                <DotsThreeVertical className="size-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuLabel className="text-[10px] font-mono text-muted-foreground uppercase">
+                                Case #{claim.claimNumber}
+                              </DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  onSelectClaim(claim._id);
+                                  onNavigateView("studio");
+                                }}
+                                className="gap-2 text-xs cursor-pointer"
+                              >
+                                <FileText className="size-3.5" />
+                                <span>Open Appeal Studio</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  onSelectClaim(claim._id);
+                                  onNavigateView("evidence");
+                                }}
+                                className="gap-2 text-xs cursor-pointer"
+                              >
+                                <Pulse className="size-3.5" />
+                                <span>Evidence Matrix</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  onSelectClaim(claim._id);
+                                  onNavigateView("communications");
+                                }}
+                                className="gap-2 text-xs cursor-pointer"
+                              >
+                                <Envelope className="size-3.5" />
+                                <span>AgentMail Gateway</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  onSelectClaim(claim._id);
+                                  onNavigateView("audit");
+                                }}
+                                className="gap-2 text-xs cursor-pointer"
+                              >
+                                <Clock className="size-3.5" />
+                                <span>Audit Timeline</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setCaseToDelete(claim)}
+                                className="gap-2 text-xs text-destructive focus:text-destructive cursor-pointer font-medium"
+                              >
+                                <Trash className="size-3.5" />
+                                <span>Delete Case</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -635,6 +717,15 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
           </Table>
         </div>
       </Card>
+
+      {/* Delete Case Confirmation Modal */}
+      <DeleteCaseModal
+        isOpen={Boolean(caseToDelete)}
+        claim={caseToDelete}
+        onClose={() => setCaseToDelete(null)}
+        onConfirmDelete={onDeleteCase || (async () => {})}
+      />
     </div>
   );
 };
+

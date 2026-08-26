@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-26T18:03:00Z
+- **Last updated:** 2026-08-26T18:14:00Z
 
 ## Log
 
@@ -106,5 +106,5 @@ Refined High-Contrast Medical Alert & Destructive Tokens for Dark Theme: Upgrade
 ### 2026-08-26 - working tree
 Refined Overturn Probability Score Badge Layout & Monospace Alignment: Fixed horizontal text overflow on the win probability indicator in the Clinical Evidence Matrix (`src/components/evidence/EvidenceMatrix.tsx`). Replaced rigid `size-12` square container with a responsive `h-12 min-w-[4.5rem] px-3` pill badge with tabular monospace numerals (`tabular-nums`), eliminating character clipping for fractional and multi-digit score percentages (e.g. `92.5%`).
 
-
-
+### 2026-08-26 - working tree
+Implemented Production-Ready Multi-Touchpoint Case Deletion & Cascading Purge: Built atomic `deleteCase` mutation (`convex/claims.ts`) enforcing multi-tenant ownership authorization (`getAuthUserId`) and executing comprehensive cascading deletions across `clinicalEvidences`, `appeals` (including PDF storage cleanup via `ctx.storage.delete`), `emailMessages`, `emailThreads`, `appealAuditLogs`, attached denial letters in Convex Storage, and the core `claims` record. Built reusable clinical confirmation dialog (`src/components/common/DeleteCaseModal.tsx`) presenting claim metadata summary (patient, claim #, disputed amount, CPT code) and an itemized purge notice. Integrated delete triggers across all key UI touchpoints: Case Radar table row actions menu (`src/components/radar/CaseRadar.tsx`), Collapsible Sidebar active case switcher (`Sidebar.tsx`, `Shell.tsx`), and the Global Command Palette (`CommandDialog.tsx`, `App.tsx`) with automatic active claim fallback selection (`useClaims.ts`). Added unit tests (`tests/claimhero.test.ts`) and verified 100% clean typecheck, linting, production build, and 24/24 unit tests with `npm run verify`.

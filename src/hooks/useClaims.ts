@@ -131,6 +131,7 @@ export function useClaims(options?: {
   const generateUploadUrlMutation = useMutation(convexApi.claims.generateUploadUrl);
   const createWithPatientMutation = useMutation(convexApi.claims.createWithPatient);
   const updateStatusMutation = useMutation(convexApi.claims.updateStatus);
+  const deleteCaseMutation = useMutation(convexApi.claims.deleteCase);
   const parseDenialAction = useAction(
     convexApi["actions/opticalParser"]?.parseDenialDocument ||
     convexApi.actions?.opticalParser?.parseDenialDocument
@@ -199,6 +200,24 @@ export function useClaims(options?: {
     [updateStatusMutation]
   );
 
+  // Delete a case and automatically handle active selection fallback
+  const deleteCase = useCallback(
+    async (claimId: string) => {
+      const result = await deleteCaseMutation({
+        claimId: claimId as any,
+      });
+
+      // If currently selected claim was deleted, switch to next available claim
+      if (selectedClaimId === claimId) {
+        const remaining = (rawClaims || []).filter((c) => c._id !== claimId);
+        setSelectedClaimId(remaining[0]?._id || "");
+      }
+
+      return result;
+    },
+    [deleteCaseMutation, selectedClaimId, rawClaims]
+  );
+
   return {
     claims,
     rawClaims: rawClaims || [],
@@ -226,5 +245,6 @@ export function useClaims(options?: {
     parseDocumentText,
     createWithPatient: createWithPatientMutation,
     updateClaimStatus,
+    deleteCase,
   };
 }

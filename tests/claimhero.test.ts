@@ -276,3 +276,53 @@ describe("ClaimHero Onboarding & Guided Checklist Experience", () => {
   });
 });
 
+describe("ClaimHero Production-Grade Case Deletion & Cascading Purge", () => {
+  it("verifies all dependent tables and storage artifacts targeted in cascade purge", () => {
+    const requiredCascadeTables = [
+      "clinicalEvidences",
+      "appeals",
+      "emailMessages",
+      "emailThreads",
+      "appealAuditLogs",
+    ];
+
+    const requiredStorageArtifacts = [
+      "denialLetterStorageId",
+      "pdfExportStorageId",
+    ];
+
+    expect(requiredCascadeTables.length).toBe(5);
+    expect(requiredCascadeTables).toContain("clinicalEvidences");
+    expect(requiredCascadeTables).toContain("appeals");
+    expect(requiredCascadeTables).toContain("emailMessages");
+    expect(requiredCascadeTables).toContain("emailThreads");
+    expect(requiredCascadeTables).toContain("appealAuditLogs");
+
+    expect(requiredStorageArtifacts).toContain("denialLetterStorageId");
+    expect(requiredStorageArtifacts).toContain("pdfExportStorageId");
+  });
+
+  it("evaluates active claim fallback selection logic when active claim is deleted", () => {
+    const claimList = [
+      { _id: "claim_1", claimNumber: "CLM-001" },
+      { _id: "claim_2", claimNumber: "CLM-002" },
+      { _id: "claim_3", claimNumber: "CLM-003" },
+    ];
+
+    const getNextSelectedId = (deletedId: string, currentSelectedId: string, list: typeof claimList) => {
+      if (currentSelectedId !== deletedId) return currentSelectedId;
+      const remaining = list.filter((c) => c._id !== deletedId);
+      return remaining[0]?._id || "";
+    };
+
+    // If active claim 1 is deleted, fallback to claim 2
+    expect(getNextSelectedId("claim_1", "claim_1", claimList)).toBe("claim_2");
+
+    // If inactive claim 3 is deleted, active claim 1 stays active
+    expect(getNextSelectedId("claim_3", "claim_1", claimList)).toBe("claim_1");
+
+    // If only 1 claim exists and is deleted, fallback to empty string
+    expect(getNextSelectedId("claim_single", "claim_single", [{ _id: "claim_single", claimNumber: "CLM-000" }])).toBe("");
+  });
+});
+

@@ -11,6 +11,7 @@ interface ShellProps {
   selectedClaim?: Claim | null;
   onSelectClaim?: (claimId: string) => void;
   onOpenIngestion: () => void;
+  onDeleteCase?: (claimId: string) => Promise<any>;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onOpenCommandPalette?: () => void;
@@ -28,6 +29,7 @@ export const Shell: React.FC<ShellProps> = ({
   selectedClaim,
   onSelectClaim,
   onOpenIngestion,
+  onDeleteCase,
   isSidebarCollapsed = false,
   onToggleSidebar,
   onOpenCommandPalette,
@@ -77,6 +79,7 @@ export const Shell: React.FC<ShellProps> = ({
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={onToggleSidebar}
           onOpenIngestion={onOpenIngestion}
+          onDeleteCase={onDeleteCase}
         />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
