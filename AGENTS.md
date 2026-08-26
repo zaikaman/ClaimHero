@@ -32,3 +32,17 @@ specs/001-appeal-sentinel/plan.md
 - Use the impeccable skill when you're working with UI tasks, and make sure your UI work stays consistent with the rest of the app's design.
 - All relevant docs should be available in the docs folder, use the find-docs skill if you need anything else.
 - When you're done with your tasks, remember to run npm run verify to make sure everything is clean, and only run this when it's actually necessary, like large refactors, big code work, don't run it when you only updated docs for example.
+
+<!-- convex-ai-start -->
+
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read
+`convex/_generated/ai/guidelines.md` first** for important guidelines on
+how to correctly use Convex APIs and patterns. The file contains rules that
+override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running
+`npx convex ai-files install`.
+
+<!-- convex-ai-end -->
