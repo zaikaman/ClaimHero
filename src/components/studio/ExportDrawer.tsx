@@ -21,6 +21,7 @@ import {
   DialogDescription,
 } from "../ui/dialog";
 import { Button } from "../ui/button";
+import { AppealBriefRenderer } from "./AppealBriefRenderer";
 
 interface ExportDrawerProps {
   isOpen: boolean;
@@ -172,8 +173,10 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
             </div>
 
             {/* Rendered Full Markdown Text */}
-            <div className="prose prose-slate max-w-none text-xs leading-relaxed whitespace-pre-line text-slate-800">
-              {markdownContent || (
+            <div className="text-xs leading-relaxed text-slate-800">
+              {markdownContent ? (
+                <AppealBriefRenderer content={markdownContent} isPrintMode={true} />
+              ) : (
                 <div className="text-center py-12 text-slate-400 italic">
                   No appeal brief generated yet. Click &quot;Synthesize Brief&quot; in the studio to generate with gpt-5-nano.
                 </div>

@@ -89,21 +89,31 @@ export const generateAppealBrief = action({
 
     // 3. Call OpenAI gpt-5-nano with structured JSON schema
     const result = await createStructuredCompletion<AppealBriefSynthesisResult>({
-      systemPrompt: `You are a world-class Healthcare Appellate Attorney, Board-Certified Medical Necessity Specialist, and ERISA Regulatory Counsel.
-Your task is to synthesize a legally airtight, cited medical appeal brief to demand the immediate overturn and payment of an improper insurance claim denial.
-Appeal Rules:
-1. Legal Citations: Explicitly cite federal ERISA protections (29 CFR § 2560.503-1), the Affordable Care Act § 2719 internal claims regulations, and relevant state insurance statutes.
-2. Clinical Necessity Arguments: Directly quote the insurer's own Clinical Policy Bulletins (CPBs) to prove the claimant met or exceeded all conservative therapy and diagnostic prerequisites.
-3. Tone: Rigorous, authoritative, factual, and uncompromisingly clinical.
-4. Structure fullAppealMarkdown with clear markdown headers (# Formal Request for Reconsideration, ## Statement of Clinical Facts, ## Legal & Statutory Protections Under ERISA, ## Medical Necessity Analysis & CPB Alignment, ## Formal Demand for Full Reimbursement).`,
-      userPrompt: `Generate a comprehensive ${appealLevel.replace(/_/g, " ").toUpperCase()} medical appeal brief for:
+      systemPrompt: `You are an elite Healthcare Appellate Attorney, Board-Certified Medical Necessity Specialist, and ERISA Regulatory Counsel.
+Your mission is to synthesize a legally airtight, cited, highly professional medical appeal brief and formal demand for reconsideration to overturn an improper insurance claim denial.
 
-Claim Information:
+APPEAL DRAFTING STANDARDS:
+1. Legal & Regulatory Foundation: Explicitly cite federal ERISA protections (29 U.S.C. § 1133, 29 CFR § 2560.503-1(h) full-and-fair review standard), the Affordable Care Act § 2719 internal claims requirements (45 CFR § 147.136), and relevant state insurance codes.
+2. Clinical Necessity & CPB Alignment: Quote the insurer's Clinical Policy Bulletins (CPBs) to prove the claimant met all prerequisite criteria (e.g. conservative therapy duration, medication trials, physical therapy compliance, diagnostic indications).
+3. Professional Tone: Authoritative, formal, evidentiary, and uncompromisingly clinical. Avoid overly emotional accusations; use precise legal-medical terminology (e.g., "arbitrary and procedurally deficient adverse benefit determination", "fiduciary obligation under plan documents").
+4. Required Document Architecture for fullAppealMarkdown:
+   - Header Block: "VIA CERTIFIED TRANSMISSION & SECURE ELECTRONIC GRIEVANCE PORTAL", Recipient Insurer Appeals Committee, and Date.
+   - Case Metadata Block: Formatted tabular summary (Patient, DOB/Member ID, Group #, Claim #, Date of Service, CPT Codes, ICD-10 Diagnosis, Disputed Amount, Denial Reason).
+   - Salutation: "Dear Appeals Committee and Clinical Review Board,"
+   - Section I. STATEMENT OF RELEVANT CLINICAL FACTS & PRIOR CONSERVATIVE CARE (Document patient symptoms, failure of conservative therapy, treating physician rationale).
+   - Section II. GOVERNING LEGAL STANDARD & ERISA 29 CFR § 2560.503-1 STATUTORY PROTECTIONS (Demand for de novo review, full access to claim file and internal clinical criteria).
+   - Section III. CLINICAL POLICY BULLETIN (CPB) ALIGNMENT & EVIDENCE OF MEDICAL NECESSITY (Explicit comparison of patient medical record against payer coverage criteria, citing Exhibits).
+   - Section IV. FORMAL REBUTTAL OF DENIAL REASON & DEMAND FOR IMMEDIATE OVERTURN (Direct refutation of denial code, demand for full reimbursement, notice of external review/DOL complaint).
+   - Formal Signature Block: "Respectfully submitted on behalf of the Claimant", Treating Physician / Authorized Advocate signature, NPI, and Facility info.
+   - Enclosures & Exhibits: List of indexed exhibits (e.g. Exhibit A: Physician Progress Notes, Exhibit B: Physical Therapy Record, Exhibit C: CPB Documentation).`,
+      userPrompt: `Synthesize a formal ${appealLevel.replace(/_/g, " ").toUpperCase()} medical appeal brief for:
+
+Case Details:
 - Claim Number: ${claim.claimNumber}
 - Patient Name: ${claim.patient?.name || "Patient"}
 - Member ID: ${claim.patient?.memberId || "N/A"}
-- Group Number: ${claim.patient?.groupNumber || "N/A"}
-- Insurance Payer: ${claim.patient?.insurancePayer} (Grievances & Appeals Dept)
+- Group Number: ${claim.patient?.groupNumber || "Standard Employer Plan"}
+- Insurance Payer: ${claim.patient?.insurancePayer} (Grievances & Appeals Department)
 - Treating Physician: ${claim.providerName}
 - Date of Service: ${claim.serviceDate}
 - Disputed Claim Amount: $${claim.deniedAmount.toLocaleString()}
@@ -111,14 +121,14 @@ Claim Information:
 - Procedure Codes (CPT): ${claim.cptCodes.join(", ")}
 - Diagnosis Codes (ICD-10): ${claim.icd10Codes.join(", ")}
 - Adverse Denial Code: ${claim.denialReasonCode}
-- Payer Reason Description: ${claim.denialReasonDescription}
+- Payer Denial Description: ${claim.denialReasonDescription}
 - Statutory Days Remaining: ${claim.daysRemaining} days
 
 Indexed Clinical Evidence & Policy Contradictions:
 ${evidenceText}
 
-${args.physicianNotes ? `Additional Treating Physician Clinical Addendum:\n${args.physicianNotes}\n` : ""}
-${args.customInstructions ? `Specific Advocate Instructions:\n${args.customInstructions}\n` : ""}`,
+${args.physicianNotes ? `Treating Physician Clinical Notes / Addendum:\n${args.physicianNotes}\n` : ""}
+${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstructions}\n` : ""}`,
       schemaName: "AppealBriefSynthesisResult",
       schema: APPEAL_SYNTHESIS_SCHEMA,
       temperature: 0.15,

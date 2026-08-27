@@ -13,6 +13,7 @@ import { Claim, ClinicalEvidence, AppealLevel } from "../../types";
 import { useAppealStudio } from "../../hooks/useAppealStudio";
 import { CitationSidebar } from "./CitationSidebar";
 import { ExportDrawer } from "./ExportDrawer";
+import { AppealBriefRenderer } from "./AppealBriefRenderer";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -249,13 +250,13 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             {/* Rendered Markdown Preview Pane */}
             {(activeTab === "preview" || activeTab === "split") && (
               <div
-                className={`h-full overflow-y-auto p-4 bg-muted/10 ${
+                className={`h-full overflow-y-auto p-4 sm:p-5 bg-background/50 ${
                   activeTab === "preview" ? "col-span-2" : ""
                 }`}
               >
                 {markdownContent ? (
-                  <div className="prose dark:prose-invert max-w-none text-xs leading-relaxed whitespace-pre-line text-foreground/90 font-sans">
-                    {markdownContent}
+                  <div className="max-w-3xl mx-auto rounded-xl border border-border/80 bg-card/60 p-5 sm:p-6 shadow-sm">
+                    <AppealBriefRenderer content={markdownContent} />
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-2 text-muted-foreground">

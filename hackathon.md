@@ -12,105 +12,108 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-27T17:51:22Z
+- **Last updated:** 2026-08-27T18:00:45Z
 
 ## Log
 
-### 2026-08-26 - working tree
+### 2026-08-26 - a497ec1
 Initialized project workspace and documented core architecture, system components, and Convex reactive schema design in `IDEA.md`.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 89fc3c0
 Ratified ClaimHero project constitution (`.specify/memory/constitution.md`) v1.0.0 establishing non-negotiable principles for strict end-to-end type safety, multi-tier testing standards, Precision Medical Dark-Mode UX consistency, sub-50ms reactive performance targets, and HIPAA-compliant data security guardrails.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 89fc3c0
 Generated formal feature specification (`specs/001-appeal-sentinel/spec.md`) and quality validation checklist covering 5 core prioritized user journeys: denial document ingestion & extraction, Clinical Policy Bulletin crawling & precedent vector matching, cited appeal brief synthesis in collaborative studio, statutory deadline countdown & autonomous dispatch, and 1-Click live simulation mode.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 6053c71
 Formulated comprehensive implementation plan (`specs/001-appeal-sentinel/plan.md`), architectural research (`research.md`), reactive Convex data model with vector indexing (`data-model.md`), API/LLM contracts (`contracts/`), and developer quickstart (`quickstart.md`) integrating Convex, React TypeScript, Vite, Tailwind CSS, Firecrawl, AgentMail, and OpenAI.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - ae77ad8
 Generated actionable, dependency-ordered task breakdown (`specs/001-appeal-sentinel/tasks.md`) containing 46 granular tasks organized across 8 implementation phases (Setup, Foundational DB/Shell, 5 incremental User Stories, and Polish/Testing).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - a02ab3f
 Completed Phase 1 Setup & Environment Initialization (T001-T005): Initialized React TypeScript build pipeline with Vite, installed dependencies including Convex, OpenAI, Firecrawl, Radix UI primitives, Lucide icons, and canvas-confetti (`package.json`). Configured Tailwind CSS with Precision Medical Dark-Mode theme tokens (`#0b0f17` canvas, `#00e5ff` cyan, `#10b981` emerald, `#f43f5e` crimson, `#f59e0b` amber) in `tailwind.config.js` and `src/index.css`. Configured strict TypeScript compiler options (`tsconfig.json`), Vite alias resolution (`vite.config.ts`), and established domain constants and regulatory rules (`src/lib/constants.ts`, `.env.example`).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 22fd90f
 Completed Phase 2 Foundational Infrastructure (T006-T013): Defined complete reactive Convex schema (`convex/schema.ts`) covering 7 core relational tables (`patients`, `claims`, `clinicalEvidences`, `appeals`, `emailThreads`, `emailMessages`, `appealAuditLogs`) and secondary indexes. Implemented unified OpenAI client wrapper (`convex/lib/openai.ts`) supporting `gpt-5-nano`, structured JSON completions, and custom endpoints. Created domain TypeScript interfaces (`src/types/index.ts`), healthcare formatting utilities (`src/lib/utils.ts`), and immutable audit logging mutations/queries (`convex/auditLogs.ts`). Implemented core UI shell layout (`src/components/layout/Shell.tsx`, `Header.tsx`, `Sidebar.tsx`, `src/App.tsx`) with live pipeline metric counters and 1-Click Simulation trigger CTA.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 0561f7f
 Completed Phase 3 User Story 1 - Denial Document Ingestion & Optical Extraction (T014-T019, MVP): Implemented patient and claim query/mutation endpoints (`convex/claims.ts`) supporting atomic case initialization and storage upload URLs. Built optical parser action (`convex/actions/opticalParser.ts`) powered by OpenAI `gpt-5-nano` with `DenialExtractionResult` structured JSON schemas extracting CPT codes (e.g., 27447), denial reason codes (CO-50), disputed amounts ($24,500), and statutory appeal deadlines. Created reactive claim subscription hook (`src/hooks/useClaims.ts`) with live aggregate financial metrics and search filtering. Built real-time Case Ingestion Radar feed (`src/components/radar/CaseRadar.tsx`) with animated scanning radar pulse, and drag-and-drop ingestion modal (`src/components/radar/IngestionModal.tsx`) with instant sample case presets and AgentMail inbound forwarding instructions.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 0561f7f
 Refactored ingestion and data pipeline to eliminate all mock/seed/simulation fallbacks: Wired `src/hooks/useClaims.ts` directly to live Convex database queries (`api.claims.list`) and file storage mutation uploads. Upgraded optical parser action (`convex/actions/opticalParser.ts`) to stream real file binary from Convex File Storage and execute strict OpenAI Vision & Structured JSON extraction into real `patients` and `claims` tables. Enhanced Ingestion Modal (`src/components/radar/IngestionModal.tsx`) with real PDF/image file picker, raw text parser, and state jurisdiction selector.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 3bcf1de
 Completed Phase 4 User Story 2 - Clinical Policy Bulletin (CPB) Evidence Crawling & Precedent Matching (T020-T025): Built clinical evidence queries and batch mutations (`convex/clinicalEvidences.ts`). Implemented Firecrawl crawler action (`convex/actions/policyCrawler.ts`) integrating live web scraping and curated medical necessity criteria with structured `gpt-5-nano` clinical extraction. Built precedent matcher action (`convex/actions/precedentMatcher.ts`) computing Overturn Probability Scores (0-100%) and identifying statutory ERISA non-compliance points. Created reactive evidence hook (`src/hooks/useEvidence.ts`), side-by-side Denial vs Insurer CPB Inspector (`src/components/evidence/EvidenceMatrix.tsx`), CPB Criteria Clause Viewer (`src/components/evidence/PolicyViewer.tsx`), and Overturned Precedent Feed (`src/components/evidence/PrecedentFeed.tsx`). Verified with `npm run verify` (100% PASS, 8 unit tests).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 3bcf1de
 Completed Phase 5 User Story 3 - Cited Appeal Brief Synthesis & Collaborative Appeal Studio (T026-T031): Implemented appeal brief versioned queries, draft auto-saving, and storage mutations (`convex/appeals.ts`). Built appeal synthesizer action (`convex/actions/appealSynthesizer.ts`) powered by OpenAI `gpt-5-nano` with `AppealBriefSynthesisResult` structured JSON schemas enforcing statutory ERISA (29 CFR § 2560.503-1) rights notices, medical necessity arguments, and exact Clinical Policy Bulletin clause citations. Created collaborative appeal studio hook (`src/hooks/useAppealStudio.ts`) with debounced auto-saving to Convex Cloud. Built split-pane Collaborative Live Appeal Studio (`src/components/studio/AppealStudio.tsx`), Citation & Evidence Footnote Sidebar (`src/components/studio/CitationSidebar.tsx`), and full formal PDF Export & Print Drawer (`src/components/studio/ExportDrawer.tsx`). Verified with `npm run verify` (100% PASS, 10 unit tests).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 2ab2928
 Completed Phase 6 User Story 4 - Statutory Deadline Countdown & Autonomous Dispatch Engine (T032-T038): Implemented scheduled statutory deadline daily sweep cron (`convex/crons.ts`) and sweep mutation (`convex/claims.ts`) automatically recalculating ERISA 180-day countdowns and logging critical alarms. Built autonomous AgentMail dispatch action (`convex/actions/mailDispatcher.ts`) transmitting formal briefs to payer grievance gateways and creating two-way communication threads (`convex/emails.ts`). Built Convex HTTP router (`convex/http.ts`) handling inbound AgentMail webhooks (`/agentmail-webhook`) with automated settlement/victory detection. Built dynamic circular ERISA countdown gauge (`src/components/radar/DeadlineCountdown.tsx`), two-way dedicated claim inbox drawer (`src/components/communications/AgentMailDrawer.tsx`), and immutable cryptographic case audit timeline (`src/components/communications/AuditTimeline.tsx`). Verified with `npm run verify` (100% PASS, 12 unit tests).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 0f47ffe
 Completed Phase 7 User Story 5 - Real-time Case Analytics, Win Probability Dashboard & Audit Timeline (T039-T041): Implemented real-time portfolio financial aggregation query (`convex/claims.ts: getPortfolioStats`) computing total disputed pipeline, active disputed amounts, recovered won funds, average win scores, statutory alarm counts, payer-by-payer breakdown, and precedent confidence distribution. Created Portfolio Recovery & Overturn Analytics dashboard (`src/components/analytics/AnalyticsMetrics.tsx`) with insurer accountability matrix and risk confidence progress gauges. Connected real-time analytics route and navigation into `src/App.tsx`, `Sidebar.tsx`, and `useClaims.ts`. Verified with `npm run verify` (100% PASS, 14 unit tests).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - a77441b
 Completed Phase 8 Polish & Cross-Cutting Concerns (T042-T046): Expanded unit and integration test suite (`tests/claimhero.test.ts`) to 16 comprehensive domain tests validating ERISA deadline countdowns, risk band scoring, CPT/CARC dictionaries, structured brief schemas, AgentMail inbound keyword classification, and portfolio aggregation. Validated full codebase with `npm run verify` (typecheck, lint, 16 tests, production build — 100% clean). Verified environment configuration in `.env.example` and developer documentation in `specs/001-appeal-sentinel/quickstart.md`. All 46 tasks across all 8 phases are 100% implemented and verified with real Convex Cloud data persistence.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - a77441b
 Completed Comprehensive UI & Design System Revamp: Re-architected frontend presentation layer with modern UI primitives (`src/components/ui/` including Button, Badge, Card, Tabs, Table, Dialog, Separator, Progress, Alert, Input, Textarea, Avatar) and refined theme tokens (`tailwind.config.js`, `src/index.css`). Redesigned all major sentinel interfaces including the Case Ingestion Radar (`CaseRadar.tsx`), Clinical Evidence Matrix (`EvidenceMatrix.tsx`, `PolicyViewer.tsx`, `PrecedentFeed.tsx`), Collaborative Appeal Studio (`AppealStudio.tsx`, `CitationSidebar.tsx`, `ExportDrawer.tsx`), Dedicated AgentMail Inbox (`AgentMailDrawer.tsx`), Portfolio Financial Analytics (`AnalyticsMetrics.tsx`), and Case Audit Timeline (`AuditTimeline.tsx`). Verified complete test suite and production build cleanly with `npm run verify`.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - cb06238
 Built Full-Viewport Cinematic Landing Hero for ClaimHero: Implemented standalone, non-scrolling cinematic hero section (`src/components/landing/CinematicHero.tsx`) featuring looping full-screen ambient video background, CSS gradient masked bottom blur overlay (`.bottom-blur-mask`), reusable liquid glass UI primitives (`.liquid-glass` with border-only pseudo-element mask gradient), and staggered blur-fade-up entry transitions (`.animate-blur-fade-up`). Crafted high-conviction clinical defense copy tailored to ClaimHero's autonomous appeal mission with interactive multi-slide feature spotlights (Autonomous Appeal Sentinel, Clinical Policy Bulletin Precedent Crawling, Direct AgentMail Payer Gateway). Seamlessly connected landing CTAs with live case radar, ingestion modal, and global command search. Verified 100% build health and 16 unit tests with `npm run verify`.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - cb06238
 Integrated Dynamic SPA URL Routing for Homepage & Dashboard: Implemented reactive URL synchronization hook (`src/hooks/useRouterView.ts`) providing distinct browser URLs for the Cinematic Homepage (`/`) and Console Dashboard views (`/app`, `/app/evidence`, `/app/studio`, `/app/inbox`, `/app/analytics`, `/app/audit`). Added full browser History API integration (`pushState`, `replaceState`, and `popstate` Back/Forward listener) alongside hash-routing fallback (`#/evidence`, `#/radar`). Added comprehensive router unit tests (`tests/claimhero.test.ts`) and verified cleanly with `npm run verify` (17/17 tests PASS).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - cb06238
 Refined Homepage as Pure Cinematic Showcase: Streamlined Homepage interface (`src/components/landing/CinematicHero.tsx`) to act strictly as a product showcase without embedding functional workspace modals. Configured all landing CTAs ("Launch Sentinel", "Inspect Evidence Matrix", "Launch Console") to navigate directly to the respective console routes (`/app`), keeping the landing viewport pristine and dedicated to presentation. Verified cleanly with `npm run verify` (17/17 tests PASS).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - d665d74
 Integrated Convex Authentication (@convex-dev/auth) & Cinematic Split-Card Login Interface: Configured Convex Auth backend (`convex/auth.ts`, `convex/auth.config.ts`, `convex/http.ts`, `convex/schema.ts: ...authTables`) supporting both 1-click Google OAuth (`@auth/core/providers/google`) and Email & Password authentication (`@convex-dev/auth/providers/Password`). Set deterministic RS256 JWT keypairs and `SITE_URL` on Convex Cloud deployment. Implemented viewer session query (`convex/users.ts`). Built responsive split-card login interface (`src/components/auth/AuthPage.tsx`) featuring ambient looping video hero background, serif typography, Google sign-in integration with fixed icon dimensions, password visibility toggle, remember-me persistence, and seamless SPA routing (`/login`, `/auth`). Connected authenticated user profile and sign-out controls to `Sidebar.tsx` and `Header.tsx`. Added unit tests (`tests/claimhero.test.ts`) and verified with `npm run verify` (20/20 tests PASS, 100% clean).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - d665d74
 Enforced Strict Dashboard Route Protection & Dynamic Session Routing: Secured all clinical workspace console views (`radar`, `evidence`, `studio`, `communications`, `analytics`, `audit`) behind reactive `useConvexAuth()` authentication guards in `src/App.tsx`. Unauthenticated requests to any dashboard view or landing page CTAs seamlessly redirect to the split-card login page and auto-resume to the target workspace upon successful login. Integrated session state into `CinematicHero.tsx` for dynamic "Open Sentinel Console" / "Sign In" actions and profile avatars. Verified clean typecheck and test suite with `npm run verify` (20/20 tests PASS).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 412014d
 Implemented Dual-Tier Sentinel Onboarding Experience (Wizard & Real-Time Action Checklist): Built 3-step interactive setup wizard (`src/components/onboarding/OnboardingWizard.tsx`) guiding new users through role configuration (Provider / Advocate / Patient), jurisdiction & payer pre-indexing (CA DMHC, NY DFS, TX TDI, ERISA; UHC, Aetna, Cigna), and 1-click starter denial case ingestion ($24,500 Total Knee Arthroplasty / $18,200 Spine Laminectomy) with confetti celebration. Implemented floating reactive HUD readiness checklist (`src/components/onboarding/OnboardingChecklist.tsx`) tracking 4 key clinical milestones with live progress calculation, automatic task verification, and certified adjudicator badge unlocking. Integrated restarting options in global Command Palette (`⌘K`). Expanded test suite to 22 tests and verified 100% clean with `npm run verify`.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - d665d74
 Enforced Strict Multi-Tenant User Isolation & Data Ownership: Added `userId` (`v.optional(v.id("users"))`) fields and relational secondary indexes (`by_user`, `by_user_status`) to `claims` and `patients` schema tables (`convex/schema.ts`). Scoped all reactive claim listing (`api.claims.list`) and portfolio metrics aggregation (`api.claims.getPortfolioStats`) to the authenticated caller via `getAuthUserId(ctx)` in `convex/claims.ts`. Automatically bound optical document parsing and intake mutations (`createWithPatient`) to active user sessions. Purged unassigned pre-authentication demo records, guaranteeing strict privacy and personalized case workspaces for every authenticated officer.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 072d5c6
 Migrated Full Project Iconography to Phosphor Icons (@phosphor-icons/react): Replaced all legacy `lucide-react` icons across the entire codebase (22 components including `App.tsx`, `Header.tsx`, `Sidebar.tsx`, `CinematicHero.tsx`, `AuthPage.tsx`, `CaseRadar.tsx`, `IngestionModal.tsx`, `DeadlineCountdown.tsx`, `EvidenceMatrix.tsx`, `PolicyViewer.tsx`, `PrecedentFeed.tsx`, `AppealStudio.tsx`, `CitationSidebar.tsx`, `ExportDrawer.tsx`, `AgentMailDrawer.tsx`, `AuditTimeline.tsx`, `AnalyticsMetrics.tsx`, `OnboardingWizard.tsx`, `OnboardingChecklist.tsx`, `CommandDialog.tsx`, `dialog.tsx`, and `dropdown-menu.tsx`) with cohesive, precision-crafted Phosphor Icons. Uninstalled `lucide-react` dependency and verified 100% clean typechecking, linting, production Vite build, and 22/22 unit tests with `npm run verify`.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 817f819
 Optimized Case Ingestion Radar Table Layout & Eliminated Horizontal Overflow: Restructured the claims radar table (`src/components/radar/CaseRadar.tsx`) by merging the standalone avatar into the Claim & Patient column, introducing smart payer name normalization (`formatPayerName`), truncating overly verbose CPB/denial titles, streamlining action triggers, and tightening row padding. The entire data table now fits 100% within the container card without triggering undesirable horizontal scrollbars. Verified clean with `npm run verify`.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 817f819
 Restructured Dashboard Sidebar & Workspace Navigation Architecture: Re-architected sidebar navigation (`src/components/layout/Sidebar.tsx`, `Shell.tsx`, `App.tsx`, `CommandDialog.tsx`) into a clean, focused hierarchy separating global platform views (`Case Radar`, `Portfolio Analytics`, `Audit Timeline`) from contextual case workflows (`Evidence Matrix`, `Appeal Studio`, `AgentMail Inbox`). Added an interactive Active Case context card in the sidebar with an inline dropdown switcher to switch active claims directly from any view. Moved all lifecycle status tabs and target payer filters directly into the `CaseRadar` page toolbar (`src/components/radar/CaseRadar.tsx`) with real-time counts, search, and reset triggers. Created an interactive in-view Case Picker empty state (`src/components/common/CasePickerEmptyState.tsx`) eliminating duplicate placeholder cards when navigating without an active claim. Verified with `npm run build` and `npx tsc --noEmit` (100% PASS).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - e3889e1
 Elevated Dashboard Aesthetic with Ambient Silk WebGL Shader Canvas & Glass Cards: Replaced monochromatic flat black styling with a dynamic ambient WebGL Silk shader background (`src/components/ui/Silk.tsx`, `Shell.tsx`) featuring undulating fluid waves (`#59677b` slate, speed: 4.4, scale: 0.9, noise: 1.0) and high-contrast radial vignette overlays. Overhauled UI theme tokens in `tailwind.config.js` and `src/index.css` to support opacity alpha values across all semantic variables, adopting deep slate-zinc dark neutrals. Re-engineered `Card` (`src/components/ui/card.tsx`), `Tabs` (`tabs.tsx`), `Table` (`table.tsx`), `Header` (`Header.tsx`), and `Sidebar` (`Sidebar.tsx`) into glassmorphic cards (`backdrop-blur-md`, `bg-card/75`, translucent borders, subtle specular top highlights). Verified clean typecheck, linting, and 22/22 unit tests with `npm run verify`.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - e3889e1
 Enforced Strict Precision Medical Dark Mode & Purged Light Mode Toggles: Consolidated `:root` CSS custom properties directly to the deep slate-zinc dark palette in `src/index.css`, permanently locking the application into high-contrast clinical dark mode. Purged legacy theme toggling logic, state hooks, and UI controls across `src/App.tsx`, `Header.tsx`, `Sidebar.tsx`, `Shell.tsx`, and `CommandDialog.tsx`. Verified 100% clean typecheck and test suite (22/22 PASS).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - b6dfead
 Engineered Ultra-Minimalist Monochrome Brand Identity & Timeless Geometric Wordmark: Transformed the ClaimHero brand identity (`src/components/common/BrandLogo.tsx`) into an ultra-minimalist, pure monochrome vector mark adhering to the design principles of Vercel, Linear, and Google. Eliminated all colored gradients, neon halo effects, cartoonish radar pulse dots, and decorative status pills. Designed a solid geometric defense shield silhouette featuring a clean negative-space medical cross cutout (`fill="currentColor"`, `fillRule="evenodd"`), guaranteeing mathematical crispness across light and dark modes. Streamlined typography into a pure, confident wordmark (`ClaimHero` with `font-semibold` / `font-bold` tracking). Integrated seamlessly across the Collapsible Sidebar (`Sidebar.tsx`), Cinematic Homepage (`CinematicHero.tsx`), Split-Card Auth Page (`AuthPage.tsx`), App Loading Splash (`App.tsx`), Onboarding Guide (`OnboardingWizard.tsx`), Command Palette (`CommandDialog.tsx`), and SVG Favicon (`public/favicon.svg`). Verified cleanly with `npm run verify` (100% typecheck, lint, 22 unit tests, production build).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 15f8ef5
 Refined High-Contrast Medical Alert & Destructive Tokens for Dark Theme: Upgraded `--destructive` CSS token in `src/index.css` from legacy low-luminance dark red (`0 62.8% 30.6%`) to vibrant, high-contrast clinical coral red (`0 84.2% 60.2%` / `#f87171`), achieving AAA accessibility contrast against deep slate backgrounds. Polished `Badge` (`src/components/ui/badge.tsx`) destructive variant with translucent tinted background (`bg-destructive/15`), crisp border (`border-destructive/30`), and legible coral text. Redesigned the Denial Reason (CARC) card in the Clinical Evidence Matrix (`src/components/evidence/EvidenceMatrix.tsx`) to feature high-contrast header codes with warning iconography and readable high-legibility body text. Verified 100% clean typecheck, linting, production build, and 22/22 unit tests with `npm run verify`.
 
-### 2026-08-26 - working tree
+### 2026-08-26 - 2f3f5b2
 Refined Overturn Probability Score Badge Layout & Monospace Alignment: Fixed horizontal text overflow on the win probability indicator in the Clinical Evidence Matrix (`src/components/evidence/EvidenceMatrix.tsx`). Replaced rigid `size-12` square container with a responsive `h-12 min-w-[4.5rem] px-3` pill badge with tabular monospace numerals (`tabular-nums`), eliminating character clipping for fractional and multi-digit score percentages (e.g. `92.5%`).
 
-### 2026-08-26 - working tree
+### 2026-08-26 - cc307e3
 Implemented Production-Ready Multi-Touchpoint Case Deletion & Cascading Purge: Built atomic `deleteCase` mutation (`convex/claims.ts`) enforcing multi-tenant ownership authorization (`getAuthUserId`) and executing comprehensive cascading deletions across `clinicalEvidences`, `appeals` (including PDF storage cleanup via `ctx.storage.delete`), `emailMessages`, `emailThreads`, `appealAuditLogs`, attached denial letters in Convex Storage, and the core `claims` record. Built reusable clinical confirmation dialog (`src/components/common/DeleteCaseModal.tsx`) presenting claim metadata summary (patient, claim #, disputed amount, CPT code) and an itemized purge notice. Integrated delete triggers across all key UI touchpoints: Case Radar table row actions menu (`src/components/radar/CaseRadar.tsx`), Collapsible Sidebar active case switcher (`Sidebar.tsx`, `Shell.tsx`), and the Global Command Palette (`CommandDialog.tsx`, `App.tsx`) with automatic active claim fallback selection (`useClaims.ts`). Added unit tests (`tests/claimhero.test.ts`) and verified 100% clean typecheck, linting, production build, and 24/24 unit tests with `npm run verify`.
 
-### 2026-08-27 - working tree
+### 2026-08-27 - 2e90b97
 Codified Impeccable Product Context & Precision Medical Design System: Authored durable product specification (`PRODUCT.md`) and configured code-first build workflow defaults (`.impeccable/config.json`). Documented formal design system (`DESIGN.md`) under the Creative North Star "The Precision Medical Sentinel", establishing normative token frontmatter, obsidian glass depth hierarchy, tabular monospace data rules, and semantic status contracts. Generated v2 machine-readable sidecar (`.impeccable/design.json`) containing tonal color ramps, elevation shadows, snappy motion timing, and self-contained drop-in UI component snippets for buttons, cards, badges, and search inputs.
 
-### 2026-08-27 - working tree
+### 2026-08-27 - c7dffdc
 Resolved OAuth Avatar Rendering & Resilience Across Navigation Surfaces: Re-engineered the core `Avatar` component (`src/components/ui/avatar.tsx`) with image status tracking (`idle`, `loading`, `loaded`, `error`), image preloading with `referrerPolicy="no-referrer"`, and zero-flash fallback rendering. Updated profile avatar presentation across the Collapsible Sidebar (`Sidebar.tsx`), App Header (`Header.tsx`), and Cinematic Landing Hero (`CinematicHero.tsx`) to render both `AvatarImage` and `AvatarFallback` concurrently, eliminating blank disc visual glitches when external Google OAuth images encounter referer blocking. Added `no-referrer-when-downgrade` meta policy to `index.html` and added `start` script alias to `package.json`. Verified with `npm run verify` (100% typecheck, lint, 24 unit tests, production build).
+
+### 2026-08-27 - working tree
+Elevated Appeal Brief Synthesis & Studio Preview to Production-Grade Legal Memorandum: Upgraded LLM appeal synthesis prompts (`convex/actions/appealSynthesizer.ts`) to mandate authentic legal memorandum architecture (formal transmission header, patient/claim metadata block, Roman numeral sections, rigorous evidentiary rebuttals, cited exhibits list, and authorized physician signature block). Built dedicated `AppealBriefRenderer` (`src/components/studio/AppealBriefRenderer.tsx`) utilizing `react-markdown` and `remark-gfm` with custom typography rules for formal headers, statutory citation callouts with shield iconography, styled metadata tables, and monospace code badges. Integrated the rich renderer into both dark-mode Appeal Studio panes (`AppealStudio.tsx`) and light/print mode Export Dossier modal (`ExportDrawer.tsx`), eliminating raw markdown syntax dumps. Verified cleanly with `npm run verify` (100% typecheck, lint, 24/24 unit tests, production build).
