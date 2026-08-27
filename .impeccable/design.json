@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-28T00:43:00.000Z",
+  "title": "Design System: ClaimHero",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Clinical Cyan",
+        "canonical": "#00e5ff",
+        "tonalRamp": [
+          "#00282e",
+          "#004d57",
+          "#007685",
+          "#00a1b5",
+          "#00cde6",
+          "#00e5ff",
+          "#5cf0ff",
+          "#b3f8ff"
+        ]
+      },
+      "neutral-canvas": {
+        "role": "neutral",
+        "displayName": "Obsidian Midnight",
+        "canonical": "#080c14",
+        "tonalRamp": [
+          "#04060a",
+          "#080c14",
+          "#0e1420",
+          "#141c2c",
+          "#1e293b",
+          "#334155",
+          "#64748b",
+          "#94a3b8"
+        ]
+      },
+      "victory-emerald": {
+        "role": "semantic",
+        "displayName": "Victory Emerald",
+        "canonical": "#10b981",
+        "tonalRamp": [
+          "#022c22",
+          "#064e3b",
+          "#065f46",
+          "#047857",
+          "#059669",
+          "#10b981",
+          "#34d399",
+          "#a7f3d0"
+        ]
+      },
+      "denial-crimson": {
+        "role": "semantic",
+        "displayName": "Denial Crimson",
+        "canonical": "#f43f5e",
+        "tonalRamp": [
+          "#4c0519",
+          "#881337",
+          "#9f1239",
+          "#be123c",
+          "#e11d48",
+          "#f43f5e",
+          "#fb7185",
+          "#fecdd3"
+        ]
+      },
+      "deadline-amber": {
+        "role": "semantic",
+        "displayName": "Deadline Amber",
+        "canonical": "#f59e0b",
+        "tonalRamp": [
+          "#451a03",
+          "#78350f",
+          "#92400e",
+          "#b45309",
+          "#d97706",
+          "#f59e0b",
+          "#fbbf24",
+          "#fde68a"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "High-impact portfolio figures and hero headlines"
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Major section headers and modal titles"
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card headers and claim case labels"
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Clinical argumentation and policy clause excerpts"
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Table headers, metadata tags, and timestamps"
+      }
+    },
+    "shadows": [
+      {
+        "name": "card-ambient",
+        "value": "0 8px 32px 0 rgba(0, 0, 0, 0.25)",
+        "purpose": "Base elevation for glassmorphic cards and floating dialogs"
+      },
+      {
+        "name": "specular-rim",
+        "value": "inset 0 1px 1px 0 rgba(255, 255, 255, 0.06)",
+        "purpose": "Subtle top-edge light refraction across dark glass panels"
+      },
+      {
+        "name": "cyan-pulse-glow",
+        "value": "0 0 16px rgba(0, 229, 255, 0.35)",
+        "purpose": "Active focus states and real-time scanning blips"
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-snappy",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Tactile interactive control transitions (150ms-200ms)"
+      },
+      {
+        "name": "fade-in-quick",
+        "value": "fadeIn 0.15s ease-out",
+        "purpose": "Immediate reveal animation for live incoming claim blips"
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "2xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "High-contrast crisp white CTA for primary actions and case generation",
+      "html": "<button class=\"ds-btn-primary\"><svg class=\"ds-btn-icon\" viewBox=\"0 0 256 256\" fill=\"currentColor\"><path d=\"M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z\"/></svg>Generate Appeal Dossier</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 500; color: #080c14; background: #f8fafc; border: 1px solid transparent; border-radius: 10px; cursor: pointer; transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 1px 2px rgba(0,0,0,0.15); user-select: none; } .ds-btn-primary:hover { background: rgba(248, 250, 252, 0.9); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-icon { width: 14px; height: 14px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Subtle glass button for secondary navigation and utility actions",
+      "html": "<button class=\"ds-btn-secondary\"><svg class=\"ds-btn-icon\" viewBox=\"0 0 256 256\" fill=\"currentColor\"><path d=\"M213.66,82.34l-56-56A8,8,0,0,0,152,24H56B,8,0,0,0,48,32V224a8,8,0,0,0,8,8H200a8,8,0,0,0,8-8V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H64V40h80V88a8,8,0,0,0,8,8h48V216Z\"/></svg>View Policy Matrix</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 500; color: #f8fafc; background: #141c2c; border: 1px solid #1e293b; border-radius: 10px; cursor: pointer; transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1); user-select: none; } .ds-btn-secondary:hover { background: #1e293b; color: #ffffff; } .ds-btn-secondary:active { transform: translateY(1px); } .ds-btn-icon { width: 14px; height: 14px; }"
+    },
+    {
+      "name": "Victory Status Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Translucent emerald badge signifying overturned claims and won settlements",
+      "html": "<span class=\"ds-badge-victory\"><svg class=\"ds-badge-icon\" viewBox=\"0 0 256 256\" fill=\"currentColor\"><path d=\"M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z\"/></svg>WON · $24,500.00</span>",
+      "css": ".ds-badge-victory { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9999px; } .ds-badge-icon { width: 12px; height: 12px; }"
+    },
+    {
+      "name": "Denial Reason Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Translucent crimson badge highlighting denial reason codes and critical disputes",
+      "html": "<span class=\"ds-badge-denial\"><svg class=\"ds-badge-icon\" viewBox=\"0 0 256 256\" fill=\"currentColor\"><path d=\"M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z\"/></svg>CO-50: Medical Necessity</span>",
+      "css": ".ds-badge-denial { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: #fb7185; background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 9999px; } .ds-badge-icon { width: 12px; height: 12px; }"
+    },
+    {
+      "name": "Glassmorphic Case Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Optical glass card container with specular highlight rim and responsive hover state",
+      "html": "<div class=\"ds-card-glass\"><div class=\"ds-card-header\"><span class=\"ds-badge-denial\">CO-50</span><span class=\"ds-card-amount\">$24,500.00</span></div><h4 class=\"ds-card-title\">Total Knee Arthroplasty (CPT 27447)</h4><p class=\"ds-card-meta\">Aetna CPB #0243 contradiction identified · 142 days remaining</p></div>",
+      "css": ".ds-card-glass { display: flex; flex-direction: column; gap: 8px; padding: 16px; background: rgba(14, 20, 32, 0.72); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25), inset 0 1px 1px 0 rgba(255, 255, 255, 0.06); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; transition: border-color 0.2s; } .ds-card-glass:hover { border-color: rgba(255, 255, 255, 0.14); } .ds-card-header { display: flex; justify-content: space-between; align-items: center; } .ds-card-amount { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: #f8fafc; } .ds-card-title { margin: 0; font-size: 14px; font-weight: 600; color: #f8fafc; } .ds-card-meta { margin: 0; font-size: 12px; color: #94a3b8; }"
+    },
+    {
+      "name": "Clinical Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Dark slate input field with cyan focus glow",
+      "html": "<input type=\"text\" class=\"ds-input-search\" placeholder=\"Search CPT, ICD-10, or Payer ID...\" />",
+      "css": ".ds-input-search { width: 100%; height: 32px; padding: 0 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; color: #f8fafc; background: rgba(30, 41, 59, 0.3); border: 1px solid #1e293b; border-radius: 10px; outline: none; transition: border-color 0.15s, box-shadow 0.15s; } .ds-input-search::placeholder { color: #64748b; } .ds-input-search:focus { border-color: #00e5ff; box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.2); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Precision Medical Sentinel",
+    "overview": "ClaimHero operates as a high-density, authoritative tactical console for fighting health insurance claim rejections. The visual world is characterized by an obsidian midnight canvas, layered optical glass, surgical cyber-luminescence, and razor-sharp data typography. Every interface component conveys the rigor of an ICU clinical telemetry monitor fused with the unyielding authority of a federal appellate legal brief.",
+    "keyCharacteristics": [
+      "High-density dark canvas (#080c14) engineered for sustained focus and zero eye fatigue during intense case reviews.",
+      "Layered translucent glass panels (12px to 16px blur) with 1px inner specular rim highlights providing depth and separation without clutter.",
+      "Purposeful, highly restricted neon color accents reserved exclusively for actionable data states, urgency alarms, and victory triggers.",
+      "Compact, tactile controls with responsive micro-interactions (150ms transitions, subtle 1px active press displacement)."
+    ],
+    "rules": [
+      {
+        "name": "The Rarity Rule",
+        "body": "High-intensity neon accents (cyan, crimson, emerald, amber) are strictly rationed and must occupy ≤10% of any given view. Their rarity is what guarantees instant visual triage.",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic Truth Rule",
+        "body": "Red is never used decoratively; it is strictly reserved for denials, errors, and critical countdown risks. Green is strictly reserved for positive claim outcomes, overturned precedents, and verified evidence.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Numbers Rule",
+        "body": "All currency amounts, case IDs, countdown timers, and probability percentages must render with monospace font or font-variant-numeric: tabular-nums to prevent visual jitter during live updates.",
+        "section": "typography"
+      },
+      {
+        "name": "The Glass Hierarchy Rule",
+        "body": "Background canvas sits at 100% opacity (#080c14). Secondary background panels use 65% opacity with 12px blur. Interactive foreground cards use 72% opacity with 16px blur and 1px border stroke (rgba(255, 255, 255, 0.08)).",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do format all monetary amounts with currency symbols and two decimal points ($24,500.00) in monospace numerals.",
+      "Do keep button and control heights compact (h-8 default) to maintain high data density.",
+      "Do use translucent glass cards (backdrop-blur-xl bg-card/70) over solid opaque boxes.",
+      "Do pair every denial code (e.g. CO-50) with its official plain-language regulatory description.",
+      "Do provide immediate visual feedback (confetti on victory, pulsing amber on urgent statutory alarms)."
+    ],
+    "donts": [
+      "Don't use bright rainbow gradients or saturated decorative backgrounds that undermine clinical and legal credibility.",
+      "Don't use generic default blue (#3b82f6); use authoritative Clinical Cyan (#00e5ff) or Precedent Indigo (#6366f1).",
+      "Don't allow monetary or countdown numbers to jitter during real-time data streaming (always enforce tabular/mono typography).",
+      "Don't hide statutory ERISA deadlines behind multi-click dropdowns; keep urgency clocks visible in primary views.",
+      "Don't use pure black (#000000) for the canvas; always use deep obsidian slate (#080c14) to preserve glass depth."
+    ]
+  }
+}
