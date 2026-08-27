@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-27T17:44:00Z
+- **Last updated:** 2026-08-27T17:51:22Z
 
 ## Log
 
@@ -111,3 +111,6 @@ Implemented Production-Ready Multi-Touchpoint Case Deletion & Cascading Purge: B
 
 ### 2026-08-27 - working tree
 Codified Impeccable Product Context & Precision Medical Design System: Authored durable product specification (`PRODUCT.md`) and configured code-first build workflow defaults (`.impeccable/config.json`). Documented formal design system (`DESIGN.md`) under the Creative North Star "The Precision Medical Sentinel", establishing normative token frontmatter, obsidian glass depth hierarchy, tabular monospace data rules, and semantic status contracts. Generated v2 machine-readable sidecar (`.impeccable/design.json`) containing tonal color ramps, elevation shadows, snappy motion timing, and self-contained drop-in UI component snippets for buttons, cards, badges, and search inputs.
+
+### 2026-08-27 - working tree
+Resolved OAuth Avatar Rendering & Resilience Across Navigation Surfaces: Re-engineered the core `Avatar` component (`src/components/ui/avatar.tsx`) with image status tracking (`idle`, `loading`, `loaded`, `error`), image preloading with `referrerPolicy="no-referrer"`, and zero-flash fallback rendering. Updated profile avatar presentation across the Collapsible Sidebar (`Sidebar.tsx`), App Header (`Header.tsx`), and Cinematic Landing Hero (`CinematicHero.tsx`) to render both `AvatarImage` and `AvatarFallback` concurrently, eliminating blank disc visual glitches when external Google OAuth images encounter referer blocking. Added `no-referrer-when-downgrade` meta policy to `index.html` and added `start` script alias to `package.json`. Verified with `npm run verify` (100% typecheck, lint, 24 unit tests, production build).

@@ -19,6 +19,7 @@ import {
 } from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
 import { BrandLogo } from "../common/BrandLogo";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
 interface CinematicHeroProps {
   onEnterConsole: (view?: NavigationView) => void;
@@ -193,11 +194,10 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
                 style={{ animationDelay: "400ms" }}
                 title={`Signed in as ${userName}`}
               >
-                {viewer?.image ? (
-                  <img src={viewer.image} alt={userName} className="size-full object-cover" />
-                ) : (
-                  <span className="text-xs font-semibold">{userInitial}</span>
-                )}
+                <Avatar size="default" className="size-full border-0 bg-transparent">
+                  {viewer?.image && <AvatarImage src={viewer.image} alt={userName} />}
+                  <AvatarFallback className="text-xs font-semibold text-white/90">{userInitial}</AvatarFallback>
+                </Avatar>
               </button>
             </>
           ) : (
