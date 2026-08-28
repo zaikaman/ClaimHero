@@ -17,6 +17,8 @@ import {
   Trash,
   DotsThreeVertical,
   Envelope,
+  Sparkle,
+  CircleNotch,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -55,6 +57,7 @@ interface CaseRadarProps {
     view: "radar" | "evidence" | "studio" | "communications" | "audit"
   ) => void;
   onDeleteCase?: (claimId: string) => Promise<any>;
+  onRunAutonomousPipeline?: (claimId: string) => Promise<any>;
 }
 
 const formatPayerName = (payer: string | undefined): string => {
@@ -77,11 +80,13 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   onOpenIngestion,
   onNavigateView,
   onDeleteCase,
+  onRunAutonomousPipeline,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [payerFilter, setPayerFilter] = useState("all");
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
+  const [runningPipelineClaimId, setRunningPipelineClaimId] = useState<string | null>(null);
 
   const totalDisputed = claims.reduce((acc, c) => acc + c.deniedAmount, 0);
   const wonClaims = claims.filter((c) => c.status === "won");
@@ -613,33 +618,86 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                       {/* 8. Actions */}
                       <TableCell className="py-2.5 text-right">
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            variant="outline"
-                            size="xs"
-                            onClick={() => {
-                              onSelectClaim(claim._id);
-                              onNavigateView("evidence");
-                            }}
-                            title="Inspect Clinical Evidence Matrix"
-                            className="h-7 px-2 text-xs"
-                          >
-                            <Pulse className="size-3 text-muted-foreground" />
-                            <span className="hidden xl:inline">Evidence</span>
-                          </Button>
-                          <Button
-                            variant="default"
-                            size="xs"
-                            onClick={() => {
-                              onSelectClaim(claim._id);
-                              onNavigateView("studio");
-                            }}
-                            title="Open Appeal Studio"
-                            className="h-7 px-2.5 text-xs gap-1"
-                          >
-                            <FileText className="size-3" />
-                            <span>Studio</span>
-                            <ArrowUpRight className="size-2.5 opacity-60" />
-                          </Button>
+                          {/* Smart Contextual Primary Action */}
+                          {claim.status === "dispatched" || claim.status === "won" ? (
+                            <Button
+                              variant="secondary"
+                              size="xs"
+                              onClick={() => {
+                                onSelectClaim(claim._id);
+                                onNavigateView("communications");
+                              }}
+                              title="Open AgentMail Box"
+                              className="h-7 px-2.5 text-xs gap-1"
+                            >
+                              <Envelope className="size-3" />
+                              <span>Inbox</span>
+                            </Button>
+                          ) : claim.status === "ready_for_review" || Boolean(claim.latestAppeal) ? (
+                            <Button
+                              variant="default"
+                              size="xs"
+                              onClick={() => {
+                                onSelectClaim(claim._id);
+                                onNavigateView("studio");
+                              }}
+                              title="Review Drafted Appeal Brief"
+                              className="h-7 px-2.5 text-xs gap-1 bg-primary text-primary-foreground font-semibold shadow-2xs"
+                            >
+                              <FileText className="size-3" />
+                              <span>Review & Send</span>
+                              <ArrowUpRight className="size-2.5 opacity-70" />
+                            </Button>
+                          ) : claim.status === "analyzing" || (claim.evidenceCount && claim.evidenceCount > 0) ? (
+                            <Button
+                              variant="default"
+                              size="xs"
+                              onClick={() => {
+                                onSelectClaim(claim._id);
+                                onNavigateView("studio");
+                              }}
+                              title="Synthesize Appeal Brief"
+                              className="h-7 px-2.5 text-xs gap-1"
+                            >
+                              <Sparkle className="size-3" />
+                              <span>Draft Brief</span>
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="default"
+                              size="xs"
+                              disabled={runningPipelineClaimId === claim._id}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                onSelectClaim(claim._id);
+                                if (onRunAutonomousPipeline) {
+                                  setRunningPipelineClaimId(claim._id);
+                                  try {
+                                    await onRunAutonomousPipeline(claim._id);
+                                    onNavigateView("studio");
+                                  } finally {
+                                    setRunningPipelineClaimId(null);
+                                  }
+                                } else {
+                                  onNavigateView("evidence");
+                                }
+                              }}
+                              title="Run Full Autonomous Sentinel Pipeline (Crawl + Score + Synthesize)"
+                              className="h-7 px-2.5 text-xs gap-1 bg-primary text-primary-foreground font-semibold shadow-2xs"
+                            >
+                              {runningPipelineClaimId === claim._id ? (
+                                <>
+                                  <CircleNotch className="size-3 animate-spin" />
+                                  <span>Solving...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkle className="size-3" />
+                                  <span>Auto-Solve</span>
+                                </>
+                              )}
+                            </Button>
+                          )}
 
                           {/* Row Context Menu */}
                           <DropdownMenu>

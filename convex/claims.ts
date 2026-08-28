@@ -41,13 +41,26 @@ export const list = query({
       }
     }
 
-    // Join with patient details
+    // Join with patient details, latest appeal draft, and evidence count
     const joinedClaims = await Promise.all(
       claims.map(async (claim) => {
         const patient = (await ctx.db.get(claim.patientId)) as Doc<"patients"> | null;
+        const appeals = await ctx.db
+          .query("appeals")
+          .withIndex("by_claim", (q: any) => q.eq("claimId", claim._id))
+          .collect();
+        const latestAppeal = appeals.sort((a, b) => b.version - a.version)[0] || null;
+
+        const evidences = await ctx.db
+          .query("clinicalEvidences")
+          .withIndex("by_claim", (q: any) => q.eq("claimId", claim._id))
+          .collect();
+
         return {
           ...claim,
           patient: patient || undefined,
+          latestAppeal,
+          evidenceCount: evidences.length,
         };
       })
     );
@@ -627,3 +640,41 @@ export const deleteCase = mutation({
     };
   },
 });
+
+/**
+ * Update claim with dynamically discovered payer contact information (e.g. via Firecrawl or OCR)
+ */
+export const updatePayerContact = mutation({
+  args: {
+    claimId: v.id("claims"),
+    payerContact: v.object({
+      officialAppealsEmail: v.string(),
+      intakePortalUrl: v.optional(v.string()),
+      statutoryPoBox: v.optional(v.string()),
+      ediPayerId: v.optional(v.string()),
+      tollFreeHelpline: v.optional(v.string()),
+      isVerified: v.boolean(),
+      source: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.claimId, {
+      payerContact: args.payerContact,
+      updatedAt: Date.now(),
+    });
+
+    const thread = await ctx.db
+      .query("emailThreads")
+      .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+      .first();
+
+    if (thread) {
+      await ctx.db.patch(thread._id, {
+        payerEmail: args.payerContact.officialAppealsEmail,
+      });
+    }
+
+    return { success: true };
+  },
+});
+

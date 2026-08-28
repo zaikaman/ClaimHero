@@ -20,6 +20,7 @@ import { PolicyViewer } from "./PolicyViewer";
 import { PrecedentFeed } from "./PrecedentFeed";
 import { formatCurrency, formatDate, stripMarkdownFormatting } from "../../lib/utils";
 import { DENIAL_REASON_CODES } from "../../lib/constants";
+import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -33,6 +34,8 @@ interface EvidenceMatrixProps {
   onCrawlPolicy: (claimId: string) => Promise<any>;
   onComputeScore: (claimId: string) => Promise<OverturnScoringResult>;
   onNavigateToStudio: () => void;
+  onNavigateView?: (view: FlowView) => void;
+  onRunAutonomousPipeline?: (claimId?: string) => Promise<any>;
 }
 
 export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
@@ -42,16 +45,36 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   onCrawlPolicy,
   onComputeScore,
   onNavigateToStudio,
+  onNavigateView,
+  onRunAutonomousPipeline,
 }) => {
   const [activeTab, setActiveTab] = useState<string>("policy");
   const [isCrawling, setIsCrawling] = useState(false);
   const [isScoring, setIsScoring] = useState(false);
+  const [isUnifiedAnalyzing, setIsUnifiedAnalyzing] = useState(false);
   const [scoringResult, setScoringResult] = useState<OverturnScoringResult | null>(
     null
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const denialReason = DENIAL_REASON_CODES[claim.denialReasonCode];
+
+  // 1-Click Complete Analysis (Crawl CPB + Compute Score in a single fluid action)
+  const handleRunCompleteAnalysis = async () => {
+    setIsUnifiedAnalyzing(true);
+    setErrorMessage(null);
+    try {
+      await onCrawlPolicy(claim._id);
+      const result = await onComputeScore(claim._id);
+      setScoringResult(result);
+    } catch (err: any) {
+      setErrorMessage(
+        err?.message || "Failed to execute complete clinical policy analysis."
+      );
+    } finally {
+      setIsUnifiedAnalyzing(false);
+    }
+  };
 
   const handleRunCrawl = async () => {
     setIsCrawling(true);
@@ -152,7 +175,37 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   };
 
   return (
-    <div className="space-y-4 animate-fadeIn">
+    <div className="space-y-4 animate-fadeIn pb-16">
+      {/* 4-Step Guided Sentinel Stepper */}
+      <SentinelFlowStepper
+        claim={claim}
+        currentView="evidence"
+        onNavigateView={(v) => {
+          if (onNavigateView) onNavigateView(v);
+          else if (v === "studio") onNavigateToStudio();
+        }}
+        evidencesCount={evidences.length}
+        hasDraftedBrief={
+          Boolean(claim.latestAppeal) ||
+          claim.status === "ready_for_review" ||
+          claim.status === "dispatched" ||
+          claim.status === "won"
+        }
+        isProcessing={isUnifiedAnalyzing || isCrawling || isScoring}
+        processingLabel={
+          isUnifiedAnalyzing
+            ? "Running Complete Analysis..."
+            : isCrawling
+            ? "Crawling Policy..."
+            : isScoring
+            ? "Evaluating Rubric..."
+            : "Processing..."
+        }
+        onRunAutonomousPipeline={
+          onRunAutonomousPipeline ? () => onRunAutonomousPipeline(claim._id) : undefined
+        }
+      />
+
       {/* Header & Main Control Toolbar */}
       <Card className="p-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -176,43 +229,64 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* 1-Click Unified Analysis Trigger */}
+            <Button
+              size="sm"
+              onClick={handleRunCompleteAnalysis}
+              disabled={isUnifiedAnalyzing || isCrawling || isScoring}
+              className="gap-1.5 bg-primary text-primary-foreground font-semibold shadow-2xs"
+            >
+              {isUnifiedAnalyzing ? (
+                <>
+                  <CircleNotch className="size-3.5 animate-spin" />
+                  <span>Analyzing Policy & Precedents...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkle className="size-3.5" />
+                  <span>1-Click Complete Analysis</span>
+                </>
+              )}
+            </Button>
+
             {/* Run Policy Crawl Trigger */}
             <Button
               variant="outline"
               size="sm"
               onClick={handleRunCrawl}
-              disabled={isCrawling || isScoring}
+              disabled={isCrawling || isScoring || isUnifiedAnalyzing}
               className="gap-1.5"
             >
               {isCrawling ? (
                 <>
                   <CircleNotch className="size-3.5 animate-spin" />
-                  <span>Crawling Policy...</span>
+                  <span>Crawling...</span>
                 </>
               ) : (
                 <>
                   <ArrowsClockwise className="size-3.5" />
-                  <span>Crawl Insurer CPB</span>
+                  <span>Crawl CPB</span>
                 </>
               )}
             </Button>
 
             {/* Run Win Score Calculation Trigger */}
             <Button
+              variant="outline"
               size="sm"
               onClick={handleRunScoring}
-              disabled={isScoring || isCrawling}
+              disabled={isScoring || isCrawling || isUnifiedAnalyzing}
               className="gap-1.5"
             >
               {isScoring ? (
                 <>
                   <CircleNotch className="size-3.5 animate-spin" />
-                  <span>Evaluating Rubric...</span>
+                  <span>Scoring...</span>
                 </>
               ) : (
                 <>
                   <TrendUp className="size-3.5" />
-                  <span>Calculate Win Score</span>
+                  <span>Score Rubric</span>
                 </>
               )}
             </Button>
@@ -508,6 +582,28 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             </TabsContent>
           </Tabs>
         </div>
+      </div>
+
+      {/* Sticky Bottom Next-Step Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background/95 backdrop-blur-md p-3 px-4 sm:px-8 flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="font-mono text-xs hidden sm:inline-flex">
+            Step 2 of 4: Evidence & CPB
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            {evidences.length > 0
+              ? `${evidences.length} Clinical Clauses Indexed • Score: ${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}%` : "Calculated"}`
+              : "Review clinical evidence before proceeding to brief synthesis"}
+          </span>
+        </div>
+
+        <Button
+          onClick={onNavigateToStudio}
+          className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all"
+        >
+          <span>Next: Review & Synthesize Appeal Brief in Studio</span>
+          <ArrowRight className="size-3.5" />
+        </Button>
       </div>
     </div>
   );

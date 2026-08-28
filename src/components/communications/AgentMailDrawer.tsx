@@ -12,9 +12,12 @@ import {
   Buildings,
   Paperclip,
   CircleNotch,
+  MagnifyingGlass,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
+import { getPayerAppellateContact } from "../../lib/constants";
+import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -27,6 +30,9 @@ interface AgentMailDrawerProps {
   isLoading?: boolean;
   onSendMessage: (text: string) => Promise<any>;
   onDispatchAppeal?: () => Promise<any>;
+  onNavigateView?: (view: FlowView) => void;
+  onRunAutonomousPipeline?: (claimId?: string) => Promise<any>;
+  onResolvePayerGateway?: (forceWebSearch?: boolean) => Promise<any>;
 }
 
 export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
@@ -36,17 +42,39 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   isLoading,
   onSendMessage,
   onDispatchAppeal,
+  onNavigateView,
+  onRunAutonomousPipeline,
+  onResolvePayerGateway,
 }) => {
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
+  const [isSearchingPayer, setIsSearchingPayer] = useState(false);
+
+  const [copiedRecipientEmail, setCopiedRecipientEmail] = useState(false);
 
   const assignedEmail =
     claim.assignedAgentEmail ||
     `appeal-claim-${claim.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
 
-  const payer = claim.patient?.insurancePayer || "Health Insurer";
+  const payerName = claim.patient?.insurancePayer || "Health Insurer";
+  const defaultPayerContact = getPayerAppellateContact(payerName);
+  const payerContact = claim.payerContact || defaultPayerContact;
+  const recipientEmail =
+    threads[0]?.payerEmail ||
+    claim.payerContact?.officialAppealsEmail ||
+    payerContact.officialAppealsEmail;
+
+  const handleSearchPayer = async () => {
+    if (!onResolvePayerGateway || isSearchingPayer) return;
+    setIsSearchingPayer(true);
+    try {
+      await onResolvePayerGateway(true);
+    } finally {
+      setIsSearchingPayer(false);
+    }
+  };
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText(assignedEmail);
@@ -78,12 +106,76 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   };
 
   return (
-    <div className="space-y-4 animate-fadeIn">
+    <div className="space-y-4 animate-fadeIn pb-12">
+      {/* 4-Step Guided Sentinel Stepper */}
+      <SentinelFlowStepper
+        claim={claim}
+        currentView="communications"
+        onNavigateView={(v) => {
+          if (onNavigateView) onNavigateView(v);
+        }}
+        evidencesCount={claim.evidenceCount || 0}
+        hasDraftedBrief={
+          Boolean(claim.latestAppeal) ||
+          claim.status === "ready_for_review" ||
+          claim.status === "dispatched" ||
+          claim.status === "won"
+        }
+        isProcessing={isDispatching}
+        processingLabel="Dispatching Appeal Packet..."
+        onRunAutonomousPipeline={
+          onRunAutonomousPipeline ? () => onRunAutonomousPipeline(claim._id) : undefined
+        }
+      />
+
+      {/* Prominent Ready to Dispatch Action Banner if not yet sent */}
+      {claim.status !== "dispatched" && claim.status !== "won" && onDispatchAppeal && (
+        <Card className="p-4 border-primary/40 bg-primary/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
+              <PaperPlaneTilt className="size-5" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-foreground">
+                  Ready to Transmit Formal Appeal Packet
+                </h3>
+                <Badge variant="secondary" className="text-[10px] font-mono">
+                  Final Step
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Dispatches the synthesized ERISA brief and clinical policy citations directly to {payerName} Grievance Department.
+              </p>
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            onClick={handleRunDispatch}
+            disabled={isDispatching}
+            className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 w-full sm:w-auto h-9"
+          >
+            {isDispatching ? (
+              <>
+                <CircleNotch className="size-4 animate-spin" />
+                <span>Transmitting via AgentMail...</span>
+              </>
+            ) : (
+              <>
+                <PaperPlaneTilt className="size-4" />
+                <span>Dispatch Formal Appeal Packet Now</span>
+              </>
+            )}
+          </Button>
+        </Card>
+      )}
+
       {/* Inbox Header Card */}
       <Card className="p-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-muted text-foreground">
               <Envelope className="size-5" />
             </div>
             <div>
@@ -102,28 +194,12 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {claim.status !== "dispatched" &&
-              claim.status !== "won" &&
-              onDispatchAppeal && (
-                <Button
-                  size="sm"
-                  onClick={handleRunDispatch}
-                  disabled={isDispatching}
-                  className="gap-1.5"
-                >
-                  {isDispatching ? (
-                    <>
-                      <CircleNotch className="size-3.5 animate-spin" />
-                      <span>Dispatching...</span>
-                    </>
-                  ) : (
-                    <>
-                      <PaperPlaneTilt className="size-3.5" />
-                      <span>Dispatch Appeal Packet</span>
-                    </>
-                  )}
-                </Button>
-              )}
+            {claim.status === "dispatched" || claim.status === "won" ? (
+              <Badge variant="secondary" className="gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 px-2.5 py-1">
+                <CheckCircle className="size-3.5" />
+                <span>Packet Transmitted to Insurer</span>
+              </Badge>
+            ) : null}
           </div>
         </div>
 
@@ -151,33 +227,118 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         {/* Left Column: Payer Information & Thread Summary (4 Cols) */}
         <div className="lg:col-span-4 space-y-3">
           <Card className="p-4 space-y-3">
-            <div className="text-xs font-semibold text-foreground flex items-center gap-1.5 border-b border-border pb-2.5">
-              <Buildings className="size-4 text-muted-foreground" />
-              <span>Recipient Insurer Contact</span>
+            <div className="flex items-center justify-between border-b border-border pb-2.5">
+              <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Buildings className="size-4 text-muted-foreground" />
+                <span>Recipient Insurer Gateway</span>
+              </div>
+              <Badge
+                variant="outline"
+                className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+              >
+                {payerContact.isVerified ? "Verified Payer Gateway" : "Intake Gateway"}
+              </Badge>
             </div>
 
-            <div className="space-y-2.5 text-xs">
+            <div className="space-y-3 text-xs">
               <div>
                 <span className="text-[10px] font-mono text-muted-foreground block">Payer</span>
-                <span className="font-semibold text-foreground">{payer} (Grievance & Appeals)</span>
+                <span className="font-semibold text-foreground">{payerName}</span>
               </div>
 
               <div>
-                <span className="text-[10px] font-mono text-muted-foreground block">Intake Gateway</span>
-                <span className="font-mono text-foreground">
-                  {threads[0]?.payerEmail ||
-                    `appeals-department@${payer.toLowerCase().replace(/[^a-z]/g, "")}.com`}
+                <span className="text-[10px] font-mono text-muted-foreground block">Official Appellate Intake</span>
+                <div className="flex items-center justify-between gap-1 mt-0.5">
+                  <span className="font-mono text-[11px] text-foreground font-medium break-all">
+                    {recipientEmail}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => {
+                      navigator.clipboard.writeText(recipientEmail);
+                      setCopiedRecipientEmail(true);
+                      setTimeout(() => setCopiedRecipientEmail(false), 2000);
+                    }}
+                    title="Copy official appeals email"
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                  >
+                    {copiedRecipientEmail ? (
+                      <Check className="size-3 text-emerald-500" />
+                    ) : (
+                      <Copy className="size-3" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-mono text-muted-foreground block">Statutory Appeals P.O. Box</span>
+                <span className="text-foreground text-[11px] font-mono block">
+                  {payerContact.statutoryPoBox}
                 </span>
               </div>
 
-              <div>
-                <span className="text-[10px] font-mono text-muted-foreground block">Status</span>
-                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Electronic Payer ID</span>
+                  <span className="font-mono text-[11px] text-foreground font-semibold">
+                    {payerContact.ediPayerId}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Appeals Helpline</span>
+                  <span className="font-mono text-[11px] text-foreground">
+                    {payerContact.tollFreeHelpline}
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-1 border-t border-border/50">
+                <span className="text-[10px] font-mono text-muted-foreground block">Delivery Channel</span>
+                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium text-[11px]">
                   <CheckCircle className="size-3.5" />
                   {claim.status === "dispatched" || claim.status === "won"
-                    ? "Dispatched & Logged"
-                    : "Drafting in Progress"}
+                    ? "Packet Transmitted & Logged"
+                    : "Ready for Certified Dispatch"}
                 </span>
+              </div>
+
+              <div className="pt-2 border-t border-border/50 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+                  <span>Gateway Source:</span>
+                  <span className="text-foreground font-medium">
+                    {claim.payerContact?.source === "firecrawl_live"
+                      ? "Firecrawl Web Search"
+                      : claim.payerContact?.source === "document_ocr"
+                      ? "Extracted from Document"
+                      : payerContact.isVerified
+                      ? "Verified Statutory Directory"
+                      : "Inferred Gateway"}
+                  </span>
+                </div>
+
+                {onResolvePayerGateway && (
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={handleSearchPayer}
+                    disabled={isSearchingPayer}
+                    className="w-full gap-1.5 text-[11px] h-8"
+                  >
+                    {isSearchingPayer ? (
+                      <>
+                        <CircleNotch className="size-3 animate-spin text-primary" />
+                        <span>Searching Web with Firecrawl...</span>
+                      </>
+                    ) : (
+                      <>
+                        <MagnifyingGlass className="size-3 text-muted-foreground" />
+                        <span>Live Search Gateway (Firecrawl)</span>
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
           </Card>

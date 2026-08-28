@@ -4,14 +4,6 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { api } from "../_generated/api";
 
-const DEFAULT_PAYER_APPEAL_EMAILS: Record<string, string> = {
-  UnitedHealthcare: "appeals-resolution@uhc.com",
-  Aetna: "erisa-appeals@aetna.com",
-  Cigna: "grievances-appeals@cigna.com",
-  "Blue Cross Blue Shield": "member-appeals@bcbs.com",
-  default: "appeals-department@insurance-payer.com",
-};
-
 export interface DispatchReceipt {
   transmissionId: string;
   claimId: string;
@@ -20,6 +12,32 @@ export interface DispatchReceipt {
   subject: string;
   dispatchedAt: number;
   status: "delivered" | "queued";
+}
+
+function resolvePayerAppellateEmail(payerName?: string): string {
+  if (!payerName) return "uhc_appeals@uhc.com";
+  const clean = payerName.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  if (clean.includes("united") || clean.includes("uhc") || clean.includes("optum")) {
+    return "uhc_appeals@uhc.com";
+  }
+  if (clean.includes("aetna") || clean.includes("cvs")) {
+    return "crga@aetna.com";
+  }
+  if (clean.includes("cigna") || clean.includes("evernorth")) {
+    return "nationalappealsunit@cigna.com";
+  }
+  if (clean.includes("blue") || clean.includes("bcbs") || clean.includes("anthem") || clean.includes("elevance")) {
+    return "grievanceappeals@anthem.com";
+  }
+  if (clean.includes("humana")) {
+    return "humana_appeals@humana.com";
+  }
+  if (clean.includes("kaiser")) {
+    return "appeals-grievances@kp.org";
+  }
+
+  return `appeals-resolution@${clean || "insurance-payer"}.com`;
 }
 
 /**
@@ -62,10 +80,7 @@ export const dispatchAppealPacket = action({
     }
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
-    const recipient =
-      args.recipientEmail ||
-      DEFAULT_PAYER_APPEAL_EMAILS[payer] ||
-      DEFAULT_PAYER_APPEAL_EMAILS["default"];
+    const recipient = args.recipientEmail || resolvePayerAppellateEmail(payer);
 
     const sender = claim.assignedAgentEmail || `appeal-claim-${claim.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
     const subject =

@@ -11,8 +11,10 @@
 import type * as actions_appealSynthesizer from "../actions/appealSynthesizer.js";
 import type * as actions_mailDispatcher from "../actions/mailDispatcher.js";
 import type * as actions_opticalParser from "../actions/opticalParser.js";
+import type * as actions_payerContactResolver from "../actions/payerContactResolver.js";
 import type * as actions_policyCrawler from "../actions/policyCrawler.js";
 import type * as actions_precedentMatcher from "../actions/precedentMatcher.js";
+import type * as actions_sentinelPipeline from "../actions/sentinelPipeline.js";
 import type * as appeals from "../appeals.js";
 import type * as auditLogs from "../auditLogs.js";
 import type * as auth from "../auth.js";
@@ -34,8 +36,10 @@ declare const fullApi: ApiFromModules<{
   "actions/appealSynthesizer": typeof actions_appealSynthesizer;
   "actions/mailDispatcher": typeof actions_mailDispatcher;
   "actions/opticalParser": typeof actions_opticalParser;
+  "actions/payerContactResolver": typeof actions_payerContactResolver;
   "actions/policyCrawler": typeof actions_policyCrawler;
   "actions/precedentMatcher": typeof actions_precedentMatcher;
+  "actions/sentinelPipeline": typeof actions_sentinelPipeline;
   appeals: typeof appeals;
   auditLogs: typeof auditLogs;
   auth: typeof auth;

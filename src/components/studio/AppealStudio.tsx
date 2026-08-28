@@ -8,12 +8,14 @@ import {
   PencilSimpleLine,
   Stethoscope,
   Printer,
+  ArrowRight,
 } from "@phosphor-icons/react";
 import { Claim, ClinicalEvidence, AppealLevel } from "../../types";
 import { useAppealStudio } from "../../hooks/useAppealStudio";
 import { CitationSidebar } from "./CitationSidebar";
 import { ExportDrawer } from "./ExportDrawer";
 import { AppealBriefRenderer } from "./AppealBriefRenderer";
+import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -25,12 +27,17 @@ interface AppealStudioProps {
   evidences: ClinicalEvidence[];
   onNavigateToDispatch?: () => void;
   onNavigateToEvidence?: () => void;
+  onNavigateView?: (view: FlowView) => void;
+  onRunAutonomousPipeline?: (claimId?: string) => Promise<any>;
 }
 
 export const AppealStudio: React.FC<AppealStudioProps> = ({
   claim,
   evidences,
   onNavigateToDispatch,
+  onNavigateToEvidence,
+  onNavigateView,
+  onRunAutonomousPipeline,
 }) => {
   const {
     appeal,
@@ -44,7 +51,6 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     isSaving,
     saveStatus,
     synthesizeAppeal,
-    insertTextAtCursor,
   } = useAppealStudio(claim);
 
   const [activeTab, setActiveTab] = useState<"edit" | "preview" | "split">("split");
@@ -64,7 +70,25 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   };
 
   return (
-    <div className="space-y-3 animate-fadeIn h-[calc(100vh-6.5rem)] flex flex-col">
+    <div className="space-y-3 animate-fadeIn pb-16 min-h-[calc(100vh-6.5rem)] flex flex-col">
+      {/* 4-Step Guided Sentinel Stepper */}
+      <SentinelFlowStepper
+        claim={claim}
+        currentView="studio"
+        onNavigateView={(v) => {
+          if (onNavigateView) onNavigateView(v);
+          else if (v === "evidence" && onNavigateToEvidence) onNavigateToEvidence();
+          else if (v === "communications" && onNavigateToDispatch) onNavigateToDispatch();
+        }}
+        evidencesCount={evidences.length}
+        hasDraftedBrief={Boolean(markdownContent.trim())}
+        isProcessing={isSynthesizing}
+        processingLabel="Synthesizing Appeal Brief..."
+        onRunAutonomousPipeline={
+          onRunAutonomousPipeline ? () => onRunAutonomousPipeline(claim._id) : undefined
+        }
+      />
+
       {/* Studio Header Toolbar */}
       <Card className="p-3.5 shrink-0">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -120,7 +144,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               className="gap-1.5"
             >
               <Stethoscope className="size-3.5" />
-              <span>Physician Notes {physicianNotes ? "✓" : ""}</span>
+              <span>Physician Notes{physicianNotes ? " (Added)" : ""}</span>
             </Button>
 
             {/* Synthesize Appeal with gpt-5-nano */}
@@ -259,12 +283,36 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                     <AppealBriefRenderer content={markdownContent} />
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-2 text-muted-foreground">
-                    <Sparkle className="size-6 text-muted-foreground/60" />
-                    <div className="text-xs font-medium text-foreground">No Brief Drafted Yet</div>
-                    <p className="text-[11px] max-w-xs">
-                      Click &quot;Synthesize Brief&quot; above to have gpt-5-nano generate an ERISA appeal brief citing policy clauses.
-                    </p>
+                  <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3 text-muted-foreground my-auto">
+                    <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                      <Sparkle className="size-6" />
+                    </div>
+                    <div className="space-y-1 max-w-sm">
+                      <div className="text-sm font-semibold text-foreground">
+                        Ready to Synthesize ERISA Appeal Brief
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Generate a formal cited appeal brief referencing {evidences.length} clinical policy clauses and 29 CFR § 2560.503-1 federal requirements.
+                      </p>
+                    </div>
+
+                    <Button
+                      onClick={handleRunSynthesis}
+                      disabled={isSynthesizing}
+                      className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md mt-2"
+                    >
+                      {isSynthesizing ? (
+                        <>
+                          <CircleNotch className="size-3.5 animate-spin" />
+                          <span>Synthesizing Brief with gpt-5-nano...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkle className="size-3.5" />
+                          <span>1-Click Synthesize Appeal Brief</span>
+                        </>
+                      )}
+                    </Button>
                   </div>
                 )}
               </div>
@@ -276,9 +324,44 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         <Card className="lg:col-span-4 p-4 overflow-y-auto">
           <CitationSidebar
             evidences={evidences}
-            onInsertSnippet={insertTextAtCursor}
           />
         </Card>
+      </div>
+
+      {/* Sticky Bottom Next-Step Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background/95 backdrop-blur-md p-3 px-4 sm:px-8 flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="font-mono text-xs hidden sm:inline-flex">
+            Step 3 of 4: Appeal Brief
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            {markdownContent
+              ? `${markdownContent.split(/\s+/).filter(Boolean).length} words • ERISA 29 CFR § 2560.503-1 Cited`
+              : "Synthesize the appeal brief before dispatching to insurer"}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsExportOpen(true)}
+            className="gap-1.5 text-xs h-8 hidden sm:inline-flex"
+          >
+            <Printer className="size-3.5" />
+            <span>Export PDF Dossier</span>
+          </Button>
+
+          <Button
+            onClick={() => {
+              if (onNavigateToDispatch) onNavigateToDispatch();
+            }}
+            className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all h-8"
+          >
+            <span>Next: Dispatch via Dedicated AgentMail</span>
+            <ArrowRight className="size-3.5" />
+          </Button>
+        </div>
       </div>
 
       {/* Export & Print Preview Drawer Modal */}

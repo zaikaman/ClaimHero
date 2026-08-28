@@ -1,6 +1,7 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import { Scales, ShieldCheck, FileText } from "@phosphor-icons/react";
 
 interface AppealBriefRendererProps {
@@ -32,7 +33,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
       } ${className}`}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkBreaks]}
         components={{
           h1: ({ children }) => (
             <div className={`pb-3 mb-4 border-b-2 ${isPrintMode ? "border-slate-900" : "border-border"}`}>

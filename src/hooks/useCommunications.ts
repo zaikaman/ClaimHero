@@ -39,6 +39,10 @@ export function useCommunications(claim?: Claim | null) {
     convexApi["actions/mailDispatcher"]?.dispatchAppealPacket ||
     convexApi.actions?.mailDispatcher?.dispatchAppealPacket
   );
+  const resolvePayerGatewayAction = useAction(
+    convexApi["actions/payerContactResolver"]?.resolvePayerGateway ||
+    convexApi.actions?.payerContactResolver?.resolvePayerGateway
+  );
 
   // Send an outbound reply/addendum message
   const sendMessage = useCallback(
@@ -48,6 +52,7 @@ export function useCommunications(claim?: Claim | null) {
       const sender = claim.assignedAgentEmail;
       const recipient =
         threads?.[0]?.payerEmail ||
+        claim.payerContact?.officialAppealsEmail ||
         `appeals@${claim.patient?.insurancePayer?.toLowerCase().replace(/[^a-z]/g, "") || "payer"}.com`;
 
       let threadId = activeThreadId;
@@ -88,6 +93,19 @@ export function useCommunications(claim?: Claim | null) {
     [claim, dispatchAction]
   );
 
+  // Autonomous Firecrawl live search for insurer intake email
+  const resolvePayerGateway = useCallback(
+    async (forceWebSearch?: boolean) => {
+      if (!claim?._id) return null;
+
+      return await resolvePayerGatewayAction({
+        claimId: claim._id as any,
+        forceWebSearch,
+      });
+    },
+    [claim, resolvePayerGatewayAction]
+  );
+
   return {
     threads: threads || [],
     messages: threadDetails?.messages || [],
@@ -96,5 +114,6 @@ export function useCommunications(claim?: Claim | null) {
     isLoadingAudit: claimId ? claimAuditLogs === undefined : recentAuditLogs === undefined,
     sendMessage,
     dispatchAppeal,
+    resolvePayerGateway,
   };
 }

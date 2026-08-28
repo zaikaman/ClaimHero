@@ -27,6 +27,8 @@ const DENIAL_EXTRACTION_SCHEMA = {
     denialReasonCode: { type: "string" },
     denialReasonDescription: { type: "string" },
     appealFilingDeadlineDays: { type: "number" },
+    payerAppealsEmail: { type: "string" },
+    payerAppealsAddress: { type: "string" },
   },
   required: [
     "claimNumber",
@@ -42,6 +44,8 @@ const DENIAL_EXTRACTION_SCHEMA = {
     "denialReasonCode",
     "denialReasonDescription",
     "appealFilingDeadlineDays",
+    "payerAppealsEmail",
+    "payerAppealsAddress",
   ],
   additionalProperties: false,
 };
@@ -60,6 +64,8 @@ export interface DenialExtractionResult {
   denialReasonCode: string;
   denialReasonDescription: string;
   appealFilingDeadlineDays: number;
+  payerAppealsEmail?: string;
+  payerAppealsAddress?: string;
 }
 
 /**
@@ -70,8 +76,9 @@ export const parseDenialDocument = action({
     rawDocumentText: v.optional(v.string()),
     storageId: v.optional(v.id("_storage")),
     patientState: v.optional(v.string()),
+    autoRunPipeline: v.optional(v.boolean()),
   },
-  handler: async (ctx, args): Promise<DenialExtractionResult & { claimId: string }> => {
+  handler: async (ctx, args): Promise<DenialExtractionResult & { claimId: string; pipelineResult?: any }> => {
     let documentContent = args.rawDocumentText?.trim() || "";
     const imageUrls: string[] = [];
 
@@ -138,12 +145,43 @@ Rules:
       denialReasonCode: extraction.denialReasonCode,
       denialReasonDescription: extraction.denialReasonDescription,
       appealFilingDeadlineDays: extraction.appealFilingDeadlineDays,
-      denialLetterStorageId: args.storageId,
     });
+
+    // If denial document contained explicit appeal/grievance email or contact info, save it
+    if (extraction.payerAppealsEmail && extraction.payerAppealsEmail.includes("@")) {
+      try {
+        await ctx.runMutation((api as any).claims.updatePayerContact, {
+          claimId,
+          payerContact: {
+            officialAppealsEmail: extraction.payerAppealsEmail,
+            statutoryPoBox: extraction.payerAppealsAddress || `${extraction.insurancePayer} Appeals Unit`,
+            isVerified: true,
+            source: "document_ocr",
+          },
+        });
+      } catch (err) {
+        console.warn("Could not save extracted payer contact:", err);
+      }
+    }
+
+    let pipelineResult: any = undefined;
+    if (args.autoRunPipeline) {
+      try {
+        pipelineResult = await ctx.runAction(
+          (api as any).actions.sentinelPipeline.runAutonomousPipeline,
+          {
+            claimId,
+          }
+        );
+      } catch (pipelineErr) {
+        console.error("Auto-pilot pipeline error:", pipelineErr);
+      }
+    }
 
     return {
       ...extraction,
       claimId,
+      pipelineResult,
     };
   },
 });

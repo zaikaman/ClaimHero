@@ -62,6 +62,19 @@ export interface Claim {
   createdAt: number;
   updatedAt: number;
   patient?: Patient;
+  latestAppeal?: Appeal | null;
+  evidenceCount?: number;
+  payerContact?: PayerContact;
+}
+
+export interface PayerContact {
+  officialAppealsEmail: string;
+  intakePortalUrl?: string;
+  statutoryPoBox?: string;
+  ediPayerId?: string;
+  tollFreeHelpline?: string;
+  isVerified: boolean;
+  source?: "preset" | "firecrawl_live" | "document_ocr";
 }
 
 export interface ScoringCriterion {

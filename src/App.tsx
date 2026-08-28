@@ -48,6 +48,7 @@ export default function App() {
     isLoadingEvidences,
     crawlPolicy,
     computeOverturnScore,
+    runFullPipeline,
   } = useEvidence(selectedClaim);
 
   const {
@@ -58,6 +59,7 @@ export default function App() {
     isLoadingAudit,
     sendMessage,
     dispatchAppeal,
+    resolvePayerGateway,
   } = useCommunications(selectedClaim);
 
   const handleToggleSidebar = useCallback(() => {
@@ -85,9 +87,9 @@ export default function App() {
     setIsIngestionOpen(true);
   };
 
-  const handleIngestionSuccess = (claimId: string) => {
+  const handleIngestionSuccess = (claimId: string, directView?: string) => {
     setSelectedClaimId(claimId);
-    setCurrentView("radar");
+    setCurrentView((directView as any) || "studio");
   };
 
   const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
@@ -192,6 +194,7 @@ export default function App() {
               onOpenIngestion={handleOpenIngestion}
               onNavigateView={setCurrentView}
               onDeleteCase={deleteCase}
+              onRunAutonomousPipeline={runFullPipeline}
             />
           )}
 
@@ -205,6 +208,8 @@ export default function App() {
                 onCrawlPolicy={crawlPolicy}
                 onComputeScore={computeOverturnScore}
                 onNavigateToStudio={() => setCurrentView("studio")}
+                onNavigateView={setCurrentView}
+                onRunAutonomousPipeline={runFullPipeline}
               />
             ) : (
               <CasePickerEmptyState
@@ -224,6 +229,8 @@ export default function App() {
                 evidences={evidences}
                 onNavigateToDispatch={() => setCurrentView("communications")}
                 onNavigateToEvidence={() => setCurrentView("evidence")}
+                onNavigateView={setCurrentView}
+                onRunAutonomousPipeline={runFullPipeline}
               />
             ) : (
               <CasePickerEmptyState
@@ -245,6 +252,9 @@ export default function App() {
                 isLoading={isLoadingCommunications}
                 onSendMessage={sendMessage}
                 onDispatchAppeal={dispatchAppeal}
+                onNavigateView={setCurrentView}
+                onRunAutonomousPipeline={runFullPipeline}
+                onResolvePayerGateway={resolvePayerGateway}
               />
             ) : (
               <CasePickerEmptyState

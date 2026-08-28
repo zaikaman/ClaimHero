@@ -12,8 +12,10 @@ import {
   WarningCircle,
   Sparkle,
 } from "@phosphor-icons/react";
+import { useAction } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { DenialExtractionResult } from "../../types";
-import { formatCurrency } from "../../lib/utils";
+import { formatCurrency, cn } from "../../lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +29,8 @@ import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 import { Textarea } from "../ui/textarea";
 
+const convexApi = api as any;
+
 interface IngestionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -38,7 +42,7 @@ interface IngestionModalProps {
     text: string,
     patientState?: string
   ) => Promise<DenialExtractionResult & { claimId: string }>;
-  onSuccess: (claimId: string) => void;
+  onSuccess: (claimId: string, directView?: string) => void;
 }
 
 const SAMPLE_CASE_PRESETS = [
@@ -143,6 +147,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState("presets");
   const [patientState, setPatientState] = useState("California");
+  const [autoPilotEnabled, setAutoPilotEnabled] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pastedText, setPastedText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -151,9 +156,14 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [extractedResult, setExtractedResult] = useState<
-    (DenialExtractionResult & { claimId: string }) | null
+    (DenialExtractionResult & { claimId: string; pipelineResult?: any }) | null
   >(null);
   const [copiedEmail, setCopiedEmail] = useState(false);
+
+  const runPipelineAction = useAction(
+    convexApi["actions/sentinelPipeline"]?.runAutonomousPipeline ||
+    convexApi.actions?.sentinelPipeline?.runAutonomousPipeline
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -171,6 +181,20 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     }
   };
 
+  const executePostExtractionPipeline = async (claimId: string) => {
+    if (!autoPilotEnabled || !runPipelineAction) return null;
+
+    setProcessingMessage("Step 2/3: Crawling Insurer CPB & Evaluating Win Score...");
+    try {
+      const pipelineRes = await runPipelineAction({ claimId: claimId as any });
+      setProcessingMessage("Step 3/3: Synthesizing cited ERISA medical appeal brief...");
+      return pipelineRes;
+    } catch (pipelineErr) {
+      console.warn("Pipeline error, falling back to basic extraction:", pipelineErr);
+      return null;
+    }
+  };
+
   const handleProcessFile = async () => {
     if (!selectedFile) {
       setErrorMessage("Please select a denial letter PDF or image file.");
@@ -178,12 +202,16 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     }
 
     setIsProcessing(true);
-    setProcessingMessage("Uploading to Convex Storage & running gpt-5-nano Vision...");
+    setProcessingMessage("Step 1/3: Optical OCR extraction with gpt-5-nano Vision...");
     setErrorMessage(null);
 
     try {
       const result = await onUploadFile(selectedFile, patientState);
-      setExtractedResult(result);
+      let pipelineResult = null;
+      if (autoPilotEnabled && result?.claimId) {
+        pipelineResult = await executePostExtractionPipeline(result.claimId);
+      }
+      setExtractedResult({ ...result, pipelineResult });
     } catch (err: any) {
       setErrorMessage(
         err?.message ||
@@ -196,12 +224,16 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
   const handleProcessPreset = async (presetContent: string) => {
     setIsProcessing(true);
-    setProcessingMessage("Extracting CPT, CARC & ERISA deadlines with gpt-5-nano...");
+    setProcessingMessage("Step 1/3: Extracting CPT, CARC & ERISA deadlines with gpt-5-nano...");
     setErrorMessage(null);
 
     try {
       const result = await onParseText(presetContent, patientState);
-      setExtractedResult(result);
+      let pipelineResult = null;
+      if (autoPilotEnabled && result?.claimId) {
+        pipelineResult = await executePostExtractionPipeline(result.claimId);
+      }
+      setExtractedResult({ ...result, pipelineResult });
     } catch (err: any) {
       setErrorMessage(
         err?.message ||
@@ -221,12 +253,16 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     }
 
     setIsProcessing(true);
-    setProcessingMessage("Parsing document text with OpenAI Structured Outputs...");
+    setProcessingMessage("Step 1/3: Parsing document text with OpenAI Structured Outputs...");
     setErrorMessage(null);
 
     try {
       const result = await onParseText(pastedText, patientState);
-      setExtractedResult(result);
+      let pipelineResult = null;
+      if (autoPilotEnabled && result?.claimId) {
+        pipelineResult = await executePostExtractionPipeline(result.claimId);
+      }
+      setExtractedResult({ ...result, pipelineResult });
     } catch (err: any) {
       setErrorMessage(
         err?.message ||
@@ -237,9 +273,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     }
   };
 
-  const handleDone = () => {
+  const handleDone = (targetView?: string) => {
     if (extractedResult?.claimId) {
-      onSuccess(extractedResult.claimId);
+      onSuccess(extractedResult.claimId, targetView || "studio");
       onClose();
     }
   };
@@ -261,21 +297,44 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           </div>
         </DialogHeader>
 
-        {/* State Jurisdiction Selector */}
-        <div className="flex items-center justify-between gap-3 bg-muted/40 border border-border p-2.5 rounded-lg text-xs">
-          <span className="text-muted-foreground font-medium">Patient State Jurisdiction:</span>
-          <select
-            value={patientState}
-            onChange={(e) => setPatientState(e.target.value)}
-            className="bg-card border border-input rounded-md px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans"
+        {/* State Jurisdiction & Autonomous Auto-Pilot Toggle */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="flex items-center justify-between gap-2 bg-muted/40 border border-border p-2 rounded-lg text-xs">
+            <span className="text-muted-foreground font-medium truncate">Jurisdiction:</span>
+            <select
+              value={patientState}
+              onChange={(e) => setPatientState(e.target.value)}
+              className="bg-card border border-input rounded-md px-2 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans"
+            >
+              <option value="California">California (ERISA 180d)</option>
+              <option value="New York">New York (DFS 180d)</option>
+              <option value="Texas">Texas (TDI 180d)</option>
+              <option value="Florida">Florida (FL DOI)</option>
+              <option value="Illinois">Illinois (IDFPR)</option>
+              <option value="Pennsylvania">Pennsylvania (PID)</option>
+            </select>
+          </div>
+
+          <div
+            onClick={() => setAutoPilotEnabled(!autoPilotEnabled)}
+            className={cn(
+              "flex items-center justify-between gap-2 border p-2 rounded-lg text-xs cursor-pointer transition-all",
+              autoPilotEnabled
+                ? "bg-primary/10 border-primary/40 text-primary font-medium"
+                : "bg-muted/30 border-border text-muted-foreground hover:text-foreground"
+            )}
           >
-            <option value="California">California (DOI 180d ERISA)</option>
-            <option value="New York">New York (DFS 180d)</option>
-            <option value="Texas">Texas (TDI 180d)</option>
-            <option value="Florida">Florida (FL DOI)</option>
-            <option value="Illinois">Illinois (IDFPR)</option>
-            <option value="Pennsylvania">Pennsylvania (PID)</option>
-          </select>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Sparkle className="size-3.5 shrink-0 text-primary" />
+              <span className="truncate">Auto-Pilot Pipeline</span>
+            </div>
+            <Badge
+              variant={autoPilotEnabled ? "default" : "outline"}
+              className="text-[9px] font-mono shrink-0 px-1.5 py-0"
+            >
+              {autoPilotEnabled ? "ON (Auto-Solve)" : "OFF (Manual)"}
+            </Badge>
+          </div>
         </div>
 
         {/* Error Alert */}
@@ -549,21 +608,44 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <p className="mt-0.5">{extractedResult.denialReasonDescription}</p>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-border/60">
+            {extractedResult.pipelineResult && (
+              <div className="rounded-lg bg-primary/10 border border-primary/30 p-2.5 flex items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5 text-foreground font-semibold">
+                  <Sparkle className="size-3.5 text-primary shrink-0" />
+                  <span>Auto-Pilot: Brief Synthesized & Policy Cited</span>
+                </div>
+                {extractedResult.pipelineResult.overturnProbabilityScore !== undefined && (
+                  <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    {extractedResult.pipelineResult.overturnProbabilityScore}% Win Score
+                  </Badge>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-border/60">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setExtractedResult(null)}
+                className="text-xs"
               >
                 Ingest Another
               </Button>
               <Button
+                variant="outline"
                 size="sm"
-                onClick={handleDone}
-                className="gap-1.5"
+                onClick={() => handleDone("radar")}
+                className="gap-1 text-xs"
               >
-                <CheckCircle className="size-3.5" />
-                <span>View in Case Radar</span>
+                <span>View in Radar</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleDone("studio")}
+                className="gap-1.5 text-xs bg-primary text-primary-foreground shadow-2xs font-semibold"
+              >
+                <Sparkle className="size-3.5" />
+                <span>Open Prepared Appeal Brief &rarr;</span>
               </Button>
             </div>
           </Card>

@@ -52,6 +52,17 @@ export default defineSchema({
     ),
     assignedAgentEmail: v.string(),
     denialLetterStorageId: v.optional(v.id("_storage")),
+    payerContact: v.optional(
+      v.object({
+        officialAppealsEmail: v.string(),
+        intakePortalUrl: v.optional(v.string()),
+        statutoryPoBox: v.optional(v.string()),
+        ediPayerId: v.optional(v.string()),
+        tollFreeHelpline: v.optional(v.string()),
+        isVerified: v.boolean(),
+        source: v.optional(v.string()),
+      })
+    ),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

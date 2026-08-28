@@ -34,7 +34,7 @@
 
 ---
 
-## Phase 3: User Story 1 - Denial Document Ingestion & Optical Extraction (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - Denial Document Ingestion & Optical Extraction (Priority: P1) - MVP
 
 **Goal**: Ingest real denial letters/EOBs via direct upload, text paste, or email, extract metadata using `gpt-5-nano` Vision/Structured Outputs, and create reactive claim cases.
 

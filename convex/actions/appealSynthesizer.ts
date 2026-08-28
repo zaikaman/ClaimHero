@@ -54,6 +54,137 @@ export interface AppealBriefSynthesisResult {
 }
 
 /**
+ * Assemble a formal legal memorandum in standard Markdown structure.
+ * Guarantees proper headers (#, ##), tables, blockquotes, bullet lists, and horizontal dividers.
+ */
+function assembleProfessionalMemorandum(
+  claim: any,
+  appealLevel: string,
+  result: AppealBriefSynthesisResult,
+  evidences: any[],
+  physicianNotes?: string
+): string {
+  const dateStr = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const payerName = claim.patient?.insurancePayer || "Health Plan Administrator";
+  const providerName = claim.providerName || "Treating Physician";
+  const patientName = claim.patient?.name || "Patient";
+  const memberId = claim.patient?.memberId || "N/A";
+  const groupNumber = claim.patient?.groupNumber || "Standard Employer Plan (ERISA Qualified)";
+  const claimNumber = claim.claimNumber;
+  const dos = claim.serviceDate;
+  const deniedAmount = `$${claim.deniedAmount.toLocaleString()}`;
+  const patientOwed = `$${claim.patientOwedAmount.toLocaleString()}`;
+  const cptCodes = (claim.cptCodes || []).join(", ");
+  const icd10Codes = (claim.icd10Codes || []).join(", ");
+  const denialReason = `${claim.denialReasonCode || "CO-50"} - ${claim.denialReasonDescription || "Adverse Determination"}`;
+
+  // If the LLM already returned a well-structured markdown document with headers and table, use it
+  if (
+    result.fullAppealMarkdown &&
+    result.fullAppealMarkdown.includes("# ") &&
+    result.fullAppealMarkdown.includes("## ") &&
+    result.fullAppealMarkdown.includes("|") &&
+    result.fullAppealMarkdown.includes("\n\n")
+  ) {
+    return result.fullAppealMarkdown.trim();
+  }
+
+  // Otherwise, construct the formal appellate memorandum from the verified structured fields
+  let brief = `# FORMAL MEDICAL APPEAL & LEGAL RECONSIDERATION MEMORANDUM\n\n`;
+  brief += `**VIA CERTIFIED SECURE ELECTRONIC GRIEVANCE PORTAL & REGISTERED TRANSMISSION**\n\n`;
+  brief += `**DATE:** ${dateStr}  \n`;
+  brief += `**TO:** ${payerName} Appeals Committee & Medical Review Board  \n`;
+  brief += `**FROM:** ${providerName} (Treating Provider / Designated Authorized Representative)  \n`;
+  brief += `**RE:** Formal ${appealLevel.replace(/_/g, " ").toUpperCase()} Appeal & Demand for Claim Overturn — 29 CFR § 2560.503-1  \n\n`;
+  brief += `---\n\n`;
+
+  brief += `### CASE IDENTIFICATION & CLAIM METADATA\n\n`;
+  brief += `| Case Parameter | Clinical & Policy Record Details |\n`;
+  brief += `| :--- | :--- |\n`;
+  brief += `| **Patient Name** | ${patientName} |\n`;
+  brief += `| **Subscriber / Member ID** | ${memberId} |\n`;
+  brief += `| **Group / Plan Identifier** | ${groupNumber} |\n`;
+  brief += `| **Claim / Reference Number** | ${claimNumber} |\n`;
+  brief += `| **Date of Service (DOS)** | ${dos} |\n`;
+  brief += `| **Treating Physician** | ${providerName} |\n`;
+  brief += `| **Procedure Codes (CPT)** | ${cptCodes} |\n`;
+  brief += `| **Diagnosis Codes (ICD-10)** | ${icd10Codes} |\n`;
+  brief += `| **Disputed Claim Amount** | ${deniedAmount} |\n`;
+  brief += `| **Patient Financial Liability** | ${patientOwed} |\n`;
+  brief += `| **Adverse Denial Code** | ${denialReason} |\n\n`;
+  brief += `---\n\n`;
+
+  brief += `### FORMAL NOTICE OF APPEAL & JURISDICTIONAL STATEMENT\n\n`;
+  brief += `**Dear Members of the Appeals Committee and Medical Review Board:**\n\n`;
+  brief += `Please accept this formal written appeal submitted pursuant to the Employee Retirement Income Security Act of 1974 (ERISA, 29 U.S.C. § 1133), federal claims procedure regulations (29 CFR § 2560.503-1), and the Affordable Care Act (ACA § 2719, 45 CFR § 147.136), challenging the adverse benefit determination rendered regarding Claim #${claimNumber}.\n\n`;
+  brief += `${result.executiveSummary}\n\n`;
+  brief += `---\n\n`;
+
+  brief += `## SECTION I: STATEMENT OF RELEVANT CLINICAL FACTS & CONSERVATIVE THERAPY HISTORY\n\n`;
+  brief += `${result.medicalNecessityArguments}\n\n`;
+  if (physicianNotes && physicianNotes.trim()) {
+    brief += `> **Treating Physician Clinical Addendum:**  \n> "${physicianNotes.trim()}"  \n> — *${providerName}*\n\n`;
+  }
+  brief += `---\n\n`;
+
+  brief += `## SECTION II: STATUTORY ERISA PROTECTIONS & GOVERNING LEGAL STANDARD\n\n`;
+  brief += `${result.statutoryRightsNotice}\n\n`;
+  brief += `1. **Mandatory De Novo Review (29 CFR § 2560.503-1(h)(3)(ii)):** The plan administrator is mandated to conduct a full and independent clinical review that affords no deference to the initial adverse determination and is conducted by an appropriately credentialed clinical specialist in the relevant field of medicine.\n`;
+  brief += `2. **Right to Full Record Disclosure (29 CFR § 2560.503-1(h)(2)(iii)):** The claimant hereby requests, at no cost, complete copies of all documents, internal clinical policies, medical reviewer qualifications, and medical director rationales relied upon in making the adverse determination.\n`;
+  brief += `3. **Statutory 180-Day Regulatory Limitation:** This appeal is filed well within the 180-day statutory limitation window mandated under federal law.\n\n`;
+  brief += `---\n\n`;
+
+  brief += `## SECTION III: CLINICAL POLICY BULLETIN (CPB) ALIGNMENT & EVIDENTIARY CITATIONS\n\n`;
+  if (result.policyCitations && result.policyCitations.length > 0) {
+    brief += `The claimant's clinical record definitively satisfies every requisite indication outlined in ${payerName}'s published Clinical Policy Bulletins:\n\n`;
+    brief += `| Policy Source | Target Clause / Criterion | Clinical Record Evidence & Direct Quote |\n`;
+    brief += `| :--- | :--- | :--- |\n`;
+    result.policyCitations.forEach((cit, idx) => {
+      brief += `| **${cit.source}** | \`${cit.clause}\` | "${cit.quote}" **(Exhibit ${String.fromCharCode(65 + idx)})** |\n`;
+    });
+    brief += `\n`;
+  } else {
+    brief += `The medical services rendered fully conform to established national standard-of-care guidelines and prevailing peer-reviewed clinical literature.\n\n`;
+  }
+  brief += `---\n\n`;
+
+  brief += `## SECTION IV: FORMAL REBUTTAL OF DENIAL & DEMAND FOR IMMEDIATE OVERTURN\n\n`;
+  brief += `${result.formalDemandForPayment}\n\n`;
+  brief += `The assertion under denial code **${claim.denialReasonCode || "CO-50"}** that the requested treatment lacks medical necessity or fails prerequisite indications is directly contradicted by the patient's objective clinical records and documented diagnostic failure of conservative care.\n\n`;
+  brief += `**We hereby formally demand:**\n`;
+  brief += `1. **Immediate Overturn** of the adverse benefit determination and full authorization/reimbursement of the disputed amount of **${deniedAmount}**.\n`;
+  brief += `2. **Written Confirmation** of overturn and claim adjudication within the thirty (30) day statutory deadline.\n`;
+  brief += `3. In the event of an adverse reconsideration, immediate provision of notice of rights to Independent External Review under ACA § 2719 and filing of a formal complaint with the Department of Labor Employee Benefits Security Administration (EBSA).\n\n`;
+  brief += `---\n\n`;
+
+  brief += `### SIGNATURE & CERTIFICATION\n\n`;
+  brief += `**Respectfully submitted,**\n\n`;
+  brief += `**/s/ ${providerName}**  \n`;
+  brief += `Authorized Treating Healthcare Provider / Designated Representative  \n`;
+  brief += `On behalf of ${patientName} (Claimant)\n\n`;
+  brief += `---\n\n`;
+
+  brief += `### INDEX OF ATTACHED EXHIBITS & CLINICAL DOCUMENTATION\n\n`;
+  if (evidences && evidences.length > 0) {
+    evidences.forEach((ev: any, idx: number) => {
+      brief += `* **Exhibit ${String.fromCharCode(65 + idx)}:** ${ev.title} — *${ev.sourceType.toUpperCase()} (Clause: ${ev.citationClause})*\n`;
+    });
+  } else {
+    brief += `* **Exhibit A:** Treating Physician Clinical Progress Notes & Comprehensive Evaluation\n`;
+    brief += `* **Exhibit B:** Diagnostic Imaging Reports & Radiographic Examination Findings\n`;
+    brief += `* **Exhibit C:** Prior Conservative Therapy Documentation & Medication Flowsheets\n`;
+    brief += `* **Exhibit D:** Insurer Clinical Policy Bulletin (CPB) Coverage Criteria\n`;
+  }
+
+  return brief;
+}
+
+/**
  * Appeal Synthesizer Action: Generate comprehensive ERISA & clinical medical appeal brief using gpt-5-nano
  */
 export const generateAppealBrief = action({
@@ -88,24 +219,17 @@ export const generateAppealBrief = action({
       : "Standard national clinical practice guideline and ERISA disclosure rules apply.";
 
     // 3. Call OpenAI gpt-5-nano with structured JSON schema
-    const result = await createStructuredCompletion<AppealBriefSynthesisResult>({
+    const rawResult = await createStructuredCompletion<AppealBriefSynthesisResult>({
       systemPrompt: `You are an elite Healthcare Appellate Attorney, Board-Certified Medical Necessity Specialist, and ERISA Regulatory Counsel.
 Your mission is to synthesize a legally airtight, cited, highly professional medical appeal brief and formal demand for reconsideration to overturn an improper insurance claim denial.
 
-APPEAL DRAFTING STANDARDS:
-1. Legal & Regulatory Foundation: Explicitly cite federal ERISA protections (29 U.S.C. § 1133, 29 CFR § 2560.503-1(h) full-and-fair review standard), the Affordable Care Act § 2719 internal claims requirements (45 CFR § 147.136), and relevant state insurance codes.
-2. Clinical Necessity & CPB Alignment: Quote the insurer's Clinical Policy Bulletins (CPBs) to prove the claimant met all prerequisite criteria (e.g. conservative therapy duration, medication trials, physical therapy compliance, diagnostic indications).
-3. Professional Tone: Authoritative, formal, evidentiary, and uncompromisingly clinical. Avoid overly emotional accusations; use precise legal-medical terminology (e.g., "arbitrary and procedurally deficient adverse benefit determination", "fiduciary obligation under plan documents").
-4. Required Document Architecture for fullAppealMarkdown:
-   - Header Block: "VIA CERTIFIED TRANSMISSION & SECURE ELECTRONIC GRIEVANCE PORTAL", Recipient Insurer Appeals Committee, and Date.
-   - Case Metadata Block: Formatted tabular summary (Patient, DOB/Member ID, Group #, Claim #, Date of Service, CPT Codes, ICD-10 Diagnosis, Disputed Amount, Denial Reason).
-   - Salutation: "Dear Appeals Committee and Clinical Review Board,"
-   - Section I. STATEMENT OF RELEVANT CLINICAL FACTS & PRIOR CONSERVATIVE CARE (Document patient symptoms, failure of conservative therapy, treating physician rationale).
-   - Section II. GOVERNING LEGAL STANDARD & ERISA 29 CFR § 2560.503-1 STATUTORY PROTECTIONS (Demand for de novo review, full access to claim file and internal clinical criteria).
-   - Section III. CLINICAL POLICY BULLETIN (CPB) ALIGNMENT & EVIDENCE OF MEDICAL NECESSITY (Explicit comparison of patient medical record against payer coverage criteria, citing Exhibits).
-   - Section IV. FORMAL REBUTTAL OF DENIAL REASON & DEMAND FOR IMMEDIATE OVERTURN (Direct refutation of denial code, demand for full reimbursement, notice of external review/DOL complaint).
-   - Formal Signature Block: "Respectfully submitted on behalf of the Claimant", Treating Physician / Authorized Advocate signature, NPI, and Facility info.
-   - Enclosures & Exhibits: List of indexed exhibits (e.g. Exhibit A: Physician Progress Notes, Exhibit B: Physical Therapy Record, Exhibit C: CPB Documentation).`,
+CRITICAL FORMATTING RULES:
+1. Markdown Headings: You MUST use # for the title, ## for major numbered sections (e.g. ## SECTION I: ...), ### for subsections, and --- horizontal dividers between sections.
+2. Paragraphs & Spacing: You MUST use double newlines (\\n\\n) between paragraphs. Never output a single continuous run-on block of text.
+3. Tables: You MUST use formatted Markdown tables with header separators (| :--- | :--- |) for metadata and clinical criteria comparisons.
+4. Blockquotes: Use > for physician clinical necessity statements and direct policy quotes.
+5. Legal Citing: Explicitly cite federal ERISA protections (29 U.S.C. § 1133, 29 CFR § 2560.503-1(h) full-and-fair review standard), the Affordable Care Act § 2719 internal claims requirements (45 CFR § 147.136), and insurer CPBs.
+6. Tone: Authoritative, formal, evidentiary, and uncompromisingly clinical.`,
       userPrompt: `Synthesize a formal ${appealLevel.replace(/_/g, " ").toUpperCase()} medical appeal brief for:
 
 Case Details:
@@ -118,8 +242,8 @@ Case Details:
 - Date of Service: ${claim.serviceDate}
 - Disputed Claim Amount: $${claim.deniedAmount.toLocaleString()}
 - Patient Financial Liability: $${claim.patientOwedAmount.toLocaleString()}
-- Procedure Codes (CPT): ${claim.cptCodes.join(", ")}
-- Diagnosis Codes (ICD-10): ${claim.icd10Codes.join(", ")}
+- Procedure Codes (CPT): ${(claim.cptCodes || []).join(", ")}
+- Diagnosis Codes (ICD-10): ${(claim.icd10Codes || []).join(", ")}
 - Adverse Denial Code: ${claim.denialReasonCode}
 - Payer Denial Description: ${claim.denialReasonDescription}
 - Statutory Days Remaining: ${claim.daysRemaining} days
@@ -134,12 +258,26 @@ ${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstruc
       temperature: 0.15,
     });
 
-    // 4. Format legal citations string
+    // 4. Assemble the definitive, perfectly structured legal memorandum
+    const formattedMarkdown = assembleProfessionalMemorandum(
+      claim,
+      appealLevel,
+      rawResult,
+      evidences,
+      args.physicianNotes
+    );
+
+    const result: AppealBriefSynthesisResult = {
+      ...rawResult,
+      fullAppealMarkdown: formattedMarkdown,
+    };
+
+    // 5. Format legal citations string
     const citationsSummary = result.policyCitations
       .map((c: PolicyCitationItem) => `- ${c.source} (${c.clause}): "${c.quote}"`)
       .join("\n");
 
-    // 5. Persist the generated brief to Convex database
+    // 6. Persist the generated brief to Convex database
     const appealId: string = await ctx.runMutation((api as any).appeals.createOrUpdateDraft, {
       claimId: args.claimId,
       appealLevel,
