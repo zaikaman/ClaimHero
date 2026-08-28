@@ -14,32 +14,6 @@ export interface DispatchReceipt {
   status: "delivered" | "queued";
 }
 
-function resolvePayerAppellateEmail(payerName?: string): string {
-  if (!payerName) return "uhc_appeals@uhc.com";
-  const clean = payerName.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-  if (clean.includes("united") || clean.includes("uhc") || clean.includes("optum")) {
-    return "uhc_appeals@uhc.com";
-  }
-  if (clean.includes("aetna") || clean.includes("cvs")) {
-    return "crga@aetna.com";
-  }
-  if (clean.includes("cigna") || clean.includes("evernorth")) {
-    return "nationalappealsunit@cigna.com";
-  }
-  if (clean.includes("blue") || clean.includes("bcbs") || clean.includes("anthem") || clean.includes("elevance")) {
-    return "grievanceappeals@anthem.com";
-  }
-  if (clean.includes("humana")) {
-    return "humana_appeals@humana.com";
-  }
-  if (clean.includes("kaiser")) {
-    return "appeals-grievances@kp.org";
-  }
-
-  return `appeals-resolution@${clean || "insurance-payer"}.com`;
-}
-
 /**
  * Autonomous Dispatch Action: Transmits full appeal brief and exhibits via AgentMail
  */
@@ -80,7 +54,14 @@ export const dispatchAppealPacket = action({
     }
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
-    const recipient = args.recipientEmail || resolvePayerAppellateEmail(payer);
+    const recipient = args.recipientEmail || claim.payerContact?.officialAppealsEmail;
+
+    if (!recipient) {
+      const portal = claim.payerContact?.intakePortalUrl ? `Official Online Portal (${claim.payerContact.portalName || claim.payerContact.intakePortalUrl})` : "";
+      const fax = claim.payerContact?.appealsFax ? `Appellate Fax (${claim.payerContact.appealsFax})` : "";
+      const channels = [portal, fax].filter(Boolean).join(" or ") || "Certified Mail";
+      throw new Error(`Insurer ${payer} does not accept formal appeals via direct email under HIPAA regulations. Please submit through their ${channels}.`);
+    }
 
     const sender = claim.assignedAgentEmail || `appeal-claim-${claim.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
     const subject =
@@ -185,15 +166,15 @@ export const sendOutboundMessage = action({
       throw new Error(`Claim ${args.claimId} not found`);
     }
 
-    const payer = claim.patient?.insurancePayer || "Health Insurer";
-    const recipient = args.customRecipient || claim.payerContact?.officialAppealsEmail || resolvePayerAppellateEmail(payer);
-    const sender = claim.assignedAgentEmail || `appeal-claim-${claim.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
+    const recipient = args.customRecipient || claim.payerContact?.officialAppealsEmail;
+    const sender = claim.assignedAgentEmail || process.env.AGENTMAIL_INBOX_ID || "thinhdinh@agentmail.to";
     const subject = args.customSubject || `Re: Claim #${claim.claimNumber} Appeal Addendum (Patient: ${claim.patient?.name})`;
 
     const agentMailKey = process.env.AGENTMAIL_API_KEY;
     const inboxId = process.env.AGENTMAIL_INBOX_ID || "thinhdinh@agentmail.to";
 
-    if (agentMailKey) {
+    // Only transmit over live AgentMail if a genuine recipient email exists
+    if (agentMailKey && recipient) {
       try {
         const res = await fetch(`https://api.agentmail.to/v0/inboxes/${encodeURIComponent(inboxId)}/messages/send`, {
           method: "POST",
@@ -226,7 +207,7 @@ export const sendOutboundMessage = action({
       threadId = await ctx.runMutation((api as any).emails.getOrCreateThread, {
         claimId: args.claimId,
         agentEmail: sender,
-        payerEmail: recipient,
+        payerEmail: recipient || "case-docket@claimhero.internal",
         subject,
       });
     }
@@ -236,7 +217,7 @@ export const sendOutboundMessage = action({
       claimId: args.claimId,
       direction: "outbound",
       sender,
-      recipient,
+      recipient: recipient || "Case Docket (Internal Record)",
       subject,
       bodyHtml: `<p>${args.text}</p>`,
       bodyText: args.text,

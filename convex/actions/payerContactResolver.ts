@@ -8,7 +8,11 @@ import { createStructuredCompletion } from "../lib/openai";
 const CONTACT_EXTRACTION_SCHEMA = {
   type: "object",
   properties: {
-    officialAppealsEmail: { type: "string" },
+    officialAppealsEmail: {
+      type: "string",
+      description:
+        "Official public email exclusively dedicated to receiving formal claim appeals or grievance submissions. LEAVE NULL OR EMPTY if the insurer does not accept appeals via email (which is the case for most major US health plans).",
+    },
     intakePortalUrl: { type: "string" },
     portalName: { type: "string" },
     appealsFax: { type: "string" },
@@ -20,8 +24,6 @@ const CONTACT_EXTRACTION_SCHEMA = {
     source: { type: "string" },
   },
   required: [
-    "officialAppealsEmail",
-    "intakePortalUrl",
     "portalName",
     "appealsFax",
     "statutoryPoBox",
@@ -35,7 +37,7 @@ const CONTACT_EXTRACTION_SCHEMA = {
 };
 
 export interface ResolvedPayerContact {
-  officialAppealsEmail: string;
+  officialAppealsEmail?: string;
   intakePortalUrl?: string;
   portalName?: string;
   appealsFax?: string;
@@ -74,7 +76,6 @@ export const resolvePayerGateway = action({
     // 2. Check if known US major payer and web search not forced
     const PRESET_PAYERS: Record<string, ResolvedPayerContact> = {
       unitedhealthcare: {
-        officialAppealsEmail: "uhc_appeals@uhc.com",
         intakePortalUrl: "https://www.uhcprovider.com/en/claims-payments-billing/appeals.html",
         portalName: "UHC Provider Appeals & Grievance Portal",
         appealsFax: "1-855-899-7400",
@@ -86,7 +87,6 @@ export const resolvePayerGateway = action({
         source: "preset",
       },
       aetna: {
-        officialAppealsEmail: "crga@aetna.com",
         intakePortalUrl: "",
         portalName: "",
         appealsFax: "1-859-455-8650",
@@ -98,7 +98,6 @@ export const resolvePayerGateway = action({
         source: "preset",
       },
       cigna: {
-        officialAppealsEmail: "nationalappealsunit@cigna.com",
         intakePortalUrl: "https://www.cigna.com/health-care-providers/coverage-and-claims/appeals-disputes",
         portalName: "CignaforHCP / myCigna Appeals Portal",
         appealsFax: "1-877-804-1679",
@@ -110,7 +109,6 @@ export const resolvePayerGateway = action({
         source: "preset",
       },
       bcbs: {
-        officialAppealsEmail: "grievanceappeals@anthem.com",
         intakePortalUrl: "https://providers.anthem.com/california-provider/contact-us",
         portalName: "Anthem Provider Portal (Availity Essentials)",
         appealsFax: "1-866-587-3316",
@@ -122,7 +120,6 @@ export const resolvePayerGateway = action({
         source: "preset",
       },
       humana: {
-        officialAppealsEmail: "humana_appeals@humana.com",
         intakePortalUrl: "https://resolutions.humana.com/",
         portalName: "Humana Resolutions Portal",
         appealsFax: "1-800-949-2961",
@@ -134,7 +131,6 @@ export const resolvePayerGateway = action({
         source: "preset",
       },
       kaiser: {
-        officialAppealsEmail: "appeals-grievances@kp.org",
         intakePortalUrl: "https://healthy.kaiserpermanente.org/community-providers/permanente-advantage/contact-us",
         portalName: "Kaiser Community Provider Portal",
         appealsFax: "1-626-405-3039",
@@ -168,7 +164,7 @@ export const resolvePayerGateway = action({
 
       if (firecrawlApiKey) {
         try {
-          const searchQuery = `"${payer}" official appeals or claims or "khiếu nại" or "chăm sóc khách hàng" email contact`;
+          const searchQuery = `"${payer}" official appeals portal or fax or claims or "khiếu nại" contact`;
           const response = await fetch("https://api.firecrawl.dev/v1/search", {
             method: "POST",
             headers: {
@@ -196,9 +192,13 @@ export const resolvePayerGateway = action({
 
       // 4. Use LLM to extract or infer verified contact details
       const systemPrompt = `You are ClaimHero's Payer Intake Intelligence Agent.
-Your task is to identify the accurate, official appellate, grievance, claims, or customer care intake email address and contact details for the specified health insurer or insurance company.
-Whether the insurer is in the United States, Vietnam (e.g. Bảo Việt, Manulife Vietnam, Prudential, Dai-ichi Life), or elsewhere, find the genuine contact email where policyholders submit formal disputes or claim inquiries.
-Return a valid RFC 5322 email address. Avoid generic placeholder text.`;
+Your task is to identify the accurate, official appellate, grievance, claims, or customer care intake gateway details for the specified health insurer or insurance company.
+
+CRITICAL RULES ON EMAIL ADDRESSES:
+1. NEVER guess, synthesize, or hallucinate an email address (such as appeals@domain.com or claims@domain.com).
+2. Most major health insurers (especially US commercial plans like UHC, Aetna, Cigna, Anthem, Humana, Kaiser) STRICTLY REJECT appeal submissions via unencrypted public email due to HIPAA compliance and mandate online portals, appellate faxes, or certified postal mail.
+3. ONLY return an officialAppealsEmail if a genuine, publicly documented email address explicitly intended for claim appeals/disputes or customer grievances was found in the search results (for instance, certain international insurers like Bảo Việt, or specific state Medicaid dispute inboxes).
+4. If no legitimate public appeals email exists for this insurer, omit or return null/empty for officialAppealsEmail. Prioritize accurate portal URLs and appellate fax numbers instead.`;
 
       const userPrompt = `Insurer Name: ${payer}
 Patient State / Jurisdiction: ${claim.patient?.state || "National"}
@@ -216,8 +216,10 @@ Extract or resolve the official appeals/grievance/claims intake gateway details 
           temperature: 0.1,
         });
 
+        const extractedEmail = aiExtraction.officialAppealsEmail?.trim();
+
         resolvedContact = {
-          officialAppealsEmail: aiExtraction.officialAppealsEmail || `claims@${cleanName || "insurer"}.com`,
+          officialAppealsEmail: extractedEmail && extractedEmail.includes("@") ? extractedEmail : undefined,
           intakePortalUrl: aiExtraction.intakePortalUrl || `https://www.${cleanName}.com`,
           portalName: aiExtraction.portalName || `${payer} Online Grievance Gateway`,
           appealsFax: aiExtraction.appealsFax || "1-800-555-0198",
@@ -230,7 +232,7 @@ Extract or resolve the official appeals/grievance/claims intake gateway details 
         };
       } catch {
         resolvedContact = {
-          officialAppealsEmail: `appeals-resolution@${cleanName || "insurance-gateway"}.com`,
+          officialAppealsEmail: undefined,
           intakePortalUrl: `https://www.${cleanName}.com`,
           portalName: `${payer} Appeals Portal`,
           appealsFax: "1-800-555-0198",
@@ -255,7 +257,7 @@ Extract or resolve the official appeals/grievance/claims intake gateway details 
       claimId: args.claimId,
       eventType: "policy_crawled",
       actor: resolvedContact.source === "firecrawl_live" ? "Firecrawl Web Crawler" : "Payer Gateway Resolver",
-      details: `Resolved official appeals gateway for ${payer}: ${resolvedContact.officialAppealsEmail} (Source: ${resolvedContact.source}).`,
+      details: `Resolved official appeals gateway for ${payer}: ${resolvedContact.officialAppealsEmail || resolvedContact.portalName || resolvedContact.appealsFax || "Appellate Gateway"} (Source: ${resolvedContact.source}).`,
     });
 
     return resolvedContact;

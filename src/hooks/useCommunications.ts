@@ -55,8 +55,7 @@ export function useCommunications(claim?: Claim | null) {
 
       const recipient =
         threads?.[0]?.payerEmail ||
-        claim.payerContact?.officialAppealsEmail ||
-        `appeals@${claim.patient?.insurancePayer?.toLowerCase().replace(/[^a-z]/g, "") || "payer"}.com`;
+        claim.payerContact?.officialAppealsEmail;
 
       if (sendOutboundAction) {
         await sendOutboundAction({

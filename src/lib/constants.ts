@@ -7,15 +7,15 @@ export interface PayerAppellateContact {
   id: string;
   name: string;
   domain: string;
-  officialAppealsEmail: string;
-  intakePortalUrl: string;
-  portalName: string;
-  appealsFax: string;
-  statutoryPoBox: string;
-  ediPayerId: string;
-  tollFreeHelpline: string;
+  officialAppealsEmail?: string;
+  intakePortalUrl?: string;
+  portalName?: string;
+  appealsFax?: string;
+  statutoryPoBox?: string;
+  ediPayerId?: string;
+  tollFreeHelpline?: string;
   isVerified: boolean;
-  submissionPolicyNote: string;
+  submissionPolicyNote?: string;
 }
 
 export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
@@ -23,7 +23,6 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     id: "uhc",
     name: "UnitedHealthcare",
     domain: "uhc.com",
-    officialAppealsEmail: "uhc_appeals@uhc.com",
     intakePortalUrl: "https://www.uhcprovider.com/en/claims-payments-billing/appeals.html",
     portalName: "UHC Provider Appeals & Grievance Portal",
     appealsFax: "1-855-899-7400",
@@ -37,7 +36,6 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     id: "aetna",
     name: "Aetna (CVS Health)",
     domain: "aetna.com",
-    officialAppealsEmail: "crga@aetna.com",
     intakePortalUrl: "",
     portalName: "",
     appealsFax: "1-859-455-8650",
@@ -51,7 +49,6 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     id: "cigna",
     name: "Cigna Healthcare",
     domain: "cigna.com",
-    officialAppealsEmail: "nationalappealsunit@cigna.com",
     intakePortalUrl: "https://www.cigna.com/health-care-providers/coverage-and-claims/appeals-disputes",
     portalName: "CignaforHCP / myCigna Appeals Portal",
     appealsFax: "1-877-804-1679",
@@ -65,7 +62,6 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     id: "bcbs",
     name: "Blue Cross Blue Shield",
     domain: "bcbs.com",
-    officialAppealsEmail: "grievanceappeals@anthem.com",
     intakePortalUrl: "https://providers.anthem.com/california-provider/contact-us",
     portalName: "Anthem Provider Portal (Availity Essentials)",
     appealsFax: "1-866-587-3316",
@@ -79,7 +75,6 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     id: "humana",
     name: "Humana",
     domain: "humana.com",
-    officialAppealsEmail: "humana_appeals@humana.com",
     intakePortalUrl: "https://resolutions.humana.com/",
     portalName: "Humana Resolutions Portal",
     appealsFax: "1-800-949-2961",
@@ -93,7 +88,6 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     id: "kaiser",
     name: "Kaiser Permanente",
     domain: "kp.org",
-    officialAppealsEmail: "appeals-grievances@kp.org",
     intakePortalUrl: "https://healthy.kaiserpermanente.org/community-providers/permanente-advantage/contact-us",
     portalName: "Kaiser Community Provider Portal",
     appealsFax: "1-626-405-3039",
@@ -111,7 +105,6 @@ export const getPayerAppellateContact = (payerName?: string): PayerAppellateCont
       id: "unknown",
       name: "Health Insurer",
       domain: "insurance-payer.com",
-      officialAppealsEmail: "appeals@insurance-payer.com",
       intakePortalUrl: "https://www.insurance-payer.com/appeals",
       portalName: "Insurer Grievance & Appeals Gateway",
       appealsFax: "1-800-555-0198",
@@ -148,7 +141,6 @@ export const getPayerAppellateContact = (payerName?: string): PayerAppellateCont
     id: clean,
     name: payerName,
     domain: `${clean}.com`,
-    officialAppealsEmail: `appeals-resolution@${clean}.com`,
     intakePortalUrl: `https://www.${clean}.com/appeals`,
     portalName: `${payerName} Official Appeals Portal`,
     appealsFax: "1-800-555-0198",

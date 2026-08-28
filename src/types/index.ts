@@ -68,7 +68,7 @@ export interface Claim {
 }
 
 export interface PayerContact {
-  officialAppealsEmail: string;
+  officialAppealsEmail?: string;
   intakePortalUrl?: string;
   portalName?: string;
   appealsFax?: string;

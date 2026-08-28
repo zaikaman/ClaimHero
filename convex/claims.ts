@@ -648,7 +648,7 @@ export const updatePayerContact = mutation({
   args: {
     claimId: v.id("claims"),
     payerContact: v.object({
-      officialAppealsEmail: v.string(),
+      officialAppealsEmail: v.optional(v.string()),
       intakePortalUrl: v.optional(v.string()),
       portalName: v.optional(v.string()),
       appealsFax: v.optional(v.string()),
@@ -671,7 +671,7 @@ export const updatePayerContact = mutation({
       .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
       .first();
 
-    if (thread) {
+    if (thread && args.payerContact.officialAppealsEmail) {
       await ctx.db.patch(thread._id, {
         payerEmail: args.payerContact.officialAppealsEmail,
       });

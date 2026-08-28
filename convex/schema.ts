@@ -54,7 +54,7 @@ export default defineSchema({
     denialLetterStorageId: v.optional(v.id("_storage")),
     payerContact: v.optional(
       v.object({
-        officialAppealsEmail: v.string(),
+        officialAppealsEmail: v.optional(v.string()),
         intakePortalUrl: v.optional(v.string()),
         portalName: v.optional(v.string()),
         appealsFax: v.optional(v.string()),

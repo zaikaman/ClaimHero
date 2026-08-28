@@ -188,10 +188,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
               <Button
                 size="sm"
-                variant="outline"
+                variant={!recipientEmail && payerContact.intakePortalUrl ? "default" : "outline"}
                 onClick={handleCopyBrief}
                 disabled={!claim.latestAppeal}
-                className="gap-1.5 text-xs h-9"
+                className={cn(
+                  "gap-1.5 text-xs h-9",
+                  !recipientEmail && payerContact.intakePortalUrl && "bg-primary text-primary-foreground font-semibold"
+                )}
               >
                 {copiedBrief ? (
                   <Check className="size-3.5 text-emerald-500" />
@@ -203,33 +206,43 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
               <Button
                 size="sm"
-                variant="outline"
+                variant={!recipientEmail && !payerContact.intakePortalUrl ? "default" : "outline"}
                 onClick={() => window.print()}
                 title="Print court-ready certified mail docket"
-                className="gap-1.5 text-xs h-9"
+                className={cn(
+                  "gap-1.5 text-xs h-9",
+                  !recipientEmail && !payerContact.intakePortalUrl && "bg-primary text-primary-foreground font-semibold"
+                )}
               >
                 <Printer className="size-3.5" />
                 <span>Print Docket</span>
               </Button>
 
-              <Button
-                size="sm"
-                onClick={handleRunDispatch}
-                disabled={isDispatching}
-                className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9"
-              >
-                {isDispatching ? (
-                  <>
-                    <CircleNotch className="size-4 animate-spin" />
-                    <span>Transmitting via AgentMail...</span>
-                  </>
-                ) : (
-                  <>
-                    <PaperPlaneTilt className="size-4" />
-                    <span>Dispatch via AgentMail</span>
-                  </>
-                )}
-              </Button>
+              {recipientEmail ? (
+                <Button
+                  size="sm"
+                  onClick={handleRunDispatch}
+                  disabled={isDispatching}
+                  className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9"
+                >
+                  {isDispatching ? (
+                    <>
+                      <CircleNotch className="size-4 animate-spin" />
+                      <span>Transmitting via AgentMail...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PaperPlaneTilt className="size-4" />
+                      <span>Dispatch via AgentMail</span>
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted/60 border border-border text-[11px] text-muted-foreground">
+                  <Info className="size-3.5 text-amber-500 shrink-0" />
+                  <span>Email Prohibited by Payer</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -372,31 +385,43 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 </div>
               )}
 
-              <div>
-                <span className="text-[10px] font-mono text-muted-foreground block">Electronic / EDI Gateway</span>
-                <div className="flex items-center justify-between gap-1 mt-0.5">
-                  <span className="font-mono text-[11px] text-foreground font-medium break-all">
-                    {recipientEmail}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={() => {
-                      navigator.clipboard.writeText(recipientEmail);
-                      setCopiedRecipientEmail(true);
-                      setTimeout(() => setCopiedRecipientEmail(false), 2000);
-                    }}
-                    title="Copy official appeals email"
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
-                  >
-                    {copiedRecipientEmail ? (
-                      <Check className="size-3 text-emerald-500" />
-                    ) : (
-                      <Copy className="size-3" />
-                    )}
-                  </Button>
+              {recipientEmail ? (
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Electronic Appeals Email</span>
+                  <div className="flex items-center justify-between gap-1 mt-0.5">
+                    <span className="font-mono text-[11px] text-foreground font-medium break-all">
+                      {recipientEmail}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => {
+                        navigator.clipboard.writeText(recipientEmail);
+                        setCopiedRecipientEmail(true);
+                        setTimeout(() => setCopiedRecipientEmail(false), 2000);
+                      }}
+                      title="Copy official appeals email"
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                    >
+                      {copiedRecipientEmail ? (
+                        <Check className="size-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="size-3" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Appeals Intake Channel</span>
+                  <span className="text-[11px] text-foreground font-medium block mt-0.5">
+                    {payerContact.intakePortalUrl ? "Official Online Portal & Appellate Fax" : "Appellate Fax & Certified Mail"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground block mt-0.5">
+                    Email submission prohibited by insurer (HIPAA protected)
+                  </span>
+                </div>
+              )}
 
               <div>
                 <span className="text-[10px] font-mono text-muted-foreground block">Statutory Appeals P.O. Box</span>
@@ -441,7 +466,11 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <CheckCircle className="size-3.5" />
                   {claim.status === "dispatched" || claim.status === "won"
                     ? "Packet Transmitted & Logged"
-                    : "Ready for Certified Dispatch"}
+                    : recipientEmail
+                    ? "Ready for AgentMail Dispatch"
+                    : payerContact.intakePortalUrl
+                    ? "Ready for Portal Submission"
+                    : "Ready for Certified Fax / Mail"}
                 </span>
               </div>
 
@@ -495,7 +524,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <Envelope className="size-8 mx-auto text-muted-foreground/60" />
                 <div className="text-xs font-medium text-foreground">No transmissions yet</div>
                 <p className="text-[11px] max-w-sm mx-auto">
-                  Click &quot;Dispatch Appeal Packet&quot; above to transmit the synthesized ERISA brief to the insurer via AgentMail.
+                  {recipientEmail
+                    ? "Click 'Dispatch via AgentMail' above to transmit the synthesized ERISA brief to the insurer."
+                    : "Payer mandates portal or fax submission. Copy the brief above to paste into their official portal, or print the certified docket."}
                 </p>
               </div>
             ) : (
@@ -565,7 +596,11 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               type="text"
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Type addendum or reply to payer..."
+              placeholder={
+                recipientEmail
+                  ? "Type addendum or reply to payer..."
+                  : "Log addendum note to case docket..."
+              }
               className="flex-1 bg-background"
             />
             <Button
