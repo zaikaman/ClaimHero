@@ -28,7 +28,7 @@ export interface DispatchReceipt {
 export const dispatchAppealPacket = action({
   args: {
     claimId: v.id("claims"),
-    appealId: v.id("appeals"),
+    appealId: v.optional(v.id("appeals")),
     recipientEmail: v.optional(v.string()),
     customSubject: v.optional(v.string()),
   },
@@ -45,9 +45,17 @@ export const dispatchAppealPacket = action({
       throw new Error(`Claim ${args.claimId} not found`);
     }
 
-    const appeal: any = await ctx.runQuery((api as any).appeals.getLatestByClaim, {
-      claimId: args.claimId,
-    });
+    let appeal: any = null;
+    if (args.appealId) {
+      appeal = await ctx.runQuery((api as any).appeals.getById, {
+        appealId: args.appealId,
+      });
+    }
+    if (!appeal) {
+      appeal = await ctx.runQuery((api as any).appeals.getLatestByClaim, {
+        claimId: args.claimId,
+      });
+    }
 
     if (!appeal) {
       throw new Error(`No appeal brief found for claim ${args.claimId}`);

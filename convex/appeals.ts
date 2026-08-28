@@ -3,6 +3,18 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 
 /**
+ * Get an appeal brief by its ID
+ */
+export const getById = query({
+  args: {
+    appealId: v.id("appeals"),
+  },
+  handler: async (ctx, args): Promise<Doc<"appeals"> | null> => {
+    return await ctx.db.get(args.appealId);
+  },
+});
+
+/**
  * Get the latest active appeal brief for a given claim
  */
 export const getLatestByClaim = query({

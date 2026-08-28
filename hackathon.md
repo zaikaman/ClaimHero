@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-28T09:40:00Z
+- **Last updated:** 2026-08-28T10:04:00Z
 
 ## Log
 
@@ -121,5 +121,8 @@ Elevated Appeal Brief Synthesis & Studio Preview to Production-Grade Legal Memor
 ### 2026-08-28 - cc5012c
 Engineered Deterministic 4-Pillar Clinical Appeal Scoring Rubric & Win Likelihood Criteria Breakdown: Upgraded `precedentMatcher.ts` action with a structured 4-pillar medical appeal scoring rubric (CPB Indication Alignment 35%, Clinical Documentation & Step-Therapy 25%, ERISA 29 CFR § 2560.503-1 Procedural Protections 20%, External Review Precedent Benchmark 20%), zero-temperature model execution (`temperature: 0.0`), and deterministic mathematical summation. Added `scoringBreakdown` persistence to `claims` table (`convex/schema.ts`, `convex/claims.ts`) and domain types (`src/types/index.ts`). Enhanced the Evidence Matrix (`EvidenceMatrix.tsx`) to showcase an explainable criteria breakdown card with visual progress bars, criterion point badges, and clinical rationale. Added comprehensive unit tests in `tests/claimhero.test.ts` and verified with `npm run verify` (100% typecheck, lint, 26/26 unit tests, production build).
 
-### 2026-08-28 - working tree
+### 2026-08-28 - 467014c
 Purged Unrendered Raw Markdown Asterisks & Enforced Clean Typography Hygiene: Implemented frontend sanitization utility `stripMarkdownFormatting` (`src/lib/utils.ts`) that cleanly strips raw markdown formatting tokens (`**`, `*`, `__`, `` ` ``) while preserving plain text readability. Applied sanitization across the Policy Evidence Inspector (`PolicyViewer.tsx`), Appeal Studio Evidence Snippets (`CitationSidebar.tsx`), Clinical Criteria Rationales and Precedent Summaries (`EvidenceMatrix.tsx`, `PrecedentFeed.tsx`). Upgraded backend clinical policy crawling action (`convex/actions/policyCrawler.ts`) and precedent matching action (`convex/actions/precedentMatcher.ts`) prompts to strictly enforce clean plain-text outputs without bold markdown asterisks. Sanitized clinical evidence queries and batch inserts in `convex/clinicalEvidences.ts` so historical and newly crawled evidence items load without raw syntax artifacts. Switched browser favicon (`public/favicon.svg`) to pure black (`#000000`) while preserving white monochrome vector brand mark on in-app surfaces. Verified cleanly with `npm run verify` (100% typecheck, lint, 28/28 unit tests, production build).
+
+### 2026-08-28 - working tree
+Resolved Appeal Dispatch Argument Validation Error & Added Direct Appeal ID Resolution: Made `appealId` optional in `dispatchAppealPacket` action (`convex/actions/mailDispatcher.ts`), enabling seamless one-click appeal dossier transmission directly from claim context while retaining specific version targeting when provided. Added dedicated `getById` query to `convex/appeals.ts` and automated fallback to latest claim draft (`appeals.getLatestByClaim`). Updated communications hook `useCommunications.ts` to cleanly dispatch outbound dossiers. Verified with `npm run verify` (100% typecheck, lint, 28/28 unit tests, production build).

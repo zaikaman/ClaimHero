@@ -76,14 +76,17 @@ export function useCommunications(claim?: Claim | null) {
   );
 
   // Dispatch full appeal packet
-  const dispatchAppeal = useCallback(async () => {
-    if (!claim?._id) throw new Error("No claim selected for dispatch");
+  const dispatchAppeal = useCallback(
+    async (appealId?: string) => {
+      if (!claim?._id) throw new Error("No claim selected for dispatch");
 
-    return await dispatchAction({
-      claimId: claim._id as any,
-      appealId: undefined as any,
-    });
-  }, [claim, dispatchAction]);
+      return await dispatchAction({
+        claimId: claim._id as any,
+        appealId: appealId ? (appealId as any) : undefined,
+      });
+    },
+    [claim, dispatchAction]
+  );
 
   return {
     threads: threads || [],
