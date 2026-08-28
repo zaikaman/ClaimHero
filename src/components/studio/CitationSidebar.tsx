@@ -64,7 +64,7 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
               Cited Authorities & Evidence
             </span>
           </div>
-          <Badge variant="secondary" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+          <Badge variant="success" size="sm" className="font-mono text-[10px]">
             Auto-Cited in Brief
           </Badge>
         </div>

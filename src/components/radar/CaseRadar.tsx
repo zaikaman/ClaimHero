@@ -28,6 +28,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
+import { Select } from "../ui/select";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import {
   Table,
@@ -422,10 +423,10 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
               {/* Insurer Payer Filter */}
               <div className="flex items-center gap-1.5">
                 <Buildings className="size-3.5 text-muted-foreground hidden sm:inline" />
-                <select
+                <Select
                   value={payerFilter}
                   onChange={(e) => setPayerFilter(e.target.value)}
-                  className="rounded-lg border border-input bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-8"
+                  className="h-8 text-xs font-sans"
                 >
                   <option value="all">All Insurers</option>
                   {INSURERS.map((ins) => (
@@ -433,7 +434,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                       {ins.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               {/* Reset Filters CTA if active */}

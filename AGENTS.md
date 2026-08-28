@@ -6,8 +6,7 @@ specs/001-appeal-sentinel/plan.md
 
 # Agent Behavior & Project Guidelines
 
-## 1. Language Policy (Quy Định Ngôn Ngữ)
-- **Communication (Giao tiếp)**: Luôn trao đổi, giải thích, báo cáo và trả lời người dùng bằng **Tiếng Việt**.
+## 1. Language Policy
 - **Code & Technical Assets**: Write all source code, identifiers, types, schemas, comments, commit messages, PR descriptions, test cases, and technical specifications exclusively in **English**.
 - **UI Content**: Default application UI copy, labels, and data must be in **English** (tailored for the international hackathon judges).
 

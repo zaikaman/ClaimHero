@@ -14,6 +14,7 @@ import { AuditLog, Claim } from "../../types";
 import { formatDate } from "../../lib/utils";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
+import { Select } from "../ui/select";
 
 interface AuditTimelineProps {
   claim?: Claim | null;
@@ -97,10 +98,10 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
         {/* Filter Selector */}
         <div className="flex items-center gap-2">
           <Funnel className="size-3.5 text-muted-foreground" />
-          <select
+          <Select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="rounded-lg border border-input bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-8"
+            className="h-8 text-xs font-sans"
           >
             <option value="all">All Events ({logs.length})</option>
             <option value="denial_ingested">Denial Ingested</option>
@@ -108,7 +109,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
             <option value="appeal_dispatched">Appeal Dispatched</option>
             <option value="payer_response_received">Payer Replies</option>
             <option value="statutory_alarm_critical">Statutory Alarms</option>
-          </select>
+          </Select>
         </div>
       </Card>
 

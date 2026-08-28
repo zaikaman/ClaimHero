@@ -21,6 +21,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Textarea } from "../ui/textarea";
+import { Select } from "../ui/select";
 
 interface AppealStudioProps {
   claim: Claim;
@@ -126,15 +127,15 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Appeal Level Selector */}
-            <select
+            <Select
               value={appealLevel}
               onChange={(e) => setAppealLevel(e.target.value as AppealLevel)}
-              className="rounded-lg border border-input bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-8"
+              className="h-8 text-xs font-sans"
             >
               <option value="level_1_internal">Level 1: Internal Appeal (ERISA 180d)</option>
               <option value="level_2_grievance">Level 2: Formal Grievance Review</option>
               <option value="level_3_external_state_review">Level 3: External State Commissioner Review</option>
-            </select>
+            </Select>
 
             {/* Treating Physician Notes Toggle */}
             <Button

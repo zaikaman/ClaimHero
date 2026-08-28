@@ -8,7 +8,10 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
     | "destructive"
     | "outline"
     | "ghost"
-    | "link";
+    | "link"
+    | "success"
+    | "warning"
+    | "info";
   size?: "default" | "sm";
 }
 
@@ -28,6 +31,12 @@ export function Badge({
       "bg-secondary text-secondary-foreground",
     destructive:
       "bg-destructive/15 text-destructive border-destructive/30 font-medium",
+    success:
+      "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-medium",
+    warning:
+      "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-medium",
+    info:
+      "bg-primary/15 text-primary border border-primary/30 font-medium",
     outline:
       "border-border text-foreground bg-transparent",
     ghost:

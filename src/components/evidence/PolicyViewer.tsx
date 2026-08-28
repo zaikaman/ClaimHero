@@ -13,6 +13,7 @@ import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Select } from "../ui/select";
 import { stripMarkdownFormatting } from "../../lib/utils";
 
 interface PolicyViewerProps {
@@ -96,17 +97,17 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
             />
           </div>
 
-          <select
+          <Select
             value={filterSource}
             onChange={(e) => setFilterSource(e.target.value)}
-            className="rounded-lg border border-input bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans h-7"
+            className="h-7 text-xs font-sans"
           >
             <option value="all">All Sources</option>
             <option value="payer_cpb">Insurer CPB</option>
             <option value="legal_precedent">ERISA / Law</option>
             <option value="pubmed_study">PubMed</option>
             <option value="fda_package_insert">FDA Label</option>
-          </select>
+          </Select>
         </div>
       </div>
 

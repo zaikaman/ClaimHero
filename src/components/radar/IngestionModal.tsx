@@ -28,6 +28,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 import { Textarea } from "../ui/textarea";
+import { Select } from "../ui/select";
 
 const convexApi = api as any;
 
@@ -301,10 +302,10 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div className="flex items-center justify-between gap-2 bg-muted/40 border border-border p-2 rounded-lg text-xs">
             <span className="text-muted-foreground font-medium truncate">Jurisdiction:</span>
-            <select
+            <Select
               value={patientState}
               onChange={(e) => setPatientState(e.target.value)}
-              className="bg-card border border-input rounded-md px-2 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-sans"
+              className="h-7 text-xs font-sans border-border/80"
             >
               <option value="California">California (ERISA 180d)</option>
               <option value="New York">New York (DFS 180d)</option>
@@ -312,7 +313,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <option value="Florida">Florida (FL DOI)</option>
               <option value="Illinois">Illinois (IDFPR)</option>
               <option value="Pennsylvania">Pennsylvania (PID)</option>
-            </select>
+            </Select>
           </div>
 
           <div

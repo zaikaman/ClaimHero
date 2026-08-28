@@ -2,8 +2,8 @@
 name: ClaimHero Design System
 description: Precision Medical Dark-Mode Design System for Autonomous Medical Appeal Sentinel
 colors:
-  primary: "#00e5ff"
-  primary-foreground: "#080c14"
+  primary: "#0ea5e9"
+  primary-foreground: "#ffffff"
   neutral-canvas: "#080c14"
   neutral-card: "#0e1420"
   neutral-subtle: "#141c2c"
@@ -59,12 +59,12 @@ spacing:
   xl: "32px"
 components:
   button-primary:
-    backgroundColor: "{colors.text-white}"
+    backgroundColor: "{colors.primary}"
     textColor: "{colors.primary-foreground}"
     rounded: "{rounded.lg}"
     padding: "6px 12px"
   button-primary-hover:
-    backgroundColor: "{colors.text-muted}"
+    backgroundColor: "{colors.primary}"
   button-secondary:
     backgroundColor: "{colors.neutral-subtle}"
     textColor: "{colors.text-white}"
@@ -188,8 +188,8 @@ Surfaces rely on optical glassmorphic layering rather than heavy opaque drop sha
 
 ### Buttons
 - **Shape:** Crisp rounded corners (10px radius, `rounded-lg`).
-- **Primary:** High-contrast crisp white background (`#f8fafc`), obsidian text (`#080c14`), hover brightness reduction (`#f8fafc/90`), subtle shadow (`0 1px 2px rgba(0,0,0,0.15)`).
-- **Secondary:** Dark subtle glass fill (`#141c2c`), crisp text (`#f8fafc`), hover background (`#1e293b`).
+- **Primary:** Precision Medical Cyan (`hsl(199, 89%, 46%)` / `#0ea5e9`), crisp pure white text (`#ffffff`), subtle ambient backlight (`shadow-xs shadow-primary/20 hover:shadow-primary/30`).
+- **Secondary & Outline:** Translucent specular glass fill (`dark:bg-white/[0.03]`), specular border highlight (`dark:border-white/[0.10]`), elevated hover brightness (`dark:hover:border-white/[0.22] dark:hover:bg-white/[0.08]`), crisp text (`#f8fafc`).
 - **Destructive:** Soft crimson tint (`#f43f5e/15`), crimson border (`#f43f5e/30`), crimson text (`#f43f5e`), hover background (`#f43f5e/25`).
 - **Ghost:** Transparent background, muted text (`#94a3b8`), hover background (`#141c2c`), hover text (`#f8fafc`).
 - **Sizes:** Default `h-8 px-3 text-xs`, Small `h-7 px-2.5 text-xs`, Extra-Small `h-6 px-2 text-xs`, Large `h-9 px-3.5 text-sm`.
@@ -206,6 +206,7 @@ Surfaces rely on optical glassmorphic layering rather than heavy opaque drop sha
 - **Style:** Compact pill (`rounded-full`, `h-5 px-2 text-xs`).
 - **Variants:**
   - *Default:* Obsidian fill with clinical cyan or white text.
+  - *Info:* Cyan translucent background (`bg-primary/15 text-primary border-primary/30`).
   - *Destructive:* Crimson translucent background (`bg-destructive/15 text-destructive border-destructive/30`).
   - *Success (Victory):* Emerald translucent background (`bg-emerald-500/15 text-emerald-400 border-emerald-500/30`).
   - *Warning (Countdown):* Amber translucent background (`bg-amber-500/15 text-amber-400 border-amber-500/30`).
