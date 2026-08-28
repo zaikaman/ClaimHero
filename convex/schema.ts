@@ -38,6 +38,18 @@ export default defineSchema({
     daysRemaining: v.number(),
     overturnProbabilityScore: v.optional(v.number()),
     riskLevel: v.optional(v.string()), // high_confidence, moderate, complex_litigation
+    scoringBreakdown: v.optional(
+      v.array(
+        v.object({
+          category: v.string(),
+          criterion: v.string(),
+          score: v.number(),
+          maxScore: v.number(),
+          status: v.string(), // strong, moderate, weak
+          rationale: v.string(),
+        })
+      )
+    ),
     assignedAgentEmail: v.string(),
     denialLetterStorageId: v.optional(v.id("_storage")),
     createdAt: v.number(),

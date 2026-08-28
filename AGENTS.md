@@ -20,6 +20,8 @@ specs/001-appeal-sentinel/plan.md
   - Intelligence: OpenAI (Clinical Reason Extraction & Cited Appeal Brief Generation)
   - Frontend: React / TypeScript / Vite / TailwindCSS with Precision Medical Dark-Mode Theme
 - **Build Log**: Keep `hackathon.md` updated after meaningful build sessions using the `/hackathon` skill.
+  - **UTC Timezone Standard**: Always use ISO 8601 UTC timestamps (`YYYY-MM-DDTHH:mm:ssZ`) in the header and UTC dates (`### YYYY-MM-DD - ...`) in log entries.
+  - **Git Hash Reconciliation**: When starting or updating `hackathon.md`, check `git log` to backfill previous `working tree` entries with their real 7-character commit hashes (`git log --oneline`). Only use `working tree` for the current active uncommitted session.
 - **Frontend Host**: Convex static hosting (`convex.site`).
 
 ## 3. Git & Branching Strategy

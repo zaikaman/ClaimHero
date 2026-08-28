@@ -264,6 +264,18 @@ export const updateStatus = mutation({
     actor: v.optional(v.string()),
     overturnProbabilityScore: v.optional(v.number()),
     riskLevel: v.optional(v.string()),
+    scoringBreakdown: v.optional(
+      v.array(
+        v.object({
+          category: v.string(),
+          criterion: v.string(),
+          score: v.number(),
+          maxScore: v.number(),
+          status: v.string(),
+          rationale: v.string(),
+        })
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -278,6 +290,9 @@ export const updateStatus = mutation({
     }
     if (args.riskLevel !== undefined) {
       patchData.riskLevel = args.riskLevel;
+    }
+    if (args.scoringBreakdown !== undefined) {
+      patchData.scoringBreakdown = args.scoringBreakdown;
     }
 
     await ctx.db.patch(args.claimId, patchData);

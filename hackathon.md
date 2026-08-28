@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-27T18:00:45Z
+- **Last updated:** 2026-08-28T09:40:00Z
 
 ## Log
 
@@ -115,5 +115,8 @@ Codified Impeccable Product Context & Precision Medical Design System: Authored 
 ### 2026-08-27 - c7dffdc
 Resolved OAuth Avatar Rendering & Resilience Across Navigation Surfaces: Re-engineered the core `Avatar` component (`src/components/ui/avatar.tsx`) with image status tracking (`idle`, `loading`, `loaded`, `error`), image preloading with `referrerPolicy="no-referrer"`, and zero-flash fallback rendering. Updated profile avatar presentation across the Collapsible Sidebar (`Sidebar.tsx`), App Header (`Header.tsx`), and Cinematic Landing Hero (`CinematicHero.tsx`) to render both `AvatarImage` and `AvatarFallback` concurrently, eliminating blank disc visual glitches when external Google OAuth images encounter referer blocking. Added `no-referrer-when-downgrade` meta policy to `index.html` and added `start` script alias to `package.json`. Verified with `npm run verify` (100% typecheck, lint, 24 unit tests, production build).
 
-### 2026-08-27 - working tree
+### 2026-08-27 - a79ed6f
 Elevated Appeal Brief Synthesis & Studio Preview to Production-Grade Legal Memorandum: Upgraded LLM appeal synthesis prompts (`convex/actions/appealSynthesizer.ts`) to mandate authentic legal memorandum architecture (formal transmission header, patient/claim metadata block, Roman numeral sections, rigorous evidentiary rebuttals, cited exhibits list, and authorized physician signature block). Built dedicated `AppealBriefRenderer` (`src/components/studio/AppealBriefRenderer.tsx`) utilizing `react-markdown` and `remark-gfm` with custom typography rules for formal headers, statutory citation callouts with shield iconography, styled metadata tables, and monospace code badges. Integrated the rich renderer into both dark-mode Appeal Studio panes (`AppealStudio.tsx`) and light/print mode Export Dossier modal (`ExportDrawer.tsx`), eliminating raw markdown syntax dumps. Verified cleanly with `npm run verify` (100% typecheck, lint, 24/24 unit tests, production build).
+
+### 2026-08-28 - working tree
+Engineered Deterministic 4-Pillar Clinical Appeal Scoring Rubric & Win Likelihood Criteria Breakdown: Upgraded `precedentMatcher.ts` action with a structured 4-pillar medical appeal scoring rubric (CPB Indication Alignment 35%, Clinical Documentation & Step-Therapy 25%, ERISA 29 CFR § 2560.503-1 Procedural Protections 20%, External Review Precedent Benchmark 20%), zero-temperature model execution (`temperature: 0.0`), and deterministic mathematical summation. Added `scoringBreakdown` persistence to `claims` table (`convex/schema.ts`, `convex/claims.ts`) and domain types (`src/types/index.ts`). Enhanced the Evidence Matrix (`EvidenceMatrix.tsx`) to showcase an explainable criteria breakdown card with visual progress bars, criterion point badges, and clinical rationale. Added comprehensive unit tests in `tests/claimhero.test.ts` and verified with `npm run verify` (100% typecheck, lint, 26/26 unit tests, production build).

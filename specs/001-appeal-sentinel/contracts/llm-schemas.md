@@ -72,10 +72,32 @@ Used by `actions/precedentMatcher.ts` to compute the win score and identify poli
   "schema": {
     "type": "object",
     "properties": {
-      "overturnProbabilityScore": { "type": "number" },
-      "riskLevel": {
-        "type": "string",
-        "enum": ["high_confidence", "moderate", "complex_litigation"]
+      "scoringBreakdown": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "category": {
+              "type": "string",
+              "enum": [
+                "policy_alignment",
+                "clinical_documentation",
+                "statutory_erisa",
+                "precedent_strength"
+              ]
+            },
+            "criterion": { "type": "string" },
+            "score": { "type": "number" },
+            "maxScore": { "type": "number" },
+            "status": {
+              "type": "string",
+              "enum": ["strong", "moderate", "weak"]
+            },
+            "rationale": { "type": "string" }
+          },
+          "required": ["category", "criterion", "score", "maxScore", "status", "rationale"],
+          "additionalProperties": false
+        }
       },
       "keyPolicyContradictions": {
         "type": "array",
@@ -88,8 +110,7 @@ Used by `actions/precedentMatcher.ts` to compute the win score and identify poli
       }
     },
     "required": [
-      "overturnProbabilityScore",
-      "riskLevel",
+      "scoringBreakdown",
       "keyPolicyContradictions",
       "winningPrecedentSummary",
       "suggestedAppealLevel"

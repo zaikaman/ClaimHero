@@ -56,11 +56,21 @@ export interface Claim {
   daysRemaining: number;
   overturnProbabilityScore?: number;
   riskLevel?: RiskLevel;
+  scoringBreakdown?: ScoringCriterion[];
   assignedAgentEmail: string;
   denialLetterStorageId?: string;
   createdAt: number;
   updatedAt: number;
   patient?: Patient;
+}
+
+export interface ScoringCriterion {
+  category: "policy_alignment" | "clinical_documentation" | "statutory_erisa" | "precedent_strength" | string;
+  criterion: string;
+  score: number;
+  maxScore: number;
+  status: "strong" | "moderate" | "weak";
+  rationale: string;
 }
 
 export interface ClinicalEvidence {
@@ -144,6 +154,7 @@ export interface DenialExtractionResult {
 export interface OverturnScoringResult {
   overturnProbabilityScore: number;
   riskLevel: RiskLevel;
+  scoringBreakdown?: ScoringCriterion[];
   keyPolicyContradictions: string[];
   winningPrecedentSummary: string;
   suggestedAppealLevel: AppealLevel;

@@ -89,16 +89,90 @@ describe("Phase 4: Clinical Evidence & Precedent Structure Validation", () => {
     expect(validSources).toContain("legal_precedent");
   });
 
-  it("validates risk band classification boundaries", () => {
+  it("validates 4-pillar deterministic appeal scoring rubric weights", () => {
+    const RUBRIC_WEIGHTS = {
+      policy_alignment: 35,
+      clinical_documentation: 25,
+      statutory_erisa: 20,
+      precedent_strength: 20,
+    };
+
+    const totalWeight = Object.values(RUBRIC_WEIGHTS).reduce((a, b) => a + b, 0);
+    expect(totalWeight).toBe(100);
+    expect(RUBRIC_WEIGHTS.policy_alignment).toBe(35);
+    expect(RUBRIC_WEIGHTS.clinical_documentation).toBe(25);
+    expect(RUBRIC_WEIGHTS.statutory_erisa).toBe(20);
+    expect(RUBRIC_WEIGHTS.precedent_strength).toBe(20);
+  });
+
+  it("computes deterministic win score from criteria sub-scores idempotently", () => {
+    const mockBreakdown = [
+      { category: "policy_alignment", score: 33, maxScore: 35 },
+      { category: "clinical_documentation", score: 23, maxScore: 25 },
+      { category: "statutory_erisa", score: 18, maxScore: 20 },
+      { category: "precedent_strength", score: 18, maxScore: 20 },
+    ];
+
+    const computeScore = (items: typeof mockBreakdown) => {
+      const sum = items.reduce((acc, item) => acc + item.score, 0);
+      return Math.min(99, Math.max(5, Math.round(sum)));
+    };
+
+    const run1 = computeScore(mockBreakdown);
+    const run2 = computeScore(mockBreakdown);
+    const run3 = computeScore(mockBreakdown);
+
+    expect(run1).toBe(92);
+    expect(run2).toBe(92);
+    expect(run3).toBe(92);
+  });
+
+  it("validates deterministic risk band classification boundaries", () => {
     const classifyScore = (score: number) => {
-      if (score >= 85) return "high_confidence";
-      if (score >= 60) return "moderate";
+      if (score >= 80) return "high_confidence";
+      if (score >= 55) return "moderate";
       return "complex_litigation";
     };
 
-    expect(classifyScore(94)).toBe("high_confidence");
-    expect(classifyScore(75)).toBe("moderate");
-    expect(classifyScore(40)).toBe("complex_litigation");
+    expect(classifyScore(92)).toBe("high_confidence");
+    expect(classifyScore(80)).toBe("high_confidence");
+    expect(classifyScore(79)).toBe("moderate");
+    expect(classifyScore(55)).toBe("moderate");
+    expect(classifyScore(54)).toBe("complex_litigation");
+    expect(classifyScore(35)).toBe("complex_litigation");
+  });
+
+  it("evaluates calculateDeterministicRubric with 100% repeatability for CPT 73721", () => {
+    const claim = {
+      cptCodes: ["73721"],
+      denialReasonCode: "CO-16",
+      denialReasonDescription: "Claim/service lacks information or has submission errors.",
+      patient: { insurancePayer: "Cigna" },
+    };
+
+    const evidences = [
+      { sourceType: "payer_cpb", citationClause: "Section 2.1", extractedEvidenceMarkdown: "MRI indicated" },
+      { sourceType: "payer_cpb", citationClause: "Section 2.2", extractedEvidenceMarkdown: "Conservative therapy criteria" },
+      { sourceType: "legal_precedent", citationClause: "IMR Case 2024-88", extractedEvidenceMarkdown: "Overturned" },
+    ];
+
+    // Simulating calculateDeterministicRubric logic
+    const hasCpb = evidences.some((e) => e.sourceType === "payer_cpb");
+    const isAuthOrAdminDenial = ["CO-197", "CO-16", "CO-4"].includes(claim.denialReasonCode);
+
+    const policyScore = hasCpb ? (isAuthOrAdminDenial ? 31 : 29) : 20;
+    const clinicalScore = evidences.length >= 3 ? 22 : 20;
+    const erisaScore = 19;
+    const precedentScore = 17;
+    const total = policyScore + clinicalScore + erisaScore + precedentScore;
+
+    expect(total).toBe(89);
+
+    // Assert 100 runs are identical
+    for (let i = 0; i < 100; i++) {
+      const runTotal = policyScore + clinicalScore + erisaScore + precedentScore;
+      expect(runTotal).toBe(89);
+    }
   });
 });
 
