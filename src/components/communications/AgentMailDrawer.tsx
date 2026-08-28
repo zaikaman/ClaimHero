@@ -325,7 +325,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               </div>
 
               {/* Official Submission Portal */}
-              {payerContact.intakePortalUrl && (
+              {payerContact.intakePortalUrl ? (
                 <div>
                   <span className="text-[10px] font-mono text-muted-foreground block">Appeals & Dispute Portal</span>
                   <a
@@ -337,6 +337,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                     <span>{payerContact.portalName || "Launch Official Payer Portal"}</span>
                     <ArrowSquareOut className="size-3 shrink-0" />
                   </a>
+                </div>
+              ) : (
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Online Portal Status</span>
+                  <span className="text-[11px] text-muted-foreground italic block mt-0.5">
+                    Not supported by payer (Appellate Fax or Mail required)
+                  </span>
                 </div>
               )}
 

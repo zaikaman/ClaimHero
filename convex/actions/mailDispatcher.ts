@@ -88,19 +88,19 @@ export const dispatchAppealPacket = action({
       `URGENT: Formal ERISA Appeal & Demand for Payment - Claim #${claim.claimNumber} (Patient: ${claim.patient?.name})`;
 
     const agentMailKey = process.env.AGENTMAIL_API_KEY;
+    const inboxId = process.env.AGENTMAIL_INBOX_ID || "thinhdinh@agentmail.to";
     const transmissionId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    // 2. If AGENTMAIL_API_KEY is present, send live outbound HTTP request
+    // 2. If AGENTMAIL_API_KEY is present, send live outbound HTTP request via AgentMail API
     if (agentMailKey) {
       try {
-        await fetch("https://api.agentmail.dev/v1/messages/send", {
+        const res = await fetch(`https://api.agentmail.to/v0/inboxes/${encodeURIComponent(inboxId)}/messages/send`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${agentMailKey}`,
           },
           body: JSON.stringify({
-            from: sender,
             to: recipient,
             subject,
             text: appeal.fullAppealMarkdown,
@@ -114,6 +114,11 @@ export const dispatchAppealPacket = action({
             </div>`,
           }),
         });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.warn("AgentMail live dispatch warning, proceeding with record storage:", res.status, errText);
+        }
       } catch (err) {
         console.warn("AgentMail live dispatch warning, proceeding with record storage:", err);
       }
@@ -157,5 +162,87 @@ export const dispatchAppealPacket = action({
       dispatchedAt: Date.now(),
       status: "delivered",
     };
+  },
+});
+
+/**
+ * Send Outbound Communication Message via AgentMail
+ */
+export const sendOutboundMessage = action({
+  args: {
+    claimId: v.id("claims"),
+    threadId: v.optional(v.id("emailThreads")),
+    text: v.string(),
+    customRecipient: v.optional(v.string()),
+    customSubject: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+      claimId: args.claimId,
+    });
+
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+
+    const payer = claim.patient?.insurancePayer || "Health Insurer";
+    const recipient = args.customRecipient || claim.payerContact?.officialAppealsEmail || resolvePayerAppellateEmail(payer);
+    const sender = claim.assignedAgentEmail || `appeal-claim-${claim.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
+    const subject = args.customSubject || `Re: Claim #${claim.claimNumber} Appeal Addendum (Patient: ${claim.patient?.name})`;
+
+    const agentMailKey = process.env.AGENTMAIL_API_KEY;
+    const inboxId = process.env.AGENTMAIL_INBOX_ID || "thinhdinh@agentmail.to";
+
+    if (agentMailKey) {
+      try {
+        const res = await fetch(`https://api.agentmail.to/v0/inboxes/${encodeURIComponent(inboxId)}/messages/send`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${agentMailKey}`,
+          },
+          body: JSON.stringify({
+            to: recipient,
+            subject,
+            text: args.text,
+            html: `<div style="font-family: sans-serif; padding: 16px;">
+              <p><strong>Claim #${claim.claimNumber} - Case Addendum</strong></p>
+              <p>${args.text}</p>
+            </div>`,
+          }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.warn("AgentMail send warning:", res.status, errText);
+        }
+      } catch (err) {
+        console.warn("AgentMail send warning:", err);
+      }
+    }
+
+    let threadId = args.threadId;
+    if (!threadId) {
+      threadId = await ctx.runMutation((api as any).emails.getOrCreateThread, {
+        claimId: args.claimId,
+        agentEmail: sender,
+        payerEmail: recipient,
+        subject,
+      });
+    }
+
+    await ctx.runMutation((api as any).emails.insertMessage, {
+      threadId,
+      claimId: args.claimId,
+      direction: "outbound",
+      sender,
+      recipient,
+      subject,
+      bodyHtml: `<p>${args.text}</p>`,
+      bodyText: args.text,
+      hasAttachments: false,
+    });
+
+    return { success: true };
   },
 });

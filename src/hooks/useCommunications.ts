@@ -39,45 +39,58 @@ export function useCommunications(claim?: Claim | null) {
     convexApi["actions/mailDispatcher"]?.dispatchAppealPacket ||
     convexApi.actions?.mailDispatcher?.dispatchAppealPacket
   );
+  const sendOutboundAction = useAction(
+    convexApi["actions/mailDispatcher"]?.sendOutboundMessage ||
+    convexApi.actions?.mailDispatcher?.sendOutboundMessage
+  );
   const resolvePayerGatewayAction = useAction(
     convexApi["actions/payerContactResolver"]?.resolvePayerGateway ||
     convexApi.actions?.payerContactResolver?.resolvePayerGateway
   );
 
-  // Send an outbound reply/addendum message
+  // Send an outbound reply/addendum message via live AgentMail
   const sendMessage = useCallback(
     async (text: string) => {
       if (!claim?._id) return;
 
-      const sender = claim.assignedAgentEmail;
       const recipient =
         threads?.[0]?.payerEmail ||
         claim.payerContact?.officialAppealsEmail ||
         `appeals@${claim.patient?.insurancePayer?.toLowerCase().replace(/[^a-z]/g, "") || "payer"}.com`;
 
-      let threadId = activeThreadId;
-      if (!threadId) {
-        threadId = await getOrCreateThreadMutation({
+      if (sendOutboundAction) {
+        await sendOutboundAction({
           claimId: claim._id as any,
-          agentEmail: sender,
-          payerEmail: recipient,
-          subject: `Claim #${claim.claimNumber} Appeal Addendum`,
+          threadId: activeThreadId as any,
+          text,
+          customRecipient: recipient,
+        });
+      } else {
+        const sender = claim.assignedAgentEmail;
+        let threadId = activeThreadId;
+        if (!threadId) {
+          threadId = await getOrCreateThreadMutation({
+            claimId: claim._id as any,
+            agentEmail: sender,
+            payerEmail: recipient,
+            subject: `Claim #${claim.claimNumber} Appeal Addendum`,
+          });
+        }
+
+        await insertMessageMutation({
+          threadId: threadId as any,
+          claimId: claim._id as any,
+          direction: "outbound",
+          sender,
+          recipient,
+          subject: `Addendum: Claim #${claim.claimNumber}`,
+          bodyHtml: `<p>${text}</p>`,
+          bodyText: text,
+          hasAttachments: false,
         });
       }
-
-      await insertMessageMutation({
-        threadId: threadId as any,
-        claimId: claim._id as any,
-        direction: "outbound",
-        sender,
-        recipient,
-        subject: `Addendum: Claim #${claim.claimNumber}`,
-        bodyHtml: `<p>${text}</p>`,
-        bodyText: text,
-        hasAttachments: false,
-      });
     },
-    [claim, threads, activeThreadId, getOrCreateThreadMutation, insertMessageMutation]
+    [claim, threads, activeThreadId, sendOutboundAction, getOrCreateThreadMutation, insertMessageMutation]
   );
 
   // Dispatch full appeal packet
