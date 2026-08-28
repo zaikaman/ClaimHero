@@ -228,8 +228,9 @@ CRITICAL FORMATTING RULES:
 2. Paragraphs & Spacing: You MUST use double newlines (\\n\\n) between paragraphs. Never output a single continuous run-on block of text.
 3. Tables: You MUST use formatted Markdown tables with header separators (| :--- | :--- |) for metadata and clinical criteria comparisons.
 4. Blockquotes: Use > for physician clinical necessity statements and direct policy quotes.
-5. Legal Citing: Explicitly cite federal ERISA protections (29 U.S.C. § 1133, 29 CFR § 2560.503-1(h) full-and-fair review standard), the Affordable Care Act § 2719 internal claims requirements (45 CFR § 147.136), and insurer CPBs.
-6. Tone: Authoritative, formal, evidentiary, and uncompromisingly clinical.`,
+5. Legal Citing: Explicitly cite federal ERISA protections (29 U.S.C. § 1133, 29 CFR § 2560.503-1(h) full-and-fair review standard), the Affordable Care Act § 2719 internal claims requirements (45 CFR § 147.136), and insurer CPBs for US claims.
+6. Tone: Authoritative, formal, evidentiary, and uncompromisingly clinical.
+7. Multilingual & Jurisdiction Adaptability: Detect the primary language of the denial context and insurer jurisdiction. If the denial letter, payer name, or notes are non-English (such as Vietnamese, Spanish, French, etc.), synthesize the appeal brief in that corresponding language (e.g. for Vietnamese insurers like Bảo Việt, Manulife, or Prudential, synthesize in formal Vietnamese legal format citing Luật Kinh doanh bảo hiểm and policy terms). If in US/English context, synthesize in formal ERISA appellate English.`,
       userPrompt: `Synthesize a formal ${appealLevel.replace(/_/g, " ").toUpperCase()} medical appeal brief for:
 
 Case Details:

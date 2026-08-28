@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-28T11:33:00Z
+- **Last updated:** 2026-08-28T12:02:00Z
 
 ## Log
 
@@ -127,5 +127,8 @@ Purged Unrendered Raw Markdown Asterisks & Enforced Clean Typography Hygiene: Im
 ### 2026-08-28 - 9cdce82
 Resolved Appeal Dispatch Argument Validation Error & Added Direct Appeal ID Resolution: Made `appealId` optional in `dispatchAppealPacket` action (`convex/actions/mailDispatcher.ts`), enabling seamless one-click appeal dossier transmission directly from claim context while retaining specific version targeting when provided. Added dedicated `getById` query to `convex/appeals.ts` and automated fallback to latest claim draft (`appeals.getLatestByClaim`). Updated communications hook `useCommunications.ts` to cleanly dispatch outbound dossiers. Verified with `npm run verify` (100% typecheck, lint, 28/28 unit tests, production build).
 
-### 2026-08-28 - working tree
+### 2026-08-28 - e00dc41
 Engineered Autonomous 1-Click Sentinel Pipeline, Professional Legal Memorandum Architecture, Dynamic Firecrawl Payer Discovery & Unified Stage-Guided UX: Implemented master backend action `sentinelPipeline.ts` (`runAutonomousPipeline`) chaining Firecrawl CPB crawling, deterministic 4-pillar precedent vector scoring, and ERISA 29 CFR § 2560.503-1 medical brief synthesis into a seamless background execution. Re-engineered `appealSynthesizer.ts` with strict markdown formatting directives and built a deterministic legal memorandum assembler (`assembleProfessionalMemorandum`) enforcing formal transmission blocks, case metadata tables, Roman numeral sections, physician clinical addendums, CPB alignment comparison tables with exhibit links, and formal signature blocks. Upgraded `AppealBriefRenderer.tsx` with `remark-breaks` and `remark-gfm` to eliminate unformatted run-on text walls. Engineered dynamic payer intake discovery engine: upgraded optical parser (`opticalParser.ts`) to extract payer contact emails/addresses directly from uploaded denial PDFs (including Vietnamese and international insurers), created autonomous web search resolver action `payerContactResolver.ts` leveraging Firecrawl Search API (`https://api.firecrawl.dev/v1/search`) and OpenAI structured completion to live-discover official grievance/claims intake gateways for unlisted insurers, and added `updatePayerContact` mutation (`convex/claims.ts`). Upgraded `AgentMailDrawer.tsx` with live Firecrawl gateway search triggers and transparent source provenance badges. Verified with `npm run verify` (100% typecheck, lint, 28/28 unit tests, production build).
+
+### 2026-08-28 - working tree
+Added Multilingual & Jurisdictional Legal Brief Synthesis: Enhanced OpenAI system directives in `appealSynthesizer.ts` with Rule 7: Multilingual & Jurisdiction Adaptability. The appeal synthesis engine dynamically detects non-English denial letters and insurer jurisdictions, generating legally tailored appeal dossiers in the corresponding official language (such as formal legal Vietnamese citing Luật Kinh doanh bảo hiểm and policy terms for Vietnamese insurers like Bảo Việt, Manulife, or Prudential, or formal ERISA appellate English for US payers). Verified with `npm run verify` (100% typecheck, lint, 28/28 unit tests, production build).
