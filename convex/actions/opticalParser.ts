@@ -147,9 +147,9 @@ Rules:
       appealFilingDeadlineDays: extraction.appealFilingDeadlineDays,
     });
 
-    // If denial document contained explicit appeal/grievance email or contact info, save it
-    if (extraction.payerAppealsEmail && extraction.payerAppealsEmail.includes("@")) {
-      try {
+    // Autonomously resolve the payer intake gateway right from the moment of ingestion
+    try {
+      if (extraction.payerAppealsEmail && extraction.payerAppealsEmail.includes("@")) {
         await ctx.runMutation((api as any).claims.updatePayerContact, {
           claimId,
           payerContact: {
@@ -159,9 +159,15 @@ Rules:
             source: "document_ocr",
           },
         });
-      } catch (err) {
-        console.warn("Could not save extracted payer contact:", err);
+      } else {
+        // Automatically discover official appeals portal, fax, and intake gateway via Firecrawl or preset directory
+        await ctx.runAction((api as any).actions.payerContactResolver.resolvePayerGateway, {
+          claimId,
+          payerName: extraction.insurancePayer,
+        });
       }
+    } catch (contactErr) {
+      console.warn("Auto payer gateway resolution note:", contactErr);
     }
 
     let pipelineResult: any = undefined;

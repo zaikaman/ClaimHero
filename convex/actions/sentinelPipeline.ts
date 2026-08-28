@@ -42,6 +42,18 @@ export const runAutonomousPipeline = action({
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
 
+    // Auto-resolve payer intake gateway if not yet cached
+    if (!claim.payerContact) {
+      try {
+        await ctx.runAction((api as any).actions.payerContactResolver.resolvePayerGateway, {
+          claimId: args.claimId,
+          payerName: payer,
+        });
+      } catch (e) {
+        console.warn("Payer gateway auto-resolution note:", e);
+      }
+    }
+
     // Step 1: Policy Crawling & Evidence Extraction
     await ctx.runMutation((api as any).claims.updateStatus, {
       claimId: args.claimId,

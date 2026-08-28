@@ -59,7 +59,6 @@ export default function App() {
     isLoadingAudit,
     sendMessage,
     dispatchAppeal,
-    resolvePayerGateway,
   } = useCommunications(selectedClaim);
 
   const handleToggleSidebar = useCallback(() => {
@@ -254,7 +253,6 @@ export default function App() {
                 onDispatchAppeal={dispatchAppeal}
                 onNavigateView={setCurrentView}
                 onRunAutonomousPipeline={runFullPipeline}
-                onResolvePayerGateway={resolvePayerGateway}
               />
             ) : (
               <CasePickerEmptyState

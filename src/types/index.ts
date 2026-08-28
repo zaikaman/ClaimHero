@@ -70,10 +70,13 @@ export interface Claim {
 export interface PayerContact {
   officialAppealsEmail: string;
   intakePortalUrl?: string;
+  portalName?: string;
+  appealsFax?: string;
   statutoryPoBox?: string;
   ediPayerId?: string;
   tollFreeHelpline?: string;
   isVerified: boolean;
+  submissionPolicyNote?: string;
   source?: "preset" | "firecrawl_live" | "document_ocr";
 }
 

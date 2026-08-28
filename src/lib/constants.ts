@@ -9,10 +9,13 @@ export interface PayerAppellateContact {
   domain: string;
   officialAppealsEmail: string;
   intakePortalUrl: string;
+  portalName: string;
+  appealsFax: string;
   statutoryPoBox: string;
   ediPayerId: string;
   tollFreeHelpline: string;
   isVerified: boolean;
+  submissionPolicyNote: string;
 }
 
 export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
@@ -22,10 +25,13 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     domain: "uhc.com",
     officialAppealsEmail: "uhc_appeals@uhc.com",
     intakePortalUrl: "https://www.uhcprovider.com/en/claims-payments/claims-appeals.html",
+    portalName: "UHC Provider Portal & MyUHC Appeals Gateway",
+    appealsFax: "1-855-899-7400",
     statutoryPoBox: "P.O. Box 30432, Salt Lake City, UT 84130-0432",
     ediPayerId: "87726",
     tollFreeHelpline: "1-800-842-1609",
     isVerified: true,
+    submissionPolicyNote: "UHC mandates formal appeals via Online Portal, Appellate Fax, or Certified Mail. Public inboxes are rejected by payer filters.",
   },
   aetna: {
     id: "aetna",
@@ -33,10 +39,13 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     domain: "aetna.com",
     officialAppealsEmail: "crga@aetna.com",
     intakePortalUrl: "https://www.aetna.com/provider/dispute-appeals.html",
+    portalName: "Aetna Provider Dispute & Grievance Portal",
+    appealsFax: "1-859-455-8650",
     statutoryPoBox: "P.O. Box 14463, Lexington, KY 40512",
     ediPayerId: "60054",
     tollFreeHelpline: "1-800-624-0756",
     isVerified: true,
+    submissionPolicyNote: "Aetna requires submission via Provider Portal, Appellate Fax, or Certified Mail to the Lexington KY Center.",
   },
   cigna: {
     id: "cigna",
@@ -44,10 +53,13 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     domain: "cigna.com",
     officialAppealsEmail: "nationalappealsunit@cigna.com",
     intakePortalUrl: "https://cignaforhcp.cigna.com",
+    portalName: "Cigna for Health Care Professionals Portal",
+    appealsFax: "1-877-815-4827",
     statutoryPoBox: "P.O. Box 188011, Chattanooga, TN 37422",
     ediPayerId: "62308",
     tollFreeHelpline: "1-800-882-4462",
     isVerified: true,
+    submissionPolicyNote: "Cigna accepts appeals via Cigna for HCP Portal, Appellate Fax, or National Appeals Unit PO Box.",
   },
   bcbs: {
     id: "bcbs",
@@ -55,10 +67,13 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     domain: "bcbs.com",
     officialAppealsEmail: "grievanceappeals@anthem.com",
     intakePortalUrl: "https://www.anthem.com/provider/appeals",
+    portalName: "Anthem Provider Appeals Gateway",
+    appealsFax: "1-888-291-7299",
     statutoryPoBox: "P.O. Box 105568, Atlanta, GA 30348",
     ediPayerId: "47198",
     tollFreeHelpline: "1-800-676-2583",
     isVerified: true,
+    submissionPolicyNote: "BCBS/Anthem accepts appeals via Online Portal, Certified Fax, or Grievance PO Box.",
   },
   humana: {
     id: "humana",
@@ -66,10 +81,13 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     domain: "humana.com",
     officialAppealsEmail: "humana_appeals@humana.com",
     intakePortalUrl: "https://www.humana.com/provider/claims/appeals",
+    portalName: "Humana Provider Claims & Appeals Portal",
+    appealsFax: "1-800-267-2577",
     statutoryPoBox: "P.O. Box 14546, Lexington, KY 40512",
     ediPayerId: "61101",
     tollFreeHelpline: "1-800-448-6262",
     isVerified: true,
+    submissionPolicyNote: "Humana accepts submissions via Portal, Appellate Fax, or Lexington Appeals Department PO Box.",
   },
   kaiser: {
     id: "kaiser",
@@ -77,10 +95,13 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     domain: "kp.org",
     officialAppealsEmail: "appeals-grievances@kp.org",
     intakePortalUrl: "https://healthy.kaiserpermanente.org/support/appeals",
+    portalName: "Kaiser Permanente Expedited Appeals Portal",
+    appealsFax: "1-888-988-2674",
     statutoryPoBox: "P.O. Box 23088, Oakland, CA 94623",
     ediPayerId: "94144",
     tollFreeHelpline: "1-800-464-4000",
     isVerified: true,
+    submissionPolicyNote: "Kaiser expedited appeals are accepted via Online Portal, Fax, or Oakland Expedited Appeals PO Box.",
   },
 };
 
@@ -92,10 +113,13 @@ export const getPayerAppellateContact = (payerName?: string): PayerAppellateCont
       domain: "insurance-payer.com",
       officialAppealsEmail: "appeals@insurance-payer.com",
       intakePortalUrl: "https://www.insurance-payer.com/appeals",
+      portalName: "Insurer Grievance & Appeals Gateway",
+      appealsFax: "1-800-555-0198",
       statutoryPoBox: "Grievance & Appeals Department",
       ediPayerId: "EDI-UNKNOWN",
       tollFreeHelpline: "1-800-555-0199",
       isVerified: false,
+      submissionPolicyNote: "Standard submission via Provider Portal, Certified Mail, or Appellate Fax.",
     };
   }
 
@@ -126,10 +150,13 @@ export const getPayerAppellateContact = (payerName?: string): PayerAppellateCont
     domain: `${clean}.com`,
     officialAppealsEmail: `appeals-resolution@${clean}.com`,
     intakePortalUrl: `https://www.${clean}.com/appeals`,
+    portalName: `${payerName} Official Appeals Portal`,
+    appealsFax: "1-800-555-0198",
     statutoryPoBox: `${payerName} Appeals & Grievances Unit`,
     ediPayerId: "EDI-AUTO",
     tollFreeHelpline: "1-800-555-0199",
     isVerified: false,
+    submissionPolicyNote: "Official submission accepted via Online Portal, Certified Mail, or Appellate Fax.",
   };
 };
 

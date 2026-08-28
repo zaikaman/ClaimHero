@@ -12,7 +12,9 @@ import {
   Buildings,
   Paperclip,
   CircleNotch,
-  MagnifyingGlass,
+  ArrowSquareOut,
+  Printer,
+  Info,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
@@ -32,7 +34,6 @@ interface AgentMailDrawerProps {
   onDispatchAppeal?: () => Promise<any>;
   onNavigateView?: (view: FlowView) => void;
   onRunAutonomousPipeline?: (claimId?: string) => Promise<any>;
-  onResolvePayerGateway?: (forceWebSearch?: boolean) => Promise<any>;
 }
 
 export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
@@ -44,15 +45,16 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   onDispatchAppeal,
   onNavigateView,
   onRunAutonomousPipeline,
-  onResolvePayerGateway,
 }) => {
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
-  const [isSearchingPayer, setIsSearchingPayer] = useState(false);
 
   const [copiedRecipientEmail, setCopiedRecipientEmail] = useState(false);
+  const [copiedBrief, setCopiedBrief] = useState(false);
+  const [copiedFax, setCopiedFax] = useState(false);
+  const [copiedPoBox, setCopiedPoBox] = useState(false);
 
   const assignedEmail =
     claim.assignedAgentEmail ||
@@ -66,20 +68,34 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     claim.payerContact?.officialAppealsEmail ||
     payerContact.officialAppealsEmail;
 
-  const handleSearchPayer = async () => {
-    if (!onResolvePayerGateway || isSearchingPayer) return;
-    setIsSearchingPayer(true);
-    try {
-      await onResolvePayerGateway(true);
-    } finally {
-      setIsSearchingPayer(false);
-    }
-  };
-
   const handleCopyEmail = () => {
     navigator.clipboard.writeText(assignedEmail);
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
+  };
+
+  const handleCopyBrief = () => {
+    const briefText = claim.latestAppeal?.fullAppealMarkdown;
+    if (!briefText) return;
+    navigator.clipboard.writeText(briefText);
+    setCopiedBrief(true);
+    setTimeout(() => setCopiedBrief(false), 2000);
+  };
+
+  const handleCopyFax = () => {
+    const fax = payerContact.appealsFax;
+    if (!fax) return;
+    navigator.clipboard.writeText(fax);
+    setCopiedFax(true);
+    setTimeout(() => setCopiedFax(false), 2000);
+  };
+
+  const handleCopyPoBox = () => {
+    const pobox = payerContact.statutoryPoBox;
+    if (!pobox) return;
+    navigator.clipboard.writeText(pobox);
+    setCopiedPoBox(true);
+    setTimeout(() => setCopiedPoBox(false), 2000);
   };
 
   const handleSendReply = async (e: React.FormEvent) => {
@@ -128,46 +144,108 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         }
       />
 
-      {/* Prominent Ready to Dispatch Action Banner if not yet sent */}
+      {/* Prominent Multi-Channel Transmission Gateway Banner if not yet sent */}
       {claim.status !== "dispatched" && claim.status !== "won" && onDispatchAppeal && (
-        <Card className="p-4 border-primary/40 bg-primary/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
-              <PaperPlaneTilt className="size-5" />
-            </div>
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-foreground">
-                  Ready to Transmit Formal Appeal Packet
-                </h3>
-                <Badge variant="secondary" className="text-[10px] font-mono">
-                  Final Step
-                </Badge>
+        <Card className="p-4 border-primary/40 bg-primary/5 space-y-3.5">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="size-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs mt-0.5 sm:mt-0">
+                <PaperPlaneTilt className="size-5" />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Dispatches the synthesized ERISA brief and clinical policy citations directly to {payerName} Grievance Department.
-              </p>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Multi-Channel Appellate Transmission
+                  </h3>
+                  <Badge variant="secondary" className="text-[10px] font-mono">
+                    Final Step
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Transmit court-ready ERISA memorandum & clinical evidence packet directly to {payerName}.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+              {payerContact.intakePortalUrl && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  asChild
+                  className="gap-1.5 text-xs h-9"
+                >
+                  <a
+                    href={payerContact.intakePortalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ArrowSquareOut className="size-3.5 text-primary" />
+                    <span>Open {payerContact.portalName ? "Portal" : "Appeals Portal"}</span>
+                  </a>
+                </Button>
+              )}
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCopyBrief}
+                disabled={!claim.latestAppeal}
+                className="gap-1.5 text-xs h-9"
+              >
+                {copiedBrief ? (
+                  <Check className="size-3.5 text-emerald-500" />
+                ) : (
+                  <Copy className="size-3.5" />
+                )}
+                <span>{copiedBrief ? "Brief Copied!" : "Copy Brief for Portal"}</span>
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => window.print()}
+                title="Print court-ready certified mail docket"
+                className="gap-1.5 text-xs h-9"
+              >
+                <Printer className="size-3.5" />
+                <span>Print Docket</span>
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={handleRunDispatch}
+                disabled={isDispatching}
+                className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9"
+              >
+                {isDispatching ? (
+                  <>
+                    <CircleNotch className="size-4 animate-spin" />
+                    <span>Transmitting via AgentMail...</span>
+                  </>
+                ) : (
+                  <>
+                    <PaperPlaneTilt className="size-4" />
+                    <span>Dispatch via AgentMail</span>
+                  </>
+                )}
+              </Button>
             </div>
           </div>
 
-          <Button
-            size="sm"
-            onClick={handleRunDispatch}
-            disabled={isDispatching}
-            className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 w-full sm:w-auto h-9"
-          >
-            {isDispatching ? (
-              <>
-                <CircleNotch className="size-4 animate-spin" />
-                <span>Transmitting via AgentMail...</span>
-              </>
-            ) : (
-              <>
-                <PaperPlaneTilt className="size-4" />
-                <span>Dispatch Formal Appeal Packet Now</span>
-              </>
-            )}
-          </Button>
+          {/* Submission Instructions & Insurer Gateway Notice */}
+          <div className="flex items-start gap-2.5 bg-background/70 border border-border/80 rounded-lg p-2.5 text-xs text-muted-foreground">
+            <Info className="size-4 text-primary shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-semibold text-foreground text-[11px] block">
+                Official Submission Standard for {payerName}:
+              </span>
+              <p className="text-[11px] leading-relaxed text-foreground/80">
+                {payerContact.submissionPolicyNote ||
+                  "Most health insurers require appeals via Online Provider Portal, Certified Appellate Fax, or Certified USPS Mail. Use your dedicated Case Inbox as your Authorized Representative electronic contact on the portal to receive real-time webhook notices."}
+              </p>
+            </div>
+          </div>
         </Card>
       )}
 
@@ -246,8 +324,49 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <span className="font-semibold text-foreground">{payerName}</span>
               </div>
 
+              {/* Official Submission Portal */}
+              {payerContact.intakePortalUrl && (
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Appeals & Dispute Portal</span>
+                  <a
+                    href={payerContact.intakePortalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 mt-0.5 text-[11px] font-medium text-primary hover:underline"
+                  >
+                    <span>{payerContact.portalName || "Launch Official Payer Portal"}</span>
+                    <ArrowSquareOut className="size-3 shrink-0" />
+                  </a>
+                </div>
+              )}
+
+              {/* Official Appellate Fax Line */}
+              {payerContact.appealsFax && (
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Appellate Fax Line</span>
+                  <div className="flex items-center justify-between gap-1 mt-0.5">
+                    <span className="font-mono text-[11px] text-foreground font-medium">
+                      {payerContact.appealsFax}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={handleCopyFax}
+                      title="Copy appellate fax number"
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                    >
+                      {copiedFax ? (
+                        <Check className="size-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="size-3" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <span className="text-[10px] font-mono text-muted-foreground block">Official Appellate Intake</span>
+                <span className="text-[10px] font-mono text-muted-foreground block">Electronic / EDI Gateway</span>
                 <div className="flex items-center justify-between gap-1 mt-0.5">
                   <span className="font-mono text-[11px] text-foreground font-medium break-all">
                     {recipientEmail}
@@ -274,9 +393,24 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
               <div>
                 <span className="text-[10px] font-mono text-muted-foreground block">Statutory Appeals P.O. Box</span>
-                <span className="text-foreground text-[11px] font-mono block">
-                  {payerContact.statutoryPoBox}
-                </span>
+                <div className="flex items-start justify-between gap-1 mt-0.5">
+                  <span className="text-foreground text-[11px] font-mono leading-tight">
+                    {payerContact.statutoryPoBox}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={handleCopyPoBox}
+                    title="Copy P.O. Box address"
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                  >
+                    {copiedPoBox ? (
+                      <Check className="size-3 text-emerald-500" />
+                    ) : (
+                      <Copy className="size-3" />
+                    )}
+                  </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
@@ -304,6 +438,15 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 </span>
               </div>
 
+              {payerContact.submissionPolicyNote && (
+                <div className="pt-2 border-t border-border/50">
+                  <div className="p-2 rounded bg-muted/40 border border-border/60 text-[10px] text-muted-foreground leading-relaxed">
+                    <span className="font-semibold text-foreground block mb-0.5">Payer Policy Notice:</span>
+                    {payerContact.submissionPolicyNote}
+                  </div>
+                </div>
+              )}
+
               <div className="pt-2 border-t border-border/50 space-y-2">
                 <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground">
                   <span>Gateway Source:</span>
@@ -317,28 +460,6 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                       : "Inferred Gateway"}
                   </span>
                 </div>
-
-                {onResolvePayerGateway && (
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={handleSearchPayer}
-                    disabled={isSearchingPayer}
-                    className="w-full gap-1.5 text-[11px] h-8"
-                  >
-                    {isSearchingPayer ? (
-                      <>
-                        <CircleNotch className="size-3 animate-spin text-primary" />
-                        <span>Searching Web with Firecrawl...</span>
-                      </>
-                    ) : (
-                      <>
-                        <MagnifyingGlass className="size-3 text-muted-foreground" />
-                        <span>Live Search Gateway (Firecrawl)</span>
-                      </>
-                    )}
-                  </Button>
-                )}
               </div>
             </div>
           </Card>

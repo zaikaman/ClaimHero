@@ -650,10 +650,13 @@ export const updatePayerContact = mutation({
     payerContact: v.object({
       officialAppealsEmail: v.string(),
       intakePortalUrl: v.optional(v.string()),
+      portalName: v.optional(v.string()),
+      appealsFax: v.optional(v.string()),
       statutoryPoBox: v.optional(v.string()),
       ediPayerId: v.optional(v.string()),
       tollFreeHelpline: v.optional(v.string()),
       isVerified: v.boolean(),
+      submissionPolicyNote: v.optional(v.string()),
       source: v.optional(v.string()),
     }),
   },
