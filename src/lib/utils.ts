@@ -184,3 +184,19 @@ export function getScoreColor(score: number): {
     bgGradient: "from-rose-500/20 to-red-500/10",
   };
 }
+
+/**
+ * Strips raw markdown formatting characters (such as **, *, __, `) from strings
+ * to ensure clean plain-text presentation in the UI without unrendered markdown tokens.
+ */
+export function stripMarkdownFormatting(text?: string): string {
+  if (!text) return "";
+  return text
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/_(.*?)_/g, "$1")
+    .replace(/\*\*/g, "")
+    .replace(/`([^`]+)`/g, "$1")
+    .trim();
+}

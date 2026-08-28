@@ -226,7 +226,8 @@ Your task is to identify specific, cited policy contradictions and formulate a w
 Requirements:
 - Identify 2 to 4 concrete, cited contradictions showing why the adverse determination under ${claim.denialReasonCode} is arbitrary and capricious under the insurer's CPB and ERISA 29 CFR § 2560.503-1.
 - Formulate a winning precedent summary citing specific clause numbers and clinical standards.
-- Provide a brief 1-sentence rationale for each of the 4 statutory pillars.`,
+- Provide a brief 1-sentence rationale for each of the 4 statutory pillars.
+- Write everything in clean plain text. Strictly do NOT use markdown bold asterisks (such as **bold**) or formatting tokens in any contradiction strings, summaries, or rationales.`,
         userPrompt: `Analyze the following insurance denial case:
 
 Claim Details:
@@ -263,17 +264,17 @@ ${evidencesSummary}`,
     const finalBreakdown: ScoringCriterionResult[] = deterministicCalculation.scoringBreakdown.map((item) => {
       let customRationale = item.rationale;
       if (item.category === "policy_alignment" && llmAnalysis.policyAlignmentRationale) {
-        customRationale = llmAnalysis.policyAlignmentRationale;
+        customRationale = llmAnalysis.policyAlignmentRationale.replace(/\*\*/g, "");
       } else if (item.category === "clinical_documentation" && llmAnalysis.clinicalDocumentationRationale) {
-        customRationale = llmAnalysis.clinicalDocumentationRationale;
+        customRationale = llmAnalysis.clinicalDocumentationRationale.replace(/\*\*/g, "");
       } else if (item.category === "statutory_erisa" && llmAnalysis.statutoryErisaRationale) {
-        customRationale = llmAnalysis.statutoryErisaRationale;
+        customRationale = llmAnalysis.statutoryErisaRationale.replace(/\*\*/g, "");
       } else if (item.category === "precedent_strength" && llmAnalysis.precedentStrengthRationale) {
-        customRationale = llmAnalysis.precedentStrengthRationale;
+        customRationale = llmAnalysis.precedentStrengthRationale.replace(/\*\*/g, "");
       }
       return {
         ...item,
-        rationale: customRationale,
+        rationale: customRationale.replace(/\*\*/g, ""),
       };
     });
 
@@ -281,8 +282,8 @@ ${evidencesSummary}`,
       overturnProbabilityScore: deterministicCalculation.overturnProbabilityScore,
       riskLevel: deterministicCalculation.riskLevel,
       scoringBreakdown: finalBreakdown,
-      keyPolicyContradictions: llmAnalysis.keyPolicyContradictions,
-      winningPrecedentSummary: llmAnalysis.winningPrecedentSummary,
+      keyPolicyContradictions: (llmAnalysis.keyPolicyContradictions || []).map((c) => c.replace(/\*\*/g, "")),
+      winningPrecedentSummary: llmAnalysis.winningPrecedentSummary?.replace(/\*\*/g, "") || "",
       suggestedAppealLevel: llmAnalysis.suggestedAppealLevel,
     };
 

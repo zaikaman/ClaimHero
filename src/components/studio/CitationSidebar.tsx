@@ -11,6 +11,7 @@ import { ClinicalEvidence } from "../../types";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { stripMarkdownFormatting } from "../../lib/utils";
 
 interface CitationSidebarProps {
   evidences: ClinicalEvidence[];
@@ -132,7 +133,7 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
                       onClick={() =>
                         handleCopy(
                           idx,
-                          `> **Policy Citation (${item.citationClause})**: ${item.extractedEvidenceMarkdown}`
+                          `> **Policy Citation (${item.citationClause})**: ${stripMarkdownFormatting(item.extractedEvidenceMarkdown)}`
                         )
                       }
                       title="Copy to clipboard"
@@ -148,7 +149,7 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
                       size="xs"
                       onClick={() =>
                         onInsertSnippet(
-                          `\n> **${item.title} (${item.citationClause})**:\n> ${item.extractedEvidenceMarkdown}\n`
+                          `\n> **${stripMarkdownFormatting(item.title)} (${item.citationClause})**:\n> ${stripMarkdownFormatting(item.extractedEvidenceMarkdown)}\n`
                         )
                       }
                       className="gap-1"
@@ -160,7 +161,7 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
                 </div>
 
                 <p className="text-[11px] text-muted-foreground line-clamp-3 leading-relaxed">
-                  {item.extractedEvidenceMarkdown}
+                  {stripMarkdownFormatting(item.extractedEvidenceMarkdown)}
                 </p>
               </Card>
             ))}

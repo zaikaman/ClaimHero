@@ -180,7 +180,7 @@ Analyze the provided insurer Clinical Policy Bulletin (CPB) or clinical guidelin
 Extract all key medical necessity qualifying criteria, specific clause identifiers (e.g. Section 1.A, Section 2.3), and contradiction rules that can be cited in an ERISA medical appeal against denial code ${args.denialReasonCode}.
 For each clause:
 - Assign sourceType: "payer_cpb", "pubmed_study", "fda_package_insert", "nccn_guideline", or "legal_precedent".
-- Extract clear, punchy markdown summarizing the exact clinical requirements.
+- Extract clear, concise plain text summarizing the exact clinical requirements. Strictly do NOT use markdown bold asterisks (such as **bold**) or formatting tokens in extractedEvidenceMarkdown or title.
 - Assign relevanceScore between 80 and 99.`,
       userPrompt: `Extract structured clinical evidence clauses from this policy text for CPT codes [${args.cptCodes.join(", ")}] and Payer ${args.payer}:\n\n${policyText}`,
       schemaName: "PolicyExtractionResponse",
@@ -195,10 +195,10 @@ For each clause:
 
     const evidencesToInsert = extractedData.clauses.map((clause) => ({
       sourceType: clause.sourceType,
-      title: clause.title || extractedData.policyTitle,
+      title: (clause.title || extractedData.policyTitle).replace(/\*\*/g, ""),
       sourceUrl: policySourceUrl,
-      citationClause: clause.citationClause,
-      extractedEvidenceMarkdown: clause.extractedEvidenceMarkdown,
+      citationClause: clause.citationClause.replace(/\*\*/g, ""),
+      extractedEvidenceMarkdown: clause.extractedEvidenceMarkdown.replace(/\*\*/g, ""),
       relevanceScore: clause.relevanceScore,
     }));
 
@@ -208,7 +208,7 @@ For each clause:
       title: "ERISA Full & Fair Review Statutory Protocol",
       sourceUrl: "https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XXV/subchapter-L/part-2560/section-2560.503-1",
       citationClause: "29 CFR § 2560.503-1(h)(2)(iii)",
-      extractedEvidenceMarkdown: `**Statutory Requirement**: Plan administrators must provide claimants upon request with all documents, records, and internal clinical criteria utilized in making the adverse determination. Adverse benefit determinations lacking specific clinical justification violate the claimant's right to a full and fair review.`,
+      extractedEvidenceMarkdown: "Statutory Requirement: Plan administrators must provide claimants upon request with all documents, records, and internal clinical criteria utilized in making the adverse determination. Adverse benefit determinations lacking specific clinical justification violate the claimant's right to a full and fair review.",
       relevanceScore: 95,
     });
 

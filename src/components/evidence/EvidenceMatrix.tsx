@@ -18,7 +18,7 @@ import {
 import { Claim, ClinicalEvidence, OverturnScoringResult, ScoringCriterion } from "../../types";
 import { PolicyViewer } from "./PolicyViewer";
 import { PrecedentFeed } from "./PrecedentFeed";
-import { formatCurrency, formatDate } from "../../lib/utils";
+import { formatCurrency, formatDate, stripMarkdownFormatting } from "../../lib/utils";
 import { DENIAL_REASON_CODES } from "../../lib/constants";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
@@ -326,7 +326,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                       </div>
 
                       <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        {crit.rationale}
+                        {stripMarkdownFormatting(crit.rationale)}
                       </p>
                     </div>
                   );
@@ -349,7 +349,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                     className="flex items-start gap-2 rounded-lg bg-card border border-border p-2.5 text-xs text-foreground/90"
                   >
                     <CheckCircle className="size-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                    <span className="leading-snug">{contra}</span>
+                    <span className="leading-snug">{stripMarkdownFormatting(contra)}</span>
                   </div>
                 ))}
               </div>
@@ -363,7 +363,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               <div className="space-y-0.5">
                 <span className="font-semibold text-foreground block">Winning Precedent Summary:</span>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  {scoringResult.winningPrecedentSummary}
+                  {stripMarkdownFormatting(scoringResult.winningPrecedentSummary)}
                 </p>
               </div>
             </div>

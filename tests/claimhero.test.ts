@@ -3,6 +3,7 @@ import {
   formatCurrency,
   formatDeadlineRemaining,
   getScoreColor,
+  stripMarkdownFormatting,
 } from "../src/lib/utils";
 import {
   CPT_CODES,
@@ -397,6 +398,21 @@ describe("ClaimHero Production-Grade Case Deletion & Cascading Purge", () => {
 
     // If only 1 claim exists and is deleted, fallback to empty string
     expect(getNextSelectedId("claim_single", "claim_single", [{ _id: "claim_single", claimNumber: "CLM-000" }])).toBe("");
+  });
+
+  it("strips raw markdown asterisks and formatting characters for clean UI presentation", () => {
+    const rawText = "**Statutory Requirement**: Plan administrators must provide claimants with all documents.";
+    expect(stripMarkdownFormatting(rawText)).toBe(
+      "Statutory Requirement: Plan administrators must provide claimants with all documents."
+    );
+
+    const multiFormatted = "Clinical **criteria** under *Section 1.A* and `CPT 27447` are **met**.";
+    expect(stripMarkdownFormatting(multiFormatted)).toBe(
+      "Clinical criteria under Section 1.A and CPT 27447 are met."
+    );
+
+    expect(stripMarkdownFormatting("")).toBe("");
+    expect(stripMarkdownFormatting(undefined)).toBe("");
   });
 });
 

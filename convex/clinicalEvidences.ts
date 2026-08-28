@@ -15,8 +15,16 @@ export const listByClaim = query({
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
       .collect();
 
-    // Sort by relevance score descending
-    return evidences.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    // Sort by relevance score descending and sanitize raw formatting
+    return evidences
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .map((item) => ({
+        ...item,
+        title: item.title?.replace(/\*\*/g, "") || "",
+        citationClause: item.citationClause?.replace(/\*\*/g, "") || "",
+        extractedEvidenceMarkdown:
+          item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
+      }));
   },
 });
 
@@ -34,7 +42,15 @@ export const listByClaimAndSource = query({
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
       .collect();
 
-    return evidences.filter((item) => item.sourceType === args.sourceType);
+    return evidences
+      .filter((item) => item.sourceType === args.sourceType)
+      .map((item) => ({
+        ...item,
+        title: item.title?.replace(/\*\*/g, "") || "",
+        citationClause: item.citationClause?.replace(/\*\*/g, "") || "",
+        extractedEvidenceMarkdown:
+          item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
+      }));
   },
 });
 
@@ -63,10 +79,10 @@ export const insertBatch = mutation({
       const id = await ctx.db.insert("clinicalEvidences", {
         claimId: args.claimId,
         sourceType: item.sourceType,
-        title: item.title,
+        title: item.title.replace(/\*\*/g, ""),
         sourceUrl: item.sourceUrl,
-        citationClause: item.citationClause,
-        extractedEvidenceMarkdown: item.extractedEvidenceMarkdown,
+        citationClause: item.citationClause.replace(/\*\*/g, ""),
+        extractedEvidenceMarkdown: item.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
         relevanceScore: item.relevanceScore,
         createdAt: now,
       });

@@ -13,6 +13,7 @@ import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { stripMarkdownFormatting } from "../../lib/utils";
 
 interface PolicyViewerProps {
   evidences: ClinicalEvidence[];
@@ -195,7 +196,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
                     <span>Medical Necessity Criteria & Policy Rule:</span>
                   </div>
                   <p className="whitespace-pre-line text-xs text-foreground/90">
-                    {item.extractedEvidenceMarkdown}
+                    {stripMarkdownFormatting(item.extractedEvidenceMarkdown)}
                   </p>
                 </div>
               </Card>

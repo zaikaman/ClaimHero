@@ -11,6 +11,7 @@ import { Claim } from "../../types";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { stripMarkdownFormatting } from "../../lib/utils";
 
 interface PrecedentFeedProps {
   claim: Claim;
@@ -166,7 +167,7 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
                   <span>Citation: {item.citation}</span>
                 </div>
                 <p className="text-xs text-foreground/90 leading-relaxed font-sans">
-                  {item.winningArgument}
+                  {stripMarkdownFormatting(item.winningArgument)}
                 </p>
               </div>
 
