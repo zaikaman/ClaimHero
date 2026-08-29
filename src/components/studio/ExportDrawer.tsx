@@ -66,8 +66,8 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col p-6 gap-4">
-        <DialogHeader className="border-b border-border pb-3 shrink-0">
+      <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col p-6 gap-4 print:h-auto print:max-w-none print:p-0 print:border-none print:shadow-none print:bg-white print:static print:inset-auto print:translate-x-0 print:translate-y-0">
+        <DialogHeader className="border-b border-border pb-3 shrink-0 print:hidden no-print">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -125,8 +125,8 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
         </DialogHeader>
 
         {/* Formal Printable Document Viewport */}
-        <div className="flex-1 overflow-y-auto p-4 bg-muted/30 rounded-xl border border-border">
-          <div className="max-w-3xl mx-auto bg-white text-slate-900 p-8 sm:p-10 rounded-lg shadow-sm font-sans space-y-6 print:p-0 print:shadow-none">
+        <div className="flex-1 overflow-y-auto p-4 bg-muted/30 rounded-xl border border-border print:p-0 print:border-none print:bg-transparent printable-dossier-scroll-area">
+          <div className="max-w-3xl mx-auto bg-white text-slate-900 p-8 sm:p-10 rounded-lg shadow-sm font-sans space-y-6 print:p-0 print:shadow-none print:max-w-none print:w-full printable-dossier">
             {/* Letterhead */}
             <div className="border-b-2 border-slate-900 pb-4 flex justify-between items-start">
               <div>
@@ -144,7 +144,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
             </div>
 
             {/* Case & Policy Meta Summary */}
-            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded border border-slate-200 text-xs">
+            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded border border-slate-200 text-xs print:bg-slate-50/90 print:border-slate-300 meta-summary-box">
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
                   <User className="size-3.5 text-slate-600" />
@@ -184,7 +184,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
             </div>
 
             {/* Formal Signoff */}
-            <div className="pt-6 border-t border-slate-200 text-xs text-slate-700 space-y-4">
+            <div className="pt-6 border-t border-slate-200 text-xs text-slate-700 space-y-4 print:border-slate-300 signoff-block">
               <div>Respectfully submitted on behalf of the Claimant,</div>
               <div className="pt-2 space-y-0.5 font-bold text-slate-900">
                 <div>{claim.patient?.name || "Claimant / Authorized Representative"}</div>

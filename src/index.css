@@ -192,3 +192,125 @@
   mask-image: linear-gradient(to top, black 0%, transparent 45%);
   -webkit-mask-image: linear-gradient(to top, black 0%, transparent 45%);
 }
+
+/* Print Styles for Court-Ready Appeal Dossiers & Formal ERISA Packets */
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 14mm 16mm 14mm 16mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    font-size: 10pt !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide entire dashboard shell, sidebars, navigations, shaders, overlays, floating elements */
+  #root,
+  .no-print,
+  [data-radix-popper-content-wrapper],
+  [data-radix-dialog-overlay],
+  .dialog-backdrop,
+  header,
+  nav,
+  button,
+  canvas {
+    display: none !important;
+  }
+
+  /* Unconstrain dialog container for pure page flow */
+  [role="dialog"] {
+    position: static !important;
+    display: block !important;
+    inset: auto !important;
+    transform: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  /* Hide close button and dialog header controls */
+  [role="dialog"] button,
+  [role="dialog"] .dialog-header-actions,
+  [role="dialog"] [data-dialog-close] {
+    display: none !important;
+  }
+
+  /* Printable dossier wrapper */
+  .printable-dossier-scroll-area {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .printable-dossier {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  /* Page breaks & typography */
+  .printable-dossier h1,
+  .printable-dossier h2,
+  .printable-dossier h3 {
+    color: #020617 !important;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  .printable-dossier .meta-summary-box,
+  .printable-dossier .signoff-block,
+  .printable-dossier blockquote {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .printable-dossier table {
+    page-break-inside: auto;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  .printable-dossier tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .printable-dossier th,
+  .printable-dossier td {
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+  }
+
+  .printable-dossier p,
+  .printable-dossier li {
+    color: #1e293b !important;
+    line-height: 1.45 !important;
+  }
+}
+

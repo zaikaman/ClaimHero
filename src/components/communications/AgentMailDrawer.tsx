@@ -24,6 +24,7 @@ import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button, buttonVariants } from "../ui/button";
 import { Input } from "../ui/input";
+import { ExportDrawer } from "../studio/ExportDrawer";
 
 interface AgentMailDrawerProps {
   claim: Claim;
@@ -55,6 +56,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const [copiedBrief, setCopiedBrief] = useState(false);
   const [copiedFax, setCopiedFax] = useState(false);
   const [copiedPoBox, setCopiedPoBox] = useState(false);
+  const [isExportDrawerOpen, setIsExportDrawerOpen] = useState(false);
 
   const assignedEmail =
     claim.assignedAgentEmail ||
@@ -211,8 +213,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               <Button
                 size="sm"
                 variant={!recipientEmail && !payerContact.intakePortalUrl ? "default" : "outline"}
-                onClick={() => window.print()}
-                title="Print court-ready certified mail docket"
+                onClick={() => setIsExportDrawerOpen(true)}
+                disabled={!claim.latestAppeal}
+                title={claim.latestAppeal ? "Open formal court-ready appeal dossier & print docket" : "Synthesize appeal brief in studio first"}
                 className={cn(
                   "gap-1.5 text-xs h-9",
                   !recipientEmail && !payerContact.intakePortalUrl && "bg-primary text-primary-foreground font-semibold"
@@ -623,6 +626,18 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
           </form>
         </Card>
       </div>
+
+      {/* Formal Appeal Dossier Export & Print Modal */}
+      <ExportDrawer
+        isOpen={isExportDrawerOpen}
+        onClose={() => setIsExportDrawerOpen(false)}
+        claim={claim}
+        appeal={claim.latestAppeal || null}
+        markdownContent={claim.latestAppeal?.fullAppealMarkdown || ""}
+        onProceedToDispatch={() => {
+          setIsExportDrawerOpen(false);
+        }}
+      />
     </div>
   );
 };

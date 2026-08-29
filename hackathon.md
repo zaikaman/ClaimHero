@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-29T09:11:00Z
+- **Last updated:** 2026-08-29T09:37:00Z
 
 ## Log
 
@@ -145,5 +145,9 @@ Engineered Multi-Channel Appellate Transmission Gateway & Upgraded Live AgentMai
 ### 2026-08-28 - 7ad58ab
 Eliminated Fabricated Mock Emails, Enforced Anti-Hallucination Firecrawl Intelligence & Truthful Gateway UI: Eliminated all fabricated, guessed, or fallback email addresses (`uhc_appeals@uhc.com`, `crga@aetna.com`, `nationalappealsunit@cigna.com`, etc.) across schemas (`convex/schema.ts`, `convex/claims.ts`), directory constants (`src/lib/constants.ts`), and Firecrawl LLM extraction prompts (`convex/actions/payerContactResolver.ts`). Payer contacts now strictly model `officialAppealsEmail` as optional; if an insurer does not accept appeals via email (standard for major US health plans under HIPAA regulations), the system prevents email transmission, renders an explicit "Appeals Intake Channel: Official Online Portal & Appellate Fax (Email Prohibited by Insurer under HIPAA)" status badge in `AgentMailDrawer.tsx`, and dynamically switches the primary banner CTA to "Copy Brief for Portal" or "Print Docket" with an "Email Prohibited by Payer" notice. For payers with legitimate public appeals inboxes (e.g. international carriers or select Medicaid programs), direct AgentMail dispatch remains active. In `mailDispatcher.ts`, guarded `dispatchAppealPacket` to refuse emailing non-existent addresses, and ensured `sendOutboundMessage` preserves addendums in the case docket when direct payer email is prohibited. Verified cleanly with `npm run verify` (100% typecheck, lint, 28/28 unit tests, production build).
 
-### 2026-08-29 - working tree
+### 2026-08-29 - c7bbb6a
 Polished Precision Medical UI Layouts & Contrast Hierarchy: Exported type-safe `buttonVariants` helper from `src/components/ui/button.tsx` to enable consistent button styling across interactive anchors. Fixed layout distortion and multi-line wrapping on the Open Portal link in `AgentMailDrawer.tsx` by rendering a direct anchor tag styled via `buttonVariants`. Resolved dimmed green-on-blue color clashes by enforcing high-contrast `text-primary-foreground` (white) icons for active stepper steps in `SentinelFlowStepper.tsx` and active copy action feedback buttons in `AgentMailDrawer.tsx`, preserving emerald badges for inactive completed states.
+
+### 2026-08-29 - working tree
+Connected Court-Ready Appeal Dossier Export & Print Modal to Multi-Channel Transmission Gateway: Replaced naive `window.print()` webpage trigger in `AgentMailDrawer.tsx` with dedicated `ExportDrawer` modal integration, allowing adjudicators to inspect the complete formal ERISA Notice of Appeal with patient letterhead, CPT/CARC metadata summaries, clinical necessity arguments, and authorized representative signature block before printing. Authored comprehensive `@media print` rules in `src/index.css` and updated `dialog.tsx` to automatically isolate the legal paper document, strip all dashboard layout chromes, sidebars, headers, dialog backdrops, and action buttons during printing, and apply clean page-break formatting for court-ready US Letter / A4 physical mail packets. Verified full test suite and production build cleanly with `npm run verify` (100% typecheck, lint, 28/28 unit tests, production build).
+
