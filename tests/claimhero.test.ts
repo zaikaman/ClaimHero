@@ -481,6 +481,8 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
     ).toBe(true);
     expect(isAiAdjudicatorAddress("judge@hackathon.com")).toBe(false);
     expect(isAiAdjudicatorAddress(undefined)).toBe(false);
+    expect(isAiAdjudicatorAddress("molinahealthcare-adjudication-clm202688192@agentmail.to")).toBe(true);
+    expect(isAiAdjudicatorAddress("claimhero-adjudicator@agentmail.to")).toBe(true);
 
     const transcript = formatCorrespondenceTranscript([
       {
@@ -696,4 +698,3 @@ describe("ClaimHero Production-Grade Case Deletion & Cascading Purge", () => {
     expect(stripMarkdownFormatting(undefined)).toBe("");
   });
 });
-

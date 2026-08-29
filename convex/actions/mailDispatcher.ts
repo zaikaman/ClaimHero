@@ -2,13 +2,16 @@
 
 import { action, type ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { createStructuredCompletion } from "../lib/openai";
 import {
-  buildAiAdjudicatorAddress,
   formatCorrespondenceTranscript,
   isAiAdjudicatorAddress,
 } from "../lib/aiAdjudicator";
+import {
+  getSharedAgentMailboxes,
+  sendAgentMailMessage,
+} from "../lib/agentMail";
 
 export interface DispatchReceipt {
   transmissionId: string;
@@ -19,6 +22,49 @@ export interface DispatchReceipt {
   dispatchedAt: number;
   status: "delivered" | "queued";
   adjudicationDetermination?: string;
+}
+
+interface ClaimMailboxes {
+  claimInboxId: string;
+  claimEmail: string;
+  adjudicatorInboxId?: string;
+  adjudicatorEmail?: string;
+}
+
+function withAgentMailMessageId<T extends Record<string, unknown>>(
+  payload: T,
+  messageId: string | undefined
+): T & { agentMailMessageId?: string } {
+  if (messageId) {
+    return { ...payload, agentMailMessageId: messageId };
+  }
+  return payload;
+}
+
+async function ensureClaimMailboxes(
+  ctx: ActionCtx,
+  claim: any
+): Promise<ClaimMailboxes> {
+  if (!process.env.AGENTMAIL_API_KEY?.trim()) {
+    throw new Error("AgentMail is not configured. Set AGENTMAIL_API_KEY before sending email.");
+  }
+
+  const mailboxes = getSharedAgentMailboxes();
+  await ctx.runMutation((internal as any).claims.setAgentMailInboxes, {
+    claimId: claim._id,
+    claimInboxId: mailboxes.senderInboxId,
+    claimInboxEmail: mailboxes.senderEmail,
+    adjudicatorInboxId: mailboxes.adjudicatorInboxId,
+    adjudicatorEmail: mailboxes.adjudicatorEmail,
+    status: "shared",
+  });
+
+  return {
+    claimInboxId: mailboxes.senderInboxId,
+    claimEmail: mailboxes.senderEmail,
+    adjudicatorInboxId: mailboxes.adjudicatorInboxId,
+    adjudicatorEmail: mailboxes.adjudicatorEmail,
+  };
 }
 
 const ADJUDICATION_SCHEMA = {
@@ -86,11 +132,21 @@ async function deliverAiAdjudication(
     sender: string;
     recipient: string;
     payer: string;
+    adjudicatorInboxId: string;
     userPrompt: string;
     isFollowUp: boolean;
   }
 ): Promise<AdjudicationResponse> {
-  const { claim, threadId, sender, recipient, payer, userPrompt, isFollowUp } = options;
+  const {
+    claim,
+    threadId,
+    sender,
+    recipient,
+    payer,
+    adjudicatorInboxId,
+    userPrompt,
+    isFollowUp,
+  } = options;
 
   const adjudicationResult = await createStructuredCompletion<AdjudicationResponse>({
     systemPrompt: isFollowUp
@@ -108,14 +164,7 @@ async function deliverAiAdjudication(
       : "SUPPLEMENTAL RECORDS REQUESTED"
   }`;
 
-  await ctx.runMutation((api as any).emails.insertMessage, {
-    threadId,
-    claimId: claim._id,
-    direction: "inbound",
-    sender: `${payer} Appellate Review Board <${recipient}>`,
-    recipient: sender,
-    subject: determinationSubject,
-    bodyHtml: `<div style="font-family: sans-serif; padding: 16px; color: #1e293b;">
+  const determinationHtml = `<div style="font-family: sans-serif; padding: 16px; color: #1e293b;">
       <h3 style="color: #059669; margin-top: 0;">OFFICIAL NOTICE OF APPELLATE DETERMINATION</h3>
       <p><strong>Insurer:</strong> ${payer}</p>
       <p><strong>Claim Reference:</strong> #${claim.claimNumber}</p>
@@ -124,10 +173,27 @@ async function deliverAiAdjudication(
       <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
       <div style="white-space: pre-line; line-height: 1.6;">${adjudicationResult.formalDeterminationLetter}</div>
       <p style="margin-top: 16px; font-size: 12px; color: #64748b;">Reviewed by: ${adjudicationResult.reviewerName}, ${adjudicationResult.reviewerTitle}</p>
-    </div>`,
+    </div>`;
+
+  const liveReply = await sendAgentMailMessage({
+    inboxId: adjudicatorInboxId,
+    to: sender,
+    subject: determinationSubject,
+    text: adjudicationResult.formalDeterminationLetter,
+    html: determinationHtml,
+  });
+
+  await ctx.runMutation((api as any).emails.insertMessage, withAgentMailMessageId({
+    threadId,
+    claimId: claim._id,
+    direction: "inbound",
+    sender: `${payer} Appellate Review Board <${recipient}>`,
+    recipient: sender,
+    subject: determinationSubject,
+    bodyHtml: determinationHtml,
     bodyText: adjudicationResult.formalDeterminationLetter,
     hasAttachments: false,
-  });
+  }, liveReply.messageId));
 
   if (adjudicationResult.determination === "OVERTURNED_APPROVED") {
     await ctx.runMutation((api as any).claims.updateStatus, {
@@ -189,42 +255,42 @@ export const dispatchAppealPacket = action({
     const mode = args.dispatchMode || (args.recipientEmail?.includes("@") ? "custom_email" : "ai_adjudicator");
 
     let recipient = args.recipientEmail?.trim();
-    if (mode === "ai_adjudicator") {
-      recipient = recipient || buildAiAdjudicatorAddress(payer);
-    } else if (mode === "official_payer") {
+    if (mode === "official_payer") {
       recipient = claim.payerContact?.officialAppealsEmail || recipient;
     }
 
-    if (!recipient) {
+    if (mode !== "ai_adjudicator" && !recipient) {
       const portal = claim.payerContact?.intakePortalUrl ? `Official Online Portal (${claim.payerContact.portalName || claim.payerContact.intakePortalUrl})` : "";
       const fax = claim.payerContact?.appealsFax ? `Appellate Fax (${claim.payerContact.appealsFax})` : "";
       const channels = [portal, fax].filter(Boolean).join(" or ") || "Certified Mail";
       throw new Error(`Insurer ${payer} does not accept formal appeals via direct email under HIPAA regulations. Please submit through their ${channels}.`);
     }
 
-    const sender = claim.assignedAgentEmail || `appeal-claim-${claim.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
+    const mailboxes = await ensureClaimMailboxes(ctx, claim);
+    const sender = mailboxes.claimEmail;
+    const adjudicatorInboxId = mailboxes.adjudicatorInboxId;
+    if (mode === "ai_adjudicator") {
+      if (!mailboxes.adjudicatorEmail || !adjudicatorInboxId) {
+        throw new Error("AgentMail did not return a payer adjudicator inbox for this claim.");
+      }
+      // Never send option 1 to a display-only address supplied by the client.
+      recipient = mailboxes.adjudicatorEmail;
+    }
+    if (!recipient) {
+      throw new Error(`No email recipient is configured for claim ${claim.claimNumber}.`);
+    }
+    const finalRecipient = recipient;
     const subject =
       args.customSubject ||
       `URGENT: Formal ERISA Appeal & Demand for Payment - Claim #${claim.claimNumber} (Patient: ${claim.patient?.name})`;
-
-    const agentMailKey = process.env.AGENTMAIL_API_KEY;
-    const inboxId = process.env.AGENTMAIL_INBOX_ID || "thinhdinh@agentmail.to";
     const transmissionId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    // 2. If AGENTMAIL_API_KEY is present, transmit live outbound email via AgentMail REST API
-    if (agentMailKey) {
-      try {
-        const res = await fetch(`https://api.agentmail.to/v0/inboxes/${encodeURIComponent(inboxId)}/messages/send`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${agentMailKey}`,
-          },
-          body: JSON.stringify({
-            to: recipient,
-            subject,
-            text: appeal.fullAppealMarkdown,
-            html: `<div style="font-family: sans-serif; max-width: 700px; margin: auto; padding: 20px; color: #1e293b;">
+    const liveTransmission = await sendAgentMailMessage({
+      inboxId: mailboxes.claimInboxId,
+      to: finalRecipient,
+      subject,
+      text: appeal.fullAppealMarkdown,
+      html: `<div style="font-family: sans-serif; max-width: 700px; margin: auto; padding: 20px; color: #1e293b;">
               <div style="background-color: #0284c7; color: #ffffff; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
                 <h2 style="margin: 0; font-size: 18px; font-weight: 700;">FORMAL ERISA MEDICAL APPEAL & DEMAND FOR RECONSIDERATION</h2>
                 <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">Pursuant to 29 CFR § 2560.503-1 Statutory Claims Procedure</p>
@@ -239,45 +305,35 @@ export const dispatchAppealPacket = action({
               <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
               <div style="white-space: pre-line; line-height: 1.6; font-size: 14px;">${appeal.fullAppealMarkdown}</div>
             </div>`,
-          }),
-        });
-
-        if (!res.ok) {
-          const errText = await res.text();
-          console.warn("AgentMail live dispatch warning, proceeding with record storage:", res.status, errText);
-        }
-      } catch (err) {
-        console.warn("AgentMail live dispatch warning, proceeding with record storage:", err);
-      }
-    }
+    });
 
     // 3. Ensure email thread exists
     const threadId: any = await ctx.runMutation((api as any).emails.getOrCreateThread, {
       claimId: args.claimId,
       agentEmail: sender,
-      payerEmail: recipient,
+      payerEmail: finalRecipient,
       subject,
     });
 
     // 4. Record outbound message in database
-    await ctx.runMutation((api as any).emails.insertMessage, {
+    await ctx.runMutation((api as any).emails.insertMessage, withAgentMailMessageId({
       threadId,
       claimId: args.claimId,
       direction: "outbound",
       sender,
-      recipient,
+      recipient: finalRecipient,
       subject,
       bodyHtml: `<p>Formal ERISA appeal brief transmission for claim #${claim.claimNumber}</p>`,
       bodyText: appeal.fullAppealMarkdown,
       hasAttachments: true,
-    });
+    }, liveTransmission.messageId));
 
     // 5. Update claim status to dispatched
     await ctx.runMutation((api as any).claims.updateStatus, {
       claimId: args.claimId,
       status: "dispatched",
       actor: mode === "ai_adjudicator" ? "Autonomous AI Payer Gateway" : "AgentMail Outbound Dispatcher",
-      details: `Transmitted legal appeal memorandum to ${payer} (${recipient}) via dedicated inbox ${sender}.`,
+      details: `Transmitted legal appeal memorandum to ${payer} (${finalRecipient}) via dedicated inbox ${sender}.`,
     });
 
     let adjudicationResult: AdjudicationResponse | null = null;
@@ -289,13 +345,18 @@ export const dispatchAppealPacket = action({
           claim,
           threadId,
           sender,
-          recipient,
+          recipient: finalRecipient,
           payer,
+          adjudicatorInboxId: adjudicatorInboxId as string,
           userPrompt: `Evaluate the following medical appeal brief for Claim #${claim.claimNumber}:\n\n${appeal.fullAppealMarkdown}`,
           isFollowUp: false,
         });
       } catch (aiErr) {
-        console.warn("Autonomous AI Adjudication note:", aiErr);
+        throw new Error(
+          `AI payer adjudication failed after the appeal packet was sent: ${
+            aiErr instanceof Error ? aiErr.message : String(aiErr)
+          }`
+        );
       }
     }
 
@@ -303,7 +364,7 @@ export const dispatchAppealPacket = action({
       transmissionId,
       claimId: args.claimId,
       sender,
-      recipient,
+      recipient: finalRecipient,
       subject,
       dispatchedAt: Date.now(),
       status: "delivered",
@@ -343,66 +404,54 @@ export const sendOutboundMessage = action({
       args.customRecipient ||
       threadData?.thread?.payerEmail ||
       claim.payerContact?.officialAppealsEmail;
-    const sender = claim.assignedAgentEmail || process.env.AGENTMAIL_INBOX_ID || "thinhdinh@agentmail.to";
     const subject = args.customSubject || `Re: Claim #${claim.claimNumber} Appeal Addendum (Patient: ${claim.patient?.name})`;
     const payer = claim.patient?.insurancePayer || "Health Insurer";
 
-    const agentMailKey = process.env.AGENTMAIL_API_KEY;
-    const inboxId = process.env.AGENTMAIL_INBOX_ID || "thinhdinh@agentmail.to";
+    const isAiAdjudicatorReply = isAiAdjudicatorAddress(recipient);
+    const mailboxes = await ensureClaimMailboxes(ctx, claim);
+    const sender = mailboxes.claimEmail;
+    const resolvedRecipient = isAiAdjudicatorReply
+      ? mailboxes.adjudicatorEmail
+      : recipient;
+    if (!resolvedRecipient) {
+      throw new Error(`No email recipient is configured for claim ${claim.claimNumber}.`);
+    }
+    if (isAiAdjudicatorReply && !mailboxes.adjudicatorInboxId) {
+      throw new Error("AgentMail did not return a payer adjudicator inbox for this claim.");
+    }
 
-    // Only transmit over live AgentMail if a genuine recipient email exists
-    if (agentMailKey && recipient) {
-      try {
-        const res = await fetch(`https://api.agentmail.to/v0/inboxes/${encodeURIComponent(inboxId)}/messages/send`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${agentMailKey}`,
-          },
-          body: JSON.stringify({
-            to: recipient,
-            subject,
-            text: args.text,
-            html: `<div style="font-family: sans-serif; padding: 16px;">
+    const liveTransmission = await sendAgentMailMessage({
+      inboxId: mailboxes.claimInboxId,
+      to: resolvedRecipient,
+      subject,
+      text: args.text,
+      html: `<div style="font-family: sans-serif; padding: 16px;">
               <p><strong>Claim #${claim.claimNumber} - Case Addendum</strong></p>
               <p>${args.text}</p>
             </div>`,
-          }),
-        });
+    });
 
-        if (!res.ok) {
-          const errText = await res.text();
-          console.warn("AgentMail send warning:", res.status, errText);
-        }
-      } catch (err) {
-        console.warn("AgentMail send warning:", err);
-      }
-    }
+    const threadId: any = await ctx.runMutation((api as any).emails.getOrCreateThread, {
+      claimId: args.claimId,
+      agentEmail: sender,
+      payerEmail: resolvedRecipient,
+      subject,
+    });
 
-    let threadId = args.threadId;
-    if (!threadId) {
-      threadId = await ctx.runMutation((api as any).emails.getOrCreateThread, {
-        claimId: args.claimId,
-        agentEmail: sender,
-        payerEmail: recipient || "case-docket@claimhero.internal",
-        subject,
-      });
-    }
-
-    await ctx.runMutation((api as any).emails.insertMessage, {
+    await ctx.runMutation((api as any).emails.insertMessage, withAgentMailMessageId({
       threadId,
       claimId: args.claimId,
       direction: "outbound",
       sender,
-      recipient: recipient || "Case Docket (Internal Record)",
+      recipient: resolvedRecipient,
       subject,
       bodyHtml: `<p>${args.text}</p>`,
       bodyText: args.text,
       hasAttachments: false,
-    });
+    }, liveTransmission.messageId));
 
     let adjudicationDetermination: string | undefined;
-    if (isAiAdjudicatorAddress(recipient) && threadId) {
+    if (isAiAdjudicatorReply && threadId) {
       try {
         const historyMessages = [
           ...((threadData?.messages || []) as Array<{
@@ -418,8 +467,9 @@ export const sendOutboundMessage = action({
           claim,
           threadId,
           sender,
-          recipient,
+          recipient: resolvedRecipient,
           payer,
+          adjudicatorInboxId: mailboxes.adjudicatorInboxId as string,
           userPrompt: `The following is the ongoing appellate correspondence for Claim #${claim.claimNumber}.
 
 ${transcript}
@@ -433,7 +483,11 @@ Issue an updated formal determination letter that responds specifically to this 
         });
         adjudicationDetermination = adjudicationResult.determination;
       } catch (aiErr) {
-        console.warn("Autonomous AI Adjudication follow-up note:", aiErr);
+        throw new Error(
+          `AI payer adjudication failed after the addendum was sent: ${
+            aiErr instanceof Error ? aiErr.message : String(aiErr)
+          }`
+        );
       }
     }
 

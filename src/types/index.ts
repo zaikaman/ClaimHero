@@ -58,6 +58,12 @@ export interface Claim {
   riskLevel?: RiskLevel;
   scoringBreakdown?: ScoringCriterion[];
   assignedAgentEmail: string;
+  agentMailInboxId?: string;
+  agentMailInboxEmail?: string;
+  agentMailAdjudicatorInboxId?: string;
+  agentMailAdjudicatorEmail?: string;
+    agentMailProvisioningStatus?: "pending" | "shared" | "provisioned" | "not_configured" | "failed" | string;
+  agentMailProvisioningError?: string;
   denialLetterStorageId?: string;
   createdAt: number;
   updatedAt: number;

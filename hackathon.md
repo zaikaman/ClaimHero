@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-29T16:45:00Z
+- **Last updated:** 2026-08-29T16:01:37Z
 
 ## Log
 
@@ -169,7 +169,8 @@ Upgraded Appeal Synthesis & Memorandum Engine to Exhaustive Clinical & ERISA App
 ### 2026-08-29 - 7ef2de1
 Shipped the Precedent Vector Archive and captured the Convex All Gas Hackathon brief. Added a `precedents` table with a 1536-d `vectorIndex` on OpenAI embeddings (`convex/schema.ts`) covering winning briefs, state commissioner rulings, and court overturns keyed by ICD-10, CPT, and CARC. Embeddings use the existing `OPENAI_MODEL` / `OPENAI_API_KEY` / `OPENAI_BASE_URL` client with a deterministic hash fallback for chat-only proxies (`convex/lib/openai.ts`, `convex/lib/embeddings.ts`). Seeded a public legal corpus (`convex/lib/precedentCorpus.ts`) and wired `ctx.vectorSearch` to retrieve the top 3 matches at draft time, inject proven statutory language into Appeal Studio, and index overturned briefs via `ctx.scheduler` (`convex/actions/precedentArchive.ts`, `convex/precedents.ts`, `convex/actions/appealSynthesizer.ts`). Replaced hardcoded precedent cards with live vector results (`PrecedentFeed.tsx`, `CitationSidebar.tsx`, `usePrecedents.ts`). Added `BRIEF.md` documenting hackathon dates, stack pillars, prizes, and judging criteria. Verified with `npm run verify` (36/36 tests). Convex features: vector search, scheduled functions, actions, schema, indexes.
 
-### 2026-08-29 - working tree
+### 2026-08-29 - 2b1d9ce
 Fixed two-way AI payer adjudicator replies on `/app/inbox`. Option 1 previously called OpenAI only on the first `dispatchAppealPacket`; inbox follow-ups went through `sendOutboundMessage` and never generated a determination. Follow-up addenda to `*-adjudication@claimhero.agentmail.com` now load thread history, call structured OpenAI review again, and insert the inbound letter (`convex/actions/mailDispatcher.ts`, `convex/lib/aiAdjudicator.ts`, `AgentMailDrawer.tsx`). Verified with `npm run verify` (37/37 tests). Convex features: actions, queries, mutations.
 
-
+### 2026-08-29 - working tree
+Reworked AgentMail integration for the free-tier two-inbox limit. ClaimHero now binds every claim to two pre-provisioned shared inboxes: one sender inbox and one AI-adjudicator inbox. Option 1 sends real outbound packets and AI determinations through those inboxes, records provider message IDs, routes inbound shared-inbox replies by claim number, and never attempts per-claim inbox creation (`convex/actions/agentMail.ts`, `convex/lib/agentMail.ts`, `convex/actions/mailDispatcher.ts`, `convex/http.ts`, `convex/schema.ts`). Verified with `npm run verify` (37/37 tests, typecheck, lint, production build). Convex features: actions, internal mutations, scheduled functions, indexes, HTTP actions.

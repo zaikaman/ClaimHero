@@ -54,6 +54,7 @@ export const getOrCreateThread = mutation({
     payerEmail: v.string(),
     subject: v.string(),
   },
+  returns: v.id("emailThreads"),
   handler: async (ctx, args): Promise<Id<"emailThreads">> => {
     const existing = await ctx.db
       .query("emailThreads")
@@ -61,6 +62,11 @@ export const getOrCreateThread = mutation({
       .collect();
 
     if (existing.length > 0 && existing[0]) {
+      await ctx.db.patch(existing[0]._id, {
+        agentEmail: args.agentEmail,
+        payerEmail: args.payerEmail,
+        subject: args.subject,
+      });
       return existing[0]._id;
     }
 
@@ -92,9 +98,21 @@ export const insertMessage = mutation({
     bodyHtml: v.string(),
     bodyText: v.string(),
     hasAttachments: v.boolean(),
+    agentMailMessageId: v.optional(v.string()),
   },
+  returns: v.id("emailMessages"),
   handler: async (ctx, args): Promise<Id<"emailMessages">> => {
     const now = Date.now();
+
+    if (args.agentMailMessageId) {
+      const existing = await ctx.db
+        .query("emailMessages")
+        .withIndex("by_agentmail_message", (q) =>
+          q.eq("agentMailMessageId", args.agentMailMessageId)
+        )
+        .first();
+      if (existing) return existing._id;
+    }
 
     const messageId = await ctx.db.insert("emailMessages", {
       threadId: args.threadId,
@@ -106,6 +124,7 @@ export const insertMessage = mutation({
       bodyHtml: args.bodyHtml,
       bodyText: args.bodyText,
       hasAttachments: args.hasAttachments,
+      agentMailMessageId: args.agentMailMessageId,
       receivedAt: now,
     });
 

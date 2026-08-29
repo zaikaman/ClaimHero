@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -161,10 +161,17 @@ export const create = mutation({
       statutoryDeadline,
       daysRemaining: deadlineDays,
       assignedAgentEmail,
+      agentMailProvisioningStatus: "pending",
       denialLetterStorageId: args.denialLetterStorageId,
       createdAt: now,
       updatedAt: now,
     });
+
+    await ctx.scheduler.runAfter(
+      0,
+      (internal as any)["actions/agentMail"].provisionClaimInboxes,
+      { claimId }
+    );
 
     // Log initial audit event
     await ctx.db.insert("appealAuditLogs", {
@@ -238,7 +245,7 @@ export const createWithPatient = mutation({
 
     const deadlineDays = args.appealFilingDeadlineDays || 180;
     const statutoryDeadline = now + deadlineDays * 86400000;
-    const assignedAgentEmail = `appeal-${args.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
+    const assignedAgentEmail = `appeal-claim-${args.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
 
     const claimId = await ctx.db.insert("claims", {
       userId: userId ?? undefined,
@@ -256,10 +263,17 @@ export const createWithPatient = mutation({
       statutoryDeadline,
       daysRemaining: deadlineDays,
       assignedAgentEmail,
+      agentMailProvisioningStatus: "pending",
       denialLetterStorageId: args.denialLetterStorageId,
       createdAt: now,
       updatedAt: now,
     });
+
+    await ctx.scheduler.runAfter(
+      0,
+      (internal as any)["actions/agentMail"].provisionClaimInboxes,
+      { claimId }
+    );
 
     // Log audit event
     await ctx.db.insert("appealAuditLogs", {
@@ -271,6 +285,49 @@ export const createWithPatient = mutation({
     });
 
     return claimId;
+  },
+});
+
+/**
+ * Persist the provider-backed AgentMail inboxes created for a claim.
+ * This is internal because only the provisioning action may update provider IDs.
+ */
+export const setAgentMailInboxes = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    claimInboxId: v.optional(v.string()),
+    claimInboxEmail: v.optional(v.string()),
+    adjudicatorInboxId: v.optional(v.string()),
+    adjudicatorEmail: v.optional(v.string()),
+    status: v.string(),
+    error: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const patchData: Record<string, string> = {
+      agentMailProvisioningStatus: args.status,
+    };
+
+    if (args.error !== undefined) {
+      patchData.agentMailProvisioningError = args.error;
+    }
+
+    if (args.claimInboxId !== undefined) {
+      patchData.agentMailInboxId = args.claimInboxId;
+    }
+    if (args.claimInboxEmail !== undefined) {
+      patchData.agentMailInboxEmail = args.claimInboxEmail;
+      // Keep the existing UI and webhook contract pointed at the real inbox.
+      patchData.assignedAgentEmail = args.claimInboxEmail;
+    }
+    if (args.adjudicatorInboxId !== undefined) {
+      patchData.agentMailAdjudicatorInboxId = args.adjudicatorInboxId;
+    }
+    if (args.adjudicatorEmail !== undefined) {
+      patchData.agentMailAdjudicatorEmail = args.adjudicatorEmail;
+    }
+    await ctx.db.patch(args.claimId, patchData);
+    return null;
   },
 });
 
@@ -724,4 +781,3 @@ export const recordAuditLog = mutation({
     return logId;
   },
 });
-

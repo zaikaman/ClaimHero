@@ -65,6 +65,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const [isExportDrawerOpen, setIsExportDrawerOpen] = useState(false);
 
   const assignedEmail =
+    claim.agentMailInboxEmail ||
     claim.assignedAgentEmail ||
     `appeal-claim-${claim.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
 
@@ -72,7 +73,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const defaultPayerContact = getPayerAppellateContact(payerName);
   const payerContact = claim.payerContact || defaultPayerContact;
   const officialEmail = claim.payerContact?.officialAppealsEmail || payerContact.officialAppealsEmail;
-  const aiAdjudicatorEmail = `${payerName.toLowerCase().replace(/[^a-z0-9]/g, "")}-adjudication@claimhero.agentmail.com`;
+  const aiAdjudicatorEmail =
+    claim.agentMailAdjudicatorEmail ||
+    `${payerName.toLowerCase().replace(/[^a-z0-9]/g, "")}-adjudication@claimhero.agentmail.com`;
 
   const effectiveRecipient =
     dispatchMode === "ai_adjudicator"
@@ -426,8 +429,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         {/* Assigned Email Address Banner */}
         <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2.5 rounded-lg border border-border bg-muted/40 p-2.5 text-xs">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground">Case Inbox:</span>
+            <span className="text-[11px] text-muted-foreground">Shared Case Inbox:</span>
             <span className="font-mono font-semibold text-foreground">{assignedEmail}</span>
+            {claim.agentMailProvisioningStatus !== "shared" && claim.agentMailProvisioningStatus !== "provisioned" ? (
+              <Badge variant="outline" className="text-[9px] text-amber-600 dark:text-amber-400 border-amber-500/30">
+                {claim.agentMailProvisioningStatus === "failed" ? "Provisioning failed" : "Provisioning"}
+              </Badge>
+            ) : null}
           </div>
 
           <Button

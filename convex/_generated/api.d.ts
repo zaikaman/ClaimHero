@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as actions_agentMail from "../actions/agentMail.js";
 import type * as actions_appealSynthesizer from "../actions/appealSynthesizer.js";
 import type * as actions_mailDispatcher from "../actions/mailDispatcher.js";
 import type * as actions_opticalParser from "../actions/opticalParser.js";
@@ -24,6 +25,7 @@ import type * as clinicalEvidences from "../clinicalEvidences.js";
 import type * as crons from "../crons.js";
 import type * as emails from "../emails.js";
 import type * as http from "../http.js";
+import type * as lib_agentMail from "../lib/agentMail.js";
 import type * as lib_aiAdjudicator from "../lib/aiAdjudicator.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_openai from "../lib/openai.js";
@@ -39,6 +41,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "actions/agentMail": typeof actions_agentMail;
   "actions/appealSynthesizer": typeof actions_appealSynthesizer;
   "actions/mailDispatcher": typeof actions_mailDispatcher;
   "actions/opticalParser": typeof actions_opticalParser;
@@ -55,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   emails: typeof emails;
   http: typeof http;
+  "lib/agentMail": typeof lib_agentMail;
   "lib/aiAdjudicator": typeof lib_aiAdjudicator;
   "lib/embeddings": typeof lib_embeddings;
   "lib/openai": typeof lib_openai;

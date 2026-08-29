@@ -51,6 +51,12 @@ export default defineSchema({
       )
     ),
     assignedAgentEmail: v.string(),
+    agentMailInboxId: v.optional(v.string()),
+    agentMailInboxEmail: v.optional(v.string()),
+    agentMailAdjudicatorInboxId: v.optional(v.string()),
+    agentMailAdjudicatorEmail: v.optional(v.string()),
+      agentMailProvisioningStatus: v.optional(v.string()), // pending, shared, provisioned, not_configured, failed
+    agentMailProvisioningError: v.optional(v.string()),
     denialLetterStorageId: v.optional(v.id("_storage")),
     payerContact: v.optional(
       v.object({
@@ -128,10 +134,12 @@ export default defineSchema({
     bodyHtml: v.string(),
     bodyText: v.string(),
     hasAttachments: v.boolean(),
+    agentMailMessageId: v.optional(v.string()),
     receivedAt: v.number(),
   })
     .index("by_thread", ["threadId"])
-    .index("by_claim", ["claimId"]),
+    .index("by_claim", ["claimId"])
+    .index("by_agentmail_message", ["agentMailMessageId"]),
 
   // Precedent Vector Archive — winning briefs, commissioner rulings, court overturns
   precedents: defineTable({

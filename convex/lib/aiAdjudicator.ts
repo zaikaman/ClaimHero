@@ -7,7 +7,12 @@ export const AI_ADJUDICATOR_INBOX_MARKER = "-adjudication@claimhero.agentmail.co
 
 export function isAiAdjudicatorAddress(email: string | undefined | null): boolean {
   if (!email) return false;
-  return email.toLowerCase().includes(AI_ADJUDICATOR_INBOX_MARKER);
+  const normalized = email.toLowerCase();
+  if (normalized.includes(AI_ADJUDICATOR_INBOX_MARKER)) return true;
+
+  const address = normalized.match(/<([^>]+)>/)?.[1] || normalized;
+  const localPart = address.split("@")[0] || "";
+  return localPart.includes("adjudication") || localPart.includes("adjudicator");
 }
 
 export function buildAiAdjudicatorAddress(payerName: string): string {
