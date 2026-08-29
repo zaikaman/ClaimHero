@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-29T14:59:29Z
+- **Last updated:** 2026-08-29T16:45:00Z
 
 ## Log
 
@@ -166,7 +166,10 @@ Engineered 3-Mode Interactive Recipient Destination, Autonomous AI Payer Adjudic
 ### 2026-08-29 - e97077f
 Upgraded Appeal Synthesis & Memorandum Engine to Exhaustive Clinical & ERISA Appellate Standard: Upgraded `appealSynthesizer.ts` and `assembleProfessionalMemorandum` to enforce exhaustive clinical chronologies, objective diagnostic severity staging (Kellgren-Lawrence Grade III/IV, severe joint space collapse, MRI/CT classifications), step-therapy timelines (12-24 weeks of structured physical therapy, oral NSAID trials, intra-articular injection histories), and validated functional impairment scores (KOOS, WOMAC, ADL restrictions). Added criterion-by-criterion Clinical Policy Bulletin (CPB) alignment comparison tables with direct quote extractions and Exhibit cross-references (Exhibits A-E). Expanded statutory legal arguments under ERISA 29 U.S.C. § 1133, 29 CFR § 2560.503-1(h)(3)(ii) (Mandatory De Novo Review), 29 CFR § 2560.503-1(h)(2)(iii) (Mandatory Complete Claim File & Reviewer Credentials Disclosure), 29 CFR § 2560.503-1(g) (Notice of Deficiency for Boilerplate Denials), and ACA § 2719 External IRO Escalation. Built fallback structured generation to guarantee robust, multi-page (800-1200+ word) legal memorandum assembly. Expanded test suite in `tests/claimhero.test.ts` to 31 tests. Verified 100% clean typechecking, linting, unit tests, and production build with `npm run verify`.
 
-### 2026-08-29 - working tree
+### 2026-08-29 - 7ef2de1
 Shipped the Precedent Vector Archive and captured the Convex All Gas Hackathon brief. Added a `precedents` table with a 1536-d `vectorIndex` on OpenAI embeddings (`convex/schema.ts`) covering winning briefs, state commissioner rulings, and court overturns keyed by ICD-10, CPT, and CARC. Embeddings use the existing `OPENAI_MODEL` / `OPENAI_API_KEY` / `OPENAI_BASE_URL` client with a deterministic hash fallback for chat-only proxies (`convex/lib/openai.ts`, `convex/lib/embeddings.ts`). Seeded a public legal corpus (`convex/lib/precedentCorpus.ts`) and wired `ctx.vectorSearch` to retrieve the top 3 matches at draft time, inject proven statutory language into Appeal Studio, and index overturned briefs via `ctx.scheduler` (`convex/actions/precedentArchive.ts`, `convex/precedents.ts`, `convex/actions/appealSynthesizer.ts`). Replaced hardcoded precedent cards with live vector results (`PrecedentFeed.tsx`, `CitationSidebar.tsx`, `usePrecedents.ts`). Added `BRIEF.md` documenting hackathon dates, stack pillars, prizes, and judging criteria. Verified with `npm run verify` (36/36 tests). Convex features: vector search, scheduled functions, actions, schema, indexes.
+
+### 2026-08-29 - working tree
+Fixed two-way AI payer adjudicator replies on `/app/inbox`. Option 1 previously called OpenAI only on the first `dispatchAppealPacket`; inbox follow-ups went through `sendOutboundMessage` and never generated a determination. Follow-up addenda to `*-adjudication@claimhero.agentmail.com` now load thread history, call structured OpenAI review again, and insert the inbound letter (`convex/actions/mailDispatcher.ts`, `convex/lib/aiAdjudicator.ts`, `AgentMailDrawer.tsx`). Verified with `npm run verify` (37/37 tests). Convex features: actions, queries, mutations.
 
 

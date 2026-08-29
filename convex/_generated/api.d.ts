@@ -24,6 +24,7 @@ import type * as clinicalEvidences from "../clinicalEvidences.js";
 import type * as crons from "../crons.js";
 import type * as emails from "../emails.js";
 import type * as http from "../http.js";
+import type * as lib_aiAdjudicator from "../lib/aiAdjudicator.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_openai from "../lib/openai.js";
 import type * as lib_precedentCorpus from "../lib/precedentCorpus.js";
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   emails: typeof emails;
   http: typeof http;
+  "lib/aiAdjudicator": typeof lib_aiAdjudicator;
   "lib/embeddings": typeof lib_embeddings;
   "lib/openai": typeof lib_openai;
   "lib/precedentCorpus": typeof lib_precedentCorpus;

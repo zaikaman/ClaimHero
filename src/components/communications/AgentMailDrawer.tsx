@@ -20,6 +20,7 @@ import {
 import { Claim, EmailMessage, EmailThread } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
 import { getPayerAppellateContact } from "../../lib/constants";
+import { isAiAdjudicatorAddress } from "../../../convex/lib/aiAdjudicator";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -83,6 +84,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const recipientEmail =
     threads[0]?.payerEmail ||
     effectiveRecipient;
+  const isAiAdjudicatorThread = isAiAdjudicatorAddress(recipientEmail);
 
   const canDispatch =
     dispatchMode === "ai_adjudicator"
@@ -717,32 +719,42 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
           {/* Reply Composer */}
           <form
             onSubmit={handleSendReply}
-            className="p-3 bg-muted/20 border-t border-border flex items-center gap-2"
+            className="p-3 bg-muted/20 border-t border-border space-y-2"
           >
-            <Input
-              type="text"
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder={
-                recipientEmail
-                  ? "Type addendum or reply to payer..."
-                  : "Log addendum note to case docket..."
-              }
-              className="flex-1 bg-background"
-            />
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isSending || !replyText.trim()}
-              className="gap-1"
-            >
-              {isSending ? (
-                <CircleNotch className="size-3.5 animate-spin" />
-              ) : (
-                <PaperPlaneTilt className="size-3.5" />
-              )}
-              <span>Send</span>
-            </Button>
+            {isSending && isAiAdjudicatorThread ? (
+              <p className="text-[11px] text-muted-foreground font-mono">
+                Payer medical director is reviewing your addendum...
+              </p>
+            ) : null}
+            <div className="flex items-center gap-2">
+              <Input
+                type="text"
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder={
+                  isAiAdjudicatorThread
+                    ? "Reply to the AI payer reviewer with addenda or additional records..."
+                    : recipientEmail
+                    ? "Type addendum or reply to payer..."
+                    : "Log addendum note to case docket..."
+                }
+                className="flex-1 bg-background"
+                disabled={isSending}
+              />
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isSending || !replyText.trim()}
+                className="gap-1"
+              >
+                {isSending ? (
+                  <CircleNotch className="size-3.5 animate-spin" />
+                ) : (
+                  <PaperPlaneTilt className="size-3.5" />
+                )}
+                <span>{isSending && isAiAdjudicatorThread ? "Reviewing" : "Send"}</span>
+              </Button>
+            </div>
           </form>
         </Card>
       </div>

@@ -462,6 +462,48 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
     expect(resolveRecipient("custom_email", "judge@hackathon.com", "Molina Healthcare")).toBe("judge@hackathon.com");
     expect(resolveRecipient("official_payer", "", "Molina Healthcare", "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com")).toBe("MFLGrievanceandAppealsDepartment@MolinaHealthcare.com");
   });
+
+  it("detects AI payer adjudicator inboxes so follow-up replies continue the review", async () => {
+    const {
+      isAiAdjudicatorAddress,
+      buildAiAdjudicatorAddress,
+      formatCorrespondenceTranscript,
+    } = await import("../convex/lib/aiAdjudicator");
+
+    expect(buildAiAdjudicatorAddress("Molina Healthcare")).toBe(
+      "molinahealthcare-adjudication@claimhero.agentmail.com"
+    );
+    expect(isAiAdjudicatorAddress("molinahealthcare-adjudication@claimhero.agentmail.com")).toBe(true);
+    expect(
+      isAiAdjudicatorAddress(
+        "Molina Healthcare Appellate Review Board <molinahealthcare-adjudication@claimhero.agentmail.com>"
+      )
+    ).toBe(true);
+    expect(isAiAdjudicatorAddress("judge@hackathon.com")).toBe(false);
+    expect(isAiAdjudicatorAddress(undefined)).toBe(false);
+
+    const transcript = formatCorrespondenceTranscript([
+      {
+        direction: "outbound",
+        subject: "Formal Appeal",
+        bodyText: "Please overturn this denial.",
+      },
+      {
+        direction: "inbound",
+        subject: "Records Requested",
+        bodyText: "Please send PT notes.",
+      },
+      {
+        direction: "outbound",
+        subject: "Addendum",
+        bodyText: "Attached 16 weeks of PT notes.",
+      },
+    ]);
+
+    expect(transcript).toContain("APPELLANT (Authorized Representative)");
+    expect(transcript).toContain("PAYER MEDICAL DIRECTOR");
+    expect(transcript).toContain("Attached 16 weeks of PT notes.");
+  });
 });
 
 describe("Phase 7: Portfolio Analytics & Recovery Calculation Engine", () => {
