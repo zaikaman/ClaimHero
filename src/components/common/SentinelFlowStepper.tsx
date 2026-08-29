@@ -191,7 +191,12 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
                 )}
               >
                 {step.isCompleted ? (
-                  <CheckCircle className="size-4 text-emerald-500" />
+                  <CheckCircle
+                    className={cn(
+                      "size-4",
+                      step.isActive ? "text-primary-foreground" : "text-emerald-500"
+                    )}
+                  />
                 ) : (
                   <StepIcon className="size-3.5" />
                 )}

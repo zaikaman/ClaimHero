@@ -22,7 +22,7 @@ import { getPayerAppellateContact } from "../../lib/constants";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
+import { Button, buttonVariants } from "../ui/button";
 import { Input } from "../ui/input";
 
 interface AgentMailDrawerProps {
@@ -169,21 +169,18 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
             <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
               {payerContact.intakePortalUrl && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  asChild
-                  className="gap-1.5 text-xs h-9"
+                <a
+                  href={payerContact.intakePortalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    buttonVariants({ variant: "outline" }),
+                    "gap-1.5 text-xs h-9 px-3 shrink-0"
+                  )}
                 >
-                  <a
-                    href={payerContact.intakePortalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <ArrowSquareOut className="size-3.5 text-primary" />
-                    <span>Open {payerContact.portalName ? "Portal" : "Appeals Portal"}</span>
-                  </a>
-                </Button>
+                  <ArrowSquareOut className="size-3.5 text-primary shrink-0" />
+                  <span>Open {payerContact.portalName ? "Portal" : "Appeals Portal"}</span>
+                </a>
               )}
 
               <Button
@@ -197,7 +194,14 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 )}
               >
                 {copiedBrief ? (
-                  <Check className="size-3.5 text-emerald-500" />
+                  <Check
+                    className={cn(
+                      "size-3.5",
+                      !recipientEmail && payerContact.intakePortalUrl
+                        ? "text-primary-foreground"
+                        : "text-emerald-500"
+                    )}
+                  />
                 ) : (
                   <Copy className="size-3.5" />
                 )}

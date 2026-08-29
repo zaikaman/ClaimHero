@@ -11,7 +11,51 @@ export interface ButtonProps
     | "ghost"
     | "link";
   size?: "default" | "xs" | "sm" | "lg" | "icon" | "icon-xs" | "icon-sm" | "icon-lg";
-  asChild?: boolean;
+}
+
+export function buttonVariants({
+  variant = "default",
+  size = "default",
+  className,
+}: {
+  variant?: ButtonProps["variant"];
+  size?: ButtonProps["size"];
+  className?: string;
+} = {}) {
+  const baseStyles =
+    "inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
+
+  const variantStyles = {
+    default:
+      "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs shadow-primary/20 hover:shadow-md hover:shadow-primary/30",
+    outline:
+      "border border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/[0.22] text-foreground/90 hover:text-foreground shadow-2xs backdrop-blur-xs",
+    secondary:
+      "bg-secondary/80 border border-white/[0.06] text-secondary-foreground hover:bg-secondary hover:border-white/[0.14] shadow-2xs",
+    ghost:
+      "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50",
+    destructive:
+      "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm",
+    link: "text-primary underline-offset-4 hover:underline",
+  };
+
+  const sizeStyles = {
+    default: "h-8 gap-1.5 px-3 text-xs",
+    xs: "h-6 gap-1 rounded-md px-2 text-xs [&_svg:not([class*='size-'])]:size-3",
+    sm: "h-7 gap-1 rounded-md px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3.5",
+    lg: "h-9 gap-1.5 px-3.5 text-sm",
+    icon: "size-8",
+    "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
+    "icon-sm": "size-7 rounded-md",
+    "icon-lg": "size-9",
+  };
+
+  return cn(
+    baseStyles,
+    variantStyles[variant || "default"],
+    sizeStyles[size || "default"],
+    className
+  );
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -25,44 +69,11 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
-    const baseStyles =
-      "inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
-
-    const variantStyles = {
-      default:
-        "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs shadow-primary/20 hover:shadow-md hover:shadow-primary/30",
-      outline:
-        "border border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/[0.22] text-foreground/90 hover:text-foreground shadow-2xs backdrop-blur-xs",
-      secondary:
-        "bg-secondary/80 border border-white/[0.06] text-secondary-foreground hover:bg-secondary hover:border-white/[0.14] shadow-2xs",
-      ghost:
-        "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50",
-      destructive:
-        "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm",
-      link: "text-primary underline-offset-4 hover:underline",
-    };
-
-    const sizeStyles = {
-      default: "h-8 gap-1.5 px-3 text-xs",
-      xs: "h-6 gap-1 rounded-md px-2 text-xs [&_svg:not([class*='size-'])]:size-3",
-      sm: "h-7 gap-1 rounded-md px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3.5",
-      lg: "h-9 gap-1.5 px-3.5 text-sm",
-      icon: "size-8",
-      "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-      "icon-sm": "size-7 rounded-md",
-      "icon-lg": "size-9",
-    };
-
     return (
       <button
         ref={ref}
         type={type}
-        className={cn(
-          baseStyles,
-          variantStyles[variant],
-          sizeStyles[size],
-          className
-        )}
+        className={buttonVariants({ variant, size, className })}
         {...props}
       />
     );
