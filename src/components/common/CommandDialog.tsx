@@ -93,7 +93,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   const caseTools = [
     { id: "evidence" as NavigationView, label: "Evidence Matrix", icon: FileMagnifyingGlass, desc: "CPBs & Win Score" },
     { id: "studio" as NavigationView, label: "Appeal Studio", icon: FileText, desc: "AI Brief Synthesis" },
-    { id: "communications" as NavigationView, label: "AgentMail Inbox", icon: Envelope, desc: "Payer Transmissions" },
+    { id: "communications" as NavigationView, label: "Payer Communications", icon: Envelope, desc: "Payer Transmissions" },
   ];
 
   return (
@@ -276,7 +276,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
               >
                 <div className="flex items-center gap-2">
                   <Envelope className="size-3.5 text-emerald-500" />
-                  <span>Copy AgentMail Gateway (intake@claimhero.agentmail.com)</span>
+                  <span>Copy Intake Gateway Address (intake@claimhero.agentmail.com)</span>
                 </div>
                 {copiedEmail ? (
                   <Check className="size-3 text-emerald-500" />
@@ -309,7 +309,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
         {/* Footer info */}
         <div className="border-t border-border px-3 py-2 bg-muted/20 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
           <span>29 CFR § 2560.503-1 Statutory Sentinel</span>
-          <span>OpenAI gpt-5-nano</span>
+          <span>Clinical Intelligence Engine</span>
         </div>
       </DialogContent>
 

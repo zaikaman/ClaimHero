@@ -178,7 +178,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 <AppealBriefRenderer content={markdownContent} isPrintMode={true} />
               ) : (
                 <div className="text-center py-12 text-slate-400 italic">
-                  No appeal brief generated yet. Click &quot;Synthesize Brief&quot; in the studio to generate with gpt-5-nano.
+                  No appeal brief generated yet. Click &quot;Synthesize Brief&quot; in the studio to generate the legal brief.
                 </div>
               )}
             </div>

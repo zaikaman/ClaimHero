@@ -628,7 +628,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 onSelectClaim(claim._id);
                                 onNavigateView("communications");
                               }}
-                              title="Open AgentMail Box"
+                              title="Open Payer Communications Inbox"
                               className="h-7 px-2.5 text-xs gap-1"
                             >
                               <Envelope className="size-3" />
@@ -683,7 +683,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                   onNavigateView("evidence");
                                 }
                               }}
-                              title="Run Full Autonomous Sentinel Pipeline (Crawl + Score + Synthesize)"
+                              title="Run Full Autonomous Sentinel Pipeline (Analyze + Score + Synthesize)"
                               className="h-7 px-2.5 text-xs gap-1 bg-primary text-primary-foreground font-semibold shadow-2xs"
                             >
                               {runningPipelineClaimId === claim._id ? (
@@ -744,7 +744,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 className="gap-2 text-xs cursor-pointer"
                               >
                                 <Envelope className="size-3.5" />
-                                <span>AgentMail Gateway</span>
+                                <span>Payer Communications</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => {

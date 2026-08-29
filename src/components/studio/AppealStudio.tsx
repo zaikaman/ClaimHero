@@ -65,7 +65,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       await synthesizeAppeal(appealLevel, physicianNotes);
     } catch (err: any) {
       setSynthesisError(
-        err?.message || "Failed to synthesize appeal brief with OpenAI."
+        err?.message || "Failed to synthesize appeal brief. Please try again."
       );
     }
   };
@@ -148,7 +148,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               <span>Physician Notes{physicianNotes ? " (Added)" : ""}</span>
             </Button>
 
-            {/* Synthesize Appeal with gpt-5-nano */}
+            {/* Synthesize Appeal Brief */}
             <Button
               size="sm"
               onClick={handleRunSynthesis}
@@ -305,7 +305,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                       {isSynthesizing ? (
                         <>
                           <CircleNotch className="size-3.5 animate-spin" />
-                          <span>Synthesizing Brief with gpt-5-nano...</span>
+                          <span>Synthesizing Appeal Brief...</span>
                         </>
                       ) : (
                         <>
@@ -359,7 +359,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             }}
             className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all h-8"
           >
-            <span>Next: Dispatch via Dedicated AgentMail</span>
+            <span>Next: Dispatch Appeal Packet</span>
             <ArrowRight className="size-3.5" />
           </Button>
         </div>

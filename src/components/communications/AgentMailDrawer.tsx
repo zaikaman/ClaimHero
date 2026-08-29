@@ -235,12 +235,12 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   {isDispatching ? (
                     <>
                       <CircleNotch className="size-4 animate-spin" />
-                      <span>Transmitting via AgentMail...</span>
+                      <span>Transmitting Appeal Packet...</span>
                     </>
                   ) : (
                     <>
                       <PaperPlaneTilt className="size-4" />
-                      <span>Dispatch via AgentMail</span>
+                      <span>Transmit Appeal Packet</span>
                     </>
                   )}
                 </Button>
@@ -262,7 +262,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               </span>
               <p className="text-[11px] leading-relaxed text-foreground/80">
                 {payerContact.submissionPolicyNote ||
-                  "Most health insurers require appeals via Online Provider Portal, Certified Appellate Fax, or Certified USPS Mail. Use your dedicated Case Inbox as your Authorized Representative electronic contact on the portal to receive real-time webhook notices."}
+                  "Most health insurers require appeals via Online Provider Portal, Certified Appellate Fax, or Certified USPS Mail. Use your dedicated Case Inbox as your Authorized Representative electronic contact on the portal to receive electronic determinations."}
               </p>
             </div>
           </div>
@@ -279,7 +279,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-semibold text-foreground font-sans">
-                  AgentMail Claim Inbox
+                  Payer Communications Inbox
                 </h2>
                 <Badge variant="outline" className="font-mono text-[10px]">
                   Claim #{claim.claimNumber}
@@ -474,7 +474,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   {claim.status === "dispatched" || claim.status === "won"
                     ? "Packet Transmitted & Logged"
                     : recipientEmail
-                    ? "Ready for AgentMail Dispatch"
+                    ? "Ready for Electronic Dispatch"
                     : payerContact.intakePortalUrl
                     ? "Ready for Portal Submission"
                     : "Ready for Certified Fax / Mail"}
@@ -495,7 +495,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <span>Gateway Source:</span>
                   <span className="text-foreground font-medium">
                     {claim.payerContact?.source === "firecrawl_live"
-                      ? "Firecrawl Web Search"
+                      ? "Automated Policy & Directory Discovery"
                       : claim.payerContact?.source === "document_ocr"
                       ? "Extracted from Document"
                       : payerContact.isVerified
@@ -516,7 +516,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               <span>Transmission History ({messages.length})</span>
             </div>
             <Badge variant="outline" size="sm" className="text-[10px]">
-              Webhook Active
+              Intake Active
             </Badge>
           </div>
 
@@ -532,7 +532,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <div className="text-xs font-medium text-foreground">No transmissions yet</div>
                 <p className="text-[11px] max-w-sm mx-auto">
                   {recipientEmail
-                    ? "Click 'Dispatch via AgentMail' above to transmit the synthesized ERISA brief to the insurer."
+                    ? "Click 'Transmit Appeal Packet' above to deliver the synthesized ERISA brief to the insurer."
                     : "Payer mandates portal or fax submission. Copy the brief above to paste into their official portal, or print the certified docket."}
                 </p>
               </div>

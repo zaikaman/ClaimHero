@@ -114,7 +114,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
       {/* Evidence Cards List */}
       {isLoading ? (
         <Card className="p-8 text-center text-xs font-mono text-muted-foreground animate-pulse bg-muted/20">
-          Crawling Clinical Policy Bulletins with Firecrawl & extracting medical criteria...
+          Indexing Clinical Policy Bulletins & extracting medical criteria...
         </Card>
       ) : filtered.length === 0 ? (
         <Card className="p-8 text-center items-center justify-center space-y-2 bg-muted/20 border-dashed">
@@ -123,7 +123,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
             No clinical policy clauses indexed yet
           </div>
           <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
-            Click &quot;Crawl Insurer CPB&quot; above to fetch official Clinical Policy Bulletins and guidelines.
+            Click &quot;Index Insurer CPB&quot; above to fetch official Clinical Policy Bulletins and guidelines.
           </p>
         </Card>
       ) : (

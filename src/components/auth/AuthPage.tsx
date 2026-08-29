@@ -94,19 +94,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
     } catch (err: any) {
       setIsGoogleLoading(false);
       console.warn("Google OAuth note:", err);
-      const msg = err?.message || "";
-      if (
-        msg.includes("AUTH_GOOGLE_ID") ||
-        msg.includes("AUTH_GOOGLE_SECRET") ||
-        msg.includes("Missing environment variable") ||
-        msg.includes("client_id")
-      ) {
-        setGoogleHint(true);
-        setError("Google OAuth is waiting for AUTH_GOOGLE_ID & AUTH_GOOGLE_SECRET in Convex deployment variables.");
-      } else {
-        setError("Google authentication could not be completed. You can use Email & Password below.");
-        setGoogleHint(true);
-      }
+      setError("Google Sign-In is temporarily unavailable. Please use Email & Password below.");
+      setGoogleHint(true);
     }
   };
 

@@ -339,8 +339,8 @@ export const SIMULATION_STAGES = [
   {
     stage: 2,
     id: "crawling",
-    title: "Firecrawl Insurer CPB & Clinical Policy Crawl",
-    description: "Crawling UnitedHealthcare Policy 2024T001 & extracting conservative therapy criteria contradiction",
+    title: "Insurer CPB & Clinical Policy Indexing",
+    description: "Indexing UnitedHealthcare Policy 2024T001 & extracting conservative therapy criteria contradiction",
     durationMs: 3000,
   },
   {

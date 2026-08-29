@@ -63,7 +63,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
   if (isLoading) {
     return (
       <div className="p-12 text-center text-xs font-mono text-muted-foreground animate-pulse">
-        Computing portfolio financial recovery metrics across Convex Cloud Database...
+        Computing portfolio financial recovery metrics & win benchmarks...
       </div>
     );
   }

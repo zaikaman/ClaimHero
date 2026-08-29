@@ -94,7 +94,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
     {
       id: "evidence",
       title: "Inspect Clinical Policy Precedents",
-      description: "Review crawled insurer CPB clauses and calculate overturn score.",
+      description: "Review indexed insurer CPB clauses and calculate overturn score.",
       isDone: hasVisitedEvidence,
       icon: FileMagnifyingGlass,
       actionLabel: "View Matrix",
@@ -111,8 +111,8 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
     },
     {
       id: "dispatch",
-      title: "Review AgentMail Payer Inbox",
-      description: "Inspect dedicated claim email gateway and audit timeline.",
+      title: "Review Payer Communications Inbox",
+      description: "Inspect dedicated claim transmission gateway and audit timeline.",
       isDone: hasVisitedCommunications,
       icon: Envelope,
       actionLabel: "Open Inbox",

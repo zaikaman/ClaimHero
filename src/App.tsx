@@ -179,7 +179,7 @@ export default function App() {
         <div className="flex h-full items-center justify-center space-y-3 flex-col">
           <CircleNotch className="size-6 text-foreground animate-spin" />
           <span className="text-xs font-mono text-muted-foreground">
-            Connecting to Convex Cloud Database...
+            Connecting to Sentinel Engine...
           </span>
         </div>
       ) : (

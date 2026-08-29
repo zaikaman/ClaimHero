@@ -95,7 +95,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-1">
             <div className="hidden sm:flex items-center gap-1.5 rounded-lg border border-border bg-muted/30 px-2.5 py-1 text-[11px] text-muted-foreground font-mono mr-1">
               <Pulse className="size-3 text-foreground" />
-              <span>gpt-5-nano</span>
+              <span>Clinical Intelligence</span>
               <span className="size-1.5 rounded-full bg-emerald-500"></span>
             </div>
 

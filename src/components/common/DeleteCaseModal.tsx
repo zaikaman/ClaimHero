@@ -130,11 +130,11 @@ export const DeleteCaseModal: React.FC<DeleteCaseModalProps> = ({
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-background/50 border border-border/40 px-2.5 py-1.5">
               <Pulse className="size-3.5 text-muted-foreground shrink-0" />
-              <span>Crawled Clinical Policy Bulletins (CPBs) & overturn scores</span>
+              <span>Indexed Clinical Policy Bulletins (CPBs) & overturn scores</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-background/50 border border-border/40 px-2.5 py-1.5">
               <Envelope className="size-3.5 text-muted-foreground shrink-0" />
-              <span>AgentMail communication threads & outbound brief transmissions</span>
+              <span>Payer communication threads & outbound brief transmissions</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-background/50 border border-border/40 px-2.5 py-1.5">
               <Clock className="size-3.5 text-muted-foreground shrink-0" />

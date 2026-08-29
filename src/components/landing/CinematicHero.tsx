@@ -54,19 +54,19 @@ const HERO_SLIDES: HeroSlide[] = [
     badge3: { icon: Buildings, label: "Aetna · UHC · Cigna · BCBS" },
     title: "Clinical Precedent. Zero Hallucination.",
     description:
-      "Deep Firecrawl ingestion indexes payer bulletins, CPT codes, and LCD precedent rulings to construct unassailable, cited appeal dossiers.",
+      "Autonomous clinical policy indexing scans payer bulletins, CPT codes, and LCD precedent rulings to construct unassailable, cited appeal dossiers.",
     primaryCtaText: "Inspect Evidence Matrix",
     secondaryCtaText: "Launch Appeal Studio",
     targetView: "evidence",
   },
   {
     badge1: { icon: Envelope, label: "Direct Payer Gateway" },
-    badge2: { icon: Clock, label: "Sub-50ms Reactive State" },
+    badge2: { icon: Clock, label: "Instant Real-Time Sync" },
     badge3: { icon: CheckCircle, label: "$1.4M+ Recovered" },
     title: "Autonomous Dispatch. Rapid Settlement.",
     description:
-      "Dedicated AgentMail inboxes automatically transmit cited briefs to grievance portals and parse incoming payer determinations in real-time.",
-    primaryCtaText: "Open AgentMail Inbox",
+      "Dedicated case inboxes automatically transmit cited briefs to grievance portals and record incoming payer determinations in real time.",
+    primaryCtaText: "Open Payer Inbox",
     secondaryCtaText: "View Portfolio Analytics",
     targetView: "communications",
   },
@@ -123,7 +123,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
     { label: "Case Radar", view: "radar", delay: "100ms" },
     { label: "Evidence Matrix", view: "evidence", delay: "150ms" },
     { label: "Appeal Studio", view: "studio", delay: "200ms" },
-    { label: "AgentMail Inbox", view: "communications", delay: "250ms" },
+    { label: "Payer Communications", view: "communications", delay: "250ms" },
     { label: "Portfolio Analytics", view: "analytics", delay: "300ms" },
   ];
 

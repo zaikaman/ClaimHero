@@ -196,7 +196,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           isUnifiedAnalyzing
             ? "Running Complete Analysis..."
             : isCrawling
-            ? "Crawling Policy..."
+            ? "Indexing Policy Guidelines..."
             : isScoring
             ? "Evaluating Rubric..."
             : "Processing..."
@@ -260,12 +260,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               {isCrawling ? (
                 <>
                   <CircleNotch className="size-3.5 animate-spin" />
-                  <span>Crawling...</span>
+                  <span>Indexing...</span>
                 </>
               ) : (
                 <>
                   <ArrowsClockwise className="size-3.5" />
-                  <span>Crawl CPB</span>
+                  <span>Index CPB</span>
                 </>
               )}
             </Button>

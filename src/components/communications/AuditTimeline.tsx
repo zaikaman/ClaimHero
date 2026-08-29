@@ -105,7 +105,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
           >
             <option value="all">All Events ({logs.length})</option>
             <option value="denial_ingested">Denial Ingested</option>
-            <option value="policy_crawled">Policy Crawled</option>
+            <option value="policy_crawled">Policy Index Verified</option>
             <option value="appeal_dispatched">Appeal Dispatched</option>
             <option value="payer_response_received">Payer Replies</option>
             <option value="statutory_alarm_critical">Statutory Alarms</option>
@@ -117,7 +117,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
       <Card className="p-6">
         {isLoading ? (
           <div className="p-8 text-center text-xs font-mono text-muted-foreground animate-pulse">
-            Loading audit logs from Convex...
+            Loading audit ledger events...
           </div>
         ) : filteredLogs.length === 0 ? (
           <div className="p-8 text-center text-xs text-muted-foreground">

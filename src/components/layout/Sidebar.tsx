@@ -135,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: "communications" as NavigationView,
-      label: "AgentMail Inbox",
+      label: "Payer Communications",
       description: "Two-way Payer Transmissions",
       icon: Envelope,
     },
@@ -180,7 +180,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               size="icon"
               onClick={() => onSelectView("communications")}
               className="size-9 shrink-0 border-border"
-              title="AgentMail Inbound Gateway"
+              title="Payer Communications Gateway"
             >
               <Envelope className="size-4" />
               <span className="sr-only">Inbox</span>
@@ -465,7 +465,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleCopyEmail} className="gap-2 cursor-pointer">
               {copiedEmail ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
-              <span>{copiedEmail ? "Address Copied!" : "Copy Inbound Mail Webhook"}</span>
+              <span>{copiedEmail ? "Address Copied!" : "Copy Inbound Intake Address"}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

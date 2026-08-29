@@ -55,7 +55,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     {
       id: "intake",
       number: 1,
-      title: "Intake & OCR",
+      title: "Intake & Records",
       subtitle: `Claim #${claim.claimNumber}`,
       view: "radar" as FlowView,
       icon: Shield,
@@ -87,7 +87,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     {
       id: "communications",
       number: 4,
-      title: "AgentMail Dispatch",
+      title: "Payer Dispatch",
       subtitle: isDispatched ? "Transmitted to Payer" : "Ready to send",
       view: "communications" as FlowView,
       icon: isDispatched ? PaperPlaneTilt : Envelope,

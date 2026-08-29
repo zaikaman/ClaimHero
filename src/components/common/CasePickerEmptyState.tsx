@@ -37,8 +37,8 @@ const VIEW_META = {
     actionText: "Open Studio",
   },
   communications: {
-    title: "Dedicated AgentMail Claim Inbox",
-    subtitle: "Select an active claim below to monitor its autonomous two-way email gateway and transmit appeal packets to the payer.",
+    title: "Dedicated Payer Communications Inbox",
+    subtitle: "Select an active claim below to monitor two-way transmissions and deliver appeal packets to the payer.",
     icon: Envelope,
     actionText: "View Inbox",
   },

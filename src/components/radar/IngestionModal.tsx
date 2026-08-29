@@ -153,7 +153,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const [pastedText, setPastedText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState(
-    "Processing with OpenAI..."
+    "Analyzing denial document..."
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [extractedResult, setExtractedResult] = useState<
@@ -185,7 +185,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const executePostExtractionPipeline = async (claimId: string) => {
     if (!autoPilotEnabled || !runPipelineAction) return null;
 
-    setProcessingMessage("Step 2/3: Crawling Insurer CPB & Evaluating Win Score...");
+    setProcessingMessage("Step 2/3: Indexing Insurer CPB & Evaluating Win Score...");
     try {
       const pipelineRes = await runPipelineAction({ claimId: claimId as any });
       setProcessingMessage("Step 3/3: Synthesizing cited ERISA medical appeal brief...");
@@ -203,7 +203,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     }
 
     setIsProcessing(true);
-    setProcessingMessage("Step 1/3: Optical OCR extraction with gpt-5-nano Vision...");
+    setProcessingMessage("Step 1/3: Optical document analysis & clinical entity extraction...");
     setErrorMessage(null);
 
     try {
@@ -216,7 +216,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     } catch (err: any) {
       setErrorMessage(
         err?.message ||
-          "Failed to parse denial document. Please check your OpenAI API key and file format."
+          "Failed to parse denial document. Please verify the document format or try again."
       );
     } finally {
       setIsProcessing(false);
@@ -225,7 +225,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
   const handleProcessPreset = async (presetContent: string) => {
     setIsProcessing(true);
-    setProcessingMessage("Step 1/3: Extracting CPT, CARC & ERISA deadlines with gpt-5-nano...");
+    setProcessingMessage("Step 1/3: Extracting CPT, CARC & ERISA statutory deadlines...");
     setErrorMessage(null);
 
     try {
@@ -254,7 +254,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     }
 
     setIsProcessing(true);
-    setProcessingMessage("Step 1/3: Parsing document text with OpenAI Structured Outputs...");
+    setProcessingMessage("Step 1/3: Parsing clinical records & denial rationale...");
     setErrorMessage(null);
 
     try {
@@ -292,7 +292,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
             <div>
               <DialogTitle>Ingest Denial Document</DialogTitle>
               <DialogDescription>
-                Optical extraction via OpenAI gpt-5-nano & Convex Cloud Database
+                Automated clinical record extraction & real-time case indexing
               </DialogDescription>
             </div>
           </div>
@@ -363,14 +363,14 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               </TabsTrigger>
               <TabsTrigger value="email" className="gap-1.5">
                 <Envelope className="size-3.5" />
-                <span>AgentMail</span>
+                <span>Electronic Intake</span>
               </TabsTrigger>
             </TabsList>
 
             {/* Tab 1: 1-Click Presets */}
             <TabsContent value="presets" className="space-y-3 pt-2">
               <p className="text-xs text-muted-foreground">
-                Select a sample medical denial case. Clicking a preset immediately parses with <span className="font-mono text-foreground font-semibold">gpt-5-nano</span> and creates the claim record:
+                Select a sample medical denial case. Clicking a preset immediately analyzes the clinical criteria and creates the claim record:
               </p>
 
               <div className="grid grid-cols-1 gap-2.5">
@@ -397,7 +397,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/50">
-                      <span>Click to extract with gpt-5-nano</span>
+                      <span>Click to load & analyze case</span>
                       <span className="text-primary font-medium">1-Click &rarr;</span>
                     </div>
                   </Card>
@@ -463,7 +463,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     ) : (
                       <>
                         <FileDoc className="size-3.5" />
-                        <span>Run Optical Parser</span>
+                        <span>Process Denial Document</span>
                       </>
                     )}
                   </Button>
@@ -496,23 +496,23 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   ) : (
                     <>
                       <FileDoc className="size-3.5" />
-                      <span>Extract with gpt-5-nano</span>
+                      <span>Analyze Denial Notice</span>
                     </>
                   )}
                 </Button>
               </div>
             </TabsContent>
 
-            {/* Tab 4: AgentMail */}
+            {/* Tab 4: Electronic Intake */}
             <TabsContent value="email" className="space-y-3 pt-2">
               <Card className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">
-                    Dedicated AgentMail Ingestion Address
+                    Dedicated Electronic Intake Address
                   </span>
                   <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-500/30">
                     <span className="size-1.5 rounded-full bg-emerald-500"></span>
-                    Webhook Active
+                    Intake Active
                   </Badge>
                 </div>
 
@@ -545,8 +545,8 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
                 <ul className="list-disc list-inside space-y-1 text-xs text-muted-foreground leading-relaxed pt-1">
                   <li>Patients or clinic billing staff forward denial notices directly to this address.</li>
-                  <li>AgentMail provisions a thread and triggers the Convex webhook.</li>
-                  <li>OpenAI extracts CPT codes and immediately initializes the case.</li>
+                  <li>ClaimHero automatically provisions a dedicated case inbox.</li>
+                  <li>Clinical intelligence extracts CPT codes and immediately initializes the case record.</li>
                 </ul>
               </Card>
 
@@ -562,7 +562,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
             <div className="flex items-center justify-between border-b border-border/60 pb-2">
               <div className="flex items-center gap-1.5 font-semibold text-xs text-emerald-600 dark:text-emerald-400">
                 <CheckCircle className="size-4" />
-                <span>Case Initialized in Convex DB</span>
+                <span>Case Initialized & Indexed</span>
               </div>
               <Badge variant="outline" className="font-mono text-xs">
                 Claim #{extractedResult.claimNumber}

@@ -75,7 +75,7 @@ export function useAppealStudio(claim?: Claim | null) {
     [latestAppeal, saveDraftMutation]
   );
 
-  // Synthesize a complete AI appeal brief using gpt-5-nano
+  // Synthesize a complete clinical appeal brief
   const synthesizeAppeal = useCallback(
     async (customLevel?: AppealLevel, customNotes?: string) => {
       if (!claim?._id) {
