@@ -53,14 +53,6 @@ export interface AppealBriefSynthesisResult {
   fullAppealMarkdown: string;
 }
 
-/**
- * Assemble a formal legal memorandum in standard Markdown structure.
- * Guarantees proper headers (#, ##), tables, blockquotes, bullet lists, and horizontal dividers.
- */
-/**
- * Assemble a formal legal memorandum in standard Markdown structure.
- * Guarantees proper headers (#, ##), tables, blockquotes, bullet lists, and horizontal dividers.
- */
 export interface VectorPrecedentMatch {
   title: string;
   citation: string;
@@ -331,9 +323,10 @@ CRITICAL INSTRUCTIONS FOR MAXIMUM CLINICAL & LEGAL DEPTH:
 4. Policy Citations: Extract at least 3-4 specific policy requirements and map them directly against the patient's records with direct quotes and clause identifiers.
 5. Formal Demand for Payment: State an unambiguous demand for immediate claim overturn, full authorization/reimbursement of the disputed amount, 30-day statutory adjudication response deadline, and notice of referral to Department of Labor EBSA and State Insurance Commissioner.
 6. Full Appeal Markdown: Assemble an exhaustive, multi-page (800-1200+ words) formal appellate brief following all formatting rules.
-7. Formatting: Use # for title, ## for major numbered sections, ### for subsections, Markdown tables (| :--- | :--- |), blockquotes (>), bullet lists, and --- horizontal dividers.
-8. Tone: Authoritative, formal, evidentiary, and uncompromisingly clinical. Never produce a superficial summary.
-9. Multilingual & Jurisdiction Adaptability: Detect the primary language of the denial context. If non-English (e.g., Vietnamese, Spanish, French), synthesize the appeal brief in that corresponding language citing local insurance regulations. If in US/English context, synthesize in formal ERISA appellate English.`,
+7. Formatting: Use # for the title, ## for major numbered sections, ### for subsections, Markdown tables (| :--- | :--- |), blockquotes (>), bullet lists, and --- horizontal dividers. Use bold and italic formatting selectively for labels, key requests, and exhibit references.
+8. Evidence discipline: Use only facts supported by the case details, indexed evidence, policy citations, physician notes, or precedent archive. Do not invent diagnostic measurements, treatment dates, medication dosages, outcome scores, legal authorities, or patient facts. If a detail is unavailable, state that it was not provided and frame the argument around the documented record.
+9. Tone: Authoritative, formal, evidentiary, and uncompromisingly clinical. Never produce a superficial summary.
+10. Multilingual & Jurisdiction Adaptability: Detect the primary language of the denial context. If non-English (e.g., Vietnamese, Spanish, French), synthesize the appeal brief in that corresponding language citing local insurance regulations. If in US/English context, synthesize in formal ERISA appellate English.`,
         userPrompt: `Synthesize an exhaustive formal ${appealLevel.replace(/_/g, " ").toUpperCase()} medical appeal brief for:
 
 Case Details:
@@ -368,7 +361,7 @@ ${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstruc
       console.warn("LLM appeal synthesis fallback engaged:", llmErr);
       rawResult = {
         executiveSummary: `This formal appellate memorandum challenges ${payer}'s adverse benefit determination regarding Claim #${claim.claimNumber} (Patient: ${claim.patient?.name || "Patient"}). The denial citing "lack of medical necessity" for CPT ${cptList} under denial code ${claim.denialReasonCode} is unsupported by the clinical record and directly contradicts published clinical coverage criteria.`,
-        medicalNecessityArguments: `The patient presents with severe, progressive pathology (ICD-10: ${icdList}) causing profound functional impairment and refractory pain. Prior to the procedure performed on ${claim.serviceDate}, the patient exhausted extensive non-operative conservative modalities over a continuous multi-month trial without sustained relief:\n\n1. **Diagnostic Severity:** Weight-bearing imaging and clinical examinations confirm advanced structural disease meeting objective severity thresholds (Kellgren-Lawrence Grade III/IV, severe joint space collapse, subchondral sclerosis, and osteophytosis).\n2. **Supervised Conservative Therapy:** Completed extensive structured physical therapy targeting mobility, muscle stabilization, and functional rehabilitation without symptomatic resolution.\n3. **Pharmacologic Management:** Completed trials of oral NSAID therapy at maximum therapeutic dosages, discontinued due to lack of efficacy and refractory pain.\n4. **Interventional Modalities:** Intra-articular injections administered with only transient or negligible clinical benefit.\n5. **Functional Limitations:** Severe impairment in Activities of Daily Living (ADLs), restricted ambulation (<100 feet), and severe functional outcome score deficits.`,
+        medicalNecessityArguments: `The patient presents with severe, progressive pathology (ICD-10: ${icdList}) causing profound functional impairment and refractory pain. Prior to the procedure performed on ${claim.serviceDate}, the patient exhausted extensive non-operative conservative modalities over a continuous multi-month trial without sustained relief:\n\n1. Diagnostic Severity: The available clinical record supports advanced structural disease and objective severity criteria.\n2. Supervised Conservative Therapy: The record documents structured physical therapy targeting mobility, muscle stabilization, and functional rehabilitation without symptomatic resolution.\n3. Pharmacologic Management: The record documents trials of oral NSAID therapy, discontinued due to lack of efficacy or refractory pain.\n4. Interventional Modalities: The record documents intra-articular injections with only transient or negligible clinical benefit.\n5. Functional Limitations: The record documents severe impairment in Activities of Daily Living and functional outcome measures where provided.`,
         statutoryRightsNotice: `Under the Employee Retirement Income Security Act of 1974 (ERISA, 29 U.S.C. § 1133) and 29 CFR § 2560.503-1, plan administrators must ensure a full and fair review. Generic denial notices failing to articulate specific clinical rationales violate federal claims regulations.`,
         policyCitations: evidences.length > 0
           ? evidences.slice(0, 3).map((e: any) => ({
@@ -425,4 +418,3 @@ ${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstruc
     };
   },
 });
-

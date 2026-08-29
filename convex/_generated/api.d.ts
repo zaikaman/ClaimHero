@@ -27,6 +27,7 @@ import type * as emails from "../emails.js";
 import type * as http from "../http.js";
 import type * as lib_agentMail from "../lib/agentMail.js";
 import type * as lib_aiAdjudicator from "../lib/aiAdjudicator.js";
+import type * as lib_appealEmail from "../lib/appealEmail.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_openai from "../lib/openai.js";
 import type * as lib_precedentCorpus from "../lib/precedentCorpus.js";
@@ -60,6 +61,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/agentMail": typeof lib_agentMail;
   "lib/aiAdjudicator": typeof lib_aiAdjudicator;
+  "lib/appealEmail": typeof lib_appealEmail;
   "lib/embeddings": typeof lib_embeddings;
   "lib/openai": typeof lib_openai;
   "lib/precedentCorpus": typeof lib_precedentCorpus;

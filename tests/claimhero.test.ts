@@ -310,6 +310,7 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
 
     // Verify length is substantial (> 1800 characters)
     expect(brief.length).toBeGreaterThan(1800);
+    expect(brief).toContain("**Patient Name**");
   });
 
   it("injects top vector-retrieved statutory language into the assembled memorandum", async () => {
@@ -354,6 +355,49 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
     expect(brief).toContain("Firestone Tire & Rubber Co. v. Bruch");
     expect(brief).toContain("489 U.S. 101 (1989)");
     expect(brief).toContain("reviewed de novo unless the plan grants discretion");
+    expect(brief).toContain("**1. Firestone Tire & Rubber Co. v. Bruch**");
+  });
+
+  it("preserves rich Markdown in the studio brief for email-bound rendering", async () => {
+    const { assembleProfessionalMemorandum } = await import("../convex/actions/appealSynthesizer");
+    const modelBrief = `# Formal Appeal\n\n## Demand\n\n| Criterion | Record |\n| :--- | :--- |\n| **Medical necessity** | Exhibit A |\n\nERISA supports this demand. ${"Clinical evidence. ".repeat(150)}`;
+
+    const brief = assembleProfessionalMemorandum(
+      {
+        claimNumber: "CLM-CLEAN-001",
+        serviceDate: "2026-06-12",
+        deniedAmount: 1000,
+        patientOwedAmount: 1000,
+        providerName: "Dr. Langston",
+        cptCodes: ["27447"],
+        icd10Codes: ["M17.11"],
+        denialReasonCode: "CO-50",
+        patient: { name: "Test Patient", memberId: "M-1", insurancePayer: "Molina Healthcare" },
+      },
+      "level_1_internal",
+      {
+        executiveSummary: "Challenge the denial.",
+        medicalNecessityArguments: "The record supports medical necessity.",
+        statutoryRightsNotice: "ERISA applies.",
+        policyCitations: [],
+        formalDemandForPayment: "Demand immediate overturn.",
+        fullAppealMarkdown: modelBrief,
+      },
+      [],
+      "Physician note with **emphasis**",
+      [
+        {
+          title: "Precedent **source**",
+          citation: "489 U.S. 101 (1989)",
+          statutoryLanguage: "Statutory *language*.",
+          winningArgument: "Winning argument.",
+          vectorScore: 0.9,
+        },
+      ]
+    );
+
+    expect(brief).toContain("**Medical necessity**");
+    expect(brief).toContain("**1. Precedent");
   });
 });
 
@@ -420,6 +464,39 @@ describe("Precedent Vector Archive", () => {
 });
 
 describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
+  it("renders appeal correspondence as professional HTML and clean plain text", async () => {
+    const { formatAppealEmail, formatCorrespondenceEmail } = await import("../convex/lib/appealEmail");
+    const appeal = formatAppealEmail(
+      "# Formal Medical Appeal\n\n## Clinical Basis\n\nThe record supports **medical necessity**.\n\n| Criterion | Record |\n| :--- | :--- |\n| Imaging | Exhibit A |\n\n- Request independent review\n- Confirm payment\n\n<script>alert('unsafe')</script>",
+      {
+        claimNumber: "CLM-EMAIL-001",
+        payer: "Molina Healthcare",
+        patientName: "Test Patient",
+        serviceDate: "2026-06-12",
+        deniedAmount: 24500,
+        denialReason: "CO-50 - Not medically necessary",
+        cptCodes: ["27447"],
+        providerName: "Dr. Langston",
+      }
+    );
+    const addendum = formatCorrespondenceEmail("Please review the attached **clinical addendum**.", {
+      claimNumber: "CLM-EMAIL-001",
+      payer: "Molina Healthcare",
+    });
+
+    expect(appeal.html).toContain("Formal Medical Appeal");
+    expect(appeal.html).toContain("<table");
+    expect(appeal.html).toContain("&lt;script&gt;");
+    expect(appeal.html).not.toContain("**");
+    expect(appeal.html).not.toContain("| Criterion | Record |");
+    expect(appeal.text).toContain("Claim reference: CLM-EMAIL-001");
+    expect(appeal.text).not.toContain("# Formal Medical Appeal");
+    expect(appeal.text).not.toContain("*");
+    expect(addendum.html).toContain("Appeal Correspondence");
+    expect(addendum.text).toContain("clinical addendum");
+    expect(addendum.text).not.toContain("*");
+  });
+
   it("formats dedicated agentmail inbox address correctly", () => {
     const claimNumber = "CLM-2026-88192";
     const formattedEmail = `appeal-claim-${claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
