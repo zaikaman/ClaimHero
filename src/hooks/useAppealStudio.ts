@@ -5,6 +5,13 @@ import { Appeal, Claim, AppealLevel } from "../types";
 
 const convexApi = api as any;
 
+export interface AppealSenderDetails {
+  name: string;
+  credentials: string;
+  email: string;
+  phone: string;
+}
+
 export function useAppealStudio(claim?: Claim | null) {
   const claimId = claim?._id;
 
@@ -20,6 +27,10 @@ export function useAppealStudio(claim?: Claim | null) {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [physicianNotes, setPhysicianNotes] = useState<string>("");
+  const [senderName, setSenderName] = useState<string>("");
+  const [senderCredentials, setSenderCredentials] = useState<string>("");
+  const [senderEmail, setSenderEmail] = useState<string>("");
+  const [senderPhone, setSenderPhone] = useState<string>("");
 
   const saveDraftMutation = useMutation(convexApi.appeals.saveDraft);
   const synthesizeAction = useAction(
@@ -77,7 +88,11 @@ export function useAppealStudio(claim?: Claim | null) {
 
   // Synthesize a complete clinical appeal brief
   const synthesizeAppeal = useCallback(
-    async (customLevel?: AppealLevel, customNotes?: string) => {
+    async (
+      customLevel?: AppealLevel,
+      customNotes?: string,
+      customSender?: AppealSenderDetails
+    ) => {
       if (!claim?._id) {
         throw new Error("No claim selected for appeal synthesis");
       }
@@ -88,6 +103,10 @@ export function useAppealStudio(claim?: Claim | null) {
           claimId: claim._id as any,
           appealLevel: customLevel || appealLevel,
           physicianNotes: customNotes || physicianNotes || undefined,
+          senderName: customSender?.name || senderName || undefined,
+          senderCredentials: customSender?.credentials || senderCredentials || undefined,
+          senderEmail: customSender?.email || senderEmail || undefined,
+          senderPhone: customSender?.phone || senderPhone || undefined,
         });
 
         if (result?.fullAppealMarkdown) {
@@ -99,7 +118,7 @@ export function useAppealStudio(claim?: Claim | null) {
         setIsSynthesizing(false);
       }
     },
-    [claim, appealLevel, physicianNotes, synthesizeAction]
+    [claim, appealLevel, physicianNotes, senderName, senderCredentials, senderEmail, senderPhone, synthesizeAction]
   );
 
   // Helper to append a citation or note into the editor
@@ -120,6 +139,14 @@ export function useAppealStudio(claim?: Claim | null) {
     setAppealLevel,
     physicianNotes,
     setPhysicianNotes,
+    senderName,
+    setSenderName,
+    senderCredentials,
+    setSenderCredentials,
+    senderEmail,
+    setSenderEmail,
+    senderPhone,
+    setSenderPhone,
     isSynthesizing,
     isSaving,
     saveStatus,

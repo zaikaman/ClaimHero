@@ -294,7 +294,7 @@ export const dispatchAppealPacket = action({
     const finalRecipient = recipient;
     const subject =
       args.customSubject ||
-      `Formal Medical Appeal | Claim #${claim.claimNumber} | ${payer}`;
+      `Appeal request | Claim #${claim.claimNumber} | ${payer}`;
     const transmissionId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const appealEmail = formatAppealEmail(appeal.fullAppealMarkdown, {
       claimNumber: claim.claimNumber,

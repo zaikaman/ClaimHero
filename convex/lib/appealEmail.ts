@@ -41,6 +41,29 @@ function inlineText(value: string): string {
   return cleanInlineText(value);
 }
 
+function formatServiceDate(value?: string): string | undefined {
+  if (!value) return undefined;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value;
+
+  const [, year, month, day] = match;
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function normalizeDenialReason(value?: string): string | undefined {
+  if (!value) return undefined;
+
+  return value
+    .replace(/these are non-covered services because this is not deemed a medical necessity by the payer/i, "Service denied as not medically necessary")
+    .replace(/[.?!]+$/, "")
+    .trim();
+}
+
 function isTableRow(line: string): boolean {
   const trimmed = line.trim();
   return trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length > 1;
@@ -201,6 +224,16 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
   };
 }
 
+function stripLeadingTitle(markdown: string): string {
+  const lines = markdown.replace(/\r/g, "").split("\n");
+  const firstContentIndex = lines.findIndex((line) => line.trim().length > 0);
+  if (firstContentIndex < 0 || !/^#\s+/.test(lines[firstContentIndex]?.trim() || "")) {
+    return markdown;
+  }
+
+  return lines.slice(0, firstContentIndex).concat(lines.slice(firstContentIndex + 1)).join("\n");
+}
+
 function displayValue(value: string | undefined): string {
   return escapeHtml(inlineText(value || "Not provided"));
 }
@@ -214,10 +247,10 @@ function buildSummaryRows(context: AppealEmailContext): Array<[string, string]> 
   const rows: Array<[string, string | undefined]> = [
     ["Claim reference", context.claimNumber],
     ["Patient", context.patientName],
-    ["Date of service", context.serviceDate],
+    ["Date of service", formatServiceDate(context.serviceDate)],
     ["Procedure codes", context.cptCodes?.join(", ")],
     ["Disputed amount", moneyValue(context.deniedAmount)],
-    ["Denial reason", denialReason],
+    ["Denial reason", normalizeDenialReason(denialReason)],
   ];
   return rows.reduce<Array<[string, string]>>((result, [label, value]) => {
     const cleanedValue = value ? inlineText(value) : "";
@@ -246,22 +279,21 @@ function buildEmailDocument(
   footer: string
 ): FormattedEmail {
   const header = buildHeader(context, title);
-  const content = renderMarkdown(markdown);
-  const provider = context.providerName ? `Prepared by ${inlineText(context.providerName)} on behalf of the claimant.` : "Prepared by the ClaimHero Appeals Desk.";
-  const safeFooter = escapeHtml(`${footer} ${provider}`);
+  const content = renderMarkdown(stripLeadingTitle(markdown));
+  const safeFooter = escapeHtml(footer);
 
   return {
     html: `<div style="max-width:720px; margin:0 auto; padding:32px 28px; background:#ffffff; color:#253342; font-family:Arial,Helvetica,sans-serif;">${header.html}<main>${content.html}</main><div style="margin-top:30px; padding-top:16px; border-top:1px solid #dbe3ea; color:#66788a; font-size:11px; line-height:1.6;">${safeFooter}</div></div>`,
-    text: `${header.text}\n\n${content.text}\n\n${footer} ${provider}`.trim(),
+    text: `${header.text}\n\n${content.text}\n\n${footer}`.trim(),
   };
 }
 
 export function formatAppealEmail(markdown: string, context: AppealEmailContext): FormattedEmail {
   return buildEmailDocument(
     context,
-    "Formal Medical Appeal",
+    "Appeal of Adverse Benefit Determination",
     markdown,
-    "This message contains the formal appeal narrative and identifies the supporting clinical exhibits in the case record."
+    "Please reference the claim number above in any reply or request for additional information."
   );
 }
 

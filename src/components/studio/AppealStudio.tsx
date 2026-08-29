@@ -7,6 +7,9 @@ import {
   Eye,
   PencilSimpleLine,
   Stethoscope,
+  IdentificationCard,
+  EnvelopeSimple,
+  Phone,
   Printer,
   ArrowRight,
 } from "@phosphor-icons/react";
@@ -22,6 +25,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Textarea } from "../ui/textarea";
+import { Input } from "../ui/input";
 import { Select } from "../ui/select";
 
 interface AppealStudioProps {
@@ -49,6 +53,14 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     setAppealLevel,
     physicianNotes,
     setPhysicianNotes,
+    senderName,
+    setSenderName,
+    senderCredentials,
+    setSenderCredentials,
+    senderEmail,
+    setSenderEmail,
+    senderPhone,
+    setSenderPhone,
     isSynthesizing,
     isSaving,
     saveStatus,
@@ -59,13 +71,19 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
   const [activeTab, setActiveTab] = useState<"edit" | "preview" | "split">("split");
   const [showNotesDrawer, setShowNotesDrawer] = useState<boolean>(false);
+  const [showSenderDetails, setShowSenderDetails] = useState<boolean>(false);
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [synthesisError, setSynthesisError] = useState<string | null>(null);
 
   const handleRunSynthesis = async () => {
     setSynthesisError(null);
     try {
-      await synthesizeAppeal(appealLevel, physicianNotes);
+      await synthesizeAppeal(appealLevel, physicianNotes, {
+        name: senderName,
+        credentials: senderCredentials,
+        email: senderEmail,
+        phone: senderPhone,
+      });
     } catch (err: any) {
       setSynthesisError(
         err?.message || "Failed to synthesize appeal brief. Please try again."
@@ -151,6 +169,16 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               <span>Physician Notes{physicianNotes ? " (Added)" : ""}</span>
             </Button>
 
+            <Button
+              variant={showSenderDetails || senderName ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowSenderDetails(!showSenderDetails)}
+              className="gap-1.5"
+            >
+              <IdentificationCard className="size-3.5" />
+              <span>Sender Details{senderName ? " (Added)" : ""}</span>
+            </Button>
+
             {/* Synthesize Appeal Brief */}
             <Button
               size="sm"
@@ -179,7 +207,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               className="gap-1.5"
             >
               <Printer className="size-3.5" />
-              <span>Export Dossier</span>
+              <span>Preview Email</span>
             </Button>
           </div>
         </div>
@@ -213,6 +241,62 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               placeholder="Paste physician clinical notes, e.g.: Patient completed 14 weeks of formal physical therapy with Dr. Miller and underwent right knee cortisone injection on 03/10/2026 with no functional relief..."
               className="bg-background text-xs"
             />
+          </div>
+        )}
+
+        {showSenderDetails && (
+          <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 space-y-2 animate-fadeIn">
+            <div className="flex items-center justify-between text-xs text-foreground">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <IdentificationCard className="size-3.5 text-muted-foreground" />
+                Person submitting the appeal
+              </span>
+              <button
+                onClick={() => setShowSenderDetails(false)}
+                className="text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                Hide
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Enter the person who will actually submit the appeal. These details are used only when provided and are not inferred from the treating provider record.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Input
+                value={senderName}
+                onChange={(e) => setSenderName(e.target.value)}
+                placeholder="Name"
+                aria-label="Sender name"
+              />
+              <Input
+                value={senderCredentials}
+                onChange={(e) => setSenderCredentials(e.target.value)}
+                placeholder="Credentials or role (optional)"
+                aria-label="Sender credentials or role"
+              />
+              <div className="relative">
+                <EnvelopeSimple className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
+                <Input
+                  type="email"
+                  value={senderEmail}
+                  onChange={(e) => setSenderEmail(e.target.value)}
+                  placeholder="Email address (optional)"
+                  aria-label="Sender email address"
+                  className="pl-8"
+                />
+              </div>
+              <div className="relative">
+                <Phone className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
+                <Input
+                  type="tel"
+                  value={senderPhone}
+                  onChange={(e) => setSenderPhone(e.target.value)}
+                  placeholder="Phone number (optional)"
+                  aria-label="Sender phone number"
+                  className="pl-8"
+                />
+              </div>
+            </div>
           </div>
         )}
       </Card>

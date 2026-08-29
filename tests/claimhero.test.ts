@@ -218,7 +218,7 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
     expect(requiredSections).toContain("medicalNecessityArguments");
   });
 
-  it("assembles an exhaustive, multi-page professional appellate memorandum with all clinical and legal pillars", async () => {
+  it("assembles a concise, sendable payer appeal email from grounded case data", async () => {
     const { assembleProfessionalMemorandum } = await import("../convex/actions/appealSynthesizer");
 
     const mockClaim = {
@@ -252,6 +252,12 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
         citationClause: "Section 1.C",
         extractedEvidenceMarkdown: "Conservative therapy must include at least two modalities for 12+ weeks.",
       },
+      {
+        sourceType: "legal_precedent",
+        title: "Winning brief — CPT 27447 / CO-50 overturn",
+        citationClause: "Internal archive",
+        extractedEvidenceMarkdown: "Vector similarity: 0.75 | Combined score: 0.84",
+      },
     ];
 
     const mockResult = {
@@ -274,11 +280,24 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
       "level_1_internal",
       mockResult,
       mockEvidences,
-      "Patient exhibits severe bone-on-bone contact and has exhausted all non-operative measures."
+      "Patient exhibits severe bone-on-bone contact and has exhausted all non-operative measures.",
+      undefined,
+      {
+        name: "Jordan Lee",
+        credentials: "Appeals Coordinator",
+        email: "jordan.lee@example.com",
+        phone: "555-0100",
+      }
     );
 
-    // Verify key structural headers and metadata
-    expect(brief).toContain("# FORMAL MEDICAL APPEAL & LEGAL RECONSIDERATION MEMORANDUM");
+    // Verify normal business-email structure and case metadata
+    expect(brief).toContain("# Appeal of Adverse Benefit Determination");
+    expect(brief).toContain("**Claim reference:** #CLM-8942-MOL");
+    expect(brief).not.toContain("**To:**");
+    expect(brief).not.toContain("**Subject:**");
+    expect(brief).not.toContain("**Appeal level:**");
+    expect(brief).toContain("Dear Appeals and Grievances Team,");
+    expect(brief).not.toContain("This formal appeal challenges");
     expect(brief).toContain("CLM-8942-MOL");
     expect(brief).toContain("Eleanor Vance");
     expect(brief).toContain("Molina Healthcare");
@@ -287,33 +306,44 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
     expect(brief).toContain("M17.11");
     expect(brief).toContain("CO-50");
 
-    // Verify clinical and conservative therapy facts
-    expect(brief).toContain("SECTION I: STATEMENT OF RELEVANT CLINICAL FACTS & CONSERVATIVE THERAPY FAILURE");
-    expect(brief).toContain("Kellgren-Lawrence Grade IV");
+    // Verify grounded clinical content and review request
+    expect(brief).toContain("## Clinical basis for reconsideration");
+    expect(brief).toContain("does not independently document the patient-specific examination findings");
+    expect(brief).not.toContain("Kellgren-Lawrence Grade IV");
     expect(brief).toContain("Dr. Robert Langston, MD");
+    expect(brief).toContain("Treating provider note submitted for review:");
+    expect(brief).toContain("Jordan Lee");
+    expect(brief).toContain("Appeals Coordinator");
+    expect(brief).toContain("jordan.lee@example.com");
+    expect(brief).toContain("June 12, 2026");
 
-    // Verify CPB table
-    expect(brief).toContain("SECTION II: CLINICAL POLICY BULLETIN (CPB) ALIGNMENT & EVIDENTIARY CRITERIA");
-    expect(brief).toContain("Molina CPB MCP-082");
+    // Verify source summaries without an exhibit table
+    expect(brief).toContain("## Supporting documentation for review");
+    expect(brief).toContain("Molina Healthcare CPB MCP-082");
+    expect(brief).toContain("## Supporting documentation for review\n\n");
+    expect(brief).not.toContain("Winning brief — CPT 27447 / CO-50 overturn");
+    expect(brief).not.toContain("Vector similarity:");
 
-    // Verify ERISA statutory mandates
-    expect(brief).toContain("SECTION III: STATUTORY ERISA PROTECTIONS & GOVERNING LEGAL STANDARDS");
-    expect(brief).toContain("29 CFR § 2560.503-1(h)(3)(ii)");
-    expect(brief).toContain("29 CFR § 2560.503-1(h)(2)(iii)");
-    expect(brief).toContain("De Novo Review");
+    // Verify conditional rights language rather than unsupported legal conclusions
+    expect(brief).toContain("If ERISA applies");
+    expect(brief).toContain("If external review is available");
 
-    // Verify Demand and Exhibits
-    expect(brief).toContain("SECTION IV: FORMAL REBUTTAL OF DENIAL & DEMAND FOR IMMEDIATE OVERTURN");
-    expect(brief).toContain("thirty (30) day");
-    expect(brief).toContain("INDEX OF ATTACHED CLINICAL EXHIBITS");
-    expect(brief).toContain("Exhibit A");
+    // Verify the email is not a litigation memorandum
+    expect(brief).toContain("## Review requested");
+    expect(brief).toContain("Reconsider and reprocess Claim #CLM-8942-MOL under the applicable plan terms.");
+    expect(brief).toContain("issue payment according to the plan and applicable provider agreement");
+    expect(brief).toContain("Sincerely,");
+    expect(brief).not.toContain("ClaimHero Appeals Desk");
+    expect(brief).not.toContain("FORMAL MEDICAL APPEAL & LEGAL RECONSIDERATION MEMORANDUM");
+    expect(brief).not.toContain("INDEX OF ATTACHED CLINICAL EXHIBITS");
+    expect(brief).not.toContain("VIA CERTIFIED SECURE ELECTRONIC GRIEVANCE PORTAL");
 
-    // Verify length is substantial (> 1800 characters)
-    expect(brief.length).toBeGreaterThan(1800);
-    expect(brief).toContain("**Patient Name**");
+    // The final body should be complete but not an automatically padded dossier.
+    expect(brief.length).toBeGreaterThan(1200);
+    expect(brief.length).toBeLessThan(4000);
   });
 
-  it("injects top vector-retrieved statutory language into the assembled memorandum", async () => {
+  it("keeps internal precedent retrieval artifacts out of the assembled email", async () => {
     const { assembleProfessionalMemorandum } = await import("../convex/actions/appealSynthesizer");
 
     const brief = assembleProfessionalMemorandum(
@@ -351,14 +381,15 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
       ]
     );
 
-    expect(brief).toContain("Vector-Retrieved Controlling Authorities");
-    expect(brief).toContain("Firestone Tire & Rubber Co. v. Bruch");
-    expect(brief).toContain("489 U.S. 101 (1989)");
-    expect(brief).toContain("reviewed de novo unless the plan grants discretion");
-    expect(brief).toContain("**1. Firestone Tire & Rubber Co. v. Bruch**");
+    expect(brief).not.toContain("Vector-Retrieved Controlling Authorities");
+    expect(brief).not.toContain("Firestone Tire & Rubber Co. v. Bruch");
+    expect(brief).not.toContain("489 U.S. 101 (1989)");
+    expect(brief).not.toContain("similarity");
+    expect(brief).not.toContain("Standard Employer Plan (ERISA Qualified)");
+    expect(brief).not.toContain("N/A");
   });
 
-  it("preserves rich Markdown in the studio brief for email-bound rendering", async () => {
+  it("does not trust a model-supplied full document over the email assembly rules", async () => {
     const { assembleProfessionalMemorandum } = await import("../convex/actions/appealSynthesizer");
     const modelBrief = `# Formal Appeal\n\n## Demand\n\n| Criterion | Record |\n| :--- | :--- |\n| **Medical necessity** | Exhibit A |\n\nERISA supports this demand. ${"Clinical evidence. ".repeat(150)}`;
 
@@ -396,8 +427,11 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
       ]
     );
 
-    expect(brief).toContain("**Medical necessity**");
-    expect(brief).toContain("**1. Precedent");
+    expect(brief).toContain("does not independently document the patient-specific examination findings");
+    expect(brief).not.toContain("The record supports medical necessity.");
+    expect(brief).not.toContain("| Criterion | Record |");
+    expect(brief).not.toContain("Clinical evidence. Clinical evidence.");
+    expect(brief).not.toContain("Precedent **source**");
   });
 });
 
@@ -484,12 +518,15 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
       payer: "Molina Healthcare",
     });
 
-    expect(appeal.html).toContain("Formal Medical Appeal");
+    expect(appeal.html).toContain("Appeal of Adverse Benefit Determination");
     expect(appeal.html).toContain("<table");
     expect(appeal.html).toContain("&lt;script&gt;");
     expect(appeal.html).not.toContain("**");
     expect(appeal.html).not.toContain("| Criterion | Record |");
     expect(appeal.text).toContain("Claim reference: CLM-EMAIL-001");
+    expect(appeal.text).toContain("Date of service: June 12, 2026");
+    expect(appeal.text).not.toContain("Prepared by");
+    expect(appeal.text.match(/Appeal of Adverse Benefit Determination/g)).toHaveLength(1);
     expect(appeal.text).not.toContain("# Formal Medical Appeal");
     expect(appeal.text).not.toContain("*");
     expect(addendum.html).toContain("Appeal Correspondence");

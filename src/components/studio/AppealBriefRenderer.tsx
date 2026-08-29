@@ -26,7 +26,9 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
 
   return (
     <div
-      className={`appeal-brief-document font-sans text-xs leading-relaxed space-y-4 ${
+      className={`appeal-brief-document font-sans text-xs leading-relaxed ${
+        isPrintMode ? "space-y-2" : "space-y-4"
+      } ${
         isPrintMode
           ? "text-slate-900 bg-white"
           : "text-foreground/90"
@@ -36,8 +38,8 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
         remarkPlugins={[remarkGfm, remarkBreaks]}
         components={{
           h1: ({ children }) => (
-            <div className={`pb-3 mb-4 border-b-2 ${isPrintMode ? "border-slate-900" : "border-border"}`}>
-              <h1 className={`text-base sm:text-lg font-bold tracking-tight uppercase flex items-center gap-2 ${
+            <div className={`pb-2 mb-3 border-b-2 ${isPrintMode ? "border-slate-900" : "border-border"}`}>
+              <h1 className={`text-base sm:text-lg font-bold tracking-tight flex items-center gap-2 ${
                 isPrintMode ? "text-slate-950" : "text-foreground"
               }`}>
                 {!isPrintMode && <Scales className="size-4.5 text-primary shrink-0" />}
@@ -46,8 +48,8 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
             </div>
           ),
           h2: ({ children }) => (
-            <div className="pt-3 pb-1.5 mt-4">
-              <h2 className={`text-xs sm:text-sm font-bold tracking-wide uppercase flex items-center gap-2 ${
+            <div className={isPrintMode ? "pt-2 pb-1 mt-3" : "pt-3 pb-1.5 mt-4"}>
+              <h2 className={`text-xs sm:text-sm font-bold tracking-wide flex items-center gap-2 ${
                 isPrintMode ? "text-slate-950 border-b border-slate-300 pb-1" : "text-foreground/95"
               }`}>
                 {!isPrintMode && (
@@ -65,7 +67,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
             </h3>
           ),
           p: ({ children }) => (
-            <p className={`mb-3 leading-relaxed ${
+            <p className={`${isPrintMode ? "mb-2" : "mb-3"} leading-relaxed ${
               isPrintMode ? "text-slate-800 text-[11.5px]" : "text-foreground/85"
             }`}>
               {children}
@@ -73,7 +75,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
           ),
           blockquote: ({ children }) => (
             <blockquote
-              className={`my-3 rounded-lg border-l-4 p-3 font-sans transition-colors ${
+              className={`${isPrintMode ? "my-2 p-2" : "my-3 p-3"} rounded-lg border-l-4 font-sans transition-colors ${
                 isPrintMode
                   ? "border-slate-700 bg-slate-100 text-slate-800 text-[11px]"
                   : "border-primary/70 bg-muted/40 text-foreground/90 shadow-sm"
@@ -90,14 +92,14 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
             </blockquote>
           ),
           ul: ({ children }) => (
-            <ul className={`list-disc pl-5 my-2 space-y-1 ${
+            <ul className={`list-disc pl-5 ${isPrintMode ? "my-1 space-y-0.5" : "my-2 space-y-1"} ${
               isPrintMode ? "text-slate-800" : "text-foreground/85"
             }`}>
               {children}
             </ul>
           ),
           ol: ({ children }) => (
-            <ol className={`list-decimal pl-5 my-2 space-y-1.5 ${
+            <ol className={`list-decimal pl-5 ${isPrintMode ? "my-1 space-y-0.5" : "my-2 space-y-1.5"} ${
               isPrintMode ? "text-slate-800" : "text-foreground/85"
             }`}>
               {children}

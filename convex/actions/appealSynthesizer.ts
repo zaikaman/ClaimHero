@@ -64,6 +64,134 @@ export interface VectorPrecedentMatch {
   sourceKind?: string;
 }
 
+export interface AppealSenderDetails {
+  name?: string;
+  credentials?: string;
+  email?: string;
+  phone?: string;
+}
+
+const SAFE_STATUTORY_RIGHTS_NOTICE =
+  "Please process this appeal under the plan's claims and appeals procedure and the instructions in the denial notice. If ERISA applies, please treat this as a request for full and fair review under 29 C.F.R. § 2560.503-1 and provide, upon request, the documents, records, plan provisions, clinical policies or criteria, and other information relevant to this claim. If external review is available, please include the applicable process and deadline in your determination.";
+
+function cleanGeneratedSection(value?: string): string {
+  if (!value) return "";
+
+  const text = value.replace(/\r/g, "").trim();
+  const internalMarker = text.search(
+    /(?:^|\n)#{1,3}\s+(?:Vector-Retrieved|Index of Attached|Case Identification)|(?:^|\n)Convex native vector search/i
+  );
+
+  return (internalMarker >= 0 ? text.slice(0, internalMarker) : text)
+    .replace(/[‐‑‒–—]/g, "-")
+    .replace(/^#{1,6}\s+/gm, "")
+    .trim();
+}
+
+function formatMoney(amount: number): string {
+  return `$${amount.toLocaleString("en-US")}`;
+}
+
+function formatServiceDate(value?: string): string {
+  if (!value) return "Not provided";
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value;
+
+  const [, year, month, day] = match;
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function formatDenialReason(code?: string, description?: string): string {
+  const cleanDescription = description?.replace(/\s+/g, " ").trim().replace(/[.?!]+$/, "");
+  if (!code && !cleanDescription) return "Not provided";
+
+  if (
+    code?.toUpperCase() === "CO-50" &&
+    cleanDescription &&
+    /these are non-covered services because this is not deemed a medical necessity by the payer/i.test(cleanDescription)
+  ) {
+    return `${code} - Service denied as not medically necessary`;
+  }
+
+  return [code, cleanDescription].filter(Boolean).join(" - ");
+}
+
+const UNSUPPORTED_CLINICAL_CONCLUSION =
+  /clinical documentation confirms|meets? (?:the |applicable )?criteria|does not present with|no (?:absolute )?contraindications?|absence of (?:an )?(?:active )?(?:joint|systemic) infection|(?:failed|failure of|exhausted) conservative|end[- ]stage|bone[- ]on[- ]bone|supports? (?:the )?medical necessity|is medically necessary/i;
+
+function buildNeutralClinicalBasis(claim: any): string {
+  const procedureCodes = claim.cptCodes?.join(", ") || "the procedure listed on the claim";
+  const diagnosisCodes = claim.icd10Codes?.join(", ") || "the diagnosis listed on the claim";
+
+  return `The claim record identifies procedure code(s) ${procedureCodes} and diagnosis code(s) ${diagnosisCodes}. The available claim record does not independently document the patient-specific examination findings, imaging, functional limitations, or treatment history needed to state additional medical-necessity facts. Please evaluate the clinical records submitted with this appeal against the applicable plan criteria.`;
+}
+
+function buildGroundedClinicalBasis(value: string | undefined, claim: any): string {
+  const cleaned = cleanGeneratedSection(value);
+  return cleaned && !UNSUPPORTED_CLINICAL_CONCLUSION.test(cleaned)
+    ? cleaned
+    : buildNeutralClinicalBasis(claim);
+}
+
+function buildPaymentRequest(claimNumber: string): string {
+  return `Reconsider and reprocess Claim #${claimNumber} under the applicable plan terms. If benefits are payable, please issue payment according to the plan and applicable provider agreement for the covered amount.`;
+}
+
+function buildSignature(providerName: string, sender?: AppealSenderDetails): string {
+  const senderLines = [sender?.name, sender?.credentials, sender?.email, sender?.phone]
+    .map((value) => value?.trim())
+    .filter(Boolean) as string[];
+
+  if (senderLines.length === 0) {
+    return `Sincerely,\n\nClaimHero Appeals Desk\nTreating provider listed in the claim: ${providerName}`;
+  }
+
+  return `Sincerely,\n\n${senderLines.join("\n")}\nTreating provider listed in the claim: ${providerName}`;
+}
+
+function isExternalEvidence(evidence: any): boolean {
+  const searchableText = [
+    evidence.sourceType,
+    evidence.title,
+    evidence.citationClause,
+    evidence.extractedEvidenceMarkdown,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return evidence.sourceType !== "legal_precedent" &&
+    !/(?:vector similarity|combined score|winning brief|claimhero overturned)/i.test(searchableText);
+}
+
+function cleanEvidenceSummary(value?: string): string {
+  const summary = cleanGeneratedSection(value)
+    .split("\n")
+    .filter((line) => !/^\s*(?:outcome|vector similarity|combined score)\s*:/i.test(line))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (summary.length <= 220) return summary;
+  return `${summary.slice(0, 217).replace(/\s+\S*$/, "")}...`;
+}
+
+function buildGroundedPolicyCitations(evidences: any[]): PolicyCitationItem[] {
+  return evidences
+    .filter((e) => isExternalEvidence(e) && e.title && e.citationClause && e.extractedEvidenceMarkdown)
+    .slice(0, 5)
+    .map((e) => ({
+      source: e.title,
+      clause: e.citationClause,
+      quote: e.extractedEvidenceMarkdown,
+    }));
+}
+
 export function formatVectorPrecedentSection(vectorPrecedents?: VectorPrecedentMatch[]): string {
   if (!vectorPrecedents || vectorPrecedents.length === 0) {
     return "";
@@ -80,180 +208,84 @@ export function formatVectorPrecedentSection(vectorPrecedents?: VectorPrecedentM
   return section.trim();
 }
 
-export function assembleProfessionalMemorandum(
+export function assembleProfessionalAppealEmail(
   claim: any,
-  appealLevel: string,
+  _appealLevel: string,
   result: AppealBriefSynthesisResult,
   evidences: any[],
   physicianNotes?: string,
-  vectorPrecedents?: VectorPrecedentMatch[]
+  _vectorPrecedents?: VectorPrecedentMatch[],
+  sender?: AppealSenderDetails
 ): string {
-  const dateStr = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  const payerName = claim.patient?.insurancePayer || "Health Plan Administrator";
-  const providerName = claim.providerName || "Treating Physician";
-  const patientName = claim.patient?.name || "Patient";
-  const memberId = claim.patient?.memberId || "N/A";
-  const groupNumber = claim.patient?.groupNumber || "Standard Employer Plan (ERISA Qualified)";
+  const providerName = claim.providerName;
+  const patientName = claim.patient.name;
   const claimNumber = claim.claimNumber;
-  const dos = claim.serviceDate;
-  const deniedAmount = `$${(claim.deniedAmount || 0).toLocaleString()}`;
-  const patientOwed = `$${(claim.patientOwedAmount || 0).toLocaleString()}`;
-  const cptCodes = (claim.cptCodes || []).join(", ");
-  const icd10Codes = (claim.icd10Codes || []).join(", ");
-  const denialReason = `${claim.denialReasonCode || "CO-50"} - ${claim.denialReasonDescription || "Adverse Determination"}`;
+  const cptCodes = claim.cptCodes.join(", ");
+  const icd10Codes = claim.icd10Codes.join(", ");
+  const denialReason = formatDenialReason(claim.denialReasonCode, claim.denialReasonDescription);
+  const clinicalBasis = buildGroundedClinicalBasis(result.medicalNecessityArguments, claim);
+  const supportingEvidences = evidences.filter(isExternalEvidence);
 
-  const vectorSection = formatVectorPrecedentSection(vectorPrecedents);
+  let email = `# Appeal of Adverse Benefit Determination\n\n`;
+  email += `**Claim reference:** #${claimNumber}\n\n`;
+  email += `**Claim details**\n`;
+  email += `- Patient/member: ${patientName}\n`;
+  email += `- Member ID: ${claim.patient.memberId}\n`;
+  if (claim.patient.groupNumber) email += `- Group number: ${claim.patient.groupNumber}\n`;
+  email += `- Date of service: ${formatServiceDate(claim.serviceDate)}\n`;
+  email += `- Procedure code(s): ${cptCodes}\n`;
+  email += `- Diagnosis code(s): ${icd10Codes}\n`;
+  email += `- Denial reason: ${denialReason}\n`;
+  email += `- Amount at issue: ${formatMoney(claim.deniedAmount)}\n\n`;
+  email += `Dear Appeals and Grievances Team,\n\n`;
+  email += `I request reconsideration of the adverse benefit determination for Claim #${claimNumber}, relating to the service provided on ${formatServiceDate(claim.serviceDate)}. The denial notice identifies ${denialReason}. Please review the submitted clinical records and applicable plan criteria and reprocess the claim if benefits are payable under the plan.\n\n`;
 
-  // Only use the raw LLM fullAppealMarkdown if it is genuinely comprehensive, rich, and contains all key legal sections
-  if (
-    result.fullAppealMarkdown &&
-    result.fullAppealMarkdown.length >= 2200 &&
-    result.fullAppealMarkdown.includes("# ") &&
-    result.fullAppealMarkdown.includes("## ") &&
-    result.fullAppealMarkdown.includes("|") &&
-    (result.fullAppealMarkdown.includes("Exhibit") || result.fullAppealMarkdown.includes("EXHIBIT")) &&
-    (result.fullAppealMarkdown.includes("29 CFR") || result.fullAppealMarkdown.includes("ERISA")) &&
-    (result.fullAppealMarkdown.includes("Demand") || result.fullAppealMarkdown.includes("DEMAND"))
-  ) {
-    const llmBrief = result.fullAppealMarkdown.trim();
-    if (vectorSection && !llmBrief.includes("Vector-Retrieved Controlling Authorities")) {
-      return `${llmBrief}\n\n---\n\n${vectorSection}`;
-    }
-    return llmBrief;
+  email += `## Clinical basis for reconsideration\n\n`;
+  email += `${clinicalBasis ||
+    "The claim record currently contains the identifying and denial information above but does not provide enough clinical history to state additional medical-necessity facts. Please evaluate the submitted clinical records and the applicable coverage criteria."}\n\n`;
+
+  if (physicianNotes?.trim()) {
+    email += `Treating provider note submitted for review:\n\n> ${physicianNotes.trim().replace(/\n/g, "\n> ")}\n\n`;
   }
 
-  // Construct the gold-standard formal appellate legal memorandum
-  let brief = `# FORMAL MEDICAL APPEAL & LEGAL RECONSIDERATION MEMORANDUM\n\n`;
-  brief += `**VIA CERTIFIED SECURE ELECTRONIC GRIEVANCE PORTAL & REGISTERED TRANSMISSION**\n\n`;
-  brief += `**DATE:** ${dateStr}  \n`;
-  brief += `**TO:** ${payerName} Appeals Committee & Medical Review Board  \n`;
-  brief += `**FROM:** ${providerName} (Treating Provider / Designated Authorized Representative)  \n`;
-  brief += `**RE:** Formal ${appealLevel.replace(/_/g, " ").toUpperCase()} Appeal & Demand for Claim Overturn — 29 CFR § 2560.503-1  \n\n`;
-  brief += `---\n\n`;
-
-  brief += `### CASE IDENTIFICATION & CLAIM METADATA\n\n`;
-  brief += `| Case Parameter | Clinical & Policy Record Details |\n`;
-  brief += `| :--- | :--- |\n`;
-  brief += `| **Patient Name** | ${patientName} |\n`;
-  brief += `| **Subscriber / Member ID** | ${memberId} |\n`;
-  brief += `| **Group / Plan Identifier** | ${groupNumber} |\n`;
-  brief += `| **Claim / Reference Number** | ${claimNumber} |\n`;
-  brief += `| **Date of Service (DOS)** | ${dos} |\n`;
-  brief += `| **Treating Physician** | ${providerName} |\n`;
-  brief += `| **Procedure Codes (CPT)** | ${cptCodes} |\n`;
-  brief += `| **Diagnosis Codes (ICD-10)** | ${icd10Codes} |\n`;
-  brief += `| **Disputed Claim Amount** | ${deniedAmount} |\n`;
-  brief += `| **Patient Financial Liability** | ${patientOwed} |\n`;
-  brief += `| **Adverse Denial Code** | ${denialReason} |\n\n`;
-  brief += `---\n\n`;
-
-  brief += `### JURISDICTIONAL STATEMENT & FORMAL NOTICE OF APPEAL\n\n`;
-  brief += `**Dear Members of the Appeals Committee and Medical Review Board:**\n\n`;
-  brief += `Please accept this formal written appeal submitted pursuant to the Employee Retirement Income Security Act of 1974 (**ERISA, 29 U.S.C. § 1133**), federal claims procedure regulations (**29 CFR § 2560.503-1**), and the Affordable Care Act (**ACA § 2719, 45 CFR § 147.136**), contesting the adverse benefit determination rendered regarding Claim #${claimNumber}.\n\n`;
-  
-  if (result.executiveSummary && result.executiveSummary.trim()) {
-    brief += `${result.executiveSummary.trim()}\n\n`;
-  } else {
-    brief += `The adverse benefit determination issued for CPT ${cptCodes} performed on ${dos} citing "lack of medical necessity" is contrary to the clinical record, unsupported by prevailing standard of care, and directly contradicts ${payerName}'s published Clinical Policy Bulletins.\n\n`;
-  }
-  brief += `---\n\n`;
-
-  brief += `## SECTION I: STATEMENT OF RELEVANT CLINICAL FACTS & CONSERVATIVE THERAPY FAILURE\n\n`;
-  if (result.medicalNecessityArguments && result.medicalNecessityArguments.trim()) {
-    brief += `${result.medicalNecessityArguments.trim()}\n\n`;
-  } else {
-    brief += `The patient presents with documented, progressive pathology (ICD-10: ${icd10Codes}) refractory to extensive conservative management. Prior to surgical/procedural intervention, the patient completed exhaustive non-operative modalities over a continuous timeline without sustained functional relief, including supervised physical therapy, targeted pharmacotherapy, and procedural interventions where indicated.\n\n`;
-  }
-
-  if (physicianNotes && physicianNotes.trim()) {
-    brief += `> **Treating Physician Clinical Statement (${providerName}):**  \n> "${physicianNotes.trim()}"\n\n`;
-  }
-  brief += `---\n\n`;
-
-  brief += `## SECTION II: CLINICAL POLICY BULLETIN (CPB) ALIGNMENT & EVIDENTIARY CRITERIA\n\n`;
-  brief += `The claimant's clinical documentation definitively satisfies every requisite indication outlined in ${payerName}'s published Clinical Policy Bulletins and national standard-of-care guidelines:\n\n`;
-
-  if (result.policyCitations && result.policyCitations.length > 0) {
-    brief += `| Policy Source | Target Clause / Criterion | Clinical Record Evidence & Direct Quote |\n`;
-    brief += `| :--- | :--- | :--- |\n`;
-    result.policyCitations.forEach((cit, idx) => {
-      brief += `| **${cit.source}** | \`${cit.clause}\` | "${cit.quote}" **(Exhibit ${String.fromCharCode(65 + idx)})** |\n`;
+  if (supportingEvidences.length > 0) {
+    email += `## Supporting documentation for review\n\n`;
+    email += `The following policy materials are identified as review references. They should be evaluated together with the patient-specific clinical records:\n\n`;
+    supportingEvidences.slice(0, 5).forEach((evidence: any) => {
+      const details = cleanEvidenceSummary(evidence.extractedEvidenceMarkdown);
+      const sourceLink = evidence.sourceUrl ? ` [Official source](${evidence.sourceUrl})` : "";
+      email += `- **${evidence.title}** - ${evidence.citationClause}${sourceLink}${details ? `: ${details}` : ""}\n`;
     });
-    brief += `\n`;
-  } else if (evidences && evidences.length > 0) {
-    brief += `| Evidentiary Source | Target Clause | Clinical Verification |\n`;
-    brief += `| :--- | :--- | :--- |\n`;
-    evidences.forEach((ev: any, idx: number) => {
-      brief += `| **${ev.title}** | \`${ev.citationClause}\` | ${ev.extractedEvidenceMarkdown.replace(/\n/g, " ")} **(Exhibit ${String.fromCharCode(65 + idx)})** |\n`;
-    });
-    brief += `\n`;
-  } else {
-    brief += `The medical services rendered fully conform to established national standard-of-care guidelines and prevailing peer-reviewed clinical literature.\n\n`;
-  }
-  brief += `---\n\n`;
-
-  brief += `## SECTION III: STATUTORY ERISA PROTECTIONS & GOVERNING LEGAL STANDARDS\n\n`;
-  if (result.statutoryRightsNotice && result.statutoryRightsNotice.trim()) {
-    brief += `${result.statutoryRightsNotice.trim()}\n\n`;
-  }
-  brief += `1. **Mandatory De Novo Review (29 CFR § 2560.503-1(h)(3)(ii)):** The plan administrator is mandated to conduct a full and independent clinical review that affords no deference to the initial adverse determination and is conducted by an appropriately credentialed, board-certified physician in the relevant specialty.\n`;
-  brief += `2. **Right to Full Record & Guideline Disclosure (29 CFR § 2560.503-1(h)(2)(iii)):** The claimant hereby formally requests, at no cost, complete copies of all documents, internal clinical policies, reviewer qualifications, and medical director notes relied upon in making the adverse determination.\n`;
-  brief += `3. **Deficiency of Generic Denial Notice (29 CFR § 2560.503-1(g)):** Plan administrators are legally obligated to articulate specific clinical rationales and policy references rather than generalized denial codes.\n`;
-  brief += `4. **Statutory Timely Adjudication Requirement:** This appeal is filed well within the 180-day statutory window mandated under federal law.\n\n`;
-
-  if (vectorSection) {
-    brief += `${vectorSection}\n`;
+    email += `\n`;
   }
 
-  brief += `---\n\n`;
+  email += `## Review requested\n\n`;
+  email += `Please:\n\n`;
+  email += `1. ${buildPaymentRequest(claimNumber)}\n`;
+  email += `2. If the denial is upheld, provide the specific clinical rationale, plan provision, criteria applied, and documents relied upon.\n`;
+  email += `3. Confirm receipt of this appeal and identify the applicable decision timeframe and any further review or external-review instructions.\n\n`;
+  email += `${SAFE_STATUTORY_RIGHTS_NOTICE}\n\n`;
+  email += `Thank you for your review. Please reference Claim #${claimNumber} in any response or request for additional information.\n\n`;
+  email += buildSignature(providerName, sender);
 
-  brief += `## SECTION IV: FORMAL REBUTTAL OF DENIAL & DEMAND FOR IMMEDIATE OVERTURN\n\n`;
-  if (result.formalDemandForPayment && result.formalDemandForPayment.trim()) {
-    brief += `${result.formalDemandForPayment.trim()}\n\n`;
-  }
-  brief += `The assertion under adverse denial code **${claim.denialReasonCode || "CO-50"}** that the requested treatment lacks medical necessity is directly contradicted by the patient's objective clinical records, diagnostic imaging, and documented exhaustion of conservative care.\n\n`;
-  brief += `**We hereby formally demand:**\n`;
-  brief += `1. **Immediate Overturn** of the adverse benefit determination and full authorization/reimbursement of the disputed amount of **${deniedAmount}**.\n`;
-  brief += `2. **Written Confirmation** of claim overturn and adjudication within the thirty (30) day statutory deadline.\n`;
-  brief += `3. In the event of an adverse reconsideration, immediate provision of notice of rights to **Independent External Review under ACA § 2719** and notice of formal complaint referral to the **Department of Labor Employee Benefits Security Administration (EBSA)** and State Insurance Commissioner.\n\n`;
-  brief += `---\n\n`;
-
-  brief += `### SIGNATURE & CERTIFICATION\n\n`;
-  brief += `**Respectfully submitted,**\n\n`;
-  brief += `**/s/ ${providerName}**  \n`;
-  brief += `Authorized Treating Healthcare Provider / Designated Authorized Representative  \n`;
-  brief += `On behalf of ${patientName} (Claimant)\n\n`;
-  brief += `---\n\n`;
-
-  brief += `### INDEX OF ATTACHED CLINICAL EXHIBITS\n\n`;
-  if (evidences && evidences.length > 0) {
-    evidences.forEach((ev: any, idx: number) => {
-      brief += `* **Exhibit ${String.fromCharCode(65 + idx)}:** ${ev.title} — *${ev.sourceType.toUpperCase()} (Clause: ${ev.citationClause})*\n`;
-    });
-  } else {
-    brief += `* **Exhibit A:** Treating Physician Clinical Progress Notes, Comprehensive Examination, and Operative Report\n`;
-    brief += `* **Exhibit B:** Diagnostic Radiology Reports & Weight-Bearing Imaging Findings\n`;
-    brief += `* **Exhibit C:** Supervised Physical Therapy Records, Flowsheets, and Discharge Summaries\n`;
-    brief += `* **Exhibit D:** Pharmacy Records & Medication Administration History\n`;
-    brief += `* **Exhibit E:** ${payerName} Clinical Policy Bulletin (CPB) Coverage Guidelines\n`;
-  }
-
-  return brief;
+  return email;
 }
 
+// Kept as a compatibility export for existing studio and test integrations.
+export const assembleProfessionalMemorandum = assembleProfessionalAppealEmail;
+
 /**
- * Appeal Synthesizer Action: Generate comprehensive ERISA & clinical medical appeal brief using gpt-5-nano
+ * Appeal Synthesizer Action: Generate grounded professional payer appeal correspondence.
  */
 export const generateAppealBrief = action({
   args: {
     claimId: v.id("claims"),
     appealLevel: v.optional(v.string()),
     physicianNotes: v.optional(v.string()),
+    senderName: v.optional(v.string()),
+    senderCredentials: v.optional(v.string()),
+    senderEmail: v.optional(v.string()),
+    senderPhone: v.optional(v.string()),
     customInstructions: v.optional(v.string()),
     vectorPrecedents: v.optional(v.array(precedentMatchValidator)),
   },
@@ -277,8 +309,9 @@ export const generateAppealBrief = action({
       claimId: args.claimId,
     });
 
-    const evidenceText = evidences.length > 0
-      ? evidences.map((e: any, idx: number) => `[Exhibit ${String.fromCharCode(65 + idx)}] (${e.sourceType.toUpperCase()} - ${e.title} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
+    const externalEvidences = evidences.filter(isExternalEvidence);
+    const evidenceText = externalEvidences.length > 0
+      ? externalEvidences.map((e: any, idx: number) => `[Source ${idx + 1}] (${e.sourceType.toUpperCase()} - ${e.title} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
       : "Standard national clinical practice guideline and ERISA disclosure rules apply.";
 
     let vectorPrecedents: VectorPrecedentMatch[] = args.vectorPrecedents || [];
@@ -305,7 +338,6 @@ export const generateAppealBrief = action({
         : "No vector-archive matches were available; rely on ERISA 29 CFR § 2560.503-1 and published CPB criteria.";
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
-    const primaryCpt = claim.cptCodes?.[0] || "27447";
     const cptList = (claim.cptCodes || []).join(", ");
     const icdList = (claim.icd10Codes || []).join(", ");
 
@@ -313,31 +345,25 @@ export const generateAppealBrief = action({
     let rawResult: AppealBriefSynthesisResult;
     try {
       rawResult = await createStructuredCompletion<AppealBriefSynthesisResult>({
-        systemPrompt: `You are an elite Healthcare Appellate Attorney, Board-Certified Medical Review Specialist, and ERISA Regulatory Counsel.
-Your mission is to synthesize an exhaustive, legally airtight, cited, highly professional medical appeal brief and formal demand for reconsideration to overturn an improper insurance claim denial.
+        systemPrompt: `You draft professional healthcare payer correspondence. Produce content that can be sent as the body of a normal appeal email, not a litigation memorandum and not legal advice.
 
-CRITICAL INSTRUCTIONS FOR MAXIMUM CLINICAL & LEGAL DEPTH:
-1. Executive Summary: Formulate a compelling, formal introductory legal statement establishing the claimant's procedural standing, the provider's authorized representation, the specific adverse benefit determination being challenged, and the clinical/statutory grounds for immediate reversal.
-2. Medical Necessity Arguments: You MUST provide an exhaustive, multi-paragraph clinical chronology detailing:
-   - Objective diagnostic severity: Exact radiographic/diagnostic classifications (e.g. Kellgren-Lawrence Grade III/IV, severe joint space narrowing <2mm, subchondral sclerosis, osteophytes, MRI disc herniation/stenosis parameters, CT evidence).
-   - Conservative management failure timeline: Detail at least 12-24 weeks of failed non-operative care including structured supervised physical therapy (session counts, functional deficits), oral NSAID trials (specific agents, daily dosages, durations, and GI/clinical contraindications or lack of efficacy), and intra-articular injections (dates, specific corticosteroid or viscosupplementation agents, transient relief duration).
-   - Validated functional outcome scores (KOOS, WOMAC, Oswestry, VAS pain score 8/10) and specific Activities of Daily Living (ADL) limitations (inability to ambulate >100 feet, restricted range of motion, inability to negotiate stairs).
-   - Clinical clearance and absence of contraindications.
-3. Statutory Rights Notice: Detail the governing legal standards under ERISA 29 U.S.C. § 1133, 29 CFR § 2560.503-1(g) (deficiency of boilerplate denial without specific clinical rationale), 29 CFR § 2560.503-1(h)(3)(ii) (Mandatory De Novo review by an independent same-specialty board-certified physician without deference to prior denial), 29 CFR § 2560.503-1(h)(2)(iii) (Mandatory free disclosure of full claim file, internal criteria, and reviewer credentials), and ACA § 2719 / 45 CFR § 147.136 (External Independent Review Organization rights).
-4. Policy Citations: Extract at least 3-4 specific policy requirements and map them directly against the patient's records with direct quotes and clause identifiers.
-5. Formal Demand for Payment: State an unambiguous demand for immediate claim overturn, full authorization/reimbursement of the disputed amount, 30-day statutory adjudication response deadline, and notice of referral to Department of Labor EBSA and State Insurance Commissioner.
-6. Full Appeal Markdown: Assemble an exhaustive, multi-page (800-1200+ words) formal appellate brief following all formatting rules.
-7. Formatting: Use # for the title, ## for major numbered sections, ### for subsections, Markdown tables (| :--- | :--- |), blockquotes (>), bullet lists, and --- horizontal dividers. Use bold and italic formatting selectively for labels, key requests, and exhibit references.
-8. Evidence discipline: Use only facts supported by the case details, indexed evidence, policy citations, physician notes, or precedent archive. Do not invent diagnostic measurements, treatment dates, medication dosages, outcome scores, legal authorities, or patient facts. If a detail is unavailable, state that it was not provided and frame the argument around the documented record.
-9. Tone: Authoritative, formal, evidentiary, and uncompromisingly clinical. Never produce a superficial summary.
-10. Multilingual & Jurisdiction Adaptability: Detect the primary language of the denial context. If non-English (e.g., Vietnamese, Spanish, French), synthesize the appeal brief in that corresponding language citing local insurance regulations. If in US/English context, synthesize in formal ERISA appellate English.`,
-        userPrompt: `Synthesize an exhaustive formal ${appealLevel.replace(/_/g, " ").toUpperCase()} medical appeal brief for:
+Evidence and safety rules:
+1. Use only facts explicitly present in the case details, indexed evidence, and treating-provider notes. Never invent symptoms, severity grades, measurements, treatment dates, medication names or doses, outcome scores, functional limitations, clearance, authorization, representation authority, plan type, jurisdiction, deadlines, or eligibility.
+2. Do not infer patient-specific clinical facts from diagnosis or procedure codes, policy criteria, or the absence of a documented contraindication. If the record does not contain clinical findings, say so plainly.
+3. Do not turn an evidence summary into a quotation. Preserve the source's meaning and identify it as a source or review reference.
+4. Treat the precedent archive as internal retrieval context. Never mention vector search, similarity scores, ClaimHero winning briefs, or internal archive labels in the email.
+5. Do not state that a legal rule was violated or that ERISA, ACA, external review, a 180-day filing period, or a 30-day response period applies unless the case record establishes that applicability. Use conditional, review-oriented language when necessary.
+6. Be concise and practical: a salutation, short paragraphs, a clinical rationale grounded in the record, a specific request, and a professional closing. The application supplies the email subject separately. Do not use all-caps filler, exhibit indexes, markdown tables, horizontal rules, threats, or ceremonial language.
+7. The application assembles the final email from your structured fields. Return an empty string for fullAppealMarkdown; do not write a second full document there.
+
+Write the structured fields in English unless the denial materials clearly establish another language.`,
+        userPrompt: `Draft the content for a ${appealLevel.replace(/_/g, " ")} medical appeal email for:
 
 Case Details:
 - Claim Number: ${claim.claimNumber}
-- Patient Name: ${claim.patient?.name || "Patient"}
-- Member ID: ${claim.patient?.memberId || "N/A"}
-- Group Number: ${claim.patient?.groupNumber || "Standard Employer Plan (ERISA Qualified)"}
+- Patient Name: ${claim.patient?.name}
+- Member ID: ${claim.patient?.memberId}
+- Group Number: ${claim.patient?.groupNumber || "Not provided"}
 - Insurance Payer: ${payer} (Grievances & Appeals Department)
 - Treating Physician: ${claim.providerName}
 - Date of Service: ${claim.serviceDate}
@@ -352,11 +378,14 @@ Case Details:
 Indexed Clinical Evidence & Policy Contradictions:
 ${evidenceText}
 
-Highest-scoring historical winning arguments from the Convex Precedent Vector Archive (top 3 by semantic similarity, filtered by ICD-10 / CPT / CARC). Inject the proven statutory language verbatim into the brief:
+Internal precedent retrieval context. Use only to identify potentially relevant issues; do not mention this context or copy its language into the email:
 ${precedentText}
 
 ${args.physicianNotes ? `Treating Physician Clinical Notes / Addendum:\n${args.physicianNotes}\n` : ""}
-${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstructions}\n` : ""}`,
+${args.senderName ? `Sender details for the closing (use only as provided):\n- Name: ${args.senderName}\n- Credentials or role: ${args.senderCredentials || "Not provided"}\n- Email: ${args.senderEmail || "Not provided"}\n- Phone: ${args.senderPhone || "Not provided"}\n` : ""}
+${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstructions}\n` : ""}
+
+Return a short, evidence-grounded email draft in the structured fields. If a clinical detail is not present, say that the current record does not provide it rather than filling the gap.`,
         schemaName: "AppealBriefSynthesisResult",
         schema: APPEAL_SYNTHESIS_SCHEMA,
         temperature: 0.15,
@@ -364,45 +393,55 @@ ${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstruc
     } catch (llmErr) {
       console.warn("LLM appeal synthesis fallback engaged:", llmErr);
       rawResult = {
-        executiveSummary: `This formal appellate memorandum challenges ${payer}'s adverse benefit determination regarding Claim #${claim.claimNumber} (Patient: ${claim.patient?.name || "Patient"}). The denial citing "lack of medical necessity" for CPT ${cptList} under denial code ${claim.denialReasonCode} is unsupported by the clinical record and directly contradicts published clinical coverage criteria.`,
-        medicalNecessityArguments: `The patient presents with severe, progressive pathology (ICD-10: ${icdList}) causing profound functional impairment and refractory pain. Prior to the procedure performed on ${claim.serviceDate}, the patient exhausted extensive non-operative conservative modalities over a continuous multi-month trial without sustained relief:\n\n1. Diagnostic Severity: The available clinical record supports advanced structural disease and objective severity criteria.\n2. Supervised Conservative Therapy: The record documents structured physical therapy targeting mobility, muscle stabilization, and functional rehabilitation without symptomatic resolution.\n3. Pharmacologic Management: The record documents trials of oral NSAID therapy, discontinued due to lack of efficacy or refractory pain.\n4. Interventional Modalities: The record documents intra-articular injections with only transient or negligible clinical benefit.\n5. Functional Limitations: The record documents severe impairment in Activities of Daily Living and functional outcome measures where provided.`,
-        statutoryRightsNotice: `Under the Employee Retirement Income Security Act of 1974 (ERISA, 29 U.S.C. § 1133) and 29 CFR § 2560.503-1, plan administrators must ensure a full and fair review. Generic denial notices failing to articulate specific clinical rationales violate federal claims regulations.`,
-        policyCitations: evidences.length > 0
-          ? evidences.slice(0, 3).map((e: any) => ({
-              source: e.title,
-              clause: e.citationClause,
-              quote: e.extractedEvidenceMarkdown,
-            }))
-          : [
-              {
-                source: `${payer} Clinical Coverage Guideline: CPT ${primaryCpt}`,
-                clause: "Section 1.A - Medical Necessity Criteria",
-                quote: "Procedure is covered when objective diagnostic criteria and failure of conservative management are documented.",
-              },
-            ],
-        formalDemandForPayment: `We demand the immediate reversal of adverse determination ${claim.denialReasonCode} and full payment of the disputed claim amount of $${(claim.deniedAmount || 0).toLocaleString()} within thirty (30) days.`,
+        executiveSummary: `This appeal requests reconsideration of the adverse benefit determination for Claim #${claim.claimNumber}, based on the claim details and supporting sources currently available.`,
+        medicalNecessityArguments: buildNeutralClinicalBasis(claim),
+        statutoryRightsNotice: SAFE_STATUTORY_RIGHTS_NOTICE,
+        policyCitations: buildGroundedPolicyCitations(evidences),
+        formalDemandForPayment: buildPaymentRequest(claim.claimNumber),
         fullAppealMarkdown: "",
       };
     }
 
-    // 4. Assemble the definitive, perfectly structured legal memorandum
+    const groundedPolicyCitations = buildGroundedPolicyCitations(evidences);
+    const groundedMedicalNecessityArguments = buildGroundedClinicalBasis(
+      rawResult.medicalNecessityArguments,
+      claim
+    );
+    const safeResult: AppealBriefSynthesisResult = {
+      ...rawResult,
+      // These fields are deliberately deterministic so the model cannot turn
+      // an uncertain jurisdiction or deadline into a legal conclusion.
+      statutoryRightsNotice: SAFE_STATUTORY_RIGHTS_NOTICE,
+      medicalNecessityArguments: groundedMedicalNecessityArguments,
+      policyCitations: groundedPolicyCitations,
+      formalDemandForPayment: buildPaymentRequest(claim.claimNumber),
+      fullAppealMarkdown: "",
+    };
+
+    // 4. Assemble a sendable email from grounded case data and concise model sections.
     const formattedMarkdown = assembleProfessionalMemorandum(
       claim,
       appealLevel,
-      rawResult,
+      safeResult,
       evidences,
       args.physicianNotes,
-      vectorPrecedents
+      vectorPrecedents,
+      {
+        name: args.senderName,
+        credentials: args.senderCredentials,
+        email: args.senderEmail,
+        phone: args.senderPhone,
+      }
     );
 
     const result: AppealBriefSynthesisResult = {
-      ...rawResult,
+      ...safeResult,
       fullAppealMarkdown: formattedMarkdown,
     };
 
-    // 5. Format legal citations string
-    const citationsSummary = result.policyCitations
-      .map((c: PolicyCitationItem) => `- ${c.source} (${c.clause}): "${c.quote}"`)
+    // 5. Persist only grounded source summaries, never model-invented citations.
+    const citationsSummary = groundedPolicyCitations
+      .map((c: PolicyCitationItem) => `- ${c.source} (${c.clause}): ${c.quote}`)
       .join("\n");
 
     // 6. Persist the generated brief to Convex database

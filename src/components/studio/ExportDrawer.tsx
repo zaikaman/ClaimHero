@@ -6,13 +6,8 @@ import {
   Check,
   PaperPlaneTilt,
   FileDoc,
-  Buildings,
-  Calendar,
-  CurrencyDollar,
-  User,
 } from "@phosphor-icons/react";
 import { Claim, Appeal } from "../../types";
-import { formatCurrency, formatDate } from "../../lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -41,19 +36,27 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
   onProceedToDispatch,
 }) => {
   const [copied, setCopied] = useState(false);
+  const needsClinicalDocumentation =
+    /does not independently document the patient-specific/i.test(markdownContent) &&
+    !/Treating provider note submitted for review:/i.test(markdownContent);
+
+  const getEmailText = () => {
+    const printableText = document.querySelector<HTMLElement>(".printable-dossier")?.innerText.trim();
+    return printableText || markdownContent;
+  };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(markdownContent);
+    navigator.clipboard.writeText(getEmailText());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownload = () => {
-    const blob = new Blob([markdownContent], { type: "text/markdown" });
+    const blob = new Blob([getEmailText()], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Appeal-Dossier-${claim.claimNumber}.md`;
+    a.download = `Appeal-Email-${claim.claimNumber}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -61,7 +64,40 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
   };
 
   const handlePrint = () => {
-    window.print();
+    const printable = document.querySelector<HTMLElement>(".printable-dossier");
+    const printWindow = window.open("", "_blank");
+
+    if (!printable || !printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.opener = null;
+
+    const styles = Array.from(document.querySelectorAll("link[rel='stylesheet'], style"))
+      .map((style) => style.outerHTML)
+      .join("\n");
+
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Appeal of Adverse Benefit Determination</title>
+          ${styles}
+          <style>
+            @page { size: letter portrait; margin: 0; }
+            html, body { margin: 0; background: #fff; color: #0f172a; }
+            body { font-family: Arial, Helvetica, sans-serif; }
+            .printable-dossier { width: auto !important; max-width: none !important; padding: 14mm 16mm !important; margin: 0 !important; box-shadow: none !important; }
+          </style>
+        </head>
+        <body>${printable.outerHTML}</body>
+      </html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onafterprint = () => printWindow.close();
+    window.setTimeout(() => printWindow.print(), 250);
   };
 
   return (
@@ -74,9 +110,9 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 <FileDoc className="size-4.5" />
               </div>
               <div>
-                <DialogTitle>Formal Appeal Dossier Export</DialogTitle>
+                <DialogTitle>Appeal Email Preview</DialogTitle>
                 <DialogDescription className="font-mono">
-                  Claim #{claim.claimNumber} • {appeal?.appealLevel?.replace(/_/g, " ").toUpperCase() || "LEVEL 1 INTERNAL"} (v{appeal?.version || 1})
+                  Claim #{claim.claimNumber} • {appeal?.appealLevel?.replace(/_/g, " ").toUpperCase() || "LEVEL 1 INTERNAL"} • Draft v{appeal?.version || 1}
                 </DialogDescription>
               </div>
             </div>
@@ -89,7 +125,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 className="gap-1"
               >
                 {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
-                <span>{copied ? "Copied" : "Copy Brief"}</span>
+                <span>{copied ? "Copied" : "Copy Email"}</span>
               </Button>
 
               <Button
@@ -99,7 +135,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 className="gap-1"
               >
                 <DownloadSimple className="size-3" />
-                <span>Download .MD</span>
+                  <span>Download .TXT</span>
               </Button>
 
               <Button
@@ -115,6 +151,8 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
               <Button
                 size="sm"
                 onClick={onProceedToDispatch}
+                disabled={needsClinicalDocumentation}
+                title={needsClinicalDocumentation ? "Add patient-specific clinical documentation and regenerate the email before dispatch." : undefined}
                 className="gap-1"
               >
                 <PaperPlaneTilt className="size-3" />
@@ -124,72 +162,23 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
           </div>
         </DialogHeader>
 
-        {/* Formal Printable Document Viewport */}
+        {needsClinicalDocumentation && (
+          <div className="no-print rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
+            Add patient-specific clinical documentation, such as examination findings, imaging, functional limitations, or treatment history, then regenerate the email before dispatching it.
+          </div>
+        )}
+
+        {/* Printable email viewport */}
         <div className="flex-1 overflow-y-auto p-4 bg-muted/30 rounded-xl border border-border print:p-0 print:border-none print:bg-transparent printable-dossier-scroll-area">
-          <div className="max-w-3xl mx-auto bg-white text-slate-900 p-8 sm:p-10 rounded-lg shadow-sm font-sans space-y-6 print:p-0 print:shadow-none print:max-w-none print:w-full printable-dossier">
-            {/* Letterhead */}
-            <div className="border-b-2 border-slate-900 pb-4 flex justify-between items-start">
-              <div>
-                <h1 className="text-base font-bold tracking-tight text-slate-950">
-                  FORMAL NOTICE OF MEDICAL APPEAL & DEMAND FOR REIMBURSEMENT
-                </h1>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Pursuant to ERISA 29 CFR § 2560.503-1 & Patient Protection and Affordable Care Act § 2719
-                </p>
-              </div>
-              <div className="text-right text-xs text-slate-600">
-                <div>Date: {formatDate(Date.now())}</div>
-                <div className="font-bold text-slate-900">PRIORITY REVIEW</div>
-              </div>
-            </div>
-
-            {/* Case & Policy Meta Summary */}
-            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded border border-slate-200 text-xs print:bg-slate-50/90 print:border-slate-300 meta-summary-box">
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <User className="size-3.5 text-slate-600" />
-                  <span><strong>Patient:</strong> {claim.patient?.name}</span>
-                </div>
-                <div><strong>Member ID:</strong> {claim.patient?.memberId}</div>
-                <div><strong>Group Number:</strong> {claim.patient?.groupNumber || "Standard Employer Plan"}</div>
-                <div><strong>Treating Provider:</strong> {claim.providerName}</div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <Buildings className="size-3.5 text-slate-600" />
-                  <span><strong>Health Plan:</strong> {claim.patient?.insurancePayer}</span>
-                </div>
-                <div><strong>Claim Number:</strong> {claim.claimNumber}</div>
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="size-3.5 text-slate-600" />
-                  <span><strong>Date of Service:</strong> {formatDate(claim.serviceDate)}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-rose-700 font-bold">
-                  <CurrencyDollar className="size-3.5" />
-                  <span>Disputed Amount: {formatCurrency(claim.deniedAmount)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Rendered Full Markdown Text */}
+          <div className="max-w-3xl mx-auto bg-white text-slate-900 p-8 sm:p-10 rounded-lg shadow-sm font-sans print:p-0 print:shadow-none print:max-w-none print:w-full printable-dossier">
             <div className="text-xs leading-relaxed text-slate-800">
               {markdownContent ? (
                 <AppealBriefRenderer content={markdownContent} isPrintMode={true} />
               ) : (
                 <div className="text-center py-12 text-slate-400 italic">
-                  No appeal brief generated yet. Click &quot;Synthesize Brief&quot; in the studio to generate the legal brief.
+                  No appeal email generated yet. Click &quot;Synthesize Brief&quot; in the studio to generate the email.
                 </div>
               )}
-            </div>
-
-            {/* Formal Signoff */}
-            <div className="pt-6 border-t border-slate-200 text-xs text-slate-700 space-y-4 print:border-slate-300 signoff-block">
-              <div>Respectfully submitted on behalf of the Claimant,</div>
-              <div className="pt-2 space-y-0.5 font-bold text-slate-900">
-                <div>{claim.patient?.name || "Claimant / Authorized Representative"}</div>
-                <div className="text-slate-600 font-normal">Contact: {claim.assignedAgentEmail}</div>
-              </div>
             </div>
           </div>
         </div>

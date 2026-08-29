@@ -193,11 +193,11 @@
   -webkit-mask-image: linear-gradient(to top, black 0%, transparent 45%);
 }
 
-/* Print Styles for Court-Ready Appeal Dossiers & Formal ERISA Packets */
+/* Print Styles for clean, sendable appeal correspondence */
 @media print {
   @page {
     size: letter portrait;
-    margin: 14mm 16mm 14mm 16mm;
+    margin: 0;
   }
 
   html,
@@ -267,7 +267,7 @@
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 14mm 16mm !important;
     box-shadow: none !important;
     border: none !important;
     background: #ffffff !important;
@@ -312,5 +312,8 @@
     color: #1e293b !important;
     line-height: 1.45 !important;
   }
-}
 
+  .printable-dossier {
+    font-size: 10pt !important;
+  }
+}
