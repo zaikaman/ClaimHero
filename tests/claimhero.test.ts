@@ -217,6 +217,100 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
     expect(requiredSections).toContain("statutoryRightsNotice");
     expect(requiredSections).toContain("medicalNecessityArguments");
   });
+
+  it("assembles an exhaustive, multi-page professional appellate memorandum with all clinical and legal pillars", async () => {
+    const { assembleProfessionalMemorandum } = await import("../convex/actions/appealSynthesizer");
+
+    const mockClaim = {
+      claimNumber: "CLM-8942-MOL",
+      serviceDate: "2026-06-12",
+      deniedAmount: 24500,
+      patientOwedAmount: 24500,
+      providerName: "Dr. Robert Langston, MD",
+      cptCodes: ["27447"],
+      icd10Codes: ["M17.11"],
+      denialReasonCode: "CO-50",
+      denialReasonDescription: "Service not deemed medically necessary",
+      patient: {
+        name: "Eleanor Vance",
+        memberId: "MOL-94820194",
+        groupNumber: "GRP-88192",
+        insurancePayer: "Molina Healthcare",
+      },
+    };
+
+    const mockEvidences = [
+      {
+        sourceType: "payer_cpb",
+        title: "Molina Healthcare CPB MCP-082",
+        citationClause: "Section 1.A",
+        extractedEvidenceMarkdown: "Radiographic evidence of severe osteoarthritis (Kellgren-Lawrence Grade 3 or 4) with joint space narrowing.",
+      },
+      {
+        sourceType: "payer_cpb",
+        title: "Molina Healthcare CPB MCP-082",
+        citationClause: "Section 1.C",
+        extractedEvidenceMarkdown: "Conservative therapy must include at least two modalities for 12+ weeks.",
+      },
+    ];
+
+    const mockResult = {
+      executiveSummary: "This formal appeal challenges Molina Healthcare's adverse determination for CPT 27447.",
+      medicalNecessityArguments: "Patient presents with end-stage right knee osteoarthritis (Kellgren-Lawrence Grade IV). Completed 16 physical therapy sessions, 6-month NSAID trial, and intra-articular steroid injections without lasting relief.",
+      statutoryRightsNotice: "Under ERISA 29 U.S.C. § 1133 and 29 CFR § 2560.503-1, claimant is entitled to a full and fair review.",
+      policyCitations: [
+        {
+          source: "Molina CPB MCP-082",
+          clause: "Section 1.A",
+          quote: "Radiographic confirmation of Kellgren-Lawrence Grade IV joint collapse",
+        },
+      ],
+      formalDemandForPayment: "We demand immediate reversal and payment of $24,500 within 30 days.",
+      fullAppealMarkdown: "", // Empty to test complete memorandum assembly
+    };
+
+    const brief = assembleProfessionalMemorandum(
+      mockClaim,
+      "level_1_internal",
+      mockResult,
+      mockEvidences,
+      "Patient exhibits severe bone-on-bone contact and has exhausted all non-operative measures."
+    );
+
+    // Verify key structural headers and metadata
+    expect(brief).toContain("# FORMAL MEDICAL APPEAL & LEGAL RECONSIDERATION MEMORANDUM");
+    expect(brief).toContain("CLM-8942-MOL");
+    expect(brief).toContain("Eleanor Vance");
+    expect(brief).toContain("Molina Healthcare");
+    expect(brief).toContain("$24,500");
+    expect(brief).toContain("27447");
+    expect(brief).toContain("M17.11");
+    expect(brief).toContain("CO-50");
+
+    // Verify clinical and conservative therapy facts
+    expect(brief).toContain("SECTION I: STATEMENT OF RELEVANT CLINICAL FACTS & CONSERVATIVE THERAPY FAILURE");
+    expect(brief).toContain("Kellgren-Lawrence Grade IV");
+    expect(brief).toContain("Dr. Robert Langston, MD");
+
+    // Verify CPB table
+    expect(brief).toContain("SECTION II: CLINICAL POLICY BULLETIN (CPB) ALIGNMENT & EVIDENTIARY CRITERIA");
+    expect(brief).toContain("Molina CPB MCP-082");
+
+    // Verify ERISA statutory mandates
+    expect(brief).toContain("SECTION III: STATUTORY ERISA PROTECTIONS & GOVERNING LEGAL STANDARDS");
+    expect(brief).toContain("29 CFR § 2560.503-1(h)(3)(ii)");
+    expect(brief).toContain("29 CFR § 2560.503-1(h)(2)(iii)");
+    expect(brief).toContain("De Novo Review");
+
+    // Verify Demand and Exhibits
+    expect(brief).toContain("SECTION IV: FORMAL REBUTTAL OF DENIAL & DEMAND FOR IMMEDIATE OVERTURN");
+    expect(brief).toContain("thirty (30) day");
+    expect(brief).toContain("INDEX OF ATTACHED CLINICAL EXHIBITS");
+    expect(brief).toContain("Exhibit A");
+
+    // Verify length is substantial (> 1800 characters)
+    expect(brief.length).toBeGreaterThan(1800);
+  });
 });
 
 describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
