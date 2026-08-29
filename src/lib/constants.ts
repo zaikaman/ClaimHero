@@ -19,6 +19,48 @@ export interface PayerAppellateContact {
 }
 
 export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
+  molina: {
+    id: "molina",
+    name: "Molina Healthcare",
+    domain: "molinahealthcare.com",
+    officialAppealsEmail: "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com",
+    intakePortalUrl: "https://member.molinahealthcare.com",
+    portalName: "MyMolina Grievance & Appeals Gateway",
+    appealsFax: "1-877-508-5748",
+    statutoryPoBox: "Molina Healthcare of Florida, Grievance and Appeals Dept., P.O. Box 521838, Longwood, FL 32752",
+    ediPayerId: "51062",
+    tollFreeHelpline: "1-888-560-5716",
+    isVerified: true,
+    submissionPolicyNote: "Molina Healthcare accepts formal written appeals and grievance submissions directly via its dedicated state appeals email (MFLGrievanceandAppealsDepartment@MolinaHealthcare.com), MyMolina portal, or appellate fax.",
+  },
+  geoblue: {
+    id: "geoblue",
+    name: "GeoBlue (BCBS Global)",
+    domain: "geo-blue.com",
+    officialAppealsEmail: "claims@geo-blue.com",
+    intakePortalUrl: "https://www.geo-blue.com",
+    portalName: "GeoBlue Member & Claims Portal",
+    appealsFax: "1-610-482-9623",
+    statutoryPoBox: "GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087",
+    ediPayerId: "GEO01",
+    tollFreeHelpline: "1-855-282-3517",
+    isVerified: true,
+    submissionPolicyNote: "GeoBlue (Blue Cross Blue Shield Global licensee) accepts direct claim disputes, appeal packets, and clinical records via its official appeals email (claims@geo-blue.com) or portal.",
+  },
+  bcbsglobal: {
+    id: "bcbsglobal",
+    name: "Blue Cross Blue Shield Global Core",
+    domain: "bcbsglobalcore.com",
+    officialAppealsEmail: "claims@bcbsglobalcore.com",
+    intakePortalUrl: "https://www.bcbsglobalcore.com",
+    portalName: "BCBS Global Core Service Center Portal",
+    appealsFax: "1-804-673-1179",
+    statutoryPoBox: "BCBS Global Core Service Center, P.O. Box 2048, Richmond, VA 23218-2048",
+    ediPayerId: "BCBSG",
+    tollFreeHelpline: "1-800-810-2583",
+    isVerified: true,
+    submissionPolicyNote: "BCBS Global Core explicitly accepts itemized international medical claim disputes and formal appeal submissions via its dedicated claims email (claims@bcbsglobalcore.com).",
+  },
   unitedhealthcare: {
     id: "uhc",
     name: "UnitedHealthcare",
@@ -118,6 +160,15 @@ export const getPayerAppellateContact = (payerName?: string): PayerAppellateCont
 
   const clean = payerName.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+  if (clean.includes("molina")) {
+    return VERIFIED_PAYER_DIRECTORY.molina;
+  }
+  if (clean.includes("geoblue") || clean.includes("geo-blue")) {
+    return VERIFIED_PAYER_DIRECTORY.geoblue;
+  }
+  if (clean.includes("bcbsglobal") || clean.includes("globalcore") || clean.includes("bcbsglobalcore")) {
+    return VERIFIED_PAYER_DIRECTORY.bcbsglobal;
+  }
   if (clean.includes("united") || clean.includes("uhc") || clean.includes("optum")) {
     return VERIFIED_PAYER_DIRECTORY.unitedhealthcare;
   }
@@ -333,14 +384,14 @@ export const SIMULATION_STAGES = [
     stage: 1,
     id: "ingestion",
     title: "Denial Document OCR & Optical Extraction",
-    description: "Ingesting $24,500 Knee Replacement Surgery Denial (CPT 27447, Code CO-50) from UnitedHealthcare",
+    description: "Ingesting $24,500 Knee Replacement Surgery Denial (CPT 27447, Code CO-50) from Molina Healthcare",
     durationMs: 3000,
   },
   {
     stage: 2,
     id: "crawling",
     title: "Insurer CPB & Clinical Policy Indexing",
-    description: "Indexing UnitedHealthcare Policy 2024T001 & extracting conservative therapy criteria contradiction",
+    description: "Indexing Molina Healthcare Clinical Policy MCP-082 & extracting conservative therapy criteria contradiction",
     durationMs: 3000,
   },
   {

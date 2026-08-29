@@ -37,7 +37,7 @@ export function useEvidence(claim?: Claim | null) {
 
       return await crawlPolicyAction({
         claimId: activeClaimId as any,
-        payer: claim?.patient?.insurancePayer || "UnitedHealthcare",
+        payer: claim?.patient?.insurancePayer || "Molina Healthcare",
         cptCodes: claim?.cptCodes?.length ? claim.cptCodes : ["27447"],
         icd10Codes: claim?.icd10Codes?.length ? claim.icd10Codes : ["M17.11"],
         denialReasonCode: claim?.denialReasonCode || "CO-50",

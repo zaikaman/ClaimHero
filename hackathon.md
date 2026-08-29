@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-29T09:56:00Z
+- **Last updated:** 2026-08-29T11:11:00Z
 
 ## Log
 
@@ -157,6 +157,9 @@ Sanitized UI Copy & Upgraded to Professional Enterprise Healthcare Terminology: 
 ### 2026-08-29 - 683e718
 Resolved Convex Mutation Reference for Audit Trail Logging: Fixed runtime exception `Could not find public function for 'claims:recordAuditLog'` during autonomous payer gateway resolution (`resolvePayerGateway`). Corrected mutation call in `payerContactResolver.ts` to reference `auditLogs.logEvent`, and added `recordAuditLog` mutation to `claims.ts` to ensure seamless mutation resolution across both endpoints. Verified 100% clean typecheck via `tsc --noEmit`.
 
-### 2026-08-29 - working tree
+### 2026-08-29 - 8204aa3
 Streamlined Case Workflow to 3 Steps & Routed Ingestion to Evidence & CPB: Simplified the active case navigation pipeline in `SentinelFlowStepper.tsx` from 4 steps down to 3 dedicated workspace steps (1. Evidence & CPB, 2. Appeal Brief, 3. Payer Dispatch), removing the redundant initial intake step (which pointed to Radar and was already covered by the back navigation button). Updated denial ingestion workflows in `App.tsx` and `IngestionModal.tsx` to automatically route users directly to the Evidence & CPB workspace upon document extraction instead of skipping directly to the drafted brief. Updated contextual step indicator badges and CTA actions across `EvidenceMatrix.tsx`, `AppealStudio.tsx`, and `IngestionModal.tsx`. Verified cleanly with zero errors via `npm run build`.
+
+### 2026-08-29 - working tree
+Engineered 3-Mode Interactive Recipient Destination, Autonomous AI Payer Adjudicator & UI Cleanup: Implemented a robust 3-mode appellate transmission gateway in `AgentMailDrawer.tsx` and `mailDispatcher.ts` to provide judges and adjudicators with comprehensive evaluation options: (1) **Autonomous AI Payer Adjudicator** (`ai_adjudicator`) which dispatches the brief to an autonomous payer medical review agent (`payer-review@claimhero.agentmail.com`), runs clinical evaluation against CPB criteria via OpenAI structured outputs, and automatically generates an inbound formal determination letter flipping the claim to `Won / Overturned` live in the docket; (2) **Interactive Test Mode** (`custom_email`) which allows judges to input their own email address, transmits the complete appeal dossier to their personal inbox via AgentMail REST API, and listens for live email replies via `/agentmail-webhook`; and (3) **Official Insurer Gateway** (`official_payer`) routing to the verified public grievance email on file (Molina Healthcare, GeoBlue, and BCBS Global Core). Removed all confetti effects from `OnboardingWizard.tsx` and `OnboardingChecklist.tsx` for a clean, serious medical enterprise aesthetic. Added unit tests in `tests/claimhero.test.ts` for all 3 dispatch modes. Verified cleanly with `npm run test` (30/30 passed) and `npm run build`.
 

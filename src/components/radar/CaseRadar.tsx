@@ -64,6 +64,9 @@ interface CaseRadarProps {
 const formatPayerName = (payer: string | undefined): string => {
   if (!payer) return "Insurer";
   const p = payer.trim();
+  if (/molina/i.test(p)) return "Molina Healthcare";
+  if (/geoblue|geo-blue/i.test(p)) return "GeoBlue";
+  if (/bcbsglobal|globalcore|bcbs global/i.test(p)) return "BCBS Global Core";
   if (/cigna/i.test(p)) return "Cigna";
   if (/unitedhealthcare|uhc/i.test(p)) return "UnitedHealthcare";
   if (/aetna/i.test(p)) return "Aetna";

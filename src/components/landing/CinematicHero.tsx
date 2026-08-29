@@ -51,7 +51,7 @@ const HERO_SLIDES: HeroSlide[] = [
   {
     badge1: { icon: ShieldCheck, label: "ERISA 29 CFR § 2560.503-1" },
     badge2: { icon: Clock, label: "< 14-Day Alarm Sweep" },
-    badge3: { icon: Buildings, label: "Aetna · UHC · Cigna · BCBS" },
+    badge3: { icon: Buildings, label: "Molina · GeoBlue · BCBS · 500+ Payers" },
     title: "Clinical Precedent. Zero Hallucination.",
     description:
       "Autonomous clinical policy indexing scans payer bulletins, CPT codes, and LCD precedent rulings to construct unassailable, cited appeal dossiers.",

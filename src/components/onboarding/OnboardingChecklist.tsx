@@ -14,7 +14,6 @@ import {
   Lightning,
   Medal,
 } from "@phosphor-icons/react";
-import confetti from "canvas-confetti";
 import { NavigationView } from "../layout/Sidebar";
 import { Claim } from "../../types";
 import { Card } from "../ui/card";
@@ -123,19 +122,6 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
   const completedCount = tasks.filter((t) => t.isDone).length;
   const isAllDone = completedCount === tasks.length;
   const progressPercent = Math.round((completedCount / tasks.length) * 100);
-
-  const [hasCelebrated, setHasCelebrated] = useState(false);
-  useEffect(() => {
-    if (isAllDone && !hasCelebrated) {
-      confetti({
-        particleCount: 100,
-        spread: 80,
-        origin: { y: 0.7, x: 0.85 },
-        colors: ["#00e5ff", "#10b981", "#fbbf24"],
-      });
-      setHasCelebrated(true);
-    }
-  }, [isAllDone, hasCelebrated]);
 
   if (isDismissed) return null;
 

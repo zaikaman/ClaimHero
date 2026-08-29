@@ -10,6 +10,7 @@ import {
   DENIAL_REASON_CODES,
   STATUTORY_REGULATIONS,
   INSURERS,
+  getPayerAppellateContact,
 } from "../src/lib/constants";
 
 describe("ClaimHero Domain Utilities & Formatting", () => {
@@ -75,11 +76,28 @@ describe("ClaimHero Regulatory & Clinical Dictionary", () => {
     expect(DENIAL_REASON_CODES["CO-197"]?.title).toContain("Precertification");
   });
 
-  it("contains major US commercial health insurance payers", () => {
+  it("contains major US commercial health insurance payers and verified email-capable payers", () => {
     const insurerNames = INSURERS.map((i) => i.name);
     expect(insurerNames).toContain("UnitedHealthcare");
     expect(insurerNames).toContain("Blue Cross Blue Shield");
     expect(insurerNames).toContain("Humana");
+    expect(insurerNames).toContain("Molina Healthcare");
+    expect(insurerNames).toContain("GeoBlue (BCBS Global)");
+    expect(insurerNames).toContain("Blue Cross Blue Shield Global Core");
+  });
+
+  it("resolves verified appeals email addresses for supported payers", () => {
+    const molina = getPayerAppellateContact("Molina Healthcare");
+    expect(molina.officialAppealsEmail).toBe("MFLGrievanceandAppealsDepartment@MolinaHealthcare.com");
+    expect(molina.isVerified).toBe(true);
+
+    const geoblue = getPayerAppellateContact("GeoBlue");
+    expect(geoblue.officialAppealsEmail).toBe("claims@geo-blue.com");
+    expect(geoblue.isVerified).toBe(true);
+
+    const bcbsGlobal = getPayerAppellateContact("BCBS Global Core");
+    expect(bcbsGlobal.officialAppealsEmail).toBe("claims@bcbsglobalcore.com");
+    expect(bcbsGlobal.isVerified).toBe(true);
   });
 });
 
@@ -222,6 +240,27 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
     expect(isApprovalEmail("Your appeal has been approved and full payment issued.")).toBe(true);
     expect(isApprovalEmail("The adverse determination is overturned upon review.")).toBe(true);
     expect(isApprovalEmail("We acknowledge receipt of your appeal packet.")).toBe(false);
+  });
+
+  it("validates 3-mode appellate recipient resolution rules", () => {
+    const resolveRecipient = (
+      mode: "ai_adjudicator" | "custom_email" | "official_payer",
+      customEmail: string,
+      payerName: string,
+      officialEmail?: string
+    ) => {
+      if (mode === "ai_adjudicator") {
+        return `${payerName.toLowerCase().replace(/[^a-z0-9]/g, "")}-adjudication@claimhero.agentmail.com`;
+      }
+      if (mode === "custom_email") {
+        return customEmail.trim();
+      }
+      return officialEmail || "prohibited";
+    };
+
+    expect(resolveRecipient("ai_adjudicator", "", "Molina Healthcare")).toBe("molinahealthcare-adjudication@claimhero.agentmail.com");
+    expect(resolveRecipient("custom_email", "judge@hackathon.com", "Molina Healthcare")).toBe("judge@hackathon.com");
+    expect(resolveRecipient("official_payer", "", "Molina Healthcare", "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com")).toBe("MFLGrievanceandAppealsDepartment@MolinaHealthcare.com");
   });
 });
 

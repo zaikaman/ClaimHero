@@ -66,10 +66,10 @@ interface PolicyExtractionResponse {
  */
 const CURATED_POLICY_REPOSITORY: Record<string, { title: string; policyNumber: string; text: string }> = {
   "27447": {
-    title: "UnitedHealthcare Commercial Medical Policy: Total Knee Arthroplasty (TKA)",
-    policyNumber: "Policy 2024T001",
-    text: `UNITEDHEALTHCARE CLINICAL POLICY BULLETIN: TOTAL KNEE ARTHROPLASTY (CPT 27447)
-Policy Number: 2024T001 | Effective Date: January 1, 2024 | Annual Review: 2026
+    title: "Molina Healthcare Clinical Coverage Policy: Total Knee Arthroplasty (TKA)",
+    policyNumber: "Policy MCP-082",
+    text: `MOLINA HEALTHCARE CLINICAL COVERAGE GUIDELINE: TOTAL KNEE ARTHROPLASTY (CPT 27447)
+Policy Number: MCP-082 | Effective Date: January 1, 2024 | Annual Review: 2026
 
 1. COVERAGE CRITERIA & MEDICAL NECESSITY:
 Total Knee Arthroplasty (CPT 27447) is considered medically necessary for patients with advanced joint disease when ALL of the following criteria (Section 1.A through 1.D) are met:
@@ -80,13 +80,13 @@ Total Knee Arthroplasty (CPT 27447) is considered medically necessary for patien
 
 2. CONTRADICTION & OVERTURN RULES:
 - Notice: If the insurer denies under 'lack of conservative therapy' but medical records show prior steroid injection AND prescription NSAID usage for >12 weeks, the conservative management requirement is fully satisfied under Section 1.C.
-- Statutory Requirement: Under ERISA 29 CFR § 2560.503-1, denial notices must cite specific criteria not met.`,
+- Statutory Requirement: Under ERISA 29 CFR § 2560.503-1 and ACA 45 CFR § 147.136, denial notices must cite specific criteria not met and provide internal appeal rights.`,
   },
   "63047": {
-    title: "Aetna Clinical Policy Bulletin: Lumbar Decompression & Laminectomy",
-    policyNumber: "CPB 0321",
-    text: `AETNA CLINICAL POLICY BULLETIN: LUMBAR SPINE DECOMPRESSION (CPT 63047)
-Policy Number: 0321 | Effective Date: March 2024 | Category: Orthopedics & Neurosurgery
+    title: "GeoBlue / BCBS Global Clinical Policy Bulletin: Lumbar Decompression & Laminectomy",
+    policyNumber: "Policy SURG.00011",
+    text: `GEOBLUE / BLUE CROSS BLUE SHIELD CLINICAL POLICY: LUMBAR SPINE DECOMPRESSION (CPT 63047)
+Policy Number: SURG.00011 | Effective Date: March 2024 | Category: Orthopedics & Neurosurgery
 
 1. INDICATIONS FOR SURGICAL DECOMPRESSION:
 Laminectomy, facetectomy, and foraminotomy with decompression of spinal cord (CPT 63047) is considered medically necessary when:
@@ -95,10 +95,10 @@ Laminectomy, facetectomy, and foraminotomy with decompression of spinal cord (CP
 - Section 2.3: Precertification Exception Rule: In cases with acute focal neurological deficits or severe functional limitation documented by a licensed neurosurgeon, retroactive pre-authorization review MUST be conducted rather than administrative denial.`,
   },
   "73721": {
-    title: "Cigna Medical Coverage Policy: Diagnostic Lower Extremity MRI",
-    policyNumber: "Guideline 0122",
-    text: `CIGNA MEDICAL COVERAGE POLICY: LOWER EXTREMITY MRI WITHOUT CONTRAST (CPT 73721)
-Guideline Number: 0122 | Effective Date: May 2024
+    title: "BCBS Global Core Medical Coverage Policy: Diagnostic Lower Extremity MRI",
+    policyNumber: "Guideline RAD.00002",
+    text: `BLUE CROSS BLUE SHIELD GLOBAL CORE MEDICAL POLICY: LOWER EXTREMITY MRI WITHOUT CONTRAST (CPT 73721)
+Guideline Number: RAD.00002 | Effective Date: May 2024
 
 1. CLINICAL NECESSITY CRITERIA:
 Lower extremity MRI (CPT 73721) is covered for acute joint trauma, suspected internal derangement (meniscal tear, cruciate ligament injury), or persistent joint pain following clinical examination.

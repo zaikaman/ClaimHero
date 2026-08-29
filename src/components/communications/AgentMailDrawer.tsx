@@ -15,6 +15,7 @@ import {
   ArrowSquareOut,
   Printer,
   Info,
+  Robot,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
@@ -26,13 +27,15 @@ import { Button, buttonVariants } from "../ui/button";
 import { Input } from "../ui/input";
 import { ExportDrawer } from "../studio/ExportDrawer";
 
+type DispatchMode = "ai_adjudicator" | "custom_email" | "official_payer";
+
 interface AgentMailDrawerProps {
   claim: Claim;
   threads: EmailThread[];
   messages: EmailMessage[];
   isLoading?: boolean;
   onSendMessage: (text: string) => Promise<any>;
-  onDispatchAppeal?: () => Promise<any>;
+  onDispatchAppeal?: (recipientEmail?: string, dispatchMode?: string) => Promise<any>;
   onNavigateView?: (view: FlowView) => void;
   onRunAutonomousPipeline?: (claimId?: string) => Promise<any>;
 }
@@ -51,6 +54,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
+  const [dispatchMode, setDispatchMode] = useState<DispatchMode>("ai_adjudicator");
+  const [customEmail, setCustomEmail] = useState<string>("");
 
   const [copiedRecipientEmail, setCopiedRecipientEmail] = useState(false);
   const [copiedBrief, setCopiedBrief] = useState(false);
@@ -65,10 +70,26 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const payerName = claim.patient?.insurancePayer || "Health Insurer";
   const defaultPayerContact = getPayerAppellateContact(payerName);
   const payerContact = claim.payerContact || defaultPayerContact;
+  const officialEmail = claim.payerContact?.officialAppealsEmail || payerContact.officialAppealsEmail;
+  const aiAdjudicatorEmail = `${payerName.toLowerCase().replace(/[^a-z0-9]/g, "")}-adjudication@claimhero.agentmail.com`;
+
+  const effectiveRecipient =
+    dispatchMode === "ai_adjudicator"
+      ? aiAdjudicatorEmail
+      : dispatchMode === "custom_email"
+      ? customEmail.trim()
+      : officialEmail;
+
   const recipientEmail =
     threads[0]?.payerEmail ||
-    claim.payerContact?.officialAppealsEmail ||
-    payerContact.officialAppealsEmail;
+    effectiveRecipient;
+
+  const canDispatch =
+    dispatchMode === "ai_adjudicator"
+      ? true
+      : dispatchMode === "custom_email"
+      ? Boolean(customEmail.trim() && customEmail.includes("@"))
+      : Boolean(officialEmail);
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText(assignedEmail);
@@ -114,10 +135,10 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   };
 
   const handleRunDispatch = async () => {
-    if (!onDispatchAppeal || isDispatching) return;
+    if (!onDispatchAppeal || isDispatching || !canDispatch) return;
     setIsDispatching(true);
     try {
-      await onDispatchAppeal();
+      await onDispatchAppeal(effectiveRecipient, dispatchMode);
     } finally {
       setIsDispatching(false);
     }
@@ -125,7 +146,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
   return (
     <div className="space-y-4 animate-fadeIn pb-12">
-      {/* 4-Step Guided Sentinel Stepper */}
+      {/* 3-Step Guided Sentinel Stepper */}
       <SentinelFlowStepper
         claim={claim}
         currentView="communications"
@@ -148,7 +169,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
       {/* Prominent Multi-Channel Transmission Gateway Banner if not yet sent */}
       {claim.status !== "dispatched" && claim.status !== "won" && onDispatchAppeal && (
-        <Card className="p-4 border-primary/40 bg-primary/5 space-y-3.5">
+        <Card className="p-4 border-primary/40 bg-primary/5 space-y-4">
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <div className="flex items-start sm:items-center gap-3">
               <div className="size-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs mt-0.5 sm:mt-0">
@@ -187,23 +208,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
               <Button
                 size="sm"
-                variant={!recipientEmail && payerContact.intakePortalUrl ? "default" : "outline"}
+                variant="outline"
                 onClick={handleCopyBrief}
                 disabled={!claim.latestAppeal}
-                className={cn(
-                  "gap-1.5 text-xs h-9",
-                  !recipientEmail && payerContact.intakePortalUrl && "bg-primary text-primary-foreground font-semibold"
-                )}
+                className="gap-1.5 text-xs h-9"
               >
                 {copiedBrief ? (
-                  <Check
-                    className={cn(
-                      "size-3.5",
-                      !recipientEmail && payerContact.intakePortalUrl
-                        ? "text-primary-foreground"
-                        : "text-emerald-500"
-                    )}
-                  />
+                  <Check className="size-3.5 text-emerald-500" />
                 ) : (
                   <Copy className="size-3.5" />
                 )}
@@ -212,44 +223,153 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
               <Button
                 size="sm"
-                variant={!recipientEmail && !payerContact.intakePortalUrl ? "default" : "outline"}
+                variant="outline"
                 onClick={() => setIsExportDrawerOpen(true)}
                 disabled={!claim.latestAppeal}
                 title={claim.latestAppeal ? "Open formal court-ready appeal dossier & print docket" : "Synthesize appeal brief in studio first"}
-                className={cn(
-                  "gap-1.5 text-xs h-9",
-                  !recipientEmail && !payerContact.intakePortalUrl && "bg-primary text-primary-foreground font-semibold"
-                )}
+                className="gap-1.5 text-xs h-9"
               >
                 <Printer className="size-3.5" />
                 <span>Print Docket</span>
               </Button>
 
-              {recipientEmail ? (
-                <Button
-                  size="sm"
-                  onClick={handleRunDispatch}
-                  disabled={isDispatching}
-                  className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9"
-                >
-                  {isDispatching ? (
-                    <>
-                      <CircleNotch className="size-4 animate-spin" />
-                      <span>Transmitting Appeal Packet...</span>
-                    </>
-                  ) : (
-                    <>
-                      <PaperPlaneTilt className="size-4" />
-                      <span>Transmit Appeal Packet</span>
-                    </>
-                  )}
-                </Button>
-              ) : (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted/60 border border-border text-[11px] text-muted-foreground">
-                  <Info className="size-3.5 text-amber-500 shrink-0" />
-                  <span>Email Prohibited by Payer</span>
+              <Button
+                size="sm"
+                onClick={handleRunDispatch}
+                disabled={isDispatching || !canDispatch || !claim.latestAppeal}
+                className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9"
+              >
+                {isDispatching ? (
+                  <>
+                    <CircleNotch className="size-4 animate-spin" />
+                    <span>Transmitting Appeal Packet...</span>
+                  </>
+                ) : (
+                  <>
+                    <PaperPlaneTilt className="size-4" />
+                    <span>
+                      {dispatchMode === "ai_adjudicator"
+                        ? "Transmit to AI Payer Reviewer"
+                        : dispatchMode === "custom_email"
+                        ? "Transmit to My Email Address"
+                        : "Transmit to Official Gateway"}
+                    </span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Interactive Appellate Recipient Destination Mode Selector */}
+          <div className="space-y-2 pt-3 border-t border-border/70">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-foreground block font-mono uppercase tracking-wider">
+                Select Appellate Recipient Destination:
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                Choose how you want to test and verify transmission
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+              {/* Mode 1: AI Adjudicator */}
+              <div
+                onClick={() => setDispatchMode("ai_adjudicator")}
+                className={cn(
+                  "cursor-pointer p-3 rounded-lg border text-left transition-all relative flex flex-col justify-between",
+                  dispatchMode === "ai_adjudicator"
+                    ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40"
+                    : "border-border bg-background/50 hover:bg-muted/40"
+                )}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Robot className={cn("size-4", dispatchMode === "ai_adjudicator" ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-xs font-semibold text-foreground">AI Payer Adjudicator</span>
+                    </div>
+                    <Badge variant="outline" className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                      2-Way Review
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    Autonomous medical review agent reviews CPB criteria and responds with formal determination letter.
+                  </p>
                 </div>
-              )}
+                <div className="mt-2.5 pt-2 border-t border-border/50 text-[10px] font-mono text-primary/90 truncate">
+                  {aiAdjudicatorEmail}
+                </div>
+              </div>
+
+              {/* Mode 2: Custom Judge Email */}
+              <div
+                onClick={() => setDispatchMode("custom_email")}
+                className={cn(
+                  "cursor-pointer p-3 rounded-lg border text-left transition-all relative flex flex-col justify-between",
+                  dispatchMode === "custom_email"
+                    ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40"
+                    : "border-border bg-background/50 hover:bg-muted/40"
+                )}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Envelope className={cn("size-4", dispatchMode === "custom_email" ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-xs font-semibold text-foreground">Interactive Test (My Email)</span>
+                    </div>
+                    <Badge variant="outline" className="text-[9px] font-mono text-cyan-600 dark:text-cyan-400 border-cyan-500/30">
+                      Personal Inbox
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    Delivers complete brief to your mail client. Reply to trigger the live webhook.
+                  </p>
+                </div>
+                {dispatchMode === "custom_email" ? (
+                  <div className="mt-2.5 pt-2 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
+                    <Input
+                      type="email"
+                      placeholder="Enter your email (e.g. judge@gmail.com)"
+                      value={customEmail}
+                      onChange={(e) => setCustomEmail(e.target.value)}
+                      className="h-7 text-[11px] px-2 bg-background font-mono"
+                    />
+                  </div>
+                ) : (
+                  <div className="mt-2.5 pt-2 border-t border-border/50 text-[10px] font-mono text-muted-foreground truncate">
+                    {customEmail || "Enter custom email address..."}
+                  </div>
+                )}
+              </div>
+
+              {/* Mode 3: Official Insurer */}
+              <div
+                onClick={() => setDispatchMode("official_payer")}
+                className={cn(
+                  "cursor-pointer p-3 rounded-lg border text-left transition-all relative flex flex-col justify-between",
+                  dispatchMode === "official_payer"
+                    ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40"
+                    : "border-border bg-background/50 hover:bg-muted/40"
+                )}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Buildings className={cn("size-4", dispatchMode === "official_payer" ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-xs font-semibold text-foreground">Official Insurer Gateway</span>
+                    </div>
+                    <Badge variant="outline" className="text-[9px] font-mono text-slate-400 border-slate-700">
+                      Production
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    Dispatches directly to {payerName}'s verified public grievance and appeals intake address.
+                  </p>
+                </div>
+                <div className="mt-2.5 pt-2 border-t border-border/50 text-[10px] font-mono text-foreground/80 truncate">
+                  {officialEmail || "Appellate Fax / Portal required"}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -258,7 +378,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             <Info className="size-4 text-primary shrink-0 mt-0.5" />
             <div className="space-y-1">
               <span className="font-semibold text-foreground text-[11px] block">
-                Official Submission Standard for {payerName}:
+                Appellate Submission Guidelines for {payerName}:
               </span>
               <p className="text-[11px] leading-relaxed text-foreground/80">
                 {payerContact.submissionPolicyNote ||

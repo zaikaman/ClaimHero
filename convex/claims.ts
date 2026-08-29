@@ -215,6 +215,13 @@ export const createWithPatient = mutation({
 
     if (existingPatients.length > 0 && existingPatients[0]) {
       patientId = existingPatients[0]._id;
+      await ctx.db.patch(patientId, {
+        name: args.patientName,
+        memberId: args.memberId,
+        groupNumber: args.groupNumber,
+        insurancePayer: args.insurancePayer,
+        state: args.state,
+      });
     } else {
       patientId = await ctx.db.insert("patients", {
         userId: userId ?? undefined,

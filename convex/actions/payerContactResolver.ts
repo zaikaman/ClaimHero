@@ -75,6 +75,42 @@ export const resolvePayerGateway = action({
 
     // 2. Check if known US major payer and web search not forced
     const PRESET_PAYERS: Record<string, ResolvedPayerContact> = {
+      molina: {
+        officialAppealsEmail: "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com",
+        intakePortalUrl: "https://member.molinahealthcare.com",
+        portalName: "MyMolina Grievance & Appeals Gateway",
+        appealsFax: "1-877-508-5748",
+        statutoryPoBox: "Molina Healthcare of Florida, Grievance and Appeals Dept., P.O. Box 521838, Longwood, FL 32752",
+        ediPayerId: "51062",
+        tollFreeHelpline: "1-888-560-5716",
+        isVerified: true,
+        submissionPolicyNote: "Molina Healthcare accepts formal written appeals and grievance submissions directly via its dedicated state appeals email (MFLGrievanceandAppealsDepartment@MolinaHealthcare.com), MyMolina portal, or appellate fax.",
+        source: "preset",
+      },
+      geoblue: {
+        officialAppealsEmail: "claims@geo-blue.com",
+        intakePortalUrl: "https://www.geo-blue.com",
+        portalName: "GeoBlue Member & Claims Portal",
+        appealsFax: "1-610-482-9623",
+        statutoryPoBox: "GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087",
+        ediPayerId: "GEO01",
+        tollFreeHelpline: "1-855-282-3517",
+        isVerified: true,
+        submissionPolicyNote: "GeoBlue (Blue Cross Blue Shield Global licensee) accepts direct claim disputes, appeal packets, and clinical records via its official appeals email (claims@geo-blue.com) or portal.",
+        source: "preset",
+      },
+      bcbsglobal: {
+        officialAppealsEmail: "claims@bcbsglobalcore.com",
+        intakePortalUrl: "https://www.bcbsglobalcore.com",
+        portalName: "BCBS Global Core Service Center Portal",
+        appealsFax: "1-804-673-1179",
+        statutoryPoBox: "BCBS Global Core Service Center, P.O. Box 2048, Richmond, VA 23218-2048",
+        ediPayerId: "BCBSG",
+        tollFreeHelpline: "1-800-810-2583",
+        isVerified: true,
+        submissionPolicyNote: "BCBS Global Core explicitly accepts itemized international medical claim disputes and formal appeal submissions via its dedicated claims email (claims@bcbsglobalcore.com).",
+        source: "preset",
+      },
       unitedhealthcare: {
         intakePortalUrl: "https://www.uhcprovider.com/en/claims-payments-billing/appeals.html",
         portalName: "UHC Provider Appeals & Grievance Portal",

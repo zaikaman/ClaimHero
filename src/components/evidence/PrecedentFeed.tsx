@@ -34,25 +34,25 @@ const HISTORICAL_PRECEDENTS: Record<string, HistoricalPrecedent[]> = {
   "27447": [
     {
       id: "prec-27447-1",
-      caseTitle: "Vance v. UnitedHealthcare (Commercial ERISA Review)",
-      payer: "UnitedHealthcare",
+      caseTitle: "Vance v. Molina Healthcare (Grievance & Appeals Review)",
+      payer: "Molina Healthcare",
       cptCode: "27447",
       denialCode: "CO-50",
       overturnRate: 94,
       recoveredAmount: "$24,500",
-      citation: "UHC CPB 2024T001 § 1.C / 29 CFR § 2560.503-1",
+      citation: "Molina Policy MCP-082 § 1.C / 29 CFR § 2560.503-1",
       winningArgument:
-        "Claimant demonstrated 14 weeks of supervised physical therapy and prior intra-articular steroid injection with persistent functional ADL deficit, satisfying all criteria under Policy 2024T001 Section 1.C.",
+        "Claimant demonstrated 14 weeks of supervised physical therapy and prior intra-articular steroid injection with persistent functional ADL deficit, satisfying all criteria under Policy MCP-082 Section 1.C.",
     },
     {
       id: "prec-27447-2",
-      caseTitle: "California DOI Independent Medical Review #IMR-2024-8819",
-      payer: "Commercial Payer",
+      caseTitle: "Florida Agency for Health Care Administration Review #AHCA-2024-8819",
+      payer: "Molina Healthcare of Florida",
       cptCode: "27447",
       denialCode: "CO-50",
       overturnRate: 89,
       recoveredAmount: "$31,200",
-      citation: "Cal. Ins. Code § 10169 / Kellgren-Lawrence Grade IV",
+      citation: "Fla. Admin. Code § 59G / Kellgren-Lawrence Grade IV",
       winningArgument:
         "Independent board-certified orthopedic reviewer ruled that Grade IV tricompartmental osteoarthritis constitutes definitive surgical indication regardless of conservative trial duration.",
     },
@@ -60,29 +60,29 @@ const HISTORICAL_PRECEDENTS: Record<string, HistoricalPrecedent[]> = {
   "63047": [
     {
       id: "prec-63047-1",
-      caseTitle: "Sterling v. Aetna Life Insurance Co.",
-      payer: "Aetna",
+      caseTitle: "Sterling v. GeoBlue Worldwide (BCBS Global Appellate Review)",
+      payer: "GeoBlue",
       cptCode: "63047",
       denialCode: "CO-197",
       overturnRate: 91,
       recoveredAmount: "$18,200",
-      citation: "Aetna CPB 0321 § 2.3 (Retroactive Prior Auth Exception)",
+      citation: "GeoBlue Policy SURG.00011 § 2.3 (Retroactive Prior Auth Exception)",
       winningArgument:
-        "Documented progressive motor deficit and acute cauda equina risk met retroactive pre-authorization exception under CPB 0321 Section 2.3.",
+        "Documented progressive motor deficit and acute cauda equina risk met retroactive pre-authorization exception under Policy SURG.00011 Section 2.3.",
     },
   ],
   "73721": [
     {
       id: "prec-73721-1",
-      caseTitle: "Chen v. Cigna Health & Life",
-      payer: "Cigna",
+      caseTitle: "Patel v. Blue Cross Blue Shield Global Core",
+      payer: "Blue Cross Blue Shield Global Core",
       cptCode: "73721",
       denialCode: "CO-16",
       overturnRate: 88,
       recoveredAmount: "$2,850",
-      citation: "Cigna Coverage Policy 0122 § 3.B",
+      citation: "BCBS Global Core Policy RAD.00002 § 3.B",
       winningArgument:
-        "Exam notes documenting acute traumatic meniscal tear with joint locking explicitly exempt claimant from plain radiograph prerequisites under Section 3.B.",
+        "Exam notes documenting acute traumatic meniscal tear with joint locking explicitly exempt claimant from plain radiograph prerequisites under Policy RAD.00002 Section 3.B.",
     },
   ],
 };

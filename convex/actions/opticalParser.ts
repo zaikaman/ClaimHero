@@ -129,9 +129,11 @@ Rules:
     });
 
     // Save patient and claim into Convex database
+    const sanitizedPatient = extraction.patientName.toLowerCase().replace(/[^a-z0-9]/g, "") || "patient";
+    const sanitizedPayer = (extraction.insurancePayer || "payer").toLowerCase().replace(/[^a-z0-9]/g, "");
     const claimId: string = await ctx.runMutation((api as any).claims.createWithPatient, {
       patientName: extraction.patientName,
-      patientEmail: `${extraction.patientName.toLowerCase().replace(/[^a-z0-9]/g, "") || "patient"}@example.com`,
+      patientEmail: `${sanitizedPatient}-${sanitizedPayer}@example.com`,
       memberId: extraction.memberId,
       insurancePayer: extraction.insurancePayer,
       state: args.patientState || "California",
@@ -149,21 +151,29 @@ Rules:
 
     // Autonomously resolve the payer intake gateway right from the moment of ingestion
     try {
+      // 1. Resolve base gateway info (portal URL, fax, PO Box, EDI ID, etc.) from verified directory or web search
+      const resolvedContact = await ctx.runAction(
+        (api as any).actions.payerContactResolver.resolvePayerGateway,
+        {
+          claimId,
+          payerName: extraction.insurancePayer,
+        }
+      );
+
+      // 2. If OCR extracted an explicit appeals email or specific PO Box, overlay it with document provenance
       if (extraction.payerAppealsEmail && extraction.payerAppealsEmail.includes("@")) {
         await ctx.runMutation((api as any).claims.updatePayerContact, {
           claimId,
           payerContact: {
+            ...resolvedContact,
             officialAppealsEmail: extraction.payerAppealsEmail,
-            statutoryPoBox: extraction.payerAppealsAddress || `${extraction.insurancePayer} Appeals Unit`,
+            statutoryPoBox:
+              extraction.payerAppealsAddress ||
+              resolvedContact?.statutoryPoBox ||
+              `${extraction.insurancePayer} Appeals Unit`,
             isVerified: true,
             source: "document_ocr",
           },
-        });
-      } else {
-        // Automatically discover official appeals portal, fax, and intake gateway via Firecrawl or preset directory
-        await ctx.runAction((api as any).actions.payerContactResolver.resolvePayerGateway, {
-          claimId,
-          payerName: extraction.insurancePayer,
         });
       }
     } catch (contactErr) {

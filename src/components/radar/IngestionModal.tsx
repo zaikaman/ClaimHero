@@ -49,21 +49,21 @@ interface IngestionModalProps {
 
 const SAMPLE_CASE_PRESETS = [
   {
-    id: "uhc_knee",
-    title: "UnitedHealthcare — Total Knee Arthroplasty",
-    payer: "UnitedHealthcare",
+    id: "molina_knee",
+    title: "Molina Healthcare — Total Knee Arthroplasty",
+    payer: "Molina Healthcare",
     amount: "$24,500",
     cpt: "27447",
     carc: "CO-50 (Not Medically Necessary)",
-    content: `UNITEDHEALTHCARE COMMERCIAL PLAN
-EXPLANATION OF BENEFITS / ADVERSE BENEFIT DETERMINATION
-Claim ID: CLM-8942-UHC
-Member ID: UHC-982341-01
+    content: `MOLINA HEALTHCARE OF FLORIDA
+EXPLANATION OF BENEFITS / NOTICE OF ADVERSE BENEFIT DETERMINATION
+Claim Reference: CLM-8942-MOL
+Member ID: MOL-982341-01
 Patient Name: Eleanor Vance
 Date of Birth: 1968-04-14
 Date of Service: 06/12/2026
 Treating Provider: Dr. Robert Langston, MD (Advanced Orthopedic Institute)
-Facility: Pacific Surgical Center
+Facility: Sunstate Surgical Hospital
 
 Services Rendered:
 - CPT Code 27447: Total Knee Arthroplasty (TKA), right knee
@@ -75,25 +75,30 @@ Services Rendered:
 
 Adjudication & Claim Denial Reason:
 Code CO-50: These are non-covered services because this is not deemed a medical necessity by the payer.
-Clinical Rationale: Under UnitedHealthcare Clinical Policy Bulletin 2024T001, total knee arthroplasty requires documented failure of at least 6 months of non-surgical conservative therapy (including formal physical therapy, intra-articular corticosteroid injections, and prescription NSAIDs). Clinical records submitted fail to establish 6 consecutive months of supervised physical therapy.
+Clinical Rationale: Under Molina Healthcare Clinical Coverage Guideline MCP-082, total knee arthroplasty requires documented failure of at least 12 weeks of non-surgical conservative therapy (including formal physical therapy, intra-articular corticosteroid injections, and prescription NSAIDs). Clinical records submitted fail to establish consecutive supervised physical therapy.
 
 Statutory Notice of Appeal Rights:
-You have the right to an internal appeal pursuant to ERISA 29 CFR § 2560.503-1. You must submit your written appeal within 180 calendar days from the date of this determination notice.`,
+You have the right to an internal appeal pursuant to ERISA 29 CFR § 2560.503-1 and ACA 45 CFR § 147.136. You must submit your written appeal within 180 calendar days from the date of this determination notice.
+Appeals Intake Destination:
+Email: MFLGrievanceandAppealsDepartment@MolinaHealthcare.com
+Mailing Address: Molina Healthcare of Florida, Grievance and Appeals Dept., P.O. Box 521838, Longwood, FL 32752
+Appeals Fax: 1-877-508-5748`,
   },
   {
-    id: "aetna_spine",
-    title: "Aetna — Lumbar Decompression & Laminectomy",
-    payer: "Aetna",
+    id: "geoblue_spine",
+    title: "GeoBlue (BCBS Global) — Lumbar Decompression",
+    payer: "GeoBlue",
     amount: "$18,200",
     cpt: "63047",
     carc: "CO-197 (Prior Auth Lacking)",
-    content: `AETNA HEALTH INSURANCE
-NOTICE OF CLAIM ADVERSE DETERMINATION
-Claim Reference: CLM-6104-AET
-Member ID: AET-554210-99
+    content: `GEOBLUE WORLDWIDE MEDICAL INSURANCE
+NOTICE OF CLAIM ADVERSE DETERMINATION & BENEFIT SUMMARY
+Claim Reference: CLM-6104-GEO
+Member ID: GEO-554210-99
 Patient Name: Marcus Sterling
 Date of Service: 07/04/2026
 Provider: Dr. Sarah Chen, MD (Spine & Neurosurgery Associates)
+Facility: International Spine Institute
 
 Procedure & Clinical Codes:
 - CPT 63047: Laminectomy, facetectomy and foraminotomy with decompression of spinal cord, single segment lumbar
@@ -104,24 +109,28 @@ Procedure & Clinical Codes:
 
 Denial Adjudication Reason:
 Code CO-197: Precertification / prior authorization / notification absent or lacking.
-Description: Surgical treatment for lumbar spinal stenosis was performed without securing prior authorization from Aetna Clinical Review Department prior to the date of service.
+Description: Surgical treatment for lumbar spinal stenosis was performed without securing prior authorization from GeoBlue Medical Review Department prior to the date of service.
 
-Appeals Procedure:
-In accordance with federal regulations under 29 CFR § 2560.503-1, you or your authorized representative have 180 days from receipt of this notice to file a Level 1 appeal demonstrating emergency medical necessity or retroactive pre-authorization criteria.`,
+Appeals Procedure & Filing Instructions:
+In accordance with federal regulations under 29 CFR § 2560.503-1, you or your authorized representative have 180 days from receipt of this notice to file a Level 1 appeal demonstrating emergency medical necessity or retroactive pre-authorization criteria under Policy SURG.00011.
+Submit complete appeal dossier and clinical records to:
+Official Claims & Appeals Email: claims@geo-blue.com
+Mailing Address: GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087
+Appeals Fax: 1-610-482-9623`,
   },
   {
-    id: "cigna_mri",
-    title: "Cigna — Knee MRI Scan",
-    payer: "Cigna",
+    id: "bcbsglobal_mri",
+    title: "BCBS Global Core — Knee MRI Scan",
+    payer: "Blue Cross Blue Shield Global Core",
     amount: "$2,850",
     cpt: "73721",
     carc: "CO-16 (Missing Plain Radiographs)",
-    content: `CIGNA HEALTHCARE
+    content: `BLUE CROSS BLUE SHIELD GLOBAL CORE
 ADVERSE CLAIM ADJUDICATION NOTICE
-Claim Number: CLM-3912-CIG
-Member: Michael Patel (ID: CIG-773419-02)
+Claim Number: CLM-3912-BCG
+Member: Michael Patel (ID: BCG-773419-02)
 Date of Service: 07/18/2026
-Provider: Metro Diagnostic Imaging Group
+Provider: Global Diagnostic Imaging Group
 
 Services:
 - CPT 73721: Magnetic resonance imaging, any joint of lower extremity; without contrast material (Knee MRI)
@@ -133,10 +142,14 @@ Services:
 
 Denial Rationale:
 Code CO-16: Claim lacks information or has submission error.
-Coverage Policy 0122 requires documented weight-bearing plain radiographs performed within the preceding 6 months prior to approval of magnetic resonance imaging for non-acute knee pain.
+Coverage Policy RAD.00002 requires documented weight-bearing plain radiographs performed within the preceding 6 months prior to approval of magnetic resonance imaging for non-acute knee pain.
 
-Statutory Rights:
-You have 180 days to request an administrative ERISA reconsideration under 29 CFR § 2560.503-1.`,
+Statutory Rights & Appeal Submission:
+You have 180 days to request an administrative ERISA reconsideration under 29 CFR § 2560.503-1.
+Submit formal appeal memorandum and physician attestation to:
+Appeals Intake Email: claims@bcbsglobalcore.com
+Service Center Address: BCBS Global Core Service Center, P.O. Box 2048, Richmond, VA 23218-2048
+Appeals Fax: 1-804-673-1179`,
   },
 ];
 

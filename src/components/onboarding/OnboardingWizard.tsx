@@ -12,7 +12,6 @@ import {
   CircleNotch,
   Stethoscope,
 } from "@phosphor-icons/react";
-import confetti from "canvas-confetti";
 import { BrandIcon } from "../common/BrandLogo";
 import { DenialExtractionResult } from "../../types";
 import {
@@ -68,32 +67,32 @@ const JURISDICTIONS = [
 ];
 
 const TARGET_PAYERS = [
+  "Molina Healthcare",
+  "GeoBlue",
+  "Blue Cross Blue Shield",
   "UnitedHealthcare",
   "Aetna",
   "Cigna",
-  "Blue Cross Blue Shield",
-  "Humana",
-  "Kaiser Permanente",
 ];
 
 const STARTER_CASES = [
   {
-    id: "uhc_knee",
-    title: "UnitedHealthcare — Total Knee Arthroplasty",
-    payer: "UnitedHealthcare",
+    id: "molina_knee",
+    title: "Molina Healthcare — Total Knee Arthroplasty",
+    payer: "Molina Healthcare",
     amount: "$24,500.00",
     cpt: "CPT 27447",
     carc: "CO-50 (Not Medically Necessary)",
     badge: "Recommended",
-    content: `UNITEDHEALTHCARE COMMERCIAL PLAN
-EXPLANATION OF BENEFITS / ADVERSE BENEFIT DETERMINATION
-Claim ID: CLM-8942-UHC
-Member ID: UHC-982341-01
+    content: `MOLINA HEALTHCARE OF FLORIDA
+EXPLANATION OF BENEFITS / NOTICE OF ADVERSE BENEFIT DETERMINATION
+Claim Reference: CLM-8942-MOL
+Member ID: MOL-982341-01
 Patient Name: Eleanor Vance
 Date of Birth: 1968-04-14
 Date of Service: 06/12/2026
 Treating Provider: Dr. Robert Langston, MD (Advanced Orthopedic Institute)
-Facility: Pacific Surgical Center
+Facility: Sunstate Surgical Hospital
 
 Services Rendered:
 - CPT Code 27447: Total Knee Arthroplasty (TKA), right knee
@@ -105,26 +104,31 @@ Services Rendered:
 
 Adjudication & Claim Denial Reason:
 Code CO-50: These are non-covered services because this is not deemed a medical necessity by the payer.
-Clinical Rationale: Under UnitedHealthcare Clinical Policy Bulletin 2024T001, total knee arthroplasty requires documented failure of at least 6 months of non-surgical conservative therapy (including formal physical therapy, intra-articular corticosteroid injections, and prescription NSAIDs). Clinical records submitted fail to establish 6 consecutive months of supervised physical therapy.
+Clinical Rationale: Under Molina Healthcare Clinical Coverage Guideline MCP-082, total knee arthroplasty requires documented failure of at least 12 weeks of non-surgical conservative therapy (including formal physical therapy, intra-articular corticosteroid injections, and prescription NSAIDs). Clinical records submitted fail to establish consecutive supervised physical therapy.
 
 Statutory Notice of Appeal Rights:
-You have the right to an internal appeal pursuant to ERISA 29 CFR § 2560.503-1. You must submit your written appeal within 180 calendar days from the date of this determination notice.`,
+You have the right to an internal appeal pursuant to ERISA 29 CFR § 2560.503-1 and ACA 45 CFR § 147.136. You must submit your written appeal within 180 calendar days from the date of this determination notice.
+Appeals Intake Destination:
+Email: MFLGrievanceandAppealsDepartment@MolinaHealthcare.com
+Mailing Address: Molina Healthcare of Florida, Grievance and Appeals Dept., P.O. Box 521838, Longwood, FL 32752
+Appeals Fax: 1-877-508-5748`,
   },
   {
-    id: "aetna_spine",
-    title: "Aetna — Lumbar Decompression & Laminectomy",
-    payer: "Aetna",
+    id: "geoblue_spine",
+    title: "GeoBlue (BCBS Global) — Lumbar Decompression",
+    payer: "GeoBlue",
     amount: "$18,200.00",
     cpt: "CPT 63047",
     carc: "CO-197 (Prior Auth Lacking)",
     badge: "High Value",
-    content: `AETNA HEALTH INSURANCE
-NOTICE OF CLAIM ADVERSE DETERMINATION
-Claim Reference: CLM-6104-AET
-Member ID: AET-554210-99
+    content: `GEOBLUE WORLDWIDE MEDICAL INSURANCE
+NOTICE OF CLAIM ADVERSE DETERMINATION & BENEFIT SUMMARY
+Claim Reference: CLM-6104-GEO
+Member ID: GEO-554210-99
 Patient Name: Marcus Sterling
 Date of Service: 07/04/2026
 Provider: Dr. Sarah Chen, MD (Spine & Neurosurgery Associates)
+Facility: International Spine Institute
 
 Procedure & Clinical Codes:
 - CPT 63047: Laminectomy, facetectomy and foraminotomy with decompression of spinal cord, single segment lumbar
@@ -135,10 +139,14 @@ Procedure & Clinical Codes:
 
 Denial Adjudication Reason:
 Code CO-197: Precertification / prior authorization / notification absent or lacking.
-Description: Surgical treatment for lumbar spinal stenosis was performed without securing prior authorization from Aetna Clinical Review Department prior to the date of service.
+Description: Surgical treatment for lumbar spinal stenosis was performed without securing prior authorization from GeoBlue Medical Review Department prior to the date of service.
 
-Appeals Procedure:
-In accordance with federal regulations under 29 CFR § 2560.503-1, you or your authorized representative have 180 days from receipt of this notice to file a Level 1 appeal demonstrating emergency medical necessity or retroactive pre-authorization criteria.`,
+Appeals Procedure & Filing Instructions:
+In accordance with federal regulations under 29 CFR § 2560.503-1, you or your authorized representative have 180 days from receipt of this notice to file a Level 1 appeal demonstrating emergency medical necessity or retroactive pre-authorization criteria under Policy SURG.00011.
+Submit complete appeal dossier and clinical records to:
+Official Claims & Appeals Email: claims@geo-blue.com
+Mailing Address: GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087
+Appeals Fax: 1-610-482-9623`,
   },
 ];
 
@@ -153,26 +161,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [selectedRole, setSelectedRole] = useState<string>("provider");
   const [selectedJurisdiction, setSelectedJurisdiction] = useState<string>("CA");
   const [selectedPayers, setSelectedPayers] = useState<string[]>([
-    "UnitedHealthcare",
-    "Aetna",
-    "Cigna",
+    "Molina Healthcare",
+    "GeoBlue",
+    "Blue Cross Blue Shield",
   ]);
-  const [selectedCaseId, setSelectedCaseId] = useState<string>("uhc_knee");
+  const [selectedCaseId, setSelectedCaseId] = useState<string>("molina_knee");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   const togglePayer = (payer: string) => {
     setSelectedPayers((prev) =>
       prev.includes(payer) ? prev.filter((p) => p !== payer) : [...prev, payer]
     );
-  };
-
-  const fireSuccessConfetti = () => {
-    confetti({
-      particleCount: 75,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ["#00e5ff", "#10b981", "#ffffff"],
-    });
   };
 
   const handleFinish = async () => {
@@ -198,13 +197,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     try {
       const result = await onParseText(preset.content, selectedJurisdiction);
       setIsProcessing(false);
-      fireSuccessConfetti();
       onSuccess(result.claimId);
       onClose();
     } catch (err) {
       setIsProcessing(false);
       console.error("Error loading onboarding starter case:", err);
-      fireSuccessConfetti();
       onClose();
     }
   };
