@@ -253,7 +253,7 @@ Extract or resolve the official appeals/grievance/claims intake gateway details 
     });
 
     // 6. Record audit log
-    await ctx.runMutation((api as any).claims.recordAuditLog, {
+    await ctx.runMutation((api as any).auditLogs.logEvent, {
       claimId: args.claimId,
       eventType: "policy_crawled",
       actor: resolvedContact.source === "firecrawl_live" ? "Firecrawl Web Crawler" : "Payer Gateway Resolver",

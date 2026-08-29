@@ -681,3 +681,31 @@ export const updatePayerContact = mutation({
   },
 });
 
+/**
+ * Record an audit log entry for a claim
+ */
+export const recordAuditLog = mutation({
+  args: {
+    claimId: v.id("claims"),
+    eventType: v.string(),
+    actor: v.string(),
+    details: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const timestamp = Date.now();
+    const logId = await ctx.db.insert("appealAuditLogs", {
+      claimId: args.claimId,
+      eventType: args.eventType,
+      actor: args.actor,
+      details: args.details,
+      timestamp,
+    });
+
+    await ctx.db.patch(args.claimId, {
+      updatedAt: timestamp,
+    });
+
+    return logId;
+  },
+});
+

@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-29T09:46:00Z
+- **Last updated:** 2026-08-29T09:51:30Z
 
 ## Log
 
@@ -151,6 +151,9 @@ Polished Precision Medical UI Layouts & Contrast Hierarchy: Exported type-safe `
 ### 2026-08-29 - b91cc02
 Connected Court-Ready Appeal Dossier Export & Print Modal to Multi-Channel Transmission Gateway: Replaced naive `window.print()` webpage trigger in `AgentMailDrawer.tsx` with dedicated `ExportDrawer` modal integration, allowing adjudicators to inspect the complete formal ERISA Notice of Appeal with patient letterhead, CPT/CARC metadata summaries, clinical necessity arguments, and authorized representative signature block before printing. Authored comprehensive `@media print` rules in `src/index.css` and updated `dialog.tsx` to automatically isolate the legal paper document, strip all dashboard layout chromes, sidebars, headers, dialog backdrops, and action buttons during printing, and apply clean page-break formatting for court-ready US Letter / A4 physical mail packets. Verified full test suite and production build cleanly with `npm run verify` (100% typecheck, lint, 28/28 unit tests, production build).
 
-### 2026-08-29 - working tree
+### 2026-08-29 - 4a72e11
 Sanitized UI Copy & Upgraded to Professional Enterprise Healthcare Terminology: Conducted a comprehensive audit across all frontend components (`Header.tsx`, `Sidebar.tsx`, `IngestionModal.tsx`, `AppealStudio.tsx`, `ExportDrawer.tsx`, `PolicyViewer.tsx`, `EvidenceMatrix.tsx`, `AgentMailDrawer.tsx`, `CinematicHero.tsx`, `CommandDialog.tsx`, `CaseRadar.tsx`, `OnboardingChecklist.tsx`, `SentinelFlowStepper.tsx`, `DeleteCaseModal.tsx`, `CasePickerEmptyState.tsx`, `AnalyticsMetrics.tsx`, `AuditTimeline.tsx`, `AuthPage.tsx`, `App.tsx`, and `constants.ts`). Purged all low-level technical jargon, internal model identifiers (`gpt-5-nano`), vendor plumbing names (`Firecrawl`, raw `OpenAI`), developer buzzwords, and exposed environment variable error strings. Replaced them with professional healthcare enterprise nomenclature: "Clinical Intelligence", "Sentinel Engine", "Payer Communications", "Clinical Policy Indexing", "Electronic Intake", "Deterministic 4-Pillar Rubric", and "Instant Real-Time Sync". Verified 100% clean typecheck and test suite execution with `npm run verify`.
+
+### 2026-08-29 - working tree
+Resolved Convex Mutation Reference for Audit Trail Logging: Fixed runtime exception `Could not find public function for 'claims:recordAuditLog'` during autonomous payer gateway resolution (`resolvePayerGateway`). Corrected mutation call in `payerContactResolver.ts` to reference `auditLogs.logEvent`, and added `recordAuditLog` mutation to `claims.ts` to ensure seamless mutation resolution across both endpoints. Verified 100% clean typecheck via `tsc --noEmit`.
 
