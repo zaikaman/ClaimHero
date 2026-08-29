@@ -333,7 +333,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background/95 backdrop-blur-md p-3 px-4 sm:px-8 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="font-mono text-xs hidden sm:inline-flex">
-            Step 3 of 4: Appeal Brief
+            Step 2 of 3: Appeal Brief
           </Badge>
           <span className="text-xs text-muted-foreground">
             {markdownContent

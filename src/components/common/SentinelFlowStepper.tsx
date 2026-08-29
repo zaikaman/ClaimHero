@@ -3,7 +3,6 @@ import {
   CheckCircle,
   CircleNotch,
   Sparkle,
-  Shield,
   FileMagnifyingGlass,
   FileText,
   Envelope,
@@ -53,18 +52,8 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
 
   const steps = [
     {
-      id: "intake",
-      number: 1,
-      title: "Intake & Records",
-      subtitle: `Claim #${claim.claimNumber}`,
-      view: "radar" as FlowView,
-      icon: Shield,
-      isCompleted: true,
-      isActive: false,
-    },
-    {
       id: "evidence",
-      number: 2,
+      number: 1,
       title: "Evidence & CPB",
       subtitle: hasEvidence
         ? `${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}% Win Score` : `${evidencesCount} Clauses`}`
@@ -76,7 +65,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     },
     {
       id: "studio",
-      number: 3,
+      number: 2,
       title: "Appeal Brief",
       subtitle: hasBrief ? `v${claim.latestAppeal?.version || 1} Synthesized` : "Draft pending",
       view: "studio" as FlowView,
@@ -86,7 +75,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     },
     {
       id: "communications",
-      number: 4,
+      number: 3,
       title: "Payer Dispatch",
       subtitle: isDispatched ? "Transmitted to Payer" : "Ready to send",
       view: "communications" as FlowView,
@@ -160,8 +149,8 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
         </div>
       </div>
 
-      {/* 4-Step Interactive Horizontal Stepper */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      {/* 3-Step Interactive Horizontal Stepper */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {steps.map((step) => {
           const StepIcon = step.icon;
           const isClickable = true;

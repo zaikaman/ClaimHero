@@ -11,6 +11,7 @@ import {
   FileDoc,
   WarningCircle,
   Sparkle,
+  FileMagnifyingGlass,
 } from "@phosphor-icons/react";
 import { useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -276,7 +277,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
   const handleDone = (targetView?: string) => {
     if (extractedResult?.claimId) {
-      onSuccess(extractedResult.claimId, targetView || "studio");
+      onSuccess(extractedResult.claimId, targetView || "evidence");
       onClose();
     }
   };
@@ -642,11 +643,11 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               </Button>
               <Button
                 size="sm"
-                onClick={() => handleDone("studio")}
+                onClick={() => handleDone("evidence")}
                 className="gap-1.5 text-xs bg-primary text-primary-foreground shadow-2xs font-semibold"
               >
-                <Sparkle className="size-3.5" />
-                <span>Open Prepared Appeal Brief &rarr;</span>
+                <FileMagnifyingGlass className="size-3.5" />
+                <span>Review Evidence & CPB &rarr;</span>
               </Button>
             </div>
           </Card>

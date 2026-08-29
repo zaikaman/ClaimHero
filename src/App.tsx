@@ -88,7 +88,7 @@ export default function App() {
 
   const handleIngestionSuccess = (claimId: string, directView?: string) => {
     setSelectedClaimId(claimId);
-    setCurrentView((directView as any) || "studio");
+    setCurrentView((directView as any) || "evidence");
   };
 
   const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();

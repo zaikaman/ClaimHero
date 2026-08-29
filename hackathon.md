@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-29T09:51:30Z
+- **Last updated:** 2026-08-29T09:56:00Z
 
 ## Log
 
@@ -154,6 +154,9 @@ Connected Court-Ready Appeal Dossier Export & Print Modal to Multi-Channel Trans
 ### 2026-08-29 - 4a72e11
 Sanitized UI Copy & Upgraded to Professional Enterprise Healthcare Terminology: Conducted a comprehensive audit across all frontend components (`Header.tsx`, `Sidebar.tsx`, `IngestionModal.tsx`, `AppealStudio.tsx`, `ExportDrawer.tsx`, `PolicyViewer.tsx`, `EvidenceMatrix.tsx`, `AgentMailDrawer.tsx`, `CinematicHero.tsx`, `CommandDialog.tsx`, `CaseRadar.tsx`, `OnboardingChecklist.tsx`, `SentinelFlowStepper.tsx`, `DeleteCaseModal.tsx`, `CasePickerEmptyState.tsx`, `AnalyticsMetrics.tsx`, `AuditTimeline.tsx`, `AuthPage.tsx`, `App.tsx`, and `constants.ts`). Purged all low-level technical jargon, internal model identifiers (`gpt-5-nano`), vendor plumbing names (`Firecrawl`, raw `OpenAI`), developer buzzwords, and exposed environment variable error strings. Replaced them with professional healthcare enterprise nomenclature: "Clinical Intelligence", "Sentinel Engine", "Payer Communications", "Clinical Policy Indexing", "Electronic Intake", "Deterministic 4-Pillar Rubric", and "Instant Real-Time Sync". Verified 100% clean typecheck and test suite execution with `npm run verify`.
 
-### 2026-08-29 - working tree
+### 2026-08-29 - 683e718
 Resolved Convex Mutation Reference for Audit Trail Logging: Fixed runtime exception `Could not find public function for 'claims:recordAuditLog'` during autonomous payer gateway resolution (`resolvePayerGateway`). Corrected mutation call in `payerContactResolver.ts` to reference `auditLogs.logEvent`, and added `recordAuditLog` mutation to `claims.ts` to ensure seamless mutation resolution across both endpoints. Verified 100% clean typecheck via `tsc --noEmit`.
+
+### 2026-08-29 - working tree
+Streamlined Case Workflow to 3 Steps & Routed Ingestion to Evidence & CPB: Simplified the active case navigation pipeline in `SentinelFlowStepper.tsx` from 4 steps down to 3 dedicated workspace steps (1. Evidence & CPB, 2. Appeal Brief, 3. Payer Dispatch), removing the redundant initial intake step (which pointed to Radar and was already covered by the back navigation button). Updated denial ingestion workflows in `App.tsx` and `IngestionModal.tsx` to automatically route users directly to the Evidence & CPB workspace upon document extraction instead of skipping directly to the drafted brief. Updated contextual step indicator badges and CTA actions across `EvidenceMatrix.tsx`, `AppealStudio.tsx`, and `IngestionModal.tsx`. Verified cleanly with zero errors via `npm run build`.
 
