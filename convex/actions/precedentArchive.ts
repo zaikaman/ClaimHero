@@ -77,6 +77,47 @@ export const seedArchive = internalAction({
 });
 
 /**
+ * Re-embed every existing archive row after changing embedding providers.
+ * This is intentionally separate from retrieval and should be run once per
+ * vector-model migration.
+ */
+export const reindexArchive = internalAction({
+  args: {},
+  returns: v.object({
+    reindexed: v.number(),
+    total: v.number(),
+  }),
+  handler: async (ctx): Promise<{ reindexed: number; total: number }> => {
+    const docs: any[] = await ctx.runQuery(
+      (internal as any).precedents.listForReindex,
+      {}
+    );
+    if (docs.length > 1000) {
+      throw new Error("Precedent archive exceeds the one-shot reindex limit of 1000 rows");
+    }
+
+    for (const doc of docs) {
+      const extraTokens = weightedTokensForCodes(
+        doc.icd10Codes,
+        doc.cptCodes,
+        doc.carcCodes
+      );
+      extraTokens.push(`kind:${doc.sourceKind}`);
+      const embedding = await createEmbedding(
+        buildPrecedentEmbedText(doc),
+        extraTokens
+      );
+      await ctx.runMutation((internal as any).precedents.updateEmbedding, {
+        precedentId: doc._id,
+        embedding,
+      });
+    }
+
+    return { reindexed: docs.length, total: docs.length };
+  },
+});
+
+/**
  * Real-time semantic retrieval: embed the claim, run ctx.vectorSearch,
  * hydrate, re-rank by ICD-10 / CPT / CARC overlap, return top 3, and
  * attach proven statutory language onto the claim as legal_precedent evidence.
@@ -103,8 +144,6 @@ export const retrieveTopPrecedents = action({
     combinedScore: number;
     codeOverlap: number;
   }>> => {
-    await seedArchiveBody(ctx);
-
     const claim: any = await ctx.runQuery((api as any).claims.getById, {
       claimId: args.claimId,
     });

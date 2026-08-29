@@ -4,6 +4,7 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { api } from "../_generated/api";
+import { precedentMatchValidator } from "../lib/precedentValidators";
 
 const APPEAL_SYNTHESIS_SCHEMA = {
   type: "object",
@@ -254,6 +255,7 @@ export const generateAppealBrief = action({
     appealLevel: v.optional(v.string()),
     physicianNotes: v.optional(v.string()),
     customInstructions: v.optional(v.string()),
+    vectorPrecedents: v.optional(v.array(precedentMatchValidator)),
   },
   handler: async (
     ctx,
@@ -279,14 +281,16 @@ export const generateAppealBrief = action({
       ? evidences.map((e: any, idx: number) => `[Exhibit ${String.fromCharCode(65 + idx)}] (${e.sourceType.toUpperCase()} - ${e.title} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
       : "Standard national clinical practice guideline and ERISA disclosure rules apply.";
 
-    let vectorPrecedents: VectorPrecedentMatch[] = [];
-    try {
-      vectorPrecedents = await ctx.runAction(
-        (api as any).actions.precedentArchive.retrieveTopPrecedents,
-        { claimId: args.claimId }
-      );
-    } catch (precedentErr) {
-      console.warn("Precedent vector retrieval note:", precedentErr);
+    let vectorPrecedents: VectorPrecedentMatch[] = args.vectorPrecedents || [];
+    if (!args.vectorPrecedents) {
+      try {
+        vectorPrecedents = await ctx.runAction(
+          (api as any).actions.precedentArchive.retrieveTopPrecedents,
+          { claimId: args.claimId }
+        );
+      } catch (precedentErr) {
+        console.warn("Precedent vector retrieval note:", precedentErr);
+      }
     }
 
     const precedentText =

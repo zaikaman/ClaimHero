@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-29T16:36:55Z
+- **Last updated:** 2026-08-29T17:21:01Z
 
 ## Log
 
@@ -175,5 +175,8 @@ Fixed two-way AI payer adjudicator replies on `/app/inbox`. Option 1 previously 
 ### 2026-08-29 - 965c8d9
 Reworked AgentMail integration for the free-tier two-inbox limit. ClaimHero now binds every claim to two pre-provisioned shared inboxes: one sender inbox and one AI-adjudicator inbox. Option 1 sends real outbound packets and AI determinations through those inboxes, records provider message IDs, routes inbound shared-inbox replies by claim number, and never attempts per-claim inbox creation (`convex/actions/agentMail.ts`, `convex/lib/agentMail.ts`, `convex/actions/mailDispatcher.ts`, `convex/http.ts`, `convex/schema.ts`). Verified with `npm run verify` (37/37 tests, typecheck, lint, production build). Convex features: actions, internal mutations, scheduled functions, indexes, HTTP actions.
 
-### 2026-08-29 - working tree
+### 2026-08-29 - ac70475
 Added a dedicated professional email renderer while preserving rich Markdown in the studio and stored appeal draft. AgentMail receives semantic HTML and clean plain text for full appeals, addenda, and payer determinations, with escaped case data and privacy-friendlier subjects; Markdown normalization is applied only at the outbound email boundary (`convex/actions/mailDispatcher.ts`, `convex/lib/appealEmail.ts`, `tests/claimhero.test.ts`). Verified with `npm run verify` (39/39 tests, typecheck, lint, production build). Convex features: actions, mutations.
+
+### 2026-08-29 - working tree
+Removed multi-minute chat-gateway waits from precedent embedding fallback by making remote embeddings opt-in through a dedicated embedding model, removed request-time corpus seeding, and passed the single pipeline retrieval into brief synthesis. Coalesced duplicate browser retrieval requests for the same claim and added a bounded one-shot archive reindex action for embedding-model migrations (`convex/lib/openai.ts`, `convex/actions/precedentArchive.ts`, `convex/precedents.ts`, `convex/actions/sentinelPipeline.ts`, `convex/actions/appealSynthesizer.ts`, `src/hooks/usePrecedents.ts`). Reindexed all 18 dev archive rows with the configured embedding model and verified with `npm run verify` (39/39 tests, typecheck, lint, production build). Convex features: vector search, actions, queries, mutations.

@@ -60,6 +60,30 @@ export const getBySourceClaim = internalQuery({
   },
 });
 
+/**
+ * Read the bounded archive set for the one-shot embedding migration.
+ * Reindexing more than 1000 rows should be split into explicit batches.
+ */
+export const listForReindex = internalQuery({
+  args: {},
+  returns: v.array(v.any()),
+  handler: async (ctx): Promise<Doc<"precedents">[]> => {
+    return await ctx.db.query("precedents").take(1001);
+  },
+});
+
+export const updateEmbedding = internalMutation({
+  args: {
+    precedentId: v.id("precedents"),
+    embedding: v.array(v.float64()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    await ctx.db.patch(args.precedentId, { embedding: args.embedding });
+    return null;
+  },
+});
+
 export const insertPrecedent = internalMutation({
   args: {
     sourceKind: sourceKindValidator,

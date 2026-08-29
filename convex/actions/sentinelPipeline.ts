@@ -96,8 +96,9 @@ export const runAutonomousPipeline = action({
       details: "Step 2b/3: Running Convex native vector search against the Precedent Vector Archive...",
     });
 
+    let vectorPrecedents: any[] = [];
     try {
-      await ctx.runAction(
+      vectorPrecedents = await ctx.runAction(
         (api as any).actions.precedentArchive.retrieveTopPrecedents,
         { claimId: args.claimId }
       );
@@ -119,6 +120,7 @@ export const runAutonomousPipeline = action({
         claimId: args.claimId,
         appealLevel: args.appealLevel || "level_1_internal",
         physicianNotes: args.physicianNotes,
+        vectorPrecedents,
       }
     );
 

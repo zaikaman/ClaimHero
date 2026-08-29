@@ -4,9 +4,51 @@ import { api } from "../../convex/_generated/api";
 import { Claim, VectorPrecedentMatch } from "../types";
 
 const convexApi = api as any;
+const inFlightRequests = new Map<string, Promise<VectorPrecedentMatch[]>>();
+const completedRequests = new Map<string, VectorPrecedentMatch[]>();
+
+async function retrieveOnce(
+  cacheKey: string,
+  claimId: string,
+  retrieveAction: (args: { claimId: string }) => Promise<VectorPrecedentMatch[]>,
+  forceRefresh = false
+): Promise<VectorPrecedentMatch[]> {
+  const inFlight = inFlightRequests.get(cacheKey);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  if (!forceRefresh) {
+    const completed = completedRequests.get(cacheKey);
+    if (completed) {
+      return completed;
+    }
+  }
+
+  const request = retrieveAction({ claimId }).then((result) => {
+    const next = Array.isArray(result) ? result.slice(0, 3) : [];
+    completedRequests.set(cacheKey, next);
+    return next;
+  });
+  inFlightRequests.set(cacheKey, request);
+
+  try {
+    return await request;
+  } finally {
+    inFlightRequests.delete(cacheKey);
+  }
+}
 
 export function usePrecedents(claim?: Claim | null) {
   const claimId = claim?._id;
+  const cacheKey = claimId
+    ? [
+        claimId,
+        claim?.denialReasonCode || "",
+        ...(claim?.cptCodes || []),
+        ...(claim?.icd10Codes || []),
+      ].join("|")
+    : "";
   const retrieveAction = useAction(
     convexApi["actions/precedentArchive"]?.retrieveTopPrecedents ||
       convexApi.actions?.precedentArchive?.retrieveTopPrecedents
@@ -29,10 +71,13 @@ export function usePrecedents(claim?: Claim | null) {
       setIsLoading(true);
       setError(null);
       try {
-        const result = (await retrieveAction({
-          claimId: activeClaimId as any,
-        })) as VectorPrecedentMatch[];
-        const next = Array.isArray(result) ? result.slice(0, 3) : [];
+        const requestKey = activeClaimId === claimId ? cacheKey : activeClaimId;
+        const next = await retrieveOnce(
+          requestKey,
+          activeClaimId,
+          retrieveAction as (args: { claimId: string }) => Promise<VectorPrecedentMatch[]>,
+          true
+        );
         setMatches(next);
         return next;
       } catch (err: any) {
@@ -43,7 +88,7 @@ export function usePrecedents(claim?: Claim | null) {
         setIsLoading(false);
       }
     },
-    [claimId, retrieveAction]
+    [cacheKey, claimId, retrieveAction]
   );
 
   useEffect(() => {
@@ -55,10 +100,14 @@ export function usePrecedents(claim?: Claim | null) {
     let cancelled = false;
     setIsLoading(true);
     setError(null);
-    retrieveAction({ claimId: claimId as any })
-      .then((result: VectorPrecedentMatch[]) => {
+    retrieveOnce(
+      cacheKey,
+      claimId,
+      retrieveAction as (args: { claimId: string }) => Promise<VectorPrecedentMatch[]>
+    )
+      .then((result) => {
         if (!cancelled) {
-          setMatches(Array.isArray(result) ? result.slice(0, 3) : []);
+          setMatches(result);
         }
       })
       .catch((err: any) => {
@@ -75,7 +124,7 @@ export function usePrecedents(claim?: Claim | null) {
     return () => {
       cancelled = true;
     };
-  }, [claimId, claim?.denialReasonCode, claim?.cptCodes, retrieveAction]);
+  }, [cacheKey, claimId, retrieveAction]);
 
   return {
     matches,

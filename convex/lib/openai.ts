@@ -21,11 +21,12 @@ export function getOpenAIConfig() {
   return { apiKey, model, baseURL };
 }
 
-export function getOpenAIClient(): OpenAI {
+export function getOpenAIClient(options: { timeout?: number; maxRetries?: number } = {}): OpenAI {
   const { apiKey, baseURL } = getOpenAIConfig();
   return new OpenAI({
     apiKey,
     baseURL,
+    ...options,
   });
 }
 
@@ -125,23 +126,28 @@ export async function createChatCompletion(options: {
 }
 
 /**
- * Produce a 1536-d embedding using the same OPENAI_MODEL / OPENAI_API_KEY /
- * OPENAI_BASE_URL client as the rest of the sentinel. No separate embedding
- * model is configured. If the configured model or proxy rejects /v1/embeddings
- * (chat-only gateways), fall back to signed feature hashing of the same text
- * so index and query remain in one vector space.
+ * Produce a 1536-d embedding. Embedding generation is opt-in because the
+ * configured chat gateway may not implement /v1/embeddings. The deterministic
+ * hash is the canonical fallback and keeps archive/index vectors in one space.
  */
 export async function createEmbedding(
   text: string,
   extraWeightedTokens: string[] = []
 ): Promise<number[]> {
-  const { model } = getOpenAIConfig();
-  const client = getOpenAIClient();
   const input = text.slice(0, 8000);
+  const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL?.trim();
+
+  // Do not send a chat model to /v1/embeddings. Chat-only proxies can leave
+  // that request pending for minutes before the old fallback is reached.
+  if (!embeddingModel) {
+    return hashEmbed(input, extraWeightedTokens);
+  }
+
+  const client = getOpenAIClient({ timeout: 10_000, maxRetries: 0 });
 
   try {
     const response = await client.embeddings.create({
-      model,
+      model: embeddingModel,
       input,
     });
     const embedding = response.data[0]?.embedding;
