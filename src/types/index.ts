@@ -89,6 +89,30 @@ export interface ScoringCriterion {
   rationale: string;
 }
 
+export type PrecedentSourceKind =
+  | "winning_brief"
+  | "commissioner_ruling"
+  | "court_overturn"
+  | "statutory_authority";
+
+export interface VectorPrecedentMatch {
+  _id: string;
+  sourceKind: PrecedentSourceKind | string;
+  title: string;
+  citation: string;
+  jurisdiction: string;
+  sourceUrl?: string;
+  icd10Codes: string[];
+  cptCodes: string[];
+  carcCodes: string[];
+  winningArgument: string;
+  statutoryLanguage: string;
+  outcome: string;
+  vectorScore: number;
+  combinedScore: number;
+  codeOverlap: number;
+}
+
 export interface ClinicalEvidence {
   _id: string;
   claimId: string;

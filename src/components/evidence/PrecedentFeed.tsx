@@ -6,96 +6,61 @@ import {
   Copy,
   Check,
   CaretRight,
+  CircleNotch,
+  Warning,
+  ArrowsClockwise,
 } from "@phosphor-icons/react";
-import { Claim } from "../../types";
+import { Claim, VectorPrecedentMatch } from "../../types";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { stripMarkdownFormatting } from "../../lib/utils";
+import { usePrecedents } from "../../hooks/usePrecedents";
 
 interface PrecedentFeedProps {
   claim: Claim;
   onApplyPrecedent?: (precedentSummary: string) => void;
 }
 
-interface HistoricalPrecedent {
-  id: string;
-  caseTitle: string;
-  payer: string;
-  cptCode: string;
-  denialCode: string;
-  overturnRate: number;
-  recoveredAmount: string;
-  citation: string;
-  winningArgument: string;
+function similarityPercent(score: number): number {
+  return Math.round(Math.max(0, Math.min(1, (score + 1) / 2)) * 1000) / 10;
 }
 
-const HISTORICAL_PRECEDENTS: Record<string, HistoricalPrecedent[]> = {
-  "27447": [
-    {
-      id: "prec-27447-1",
-      caseTitle: "Vance v. Molina Healthcare (Grievance & Appeals Review)",
-      payer: "Molina Healthcare",
-      cptCode: "27447",
-      denialCode: "CO-50",
-      overturnRate: 94,
-      recoveredAmount: "$24,500",
-      citation: "Molina Policy MCP-082 § 1.C / 29 CFR § 2560.503-1",
-      winningArgument:
-        "Claimant demonstrated 14 weeks of supervised physical therapy and prior intra-articular steroid injection with persistent functional ADL deficit, satisfying all criteria under Policy MCP-082 Section 1.C.",
-    },
-    {
-      id: "prec-27447-2",
-      caseTitle: "Florida Agency for Health Care Administration Review #AHCA-2024-8819",
-      payer: "Molina Healthcare of Florida",
-      cptCode: "27447",
-      denialCode: "CO-50",
-      overturnRate: 89,
-      recoveredAmount: "$31,200",
-      citation: "Fla. Admin. Code § 59G / Kellgren-Lawrence Grade IV",
-      winningArgument:
-        "Independent board-certified orthopedic reviewer ruled that Grade IV tricompartmental osteoarthritis constitutes definitive surgical indication regardless of conservative trial duration.",
-    },
-  ],
-  "63047": [
-    {
-      id: "prec-63047-1",
-      caseTitle: "Sterling v. GeoBlue Worldwide (BCBS Global Appellate Review)",
-      payer: "GeoBlue",
-      cptCode: "63047",
-      denialCode: "CO-197",
-      overturnRate: 91,
-      recoveredAmount: "$18,200",
-      citation: "GeoBlue Policy SURG.00011 § 2.3 (Retroactive Prior Auth Exception)",
-      winningArgument:
-        "Documented progressive motor deficit and acute cauda equina risk met retroactive pre-authorization exception under Policy SURG.00011 Section 2.3.",
-    },
-  ],
-  "73721": [
-    {
-      id: "prec-73721-1",
-      caseTitle: "Patel v. Blue Cross Blue Shield Global Core",
-      payer: "Blue Cross Blue Shield Global Core",
-      cptCode: "73721",
-      denialCode: "CO-16",
-      overturnRate: 88,
-      recoveredAmount: "$2,850",
-      citation: "BCBS Global Core Policy RAD.00002 § 3.B",
-      winningArgument:
-        "Exam notes documenting acute traumatic meniscal tear with joint locking explicitly exempt claimant from plain radiograph prerequisites under Policy RAD.00002 Section 3.B.",
-    },
-  ],
-};
+function sourceKindLabel(kind: string): string {
+  switch (kind) {
+    case "winning_brief":
+      return "Winning Brief";
+    case "commissioner_ruling":
+      return "Commissioner Ruling";
+    case "court_overturn":
+      return "Court Overturn";
+    case "statutory_authority":
+      return "Statutory Authority";
+    default:
+      return kind.replace(/_/g, " ");
+  }
+}
+
+function insertionText(item: VectorPrecedentMatch): string {
+  const similarity = similarityPercent(item.vectorScore);
+  return [
+    `### Controlling Precedent: ${item.title}`,
+    ``,
+    `> ${item.statutoryLanguage}`,
+    ``,
+    item.winningArgument,
+    ``,
+    `*Citation: ${item.citation} (vector similarity ${similarity}%)*`,
+  ].join("\n");
+}
 
 export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
   claim,
   onApplyPrecedent,
 }) => {
+  const { matches, isLoading, error, retrievePrecedents } = usePrecedents(claim);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
-
-  const primaryCpt = claim.cptCodes[0] || "27447";
-  const precedents =
-    HISTORICAL_PRECEDENTS[primaryCpt] || HISTORICAL_PRECEDENTS["27447"] || [];
+  const primaryCpt = claim.cptCodes[0] || "N/A";
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -109,49 +74,80 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
         <div className="flex items-center gap-2">
           <Medal className="size-4 text-emerald-500" />
           <span className="text-xs font-semibold text-foreground">
-            Matching Overturned Precedents ({precedents.length})
+            Vector-Matched Overturn Precedents ({matches.length})
           </span>
         </div>
-        <Badge variant="outline" className="font-mono text-[10px]">
-          CPT {primaryCpt} • {claim.denialReasonCode}
-        </Badge>
+        <div className="flex items-center gap-1.5">
+          <Badge variant="outline" className="font-mono text-[10px]">
+            CPT {primaryCpt} • {claim.denialReasonCode}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => retrievePrecedents(claim._id).catch(() => undefined)}
+            disabled={isLoading}
+            title="Re-run vector search"
+          >
+            {isLoading ? (
+              <CircleNotch className="size-3 animate-spin" />
+            ) : (
+              <ArrowsClockwise className="size-3" />
+            )}
+          </Button>
+        </div>
       </div>
 
+      {error && (
+        <Card className="p-3 flex items-start gap-2 border-destructive/30 bg-destructive/5">
+          <Warning className="size-3.5 text-destructive shrink-0 mt-0.5" />
+          <p className="text-[11px] text-destructive leading-relaxed">{error}</p>
+        </Card>
+      )}
+
+      {isLoading && matches.length === 0 && (
+        <Card className="p-6 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+          <CircleNotch className="size-5 animate-spin text-primary" />
+          <p className="text-xs">Running Convex vector search against the Precedent Archive...</p>
+        </Card>
+      )}
+
+      {!isLoading && matches.length === 0 && !error && (
+        <Card className="p-4 text-center text-xs text-muted-foreground bg-muted/20 border-dashed">
+          No vector matches yet. Run evidence analysis or synthesize a brief to query the archive by ICD-10, CPT, and CARC.
+        </Card>
+      )}
+
       <div className="space-y-2.5">
-        {precedents.map((item) => {
-          const isCopied = copiedId === item.id;
+        {matches.map((item) => {
+          const isCopied = copiedId === item._id;
+          const similarity = similarityPercent(item.vectorScore);
 
           return (
             <Card
-              key={item.id}
+              key={item._id}
               className="p-3.5 space-y-2.5 bg-card hover:bg-muted/20 transition-all"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="secondary" className="gap-1 font-mono text-xs text-emerald-600 dark:text-emerald-400">
                       <TrendUp className="size-3" />
-                      <span>{item.overturnRate}% Win Rate</span>
+                      <span>{similarity}% similar</span>
                     </Badge>
-                    <span className="font-mono text-xs font-semibold text-foreground">
-                      Recovered {item.recoveredAmount}
-                    </span>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      {sourceKindLabel(item.sourceKind)}
+                    </Badge>
                   </div>
                   <h4 className="text-xs font-semibold text-foreground mt-1">
-                    {item.caseTitle}
+                    {item.title}
                   </h4>
                 </div>
 
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  onClick={() =>
-                    handleCopy(
-                      item.id,
-                      `${item.caseTitle} — ${item.citation}: ${item.winningArgument}`
-                    )
-                  }
-                  title="Copy citation"
+                  onClick={() => handleCopy(item._id, insertionText(item))}
+                  title="Copy statutory language"
                 >
                   {isCopied ? (
                     <Check className="size-3 text-emerald-500" />
@@ -167,6 +163,9 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
                   <span>Citation: {item.citation}</span>
                 </div>
                 <p className="text-xs text-foreground/90 leading-relaxed font-sans">
+                  {stripMarkdownFormatting(item.statutoryLanguage)}
+                </p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
                   {stripMarkdownFormatting(item.winningArgument)}
                 </p>
               </div>
@@ -174,10 +173,10 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
               {onApplyPrecedent && (
                 <div className="flex justify-end pt-0.5">
                   <button
-                    onClick={() => onApplyPrecedent(item.winningArgument)}
+                    onClick={() => onApplyPrecedent(insertionText(item))}
                     className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline transition-colors"
                   >
-                    <span>Insert into Appeal Arguments</span>
+                    <span>Insert proven language into Appeal Studio</span>
                     <CaretRight className="size-3" />
                   </button>
                 </div>

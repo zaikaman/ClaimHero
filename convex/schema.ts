@@ -133,6 +133,43 @@ export default defineSchema({
     .index("by_thread", ["threadId"])
     .index("by_claim", ["claimId"]),
 
+  // Precedent Vector Archive — winning briefs, commissioner rulings, court overturns
+  precedents: defineTable({
+    sourceKind: v.union(
+      v.literal("winning_brief"),
+      v.literal("commissioner_ruling"),
+      v.literal("court_overturn"),
+      v.literal("statutory_authority")
+    ),
+    title: v.string(),
+    citation: v.string(),
+    jurisdiction: v.string(),
+    sourceUrl: v.optional(v.string()),
+    icd10Codes: v.array(v.string()),
+    cptCodes: v.array(v.string()),
+    carcCodes: v.array(v.string()),
+    primaryIcd10: v.string(),
+    primaryCpt: v.string(),
+    carcCode: v.string(),
+    winningArgument: v.string(),
+    statutoryLanguage: v.string(),
+    outcome: v.string(),
+    embedding: v.array(v.float64()),
+    sourceClaimId: v.optional(v.id("claims")),
+    corpusKey: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_corpus_key", ["corpusKey"])
+    .index("by_carc", ["carcCode"])
+    .index("by_primary_cpt", ["primaryCpt"])
+    .index("by_source_kind", ["sourceKind"])
+    .index("by_source_claim", ["sourceClaimId"])
+    .vectorIndex("by_embedding", {
+      vectorField: "embedding",
+      dimensions: 1536,
+      filterFields: ["sourceKind", "primaryCpt", "carcCode", "primaryIcd10"],
+    }),
+
   // Immutable Event Audit Trail
   appealAuditLogs: defineTable({
     claimId: v.id("claims"),

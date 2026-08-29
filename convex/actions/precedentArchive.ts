@@ -1,0 +1,328 @@
+"use node";
+
+import { action, internalAction } from "../_generated/server";
+import type { ActionCtx } from "../_generated/server";
+import { v } from "convex/values";
+import { api, internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import { createEmbedding } from "../lib/openai";
+import { PRECEDENT_CORPUS } from "../lib/precedentCorpus";
+import {
+  buildClaimQueryText,
+  buildPrecedentEmbedText,
+  rankPrecedentHits,
+  weightedTokensForCodes,
+} from "../lib/embeddings";
+import { precedentMatchValidator } from "../lib/precedentValidators";
+
+const matchListValidator = v.array(precedentMatchValidator);
+
+function primaryOrUnspecified(values: string[]): string {
+  const first = values.find((value) => value && value.trim().length > 0);
+  return first ? first.trim() : "UNSPECIFIED";
+}
+
+async function seedArchiveBody(ctx: ActionCtx): Promise<{ upserted: number }> {
+  let upserted = 0;
+
+  for (const entry of PRECEDENT_CORPUS) {
+    const existing: string | null = await ctx.runQuery(
+      (internal as any).precedents.getByCorpusKey,
+      { corpusKey: entry.corpusKey }
+    );
+    if (existing) {
+      continue;
+    }
+
+    const embedText = buildPrecedentEmbedText(entry);
+    const extraTokens = weightedTokensForCodes(entry.icd10Codes, entry.cptCodes, entry.carcCodes);
+    extraTokens.push(`kind:${entry.sourceKind}`);
+    const embedding = await createEmbedding(embedText, extraTokens);
+
+    await ctx.runMutation((internal as any).precedents.insertPrecedent, {
+      sourceKind: entry.sourceKind,
+      title: entry.title,
+      citation: entry.citation,
+      jurisdiction: entry.jurisdiction,
+      sourceUrl: entry.sourceUrl,
+      icd10Codes: entry.icd10Codes,
+      cptCodes: entry.cptCodes,
+      carcCodes: entry.carcCodes,
+      primaryIcd10: primaryOrUnspecified(entry.icd10Codes),
+      primaryCpt: primaryOrUnspecified(entry.cptCodes),
+      carcCode: primaryOrUnspecified(entry.carcCodes),
+      winningArgument: entry.winningArgument,
+      statutoryLanguage: entry.statutoryLanguage,
+      outcome: entry.outcome,
+      embedding,
+      corpusKey: entry.corpusKey,
+    });
+    upserted += 1;
+  }
+
+  return { upserted };
+}
+
+/**
+ * Embed and upsert the public legal corpus. Idempotent via corpusKey.
+ */
+export const seedArchive = internalAction({
+  args: {},
+  returns: v.object({
+    upserted: v.number(),
+  }),
+  handler: async (ctx): Promise<{ upserted: number }> => {
+    return await seedArchiveBody(ctx);
+  },
+});
+
+/**
+ * Real-time semantic retrieval: embed the claim, run ctx.vectorSearch,
+ * hydrate, re-rank by ICD-10 / CPT / CARC overlap, return top 3, and
+ * attach proven statutory language onto the claim as legal_precedent evidence.
+ */
+export const retrieveTopPrecedents = action({
+  args: {
+    claimId: v.id("claims"),
+  },
+  returns: matchListValidator,
+  handler: async (ctx, args): Promise<Array<{
+    _id: Id<"precedents">;
+    sourceKind: string;
+    title: string;
+    citation: string;
+    jurisdiction: string;
+    sourceUrl?: string;
+    icd10Codes: string[];
+    cptCodes: string[];
+    carcCodes: string[];
+    winningArgument: string;
+    statutoryLanguage: string;
+    outcome: string;
+    vectorScore: number;
+    combinedScore: number;
+    codeOverlap: number;
+  }>> => {
+    await seedArchiveBody(ctx);
+
+    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+      claimId: args.claimId,
+    });
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+
+    const icd10Codes: string[] = claim.icd10Codes || [];
+    const cptCodes: string[] = claim.cptCodes || [];
+    const denialReasonCode: string = claim.denialReasonCode || "CO-50";
+    const denialReasonDescription: string = claim.denialReasonDescription || "";
+
+    const queryText = buildClaimQueryText({
+      icd10Codes,
+      cptCodes,
+      denialReasonCode,
+      denialReasonDescription,
+    });
+    const extraTokens = weightedTokensForCodes(icd10Codes, cptCodes, [denialReasonCode]);
+    const embedding = await createEmbedding(queryText, extraTokens);
+
+    const merged = new Map<string, { _id: any; _score: number }>();
+
+    const unfiltered = await ctx.vectorSearch("precedents", "by_embedding", {
+      vector: embedding,
+      limit: 16,
+    });
+    for (const hit of unfiltered) {
+      merged.set(hit._id, hit);
+    }
+
+    const filterClauses: Array<{ field: "carcCode" | "primaryCpt" | "primaryIcd10"; value: string }> = [];
+    if (denialReasonCode) {
+      filterClauses.push({ field: "carcCode", value: denialReasonCode });
+    }
+    if (cptCodes[0]) {
+      filterClauses.push({ field: "primaryCpt", value: cptCodes[0] });
+    }
+    if (icd10Codes[0]) {
+      filterClauses.push({ field: "primaryIcd10", value: icd10Codes[0] });
+    }
+
+    if (filterClauses.length === 1) {
+      const clause = filterClauses[0];
+      const filtered = await ctx.vectorSearch("precedents", "by_embedding", {
+        vector: embedding,
+        limit: 12,
+        filter: (q) => q.eq(clause.field, clause.value),
+      });
+      for (const hit of filtered) {
+        const prior = merged.get(hit._id);
+        if (!prior || hit._score > prior._score) {
+          merged.set(hit._id, hit);
+        }
+      }
+    } else if (filterClauses.length > 1) {
+      const filtered = await ctx.vectorSearch("precedents", "by_embedding", {
+        vector: embedding,
+        limit: 12,
+        filter: (q) =>
+          q.or(
+            q.eq(filterClauses[0].field, filterClauses[0].value),
+            q.eq(filterClauses[1].field, filterClauses[1].value),
+            ...(filterClauses[2]
+              ? [q.eq(filterClauses[2].field, filterClauses[2].value)]
+              : [])
+          ),
+      });
+      for (const hit of filtered) {
+        const prior = merged.get(hit._id);
+        if (!prior || hit._score > prior._score) {
+          merged.set(hit._id, hit);
+        }
+      }
+    }
+
+    const orderedHits = [...merged.values()].sort((a, b) => b._score - a._score);
+    const ids = orderedHits.map((hit) => hit._id);
+    const docs: any[] = await ctx.runQuery((internal as any).precedents.hydrateByIds, { ids });
+    const docsById = new Map(docs.map((doc) => [doc._id, doc]));
+
+    const rankable = orderedHits
+      .map((hit) => {
+        const doc = docsById.get(hit._id);
+        if (!doc) return null;
+        return {
+          _id: doc._id,
+          vectorScore: hit._score,
+          icd10Codes: doc.icd10Codes,
+          cptCodes: doc.cptCodes,
+          carcCodes: doc.carcCodes,
+          sourceKind: doc.sourceKind,
+          title: doc.title,
+          citation: doc.citation,
+          jurisdiction: doc.jurisdiction,
+          sourceUrl: doc.sourceUrl,
+          winningArgument: doc.winningArgument,
+          statutoryLanguage: doc.statutoryLanguage,
+          outcome: doc.outcome,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+
+    const top = rankPrecedentHits(
+      rankable,
+      { icd10Codes, cptCodes, denialReasonCode, denialReasonDescription },
+      3
+    );
+
+    const matches = top.map((row) => ({
+      _id: row._id,
+      sourceKind: row.sourceKind,
+      title: row.title,
+      citation: row.citation,
+      jurisdiction: row.jurisdiction,
+      sourceUrl: row.sourceUrl,
+      icd10Codes: row.icd10Codes,
+      cptCodes: row.cptCodes,
+      carcCodes: row.carcCodes,
+      winningArgument: row.winningArgument,
+      statutoryLanguage: row.statutoryLanguage,
+      outcome: row.outcome,
+      vectorScore: row.vectorScore,
+      combinedScore: row.combinedScore,
+      codeOverlap: row.codeOverlap,
+    }));
+
+    if (matches.length > 0) {
+      await ctx.runMutation((internal as any).precedents.attachMatchesToClaim, {
+        claimId: args.claimId,
+        matches,
+      });
+    }
+
+    return matches;
+  },
+});
+
+/**
+ * Index a de-identified winning appeal brief into the vector archive.
+ */
+export const indexWonAppeal = internalAction({
+  args: {
+    claimId: v.id("claims"),
+  },
+  returns: v.union(v.id("precedents"), v.null()),
+  handler: async (ctx, args): Promise<Id<"precedents"> | null> => {
+    const already: Id<"precedents"> | null = await ctx.runQuery(
+      (internal as any).precedents.getBySourceClaim,
+      { sourceClaimId: args.claimId }
+    );
+    if (already) {
+      return already;
+    }
+
+    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+      claimId: args.claimId,
+    });
+    if (!claim) {
+      return null;
+    }
+
+    const appeal: any = await ctx.runQuery((api as any).appeals.getLatestByClaim, {
+      claimId: args.claimId,
+    });
+    if (!appeal?.fullAppealMarkdown) {
+      return null;
+    }
+
+    const icd10Codes: string[] = claim.icd10Codes || [];
+    const cptCodes: string[] = claim.cptCodes || [];
+    const carcCodes: string[] = claim.denialReasonCode ? [claim.denialReasonCode] : [];
+    const title = `Winning brief — CPT ${(cptCodes[0] || "procedure")} / ${claim.denialReasonCode || "CARC"} overturn`;
+    const citation = `ClaimHero overturned appeal ${claim.claimNumber}`;
+    const winningArgument = (appeal.medicalNecessityArguments || appeal.fullAppealMarkdown)
+      .replace(/\*\*/g, "")
+      .slice(0, 2400);
+    const statutoryLanguage = (appeal.legalCitations || "")
+      .replace(/\*\*/g, "")
+      .slice(0, 1800);
+
+    const entry = {
+      title,
+      citation,
+      winningArgument,
+      statutoryLanguage:
+        statutoryLanguage ||
+        "This brief prevailed on internal appeal. Proven medical-necessity and ERISA 29 CFR § 2560.503-1 arguments are retained for future semantic retrieval.",
+      outcome: `Overturned. Recovered $${Number(claim.deniedAmount || 0).toLocaleString()}.`,
+      icd10Codes,
+      cptCodes,
+      carcCodes,
+      sourceKind: "winning_brief" as const,
+    };
+
+    const embedding = await createEmbedding(
+      buildPrecedentEmbedText(entry),
+      weightedTokensForCodes(icd10Codes, cptCodes, carcCodes)
+    );
+
+    const insertedId: Id<"precedents"> = await ctx.runMutation((internal as any).precedents.insertPrecedent, {
+      sourceKind: "winning_brief",
+      title: entry.title,
+      citation: entry.citation,
+      jurisdiction: claim.patient?.state || "US-FED",
+      icd10Codes,
+      cptCodes,
+      carcCodes,
+      primaryIcd10: primaryOrUnspecified(icd10Codes),
+      primaryCpt: primaryOrUnspecified(cptCodes),
+      carcCode: primaryOrUnspecified(carcCodes),
+      winningArgument: entry.winningArgument,
+      statutoryLanguage: entry.statutoryLanguage,
+      outcome: entry.outcome,
+      embedding,
+      sourceClaimId: args.claimId,
+      corpusKey: `won-claim-${args.claimId}`,
+    });
+    return insertedId;
+  },
+});

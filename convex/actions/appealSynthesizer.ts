@@ -61,12 +61,39 @@ export interface AppealBriefSynthesisResult {
  * Assemble a formal legal memorandum in standard Markdown structure.
  * Guarantees proper headers (#, ##), tables, blockquotes, bullet lists, and horizontal dividers.
  */
+export interface VectorPrecedentMatch {
+  title: string;
+  citation: string;
+  statutoryLanguage: string;
+  winningArgument: string;
+  vectorScore: number;
+  combinedScore?: number;
+  sourceKind?: string;
+}
+
+export function formatVectorPrecedentSection(vectorPrecedents?: VectorPrecedentMatch[]): string {
+  if (!vectorPrecedents || vectorPrecedents.length === 0) {
+    return "";
+  }
+
+  let section = `### Vector-Retrieved Controlling Authorities\n\n`;
+  section += `Convex native vector search against the Precedent Vector Archive (indexed by ICD-10, CPT, and CARC) returned the following highest-scoring historical winning arguments. Proven statutory language is incorporated herein:\n\n`;
+  vectorPrecedents.forEach((match, idx) => {
+    const similarity = Math.round(Math.max(0, Math.min(1, (match.vectorScore + 1) / 2)) * 1000) / 10;
+    section += `**${idx + 1}. ${match.title}** — \`${match.citation}\` (similarity ${similarity}%)\n\n`;
+    section += `> ${match.statutoryLanguage}\n\n`;
+    section += `${match.winningArgument}\n\n`;
+  });
+  return section.trim();
+}
+
 export function assembleProfessionalMemorandum(
   claim: any,
   appealLevel: string,
   result: AppealBriefSynthesisResult,
   evidences: any[],
-  physicianNotes?: string
+  physicianNotes?: string,
+  vectorPrecedents?: VectorPrecedentMatch[]
 ): string {
   const dateStr = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -87,6 +114,8 @@ export function assembleProfessionalMemorandum(
   const icd10Codes = (claim.icd10Codes || []).join(", ");
   const denialReason = `${claim.denialReasonCode || "CO-50"} - ${claim.denialReasonDescription || "Adverse Determination"}`;
 
+  const vectorSection = formatVectorPrecedentSection(vectorPrecedents);
+
   // Only use the raw LLM fullAppealMarkdown if it is genuinely comprehensive, rich, and contains all key legal sections
   if (
     result.fullAppealMarkdown &&
@@ -98,7 +127,11 @@ export function assembleProfessionalMemorandum(
     (result.fullAppealMarkdown.includes("29 CFR") || result.fullAppealMarkdown.includes("ERISA")) &&
     (result.fullAppealMarkdown.includes("Demand") || result.fullAppealMarkdown.includes("DEMAND"))
   ) {
-    return result.fullAppealMarkdown.trim();
+    const llmBrief = result.fullAppealMarkdown.trim();
+    if (vectorSection && !llmBrief.includes("Vector-Retrieved Controlling Authorities")) {
+      return `${llmBrief}\n\n---\n\n${vectorSection}`;
+    }
+    return llmBrief;
   }
 
   // Construct the gold-standard formal appellate legal memorandum
@@ -179,6 +212,11 @@ export function assembleProfessionalMemorandum(
   brief += `2. **Right to Full Record & Guideline Disclosure (29 CFR § 2560.503-1(h)(2)(iii)):** The claimant hereby formally requests, at no cost, complete copies of all documents, internal clinical policies, reviewer qualifications, and medical director notes relied upon in making the adverse determination.\n`;
   brief += `3. **Deficiency of Generic Denial Notice (29 CFR § 2560.503-1(g)):** Plan administrators are legally obligated to articulate specific clinical rationales and policy references rather than generalized denial codes.\n`;
   brief += `4. **Statutory Timely Adjudication Requirement:** This appeal is filed well within the 180-day statutory window mandated under federal law.\n\n`;
+
+  if (vectorSection) {
+    brief += `${vectorSection}\n`;
+  }
+
   brief += `---\n\n`;
 
   brief += `## SECTION IV: FORMAL REBUTTAL OF DENIAL & DEMAND FOR IMMEDIATE OVERTURN\n\n`;
@@ -249,6 +287,27 @@ export const generateAppealBrief = action({
       ? evidences.map((e: any, idx: number) => `[Exhibit ${String.fromCharCode(65 + idx)}] (${e.sourceType.toUpperCase()} - ${e.title} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
       : "Standard national clinical practice guideline and ERISA disclosure rules apply.";
 
+    let vectorPrecedents: VectorPrecedentMatch[] = [];
+    try {
+      vectorPrecedents = await ctx.runAction(
+        (api as any).actions.precedentArchive.retrieveTopPrecedents,
+        { claimId: args.claimId }
+      );
+    } catch (precedentErr) {
+      console.warn("Precedent vector retrieval note:", precedentErr);
+    }
+
+    const precedentText =
+      vectorPrecedents.length > 0
+        ? vectorPrecedents
+            .map((match, idx) => {
+              const similarity =
+                Math.round(Math.max(0, Math.min(1, (match.vectorScore + 1) / 2)) * 1000) / 10;
+              return `[Vector Precedent ${idx + 1}] ${match.title} (${match.citation}, similarity ${similarity}%):\nStatutory language: ${match.statutoryLanguage}\nWinning argument: ${match.winningArgument}`;
+            })
+            .join("\n\n")
+        : "No vector-archive matches were available; rely on ERISA 29 CFR § 2560.503-1 and published CPB criteria.";
+
     const payer = claim.patient?.insurancePayer || "Health Insurer";
     const primaryCpt = claim.cptCodes?.[0] || "27447";
     const cptList = (claim.cptCodes || []).join(", ");
@@ -296,6 +355,9 @@ Case Details:
 Indexed Clinical Evidence & Policy Contradictions:
 ${evidenceText}
 
+Highest-scoring historical winning arguments from the Convex Precedent Vector Archive (top 3 by semantic similarity, filtered by ICD-10 / CPT / CARC). Inject the proven statutory language verbatim into the brief:
+${precedentText}
+
 ${args.physicianNotes ? `Treating Physician Clinical Notes / Addendum:\n${args.physicianNotes}\n` : ""}
 ${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstructions}\n` : ""}`,
         schemaName: "AppealBriefSynthesisResult",
@@ -332,7 +394,8 @@ ${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstruc
       appealLevel,
       rawResult,
       evidences,
-      args.physicianNotes
+      args.physicianNotes,
+      vectorPrecedents
     );
 
     const result: AppealBriefSynthesisResult = {

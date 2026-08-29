@@ -89,6 +89,22 @@ export const runAutonomousPipeline = action({
       }
     );
 
+    await ctx.runMutation((api as any).claims.updateStatus, {
+      claimId: args.claimId,
+      status: "precedent_matched",
+      actor: "Autonomous Sentinel Pipeline",
+      details: "Step 2b/3: Running Convex native vector search against the Precedent Vector Archive...",
+    });
+
+    try {
+      await ctx.runAction(
+        (api as any).actions.precedentArchive.retrieveTopPrecedents,
+        { claimId: args.claimId }
+      );
+    } catch (precedentErr) {
+      console.warn("Pipeline vector archive note:", precedentErr);
+    }
+
     // Step 3: Formal ERISA Appeal Brief Synthesis
     await ctx.runMutation((api as any).claims.updateStatus, {
       claimId: args.claimId,

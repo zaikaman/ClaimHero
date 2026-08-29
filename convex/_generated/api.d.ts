@@ -13,6 +13,7 @@ import type * as actions_mailDispatcher from "../actions/mailDispatcher.js";
 import type * as actions_opticalParser from "../actions/opticalParser.js";
 import type * as actions_payerContactResolver from "../actions/payerContactResolver.js";
 import type * as actions_policyCrawler from "../actions/policyCrawler.js";
+import type * as actions_precedentArchive from "../actions/precedentArchive.js";
 import type * as actions_precedentMatcher from "../actions/precedentMatcher.js";
 import type * as actions_sentinelPipeline from "../actions/sentinelPipeline.js";
 import type * as appeals from "../appeals.js";
@@ -23,7 +24,11 @@ import type * as clinicalEvidences from "../clinicalEvidences.js";
 import type * as crons from "../crons.js";
 import type * as emails from "../emails.js";
 import type * as http from "../http.js";
+import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_openai from "../lib/openai.js";
+import type * as lib_precedentCorpus from "../lib/precedentCorpus.js";
+import type * as lib_precedentValidators from "../lib/precedentValidators.js";
+import type * as precedents from "../precedents.js";
 import type * as users from "../users.js";
 
 import type {
@@ -38,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   "actions/opticalParser": typeof actions_opticalParser;
   "actions/payerContactResolver": typeof actions_payerContactResolver;
   "actions/policyCrawler": typeof actions_policyCrawler;
+  "actions/precedentArchive": typeof actions_precedentArchive;
   "actions/precedentMatcher": typeof actions_precedentMatcher;
   "actions/sentinelPipeline": typeof actions_sentinelPipeline;
   appeals: typeof appeals;
@@ -48,7 +54,11 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   emails: typeof emails;
   http: typeof http;
+  "lib/embeddings": typeof lib_embeddings;
   "lib/openai": typeof lib_openai;
+  "lib/precedentCorpus": typeof lib_precedentCorpus;
+  "lib/precedentValidators": typeof lib_precedentValidators;
+  precedents: typeof precedents;
   users: typeof users;
 }>;
 

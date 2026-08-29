@@ -311,6 +311,112 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
     // Verify length is substantial (> 1800 characters)
     expect(brief.length).toBeGreaterThan(1800);
   });
+
+  it("injects top vector-retrieved statutory language into the assembled memorandum", async () => {
+    const { assembleProfessionalMemorandum } = await import("../convex/actions/appealSynthesizer");
+
+    const brief = assembleProfessionalMemorandum(
+      {
+        claimNumber: "CLM-VEC-001",
+        serviceDate: "2026-06-12",
+        deniedAmount: 24500,
+        patientOwedAmount: 24500,
+        providerName: "Dr. Langston",
+        cptCodes: ["27447"],
+        icd10Codes: ["M17.11"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+        patient: { name: "Test Patient", memberId: "M-1", insurancePayer: "Molina Healthcare" },
+      },
+      "level_1_internal",
+      {
+        executiveSummary: "Challenge the denial.",
+        medicalNecessityArguments: "Advanced osteoarthritis after failed conservative care.",
+        statutoryRightsNotice: "ERISA 29 CFR § 2560.503-1 applies.",
+        policyCitations: [],
+        formalDemandForPayment: "Demand immediate overturn.",
+        fullAppealMarkdown: "",
+      },
+      [],
+      undefined,
+      [
+        {
+          title: "Firestone Tire & Rubber Co. v. Bruch",
+          citation: "489 U.S. 101 (1989)",
+          statutoryLanguage: "A denial of benefits is reviewed de novo unless the plan grants discretion.",
+          winningArgument: "Undisclosed internal criteria cannot survive de novo review.",
+          vectorScore: 0.91,
+        },
+      ]
+    );
+
+    expect(brief).toContain("Vector-Retrieved Controlling Authorities");
+    expect(brief).toContain("Firestone Tire & Rubber Co. v. Bruch");
+    expect(brief).toContain("489 U.S. 101 (1989)");
+    expect(brief).toContain("reviewed de novo unless the plan grants discretion");
+  });
+});
+
+describe("Precedent Vector Archive", () => {
+  it("produces L2-normalized 1536-d hash embeddings that are deterministic", async () => {
+    const { hashEmbed, EMBEDDING_DIMENSIONS, l2Normalize } = await import("../convex/lib/embeddings");
+
+    const a = hashEmbed("total knee arthroplasty medical necessity CO-50", ["cpt:27447", "icd:m17.11", "carc:co-50"]);
+    const b = hashEmbed("total knee arthroplasty medical necessity CO-50", ["cpt:27447", "icd:m17.11", "carc:co-50"]);
+
+    expect(a).toHaveLength(EMBEDDING_DIMENSIONS);
+    expect(b).toEqual(a);
+
+    const magnitude = Math.sqrt(a.reduce((sum, value) => sum + value * value, 0));
+    expect(magnitude).toBeCloseTo(1, 5);
+
+    const padded = l2Normalize([3, 4]);
+    expect(padded[0]).toBeCloseTo(0.6, 5);
+    expect(padded[1]).toBeCloseTo(0.8, 5);
+  });
+
+  it("re-ranks vector hits by ICD-10, CPT, and CARC overlap and returns the top 3", async () => {
+    const { rankPrecedentHits } = await import("../convex/lib/embeddings");
+
+    const ranked = rankPrecedentHits(
+      [
+        { _id: "low", vectorScore: 0.99, icd10Codes: ["J18.9"], cptCodes: ["99213"], carcCodes: ["CO-18"] },
+        { _id: "tka", vectorScore: 0.72, icd10Codes: ["M17.11"], cptCodes: ["27447"], carcCodes: ["CO-50"] },
+        { _id: "spine", vectorScore: 0.80, icd10Codes: ["M51.16"], cptCodes: ["63047"], carcCodes: ["CO-50"] },
+        { _id: "mri", vectorScore: 0.70, icd10Codes: ["M25.561"], cptCodes: ["73721"], carcCodes: ["CO-16"] },
+      ],
+      { icd10Codes: ["M17.11"], cptCodes: ["27447"], denialReasonCode: "CO-50", denialReasonDescription: "Not medically necessary" },
+      3
+    );
+
+    expect(ranked).toHaveLength(3);
+    expect(ranked[0]._id).toBe("tka");
+    expect(ranked[0].codeOverlap).toBeGreaterThan(ranked[1].codeOverlap);
+  });
+
+  it("indexes real public authorities by diagnosis, procedure, and CARC code", async () => {
+    const { PRECEDENT_CORPUS } = await import("../convex/lib/precedentCorpus");
+
+    expect(PRECEDENT_CORPUS.length).toBeGreaterThanOrEqual(12);
+    expect(PRECEDENT_CORPUS.every((entry) => entry.citation.length > 0)).toBe(true);
+    expect(PRECEDENT_CORPUS.every((entry) => entry.statutoryLanguage.length > 40)).toBe(true);
+    expect(PRECEDENT_CORPUS.some((entry) => entry.citation.includes("489 U.S. 101"))).toBe(true);
+    expect(PRECEDENT_CORPUS.some((entry) => entry.citation.includes("29 CFR § 2560.503-1"))).toBe(true);
+    expect(PRECEDENT_CORPUS.some((entry) => entry.cptCodes.includes("27447") && entry.carcCodes.includes("CO-50"))).toBe(true);
+    expect(PRECEDENT_CORPUS.some((entry) => entry.sourceKind === "commissioner_ruling")).toBe(true);
+    expect(PRECEDENT_CORPUS.some((entry) => entry.sourceKind === "court_overturn")).toBe(true);
+  });
+
+  it("keeps the global precedent archive out of per-claim cascade deletion", () => {
+    const requiredCascadeTables = [
+      "clinicalEvidences",
+      "appeals",
+      "emailMessages",
+      "emailThreads",
+      "appealAuditLogs",
+    ];
+    expect(requiredCascadeTables).not.toContain("precedents");
+  });
 });
 
 describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {

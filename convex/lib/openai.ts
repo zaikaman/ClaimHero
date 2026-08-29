@@ -1,4 +1,9 @@
 import OpenAI from "openai";
+import {
+  EMBEDDING_DIMENSIONS,
+  fitDimensions,
+  hashEmbed,
+} from "./embeddings";
 
 /**
  * Singleton OpenAI Client Instance
@@ -117,4 +122,35 @@ export async function createChatCompletion(options: {
   });
 
   return response.choices[0]?.message?.content || "";
+}
+
+/**
+ * Produce a 1536-d embedding using the same OPENAI_MODEL / OPENAI_API_KEY /
+ * OPENAI_BASE_URL client as the rest of the sentinel. No separate embedding
+ * model is configured. If the configured model or proxy rejects /v1/embeddings
+ * (chat-only gateways), fall back to signed feature hashing of the same text
+ * so index and query remain in one vector space.
+ */
+export async function createEmbedding(
+  text: string,
+  extraWeightedTokens: string[] = []
+): Promise<number[]> {
+  const { model } = getOpenAIConfig();
+  const client = getOpenAIClient();
+  const input = text.slice(0, 8000);
+
+  try {
+    const response = await client.embeddings.create({
+      model,
+      input,
+    });
+    const embedding = response.data[0]?.embedding;
+    if (Array.isArray(embedding) && embedding.length > 0) {
+      return fitDimensions(embedding, EMBEDDING_DIMENSIONS);
+    }
+  } catch {
+    // Chat-only proxies and non-embedding chat models land here.
+  }
+
+  return hashEmbed(input, extraWeightedTokens);
 }

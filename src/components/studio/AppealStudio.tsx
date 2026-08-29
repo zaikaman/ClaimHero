@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { Claim, ClinicalEvidence, AppealLevel } from "../../types";
 import { useAppealStudio } from "../../hooks/useAppealStudio";
+import { usePrecedents } from "../../hooks/usePrecedents";
 import { CitationSidebar } from "./CitationSidebar";
 import { ExportDrawer } from "./ExportDrawer";
 import { AppealBriefRenderer } from "./AppealBriefRenderer";
@@ -52,7 +53,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     isSaving,
     saveStatus,
     synthesizeAppeal,
+    insertTextAtCursor,
   } = useAppealStudio(claim);
+  const { matches: vectorMatches, isLoading: isLoadingPrecedents } = usePrecedents(claim);
 
   const [activeTab, setActiveTab] = useState<"edit" | "preview" | "split">("split");
   const [showNotesDrawer, setShowNotesDrawer] = useState<boolean>(false);
@@ -325,6 +328,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         <Card className="lg:col-span-4 p-4 overflow-y-auto">
           <CitationSidebar
             evidences={evidences}
+            vectorMatches={vectorMatches}
+            isLoadingPrecedents={isLoadingPrecedents}
+            onInsertSnippet={insertTextAtCursor}
           />
         </Card>
       </div>

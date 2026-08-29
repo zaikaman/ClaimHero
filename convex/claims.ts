@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 /**
  * List all claims with optional status and payer filters, scoped to the authenticated user
@@ -324,6 +325,14 @@ export const updateStatus = mutation({
       details: args.details || `Case status updated to ${args.status}`,
       timestamp: now,
     });
+
+    if (args.status === "won") {
+      await ctx.scheduler.runAfter(
+        0,
+        (internal as any)["actions/precedentArchive"].indexWonAppeal,
+        { claimId: args.claimId }
+      );
+    }
 
     return null;
   },

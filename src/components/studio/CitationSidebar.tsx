@@ -6,8 +6,10 @@ import {
   Check,
   Shield,
   CheckCircle,
+  Medal,
+  CircleNotch,
 } from "@phosphor-icons/react";
-import { ClinicalEvidence } from "../../types";
+import { ClinicalEvidence, VectorPrecedentMatch } from "../../types";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -15,7 +17,26 @@ import { stripMarkdownFormatting } from "../../lib/utils";
 
 interface CitationSidebarProps {
   evidences: ClinicalEvidence[];
+  vectorMatches?: VectorPrecedentMatch[];
+  isLoadingPrecedents?: boolean;
   onInsertSnippet?: (snippet: string) => void;
+}
+
+function similarityPercent(score: number): number {
+  return Math.round(Math.max(0, Math.min(1, (score + 1) / 2)) * 1000) / 10;
+}
+
+function formatVectorInsertion(match: VectorPrecedentMatch): string {
+  const similarity = similarityPercent(match.vectorScore);
+  return [
+    `### Controlling Precedent: ${match.title}`,
+    ``,
+    `> ${match.statutoryLanguage}`,
+    ``,
+    match.winningArgument,
+    ``,
+    `*Citation: ${match.citation} (vector similarity ${similarity}%)*`,
+  ].join("\n");
 }
 
 const STATUTORY_LEGAL_AUTHORITIES = [
@@ -44,8 +65,12 @@ const STATUTORY_LEGAL_AUTHORITIES = [
 
 export const CitationSidebar: React.FC<CitationSidebarProps> = ({
   evidences,
+  vectorMatches = [],
+  isLoadingPrecedents = false,
+  onInsertSnippet,
 }) => {
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const policyEvidences = evidences.filter((item) => item.sourceType !== "legal_precedent");
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -69,8 +94,80 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
           </Badge>
         </div>
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Statutory protections and policy criteria are automatically integrated into the legal brief by the Sentinel AI.
+          Convex vector search injects the top 3 historical winning arguments. Statutory protections and CPB criteria are auto-cited in the brief.
         </p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+          <Medal className="size-3" />
+          <span>Vector Archive Top 3 ({vectorMatches.length})</span>
+        </div>
+
+        {isLoadingPrecedents && vectorMatches.length === 0 ? (
+          <Card className="p-4 flex items-center gap-2 text-xs text-muted-foreground">
+            <CircleNotch className="size-3.5 animate-spin text-primary" />
+            <span>Querying Precedent Vector Archive...</span>
+          </Card>
+        ) : vectorMatches.length === 0 ? (
+          <Card className="p-4 text-center text-xs text-muted-foreground bg-muted/20 border-dashed">
+            Synthesize a brief or open this case to retrieve controlling authorities by ICD-10, CPT, and CARC.
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {vectorMatches.map((match) => {
+              const similarity = similarityPercent(match.vectorScore);
+              const snippet = formatVectorInsertion(match);
+              return (
+                <Card
+                  key={match._id}
+                  className="p-3 space-y-2 bg-card hover:bg-muted/20 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-xs font-semibold text-foreground">
+                          {match.title}
+                        </span>
+                        <Badge variant="success" className="text-[9px] font-mono px-1.5 py-0">
+                          {similarity}% match
+                        </Badge>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground block font-mono">
+                        {match.citation}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => handleCopy(match._id, snippet)}
+                      title="Copy proven statutory language"
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                    >
+                      {copiedId === match._id ? (
+                        <Check className="size-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="size-3" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3">
+                    {stripMarkdownFormatting(match.statutoryLanguage)}
+                  </p>
+                  {onInsertSnippet && (
+                    <button
+                      type="button"
+                      onClick={() => onInsertSnippet(snippet)}
+                      className="text-[11px] font-medium text-primary hover:underline"
+                    >
+                      Insert proven language into brief
+                    </button>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* 1. Statutory ERISA Protections */}
@@ -128,16 +225,16 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
       <div className="space-y-2">
         <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
           <Shield className="size-3" />
-          <span>Insurer CPB Criteria & Exhibits ({evidences.length})</span>
+          <span>Insurer CPB Criteria & Exhibits ({policyEvidences.length})</span>
         </div>
 
-        {evidences.length === 0 ? (
+        {policyEvidences.length === 0 ? (
           <Card className="p-4 text-center text-xs text-muted-foreground bg-muted/20 border-dashed">
             No policy clauses indexed yet. Run policy crawl in the Evidence Matrix tab.
           </Card>
         ) : (
           <div className="space-y-2">
-            {evidences.map((item, idx) => {
+            {policyEvidences.map((item, idx) => {
               const exhibitLetter = String.fromCharCode(65 + idx);
 
               return (
