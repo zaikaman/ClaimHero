@@ -416,3 +416,266 @@ export const SIMULATION_STAGES = [
     durationMs: 3000,
   },
 ];
+
+export interface SampleCasePreset {
+  id: string;
+  title: string;
+  payer: string;
+  amount: string;
+  cpt: string;
+  carc: string;
+  badge?: string;
+  content: string;
+  sender: {
+    name: string;
+    credentials: string;
+    email: string;
+    phone: string;
+  };
+  questions: Array<{
+    field: "symptomsAndFunctionalImpact" | "examinationFindings" | "imagingAndDiagnostics" | "treatmentHistoryAndResponse" | "otherDocumentedFacts";
+    question: string;
+    whyItMatters: string;
+  }>;
+  clinicalFacts: {
+    symptomsAndFunctionalImpact: string;
+    examinationFindings: string;
+    imagingAndDiagnostics: string;
+    treatmentHistoryAndResponse: string;
+    otherDocumentedFacts: string;
+    recordsAreIncomplete: boolean;
+  };
+}
+
+export const SAMPLE_CASE_PRESETS: SampleCasePreset[] = [
+  {
+    id: "molina_knee",
+    title: "Molina Healthcare — Total Knee Arthroplasty",
+    payer: "Molina Healthcare",
+    amount: "$24,500",
+    cpt: "27447",
+    carc: "CO-50 (Not Medically Necessary)",
+    badge: "Recommended",
+    content: `MOLINA HEALTHCARE OF FLORIDA
+EXPLANATION OF BENEFITS / NOTICE OF ADVERSE BENEFIT DETERMINATION
+Claim Reference: CLM-8942-MOL
+Member ID: MOL-982341-01
+Patient Name: Eleanor Vance
+Date of Birth: 1968-04-14
+Date of Service: 06/12/2026
+Treating Provider: Dr. Robert Langston, MD (Advanced Orthopedic Institute)
+Facility: Sunstate Surgical Hospital
+
+Services Rendered:
+- CPT Code 27447: Total Knee Arthroplasty (TKA), right knee
+- ICD-10 Code M17.11: Primary osteoarthritis, right knee
+- Total Billed Amount: $24,500.00
+- Plan Allowance / Paid: $0.00
+- Denied Amount: $24,500.00
+- Patient Financial Liability: $24,500.00
+
+Adjudication & Claim Denial Reason:
+Code CO-50: These are non-covered services because this is not deemed a medical necessity by the payer.
+Clinical Rationale: Under Molina Healthcare Clinical Coverage Guideline MCP-082, total knee arthroplasty requires documented failure of at least 12 weeks of non-surgical conservative therapy (including formal physical therapy, intra-articular corticosteroid injections, and prescription NSAIDs). Clinical records submitted fail to establish consecutive supervised physical therapy.
+
+Statutory Notice of Appeal Rights:
+You have the right to an internal appeal pursuant to ERISA 29 CFR § 2560.503-1 and ACA 45 CFR § 147.136. You must submit your written appeal within 180 calendar days from the date of this determination notice.
+Appeals Intake Destination:
+Email: MFLGrievanceandAppealsDepartment@MolinaHealthcare.com
+Mailing Address: Molina Healthcare of Florida, Grievance and Appeals Dept., P.O. Box 521838, Longwood, FL 32752
+Appeals Fax: 1-877-508-5748`,
+    sender: {
+      name: "Jordan Lee",
+      credentials: "Appeals Coordinator",
+      email: "jordan.lee@orthoclinic.org",
+      phone: "(555) 234-8901",
+    },
+    questions: [
+      {
+        field: "symptomsAndFunctionalImpact",
+        question: "What specific symptoms and functional limitations are documented in the clinical record regarding the patient's right knee osteoarthritis? Leave blank if not documented.",
+        whyItMatters: "Documents severe chronic pain and functional impairment requiring arthroplasty.",
+      },
+      {
+        field: "examinationFindings",
+        question: "What objective physical examination findings are documented in the clinical record for the right knee? Leave blank if not documented.",
+        whyItMatters: "Provides objective clinical data supporting severe degenerative joint disease.",
+      },
+      {
+        field: "imagingAndDiagnostics",
+        question: "What are the date and findings of the most recent weight-bearing plain radiograph of the knee documented in the record? Leave blank if not documented.",
+        whyItMatters: "Directly addresses the radiographic severity requirements cited in Molina MCP-082.",
+      },
+      {
+        field: "treatmentHistoryAndResponse",
+        question: "What prior conservative treatments (including physical therapy, injections, and NSAIDs) are documented in the clinical record, and what was the documented response? Leave blank if not documented.",
+        whyItMatters: "Directly addresses the 12-week conservative therapy requirement cited in the denial.",
+      },
+      {
+        field: "otherDocumentedFacts",
+        question: "Are there any other relevant clinical facts documented in the record regarding this knee condition? Leave blank if not documented.",
+        whyItMatters: "Allows for the inclusion of treating surgeon attestation and clinical necessity documentation.",
+      },
+    ],
+    clinicalFacts: {
+      symptomsAndFunctionalImpact: "Patient exhibits end-stage right knee osteoarthritic pain (8/10 VAS) with severe functional limitations: ambulation distance restricted to <50 feet, inability to negotiate stairs, and progressive loss of independence in activities of daily living (ADLs).",
+      examinationFindings: "Severe medial and lateral joint line tenderness, coarse crepitus through active/passive range of motion, fixed flexion contracture of 10 degrees with maximum flexion limited to 95 degrees, and moderate persistent joint effusion.",
+      imagingAndDiagnostics: "Weight-bearing bilateral knee radiographs (05/10/2026) show severe tricompartmental osteoarthritis with bone-on-bone medial joint space obliteration (Kellgren-Lawrence Grade IV), subchondral sclerosis, and marked marginal osteophytes.",
+      treatmentHistoryAndResponse: "Completed 16 consecutive weeks of formal outpatient physical therapy (2x/weekly, Jan-Apr 2026) with documented failure to relieve symptoms; 6-month trial of prescription meloxicam 15mg daily; and two intra-articular steroid injections (02/15/2026, 05/01/2026) yielding only transient relief (<2 weeks).",
+      otherDocumentedFacts: "Dr. Robert Langston, MD certified that conservative modalities have been fully exhausted and total knee arthroplasty is medically necessary under Molina Guideline MCP-082.",
+      recordsAreIncomplete: false,
+    },
+  },
+  {
+    id: "geoblue_spine",
+    title: "GeoBlue (BCBS Global) — Lumbar Decompression",
+    payer: "GeoBlue",
+    amount: "$18,200",
+    cpt: "63047",
+    carc: "CO-197 (Prior Auth Lacking)",
+    badge: "High Value",
+    content: `GEOBLUE WORLDWIDE MEDICAL INSURANCE
+NOTICE OF CLAIM ADVERSE DETERMINATION & BENEFIT SUMMARY
+Claim Reference: CLM-6104-GEO
+Member ID: GEO-554210-99
+Patient Name: Marcus Sterling
+Date of Service: 07/04/2026
+Provider: Dr. Sarah Chen, MD (Spine & Neurosurgery Associates)
+Facility: International Spine Institute
+
+Procedure & Clinical Codes:
+- CPT 63047: Laminectomy, facetectomy and foraminotomy with decompression of spinal cord, single segment lumbar
+- ICD-10 M51.26: Other intervertebral disc displacement, lumbar region
+- Total Billed: $18,200.00
+- Amount Denied: $18,200.00
+- Patient Responsibility: $18,200.00
+
+Denial Adjudication Reason:
+Code CO-197: Precertification / prior authorization / notification absent or lacking.
+Description: Surgical treatment for lumbar spinal stenosis was performed without securing prior authorization from GeoBlue Medical Review Department prior to the date of service.
+
+Appeals Procedure & Filing Instructions:
+In accordance with federal regulations under 29 CFR § 2560.503-1, you or your authorized representative have 180 days from receipt of this notice to file a Level 1 appeal demonstrating emergency medical necessity or retroactive pre-authorization criteria under Policy SURG.00011.
+Submit complete appeal dossier and clinical records to:
+Official Claims & Appeals Email: claims@geo-blue.com
+Mailing Address: GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087
+Appeals Fax: 1-610-482-9623`,
+    sender: {
+      name: "Alex Morgan",
+      credentials: "Surgical Case Coordinator",
+      email: "alex.morgan@spineinstitute.org",
+      phone: "(555) 456-7890",
+    },
+    questions: [
+      {
+        field: "symptomsAndFunctionalImpact",
+        question: "What specific symptoms, functional limitations, or neurological deficits are documented in the record for the lumbar spine? Leave blank if not documented.",
+        whyItMatters: "Establishes the urgent clinical indication for decompression surgery.",
+      },
+      {
+        field: "examinationFindings",
+        question: "What objective physical examination and neurological findings are documented in the clinical record? Leave blank if not documented.",
+        whyItMatters: "Provides objective motor strength, reflex, and sensory deficit findings.",
+      },
+      {
+        field: "imagingAndDiagnostics",
+        question: "What are the date and findings of the most recent diagnostic imaging (MRI/CT) of the lumbar spine in the record? Leave blank if not documented.",
+        whyItMatters: "Directly addresses anatomical compression and surgical necessity criteria under Policy SURG.00011.",
+      },
+      {
+        field: "treatmentHistoryAndResponse",
+        question: "What prior treatments and clinical deterioration timeline are documented prior to surgery? Leave blank if not documented.",
+        whyItMatters: "Documents conservative therapy attempts and sudden rapid progression necessitating urgent intervention.",
+      },
+      {
+        field: "otherDocumentedFacts",
+        question: "Are there any other relevant clinical facts documented regarding the emergency nature of the procedure? Leave blank if not documented.",
+        whyItMatters: "Provides attending surgeon emergency attestation explaining lack of prior authorization.",
+      },
+    ],
+    clinicalFacts: {
+      symptomsAndFunctionalImpact: "Acute onset of intractable right lower extremity radiculopathy in L5-S1 distribution with rapid progression to motor weakness and right foot drop over 48 hours. Patient unable to ambulate or bear weight safely.",
+      examinationFindings: "Neurological examination demonstrates right foot drop with extensor hallucis longus and tibialis anterior weakness (grade 3/5), positive straight leg raise test on right at 30 degrees, absent right Achilles reflex (0/2), and L5-S1 hypoesthesia.",
+      imagingAndDiagnostics: "Emergency lumbar spine MRI (06/28/2026) demonstrated acute extruded L5-S1 right paracentral disc herniation causing high-grade central canal stenosis and acute impingement of the traversing right S1 nerve root.",
+      treatmentHistoryAndResponse: "Patient was undergoing conservative outpatient physical therapy and oral analgesics, but suffered sudden neurological deterioration requiring emergency surgical decompression to prevent irreversible nerve root damage.",
+      otherDocumentedFacts: "Attending neurosurgeon Dr. Sarah Chen, MD documented that emergency decompression was immediately necessary within 24 hours to prevent permanent foot drop, satisfying retroactive authorization criteria under GeoBlue Policy SURG.00011.",
+      recordsAreIncomplete: false,
+    },
+  },
+  {
+    id: "bcbsglobal_mri",
+    title: "BCBS Global Core — Knee MRI Scan",
+    payer: "Blue Cross Blue Shield Global Core",
+    amount: "$2,850",
+    cpt: "73721",
+    carc: "CO-16 (Missing Plain Radiographs)",
+    badge: "Imaging Criteria",
+    content: `BLUE CROSS BLUE SHIELD GLOBAL CORE
+ADVERSE CLAIM ADJUDICATION NOTICE
+Claim Number: CLM-3912-BCG
+Member: Michael Patel (ID: BCG-773419-02)
+Date of Service: 07/18/2026
+Provider: Global Diagnostic Imaging Group
+
+Services:
+- CPT 73721: Magnetic resonance imaging, any joint of lower extremity; without contrast material (Knee MRI)
+- ICD-10 M23.22: Derangement of meniscus due to old tear or injury, right knee
+- Billed: $2,850.00
+- Paid: $0.00
+- Denied: $2,850.00
+- Patient Due: $2,850.00
+
+Denial Rationale:
+Code CO-16: Claim lacks information or has submission error.
+Coverage Policy RAD.00002 requires documented weight-bearing plain radiographs performed within the preceding 6 months prior to approval of magnetic resonance imaging for non-acute knee pain.
+
+Statutory Rights & Appeal Submission:
+You have 180 days to request an administrative ERISA reconsideration under 29 CFR § 2560.503-1.
+Submit formal appeal memorandum and physician attestation to:
+Appeals Intake Email: claims@bcbsglobalcore.com
+Service Center Address: BCBS Global Core Service Center, P.O. Box 2048, Richmond, VA 23218-2048
+Appeals Fax: 1-804-673-1179`,
+    sender: {
+      name: "Taylor Reed",
+      credentials: "Appeals Specialist",
+      email: "taylor.reed@diagnosticimaging.org",
+      phone: "(555) 789-0123",
+    },
+    questions: [
+      {
+        field: "symptomsAndFunctionalImpact",
+        question: "What specific symptoms and functional limitations are documented in the clinical record regarding the patient's knee? Leave blank if not documented.",
+        whyItMatters: "Establishes the clinical context for the requested procedure.",
+      },
+      {
+        field: "examinationFindings",
+        question: "What objective physical examination findings are documented in the clinical record for the knee? Leave blank if not documented.",
+        whyItMatters: "Provides objective clinical data to support the evaluation.",
+      },
+      {
+        field: "imagingAndDiagnostics",
+        question: "What is the date and result of the most recent weight-bearing plain radiograph of the knee documented in the record? Leave blank if not documented.",
+        whyItMatters: "Directly addresses the specific documentation requirement cited in the denial policy.",
+      },
+      {
+        field: "treatmentHistoryAndResponse",
+        question: "What prior treatments for this knee condition are documented in the clinical record, and what was the documented response to those treatments? Leave blank if not documented.",
+        whyItMatters: "Documents the clinical course prior to the request for advanced imaging.",
+      },
+      {
+        field: "otherDocumentedFacts",
+        question: "Are there any other relevant clinical facts documented in the record regarding this knee condition? Leave blank if not documented.",
+        whyItMatters: "Allows for the inclusion of pertinent clinical information not captured by the other categories.",
+      },
+    ],
+    clinicalFacts: {
+      symptomsAndFunctionalImpact: "Patient reports 8 weeks of persistent right knee pain, joint line tenderness, clicking sensations, and intermittent giving way following a twisting sports injury. Unable to run, squat, or climb stairs without sharp pain.",
+      examinationFindings: "Physical exam reveals positive McMurray test on medial joint line, localized medial joint line tenderness, mild joint effusion, and terminal flexion discomfort at 115 degrees.",
+      imagingAndDiagnostics: "Weight-bearing plain radiographs (AP/Lateral) completed on 05/20/2026 demonstrated no acute fracture, preserved joint spaces, and minimal degenerative changes, confirming compliance with RAD.00002 x-ray requirements prior to MRI.",
+      treatmentHistoryAndResponse: "Completed 6 weeks of conservative management consisting of oral NSAIDs (naproxen 500mg BID), activity modification, and home physical therapy exercises without symptom resolution.",
+      otherDocumentedFacts: "Enclosed prior weight-bearing radiograph report dated 05/20/2026 cures the documentation deficiency cited in denial code CO-16.",
+      recordsAreIncomplete: false,
+    },
+  },
+];
+

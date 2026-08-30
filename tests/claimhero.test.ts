@@ -12,6 +12,7 @@ import {
   STATUTORY_REGULATIONS,
   INSURERS,
   getPayerAppellateContact,
+  SAMPLE_CASE_PRESETS,
 } from "../src/lib/constants";
 import { extractEmailAddress, normalizeAgentMailWebhook } from "../convex/lib/agentMailWebhook";
 
@@ -1020,3 +1021,83 @@ describe("ClaimHero Production-Grade Case Deletion & Cascading Purge", () => {
     expect(stripMarkdownFormatting(undefined)).toBe("");
   });
 });
+
+describe("ClaimHero Template Presets & Documented Clinical Context", () => {
+  it("provides 3 complete preset template denials with distinct clinical criteria", () => {
+    expect(SAMPLE_CASE_PRESETS.length).toBe(3);
+    const presetIds = SAMPLE_CASE_PRESETS.map((p) => p.id);
+    expect(presetIds).toContain("molina_knee");
+    expect(presetIds).toContain("geoblue_spine");
+    expect(presetIds).toContain("bcbsglobal_mri");
+  });
+
+  it("includes valid sender contact information across all 3 template presets", () => {
+    for (const preset of SAMPLE_CASE_PRESETS) {
+      expect(preset.sender.name.trim().length).toBeGreaterThan(0);
+      expect(preset.sender.email.trim().length).toBeGreaterThan(0);
+      expect(preset.sender.phone.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("verifies tailored clinical questions for all 5 fields across all presets", () => {
+    const requiredFields = [
+      "symptomsAndFunctionalImpact",
+      "examinationFindings",
+      "imagingAndDiagnostics",
+      "treatmentHistoryAndResponse",
+      "otherDocumentedFacts",
+    ];
+
+    for (const preset of SAMPLE_CASE_PRESETS) {
+      expect(preset.questions.length).toBe(5);
+      const fields = preset.questions.map((q) => q.field);
+      for (const req of requiredFields) {
+        expect(fields).toContain(req);
+      }
+      for (const q of preset.questions) {
+        expect(q.question.trim().length).toBeGreaterThan(0);
+        expect(q.whyItMatters.trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("validates exact tailored knee imaging questions for BCBS Global Core Knee MRI", () => {
+    const bcbs = SAMPLE_CASE_PRESETS.find((p) => p.id === "bcbsglobal_mri");
+    expect(bcbs).toBeDefined();
+    if (!bcbs) return;
+
+    const qMap = new Map(bcbs.questions.map((q) => [q.field, q]));
+
+    const symptomsQ = qMap.get("symptomsAndFunctionalImpact");
+    expect(symptomsQ?.question).toContain("What specific symptoms and functional limitations are documented in the clinical record regarding the patient's knee?");
+    expect(symptomsQ?.whyItMatters).toContain("Establishes the clinical context for the requested procedure.");
+
+    const examQ = qMap.get("examinationFindings");
+    expect(examQ?.question).toContain("What objective physical examination findings are documented in the clinical record for the knee?");
+    expect(examQ?.whyItMatters).toContain("Provides objective clinical data to support the evaluation.");
+
+    const imagingQ = qMap.get("imagingAndDiagnostics");
+    expect(imagingQ?.question).toContain("What is the date and result of the most recent weight-bearing plain radiograph of the knee documented in the record?");
+    expect(imagingQ?.whyItMatters).toContain("Directly addresses the specific documentation requirement cited in the denial policy.");
+
+    const treatmentQ = qMap.get("treatmentHistoryAndResponse");
+    expect(treatmentQ?.question).toContain("What prior treatments for this knee condition are documented in the clinical record, and what was the documented response to those treatments?");
+    expect(treatmentQ?.whyItMatters).toContain("Documents the clinical course prior to the request for advanced imaging.");
+
+    const otherQ = qMap.get("otherDocumentedFacts");
+    expect(otherQ?.question).toContain("Are there any other relevant clinical facts documented in the record regarding this knee condition?");
+    expect(otherQ?.whyItMatters).toContain("Allows for the inclusion of pertinent clinical information not captured by the other categories.");
+  });
+
+  it("guarantees pre-written, non-empty clinical facts for judges across all 3 template presets", () => {
+    for (const preset of SAMPLE_CASE_PRESETS) {
+      expect(preset.clinicalFacts.symptomsAndFunctionalImpact.trim().length).toBeGreaterThan(20);
+      expect(preset.clinicalFacts.examinationFindings.trim().length).toBeGreaterThan(20);
+      expect(preset.clinicalFacts.imagingAndDiagnostics.trim().length).toBeGreaterThan(20);
+      expect(preset.clinicalFacts.treatmentHistoryAndResponse.trim().length).toBeGreaterThan(20);
+      expect(preset.clinicalFacts.otherDocumentedFacts.trim().length).toBeGreaterThan(20);
+      expect(preset.clinicalFacts.recordsAreIncomplete).toBe(false);
+    }
+  });
+});
+

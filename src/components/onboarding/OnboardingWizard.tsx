@@ -12,8 +12,11 @@ import {
   CircleNotch,
   Stethoscope,
 } from "@phosphor-icons/react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { BrandIcon } from "../common/BrandLogo";
 import { DenialExtractionResult } from "../../types";
+import { SAMPLE_CASE_PRESETS } from "../../lib/constants";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +27,8 @@ import {
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
+
+const convexApi = api as any;
 
 interface OnboardingWizardProps {
   isOpen: boolean;
@@ -75,80 +80,7 @@ const TARGET_PAYERS = [
   "Cigna",
 ];
 
-const STARTER_CASES = [
-  {
-    id: "molina_knee",
-    title: "Molina Healthcare — Total Knee Arthroplasty",
-    payer: "Molina Healthcare",
-    amount: "$24,500.00",
-    cpt: "CPT 27447",
-    carc: "CO-50 (Not Medically Necessary)",
-    badge: "Recommended",
-    content: `MOLINA HEALTHCARE OF FLORIDA
-EXPLANATION OF BENEFITS / NOTICE OF ADVERSE BENEFIT DETERMINATION
-Claim Reference: CLM-8942-MOL
-Member ID: MOL-982341-01
-Patient Name: Eleanor Vance
-Date of Birth: 1968-04-14
-Date of Service: 06/12/2026
-Treating Provider: Dr. Robert Langston, MD (Advanced Orthopedic Institute)
-Facility: Sunstate Surgical Hospital
-
-Services Rendered:
-- CPT Code 27447: Total Knee Arthroplasty (TKA), right knee
-- ICD-10 Code M17.11: Primary osteoarthritis, right knee
-- Total Billed Amount: $24,500.00
-- Plan Allowance / Paid: $0.00
-- Denied Amount: $24,500.00
-- Patient Financial Liability: $24,500.00
-
-Adjudication & Claim Denial Reason:
-Code CO-50: These are non-covered services because this is not deemed a medical necessity by the payer.
-Clinical Rationale: Under Molina Healthcare Clinical Coverage Guideline MCP-082, total knee arthroplasty requires documented failure of at least 12 weeks of non-surgical conservative therapy (including formal physical therapy, intra-articular corticosteroid injections, and prescription NSAIDs). Clinical records submitted fail to establish consecutive supervised physical therapy.
-
-Statutory Notice of Appeal Rights:
-You have the right to an internal appeal pursuant to ERISA 29 CFR § 2560.503-1 and ACA 45 CFR § 147.136. You must submit your written appeal within 180 calendar days from the date of this determination notice.
-Appeals Intake Destination:
-Email: MFLGrievanceandAppealsDepartment@MolinaHealthcare.com
-Mailing Address: Molina Healthcare of Florida, Grievance and Appeals Dept., P.O. Box 521838, Longwood, FL 32752
-Appeals Fax: 1-877-508-5748`,
-  },
-  {
-    id: "geoblue_spine",
-    title: "GeoBlue (BCBS Global) — Lumbar Decompression",
-    payer: "GeoBlue",
-    amount: "$18,200.00",
-    cpt: "CPT 63047",
-    carc: "CO-197 (Prior Auth Lacking)",
-    badge: "High Value",
-    content: `GEOBLUE WORLDWIDE MEDICAL INSURANCE
-NOTICE OF CLAIM ADVERSE DETERMINATION & BENEFIT SUMMARY
-Claim Reference: CLM-6104-GEO
-Member ID: GEO-554210-99
-Patient Name: Marcus Sterling
-Date of Service: 07/04/2026
-Provider: Dr. Sarah Chen, MD (Spine & Neurosurgery Associates)
-Facility: International Spine Institute
-
-Procedure & Clinical Codes:
-- CPT 63047: Laminectomy, facetectomy and foraminotomy with decompression of spinal cord, single segment lumbar
-- ICD-10 M51.26: Other intervertebral disc displacement, lumbar region
-- Total Billed: $18,200.00
-- Amount Denied: $18,200.00
-- Patient Responsibility: $18,200.00
-
-Denial Adjudication Reason:
-Code CO-197: Precertification / prior authorization / notification absent or lacking.
-Description: Surgical treatment for lumbar spinal stenosis was performed without securing prior authorization from GeoBlue Medical Review Department prior to the date of service.
-
-Appeals Procedure & Filing Instructions:
-In accordance with federal regulations under 29 CFR § 2560.503-1, you or your authorized representative have 180 days from receipt of this notice to file a Level 1 appeal demonstrating emergency medical necessity or retroactive pre-authorization criteria under Policy SURG.00011.
-Submit complete appeal dossier and clinical records to:
-Official Claims & Appeals Email: claims@geo-blue.com
-Mailing Address: GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087
-Appeals Fax: 1-610-482-9623`,
-  },
-];
+const STARTER_CASES = SAMPLE_CASE_PRESETS;
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   isOpen,
@@ -167,6 +99,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   ]);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("molina_knee");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+
+  const updateAppealContextMutation = useMutation(convexApi.claims.updateAppealContext);
 
   const togglePayer = (payer: string) => {
     setSelectedPayers((prev) =>
@@ -196,6 +130,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
     try {
       const result = await onParseText(preset.content, selectedJurisdiction);
+      if (updateAppealContextMutation && preset.sender && preset.clinicalFacts) {
+        try {
+          await updateAppealContextMutation({
+            claimId: result.claimId as any,
+            sender: preset.sender,
+            clinicalFacts: preset.clinicalFacts,
+          });
+        } catch (contextErr) {
+          console.warn("Could not pre-seed onboarding appeal context:", contextErr);
+        }
+      }
       setIsProcessing(false);
       onSuccess(result.claimId);
       onClose();

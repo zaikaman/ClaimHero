@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   CloudArrowUp,
   FileText,
@@ -19,6 +19,7 @@ import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { ClinicalFacts, ClinicalIntakeQuestion, DenialExtractionResult } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
+import { SAMPLE_CASE_PRESETS, SampleCasePreset } from "../../lib/constants";
 import {
   Dialog,
   DialogContent,
@@ -87,112 +88,6 @@ interface IngestionModalProps {
   onSuccess: (claimId: string, directView?: string) => void;
 }
 
-const SAMPLE_CASE_PRESETS = [
-  {
-    id: "molina_knee",
-    title: "Molina Healthcare — Total Knee Arthroplasty",
-    payer: "Molina Healthcare",
-    amount: "$24,500",
-    cpt: "27447",
-    carc: "CO-50 (Not Medically Necessary)",
-    content: `MOLINA HEALTHCARE OF FLORIDA
-EXPLANATION OF BENEFITS / NOTICE OF ADVERSE BENEFIT DETERMINATION
-Claim Reference: CLM-8942-MOL
-Member ID: MOL-982341-01
-Patient Name: Eleanor Vance
-Date of Birth: 1968-04-14
-Date of Service: 06/12/2026
-Treating Provider: Dr. Robert Langston, MD (Advanced Orthopedic Institute)
-Facility: Sunstate Surgical Hospital
-
-Services Rendered:
-- CPT Code 27447: Total Knee Arthroplasty (TKA), right knee
-- ICD-10 Code M17.11: Primary osteoarthritis, right knee
-- Total Billed Amount: $24,500.00
-- Plan Allowance / Paid: $0.00
-- Denied Amount: $24,500.00
-- Patient Financial Liability: $24,500.00
-
-Adjudication & Claim Denial Reason:
-Code CO-50: These are non-covered services because this is not deemed a medical necessity by the payer.
-Clinical Rationale: Under Molina Healthcare Clinical Coverage Guideline MCP-082, total knee arthroplasty requires documented failure of at least 12 weeks of non-surgical conservative therapy (including formal physical therapy, intra-articular corticosteroid injections, and prescription NSAIDs). Clinical records submitted fail to establish consecutive supervised physical therapy.
-
-Statutory Notice of Appeal Rights:
-You have the right to an internal appeal pursuant to ERISA 29 CFR § 2560.503-1 and ACA 45 CFR § 147.136. You must submit your written appeal within 180 calendar days from the date of this determination notice.
-Appeals Intake Destination:
-Email: MFLGrievanceandAppealsDepartment@MolinaHealthcare.com
-Mailing Address: Molina Healthcare of Florida, Grievance and Appeals Dept., P.O. Box 521838, Longwood, FL 32752
-Appeals Fax: 1-877-508-5748`,
-  },
-  {
-    id: "geoblue_spine",
-    title: "GeoBlue (BCBS Global) — Lumbar Decompression",
-    payer: "GeoBlue",
-    amount: "$18,200",
-    cpt: "63047",
-    carc: "CO-197 (Prior Auth Lacking)",
-    content: `GEOBLUE WORLDWIDE MEDICAL INSURANCE
-NOTICE OF CLAIM ADVERSE DETERMINATION & BENEFIT SUMMARY
-Claim Reference: CLM-6104-GEO
-Member ID: GEO-554210-99
-Patient Name: Marcus Sterling
-Date of Service: 07/04/2026
-Provider: Dr. Sarah Chen, MD (Spine & Neurosurgery Associates)
-Facility: International Spine Institute
-
-Procedure & Clinical Codes:
-- CPT 63047: Laminectomy, facetectomy and foraminotomy with decompression of spinal cord, single segment lumbar
-- ICD-10 M51.26: Other intervertebral disc displacement, lumbar region
-- Total Billed: $18,200.00
-- Amount Denied: $18,200.00
-- Patient Responsibility: $18,200.00
-
-Denial Adjudication Reason:
-Code CO-197: Precertification / prior authorization / notification absent or lacking.
-Description: Surgical treatment for lumbar spinal stenosis was performed without securing prior authorization from GeoBlue Medical Review Department prior to the date of service.
-
-Appeals Procedure & Filing Instructions:
-In accordance with federal regulations under 29 CFR § 2560.503-1, you or your authorized representative have 180 days from receipt of this notice to file a Level 1 appeal demonstrating emergency medical necessity or retroactive pre-authorization criteria under Policy SURG.00011.
-Submit complete appeal dossier and clinical records to:
-Official Claims & Appeals Email: claims@geo-blue.com
-Mailing Address: GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087
-Appeals Fax: 1-610-482-9623`,
-  },
-  {
-    id: "bcbsglobal_mri",
-    title: "BCBS Global Core — Knee MRI Scan",
-    payer: "Blue Cross Blue Shield Global Core",
-    amount: "$2,850",
-    cpt: "73721",
-    carc: "CO-16 (Missing Plain Radiographs)",
-    content: `BLUE CROSS BLUE SHIELD GLOBAL CORE
-ADVERSE CLAIM ADJUDICATION NOTICE
-Claim Number: CLM-3912-BCG
-Member: Michael Patel (ID: BCG-773419-02)
-Date of Service: 07/18/2026
-Provider: Global Diagnostic Imaging Group
-
-Services:
-- CPT 73721: Magnetic resonance imaging, any joint of lower extremity; without contrast material (Knee MRI)
-- ICD-10 M23.22: Derangement of meniscus due to old tear or injury, right knee
-- Billed: $2,850.00
-- Paid: $0.00
-- Denied: $2,850.00
-- Patient Due: $2,850.00
-
-Denial Rationale:
-Code CO-16: Claim lacks information or has submission error.
-Coverage Policy RAD.00002 requires documented weight-bearing plain radiographs performed within the preceding 6 months prior to approval of magnetic resonance imaging for non-acute knee pain.
-
-Statutory Rights & Appeal Submission:
-You have 180 days to request an administrative ERISA reconsideration under 29 CFR § 2560.503-1.
-Submit formal appeal memorandum and physician attestation to:
-Appeals Intake Email: claims@bcbsglobalcore.com
-Service Center Address: BCBS Global Core Service Center, P.O. Box 2048, Richmond, VA 23218-2048
-Appeals Fax: 1-804-673-1179`,
-  },
-];
-
 export const IngestionModal: React.FC<IngestionModalProps> = ({
   isOpen,
   onClose,
@@ -213,6 +108,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const [extractedResult, setExtractedResult] = useState<
     (DenialExtractionResult & { claimId: string; pipelineResult?: any }) | null
   >(null);
+  const [activePreset, setActivePreset] = useState<SampleCasePreset | null>(null);
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [contextSubmitted, setContextSubmitted] = useState(false);
   const [isPreparingContext, setIsPreparingContext] = useState(false);
@@ -223,6 +119,29 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const [senderPhone, setSenderPhone] = useState("");
   const [clinicalFacts, setClinicalFacts] = useState<ClinicalFacts>(EMPTY_CLINICAL_FACTS);
   const [contextAcknowledged, setContextAcknowledged] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab("presets");
+      setSelectedFile(null);
+      setPastedText("");
+      setIsProcessing(false);
+      setProcessingMessage("Analyzing denial document...");
+      setErrorMessage(null);
+      setExtractedResult(null);
+      setActivePreset(null);
+      setCopiedEmail(false);
+      setContextSubmitted(false);
+      setIsPreparingContext(false);
+      setIntakeQuestions(DEFAULT_CLINICAL_QUESTIONS);
+      setSenderName("");
+      setSenderCredentials("");
+      setSenderEmail("");
+      setSenderPhone("");
+      setClinicalFacts(EMPTY_CLINICAL_FACTS);
+      setContextAcknowledged(false);
+    }
+  }, [isOpen]);
 
   const runPipelineAction = useAction(
     convexApi["actions/sentinelPipeline"]?.runAutonomousPipeline ||
@@ -273,9 +192,26 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     }
   };
 
-  const prepareContextReview = async (result: DenialExtractionResult & { claimId: string }) => {
+  const prepareContextReview = async (
+    result: DenialExtractionResult & { claimId: string },
+    preset?: SampleCasePreset
+  ) => {
     setExtractedResult({ ...result, pipelineResult: null });
     setContextSubmitted(false);
+    setActivePreset(preset || null);
+
+    if (preset) {
+      setIntakeQuestions(preset.questions);
+      setClinicalFacts({ ...preset.clinicalFacts });
+      setSenderName(preset.sender.name);
+      setSenderCredentials(preset.sender.credentials);
+      setSenderEmail(preset.sender.email);
+      setSenderPhone(preset.sender.phone);
+      setContextAcknowledged(true);
+      setIsPreparingContext(false);
+      return;
+    }
+
     setContextAcknowledged(false);
     setIntakeQuestions(DEFAULT_CLINICAL_QUESTIONS);
     setClinicalFacts({ ...EMPTY_CLINICAL_FACTS });
@@ -326,14 +262,14 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     }
   };
 
-  const handleProcessPreset = async (presetContent: string) => {
+  const handleProcessPreset = async (preset: SampleCasePreset) => {
     setIsProcessing(true);
     setProcessingMessage("Step 1/3: Extracting CPT, CARC & ERISA statutory deadlines...");
     setErrorMessage(null);
 
     try {
-      const result = await onParseText(presetContent, patientState);
-      await prepareContextReview(result);
+      const result = await onParseText(preset.content, patientState);
+      await prepareContextReview(result, preset);
     } catch (err: any) {
       setErrorMessage(
         err?.message ||
@@ -526,7 +462,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 {SAMPLE_CASE_PRESETS.map((preset) => (
                   <Card
                     key={preset.id}
-                    onClick={() => !isProcessing && handleProcessPreset(preset.content)}
+                    onClick={() => !isProcessing && handleProcessPreset(preset)}
                     className="p-3.5 hover:bg-muted/40 transition-all cursor-pointer space-y-2"
                   >
                     <div className="flex items-center justify-between">
@@ -720,7 +656,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     </Badge>
                   </div>
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    The denial has been extracted. Answer what the available records actually say; leave a field blank when it is unavailable. ClaimHero will not infer clinical facts from diagnosis or procedure codes.
+                    {activePreset
+                      ? "Verified clinical documentation and sender details have been loaded for this sample case. Review the documented findings or edit any field before generating the appeal."
+                      : "The denial has been extracted. Answer what the available records actually say; leave a field blank when it is unavailable. ClaimHero will not infer clinical facts from diagnosis or procedure codes."}
                   </p>
                 </div>
               </div>
@@ -785,10 +723,14 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <h4 className="text-xs font-semibold text-foreground">Documented clinical context</h4>
-                  <p className="text-[11px] text-muted-foreground">These prompts are tailored to this denial. Paste exact record language or a concise factual summary; do not use a diagnosis code as a substitute for a finding.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {activePreset
+                      ? "Documented clinical record findings and objective diagnostic evidence loaded from this case preset. You can edit any field as needed."
+                      : "These prompts are tailored to this denial. Paste exact record language or a concise factual summary; do not use a diagnosis code as a substitute for a finding."}
+                  </p>
                 </div>
                 <Badge variant="outline" className="gap-1 text-[10px] shrink-0">
-                  <Sparkle className="size-3" /> AI prompts
+                  <Sparkle className="size-3" /> {activePreset ? "Preset Clinical Evidence" : "AI prompts"}
                 </Badge>
               </div>
 
@@ -827,7 +769,11 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 onChange={(e) => setContextAcknowledged(e.target.checked)}
                 className="mt-0.5 size-3.5 shrink-0 accent-primary"
               />
-              <span>I confirm that the entries above reflect the available record or are clearly identified as reported information. Blank sections mean the information is unavailable; ClaimHero must not fill those gaps or infer medical necessity.</span>
+              <span>
+                {activePreset
+                  ? "I confirm that the clinical entries and sender details above reflect the verified case records and are ready for policy citation and appeal brief synthesis."
+                  : "I confirm that the entries above reflect the available record or are clearly identified as reported information. Blank sections mean the information is unavailable; ClaimHero must not fill those gaps or infer medical necessity."}
+              </span>
             </label>
 
             <div className="flex flex-col-reverse justify-between gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center">
