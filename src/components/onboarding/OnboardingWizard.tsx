@@ -136,6 +136,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             claimId: result.claimId as any,
             sender: preset.sender,
             clinicalFacts: preset.clinicalFacts,
+            physicianNotes: preset.physicianNotes || undefined,
           });
         } catch (contextErr) {
           console.warn("Could not pre-seed onboarding appeal context:", contextErr);

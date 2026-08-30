@@ -62,6 +62,7 @@ export const runAutonomousPipeline = action({
     const context = claim.appealContext;
     let sender = args.sender || context?.sender;
     let clinicalFacts = args.clinicalFacts || context?.clinicalFacts;
+    const physicianNotes = args.physicianNotes || context?.physicianNotes;
 
     // Graceful fallback for legacy claims or automated retriggers that lack explicit intake.
     // Prior strict throws caused `Uncaught Error: Complete the sender details...` and blocked the pipeline.
@@ -236,7 +237,7 @@ export const runAutonomousPipeline = action({
       {
         claimId: args.claimId,
         appealLevel: args.appealLevel || "level_1_internal",
-        physicianNotes: args.physicianNotes,
+        physicianNotes,
         senderName: sender.name,
         senderCredentials: sender.credentials,
         senderEmail: sender.email,

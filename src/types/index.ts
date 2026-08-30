@@ -93,6 +93,7 @@ export interface ClinicalFacts {
 export interface AppealContext {
   sender: AppealSenderDetails;
   clinicalFacts: ClinicalFacts;
+  physicianNotes?: string;
   confirmedAt: number;
 }
 

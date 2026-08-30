@@ -26,7 +26,7 @@ export function useAppealStudio(claim?: Claim | null) {
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const [physicianNotes, setPhysicianNotes] = useState<string>("");
+  const [physicianNotes, setPhysicianNotes] = useState<string>(claim?.appealContext?.physicianNotes || "");
   const [senderName, setSenderName] = useState<string>(claim?.appealContext?.sender.name || "");
   const [senderCredentials, setSenderCredentials] = useState<string>(claim?.appealContext?.sender.credentials || "");
   const [senderEmail, setSenderEmail] = useState<string>(claim?.appealContext?.sender.email || "");
@@ -54,12 +54,17 @@ export function useAppealStudio(claim?: Claim | null) {
 
   useEffect(() => {
     if (!claim?._id || initializedContextClaimRef.current === claim._id) return;
-    const sender = claim.appealContext?.sender;
-    if (sender) {
-      setSenderName(sender.name || "");
-      setSenderCredentials(sender.credentials || "");
-      setSenderEmail(sender.email || "");
-      setSenderPhone(sender.phone || "");
+    const context = claim.appealContext;
+    if (context) {
+      if (context.sender) {
+        setSenderName(context.sender.name || "");
+        setSenderCredentials(context.sender.credentials || "");
+        setSenderEmail(context.sender.email || "");
+        setSenderPhone(context.sender.phone || "");
+      }
+      if (context.physicianNotes) {
+        setPhysicianNotes(context.physicianNotes);
+      }
     }
     initializedContextClaimRef.current = claim._id;
   }, [claim]);

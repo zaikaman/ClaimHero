@@ -788,6 +788,7 @@ export const updateAppealContext = mutation({
       otherDocumentedFacts: v.optional(v.string()),
       recordsAreIncomplete: v.boolean(),
     }),
+    physicianNotes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const claim = await ctx.db.get(args.claimId);
@@ -828,6 +829,7 @@ export const updateAppealContext = mutation({
           otherDocumentedFacts: clean(args.clinicalFacts.otherDocumentedFacts, 10000),
           recordsAreIncomplete: args.clinicalFacts.recordsAreIncomplete,
         },
+        physicianNotes: clean(args.physicianNotes, 15000),
         confirmedAt: now,
       },
       updatedAt: now,

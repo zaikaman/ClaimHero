@@ -118,6 +118,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const [senderEmail, setSenderEmail] = useState("");
   const [senderPhone, setSenderPhone] = useState("");
   const [clinicalFacts, setClinicalFacts] = useState<ClinicalFacts>(EMPTY_CLINICAL_FACTS);
+  const [physicianNotes, setPhysicianNotes] = useState("");
   const [contextAcknowledged, setContextAcknowledged] = useState(false);
 
   useEffect(() => {
@@ -139,6 +140,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       setSenderEmail("");
       setSenderPhone("");
       setClinicalFacts(EMPTY_CLINICAL_FACTS);
+      setPhysicianNotes("");
       setContextAcknowledged(false);
     }
   }, [isOpen]);
@@ -183,6 +185,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           phone: senderPhone.trim() || undefined,
         },
         clinicalFacts,
+        physicianNotes: physicianNotes.trim() || undefined,
       });
       setProcessingMessage("Step 3/3: Synthesizing cited ERISA medical appeal brief...");
       return pipelineRes;
@@ -203,6 +206,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     if (preset) {
       setIntakeQuestions(preset.questions);
       setClinicalFacts({ ...preset.clinicalFacts });
+      setPhysicianNotes(preset.physicianNotes || "");
       setSenderName(preset.sender.name);
       setSenderCredentials(preset.sender.credentials);
       setSenderEmail(preset.sender.email);
@@ -215,6 +219,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     setContextAcknowledged(false);
     setIntakeQuestions(DEFAULT_CLINICAL_QUESTIONS);
     setClinicalFacts({ ...EMPTY_CLINICAL_FACTS });
+    setPhysicianNotes("");
     setSenderName("");
     setSenderCredentials("");
     setSenderEmail("");
@@ -346,6 +351,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           treatmentHistoryAndResponse: clinicalFacts.treatmentHistoryAndResponse?.trim() || undefined,
           otherDocumentedFacts: clinicalFacts.otherDocumentedFacts?.trim() || undefined,
         },
+        physicianNotes: physicianNotes.trim() || undefined,
       });
 
       let pipelineResult = null;
@@ -368,7 +374,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6 gap-5">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto p-6 gap-5">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -642,39 +648,46 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
             </TabsContent>
           </Tabs>
         ) : !contextSubmitted ? (
-          <Card className="p-4 space-y-4 border-amber-500/30 bg-amber-500/5">
-            <div className="flex items-start justify-between gap-3 border-b border-border/60 pb-3">
-              <div className="flex items-start gap-2.5">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                  <Shield className="size-4" />
+          <Card className="p-5 space-y-6 border-border bg-card/85 shadow-sm rounded-xl">
+            {/* Header Status Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/70 pb-3.5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Confirm Case Context & Records
+                  </h3>
+                  <Badge variant="outline" className="border-amber-500/40 text-amber-500 text-[10px] font-mono px-2 py-0.5">
+                    Drafting Paused
+                  </Badge>
                 </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-semibold text-foreground">Confirm case context before drafting</h3>
-                    <Badge variant="outline" className="border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px]">
-                      Drafting paused
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {activePreset
-                      ? "Verified clinical documentation and sender details have been loaded for this sample case. Review the documented findings or edit any field before generating the appeal."
-                      : "The denial has been extracted. Answer what the available records actually say; leave a field blank when it is unavailable. ClaimHero will not infer clinical facts from diagnosis or procedure codes."}
-                  </p>
-                </div>
+                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                  {activePreset
+                    ? "Verified clinical records and appellate submitter coordinates have been loaded for this case preset. Review findings or edit any field before generating the appeal."
+                    : "The denial has been extracted. Document what the medical charts explicitly state; leave fields blank when unrecorded to avoid unsupported assertions."}
+                </p>
               </div>
             </div>
 
-            <div className="space-y-2">
+            {/* Section 1: Authorized Submitter */}
+            <div className="space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <h4 className="text-xs font-semibold text-foreground">Person submitting the appeal</h4>
-                  <p className="text-[11px] text-muted-foreground">Required for a sendable signature. Use the actual sender, not the treating provider unless that person is submitting it.</p>
+                  <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-[11px]">
+                    Authorized Submitter
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground">
+                    Person or coordinator submitting the formal appeal.
+                  </p>
                 </div>
-                <Badge variant="secondary" className="text-[10px] shrink-0">Required</Badge>
+                <Badge variant="secondary" className="text-[10px] font-mono shrink-0">
+                  Required
+                </Badge>
               </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="ingest-sender-name" className="mb-1 block text-[11px] font-medium text-foreground">Full name</label>
+                  <label htmlFor="ingest-sender-name" className="mb-1 block text-[11px] font-medium text-foreground">
+                    Full Name
+                  </label>
                   <Input
                     id="ingest-sender-name"
                     value={senderName}
@@ -685,7 +698,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label htmlFor="ingest-sender-role" className="mb-1 block text-[11px] font-medium text-foreground">Credentials or role <span className="font-normal text-muted-foreground">(optional)</span></label>
+                  <label htmlFor="ingest-sender-role" className="mb-1 block text-[11px] font-medium text-foreground">
+                    Credentials or Role <span className="font-normal text-muted-foreground">(optional)</span>
+                  </label>
                   <Input
                     id="ingest-sender-role"
                     value={senderCredentials}
@@ -695,7 +710,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label htmlFor="ingest-sender-email" className="mb-1 block text-[11px] font-medium text-foreground">Email address <span className="font-normal text-muted-foreground">(or phone)</span></label>
+                  <label htmlFor="ingest-sender-email" className="mb-1 block text-[11px] font-medium text-foreground">
+                    Email Address <span className="font-normal text-muted-foreground">(or phone)</span>
+                  </label>
                   <Input
                     id="ingest-sender-email"
                     type="email"
@@ -706,7 +723,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label htmlFor="ingest-sender-phone" className="mb-1 block text-[11px] font-medium text-foreground">Phone number <span className="font-normal text-muted-foreground">(or email)</span></label>
+                  <label htmlFor="ingest-sender-phone" className="mb-1 block text-[11px] font-medium text-foreground">
+                    Phone Number <span className="font-normal text-muted-foreground">(or email)</span>
+                  </label>
                   <Input
                     id="ingest-sender-phone"
                     type="tel"
@@ -719,42 +738,45 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               </div>
             </div>
 
-            <div className="space-y-3 border-t border-border/60 pt-3">
+            {/* Section 2: Documented Clinical Findings */}
+            <div className="space-y-4 border-t border-border/70 pt-4">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <h4 className="text-xs font-semibold text-foreground">Documented clinical context</h4>
+                  <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-[11px]">
+                    Documented Clinical Findings
+                  </h4>
                   <p className="text-[11px] text-muted-foreground">
                     {activePreset
-                      ? "Documented clinical record findings and objective diagnostic evidence loaded from this case preset. You can edit any field as needed."
-                      : "These prompts are tailored to this denial. Paste exact record language or a concise factual summary; do not use a diagnosis code as a substitute for a finding."}
+                      ? "Objective clinical findings, functional limitations, and diagnostic results loaded from this case preset."
+                      : "Prompts tailored to this denial. Enter factual findings from the medical records; leave blank if unavailable."}
                   </p>
                 </div>
-                <Badge variant="outline" className="gap-1 text-[10px] shrink-0">
-                  <Sparkle className="size-3" /> {activePreset ? "Preset Clinical Evidence" : "AI prompts"}
+                <Badge variant="outline" className="text-[10px] font-mono shrink-0">
+                  {activePreset ? "Preset Clinical Facts" : "Clinical Prompts"}
                 </Badge>
               </div>
 
               {isPreparingContext ? (
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground" role="status">
+                <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground" role="status">
                   <CircleNotch className="size-3.5 animate-spin text-primary" />
-                  <span>Preparing denial-specific questions...</span>
+                  <span>Preparing denial-specific clinical prompts...</span>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   {intakeQuestions.map((question) => (
-                    <div key={question.field}>
-                      <label htmlFor={`clinical-${question.field}`} className="mb-1 block text-xs font-medium leading-relaxed text-foreground">
+                    <div key={question.field} className="space-y-1">
+                      <label htmlFor={`clinical-${question.field}`} className="block text-xs font-medium leading-relaxed text-foreground">
                         {question.question}
                       </label>
-                      <p className="mb-1.5 text-[10px] leading-relaxed text-muted-foreground">{question.whyItMatters}</p>
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">{question.whyItMatters}</p>
                       <Textarea
                         id={`clinical-${question.field}`}
-                        rows={2}
+                        rows={3}
                         value={clinicalFacts[question.field] || ""}
                         onChange={(e) => setClinicalFacts((current) => ({ ...current, [question.field]: e.target.value }))}
-                        placeholder="Leave blank if this is not in the records you have."
+                        placeholder="Leave blank if this is not documented in available records."
                         maxLength={10000}
-                        className="bg-background text-xs"
+                        className="bg-background text-xs leading-relaxed"
                       />
                     </div>
                   ))}
@@ -762,7 +784,36 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               )}
             </div>
 
-            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-[11px] leading-relaxed text-muted-foreground">
+            {/* Section 3: Treating Physician Notes & Clinical Addendum */}
+            <div className="space-y-3 border-t border-border/70 pt-4">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-[11px]">
+                    Treating Physician Notes & Clinical Addendum
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground">
+                    {activePreset
+                      ? "Pre-filled treating physician clinical chart notes, therapy logs, and surgical necessity attestation."
+                      : "Optional clinical narrative, therapy logs, or physician statement. Incorporated directly into the synthesized appeal brief."}
+                  </p>
+                </div>
+                <Badge variant={physicianNotes ? "secondary" : "outline"} className="text-[10px] font-mono shrink-0">
+                  {physicianNotes ? "Notes Loaded" : "Optional"}
+                </Badge>
+              </div>
+              <Textarea
+                id="ingest-physician-notes"
+                rows={8}
+                value={physicianNotes}
+                onChange={(e) => setPhysicianNotes(e.target.value)}
+                placeholder="Paste treating physician clinical chart notes, therapy logs, or medical necessity statement..."
+                maxLength={15000}
+                className="bg-background text-xs font-mono leading-relaxed"
+              />
+            </div>
+
+            {/* Section 4: Attestation */}
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/80 bg-muted/20 p-3.5 text-[11px] leading-relaxed text-muted-foreground hover:bg-muted/30 transition-colors">
               <input
                 type="checkbox"
                 checked={contextAcknowledged}
@@ -771,12 +822,13 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               />
               <span>
                 {activePreset
-                  ? "I confirm that the clinical entries and sender details above reflect the verified case records and are ready for policy citation and appeal brief synthesis."
-                  : "I confirm that the entries above reflect the available record or are clearly identified as reported information. Blank sections mean the information is unavailable; ClaimHero must not fill those gaps or infer medical necessity."}
+                  ? "I confirm that the clinical entries and submitter details above reflect the verified case records and are ready for policy citation and appeal brief synthesis."
+                  : "I confirm that the entries above reflect the available medical record. Blank sections mean the information is unrecorded; ClaimHero will not infer medical necessity."}
               </span>
             </label>
 
-            <div className="flex flex-col-reverse justify-between gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center">
+            {/* Section 5: Action Footer */}
+            <div className="flex flex-col-reverse justify-between gap-2 border-t border-border/70 pt-4 sm:flex-row sm:items-center">
               <Button
                 variant="ghost"
                 size="sm"

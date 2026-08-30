@@ -1135,5 +1135,73 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
       expect(preset.clinicalFacts.recordsAreIncomplete).toBe(false);
     }
   });
+
+  it("guarantees authentic pre-written physician notes across all 3 template presets", () => {
+    for (const preset of SAMPLE_CASE_PRESETS) {
+      expect(preset.physicianNotes).toBeDefined();
+      expect(preset.physicianNotes.trim().length).toBeGreaterThan(100);
+      expect(preset.physicianNotes).toContain("PATIENT:");
+      expect(preset.physicianNotes).toContain("Attending");
+    }
+
+    const molina = SAMPLE_CASE_PRESETS.find((p) => p.id === "molina_knee");
+    expect(molina?.physicianNotes).toContain("Dr. Robert Langston");
+    expect(molina?.physicianNotes).toContain("16 consecutive weeks");
+    expect(molina?.physicianNotes).toContain("MCP-082");
+
+    const geoblue = SAMPLE_CASE_PRESETS.find((p) => p.id === "geoblue_spine");
+    expect(geoblue?.physicianNotes).toContain("Dr. Sarah Chen");
+    expect(geoblue?.physicianNotes).toContain("SURG.00011");
+    expect(geoblue?.physicianNotes).toContain("foot drop");
+
+    const bcbs = SAMPLE_CASE_PRESETS.find((p) => p.id === "bcbsglobal_mri");
+    expect(bcbs?.physicianNotes).toContain("Dr. Angela Martinez");
+    expect(bcbs?.physicianNotes).toContain("RAD.00002");
+    expect(bcbs?.physicianNotes).toContain("05/20/2026");
+  });
+
+  it("incorporates physicianNotes into synthesized appeal brief email", async () => {
+    const { assembleProfessionalAppealEmail } = await import("../convex/actions/appealSynthesizer");
+    const mockClaim = {
+      claimNumber: "CLM-TEST-999",
+      providerName: "Dr. Robert Langston",
+      serviceDate: "2026-06-12",
+      deniedAmount: 24500,
+      denialReasonCode: "CO-50",
+      denialReasonDescription: "Not medically necessary",
+      cptCodes: ["27447"],
+      icd10Codes: ["M17.11"],
+      patient: {
+        name: "Eleanor Vance",
+        memberId: "MOL-982341-01",
+        insurancePayer: "Molina Healthcare",
+      },
+    };
+
+    const mockResult = {
+      executiveSummary: "Summary",
+      statutoryRightsNotice: "Notice",
+      medicalNecessityArguments: "Medical arguments",
+      policyCitations: [],
+      formalDemandForPayment: "Demand",
+      fullAppealMarkdown: "",
+    };
+
+    const email = assembleProfessionalAppealEmail(
+      mockClaim,
+      "level_1_internal",
+      mockResult,
+      [],
+      "Dr. Langston certified 16 weeks of physical therapy completed with zero functional relief.",
+      [],
+      { name: "Jordan Lee", email: "jordan.lee@orthoclinic.org" },
+      { recordsAreIncomplete: false }
+    );
+
+    expect(email).toContain("Additional clinical information supplied for review");
+    expect(email).toContain("Dr. Langston certified 16 weeks of physical therapy");
+    expect(email).toContain("Jordan Lee");
+  });
 });
+
 

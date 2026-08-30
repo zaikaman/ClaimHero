@@ -74,6 +74,7 @@ export default defineSchema({
           otherDocumentedFacts: v.optional(v.string()),
           recordsAreIncomplete: v.boolean(),
         }),
+        physicianNotes: v.optional(v.string()),
         confirmedAt: v.number(),
       })
     ),

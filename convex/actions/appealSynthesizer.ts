@@ -501,6 +501,7 @@ export const generateAppealBrief = action({
     );
     const persistedContext = claim.appealContext;
     const clinicalFacts: ClinicalFacts | undefined = args.clinicalFacts || persistedContext?.clinicalFacts;
+    const physicianNotes: string | undefined = args.physicianNotes || persistedContext?.physicianNotes;
     const sender: AppealSenderDetails | undefined = args.senderName?.trim()
       ? {
           name: args.senderName,
@@ -592,7 +593,7 @@ ${evidenceText}
 Internal precedent retrieval context. Use only to identify potentially relevant issues; do not mention this context or copy its language into the email:
 ${precedentText}
 
-${args.physicianNotes ? `Treating Physician Clinical Notes / Addendum:\n${args.physicianNotes}\n` : ""}
+${physicianNotes ? `Treating Physician Clinical Notes / Addendum:\n${physicianNotes}\n` : ""}
 ${clinicalFacts ? `Human-confirmed clinical intake facts. Quote or accurately summarize only these entries; do not infer additional facts:\n${JSON.stringify(clinicalFacts)}\n` : "No patient-specific clinical intake facts were provided. State that the clinical record is incomplete.\n"}
 ${sender?.name ? `Sender details for the closing (use only as provided):\n- Name: ${sender.name}\n- Credentials or role: ${sender.credentials || "Not provided"}\n- Email: ${sender.email || "Not provided"}\n- Phone: ${sender.phone || "Not provided"}\n` : ""}
 ${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstructions}\n` : ""}
@@ -637,7 +638,7 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       appealLevel,
       safeResult,
       evidences,
-      args.physicianNotes,
+      physicianNotes,
       vectorPrecedents,
       sender,
       clinicalFacts

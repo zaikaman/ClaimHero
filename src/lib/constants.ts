@@ -445,6 +445,7 @@ export interface SampleCasePreset {
     otherDocumentedFacts: string;
     recordsAreIncomplete: boolean;
   };
+  physicianNotes: string;
 }
 
 export const SAMPLE_CASE_PRESETS: SampleCasePreset[] = [
@@ -525,6 +526,19 @@ Appeals Fax: 1-877-508-5748`,
       otherDocumentedFacts: "Dr. Robert Langston, MD certified that conservative modalities have been fully exhausted and total knee arthroplasty is medically necessary under Molina Guideline MCP-082.",
       recordsAreIncomplete: false,
     },
+    physicianNotes: `PATIENT: Eleanor Vance | DOB: 04/14/1968 | DOS: 06/12/2026
+TREATING PHYSICIAN CLINICAL ATTESTATION & CONSERVATIVE THERAPY RECORD:
+Patient Eleanor Vance is a 58-year-old female presenting with severe end-stage tricompartmental right knee osteoarthritis (Kellgren-Lawrence Grade IV) with bone-on-bone medial joint space obliteration, marked marginal osteophytes, and fixed flexion contracture of 10 degrees (maximum flexion limited to 95 degrees).
+
+CONSERVATIVE THERAPY MODALITIES COMPLETED & FAILED:
+1. Supervised Physical Therapy: Completed 16 consecutive weeks of formal outpatient physical therapy (2 sessions/week from 01/06/2026 through 04/28/2026 at Sunstate Rehabilitation; 32 total sessions completed). Therapy discharge summary demonstrates zero functional improvement and persistent 8/10 VAS pain restricting ambulation to <50 feet.
+2. Pharmacotherapy: 6-month therapeutic course of prescription Meloxicam (15 mg PO daily) with inadequate analgesic response and secondary gastrointestinal intolerance.
+3. Intra-articular Injections: Underwent two image-guided right knee corticosteroid injections (Triamcinolone acetonide 40 mg on 02/15/2026 and 05/01/2026) providing only transient partial relief (<14 days duration).
+
+CLINICAL NECESSITY DETERMINATION:
+Under Molina Healthcare Clinical Coverage Guideline MCP-082, the patient has completely exhausted all non-operative conservative modalities. Right Total Knee Arthroplasty (CPT 27447) is urgently medically necessary to restore basic weight-bearing ambulation and prevent progressive functional deterioration.
+
+Attending Orthopedic Surgeon: Dr. Robert Langston, MD, FAAOS (Sunstate Surgical Hospital)`,
   },
   {
     id: "geoblue_spine",
@@ -601,6 +615,19 @@ Appeals Fax: 1-610-482-9623`,
       otherDocumentedFacts: "Attending neurosurgeon Dr. Sarah Chen, MD documented that emergency decompression was immediately necessary within 24 hours to prevent permanent foot drop, satisfying retroactive authorization criteria under GeoBlue Policy SURG.00011.",
       recordsAreIncomplete: false,
     },
+    physicianNotes: `PATIENT: Marcus Sterling | DOB: 11/22/1974 | DOS: 07/04/2026
+ATTENDING NEUROSURGEON EMERGENCY CLINICAL ATTESTATION:
+Patient Marcus Sterling presented on an emergency basis with acute intractable right lower extremity radiculopathy in the L5-S1 dermatomal distribution accompanied by acute progressive neurological deterioration over a 48-hour window.
+
+CLINICAL EXAMINATION & NEUROLOGICAL DEFICITS:
+1. Motor Deficits: Objective right foot drop with extensor hallucis longus (EHL) and tibialis anterior motor strength graded 3/5 (against gravity only, no resistance).
+2. Reflexes & Sensory: Absent right Achilles deep tendon reflex (0/2), positive straight leg raise test at 30 degrees on right, and marked hypoesthesia across right lateral foot and S1 distribution.
+3. Diagnostic MRI: Emergency lumbar MRI (06/28/2026) revealed acute large extruded L5-S1 right paracentral disc herniation resulting in severe central canal stenosis and acute severe impingement of the traversing right S1 nerve root.
+
+EMERGENCY SURGICAL INDICATION & RETROACTIVE PRE-AUTHORIZATION:
+In accordance with GeoBlue Policy SURG.00011 and prudent layperson emergency standards, emergency lumbar laminectomy, facetectomy, and foraminotomy (CPT 63047) was immediately indicated within 24 hours to prevent permanent motor paralysis and irreversible nerve root ischemia. Awaiting prospective commercial prior authorization was medically contraindicated and posed immediate threat of permanent disability.
+
+Attending Neurosurgeon: Dr. Sarah Chen, MD, FAANS (Spine & Neurosurgery Associates)`,
   },
   {
     id: "bcbsglobal_mri",
@@ -676,6 +703,19 @@ Appeals Fax: 1-804-673-1179`,
       otherDocumentedFacts: "Enclosed prior weight-bearing radiograph report dated 05/20/2026 cures the documentation deficiency cited in denial code CO-16.",
       recordsAreIncomplete: false,
     },
+    physicianNotes: `PATIENT: Michael Patel | DOB: 09/03/1982 | DOS: 07/18/2026
+TREATING CLINICIAN CONSULTATION NOTE & RADIOLOGY ATTESTATION:
+Patient Michael Patel is a 43-year-old male presenting for advanced diagnostic evaluation of persistent right knee pain, joint line clicking, and episodes of knee giving way subsequent to an acute rotational sports injury 8 weeks prior.
+
+OBJECTIVE CLINICAL FINDINGS:
+1. Physical Examination: Localized tenderness along the medial joint line, positive McMurray sign with palpable pop/click, mild joint effusion, and terminal flexion limited to 115 degrees due to mechanical impingement.
+2. Prior Plain Radiographs (Policy RAD.00002 Compliance): Weight-bearing bilateral AP and lateral radiographs of the right knee were completed on 05/20/2026 at Global Diagnostic Imaging. X-rays confirmed absence of fracture or dislocation with preserved joint spacing, satisfying the prerequisite 6-month radiograph mandate under BCBS Coverage Policy RAD.00002.
+3. Conservative Management: Underwent 6 weeks of structured conservative therapy consisting of oral Naproxen (500 mg BID), cryotherapy, and home exercise regimen without symptomatic relief.
+
+ADVANCED IMAGING MEDICAL NECESSITY:
+Magnetic Resonance Imaging of the knee without contrast (CPT 73721) is medically necessary to assess internal meniscal derangement and evaluate for surgical arthroscopy. Denial code CO-16 is refuted as qualifying plain radiographs (05/20/2026) were performed and are submitted herewith.
+
+Attending Physician: Dr. Angela Martinez, MD (Global Diagnostic Imaging Group)`,
   },
 ];
 

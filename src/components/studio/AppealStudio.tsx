@@ -235,11 +235,11 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               </button>
             </div>
             <Textarea
-              rows={3}
+              rows={7}
               value={physicianNotes}
               onChange={(e) => setPhysicianNotes(e.target.value)}
               placeholder="Paste physician clinical notes, e.g.: Patient completed 14 weeks of formal physical therapy with Dr. Miller and underwent right knee cortisone injection on 03/10/2026 with no functional relief..."
-              className="bg-background text-xs"
+              className="bg-background text-xs font-mono leading-relaxed"
             />
           </div>
         )}
