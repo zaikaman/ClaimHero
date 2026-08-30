@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-30T08:24:00Z
+- **Last updated:** 2026-08-30T08:31:00Z
 
 ## Log
 
@@ -208,5 +208,8 @@ Automated legal precedent and vector archive injection into the AI appeal synthe
 ### 2026-08-30 - 31a95ee
 Standardized design system radius tokens and resolved Appeal Studio toolbar overflow. Reduced the global design token `--radius` from `0.625rem` to `0.375rem` in `src/index.css` and standardized `Button` component sizes in `src/components/ui/button.tsx` to eliminate rounded pill distortion on small action buttons. Resolved right-edge button clipping in Appeal Studio (`AppealStudio.tsx`) by upgrading the toolbar container to responsive `flex-col 2xl:flex-row` with flex-wrapping and `overflow-visible`, ensuring the "Synthesize Brief" action renders cleanly across all viewport widths. Standardized all button elements across `Header.tsx`, `Sidebar.tsx`, `CaseRadar.tsx`, `CinematicHero.tsx`, `AuthPage.tsx`, `OnboardingWizard.tsx`, and `avatar.tsx` to rectangular `rounded-md` geometry.
 
-### 2026-08-30 - working tree
+### 2026-08-30 - c3d6645
 Hardened AgentMail webhook routing, defended Convex mutations against stale async executions, and corrected Recipient Insurer Gateway display. Fixed `AgentMailDrawer.tsx` to render the insurer's verified official appeals email (`payerContact.officialAppealsEmail`, e.g. `claims@geo-blue.com`) instead of the thread's internal sender address in the Recipient Insurer Gateway card. Guarded `claims.ts:updateStatus`, `clinicalEvidences.ts:insertBatch`, and `appeals.ts:createOrUpdateDraft` against deleted or nonexistent claim documents to eliminate unhandled `Update on nonexistent document ID` exceptions during long-running background crawler or pipeline runs. Enhanced AgentMail reply matching in `agentMail.ts:processInboundClaimReply` to evaluate both subject lines and email body text against claim numbers, and recognized the dedicated adjudicator mailbox. Validated with `npm run verify`: 100% typecheck, lint, 53/53 passing unit tests, and production build.
+
+### 2026-08-30 - working tree
+Fixed AgentMail webhook dispatch routing to eliminate spurious warning logs and ensured strict production-grade error transparency. Segregated `/agentmail-webhook` in `http.ts` to schedule `processInboundIntake` solely for configured intake mailboxes and `processInboundClaimReply` for case correspondence mailboxes, eliminating `Ignoring AgentMail event for unexpected inbox` logs. Enforced strict error surfacing on AI payer adjudication in `mailDispatcher.ts:deliverAiAdjudication` so upstream OpenAI gateway and LLM errors are reported truthfully without injecting synthetic fallback or mock data. Validated with `npm run verify`: 100% typecheck, lint, 53/53 passing unit tests, and production build.

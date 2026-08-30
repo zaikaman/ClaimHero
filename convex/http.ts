@@ -39,22 +39,33 @@ http.route({
       }
       if (event.eventType !== "message.received") return new Response(null, { status: 204 });
 
-      const scheduledArgs = {
-        eventId: event.eventId,
-        messageId: event.messageId,
-        inboxId: event.inboxId,
-        sender: event.from,
-        recipient: event.recipients[0],
-        subject: event.subject,
-        text: event.text,
-        html: event.html,
-      };
-      await ctx.scheduler.runAfter(0, (internal as any)["actions/agentMail"].processInboundIntake, scheduledArgs);
-      await ctx.scheduler.runAfter(0, (internal as any)["actions/agentMail"].processInboundClaimReply, {
-        eventId: event.eventId,
-        messageId: event.messageId,
-        inboxId: event.inboxId,
-      });
+      const intakeInboxId = process.env.AGENTMAIL_INTAKE_INBOX_ID?.trim();
+      const intakeEmail = process.env.AGENTMAIL_INTAKE_EMAIL?.trim().toLowerCase();
+
+      const isIntakeEvent = Boolean(
+        (intakeInboxId && event.inboxId === intakeInboxId) ||
+        (intakeEmail && event.recipients.some((r) => r.toLowerCase().includes(intakeEmail)))
+      );
+
+      if (isIntakeEvent) {
+        const scheduledArgs = {
+          eventId: event.eventId,
+          messageId: event.messageId,
+          inboxId: event.inboxId,
+          sender: event.from,
+          recipient: event.recipients[0],
+          subject: event.subject,
+          text: event.text,
+          html: event.html,
+        };
+        await ctx.scheduler.runAfter(0, (internal as any)["actions/agentMail"].processInboundIntake, scheduledArgs);
+      } else {
+        await ctx.scheduler.runAfter(0, (internal as any)["actions/agentMail"].processInboundClaimReply, {
+          eventId: event.eventId,
+          messageId: event.messageId,
+          inboxId: event.inboxId,
+        });
+      }
 
       return new Response(JSON.stringify({ accepted: true, eventId: event.eventId }), {
         status: 202,

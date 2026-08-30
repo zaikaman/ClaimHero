@@ -95,7 +95,6 @@ export const processInboundIntake = internalAction({
   handler: async (ctx, args) => {
     const intakeMailbox = getIntakeAgentMailbox();
     if (args.inboxId !== intakeMailbox.inboxId) {
-      console.warn(`Ignoring AgentMail event for unexpected inbox ${args.inboxId}.`);
       return null;
     }
 
