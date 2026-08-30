@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-30T08:17:00Z
+- **Last updated:** 2026-08-30T08:24:00Z
 
 ## Log
 
@@ -205,5 +205,8 @@ Redesigned toolbar button architectures to eliminate awkward two-line button wra
 ### 2026-08-30 - a1b41a1
 Automated legal precedent and vector archive injection into the AI appeal synthesis pipeline, removing manual user insertion prompts across the UI. Because clinical advocates and lay users lack the specialized legal knowledge to manually parse statutory excerpts and decide what legal citations to inject, vector-matched precedents now behave identically to Insurer CPB Criteria & Exhibits: top vector matches are automatically provided as internal retrieval context to the synthesis LLM (`appealSynthesizer.ts`, `sentinelPipeline.ts`), which autonomously decides how to apply and reference them in the appeal brief. Replaced manual "Insert proven language into brief" actions in `CitationSidebar.tsx` and `PrecedentFeed.tsx` with clean citation copy actions and consistent "Auto-Injected as LLM Synthesis Context" status indicators matching the rest of the evidence matrix. Validated with `npm run verify`: 100% typecheck, lint, 53/53 passing unit tests, and production build.
 
-### 2026-08-30 - working tree
+### 2026-08-30 - 31a95ee
 Standardized design system radius tokens and resolved Appeal Studio toolbar overflow. Reduced the global design token `--radius` from `0.625rem` to `0.375rem` in `src/index.css` and standardized `Button` component sizes in `src/components/ui/button.tsx` to eliminate rounded pill distortion on small action buttons. Resolved right-edge button clipping in Appeal Studio (`AppealStudio.tsx`) by upgrading the toolbar container to responsive `flex-col 2xl:flex-row` with flex-wrapping and `overflow-visible`, ensuring the "Synthesize Brief" action renders cleanly across all viewport widths. Standardized all button elements across `Header.tsx`, `Sidebar.tsx`, `CaseRadar.tsx`, `CinematicHero.tsx`, `AuthPage.tsx`, `OnboardingWizard.tsx`, and `avatar.tsx` to rectangular `rounded-md` geometry.
+
+### 2026-08-30 - working tree
+Hardened AgentMail webhook routing, defended Convex mutations against stale async executions, and corrected Recipient Insurer Gateway display. Fixed `AgentMailDrawer.tsx` to render the insurer's verified official appeals email (`payerContact.officialAppealsEmail`, e.g. `claims@geo-blue.com`) instead of the thread's internal sender address in the Recipient Insurer Gateway card. Guarded `claims.ts:updateStatus`, `clinicalEvidences.ts:insertBatch`, and `appeals.ts:createOrUpdateDraft` against deleted or nonexistent claim documents to eliminate unhandled `Update on nonexistent document ID` exceptions during long-running background crawler or pipeline runs. Enhanced AgentMail reply matching in `agentMail.ts:processInboundClaimReply` to evaluate both subject lines and email body text against claim numbers, and recognized the dedicated adjudicator mailbox. Validated with `npm run verify`: 100% typecheck, lint, 53/53 passing unit tests, and production build.

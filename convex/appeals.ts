@@ -71,7 +71,13 @@ export const createOrUpdateDraft = mutation({
     fullAppealMarkdown: v.string(),
     lastEditedBy: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<Id<"appeals">> => {
+  handler: async (ctx, args): Promise<Id<"appeals"> | null> => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) {
+      console.warn(`Claim ${args.claimId} not found during createOrUpdateDraft; skipping.`);
+      return null;
+    }
+
     const now = Date.now();
     const existing = await ctx.db
       .query("appeals")

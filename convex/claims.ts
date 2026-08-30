@@ -369,6 +369,11 @@ export const updateStatus = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) {
+      console.warn(`Claim ${args.claimId} not found during updateStatus; skipping.`);
+      return null;
+    }
 
     const patchData: Record<string, any> = {
       status: args.status,

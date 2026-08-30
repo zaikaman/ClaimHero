@@ -550,18 +550,18 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 </div>
               )}
 
-              {recipientEmail ? (
+              {officialEmail ? (
                 <div>
                   <span className="text-[10px] font-mono text-muted-foreground block">Electronic Appeals Email</span>
                   <div className="flex items-center justify-between gap-1 mt-0.5">
                     <span className="font-mono text-[11px] text-foreground font-medium break-all">
-                      {recipientEmail}
+                      {officialEmail}
                     </span>
                     <Button
                       variant="ghost"
                       size="icon-xs"
                       onClick={() => {
-                        navigator.clipboard.writeText(recipientEmail);
+                        navigator.clipboard.writeText(officialEmail);
                         setCopiedRecipientEmail(true);
                         setTimeout(() => setCopiedRecipientEmail(false), 2000);
                       }}
