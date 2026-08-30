@@ -950,3 +950,100 @@ export const recordAuditLog = mutation({
     return logId;
   },
 });
+
+/**
+ * Update financial liability calculation data on a claim
+ */
+export const updateFinancialLiability = mutation({
+  args: {
+    claimId: v.id("claims"),
+    financialLiability: v.object({
+      billedAmount: v.number(),
+      allowedAmount: v.number(),
+      contractualDiscount: v.number(),
+      deductibleTotal: v.number(),
+      deductibleMet: v.number(),
+      coinsuranceRate: v.number(),
+      copayAmount: v.number(),
+      outOfPocketMax: v.number(),
+      outOfPocketSpent: v.number(),
+      networkStatus: v.string(),
+      noSurprisesActProtected: v.boolean(),
+      calculatedPatientShare: v.number(),
+      balanceBillingAmount: v.number(),
+      totalPatientExposureDenied: v.number(),
+      totalPatientLiabilityOverturned: v.number(),
+      netPatientSavings: v.number(),
+      payerExpectedObligation: v.number(),
+      updatedAt: v.number(),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) throw new Error("Claim not found");
+
+    const now = Date.now();
+    await ctx.db.patch(args.claimId, {
+      financialLiability: args.financialLiability,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("appealAuditLogs", {
+      claimId: args.claimId,
+      eventType: "financial_liability_calculated",
+      actor: "Financial Liability Sentinel",
+      details: `Calculated patient exposure: Denied $${args.financialLiability.totalPatientExposureDenied.toLocaleString()} vs Overturned $${args.financialLiability.totalPatientLiabilityOverturned.toLocaleString()} (Net Savings: $${args.financialLiability.netPatientSavings.toLocaleString()})`,
+      timestamp: now,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Update statutory ERISA § 502(c) failure-to-disclose penalty data on a claim
+ */
+export const updateErisaPenalties = mutation({
+  args: {
+    claimId: v.id("claims"),
+    erisaPenalties: v.object({
+      documentRequestDate: v.string(),
+      disclosureDeadlineDate: v.string(),
+      calculationDate: v.string(),
+      requestedDocuments: v.array(v.string()),
+      complianceStatus: v.string(),
+      dailyPenaltyRate: v.number(),
+      daysInDefault: v.number(),
+      accruedPenaltyAmount: v.number(),
+      statutoryInterestRate: v.number(),
+      accruedInterestAmount: v.number(),
+      estimatedAttorneysFees: v.number(),
+      totalStatutoryDamages: v.number(),
+      totalPlanAdministratorExposure: v.number(),
+      severityTier: v.string(),
+      statutoryDemandLanguage: v.string(),
+      updatedAt: v.number(),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) throw new Error("Claim not found");
+
+    const now = Date.now();
+    await ctx.db.patch(args.claimId, {
+      erisaPenalties: args.erisaPenalties,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("appealAuditLogs", {
+      claimId: args.claimId,
+      eventType: "erisa_penalties_assessed",
+      actor: "Statutory ERISA Sentinel",
+      details: `Assessed ERISA § 502(c) penalties: ${args.erisaPenalties.daysInDefault} days in default @ $${args.erisaPenalties.dailyPenaltyRate}/day = $${args.erisaPenalties.accruedPenaltyAmount.toLocaleString()} accrued penalty (Total Exposure: $${args.erisaPenalties.totalPlanAdministratorExposure.toLocaleString()})`,
+      timestamp: now,
+    });
+
+    return { success: true };
+  },
+});
+

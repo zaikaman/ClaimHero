@@ -15,7 +15,7 @@ import { formatCurrency, cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 
-export type FlowView = "radar" | "evidence" | "studio" | "p2p" | "communications" | "audit";
+export type FlowView = "radar" | "evidence" | "studio" | "p2p" | "calculator" | "communications" | "audit";
 
 interface SentinelFlowStepperProps {
   claim: Claim;

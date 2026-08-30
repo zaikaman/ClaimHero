@@ -1,4 +1,4 @@
-import { Claim, Appeal, ClinicalEvidence, AppealLevel } from "../types";
+import { Claim, Appeal, ClinicalEvidence, AppealLevel, FinancialLiabilityData, ErisaPenaltyData } from "../types";
 import { VERIFIED_PAYER_DIRECTORY, getPayerAppellateContact } from "./constants";
 import { fastSanitizeText } from "./redactionEngine";
 import { formatCurrency } from "./utils";
@@ -32,11 +32,11 @@ export interface DossierData {
   filingDate: string;
   statutoryLevel: AppealLevel;
   statutoryLevelLabel: string;
-  targetAuthority: string;
   statutoryPosture: string;
+  targetAuthority: string;
   statutoryAuthorities: string[];
   
-  // Payer EDI & Appellate Gateway
+  // Payer Identification
   payerName: string;
   payerEdiId: string;
   payerAppealsAddress: string;
@@ -44,17 +44,18 @@ export interface DossierData {
   payerAppealsEmail?: string;
   payerPortalUrl?: string;
   
-  // Beneficiary details
+  // Patient / Beneficiary Identification
   patientName: string;
+  dateOfBirth?: string;
   memberId: string;
   groupNumber?: string;
   state: string;
   
-  // Clinical Provider
+  // Provider / Attestation Information
   providerName: string;
   physicianInfo: DossierPhysicianInfo;
   
-  // Financial Liabilities & Codes
+  // Financial & Clinical Codes
   serviceDate: string;
   billedAmount: number;
   deniedAmount: number;
@@ -63,6 +64,8 @@ export interface DossierData {
   icd10Codes: string[];
   denialReasonCode: string;
   denialReasonDescription: string;
+  financialLiability?: FinancialLiabilityData;
+  erisaPenalties?: ErisaPenaltyData;
   
   // Core Appellate Brief Content
   executiveSummary: string;
@@ -357,6 +360,8 @@ export function buildDossierData(
     icd10Codes: claim.icd10Codes || [],
     denialReasonCode: claim.denialReasonCode || "CO-50",
     denialReasonDescription: claim.denialReasonDescription || "Service denied as not medically necessary by payer.",
+    financialLiability: claim.financialLiability,
+    erisaPenalties: claim.erisaPenalties,
     
     executiveSummary,
     medicalNecessityArguments,

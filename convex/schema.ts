@@ -101,6 +101,48 @@ export default defineSchema({
         appliedAt: v.number(),
       })
     ),
+    financialLiability: v.optional(
+      v.object({
+        billedAmount: v.number(),
+        allowedAmount: v.number(),
+        contractualDiscount: v.number(),
+        deductibleTotal: v.number(),
+        deductibleMet: v.number(),
+        coinsuranceRate: v.number(),
+        copayAmount: v.number(),
+        outOfPocketMax: v.number(),
+        outOfPocketSpent: v.number(),
+        networkStatus: v.string(),
+        noSurprisesActProtected: v.boolean(),
+        calculatedPatientShare: v.number(),
+        balanceBillingAmount: v.number(),
+        totalPatientExposureDenied: v.number(),
+        totalPatientLiabilityOverturned: v.number(),
+        netPatientSavings: v.number(),
+        payerExpectedObligation: v.number(),
+        updatedAt: v.number(),
+      })
+    ),
+    erisaPenalties: v.optional(
+      v.object({
+        documentRequestDate: v.string(),
+        disclosureDeadlineDate: v.string(),
+        calculationDate: v.string(),
+        requestedDocuments: v.array(v.string()),
+        complianceStatus: v.string(),
+        dailyPenaltyRate: v.number(),
+        daysInDefault: v.number(),
+        accruedPenaltyAmount: v.number(),
+        statutoryInterestRate: v.number(),
+        accruedInterestAmount: v.number(),
+        estimatedAttorneysFees: v.number(),
+        totalStatutoryDamages: v.number(),
+        totalPlanAdministratorExposure: v.number(),
+        severityTier: v.string(),
+        statutoryDemandLanguage: v.string(),
+        updatedAt: v.number(),
+      })
+    ),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

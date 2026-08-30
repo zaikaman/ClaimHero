@@ -6,6 +6,7 @@ import { IngestionModal } from "./components/radar/IngestionModal";
 import { EvidenceMatrix } from "./components/evidence/EvidenceMatrix";
 import { AppealStudio } from "./components/studio/AppealStudio";
 import { P2PDefenseStudio } from "./components/p2p/P2PDefenseStudio";
+import { FinancialLiabilityCalculator } from "./components/calculator/FinancialLiabilityCalculator";
 import { AgentMailDrawer } from "./components/communications/AgentMailDrawer";
 import { AuditTimeline } from "./components/communications/AuditTimeline";
 import { AnalyticsMetrics } from "./components/analytics/AnalyticsMetrics";
@@ -269,7 +270,24 @@ export default function App() {
               />
             ))}
 
-          {/* 5. Dedicated AgentMail Claim Inbox (Active Case Workspace) */}
+          {/* 5. Financial Liability & Statutory ERISA Penalty Calculator (Active Case Workspace) */}
+          {currentView === "calculator" &&
+            (selectedClaim ? (
+              <FinancialLiabilityCalculator
+                claim={selectedClaim}
+                onNavigateView={setCurrentView}
+              />
+            ) : (
+              <CasePickerEmptyState
+                viewType="studio"
+                claims={claims}
+                onSelectClaim={setSelectedClaimId}
+                onOpenIngestion={handleOpenIngestion}
+                onNavigateToRadar={() => setCurrentView("radar")}
+              />
+            ))}
+
+          {/* 6. Dedicated AgentMail Claim Inbox (Active Case Workspace) */}
           {currentView === "communications" &&
             (selectedClaim ? (
               <AgentMailDrawer

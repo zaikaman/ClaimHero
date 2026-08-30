@@ -82,6 +82,18 @@
     @apply bg-background text-foreground antialiased font-sans;
     min-height: 100vh;
   }
+
+  /* Remove default browser number input increment/decrement spinners */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
 }
 
 /* Glass Card & Panel Styling */

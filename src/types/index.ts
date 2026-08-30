@@ -67,12 +67,115 @@ export interface Claim {
   denialLetterStorageId?: string;
   appealContext?: AppealContext;
   redactionMetadata?: RedactionMetadata;
+  financialLiability?: FinancialLiabilityData;
+  erisaPenalties?: ErisaPenaltyData;
   createdAt: number;
   updatedAt: number;
   patient?: Patient;
   latestAppeal?: Appeal | null;
   evidenceCount?: number;
   payerContact?: PayerContact;
+}
+
+export type NetworkStatus = "in_network" | "out_of_network";
+
+export interface FinancialLiabilityData {
+  billedAmount: number;
+  allowedAmount: number;
+  contractualDiscount: number;
+  deductibleTotal: number;
+  deductibleMet: number;
+  coinsuranceRate: number; // 0 - 100
+  copayAmount: number;
+  outOfPocketMax: number;
+  outOfPocketSpent: number;
+  networkStatus: NetworkStatus;
+  noSurprisesActProtected: boolean;
+  calculatedPatientShare: number;
+  balanceBillingAmount: number;
+  totalPatientExposureDenied: number;
+  totalPatientLiabilityOverturned: number;
+  netPatientSavings: number;
+  payerExpectedObligation: number;
+  updatedAt: number;
+}
+
+export interface FinancialScheduleItem {
+  id: string;
+  label: string;
+  description: string;
+  deniedAmount: number;
+  overturnedAmount: number;
+  variance: number;
+  type: "charge" | "adjustment" | "cost_share" | "total";
+}
+
+export interface FinancialLiabilityResult {
+  data: FinancialLiabilityData;
+  deductibleApplied: number;
+  coinsuranceOwed: number;
+  copayOwed: number;
+  remainingOopCapacity: number;
+  coveredPatientShare: number;
+  balanceBillingExposure: number;
+  totalPatientExposureDenied: number;
+  totalPatientLiabilityOverturned: number;
+  netPatientSavings: number;
+  payerExpectedObligation: number;
+  schedule: FinancialScheduleItem[];
+  isOopMaxReached: boolean;
+  costSharingBreakdownPercent: {
+    deductible: number;
+    coinsurance: number;
+    copay: number;
+    payer: number;
+  };
+}
+
+export type StatutoryComplianceStatus = "defaulted" | "partial" | "compliant";
+
+export type StatutorySeverityTier =
+  | "grace_period"
+  | "actionable_default"
+  | "egregious_noncompliance"
+  | "bad_faith_enforcement";
+
+export interface ErisaPenaltyData {
+  documentRequestDate: string; // YYYY-MM-DD
+  disclosureDeadlineDate: string; // YYYY-MM-DD
+  calculationDate: string; // YYYY-MM-DD
+  requestedDocuments: string[];
+  complianceStatus: StatutoryComplianceStatus;
+  dailyPenaltyRate: number;
+  daysInDefault: number;
+  accruedPenaltyAmount: number;
+  statutoryInterestRate: number; // e.g. 18 for 18%
+  accruedInterestAmount: number;
+  estimatedAttorneysFees: number;
+  totalStatutoryDamages: number;
+  totalPlanAdministratorExposure: number;
+  severityTier: StatutorySeverityTier;
+  statutoryDemandLanguage: string;
+  updatedAt: number;
+}
+
+export interface ErisaPenaltyTrajectoryItem {
+  horizonDays: number;
+  futureDate: string;
+  projectedDaysInDefault: number;
+  projectedPenalties: number;
+  projectedInterest: number;
+  projectedTotalExposure: number;
+}
+
+export interface ErisaPenaltyResult {
+  data: ErisaPenaltyData;
+  daysElapsedSinceRequest: number;
+  graceDaysRemaining: number;
+  isPastDeadline: boolean;
+  statutoryAuthorityCitation: string;
+  trajectories: ErisaPenaltyTrajectoryItem[];
+  noticeOfDefaultText: string;
 }
 
 export interface RedactionMetadata {
