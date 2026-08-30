@@ -47,6 +47,11 @@ export default function App() {
     evidences,
     isLoadingEvidences,
     crawlPolicy,
+    crawlPubMed,
+    crawlFda,
+    crawlCustomUrl,
+    crawlMultiSourceHub,
+    deleteEvidence,
     computeOverturnScore,
     runFullPipeline,
   } = useEvidence(selectedClaim);
@@ -205,6 +210,11 @@ export default function App() {
                 evidences={evidences}
                 isLoadingEvidences={isLoadingEvidences}
                 onCrawlPolicy={crawlPolicy}
+                onCrawlPubMed={crawlPubMed}
+                onCrawlFDA={crawlFda}
+                onCrawlCustomUrl={crawlCustomUrl}
+                onCrawlMultiSource={crawlMultiSourceHub}
+                onDeleteEvidence={deleteEvidence}
                 onComputeScore={computeOverturnScore}
                 onNavigateToStudio={() => setCurrentView("studio")}
                 onNavigateView={setCurrentView}

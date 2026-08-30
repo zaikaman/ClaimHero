@@ -3,6 +3,41 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 
 /**
+ * Format and sanitize citation clauses into clean, concise identifiers
+ * Prevents long sentences or descriptive text from bloating badge UI.
+ */
+export function sanitizeCitationClause(raw: string | undefined): string {
+  if (!raw) return "Clinical Citation";
+  const str = raw.replace(/\*\*/g, "").trim();
+
+  // If formatted as "IDENTIFIER | Long Description Sentence...", extract clean ID
+  if (str.includes(" | ")) {
+    const parts = str.split(" | ");
+    const prefix = parts[0]?.trim();
+    const rest = parts.slice(1).join(" | ").trim();
+
+    if (prefix && /^(PMID|NCT|NDA|PMA|510\(k\)|Section|CPB|MCP|LCD|29 CFR|IMR)/i.test(prefix)) {
+      if (rest && rest.length <= 25 && rest.split(/\s+/).length <= 3) {
+        return `${prefix} • ${rest}`;
+      }
+      return prefix;
+    }
+  }
+
+  // If long sentence text was placed in citationClause, clamp to concise reference
+  if (str.length > 35) {
+    // If it starts with an identifier like "PMID: 123456", extract up to first break
+    const match = str.match(/^(PMID:?\s*\d+|NCT\d+|NDA\s*\d+|PMA\s*\d+|Section\s*[\d.]+|29 CFR\s*[\d.-]+)/i);
+    if (match) {
+      return match[0].trim();
+    }
+    return str.slice(0, 32) + "...";
+  }
+
+  return str;
+}
+
+/**
  * List all clinical evidence items for a given claim, ordered by relevance
  */
 export const listByClaim = query({
@@ -21,7 +56,7 @@ export const listByClaim = query({
       .map((item) => ({
         ...item,
         title: item.title?.replace(/\*\*/g, "") || "",
-        citationClause: item.citationClause?.replace(/\*\*/g, "") || "",
+        citationClause: sanitizeCitationClause(item.citationClause),
         extractedEvidenceMarkdown:
           item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
       }));
@@ -47,7 +82,7 @@ export const listByClaimAndSource = query({
       .map((item) => ({
         ...item,
         title: item.title?.replace(/\*\*/g, "") || "",
-        citationClause: item.citationClause?.replace(/\*\*/g, "") || "",
+        citationClause: sanitizeCitationClause(item.citationClause),
         extractedEvidenceMarkdown:
           item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
       }));
@@ -87,7 +122,7 @@ export const insertBatch = mutation({
         sourceType: item.sourceType,
         title: item.title.replace(/\*\*/g, ""),
         sourceUrl: item.sourceUrl,
-        citationClause: item.citationClause.replace(/\*\*/g, ""),
+        citationClause: sanitizeCitationClause(item.citationClause),
         extractedEvidenceMarkdown: item.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
         relevanceScore: item.relevanceScore,
         createdAt: now,
@@ -126,3 +161,101 @@ export const clearByClaim = mutation({
     }
   },
 });
+
+/**
+ * Delete a single clinical evidence item
+ */
+export const deleteEvidence = mutation({
+  args: {
+    evidenceId: v.id("clinicalEvidences"),
+  },
+  handler: async (ctx, args) => {
+    const evidence = await ctx.db.get(args.evidenceId);
+    if (!evidence) return null;
+
+    await ctx.db.delete(args.evidenceId);
+
+    // Audit log
+    await ctx.db.insert("appealAuditLogs", {
+      claimId: evidence.claimId,
+      eventType: "evidence_removed",
+      actor: "Clinical Research Officer",
+      details: `Removed clinical evidence clause: ${evidence.title} (${evidence.citationClause}).`,
+      timestamp: Date.now(),
+    });
+
+    return args.evidenceId;
+  },
+});
+
+/**
+ * Insert a single clinical evidence item
+ */
+export const insertSingle = mutation({
+  args: {
+    claimId: v.id("claims"),
+    sourceType: v.string(),
+    title: v.string(),
+    sourceUrl: v.optional(v.string()),
+    citationClause: v.string(),
+    extractedEvidenceMarkdown: v.string(),
+    relevanceScore: v.number(),
+  },
+  handler: async (ctx, args): Promise<Id<"clinicalEvidences">> => {
+    const now = Date.now();
+    const cleanClause = sanitizeCitationClause(args.citationClause);
+    const id = await ctx.db.insert("clinicalEvidences", {
+      claimId: args.claimId,
+      sourceType: args.sourceType,
+      title: args.title.replace(/\*\*/g, ""),
+      sourceUrl: args.sourceUrl,
+      citationClause: cleanClause,
+      extractedEvidenceMarkdown: args.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
+      relevanceScore: args.relevanceScore,
+      createdAt: now,
+    });
+
+    await ctx.db.insert("appealAuditLogs", {
+      claimId: args.claimId,
+      eventType: "evidence_added",
+      actor: "Clinical Research Hub",
+      details: `Added ${args.sourceType} evidence clause: ${args.title} (${cleanClause}).`,
+      timestamp: now,
+    });
+
+    return id;
+  },
+});
+
+/**
+ * Return a summary breakdown of evidence counts by source type for a claim
+ */
+export const listSourcesSummary = query({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    const evidences = await ctx.db
+      .query("clinicalEvidences")
+      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .collect();
+
+    const summary: Record<string, number> = {
+      payer_cpb: 0,
+      pubmed_study: 0,
+      fda_package_insert: 0,
+      nccn_guideline: 0,
+      legal_precedent: 0,
+    };
+
+    for (const item of evidences) {
+      summary[item.sourceType] = (summary[item.sourceType] || 0) + 1;
+    }
+
+    return {
+      total: evidences.length,
+      bySource: summary,
+    };
+  },
+});
+

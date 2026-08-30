@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-30T08:31:00Z
+- **Last updated:** 2026-08-30T10:30:35Z
 
 ## Log
 
@@ -211,5 +211,12 @@ Standardized design system radius tokens and resolved Appeal Studio toolbar over
 ### 2026-08-30 - c3d6645
 Hardened AgentMail webhook routing, defended Convex mutations against stale async executions, and corrected Recipient Insurer Gateway display. Fixed `AgentMailDrawer.tsx` to render the insurer's verified official appeals email (`payerContact.officialAppealsEmail`, e.g. `claims@geo-blue.com`) instead of the thread's internal sender address in the Recipient Insurer Gateway card. Guarded `claims.ts:updateStatus`, `clinicalEvidences.ts:insertBatch`, and `appeals.ts:createOrUpdateDraft` against deleted or nonexistent claim documents to eliminate unhandled `Update on nonexistent document ID` exceptions during long-running background crawler or pipeline runs. Enhanced AgentMail reply matching in `agentMail.ts:processInboundClaimReply` to evaluate both subject lines and email body text against claim numbers, and recognized the dedicated adjudicator mailbox. Validated with `npm run verify`: 100% typecheck, lint, 53/53 passing unit tests, and production build.
 
-### 2026-08-30 - working tree
+### 2026-08-30 - 986d5fa
 Fixed AgentMail webhook dispatch routing to eliminate spurious warning logs and ensured strict production-grade error transparency. Segregated `/agentmail-webhook` in `http.ts` to schedule `processInboundIntake` solely for configured intake mailboxes and `processInboundClaimReply` for case correspondence mailboxes, eliminating `Ignoring AgentMail event for unexpected inbox` logs. Enforced strict error surfacing on AI payer adjudication in `mailDispatcher.ts:deliverAiAdjudication` so upstream OpenAI gateway and LLM errors are reported truthfully without injecting synthetic fallback or mock data. Validated with `npm run verify`: 100% typecheck, lint, 53/53 passing unit tests, and production build.
+
+### 2026-08-30 - working tree
+Expanded Firecrawl beyond insurer Clinical Policy Bulletins (CPB) into a full Multi-Source Clinical Research Hub featuring PubMed & ClinicalTrials.gov scraping, FDA Package Insert & Indication crawling, custom guideline scraping, and an Interactive Web Research Console. Implemented `crawlPubMedAndTrials` in `convex/actions/policyCrawler.ts` to retrieve peer-reviewed medical trial abstracts and extract standard-of-care conclusions and trial endpoints (`PUBMED_EXTRACTION_SCHEMA`) for procedure CPT and ICD-10 codes. Implemented `crawlFdaIndications` to scrape FDA-approved package inserts (`accessdata.fda.gov`, `dailymed.nlm.nih.gov`) and extract on-label indications, application/NDA numbers, and anti-investigational legal rebuttals to overcome arbitrary experimental denial determinations. Added `crawlCustomResearchUrl` and `crawlMultiSourceHub` actions, and expanded `NEUTRAL_PUBLIC_HOSTS` to whitelist medical research authority domains. Added `deleteEvidence`, `insertSingle`, and `listSourcesSummary` in `convex/clinicalEvidences.ts`. Built the Interactive Web Research Console (`src/components/evidence/ClinicalResearchConsole.tsx`) with multi-source channel selection, quick preset triggers, a live streaming telemetry HUD with a 5-stage progress tracker and real-time elapsed timer, and live evidence dossier inspection. Implemented `sanitizeCitationClause` in `convex/clinicalEvidences.ts` to format long pipe-separated sentences into clean identifiers (e.g. `PMID: 32875890`, `NDA 21-435`) and added `max-w` truncation and `min-w-0 flex-1` layout containment across `ClinicalResearchConsole.tsx` and `PolicyViewer.tsx`, preventing verbose clinical sentences from breaking badge layout into disjointed multi-line stacks. Fixed stage 5 progression state in `ClinicalResearchConsole.tsx` so all 5 stages render completed green checkmarks upon indexing completion, replacing lingering spinner icons with `CheckCircle` and `5/5 Complete` badges. Integrated the Research Hub directly into `EvidenceMatrix.tsx`, `PolicyViewer.tsx`, `useEvidence.ts`, and `App.tsx`. Added comprehensive unit tests in `tests/claimhero.test.ts` and validated cleanly with `npm run verify`: 100% typecheck, lint, 57/57 passing unit tests, and production build.
+
+
+
+

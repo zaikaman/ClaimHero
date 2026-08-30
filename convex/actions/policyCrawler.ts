@@ -68,6 +68,116 @@ const POLICY_SEARCH_INTENT_SCHEMA = {
   additionalProperties: false,
 };
 
+const PUBMED_EXTRACTION_SCHEMA = {
+  type: "object",
+  properties: {
+    studyTitle: { type: "string" },
+    authorsOrJournal: { type: "string" },
+    identifier: { type: "string" },
+    studyDesign: { type: "string" },
+    keyFindings: { type: "string" },
+    standardOfCareConclusion: { type: "string" },
+    clauses: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          citationClause: { type: "string" },
+          extractedEvidenceMarkdown: { type: "string" },
+          relevanceScore: { type: "number" },
+        },
+        required: [
+          "title",
+          "citationClause",
+          "extractedEvidenceMarkdown",
+          "relevanceScore",
+        ],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: [
+    "studyTitle",
+    "authorsOrJournal",
+    "identifier",
+    "studyDesign",
+    "keyFindings",
+    "standardOfCareConclusion",
+    "clauses",
+  ],
+  additionalProperties: false,
+};
+
+const FDA_EXTRACTION_SCHEMA = {
+  type: "object",
+  properties: {
+    productName: { type: "string" },
+    applicationNumber: { type: "string" },
+    approvalDate: { type: "string" },
+    approvedIndications: { type: "string" },
+    antiInvestigationalRebuttal: { type: "string" },
+    clauses: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          citationClause: { type: "string" },
+          extractedEvidenceMarkdown: { type: "string" },
+          relevanceScore: { type: "number" },
+        },
+        required: [
+          "title",
+          "citationClause",
+          "extractedEvidenceMarkdown",
+          "relevanceScore",
+        ],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: [
+    "productName",
+    "applicationNumber",
+    "approvalDate",
+    "approvedIndications",
+    "antiInvestigationalRebuttal",
+    "clauses",
+  ],
+  additionalProperties: false,
+};
+
+const CUSTOM_GUIDELINE_EXTRACTION_SCHEMA = {
+  type: "object",
+  properties: {
+    documentTitle: { type: "string" },
+    issuingAuthority: { type: "string" },
+    effectiveDate: { type: "string" },
+    clauses: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          citationClause: { type: "string" },
+          extractedEvidenceMarkdown: { type: "string" },
+          relevanceScore: { type: "number" },
+        },
+        required: [
+          "title",
+          "citationClause",
+          "extractedEvidenceMarkdown",
+          "relevanceScore",
+        ],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["documentTitle", "issuingAuthority", "effectiveDate", "clauses"],
+  additionalProperties: false,
+};
+
 interface ExtractedClause {
   sourceType: string;
   title: string;
@@ -81,6 +191,47 @@ interface PolicyExtractionResponse {
   policyNumber: string;
   effectiveDate: string;
   clauses: ExtractedClause[];
+}
+
+interface PubMedExtractionResponse {
+  studyTitle: string;
+  authorsOrJournal: string;
+  identifier: string;
+  studyDesign: string;
+  keyFindings: string;
+  standardOfCareConclusion: string;
+  clauses: Array<{
+    title: string;
+    citationClause: string;
+    extractedEvidenceMarkdown: string;
+    relevanceScore: number;
+  }>;
+}
+
+interface FdaExtractionResponse {
+  productName: string;
+  applicationNumber: string;
+  approvalDate: string;
+  approvedIndications: string;
+  antiInvestigationalRebuttal: string;
+  clauses: Array<{
+    title: string;
+    citationClause: string;
+    extractedEvidenceMarkdown: string;
+    relevanceScore: number;
+  }>;
+}
+
+interface CustomGuidelineExtractionResponse {
+  documentTitle: string;
+  issuingAuthority: string;
+  effectiveDate: string;
+  clauses: Array<{
+    title: string;
+    citationClause: string;
+    extractedEvidenceMarkdown: string;
+    relevanceScore: number;
+  }>;
 }
 
 interface PolicyRelevanceResponse {
@@ -258,11 +409,18 @@ export const NEUTRAL_PUBLIC_HOSTS = new Set([
   "www.medicaid.gov",
   "fda.gov",
   "www.fda.gov",
+  "accessdata.fda.gov",
+  "www.accessdata.fda.gov",
+  "dailymed.nlm.nih.gov",
+  "fda.report",
+  "www.fda.report",
   "nih.gov",
   "www.nih.gov",
   "ncbi.nlm.nih.gov",
   "pubmed.ncbi.nlm.nih.gov",
   "www.ncbi.nlm.nih.gov",
+  "clinicaltrials.gov",
+  "www.clinicaltrials.gov",
   "nccn.org",
   "www.nccn.org",
   "cdc.gov",
@@ -292,6 +450,16 @@ export const NEUTRAL_PUBLIC_HOSTS = new Set([
   "www.statpearls.com",
   "cochranelibrary.com",
   "www.cochranelibrary.com",
+  "nejm.org",
+  "www.nejm.org",
+  "thelancet.com",
+  "www.thelancet.com",
+  "jamanetwork.com",
+  "www.jamanetwork.com",
+  "bmj.com",
+  "www.bmj.com",
+  "drugs.com",
+  "www.drugs.com",
   "ama-assn.org",
   "www.ama-assn.org",
   "guidelinecentral.com",
@@ -1114,3 +1282,513 @@ For each clause:
     };
   },
 });
+
+/**
+ * Generate targeted PubMed & ClinicalTrials.gov search queries.
+ */
+async function generatePubMedSearchQueries(
+  cptCodes: string[],
+  icd10Codes: string[],
+  denialReasonCode: string,
+  denialReasonDescription = "",
+  customQuery = "",
+): Promise<string[]> {
+  if (customQuery?.trim()) {
+    return [
+      `site:pubmed.ncbi.nlm.nih.gov ${customQuery.trim()}`,
+      `site:clinicaltrials.gov ${customQuery.trim()}`,
+    ];
+  }
+
+  const cptDescriptions = cptCodes
+    .map((code) => {
+      const name = CPT_CLINICAL_NAMES[code];
+      return name ? `${code} ${name}` : code;
+    })
+    .join(" ");
+
+  const result = await createStructuredCompletion<PolicySearchIntentResponse>({
+    systemPrompt: `You are an expert Medical Research Librarian.
+Generate 2-3 precise Google/web search queries targeting peer-reviewed medical trial abstracts and clinical study efficacy evidence on PubMed (site:pubmed.ncbi.nlm.nih.gov) and ClinicalTrials.gov (site:clinicaltrials.gov).
+Focus queries on:
+1. Standard of care status and clinical efficacy for the given procedure and diagnosis.
+2. Clinical trial endpoints, randomized controlled trials (RCTs), meta-analyses, and long-term functional outcomes.
+3. Overcoming denial justification (e.g. medical necessity, conservative therapy failure, non-experimental evidence).
+Include site:pubmed.ncbi.nlm.nih.gov or site:clinicaltrials.gov in the queries.`,
+    userPrompt: `Generate PubMed and ClinicalTrials search queries for:
+Procedure: ${cptDescriptions || "Medical Procedure"}
+Diagnosis: ${icd10Codes.join(", ") || "Clinical Diagnosis"}
+Denial Issue: ${denialReasonCode} - ${denialReasonDescription || "Medical necessity"}`,
+    schemaName: "PolicySearchIntentResponse",
+    schema: POLICY_SEARCH_INTENT_SCHEMA,
+    temperature: 0.1,
+  });
+
+  return result.queries.filter(Boolean).slice(0, 3);
+}
+
+/**
+ * Generate targeted FDA package insert / NDA / 510(k) search queries.
+ */
+async function generateFdaSearchQueries(
+  cptCodes: string[],
+  icd10Codes: string[],
+  drugOrDeviceName = "",
+  customUrl = "",
+): Promise<string[]> {
+  if (customUrl?.trim()) return [];
+
+  const cptDescriptions = cptCodes
+    .map((code) => {
+      const name = CPT_CLINICAL_NAMES[code];
+      return name ? `${code} ${name}` : code;
+    })
+    .join(" ");
+
+  const result = await createStructuredCompletion<PolicySearchIntentResponse>({
+    systemPrompt: `You are an expert FDA Regulatory Affairs and Healthcare Compliance Specialist.
+Generate 2-3 precise web search queries targeting official FDA package inserts, FDA approvals (Drugs@FDA site:accessdata.fda.gov or Devices site:accessdata.fda.gov), and DailyMed package labels (site:dailymed.nlm.nih.gov).
+Focus queries on approved on-label indications, safety pharmacology, 510(k) / PMA / NDA approval status that proves the treatment is FDA-approved and legally non-experimental.`,
+    userPrompt: `Generate FDA package insert and approval search queries for:
+Procedure / Device: ${drugOrDeviceName || cptDescriptions || "Medical intervention"}
+Diagnosis: ${icd10Codes.join(", ") || "Clinical Indication"}`,
+    schemaName: "PolicySearchIntentResponse",
+    schema: POLICY_SEARCH_INTENT_SCHEMA,
+    temperature: 0.1,
+  });
+
+  return result.queries.filter(Boolean).slice(0, 3);
+}
+
+/**
+ * PubMed & ClinicalTrials.gov Scraper Action
+ * Dynamically retrieves peer-reviewed medical study abstracts proving standard-of-care status and clinical efficacy.
+ */
+export const crawlPubMedAndTrials = action({
+  args: {
+    claimId: v.id("claims"),
+    cptCodes: v.array(v.string()),
+    icd10Codes: v.array(v.string()),
+    denialReasonCode: v.string(),
+    denialReasonDescription: v.optional(v.string()),
+    customQuery: v.optional(v.string()),
+    customUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+    if (!firecrawlApiKey?.trim()) {
+      throw new Error("PubMed & clinical trials research requires FIRECRAWL_API_KEY.");
+    }
+
+    let sourceMarkdown = "";
+    let sourceUrl = args.customUrl || "";
+
+    if (args.customUrl) {
+      const scraped = await scrapeFirecrawlPolicySource(firecrawlApiKey, args.customUrl);
+      sourceMarkdown = scraped.markdown;
+      sourceUrl = scraped.sourceUrl;
+    } else {
+      const searchQueries = await generatePubMedSearchQueries(
+        args.cptCodes,
+        args.icd10Codes,
+        args.denialReasonCode,
+        args.denialReasonDescription || "",
+        args.customQuery || "",
+      );
+
+      let foundSource: FirecrawlPolicySource | null = null;
+      for (const query of searchQueries) {
+        try {
+          const response = await fetch("https://api.firecrawl.dev/v2/search", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${firecrawlApiKey}`,
+            },
+            body: JSON.stringify({
+              query,
+              limit: 5,
+              sources: ["web"],
+            }),
+          });
+
+          if (!response.ok) continue;
+          const payload = await response.json();
+          const candidateUrls = selectFirecrawlPolicyUrls(payload, [...args.cptCodes, "pubmed", "trial", "study", "efficacy"], 0, 4);
+
+          for (const candUrl of candidateUrls) {
+            try {
+              const scraped = await scrapeFirecrawlPolicySource(firecrawlApiKey, candUrl);
+              if (scraped.markdown && scraped.markdown.length > 300) {
+                foundSource = scraped;
+                break;
+              }
+            } catch {
+              // Try next candidate
+            }
+          }
+
+          if (foundSource) break;
+        } catch {
+          // Continue to next query
+        }
+      }
+
+      if (!foundSource) {
+        throw new Error("Firecrawl PubMed search could not locate an accessible clinical trial or study abstract.");
+      }
+
+      sourceMarkdown = foundSource.markdown;
+      sourceUrl = foundSource.sourceUrl;
+    }
+
+    const windowedText = sourceMarkdown.slice(0, 40000);
+
+    const extracted = await createStructuredCompletion<PubMedExtractionResponse>({
+      systemPrompt: `You are an expert Clinical Epidemiologist and Medical Evidence Specialist.
+Analyze the provided peer-reviewed medical study abstract or ClinicalTrials.gov entry.
+Extract the study's standard-of-care conclusions, clinical efficacy findings, trial methodology, and concise citation clauses to support health insurance appeals.
+For citationClause, provide ONLY a short section identifier under 25 characters (e.g. "Results §3", "Methods", "Conclusions", "Abstract", "Table 2"). Strictly do NOT put sentences or titles in citationClause.
+Strictly do NOT use markdown bold asterisks (such as **bold**) in extracted markdown or titles.
+Assign relevanceScore between 85 and 99.`,
+      userPrompt: `Extract structured clinical trial evidence for CPT codes [${args.cptCodes.join(", ")}]:\n\n${windowedText}`,
+      schemaName: "PubMedExtractionResponse",
+      schema: PUBMED_EXTRACTION_SCHEMA,
+      temperature: 0.1,
+    });
+
+    const evidencesToInsert = extracted.clauses.map((clause) => {
+      const rawClause = (clause.citationClause || "").replace(/\*\*/g, "").trim();
+      const shortClause = rawClause.length > 25 ? rawClause.slice(0, 22) + "..." : rawClause;
+      const id = extracted.identifier || "PMID";
+      const citationClause = shortClause && !shortClause.toLowerCase().includes(id.toLowerCase())
+        ? `${id} • ${shortClause}`
+        : id;
+
+      return {
+        sourceType: "pubmed_study",
+        title: `${extracted.studyTitle} (${extracted.identifier || extracted.authorsOrJournal || "PubMed"})`.replace(/\*\*/g, ""),
+        sourceUrl: sourceUrl || "https://pubmed.ncbi.nlm.nih.gov",
+        citationClause,
+        extractedEvidenceMarkdown: `${clause.extractedEvidenceMarkdown}\n\nStudy Design: ${extracted.studyDesign}\nKey Clinical Findings: ${extracted.keyFindings}\nStandard of Care: ${extracted.standardOfCareConclusion}`.replace(/\*\*/g, "").trim(),
+        relevanceScore: clause.relevanceScore || 90,
+      };
+    });
+
+    if (evidencesToInsert.length > 0) {
+      await ctx.runMutation((api as any).clinicalEvidences.insertBatch, {
+        claimId: args.claimId,
+        evidences: evidencesToInsert,
+      });
+
+      await ctx.runMutation((api as any).claims.updateStatus, {
+        claimId: args.claimId,
+        status: "analyzing",
+        details: `Firecrawl indexed ${evidencesToInsert.length} PubMed study clauses (${extracted.identifier || "Clinical Trial"}).`,
+      });
+    }
+
+    return {
+      studyTitle: extracted.studyTitle,
+      identifier: extracted.identifier,
+      studyDesign: extracted.studyDesign,
+      clausesExtracted: evidencesToInsert.length,
+      evidences: evidencesToInsert,
+    };
+  },
+});
+
+/**
+ * FDA Label & Indication Crawler Action
+ * Scrapes FDA-approved package inserts to legally rebut arbitrary "experimental / investigational" denial determinations.
+ */
+export const crawlFdaIndications = action({
+  args: {
+    claimId: v.id("claims"),
+    cptCodes: v.array(v.string()),
+    icd10Codes: v.array(v.string()),
+    denialReasonCode: v.string(),
+    customUrl: v.optional(v.string()),
+    drugOrDeviceName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+    if (!firecrawlApiKey?.trim()) {
+      throw new Error("FDA indication research requires FIRECRAWL_API_KEY.");
+    }
+
+    let sourceMarkdown = "";
+    let sourceUrl = args.customUrl || "";
+
+    if (args.customUrl) {
+      const scraped = await scrapeFirecrawlPolicySource(firecrawlApiKey, args.customUrl);
+      sourceMarkdown = scraped.markdown;
+      sourceUrl = scraped.sourceUrl;
+    } else {
+      const searchQueries = await generateFdaSearchQueries(
+        args.cptCodes,
+        args.icd10Codes,
+        args.drugOrDeviceName || "",
+      );
+
+      let foundSource: FirecrawlPolicySource | null = null;
+      for (const query of searchQueries) {
+        try {
+          const response = await fetch("https://api.firecrawl.dev/v2/search", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${firecrawlApiKey}`,
+            },
+            body: JSON.stringify({
+              query,
+              limit: 5,
+              sources: ["web"],
+            }),
+          });
+
+          if (!response.ok) continue;
+          const payload = await response.json();
+          const candidateUrls = selectFirecrawlPolicyUrls(payload, ["fda", "label", "indication", "package insert", "accessdata"], 0, 4);
+
+          for (const candUrl of candidateUrls) {
+            try {
+              const scraped = await scrapeFirecrawlPolicySource(firecrawlApiKey, candUrl);
+              if (scraped.markdown && scraped.markdown.length > 300) {
+                foundSource = scraped;
+                break;
+              }
+            } catch {
+              // Try next candidate
+            }
+          }
+
+          if (foundSource) break;
+        } catch {
+          // Continue to next query
+        }
+      }
+
+      if (!foundSource) {
+        throw new Error("Firecrawl could not locate an accessible FDA package insert or indication document.");
+      }
+
+      sourceMarkdown = foundSource.markdown;
+      sourceUrl = foundSource.sourceUrl;
+    }
+
+    const windowedText = sourceMarkdown.slice(0, 40000);
+
+    const extracted = await createStructuredCompletion<FdaExtractionResponse>({
+      systemPrompt: `You are an expert FDA Regulatory Affairs and Health Law Counsel.
+Analyze the provided FDA package insert, approval summary, or DailyMed label.
+Extract the official on-label indications, application/NDA/PMA/510(k) numbers, and articulate a rigorous legal/clinical rebuttal showing that FDA approval legally refutes arbitrary payer "experimental / investigational" determinations.
+For citationClause, provide ONLY a concise section identifier under 25 characters (e.g. "Section 1: Indications", "Dosage & Admin", "Boxed Warning", "Indication §1.2"). Strictly do NOT put sentences or full titles in citationClause.
+Strictly do NOT use markdown bold asterisks in extracted text or titles.
+Assign relevanceScore between 88 and 99.`,
+      userPrompt: `Extract FDA indication evidence for CPT codes [${args.cptCodes.join(", ")}]:\n\n${windowedText}`,
+      schemaName: "FdaExtractionResponse",
+      schema: FDA_EXTRACTION_SCHEMA,
+      temperature: 0.1,
+    });
+
+    const evidencesToInsert = extracted.clauses.map((clause) => {
+      const rawClause = (clause.citationClause || "").replace(/\*\*/g, "").trim();
+      const shortClause = rawClause.length > 25 ? rawClause.slice(0, 22) + "..." : rawClause;
+      const appNum = extracted.applicationNumber || "FDA Label";
+      const citationClause = shortClause && !shortClause.toLowerCase().includes(appNum.toLowerCase())
+        ? `${appNum} • ${shortClause}`
+        : appNum;
+
+      return {
+        sourceType: "fda_package_insert",
+        title: `FDA Approved Label: ${extracted.productName} (${extracted.applicationNumber})`.replace(/\*\*/g, ""),
+        sourceUrl: sourceUrl || "https://accessdata.fda.gov",
+        citationClause,
+        extractedEvidenceMarkdown: `${clause.extractedEvidenceMarkdown}\n\nApproved Indications: ${extracted.approvedIndications}\nApproval Date: ${extracted.approvalDate}\nAnti-Investigational Legal Basis: ${extracted.antiInvestigationalRebuttal}`.replace(/\*\*/g, "").trim(),
+        relevanceScore: clause.relevanceScore || 92,
+      };
+    });
+
+    if (evidencesToInsert.length > 0) {
+      await ctx.runMutation((api as any).clinicalEvidences.insertBatch, {
+        claimId: args.claimId,
+        evidences: evidencesToInsert,
+      });
+
+      await ctx.runMutation((api as any).claims.updateStatus, {
+        claimId: args.claimId,
+        status: "analyzing",
+        details: `Firecrawl indexed ${evidencesToInsert.length} FDA label & indication clauses (${extracted.productName}).`,
+      });
+    }
+
+    return {
+      productName: extracted.productName,
+      applicationNumber: extracted.applicationNumber,
+      approvalDate: extracted.approvalDate,
+      clausesExtracted: evidencesToInsert.length,
+      evidences: evidencesToInsert,
+    };
+  },
+});
+
+/**
+ * Custom Research URL Scraper Action
+ * Allows clinicians or patients to input custom insurance URLs or clinical guidelines for structured criteria extraction.
+ */
+export const crawlCustomResearchUrl = action({
+  args: {
+    claimId: v.id("claims"),
+    customUrl: v.string(),
+    sourceCategory: v.optional(v.string()), // payer_cpb, pubmed_study, fda_package_insert, nccn_guideline, legal_precedent
+    clinicalNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+    if (!firecrawlApiKey?.trim()) {
+      throw new Error("Custom URL research requires FIRECRAWL_API_KEY.");
+    }
+
+    if (!isAcceptableSourceUrl(args.customUrl)) {
+      throw new Error("Please provide a valid HTTP or HTTPS web URL.");
+    }
+
+    const scraped = await scrapeFirecrawlPolicySource(firecrawlApiKey, args.customUrl);
+    const windowedText = scraped.markdown.slice(0, 45000);
+    const category = args.sourceCategory || "payer_cpb";
+
+    const extracted = await createStructuredCompletion<CustomGuidelineExtractionResponse>({
+      systemPrompt: `You are an expert Clinical Policy Auditor and Health Insurance Appellate Counsel.
+Analyze the scraped medical guideline, clinical policy, or research document.
+Extract all actionable medical necessity criteria, coverage rules, diagnostic standards, and qualifying exceptions.
+Strictly do NOT use markdown bold asterisks in titles or extracted evidence markdown.
+Assign relevanceScore between 80 and 99.`,
+      userPrompt: `Extract structured clinical criteria clauses from this document:${args.clinicalNotes ? `\nClinical Notes: ${args.clinicalNotes}` : ""}\n\n${windowedText}`,
+      schemaName: "CustomGuidelineExtractionResponse",
+      schema: CUSTOM_GUIDELINE_EXTRACTION_SCHEMA,
+      temperature: 0.1,
+    });
+
+    const evidencesToInsert = extracted.clauses.map((clause) => ({
+      sourceType: category,
+      title: `${extracted.documentTitle} (${extracted.issuingAuthority || "Clinical Authority"})`.replace(/\*\*/g, ""),
+      sourceUrl: scraped.sourceUrl || args.customUrl,
+      citationClause: clause.citationClause.replace(/\*\*/g, ""),
+      extractedEvidenceMarkdown: clause.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
+      relevanceScore: clause.relevanceScore || 88,
+    }));
+
+    if (evidencesToInsert.length > 0) {
+      await ctx.runMutation((api as any).clinicalEvidences.insertBatch, {
+        claimId: args.claimId,
+        evidences: evidencesToInsert,
+      });
+
+      await ctx.runMutation((api as any).claims.updateStatus, {
+        claimId: args.claimId,
+        status: "analyzing",
+        details: `Firecrawl extracted ${evidencesToInsert.length} clauses from custom URL: ${extracted.documentTitle}.`,
+      });
+    }
+
+    return {
+      documentTitle: extracted.documentTitle,
+      issuingAuthority: extracted.issuingAuthority,
+      effectiveDate: extracted.effectiveDate,
+      clausesExtracted: evidencesToInsert.length,
+      evidences: evidencesToInsert,
+    };
+  },
+});
+
+/**
+ * Multi-Source Clinical Research Hub Action
+ * Coordinates comprehensive parallel ingestion across Insurer CPB, PubMed Studies, and FDA Indication inserts.
+ */
+export const crawlMultiSourceHub = action({
+  args: {
+    claimId: v.id("claims"),
+    payer: v.string(),
+    cptCodes: v.array(v.string()),
+    icd10Codes: v.array(v.string()),
+    denialReasonCode: v.string(),
+    denialReasonDescription: v.optional(v.string()),
+    customPolicyUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Clear prior evidence to start fresh multi-source sweep
+    await ctx.runMutation((api as any).clinicalEvidences.clearByClaim, {
+      claimId: args.claimId,
+    });
+
+    const results: {
+      cpbResult?: any;
+      pubMedResult?: any;
+      fdaResult?: any;
+      errors: string[];
+    } = {
+      errors: [],
+    };
+
+    // 1. Crawl Insurer CPB / Guideline
+    try {
+      results.cpbResult = await ctx.runAction((api as any).actions?.policyCrawler?.crawlInsurerPolicy || (api as any)["actions/policyCrawler"]?.crawlInsurerPolicy, {
+        claimId: args.claimId,
+        payer: args.payer,
+        cptCodes: args.cptCodes,
+        icd10Codes: args.icd10Codes,
+        denialReasonCode: args.denialReasonCode,
+        denialReasonDescription: args.denialReasonDescription,
+        customPolicyUrl: args.customPolicyUrl,
+      });
+    } catch (err: any) {
+      results.errors.push(`CPB Crawl: ${err?.message || "Failed"}`);
+    }
+
+    // 2. Crawl PubMed & ClinicalTrials
+    try {
+      results.pubMedResult = await ctx.runAction((api as any).actions?.policyCrawler?.crawlPubMedAndTrials || (api as any)["actions/policyCrawler"]?.crawlPubMedAndTrials, {
+        claimId: args.claimId,
+        cptCodes: args.cptCodes,
+        icd10Codes: args.icd10Codes,
+        denialReasonCode: args.denialReasonCode,
+        denialReasonDescription: args.denialReasonDescription,
+      });
+    } catch (err: any) {
+      results.errors.push(`PubMed Scrape: ${err?.message || "Failed"}`);
+    }
+
+    // 3. Crawl FDA Labels & Indications
+    try {
+      results.fdaResult = await ctx.runAction((api as any).actions?.policyCrawler?.crawlFdaIndications || (api as any)["actions/policyCrawler"]?.crawlFdaIndications, {
+        claimId: args.claimId,
+        cptCodes: args.cptCodes,
+        icd10Codes: args.icd10Codes,
+        denialReasonCode: args.denialReasonCode,
+      });
+    } catch (err: any) {
+      results.errors.push(`FDA Crawler: ${err?.message || "Failed"}`);
+    }
+
+    // Ensure ERISA statutory legal precedent is always present
+    await ctx.runMutation((api as any).clinicalEvidences.insertSingle, {
+      claimId: args.claimId,
+      sourceType: "legal_precedent",
+      title: "ERISA Full & Fair Review Statutory Protocol",
+      sourceUrl: "https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XXV/subchapter-L/part-2560/section-2560.503-1",
+      citationClause: "29 CFR § 2560.503-1(h)(2)(iii)",
+      extractedEvidenceMarkdown: "Statutory Requirement: Plan administrators must provide claimants upon request with all documents, records, and internal clinical criteria utilized in making the adverse determination. Adverse benefit determinations lacking specific clinical justification violate the claimant's right to a full and fair review.",
+      relevanceScore: 95,
+    });
+
+    return {
+      success: true,
+      cpbClauses: results.cpbResult?.clausesExtracted || 0,
+      pubMedClauses: results.pubMedResult?.clausesExtracted || 0,
+      fdaClauses: results.fdaResult?.clausesExtracted || 0,
+      errors: results.errors,
+    };
+  },
+});
+

@@ -270,3 +270,58 @@ export interface DashboardStats {
   averageWinScore: number;
   criticalDeadlinesCount: number;
 }
+
+// Multi-Source Clinical Research Hub Types
+export type ResearchMode =
+  | "multi_source"
+  | "payer_cpb"
+  | "pubmed_trials"
+  | "fda_labels"
+  | "custom_url";
+
+export interface ResearchProgressStep {
+  id: string;
+  label: string;
+  detail: string;
+  status: "pending" | "running" | "completed" | "error";
+  durationMs?: number;
+}
+
+export interface MultiSourceCrawlResult {
+  success: boolean;
+  cpbClauses: number;
+  pubMedClauses: number;
+  fdaClauses: number;
+  errors: string[];
+}
+
+export interface PubMedScrapeResult {
+  studyTitle: string;
+  identifier: string;
+  studyDesign: string;
+  clausesExtracted: number;
+  evidences: Array<{
+    sourceType: string;
+    title: string;
+    sourceUrl?: string;
+    citationClause: string;
+    extractedEvidenceMarkdown: string;
+    relevanceScore: number;
+  }>;
+}
+
+export interface FdaScrapeResult {
+  productName: string;
+  applicationNumber: string;
+  approvalDate: string;
+  clausesExtracted: number;
+  evidences: Array<{
+    sourceType: string;
+    title: string;
+    sourceUrl?: string;
+    citationClause: string;
+    extractedEvidenceMarkdown: string;
+    relevanceScore: number;
+  }>;
+}
+

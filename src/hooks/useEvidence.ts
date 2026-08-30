@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useQuery, useAction } from "convex/react";
+import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Claim, ClinicalEvidence, OverturnScoringResult } from "../types";
 
@@ -14,9 +14,35 @@ export function useEvidence(claim?: Claim | null) {
     claimId ? { claimId: claimId as any } : "skip"
   ) as ClinicalEvidence[] | undefined;
 
+  // Query summary breakdown of evidence sources
+  const sourcesSummary = useQuery(
+    convexApi.clinicalEvidences.listSourcesSummary,
+    claimId ? { claimId: claimId as any } : "skip"
+  );
+
   const crawlPolicyAction = useAction(
     convexApi["actions/policyCrawler"]?.crawlInsurerPolicy ||
     convexApi.actions?.policyCrawler?.crawlInsurerPolicy
+  );
+
+  const crawlPubMedAction = useAction(
+    convexApi["actions/policyCrawler"]?.crawlPubMedAndTrials ||
+    convexApi.actions?.policyCrawler?.crawlPubMedAndTrials
+  );
+
+  const crawlFdaAction = useAction(
+    convexApi["actions/policyCrawler"]?.crawlFdaIndications ||
+    convexApi.actions?.policyCrawler?.crawlFdaIndications
+  );
+
+  const crawlCustomUrlAction = useAction(
+    convexApi["actions/policyCrawler"]?.crawlCustomResearchUrl ||
+    convexApi.actions?.policyCrawler?.crawlCustomResearchUrl
+  );
+
+  const crawlMultiSourceHubAction = useAction(
+    convexApi["actions/policyCrawler"]?.crawlMultiSourceHub ||
+    convexApi.actions?.policyCrawler?.crawlMultiSourceHub
   );
 
   const computeScoreAction = useAction(
@@ -27,6 +53,14 @@ export function useEvidence(claim?: Claim | null) {
   const runPipelineAction = useAction(
     convexApi["actions/sentinelPipeline"]?.runAutonomousPipeline ||
     convexApi.actions?.sentinelPipeline?.runAutonomousPipeline
+  );
+
+  const deleteEvidenceMutation = useMutation(
+    convexApi.clinicalEvidences.deleteEvidence
+  );
+
+  const insertSingleEvidenceMutation = useMutation(
+    convexApi.clinicalEvidences.insertSingle
   );
 
   // Trigger Firecrawl policy crawler with claim parameters
@@ -41,10 +75,119 @@ export function useEvidence(claim?: Claim | null) {
         cptCodes: claim?.cptCodes?.length ? claim.cptCodes : ["27447"],
         icd10Codes: claim?.icd10Codes?.length ? claim.icd10Codes : ["M17.11"],
         denialReasonCode: claim?.denialReasonCode || "CO-50",
+        denialReasonDescription: claim?.denialReasonDescription,
         customPolicyUrl,
       });
     },
     [crawlPolicyAction, claim]
+  );
+
+  // Trigger PubMed & ClinicalTrials.gov scraper
+  const crawlPubMed = useCallback(
+    async (targetClaimId?: string, customQuery?: string, customUrl?: string) => {
+      const activeClaimId = targetClaimId || claim?._id;
+      if (!activeClaimId) throw new Error("No claim specified for PubMed research");
+
+      return await crawlPubMedAction({
+        claimId: activeClaimId as any,
+        cptCodes: claim?.cptCodes?.length ? claim.cptCodes : ["27447"],
+        icd10Codes: claim?.icd10Codes?.length ? claim.icd10Codes : ["M17.11"],
+        denialReasonCode: claim?.denialReasonCode || "CO-50",
+        denialReasonDescription: claim?.denialReasonDescription,
+        customQuery,
+        customUrl,
+      });
+    },
+    [crawlPubMedAction, claim]
+  );
+
+  // Trigger FDA package insert & indication crawler
+  const crawlFda = useCallback(
+    async (targetClaimId?: string, customUrl?: string, drugOrDeviceName?: string) => {
+      const activeClaimId = targetClaimId || claim?._id;
+      if (!activeClaimId) throw new Error("No claim specified for FDA indication research");
+
+      return await crawlFdaAction({
+        claimId: activeClaimId as any,
+        cptCodes: claim?.cptCodes?.length ? claim.cptCodes : ["27447"],
+        icd10Codes: claim?.icd10Codes?.length ? claim.icd10Codes : ["M17.11"],
+        denialReasonCode: claim?.denialReasonCode || "CO-50",
+        customUrl,
+        drugOrDeviceName,
+      });
+    },
+    [crawlFdaAction, claim]
+  );
+
+  // Trigger Custom URL guideline scraper
+  const crawlCustomUrl = useCallback(
+    async (
+      targetClaimId: string,
+      customUrl: string,
+      sourceCategory: string = "payer_cpb",
+      clinicalNotes?: string
+    ) => {
+      const activeClaimId = targetClaimId || claim?._id;
+      if (!activeClaimId) throw new Error("No claim specified for custom URL scraping");
+
+      return await crawlCustomUrlAction({
+        claimId: activeClaimId as any,
+        customUrl,
+        sourceCategory,
+        clinicalNotes,
+      });
+    },
+    [crawlCustomUrlAction, claim]
+  );
+
+  // Trigger full Multi-Source Sentinel Hub crawl (Insurer CPB + PubMed + FDA)
+  const crawlMultiSourceHub = useCallback(
+    async (targetClaimId?: string, customPolicyUrl?: string) => {
+      const activeClaimId = targetClaimId || claim?._id;
+      if (!activeClaimId) throw new Error("No claim specified for multi-source crawl");
+
+      return await crawlMultiSourceHubAction({
+        claimId: activeClaimId as any,
+        payer: claim?.patient?.insurancePayer || "Molina Healthcare",
+        cptCodes: claim?.cptCodes?.length ? claim.cptCodes : ["27447"],
+        icd10Codes: claim?.icd10Codes?.length ? claim.icd10Codes : ["M17.11"],
+        denialReasonCode: claim?.denialReasonCode || "CO-50",
+        denialReasonDescription: claim?.denialReasonDescription,
+        customPolicyUrl,
+      });
+    },
+    [crawlMultiSourceHubAction, claim]
+  );
+
+  // Delete a single evidence clause
+  const deleteEvidence = useCallback(
+    async (evidenceId: string) => {
+      return await deleteEvidenceMutation({
+        evidenceId: evidenceId as any,
+      });
+    },
+    [deleteEvidenceMutation]
+  );
+
+  // Insert a single custom evidence clause
+  const insertSingleEvidence = useCallback(
+    async (
+      targetClaimId: string,
+      evidence: {
+        sourceType: string;
+        title: string;
+        sourceUrl?: string;
+        citationClause: string;
+        extractedEvidenceMarkdown: string;
+        relevanceScore: number;
+      }
+    ) => {
+      return await insertSingleEvidenceMutation({
+        claimId: targetClaimId as any,
+        ...evidence,
+      });
+    },
+    [insertSingleEvidenceMutation]
   );
 
   // Trigger Overturn Probability scoring
@@ -98,9 +241,17 @@ export function useEvidence(claim?: Claim | null) {
   return {
     evidences: rawEvidences || [],
     isLoadingEvidences: claimId ? rawEvidences === undefined : false,
+    sourcesSummary,
     crawlPolicy,
+    crawlPubMed,
+    crawlFda,
+    crawlCustomUrl,
+    crawlMultiSourceHub,
+    deleteEvidence,
+    insertSingleEvidence,
     computeOverturnScore,
     runCompleteAnalysis,
     runFullPipeline,
   };
 }
+

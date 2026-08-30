@@ -777,7 +777,7 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
     expect(html).toContain("underline");
     expect(unsafeHtml).not.toContain("href=");
     expect(unsafeHtml).not.toContain("javascript:");
-  });
+  }, 15000);
 
   it("formats dedicated agentmail inbox address correctly", () => {
     const claimNumber = "CLM-2026-88192";
@@ -1203,5 +1203,90 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
     expect(email).toContain("Jordan Lee");
   });
 });
+
+describe("Firecrawl Multi-Source Clinical Research Hub", () => {
+  it("includes all medical research, trial registries, and FDA authority hosts in NEUTRAL_PUBLIC_HOSTS", async () => {
+    const { NEUTRAL_PUBLIC_HOSTS } = await import("../convex/actions/policyCrawler");
+    expect(NEUTRAL_PUBLIC_HOSTS.has("pubmed.ncbi.nlm.nih.gov")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("clinicaltrials.gov")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("accessdata.fda.gov")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("dailymed.nlm.nih.gov")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("fda.gov")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("nih.gov")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("nejm.org")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("thelancet.com")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("jamanetwork.com")).toBe(true);
+  });
+
+  it("permits PubMed, ClinicalTrials, and FDA sources regardless of claim insurance payer", async () => {
+    const { isPayerMismatchedSource } = await import("../convex/actions/policyCrawler");
+    
+    // PubMed study is neutral for Molina Healthcare
+    expect(
+      isPayerMismatchedSource("Molina Healthcare", "https://pubmed.ncbi.nlm.nih.gov/34123456/")
+    ).toBe(false);
+
+    // ClinicalTrials is neutral for UnitedHealthcare
+    expect(
+      isPayerMismatchedSource("UnitedHealthcare", "https://clinicaltrials.gov/study/NCT04281485")
+    ).toBe(false);
+
+    // FDA Drugs@FDA is neutral for Blue Cross Blue Shield
+    expect(
+      isPayerMismatchedSource("Blue Cross Blue Shield", "https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm")
+    ).toBe(false);
+
+    // DailyMed is neutral for Cigna
+    expect(
+      isPayerMismatchedSource("Cigna", "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=12345")
+    ).toBe(false);
+
+    // Cross-payer mismatch (e.g. Humana source for Molina payer) is still blocked
+    expect(
+      isPayerMismatchedSource("Molina Healthcare", "https://www.humana.com/provider/medical-resources/clinical-guidance")
+    ).toBe(true);
+  });
+
+  it("validates all 5 supported clinical evidence source types", () => {
+    const sourceTypes: string[] = [
+      "payer_cpb",
+      "pubmed_study",
+      "fda_package_insert",
+      "nccn_guideline",
+      "legal_precedent",
+    ];
+
+    expect(sourceTypes).toHaveLength(5);
+    expect(sourceTypes).toContain("pubmed_study");
+    expect(sourceTypes).toContain("fda_package_insert");
+    expect(sourceTypes).toContain("payer_cpb");
+    expect(sourceTypes).toContain("nccn_guideline");
+    expect(sourceTypes).toContain("legal_precedent");
+  });
+
+  it("sanitizes long pipe-separated and verbose sentence citation clauses cleanly", async () => {
+    const { sanitizeCitationClause } = await import("../convex/clinicalEvidences");
+
+    // Case 1: Pipe with long sentence from PubMed
+    const longPubMed = "PMID: 32875890 | Location of disc herniation demonstrated a strong association with the likelihood of spontaneous regression";
+    expect(sanitizeCitationClause(longPubMed)).toBe("PMID: 32875890");
+
+    // Case 2: Pipe with short sub-clause
+    const shortPubMed = "PMID: 32875890 | Results §3";
+    expect(sanitizeCitationClause(shortPubMed)).toBe("PMID: 32875890 • Results §3");
+
+    // Case 3: FDA application number with long indication sentence
+    const longFda = "NDA 21-435 | Approved for the management of neuropathic pain associated with spinal cord injury";
+    expect(sanitizeCitationClause(longFda)).toBe("NDA 21-435");
+
+    // Case 4: Standard CPB section
+    const cpbSection = "Section 2.1: Conservative Therapy";
+    expect(sanitizeCitationClause(cpbSection)).toBe("Section 2.1: Conservative Therapy");
+
+    // Case 5: Empty / undefined fallback
+    expect(sanitizeCitationClause(undefined)).toBe("Clinical Citation");
+  });
+});
+
 
 

@@ -14,10 +14,12 @@ import {
   BookOpen,
   Medal,
   Scales,
+  Globe,
 } from "@phosphor-icons/react";
 import { Claim, ClinicalEvidence, OverturnScoringResult, ScoringCriterion } from "../../types";
 import { PolicyViewer } from "./PolicyViewer";
 import { PrecedentFeed } from "./PrecedentFeed";
+import { ClinicalResearchConsole } from "./ClinicalResearchConsole";
 import { formatCurrency, formatDate, stripMarkdownFormatting } from "../../lib/utils";
 import { DENIAL_REASON_CODES } from "../../lib/constants";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
@@ -31,7 +33,12 @@ interface EvidenceMatrixProps {
   claim: Claim;
   evidences: ClinicalEvidence[];
   isLoadingEvidences?: boolean;
-  onCrawlPolicy: (claimId: string) => Promise<any>;
+  onCrawlPolicy: (claimId: string, customUrl?: string) => Promise<any>;
+  onCrawlPubMed?: (claimId: string, query?: string, customUrl?: string) => Promise<any>;
+  onCrawlFDA?: (claimId: string, customUrl?: string, deviceName?: string) => Promise<any>;
+  onCrawlCustomUrl?: (claimId: string, url: string, category?: string, notes?: string) => Promise<any>;
+  onCrawlMultiSource?: (claimId: string, customUrl?: string) => Promise<any>;
+  onDeleteEvidence?: (evidenceId: string) => Promise<any>;
   onComputeScore: (claimId: string) => Promise<OverturnScoringResult>;
   onNavigateToStudio: () => void;
   onNavigateView?: (view: FlowView) => void;
@@ -43,6 +50,11 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   evidences,
   isLoadingEvidences,
   onCrawlPolicy,
+  onCrawlPubMed,
+  onCrawlFDA,
+  onCrawlCustomUrl,
+  onCrawlMultiSource,
+  onDeleteEvidence,
   onComputeScore,
   onNavigateToStudio,
   onNavigateView,
@@ -58,6 +70,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const denialReason = DENIAL_REASON_CODES[claim.denialReasonCode];
+
 
   // 1-Click Complete Analysis (Crawl CPB + Compute Score in a single fluid action)
   const handleRunCompleteAnalysis = async () => {
@@ -268,6 +281,17 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                   <span>Index CPB</span>
                 </>
               )}
+            </Button>
+
+            {/* Research Hub Direct Trigger */}
+            <Button
+              variant={activeTab === "research" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveTab("research")}
+              className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0"
+            >
+              <Globe className="size-3.5 text-primary" />
+              <span>Research Hub</span>
             </Button>
 
             {/* Run Win Score Calculation Trigger */}
@@ -559,7 +583,11 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             <TabsList variant="line" className="w-full">
               <TabsTrigger value="policy" className="gap-1.5">
                 <BookOpen className="size-3.5" />
-                <span>Clinical Policy Bulletins ({evidences.length})</span>
+                <span>Evidence Dossier ({evidences.length})</span>
+              </TabsTrigger>
+              <TabsTrigger value="research" className="gap-1.5">
+                <Globe className="size-3.5 text-primary" />
+                <span>Research Hub</span>
               </TabsTrigger>
               <TabsTrigger value="precedents" className="gap-1.5">
                 <Medal className="size-3.5" />
@@ -571,6 +599,23 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               <PolicyViewer
                 evidences={evidences}
                 isLoading={isLoadingEvidences || isCrawling}
+                onDeleteEvidence={onDeleteEvidence}
+                onOpenResearchConsole={() => setActiveTab("research")}
+              />
+            </TabsContent>
+
+            <TabsContent value="research" className="pt-1">
+              <ClinicalResearchConsole
+                claim={claim}
+                evidences={evidences}
+                onCrawlCPB={onCrawlPolicy}
+                onCrawlPubMed={onCrawlPubMed || (async () => {})}
+                onCrawlFDA={onCrawlFDA || (async () => {})}
+                onCrawlCustomUrl={onCrawlCustomUrl || (async () => {})}
+                onCrawlMultiSource={onCrawlMultiSource || (async () => {})}
+                onDeleteEvidence={onDeleteEvidence}
+                onComputeScore={onComputeScore}
+                onNavigateToStudio={onNavigateToStudio}
               />
             </TabsContent>
 
