@@ -151,7 +151,11 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_patient", ["patientId"])
     .index("by_deadline", ["statutoryDeadline"])
-    .index("by_claim_number", ["claimNumber"]),
+    .index("by_claim_number", ["claimNumber"])
+    .searchIndex("search_claims", {
+      searchField: "denialReasonDescription",
+      filterFields: ["userId", "status", "denialReasonCode"],
+    }),
 
   // Clinical Policy Bulletins, Studies & Evidence
   clinicalEvidences: defineTable({
@@ -166,7 +170,11 @@ export default defineSchema({
   })
     .index("by_claim", ["claimId"])
     .index("by_claim_source", ["claimId", "sourceType"])
-    .index("by_source", ["sourceType"]),
+    .index("by_source", ["sourceType"])
+    .searchIndex("search_evidence", {
+      searchField: "extractedEvidenceMarkdown",
+      filterFields: ["claimId", "sourceType"],
+    }),
 
   // Synthesized & Collaborative Legal/Medical Appeal Briefs
   appeals: defineTable({
@@ -272,6 +280,10 @@ export default defineSchema({
       vectorField: "embedding",
       dimensions: 1536,
       filterFields: ["sourceKind", "primaryCpt", "carcCode", "primaryIcd10"],
+    })
+    .searchIndex("search_precedents", {
+      searchField: "winningArgument",
+      filterFields: ["sourceKind", "primaryCpt", "carcCode"],
     }),
 
   // Immutable Event Audit Trail

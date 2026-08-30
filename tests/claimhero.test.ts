@@ -1327,5 +1327,53 @@ describe("Firecrawl Multi-Source Clinical Research Hub", () => {
   });
 });
 
+describe("Convex Advanced Components & Infrastructure (Rate Limiter, Search Indexes & Aggregates)", () => {
+  it("exports configured RateLimiter instances with defined rate limits", async () => {
+    const { rateLimiter } = await import("../convex/lib/rateLimiter");
+    expect(rateLimiter).toBeDefined();
+    expect(rateLimiter.limits).toBeDefined();
+    expect(rateLimiter.limits?.sentinelPipeline).toMatchObject({
+      kind: "token bucket",
+      rate: 5,
+      capacity: 5,
+    });
+    expect(rateLimiter.limits?.opticalParser).toMatchObject({
+      kind: "token bucket",
+      rate: 10,
+      capacity: 10,
+    });
+    expect(rateLimiter.limits?.policyCrawler).toMatchObject({
+      kind: "token bucket",
+      rate: 10,
+      capacity: 10,
+    });
+    expect(rateLimiter.limits?.appealSynthesizer).toMatchObject({
+      kind: "token bucket",
+      rate: 10,
+      capacity: 10,
+    });
+    expect(rateLimiter.limits?.mailDispatcher).toMatchObject({
+      kind: "token bucket",
+      rate: 10,
+      capacity: 10,
+    });
+  });
+
+  it("exports TableAggregate instance configured for real-time claims financial analytics", async () => {
+    const { claimsAggregate } = await import("../convex/lib/aggregates");
+    expect(claimsAggregate).toBeDefined();
+  });
+
+  it("exports search query functions across claims, evidence, and precedents", async () => {
+    const claimsModule = await import("../convex/claims");
+    const evidenceModule = await import("../convex/clinicalEvidences");
+    const precedentsModule = await import("../convex/precedents");
+
+    expect(claimsModule.search).toBeDefined();
+    expect(evidenceModule.searchEvidence).toBeDefined();
+    expect(precedentsModule.searchTextPrecedents).toBeDefined();
+  });
+});
+
 
 

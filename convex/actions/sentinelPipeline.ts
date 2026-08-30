@@ -3,6 +3,7 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { api } from "../_generated/api";
+import { rateLimiter } from "../lib/rateLimiter";
 
 export interface PipelineResult {
   success: boolean;
@@ -56,6 +57,16 @@ export const runAutonomousPipeline = action({
 
     if (!claim) {
       throw new Error(`Claim with ID ${args.claimId} not found`);
+    }
+
+    // Enforce rate limiting per user
+    const limitStatus = await rateLimiter.limit(ctx, "sentinelPipeline", {
+      key: claim.userId || "global",
+    });
+    if (!limitStatus.ok) {
+      throw new Error(
+        `Rate limit reached for autonomous pipeline execution. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+      );
     }
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";

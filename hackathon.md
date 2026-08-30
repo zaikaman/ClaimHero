@@ -2,17 +2,17 @@
 
 - **Project:** ClaimHero
 - **Event:** Convex All Gas Hackathon
-- **What it does:** Autonomous medical and health insurance appeal sentinel that parses denial letters, crawls insurer clinical policy bulletins, tracks statutory deadlines, and generates cited appeal dossiers.
+- **What it does:** Autonomous medical and health insurance appeal sentinel that parses denial notices, crawls insurer Clinical Policy Bulletins live, matches 1536-d legal precedents, scores overturn probability via a deterministic 4-pillar rubric, synthesizes multi-tier cited ERISA appeal briefs, equips physicians with real-time Peer-to-Peer (P2P) Live Call Copilots, audits $110/day statutory ERISA non-disclosure penalties, de-identifies HIPAA PII, compiles court-ready exhibit binders, and autonomously transmits dossiers through dedicated two-way AgentMail gateways.
 - **Live app:** https://usable-sturgeon-376.convex.site
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://usable-sturgeon-376.convex.cloud
-- **Components:** @convex-dev/auth, @convex-dev/static-hosting
-- **Convex features:** database schema, relational indexes, vector search, queries, mutations, actions, scheduled functions, file storage, crons, httpRouter, auth
+- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate
+- **Convex features:** database schema, relational indexes, vector search (1536-d), full-text search (searchIndex), queries, mutations, actions, scheduled functions, file storage, crons, httpRouter, auth, components
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-30T17:18:30Z
+- **Last updated:** 2026-08-30T17:47:00Z
 
 ## Log
 
@@ -244,8 +244,11 @@ Authored the definitive Convex All Gas judges README (`README.md`) for `BRIEF.md
 ### 2026-08-30 - b3bdf99
 Synchronized production live app links and deployment endpoints across `README.md` and `hackathon.md` to point to `https://usable-sturgeon-376.convex.site`.
 
-### 2026-08-30 - working tree
+### 2026-08-30 - b398ac1
 Hardened vector embedding pipeline by removing silent deterministic hash fallbacks from `convex/lib/openai.ts:createEmbedding`. Unset `OPENAI_EMBEDDING_MODEL` environment variable now fails hard with an explicit descriptive error (`OPENAI_EMBEDDING_MODEL is not configured`) and OpenAI API errors bubble up rather than silently generating synthetic pseudo-embeddings. Updated `.env.example` and `README.md` to document `OPENAI_EMBEDDING_MODEL=text-embedding-3-small` as required for authentic vector similarity searches across the Precedent Vector Archive (`convex/lib/embeddings.ts`, `convex/actions/precedentArchive.ts`). Added dedicated unit tests (`tests/claimhero.test.ts`) validating fail-hard error semantics. Validated complete test suite and production build with `npm run verify` (100% clean typecheck, lint, 113/113 passing unit tests, and production build). Convex features: vector search, actions, configuration.
+
+### 2026-08-30 - working tree
+Maximized Convex All Gas Hackathon judging criteria across Components, Full-Stack Depth, and Scalability by integrating `@convex-dev/rate-limiter`, native Convex Full-Text `searchIndex` (hybrid with 1536-d `vectorIndex`), and `@convex-dev/aggregate` TableAggregate. Mounted `rateLimiter` and `aggregate` official components in `convex/convex.config.ts`. Defined token-bucket rate limits (`convex/lib/rateLimiter.ts`) guarding heavy AI, optical parsing, Firecrawl scraping, and AgentMail dispatch actions (`sentinelPipeline.ts`, `opticalParser.ts`, `policyCrawler.ts`, `appealSynthesizer.ts`, `p2pDefenseGenerator.ts`, `mailDispatcher.ts`). Added native Convex full-text `.searchIndex()` definitions to `claims` (`search_claims`), `clinicalEvidences` (`search_evidence`), and `precedents` (`search_precedents`) in `convex/schema.ts`, exposing high-performance lexical search endpoints (`claims:search`, `clinicalEvidences:searchEvidence`, `precedents:searchTextPrecedents`). Configured real-time `TableAggregate` (`convex/lib/aggregates.ts`) tracking claims portfolio amounts and case volume atomically in mutations (`claims.ts`). Expanded test suite (`tests/claimhero.test.ts`) to 116 passing tests. Verified 100% clean with `npm run verify` (typecheck, lint, 116/116 unit tests, production build). Convex features: components, rate-limiter, aggregate, full-text search, vector search, database schema, mutations, queries, actions.
 
 
 

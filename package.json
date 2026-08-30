@@ -16,7 +16,9 @@
   },
   "dependencies": {
     "@auth/core": "^0.41.3",
+    "@convex-dev/aggregate": "^0.3.0",
     "@convex-dev/auth": "^0.0.95",
+    "@convex-dev/rate-limiter": "^0.3.2",
     "@convex-dev/static-hosting": "^0.2.1",
     "@mendable/firecrawl-js": "^1.18.1",
     "@phosphor-icons/react": "^2.1.10",

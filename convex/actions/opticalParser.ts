@@ -4,6 +4,7 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { api } from "../_generated/api";
+import { rateLimiter } from "../lib/rateLimiter";
 
 const DENIAL_EXTRACTION_SCHEMA = {
   type: "object",
@@ -80,6 +81,16 @@ export const parseDenialDocument = action({
     autoRunPipeline: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<DenialExtractionResult & { claimId: string; pipelineResult?: any }> => {
+    // Enforce rate limiting
+    const limitStatus = await rateLimiter.limit(ctx, "opticalParser", {
+      key: args.patientEmail || "global",
+    });
+    if (!limitStatus.ok) {
+      throw new Error(
+        `Rate limit reached for optical document parsing. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+      );
+    }
+
     let documentContent = args.rawDocumentText?.trim() || "";
     const imageUrls: string[] = [];
     const fileInputs: Array<{ fileData: string; filename: string }> = [];

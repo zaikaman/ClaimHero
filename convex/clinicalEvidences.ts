@@ -259,3 +259,40 @@ export const listSourcesSummary = query({
   },
 });
 
+/**
+ * Full-text search across clinical evidence clauses and guidelines using Convex searchIndex
+ */
+export const searchEvidence = query({
+  args: {
+    claimId: v.optional(v.id("claims")),
+    sourceType: v.optional(v.string()),
+    query: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    if (!args.query.trim()) {
+      return [];
+    }
+
+    const results = await ctx.db
+      .query("clinicalEvidences")
+      .withSearchIndex("search_evidence", (q) => {
+        let builder = q.search("extractedEvidenceMarkdown", args.query);
+        if (args.claimId) {
+          builder = builder.eq("claimId", args.claimId);
+        }
+        if (args.sourceType && args.sourceType !== "all") {
+          builder = builder.eq("sourceType", args.sourceType);
+        }
+        return builder;
+      })
+      .take(args.limit || 15);
+
+    return results.map((item) => ({
+      ...item,
+      title: item.title?.replace(/\*\*/g, "") || "",
+      citationClause: sanitizeCitationClause(item.citationClause),
+    }));
+  },
+});
+

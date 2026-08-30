@@ -1,6 +1,6 @@
 # ClaimHero — Autonomous Medical & Health Insurance Appeal Sentinel
 
-> **Turn every denial into a cited, dispatch-ready appeal in under 90 seconds.** ClaimHero is a production-grade, full-stack sentinel that ingests denial letters, crawls live insurer Clinical Policy Bulletins, scores overturn probability with a deterministic 4-pillar rubric, synthesizes grounded ERISA-cited briefs, and dispatches them through real payer gateways — all on Convex.
+> **Turn every denial into a cited, dispatch-ready appeal in under 90 seconds.** ClaimHero is a production-grade, full-stack sentinel that ingests denial notices, crawls live insurer Clinical Policy Bulletins, matches 1536-d legal precedents, scores overturn probability with a deterministic 4-pillar rubric, synthesizes multi-tier ERISA briefs, arms doctors with real-time P2P Live Call Copilots, audits statutory $110/day failure-to-disclose penalties, de-identifies HIPAA PII, compiles court-ready exhibit binders, and autonomously transmits dossiers through dedicated two-way AgentMail gateways — all on Convex.
 
 <p align="center">
   <a href="https://github.com/zaikaman/ClaimHero"><img alt="Convex" src="https://img.shields.io/badge/Convex-Reactive%20Backend-FF3366?style=for-the-badge&logo=convex&logoColor=white" /></a>
@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-112%2F112%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-116%2F116%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -81,11 +81,6 @@ ClaimHero automates the entire lifecycle from denial ingestion to payer adjudica
 
 ## 3. 60-Second Judge Quickstart
 
-No seed data is required. The fastest path to *wow*:
-
-### Option A — 1-Click Preset (recommended for judges)
-
-1. Open the app -> **Sign in** (Google OAuth or Email/Password via `@convex-dev/auth`).
 2. Click **Quick Ingest** (sidebar) or `Cmd+K` -> *Ingest Denial Notice*.
 3. Pick a preset:
    * **Molina Healthcare — Total Knee Arthroplasty** — $24,500 / CPT 27447 / CO-50 (`molina_knee`)
@@ -200,8 +195,11 @@ Convex is not an addon; it *is* the backend. Every feature is a Convex primitive
 | Convex Feature | Where it lives | What it does |
 |---|---|---|
 | **Schema & Relational Indexes** | `convex/schema.ts:5` | 9 tables + 20+ secondary indexes (`by_user`, `by_user_status`, `by_claim`, `by_claimId_and_appealLevel`, etc.) |
-| **Vector Search** | `convex/schema.ts:271` `precedents.vectorIndex("by_embedding", { dimensions: 1536 })` | Native `ctx.vectorSearch` in `precedentArchive.ts` returns top-3 matches; re-ranked by ICD/CPT/CARC overlap (`convex/lib/embeddings.ts:rankPrecedentHits`) |
-| **Queries** | `convex/claims.ts:10` `list`, `getById`, `getPortfolioStats:478` | Multi-tenant, payer-filtered, joined with patient + latest appeal + evidence count; portfolio aggregation with payer breakdown |
+| **Vector Search (1536-d)** | `convex/schema.ts:271` `precedents.vectorIndex("by_embedding", { dimensions: 1536 })` | Native `ctx.vectorSearch` in `precedentArchive.ts` returns top-3 matches; re-ranked by ICD/CPT/CARC overlap (`convex/lib/embeddings.ts:rankPrecedentHits`) |
+| **Full-Text Search Index** | `convex/schema.ts:155, 170, 276` `.searchIndex()` | Native Convex `.withSearchIndex()` on `claims` (`search_claims`), `clinicalEvidences` (`search_evidence`), and `precedents` (`search_precedents`) for instant server-side lexical filtering |
+| **Rate Limiter Component** | `convex/convex.config.ts`, `convex/lib/rateLimiter.ts` | `@convex-dev/rate-limiter` token-bucket limits guarding heavy AI, OCR, Firecrawl, and AgentMail endpoints |
+| **TableAggregate Component** | `convex/convex.config.ts`, `convex/lib/aggregates.ts` | `@convex-dev/aggregate` TableAggregate tracking portfolio claim values and volume in O(log N) operations |
+| **Queries** | `convex/claims.ts:10` `list`, `search:15`, `getById:48`, `getPortfolioStats:478` | Multi-tenant, payer-filtered, joined with patient + latest appeal + evidence count; portfolio aggregation with payer breakdown |
 | **Mutations** | `convex/claims.ts:138` `create`, `createWithPatient:204`, `updateStatus:359`, `deleteCase:652`, `updateAppealContext:789`, `updateFinancialLiability:957` | Atomic patient+claim creation, cascading purge (5 tables + 2 storage artifacts), HIPAA metadata, ERISA penalty persistence |
 | **Actions (Node)** | `convex/actions/*` (8 actions) | All Firecrawl/OpenAI I/O lives in `"use node"` actions — never in queries/mutations |
 | **Scheduled Functions** | `ctx.scheduler.runAfter(0, ...)` in `claims.ts:182`, `sentinelPipeline.ts`, `http.ts:61` | Post-ingest inbox provisioning, post-crawl status bumps, post-win precedent reindex |

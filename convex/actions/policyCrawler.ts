@@ -4,6 +4,7 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { api } from "../_generated/api";
+import { rateLimiter } from "../lib/rateLimiter";
 
 const POLICY_EXTRACTION_SCHEMA = {
   type: "object",
@@ -1028,6 +1029,16 @@ export const crawlInsurerPolicy = action({
     customPolicyUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Enforce rate limiting
+    const limitStatus = await rateLimiter.limit(ctx, "policyCrawler", {
+      key: args.payer || "global",
+    });
+    if (!limitStatus.ok) {
+      throw new Error(
+        `Rate limit reached for clinical policy crawling. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+      );
+    }
+
     const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
     if (!firecrawlApiKey?.trim()) {
       throw new Error("Clinical policy analysis requires FIRECRAWL_API_KEY; no fallback policy source is available.");

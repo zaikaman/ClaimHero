@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { api } from "../_generated/api";
 import { precedentMatchValidator } from "../lib/precedentValidators";
+import { rateLimiter } from "../lib/rateLimiter";
 
 const APPEAL_SYNTHESIS_SCHEMA = {
   type: "object",
@@ -559,6 +560,16 @@ export const generateAppealBrief = action({
 
     if (!claim) {
       throw new Error(`Claim ${args.claimId} not found`);
+    }
+
+    // Enforce rate limiting per user
+    const limitStatus = await rateLimiter.limit(ctx, "appealSynthesizer", {
+      key: claim.userId || "global",
+    });
+    if (!limitStatus.ok) {
+      throw new Error(
+        `Rate limit reached for legal brief synthesis. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+      );
     }
 
     // 2. Fetch indexed clinical evidence clauses

@@ -250,3 +250,47 @@ export const listAttachedForClaim = query({
       }));
   },
 });
+
+/**
+ * Full-text search across precedent winning arguments and statutory citations using Convex searchIndex
+ */
+export const searchTextPrecedents = query({
+  args: {
+    query: v.string(),
+    sourceKind: v.optional(sourceKindValidator),
+    primaryCpt: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    if (!args.query.trim()) {
+      return [];
+    }
+
+    const results = await ctx.db
+      .query("precedents")
+      .withSearchIndex("search_precedents", (q) => {
+        let builder = q.search("winningArgument", args.query);
+        if (args.sourceKind) {
+          builder = builder.eq("sourceKind", args.sourceKind);
+        }
+        if (args.primaryCpt) {
+          builder = builder.eq("primaryCpt", args.primaryCpt);
+        }
+        return builder;
+      })
+      .take(args.limit || 10);
+
+    return results.map((row) => ({
+      _id: row._id,
+      sourceKind: row.sourceKind,
+      title: row.title,
+      citation: row.citation,
+      primaryCpt: row.primaryCpt,
+      carcCode: row.carcCode,
+      winningArgument: row.winningArgument,
+      statutoryLanguage: row.statutoryLanguage,
+      sourceUrl: row.sourceUrl,
+    }));
+  },
+});
+

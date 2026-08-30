@@ -3,6 +3,48 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
+import { claimsAggregate } from "./lib/aggregates";
+
+/**
+ * Full-text search across claims using Convex native searchIndex
+ */
+export const search = query({
+  args: {
+    query: v.string(),
+    status: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!args.query.trim()) {
+      return [];
+    }
+
+    const results = await ctx.db
+      .query("claims")
+      .withSearchIndex("search_claims", (q) => {
+        let builder = q.search("denialReasonDescription", args.query);
+        if (userId) {
+          builder = builder.eq("userId", userId);
+        }
+        if (args.status && args.status !== "all") {
+          builder = builder.eq("status", args.status);
+        }
+        return builder;
+      })
+      .take(args.limit || 20);
+
+    return Promise.all(
+      results.map(async (claim) => {
+        const patient = (await ctx.db.get(claim.patientId)) as Doc<"patients"> | null;
+        return {
+          ...claim,
+          patient: patient || undefined,
+        };
+      })
+    );
+  },
+});
 
 /**
  * List all claims with optional status and payer filters, scoped to the authenticated user
@@ -194,6 +236,11 @@ export const create = mutation({
       timestamp: now,
     });
 
+    const createdClaimDoc = await ctx.db.get(claimId);
+    if (createdClaimDoc) {
+      await claimsAggregate.insert(ctx, createdClaimDoc);
+    }
+
     return claimId;
   },
 });
@@ -305,6 +352,11 @@ export const createWithPatient = mutation({
       details: `Extracted denial document for ${args.patientName} (${args.insurancePayer} - ${args.claimNumber})`,
       timestamp: now,
     });
+
+    const createdClaimDoc = await ctx.db.get(claimId);
+    if (createdClaimDoc) {
+      await claimsAggregate.insert(ctx, createdClaimDoc);
+    }
 
     return claimId;
   },
@@ -725,8 +777,9 @@ export const deleteCase = mutation({
       }
     }
 
-    // 6. Delete the core claim record
+    // 6. Delete the core claim record and update aggregates
     await ctx.db.delete(args.claimId);
+    await claimsAggregate.delete(ctx, claim);
 
     return {
       success: true,

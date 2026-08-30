@@ -16,6 +16,7 @@ import {
   formatAppealEmail,
   formatCorrespondenceEmail,
 } from "../lib/appealEmail";
+import { rateLimiter } from "../lib/rateLimiter";
 
 export interface DispatchReceipt {
   transmissionId: string;
@@ -245,6 +246,16 @@ export const dispatchAppealPacket = action({
 
     if (!claim) {
       throw new Error(`Claim ${args.claimId} not found`);
+    }
+
+    // Enforce rate limiting per user
+    const limitStatus = await rateLimiter.limit(ctx, "mailDispatcher", {
+      key: claim.userId || "global",
+    });
+    if (!limitStatus.ok) {
+      throw new Error(
+        `Rate limit reached for outbound payer transmission. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+      );
     }
 
     let appeal: any = null;

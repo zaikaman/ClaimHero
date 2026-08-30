@@ -4,6 +4,7 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { api } from "../_generated/api";
+import { rateLimiter } from "../lib/rateLimiter";
 
 const P2P_DEFENSE_SCHEMA = {
   type: "object",
@@ -315,6 +316,16 @@ export const generateP2PScript = action({
 
     if (!claim) {
       throw new Error(`Claim ${args.claimId} not found`);
+    }
+
+    // Enforce rate limiting per user
+    const limitStatus = await rateLimiter.limit(ctx, "p2pGenerator", {
+      key: claim.userId || "global",
+    });
+    if (!limitStatus.ok) {
+      throw new Error(
+        `Rate limit reached for P2P script generation. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+      );
     }
 
     // 2. Fetch clinical evidence

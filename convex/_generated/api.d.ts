@@ -30,12 +30,14 @@ import type * as emails from "../emails.js";
 import type * as http from "../http.js";
 import type * as lib_agentMail from "../lib/agentMail.js";
 import type * as lib_agentMailWebhook from "../lib/agentMailWebhook.js";
+import type * as lib_aggregates from "../lib/aggregates.js";
 import type * as lib_aiAdjudicator from "../lib/aiAdjudicator.js";
 import type * as lib_appealEmail from "../lib/appealEmail.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_openai from "../lib/openai.js";
 import type * as lib_precedentCorpus from "../lib/precedentCorpus.js";
 import type * as lib_precedentValidators from "../lib/precedentValidators.js";
+import type * as lib_rateLimiter from "../lib/rateLimiter.js";
 import type * as p2pCallSessions from "../p2pCallSessions.js";
 import type * as p2pScripts from "../p2pScripts.js";
 import type * as precedents from "../precedents.js";
@@ -70,12 +72,14 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/agentMail": typeof lib_agentMail;
   "lib/agentMailWebhook": typeof lib_agentMailWebhook;
+  "lib/aggregates": typeof lib_aggregates;
   "lib/aiAdjudicator": typeof lib_aiAdjudicator;
   "lib/appealEmail": typeof lib_appealEmail;
   "lib/embeddings": typeof lib_embeddings;
   "lib/openai": typeof lib_openai;
   "lib/precedentCorpus": typeof lib_precedentCorpus;
   "lib/precedentValidators": typeof lib_precedentValidators;
+  "lib/rateLimiter": typeof lib_rateLimiter;
   p2pCallSessions: typeof p2pCallSessions;
   p2pScripts: typeof p2pScripts;
   precedents: typeof precedents;
@@ -110,4 +114,6 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   staticHosting: import("@convex-dev/static-hosting/_generated/component.js").ComponentApi<"staticHosting">;
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  aggregate: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"aggregate">;
 };
