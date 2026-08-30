@@ -113,13 +113,13 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
       {/* Studio Header Toolbar */}
       <Card className="p-3.5 shrink-0">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shrink-0 shadow-xs">
               <FileText className="size-4.5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-sm font-semibold text-foreground font-sans">
                   Collaborative Appeal Studio
                 </h2>
@@ -146,37 +146,51 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar sm:flex-nowrap shrink-0">
             {/* Appeal Level Selector */}
-            <Select
-              value={appealLevel}
-              onChange={(e) => setAppealLevel(e.target.value as AppealLevel)}
-              className="h-8 text-xs font-sans"
-            >
-              <option value="level_1_internal">Level 1: Internal Appeal (ERISA 180d)</option>
-              <option value="level_2_grievance">Level 2: Formal Grievance Review</option>
-              <option value="level_3_external_state_review">Level 3: External State Commissioner Review</option>
-            </Select>
+            <div className="shrink-0">
+              <Select
+                value={appealLevel}
+                onChange={(e) => setAppealLevel(e.target.value as AppealLevel)}
+                className="h-8 text-xs font-sans rounded-md w-[190px] sm:w-[210px] bg-background border border-border"
+              >
+                <option value="level_1_internal">Level 1: Internal Appeal (ERISA)</option>
+                <option value="level_2_grievance">Level 2: Formal Grievance</option>
+                <option value="level_3_external_state_review">Level 3: External Review</option>
+              </Select>
+            </div>
 
             {/* Treating Physician Notes Toggle */}
             <Button
               variant={showNotesDrawer || physicianNotes ? "secondary" : "outline"}
               size="sm"
               onClick={() => setShowNotesDrawer(!showNotesDrawer)}
-              className="gap-1.5"
+              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
             >
               <Stethoscope className="size-3.5" />
               <span>Physician Notes{physicianNotes ? " (Added)" : ""}</span>
             </Button>
 
+            {/* Submitter / Sender Details Toggle */}
             <Button
               variant={showSenderDetails || senderName ? "secondary" : "outline"}
               size="sm"
               onClick={() => setShowSenderDetails(!showSenderDetails)}
-              className="gap-1.5"
+              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
             >
               <IdentificationCard className="size-3.5" />
               <span>Sender Details{senderName ? " (Added)" : ""}</span>
+            </Button>
+
+            {/* Export & Preview Trigger */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsExportOpen(true)}
+              className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
+            >
+              <Printer className="size-3.5" />
+              <span>Preview Email</span>
             </Button>
 
             {/* Synthesize Appeal Brief */}
@@ -184,7 +198,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               size="sm"
               onClick={handleRunSynthesis}
               disabled={isSynthesizing || isSaving}
-              className="gap-1.5"
+              className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
             >
               {isSynthesizing ? (
                 <>
@@ -197,17 +211,6 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   <span>Synthesize Brief</span>
                 </>
               )}
-            </Button>
-
-            {/* Export & Preview Trigger */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsExportOpen(true)}
-              className="gap-1.5"
-            >
-              <Printer className="size-3.5" />
-              <span>Preview Email</span>
             </Button>
           </div>
         </div>

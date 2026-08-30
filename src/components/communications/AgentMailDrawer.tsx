@@ -175,12 +175,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
       {/* Prominent Multi-Channel Transmission Gateway Banner if not yet sent */}
       {claim.status !== "dispatched" && claim.status !== "won" && onDispatchAppeal && (
         <Card className="p-4 border-primary/40 bg-primary/5 space-y-4">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-            <div className="flex items-start sm:items-center gap-3">
-              <div className="size-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs mt-0.5 sm:mt-0">
-                <PaperPlaneTilt className="size-5" />
+          {/* Card Header: Title & Description on Left, Companion Utility Tools on Right */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
+                <PaperPlaneTilt className="size-4.5" />
               </div>
-              <div className="space-y-0.5">
+              <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-semibold text-foreground">
                     Multi-Channel Appellate Transmission
@@ -195,19 +196,20 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            {/* Companion Utility Tools - Single line group of rectangular buttons */}
+            <div className="flex items-center gap-2 shrink-0">
               {payerContact.intakePortalUrl && (
                 <a
                   href={payerContact.intakePortalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn(
-                    buttonVariants({ variant: "outline" }),
-                    "gap-1.5 text-xs h-9 px-3 shrink-0"
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "h-8 rounded-md text-xs px-2.5 gap-1.5 shrink-0"
                   )}
                 >
                   <ArrowSquareOut className="size-3.5 text-primary shrink-0" />
-                  <span>Open {payerContact.portalName ? "Portal" : "Appeals Portal"}</span>
+                  <span>Open Portal</span>
                 </a>
               )}
 
@@ -216,7 +218,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 variant="outline"
                 onClick={handleCopyBrief}
                 disabled={!claim.latestAppeal}
-                className="gap-1.5 text-xs h-9"
+                className="h-8 rounded-md text-xs px-2.5 gap-1.5 shrink-0"
               >
                 {copiedBrief ? (
                   <Check className="size-3.5 text-emerald-500" />
@@ -232,41 +234,16 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 onClick={() => setIsExportDrawerOpen(true)}
                 disabled={!claim.latestAppeal}
                 title={claim.latestAppeal ? "Open formal court-ready appeal dossier & print docket" : "Synthesize appeal brief in studio first"}
-                className="gap-1.5 text-xs h-9"
+                className="h-8 rounded-md text-xs px-2.5 gap-1.5 shrink-0"
               >
                 <Printer className="size-3.5" />
                 <span>Print Docket</span>
-              </Button>
-
-              <Button
-                size="sm"
-                onClick={handleRunDispatch}
-                disabled={isDispatching || !canDispatch || !claim.latestAppeal}
-                className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9"
-              >
-                {isDispatching ? (
-                  <>
-                    <CircleNotch className="size-4 animate-spin" />
-                    <span>Transmitting Appeal Packet...</span>
-                  </>
-                ) : (
-                  <>
-                    <PaperPlaneTilt className="size-4" />
-                    <span>
-                      {dispatchMode === "ai_adjudicator"
-                        ? "Transmit to AI Payer Reviewer"
-                        : dispatchMode === "custom_email"
-                        ? "Transmit to My Email Address"
-                        : "Transmit to Official Gateway"}
-                    </span>
-                  </>
-                )}
               </Button>
             </div>
           </div>
 
           {/* Interactive Appellate Recipient Destination Mode Selector */}
-          <div className="space-y-2 pt-3 border-t border-border/70">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-foreground block font-mono uppercase tracking-wider">
                 Select Appellate Recipient Destination:
@@ -376,6 +353,57 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Dedicated Transmission Launchpad Action Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl border border-primary/30 bg-primary/10">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="size-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0 text-primary">
+                <PaperPlaneTilt className="size-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-foreground">
+                    Ready for Appellate Dispatch
+                  </span>
+                  <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
+                    {dispatchMode === "ai_adjudicator"
+                      ? "AI Simulation Mode"
+                      : dispatchMode === "custom_email"
+                      ? "Test Delivery Mode"
+                      : "Official Insurer Mode"}
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  Recipient: <span className="font-mono text-foreground font-medium">{effectiveRecipient || "No recipient specified"}</span>
+                </p>
+              </div>
+            </div>
+
+            <Button
+              size="sm"
+              onClick={handleRunDispatch}
+              disabled={isDispatching || !canDispatch || !claim.latestAppeal}
+              className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9 px-4"
+            >
+              {isDispatching ? (
+                <>
+                  <CircleNotch className="size-4 animate-spin" />
+                  <span>Transmitting Appeal Packet...</span>
+                </>
+              ) : (
+                <>
+                  <PaperPlaneTilt className="size-4" />
+                  <span>
+                    {dispatchMode === "ai_adjudicator"
+                      ? "Transmit to AI Payer Reviewer"
+                      : dispatchMode === "custom_email"
+                      ? "Transmit to My Email Address"
+                      : "Transmit to Official Gateway"}
+                  </span>
+                </>
+              )}
+            </Button>
           </div>
 
           {/* Submission Instructions & Insurer Gateway Notice */}

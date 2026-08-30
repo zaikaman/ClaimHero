@@ -117,12 +117,12 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar sm:flex-nowrap shrink-0">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCopy}
-                className="gap-1"
+                className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
               >
                 {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
                 <span>{copied ? "Copied" : "Copy Email"}</span>
@@ -132,19 +132,19 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={handleDownload}
-                className="gap-1"
+                className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
               >
                 <DownloadSimple className="size-3" />
-                  <span>Download .TXT</span>
+                <span>Download .TXT</span>
               </Button>
 
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handlePrint}
-                className="gap-1"
+                className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
               >
-                <Printer className="size-3" />
+                <Printer className="size-3.5" />
                 <span>Print / PDF</span>
               </Button>
 
@@ -153,9 +153,9 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 onClick={onProceedToDispatch}
                 disabled={needsClinicalDocumentation}
                 title={needsClinicalDocumentation ? "Add patient-specific clinical documentation and regenerate the email before dispatch." : undefined}
-                className="gap-1"
+                className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
               >
-                <PaperPlaneTilt className="size-3" />
+                <PaperPlaneTilt className="size-3.5" />
                 <span>Proceed to Dispatch</span>
               </Button>
             </div>

@@ -228,18 +228,18 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar sm:flex-nowrap shrink-0">
             {/* 1-Click Unified Analysis Trigger */}
             <Button
               size="sm"
               onClick={handleRunCompleteAnalysis}
               disabled={isUnifiedAnalyzing || isCrawling || isScoring}
-              className="gap-1.5 bg-primary text-primary-foreground font-semibold shadow-2xs"
+              className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
             >
               {isUnifiedAnalyzing ? (
                 <>
                   <CircleNotch className="size-3.5 animate-spin" />
-                  <span>Analyzing Policy & Precedents...</span>
+                  <span>Analyzing Policy...</span>
                 </>
               ) : (
                 <>
@@ -255,7 +255,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               size="sm"
               onClick={handleRunCrawl}
               disabled={isCrawling || isScoring || isUnifiedAnalyzing}
-              className="gap-1.5"
+              className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0"
             >
               {isCrawling ? (
                 <>
@@ -276,7 +276,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               size="sm"
               onClick={handleRunScoring}
               disabled={isScoring || isCrawling || isUnifiedAnalyzing}
-              className="gap-1.5"
+              className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0"
             >
               {isScoring ? (
                 <>
