@@ -5,7 +5,7 @@ import {
   Scales,
   Copy,
   Check,
-  CaretRight,
+  CheckCircle,
   CircleNotch,
   Warning,
   ArrowsClockwise,
@@ -19,7 +19,6 @@ import { usePrecedents } from "../../hooks/usePrecedents";
 
 interface PrecedentFeedProps {
   claim: Claim;
-  onApplyPrecedent?: (precedentSummary: string) => void;
 }
 
 function similarityPercent(score: number): number {
@@ -41,23 +40,11 @@ function sourceKindLabel(kind: string): string {
   }
 }
 
-function insertionText(item: VectorPrecedentMatch): string {
-  const similarity = similarityPercent(item.vectorScore);
-  return [
-    `### Controlling Precedent: ${item.title}`,
-    ``,
-    `> ${item.statutoryLanguage}`,
-    ``,
-    item.winningArgument,
-    ``,
-    `*Citation: ${item.citation} (vector similarity ${similarity}%)*`,
-  ].join("\n");
+function citationCopyText(item: VectorPrecedentMatch): string {
+  return `> **Controlling Precedent (${item.title} - ${item.citation})**: ${stripMarkdownFormatting(item.statutoryLanguage)}\n\n${stripMarkdownFormatting(item.winningArgument)}`;
 }
 
-export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
-  claim,
-  onApplyPrecedent,
-}) => {
+export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
   const { matches, isLoading, error, retrievePrecedents } = usePrecedents(claim);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const primaryCpt = claim.cptCodes[0] || "N/A";
@@ -146,8 +133,8 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  onClick={() => handleCopy(item._id, insertionText(item))}
-                  title="Copy statutory language"
+                  onClick={() => handleCopy(item._id, citationCopyText(item))}
+                  title="Copy controlling precedent citation"
                 >
                   {isCopied ? (
                     <Check className="size-3 text-emerald-500" />
@@ -170,17 +157,10 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({
                 </p>
               </div>
 
-              {onApplyPrecedent && (
-                <div className="flex justify-end pt-0.5">
-                  <button
-                    onClick={() => onApplyPrecedent(insertionText(item))}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline transition-colors"
-                  >
-                    <span>Insert proven language into Appeal Studio</span>
-                    <CaretRight className="size-3" />
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 pt-0.5 font-medium">
+                <CheckCircle className="size-3" />
+                <span>Auto-Injected into AI Appeal Synthesis Context</span>
+              </div>
             </Card>
           );
         })}

@@ -65,7 +65,6 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     isSaving,
     saveStatus,
     synthesizeAppeal,
-    insertTextAtCursor,
   } = useAppealStudio(claim);
   const { matches: vectorMatches, isLoading: isLoadingPrecedents } = usePrecedents(claim);
 
@@ -417,7 +416,6 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             evidences={evidences}
             vectorMatches={vectorMatches}
             isLoadingPrecedents={isLoadingPrecedents}
-            onInsertSnippet={insertTextAtCursor}
           />
         </Card>
       </div>

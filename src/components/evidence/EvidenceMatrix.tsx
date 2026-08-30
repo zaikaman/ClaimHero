@@ -575,13 +575,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             </TabsContent>
 
             <TabsContent value="precedents" className="pt-1">
-              <PrecedentFeed
-                claim={claim}
-                onApplyPrecedent={(snippet) => {
-                  void navigator.clipboard.writeText(snippet);
-                  onNavigateToStudio();
-                }}
-              />
+              <PrecedentFeed claim={claim} />
             </TabsContent>
           </Tabs>
         </div>

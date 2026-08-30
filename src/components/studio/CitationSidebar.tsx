@@ -19,24 +19,10 @@ interface CitationSidebarProps {
   evidences: ClinicalEvidence[];
   vectorMatches?: VectorPrecedentMatch[];
   isLoadingPrecedents?: boolean;
-  onInsertSnippet?: (snippet: string) => void;
 }
 
 function similarityPercent(score: number): number {
   return Math.round(Math.max(0, Math.min(1, (score + 1) / 2)) * 1000) / 10;
-}
-
-function formatVectorInsertion(match: VectorPrecedentMatch): string {
-  const similarity = similarityPercent(match.vectorScore);
-  return [
-    `### Controlling Precedent: ${match.title}`,
-    ``,
-    `> ${match.statutoryLanguage}`,
-    ``,
-    match.winningArgument,
-    ``,
-    `*Citation: ${match.citation} (vector similarity ${similarity}%)*`,
-  ].join("\n");
 }
 
 const STATUTORY_LEGAL_AUTHORITIES = [
@@ -67,7 +53,6 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
   evidences,
   vectorMatches = [],
   isLoadingPrecedents = false,
-  onInsertSnippet,
 }) => {
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const policyEvidences = evidences.filter((item) => item.sourceType !== "legal_precedent");
@@ -117,7 +102,6 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
           <div className="space-y-2">
             {vectorMatches.map((match) => {
               const similarity = similarityPercent(match.vectorScore);
-              const snippet = formatVectorInsertion(match);
               return (
                 <Card
                   key={match._id}
@@ -140,8 +124,13 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      onClick={() => handleCopy(match._id, snippet)}
-                      title="Copy proven statutory language"
+                      onClick={() =>
+                        handleCopy(
+                          match._id,
+                          `> **Controlling Precedent (${match.title} - ${match.citation})**: ${stripMarkdownFormatting(match.statutoryLanguage)}\n\n${stripMarkdownFormatting(match.winningArgument)}`
+                        )
+                      }
+                      title="Copy controlling precedent language"
                       className="shrink-0 text-muted-foreground hover:text-foreground"
                     >
                       {copiedId === match._id ? (
@@ -154,15 +143,10 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
                   <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3">
                     {stripMarkdownFormatting(match.statutoryLanguage)}
                   </p>
-                  {onInsertSnippet && (
-                    <button
-                      type="button"
-                      onClick={() => onInsertSnippet(snippet)}
-                      className="text-[11px] font-medium text-primary hover:underline"
-                    >
-                      Insert proven language into brief
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 pt-0.5 font-medium">
+                    <CheckCircle className="size-3" />
+                    <span>Auto-Injected as LLM Synthesis Context</span>
+                  </div>
                 </Card>
               );
             })}
