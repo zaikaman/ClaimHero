@@ -117,7 +117,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar sm:flex-nowrap shrink-0">
+            <div className="flex items-center gap-2 flex-wrap shrink-0">
               <Button
                 variant="outline"
                 size="sm"

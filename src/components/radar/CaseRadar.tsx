@@ -381,7 +381,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                   key={tab.id}
                   onClick={() => setStatusFilter(tab.id)}
                   className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer border",
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all cursor-pointer border",
                     isSelected
                       ? "bg-primary text-primary-foreground border-transparent font-semibold shadow-2xs"
                       : "bg-muted/30 hover:bg-muted/70 text-muted-foreground hover:text-foreground border-border/70"

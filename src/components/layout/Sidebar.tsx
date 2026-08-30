@@ -153,7 +153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={() => onSelectView("landing")}
           className={cn(
-            "w-full flex items-center gap-2.5 px-2 py-1 rounded-xl hover:bg-muted/60 transition-all text-left group cursor-pointer",
+            "w-full flex items-center gap-2.5 px-2 py-1 rounded-md hover:bg-muted/60 transition-all text-left group cursor-pointer",
             isCollapsed && "justify-center px-0"
           )}
           title="Open Cinematic Landing Hero"
@@ -170,7 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center gap-1.5 px-1">
             <button
               onClick={() => onOpenIngestion?.()}
-              className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground h-9 px-3 text-xs font-medium hover:bg-primary/90 transition-colors shadow-xs cursor-pointer"
+              className="flex-1 flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground h-9 px-3 text-xs font-medium hover:bg-primary/90 transition-colors shadow-xs cursor-pointer"
             >
               <PlusCircle className="size-4" />
               <span>Quick Ingest</span>
@@ -179,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               variant="outline"
               size="icon"
               onClick={() => onSelectView("communications")}
-              className="size-9 shrink-0 border-border"
+              className="size-9 shrink-0 border-border rounded-md"
               title="Payer Communications Gateway"
             >
               <Envelope className="size-4" />
@@ -191,7 +191,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Button
               size="icon"
               onClick={() => onOpenIngestion?.()}
-              className="size-9 rounded-lg shadow-xs"
+              className="size-9 rounded-md shadow-xs"
               title="Quick Ingest Denial"
             >
               <PlusCircle className="size-4" />
@@ -216,7 +216,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onClick={() => onSelectView(item.id)}
                   title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
                   className={cn(
-                    "w-full flex items-center rounded-lg text-xs font-medium transition-colors text-left group cursor-pointer",
+                    "w-full flex items-center rounded-md text-xs font-medium transition-colors text-left group cursor-pointer",
                     isCollapsed ? "justify-center p-2" : "justify-between px-2.5 py-1.5",
                     isActive
                       ? "bg-secondary text-foreground font-semibold shadow-xs"
@@ -363,7 +363,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onClick={() => onSelectView(item.id)}
                   title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
                   className={cn(
-                    "w-full flex items-center rounded-lg text-xs font-medium transition-colors text-left group cursor-pointer",
+                    "w-full flex items-center rounded-md text-xs font-medium transition-colors text-left group cursor-pointer",
                     isCollapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-1.5",
                     isActive
                       ? "bg-secondary/90 text-foreground font-semibold shadow-xs backdrop-blur-sm"

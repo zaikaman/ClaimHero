@@ -4,7 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import {
   Sidebar,
   MagnifyingGlass,
-  CloudArrowUp,
+  PlusCircle,
   GithubLogo,
   Pulse,
   SignIn,
@@ -103,9 +103,9 @@ export const Header: React.FC<HeaderProps> = ({
             <Button
               size="sm"
               onClick={onOpenIngestion}
-              className="gap-1.5"
+              className="gap-1.5 text-xs h-8 shadow-xs"
             >
-              <CloudArrowUp className="size-3.5" />
+              <PlusCircle className="size-3.5" />
               <span className="hidden sm:inline">Ingest Denial</span>
             </Button>
 
@@ -124,12 +124,12 @@ export const Header: React.FC<HeaderProps> = ({
             {viewer ? (
               <button
                 onClick={() => onSelectView?.("radar")}
-                className="focus:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-full"
+                className="focus:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-md"
                 title={`Signed in as ${userName} (${viewer.email || ""})`}
               >
-                <Avatar size="sm" className="size-7 ml-1 border border-border shrink-0 bg-primary/10 text-primary">
-                  {viewer.image && <AvatarImage src={viewer.image} alt={userName} />}
-                  <AvatarFallback className="text-primary text-xs font-bold">
+                <Avatar size="sm" className="size-7 ml-1 border border-border shrink-0 bg-primary/10 text-primary rounded-md">
+                  {viewer.image && <AvatarImage src={viewer.image} alt={userName} className="rounded-md" />}
+                  <AvatarFallback className="text-primary text-xs font-bold rounded-md">
                     {userInitial}
                   </AvatarFallback>
                 </Avatar>

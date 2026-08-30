@@ -111,13 +111,13 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       />
 
       {/* Studio Header Toolbar */}
-      <Card className="p-3.5 shrink-0">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shrink-0 shadow-xs">
+      <Card className="p-3.5 shrink-0 overflow-visible">
+        <div className="flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground shrink-0 shadow-xs">
               <FileText className="size-4.5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-sm font-semibold text-foreground font-sans">
                   Collaborative Appeal Studio
@@ -138,20 +138,20 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground truncate">
                 Patient: <span className="text-foreground font-medium">{claim.patient?.name}</span> • Payer:{" "}
                 <span className="text-foreground font-medium">{claim.patient?.insurancePayer}</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar sm:flex-nowrap shrink-0">
+          <div className="flex items-center gap-2 flex-wrap 2xl:flex-nowrap shrink-0">
             {/* Appeal Level Selector */}
             <div className="shrink-0">
               <Select
                 value={appealLevel}
                 onChange={(e) => setAppealLevel(e.target.value as AppealLevel)}
-                className="h-8 text-xs font-sans rounded-md w-[190px] sm:w-[210px] bg-background border border-border"
+                className="h-8 text-xs font-sans rounded-md w-[180px] sm:w-[200px] bg-background border border-border"
               >
                 <option value="level_1_internal">Level 1: Internal Appeal (ERISA)</option>
                 <option value="level_2_grievance">Level 2: Formal Grievance</option>
@@ -165,6 +165,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               size="sm"
               onClick={() => setShowNotesDrawer(!showNotesDrawer)}
               className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
+              title="Treating physician clinical notes and addendum"
             >
               <Stethoscope className="size-3.5" />
               <span>Physician Notes{physicianNotes ? " (Added)" : ""}</span>
@@ -176,6 +177,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               size="sm"
               onClick={() => setShowSenderDetails(!showSenderDetails)}
               className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
+              title="Person submitting the appeal"
             >
               <IdentificationCard className="size-3.5" />
               <span>Sender Details{senderName ? " (Added)" : ""}</span>
@@ -187,6 +189,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               size="sm"
               onClick={() => setIsExportOpen(true)}
               className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
+              title="Preview printable appeal brief"
             >
               <Printer className="size-3.5" />
               <span>Preview Email</span>
@@ -198,6 +201,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               onClick={handleRunSynthesis}
               disabled={isSynthesizing || isSaving}
               className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
+              title="Synthesize cited appeal brief with AI"
             >
               {isSynthesizing ? (
                 <>

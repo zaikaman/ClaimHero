@@ -29,7 +29,7 @@ function Avatar({ className, size = "default", children, ...props }: AvatarProps
       <div
         data-slot="avatar"
         className={cn(
-          "relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/50 bg-muted/60 font-medium select-none",
+          "relative flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/50 bg-muted/60 font-medium select-none",
           sizeStyles[size],
           className
         )}
@@ -106,7 +106,7 @@ function AvatarImage({
       data-slot="avatar-image"
       referrerPolicy="no-referrer"
       crossOrigin="anonymous"
-      className={cn("absolute inset-0 size-full object-cover rounded-full", className)}
+      className={cn("absolute inset-0 size-full object-cover rounded-md", className)}
       {...props}
     />
   );

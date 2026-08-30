@@ -177,10 +177,10 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
         <div className="flex items-center gap-3">
           {isAuthenticated ? (
             <>
-              {/* Open Console Pill Button */}
+              {/* Open Console Button */}
               <button
                 onClick={() => onEnterConsole("radar")}
-                className="hidden sm:flex animate-blur-fade-up liquid-glass items-center gap-2 rounded-full px-4 md:px-5 py-2 text-sm text-white/90 hover:text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95"
+                className="hidden sm:flex animate-blur-fade-up liquid-glass items-center gap-2 rounded-md px-4 md:px-5 py-2 text-sm text-white/90 hover:text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95"
                 style={{ animationDelay: "350ms" }}
               >
                 <span>Sentinel Console</span>
@@ -190,32 +190,32 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
               {/* User Profile Avatar */}
               <button
                 onClick={() => onEnterConsole("radar")}
-                className="hidden sm:flex animate-blur-fade-up size-10 rounded-full border border-white/20 items-center justify-center text-white/90 hover:text-white transition-all cursor-pointer overflow-hidden active:scale-95 bg-white/10"
+                className="hidden sm:flex animate-blur-fade-up size-10 rounded-md border border-white/20 items-center justify-center text-white/90 hover:text-white transition-all cursor-pointer overflow-hidden active:scale-95 bg-white/10"
                 style={{ animationDelay: "400ms" }}
                 title={`Signed in as ${userName}`}
               >
-                <Avatar size="default" className="size-full border-0 bg-transparent">
-                  {viewer?.image && <AvatarImage src={viewer.image} alt={userName} />}
-                  <AvatarFallback className="text-xs font-semibold text-white/90">{userInitial}</AvatarFallback>
+                <Avatar size="default" className="size-full border-0 bg-transparent rounded-md">
+                  {viewer?.image && <AvatarImage src={viewer.image} alt={userName} className="rounded-md" />}
+                  <AvatarFallback className="text-xs font-semibold text-white/90 rounded-md">{userInitial}</AvatarFallback>
                 </Avatar>
               </button>
             </>
           ) : (
             <>
-              {/* Sign In Pill Button */}
+              {/* Sign In Button */}
               <button
                 onClick={() => onEnterConsole("login")}
-                className="hidden sm:flex animate-blur-fade-up liquid-glass items-center gap-1.5 rounded-full px-4 py-2 text-sm text-white/90 hover:text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95"
+                className="hidden sm:flex animate-blur-fade-up liquid-glass items-center gap-1.5 rounded-md px-4 py-2 text-sm text-white/90 hover:text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95"
                 style={{ animationDelay: "320ms" }}
               >
                 <User className="size-4 text-white/80" />
                 <span>Sign In</span>
               </button>
 
-              {/* Enter Console Pill Button */}
+              {/* Enter Console Button */}
               <button
                 onClick={() => onEnterConsole("login")}
-                className="hidden sm:flex animate-blur-fade-up bg-white text-black hover:bg-gray-200 transition-all rounded-full font-medium px-4 md:px-5 py-2 text-sm flex items-center gap-2 shadow-lg active:scale-95 cursor-pointer"
+                className="hidden sm:flex animate-blur-fade-up bg-white text-black hover:bg-gray-200 transition-all rounded-md font-medium px-4 md:px-5 py-2 text-sm flex items-center gap-2 shadow-lg active:scale-95 cursor-pointer"
                 style={{ animationDelay: "350ms" }}
               >
                 <span>Launch Sentinel</span>
@@ -227,7 +227,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
           {/* Hamburger Menu Button (visible only below lg) */}
           <button
             onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-            className="lg:hidden animate-blur-fade-up liquid-glass w-10 h-10 rounded-full flex items-center justify-center text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95 relative"
+            className="lg:hidden animate-blur-fade-up liquid-glass w-10 h-10 rounded-md flex items-center justify-center text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95 relative"
             style={{ animationDelay: "350ms" }}
             aria-label="Toggle Menu"
           >
@@ -284,7 +284,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
                 setIsMobileMenuOpen(false);
                 onEnterConsole("radar");
               }}
-              className="w-full liquid-glass rounded-full py-2.5 px-4 text-xs font-medium flex items-center justify-center gap-2 text-white hover:bg-white/5"
+              className="w-full liquid-glass rounded-md py-2.5 px-4 text-xs font-medium flex items-center justify-center gap-2 text-white hover:bg-white/5"
             >
               <Compass className="size-4" />
               <span>Launch Sentinel Console</span>
@@ -294,7 +294,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
                 setIsMobileMenuOpen(false);
                 onEnterConsole("login");
               }}
-              className="w-full bg-white text-black rounded-full py-2.5 px-4 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-gray-200"
+              className="w-full bg-white text-black rounded-md py-2.5 px-4 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-gray-200"
             >
               <User className="size-4 text-black" />
               <span>Sign In / Create Account</span>
@@ -357,7 +357,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
               {/* Primary Solid White Showcase CTA Button */}
               <button
                 onClick={() => onEnterConsole(slide.targetView)}
-                className="animate-blur-fade-up bg-white text-black hover:bg-gray-200 transition-all rounded-full font-medium px-6 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base flex items-center gap-2.5 shadow-xl hover:shadow-white/20 active:scale-95 cursor-pointer"
+                className="animate-blur-fade-up bg-white text-black hover:bg-gray-200 transition-all rounded-md font-medium px-6 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base flex items-center gap-2.5 shadow-xl hover:shadow-white/20 active:scale-95 cursor-pointer"
                 style={{ animationDelay: "600ms" }}
               >
                 <Play className="size-[18px] fill-black text-black" />
@@ -367,7 +367,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
               {/* Secondary Liquid Glass Showcase CTA Button */}
               <button
                 onClick={() => onEnterConsole(slide.targetView)}
-                className="animate-blur-fade-up liquid-glass text-white rounded-full font-medium px-6 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base flex items-center gap-2 hover:bg-white/5 transition-all active:scale-95 cursor-pointer"
+                className="animate-blur-fade-up liquid-glass text-white rounded-md font-medium px-6 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base flex items-center gap-2 hover:bg-white/5 transition-all active:scale-95 cursor-pointer"
                 style={{ animationDelay: "700ms" }}
               >
                 <span>{slide.secondaryCtaText}</span>
@@ -391,7 +391,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
                   <div
                     key={i}
                     onClick={() => setCurrentSlideIndex(i)}
-                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                    className={`h-1.5 rounded-sm transition-all cursor-pointer ${
                       currentSlideIndex === i ? "w-5 bg-white" : "w-1.5 bg-white/30"
                     }`}
                   />
@@ -399,11 +399,11 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
               </div>
             </div>
 
-            {/* Prev / Next Showcase Navigation Pill Buttons */}
+            {/* Prev / Next Showcase Navigation Buttons */}
             <div className="flex items-center gap-2">
               <button
                 onClick={handlePrevSlide}
-                className="animate-blur-fade-up liquid-glass rounded-full px-4 sm:px-6 py-2.5 sm:py-3 flex items-center gap-1.5 text-sm text-white hover:bg-white/5 transition-all active:scale-95 cursor-pointer"
+                className="animate-blur-fade-up liquid-glass rounded-md px-4 sm:px-6 py-2.5 sm:py-3 flex items-center gap-1.5 text-sm text-white hover:bg-white/5 transition-all active:scale-95 cursor-pointer"
                 style={{ animationDelay: "800ms" }}
                 aria-label="Previous Slide"
               >
@@ -413,7 +413,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
 
               <button
                 onClick={handleNextSlide}
-                className="animate-blur-fade-up liquid-glass rounded-full px-4 sm:px-6 py-2.5 sm:py-3 flex items-center gap-1.5 text-sm text-white hover:bg-white/5 transition-all active:scale-95 cursor-pointer"
+                className="animate-blur-fade-up liquid-glass rounded-md px-4 sm:px-6 py-2.5 sm:py-3 flex items-center gap-1.5 text-sm text-white hover:bg-white/5 transition-all active:scale-95 cursor-pointer"
                 style={{ animationDelay: "900ms" }}
                 aria-label="Next Slide"
               >

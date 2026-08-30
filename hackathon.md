@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-30T08:04:00Z
+- **Last updated:** 2026-08-30T08:17:00Z
 
 ## Log
 
@@ -202,5 +202,8 @@ Added Treating Physician Notes & Clinical Addendum upfront to the initial case i
 ### 2026-08-30 - f225957
 Redesigned toolbar button architectures to eliminate awkward two-line button wrapping and replaced rounded pill styling with crisp, modern rectangular UI elements. Structured the toolbar in `AppealStudio.tsx` into single-line modular units (Appellate Tier Selector, Treating Physician Notes toggle, Submitter Details toggle, Preview Email, and Synthesize Brief), preventing orphan button wraps across standard viewports. Separated companion portal utility tools in `AgentMailDrawer.tsx` into a compact header toolbar and placed the primary transmission CTA into a dedicated bottom dispatch launchpad bar displaying active recipient indicators. Standardized global button and badge primitives (`button.tsx`, `badge.tsx`, `select.tsx`, `input.tsx`, `EvidenceMatrix.tsx`, `ExportDrawer.tsx`) to crisp rectangular `rounded-md` geometry. Validated with `npm run verify`: 100% typecheck, lint, 53/53 passing unit tests, and production build.
 
-### 2026-08-30 - working tree
+### 2026-08-30 - a1b41a1
 Automated legal precedent and vector archive injection into the AI appeal synthesis pipeline, removing manual user insertion prompts across the UI. Because clinical advocates and lay users lack the specialized legal knowledge to manually parse statutory excerpts and decide what legal citations to inject, vector-matched precedents now behave identically to Insurer CPB Criteria & Exhibits: top vector matches are automatically provided as internal retrieval context to the synthesis LLM (`appealSynthesizer.ts`, `sentinelPipeline.ts`), which autonomously decides how to apply and reference them in the appeal brief. Replaced manual "Insert proven language into brief" actions in `CitationSidebar.tsx` and `PrecedentFeed.tsx` with clean citation copy actions and consistent "Auto-Injected as LLM Synthesis Context" status indicators matching the rest of the evidence matrix. Validated with `npm run verify`: 100% typecheck, lint, 53/53 passing unit tests, and production build.
+
+### 2026-08-30 - working tree
+Standardized design system radius tokens and resolved Appeal Studio toolbar overflow. Reduced the global design token `--radius` from `0.625rem` to `0.375rem` in `src/index.css` and standardized `Button` component sizes in `src/components/ui/button.tsx` to eliminate rounded pill distortion on small action buttons. Resolved right-edge button clipping in Appeal Studio (`AppealStudio.tsx`) by upgrading the toolbar container to responsive `flex-col 2xl:flex-row` with flex-wrapping and `overflow-visible`, ensuring the "Synthesize Brief" action renders cleanly across all viewport widths. Standardized all button elements across `Header.tsx`, `Sidebar.tsx`, `CaseRadar.tsx`, `CinematicHero.tsx`, `AuthPage.tsx`, `OnboardingWizard.tsx`, and `avatar.tsx` to rectangular `rounded-md` geometry.

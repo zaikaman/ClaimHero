@@ -42,11 +42,11 @@ export function buttonVariants({
   const sizeStyles = {
     default: "h-8 gap-1.5 px-3 text-xs rounded-md",
     xs: "h-6 gap-1 rounded px-2 text-xs [&_svg:not([class*='size-'])]:size-3",
-    sm: "h-7.5 gap-1.5 rounded-md px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3.5",
+    sm: "h-8 gap-1.5 rounded-md px-3 text-xs [&_svg:not([class*='size-'])]:size-3.5",
     lg: "h-9 gap-1.5 rounded-md px-3.5 text-sm",
     icon: "size-8 rounded-md",
     "icon-xs": "size-6 rounded [&_svg:not([class*='size-'])]:size-3",
-    "icon-sm": "size-7.5 rounded-md",
+    "icon-sm": "size-8 rounded-md",
     "icon-lg": "size-9 rounded-md",
   };
 

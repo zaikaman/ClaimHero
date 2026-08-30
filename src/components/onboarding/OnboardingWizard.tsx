@@ -335,7 +335,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         variant={isSelected ? "default" : "outline"}
                         size="sm"
                         onClick={() => togglePayer(payer)}
-                        className={`h-7 px-3 rounded-full text-xs font-medium gap-1.5 transition-all ${
+                        className={`h-7 px-3 rounded-md text-xs font-medium gap-1.5 transition-all ${
                           isSelected
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted/40 text-muted-foreground hover:text-foreground"

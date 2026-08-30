@@ -228,7 +228,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar sm:flex-nowrap shrink-0">
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
             {/* 1-Click Unified Analysis Trigger */}
             <Button
               size="sm"

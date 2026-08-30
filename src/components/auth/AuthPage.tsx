@@ -118,7 +118,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
       <div className="absolute top-4 sm:top-6 left-4 sm:left-8 z-30">
         <button
           onClick={() => onNavigate("landing")}
-          className="liquid-glass flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm text-white/90 hover:text-white transition-all active:scale-95 cursor-pointer hover:bg-white/10 shadow-lg backdrop-blur-md"
+          className="liquid-glass flex items-center gap-2 px-4 py-2 rounded-md text-xs sm:text-sm text-white/90 hover:text-white transition-all active:scale-95 cursor-pointer hover:bg-white/10 shadow-lg backdrop-blur-md"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Overview</span>
