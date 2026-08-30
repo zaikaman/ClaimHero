@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zaikaman/ClaimHero"><strong>Live App (convex.site)</strong></a> &nbsp;|&nbsp;
+  <a href="https://usable-sturgeon-376.convex.site"><strong>Live App (convex.site)</strong></a> &nbsp;|&nbsp;
   <a href="https://github.com/zaikaman/ClaimHero"><strong>3-Min Demo Video</strong></a> &nbsp;|&nbsp;
   <a href="./hackathon.md"><strong>Build Log (hackathon.md)</strong></a> &nbsp;|&nbsp;
   <a href="./BRIEF.md"><strong>Hackathon Brief</strong></a>
