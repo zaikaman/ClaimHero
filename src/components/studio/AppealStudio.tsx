@@ -13,6 +13,13 @@ import {
   PhoneCall,
   Printer,
   ArrowRight,
+  Scales,
+  TrendUp,
+  ShieldWarning,
+  ClockCounterClockwise,
+  Gavel,
+  ShieldCheck,
+  X,
 } from "@phosphor-icons/react";
 import { Claim, ClinicalEvidence, AppealLevel } from "../../types";
 import { useAppealStudio } from "../../hooks/useAppealStudio";
@@ -38,6 +45,51 @@ interface AppealStudioProps {
   onRunAutonomousPipeline?: (claimId?: string) => Promise<any>;
 }
 
+const TIER_METADATA_CONFIG = {
+  level_1_internal: {
+    levelNumber: 1,
+    title: "Level 1: Internal Administrative Appeal",
+    shortTitle: "Level 1 Internal",
+    targetAuthority: "Payer Medical Director Review",
+    postureLabel: "Administrative Reconsideration",
+    legalAggressiveness: "Standard",
+    colorClass: "border-sky-500/40 text-sky-400 bg-sky-500/10",
+    badgeVariant: "default" as const,
+    keyStatute: "ERISA 29 C.F.R. § 2560.503-1",
+    description: "Initial formal challenge presenting clinical CPB contradictions, treating physician addendum, and standard ERISA disclosure demands.",
+    nextTier: "level_2_grievance" as AppealLevel,
+    nextTierLabel: "Level 2 Formal Grievance",
+  },
+  level_2_grievance: {
+    levelNumber: 2,
+    title: "Level 2: Formal Grievance & Peer Review Panel",
+    shortTitle: "Level 2 Grievance",
+    targetAuthority: "Multi-Disciplinary Peer Review Panel",
+    postureLabel: "Elevated Adversarial Posture",
+    legalAggressiveness: "Elevated Grievance",
+    colorClass: "border-amber-500/40 text-amber-400 bg-amber-500/10",
+    badgeVariant: "warning" as const,
+    keyStatute: "ERISA § 503 & 29 C.F.R. § 2560.503-1(h)(3)(iii)",
+    description: "Elevated statutory challenge demanding independent same-specialty board-certified peer review, reviewer credentials disclosure, and bad-faith warnings.",
+    nextTier: "level_3_external_state_review" as AppealLevel,
+    nextTierLabel: "Level 3 External Review (IRO & DOI)",
+  },
+  level_3_external_state_review: {
+    levelNumber: 3,
+    title: "Level 3: External IRO & State Commissioner Petition",
+    shortTitle: "Level 3 External IRO",
+    targetAuthority: "External IRO & State Insurance Commissioner",
+    postureLabel: "Maximum Statutory Enforcement",
+    legalAggressiveness: "Maximum Statutory Enforcement",
+    colorClass: "border-rose-500/40 text-rose-400 bg-rose-500/10",
+    badgeVariant: "destructive" as const,
+    keyStatute: "ERISA § 502(a)(1)(B) & 45 C.F.R. § 147.136",
+    description: "Maximum legal enforcement petitioning independent external review and State DOI complaint with statutory bad-faith penalties and fee-shifting.",
+    nextTier: null,
+    nextTierLabel: null,
+  },
+};
+
 export const AppealStudio: React.FC<AppealStudioProps> = ({
   claim,
   evidences,
@@ -48,6 +100,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 }) => {
   const {
     appeal,
+    appealVersions,
+    selectedAppealId,
+    selectVersion,
     markdownContent,
     setMarkdownContent,
     appealLevel,
@@ -63,17 +118,24 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     senderPhone,
     setSenderPhone,
     isSynthesizing,
+    isEscalating,
     isSaving,
     saveStatus,
     synthesizeAppeal,
+    escalateTier,
   } = useAppealStudio(claim);
   const { matches: vectorMatches, isLoading: isLoadingPrecedents } = usePrecedents(claim);
 
   const [activeTab, setActiveTab] = useState<"edit" | "preview" | "split">("split");
   const [showNotesDrawer, setShowNotesDrawer] = useState<boolean>(false);
   const [showSenderDetails, setShowSenderDetails] = useState<boolean>(false);
+  const [showVersionHistory, setShowVersionHistory] = useState<boolean>(false);
+  const [showEscalationModal, setShowEscalationModal] = useState<boolean>(false);
+  const [escalationReason, setEscalationReason] = useState<string>("");
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [synthesisError, setSynthesisError] = useState<string | null>(null);
+
+  const currentTierConfig = TIER_METADATA_CONFIG[appealLevel] || TIER_METADATA_CONFIG.level_1_internal;
 
   const handleRunSynthesis = async () => {
     setSynthesisError(null);
@@ -91,6 +153,20 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     }
   };
 
+  const handleConfirmEscalation = async () => {
+    if (!currentTierConfig.nextTier) return;
+    setSynthesisError(null);
+    try {
+      await escalateTier(currentTierConfig.nextTier, escalationReason);
+      setShowEscalationModal(false);
+      setEscalationReason("");
+    } catch (err: any) {
+      setSynthesisError(
+        err?.message || "Failed to escalate appeal tier. Please try again."
+      );
+    }
+  };
+
   return (
     <div className="space-y-3 animate-fadeIn pb-16 min-h-[calc(100vh-6.5rem)] flex flex-col">
       {/* 4-Step Guided Sentinel Stepper */}
@@ -104,12 +180,172 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         }}
         evidencesCount={evidences.length}
         hasDraftedBrief={Boolean(markdownContent.trim())}
-        isProcessing={isSynthesizing}
-        processingLabel="Synthesizing Appeal Brief..."
+        isProcessing={isSynthesizing || isEscalating}
+        processingLabel={isEscalating ? "Escalating Legal Posture..." : "Synthesizing Appeal Brief..."}
         onRunAutonomousPipeline={
           onRunAutonomousPipeline ? () => onRunAutonomousPipeline(claim._id) : undefined
         }
       />
+
+      {/* Multi-Tier Statutory Escalation Stepper Bar */}
+      <Card className="p-2.5 sm:p-3 shrink-0 overflow-visible bg-gradient-to-r from-card/90 via-card to-card/90 border-border/80 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* 3 Statutory Legal Tiers */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap flex-1">
+            {(["level_1_internal", "level_2_grievance", "level_3_external_state_review"] as AppealLevel[]).map((tierKey) => {
+              const tier = TIER_METADATA_CONFIG[tierKey];
+              const isActive = appealLevel === tierKey;
+              const hasRevisionForTier = appealVersions.some((v) => v.appealLevel === tierKey);
+
+              return (
+                <button
+                  key={tierKey}
+                  onClick={() => setAppealLevel(tierKey)}
+                  className={`flex-1 min-w-[130px] p-2 rounded-lg border text-left transition-all relative ${
+                    isActive
+                      ? `${tier.colorClass} shadow-xs font-semibold ring-1 ring-primary/30`
+                      : "border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1 mb-0.5">
+                    <span className="text-[10px] font-mono tracking-wider uppercase opacity-80">
+                      Tier {tier.levelNumber}
+                    </span>
+                    {hasRevisionForTier && (
+                      <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4">
+                        Saved
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-xs font-medium text-foreground truncate">
+                    {tier.shortTitle}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground truncate mt-0.5">
+                    {tier.postureLabel}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Quick Actions & Escalation Trigger */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Version History Toggle */}
+            <Button
+              variant={showVersionHistory ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowVersionHistory(!showVersionHistory)}
+              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
+              title="Browse historical appeal revisions across tiers"
+            >
+              <ClockCounterClockwise className="size-3.5 text-muted-foreground" />
+              <span>Revisions ({appealVersions.length})</span>
+            </Button>
+
+            {/* 1-Click Escalate Tier Button */}
+            {currentTierConfig.nextTier ? (
+              <Button
+                size="sm"
+                onClick={() => setShowEscalationModal(true)}
+                disabled={isEscalating || isSynthesizing}
+                className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0 bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-xs"
+                title={`Escalate dispute to ${currentTierConfig.nextTierLabel}`}
+              >
+                <TrendUp className="size-3.5" />
+                <span>Escalate to Tier {TIER_METADATA_CONFIG[currentTierConfig.nextTier].levelNumber}</span>
+              </Button>
+            ) : (
+              <Badge variant="destructive" className="h-8 px-2.5 text-xs gap-1.5 font-sans font-medium">
+                <Scales className="size-3.5" />
+                <span>Tier 3 Maximum Enforcement</span>
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Active Statutory Posture Pill Ribbon */}
+        <div className="mt-2.5 pt-2 border-t border-border/50 flex items-center justify-between gap-2 flex-wrap text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-foreground flex items-center gap-1">
+              <Gavel className="size-3 text-primary" />
+              Target Authority:
+            </span>
+            <span className="text-foreground">{currentTierConfig.targetAuthority}</span>
+            <span className="text-border">•</span>
+            <span className="font-mono text-primary">{currentTierConfig.keyStatute}</span>
+          </div>
+          <div className="flex items-center gap-1 text-[10px] font-mono">
+            <span>Aggressiveness:</span>
+            <span className={`font-semibold ${
+              appealLevel === "level_3_external_state_review"
+                ? "text-rose-400"
+                : appealLevel === "level_2_grievance"
+                ? "text-amber-400"
+                : "text-sky-400"
+            }`}>
+              {currentTierConfig.legalAggressiveness}
+            </span>
+          </div>
+        </div>
+      </Card>
+
+      {/* Revision History Drawer Panel */}
+      {showVersionHistory && (
+        <Card className="p-3 bg-muted/30 border-border/80 animate-fadeIn space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-foreground flex items-center gap-1.5">
+              <ClockCounterClockwise className="size-3.5 text-muted-foreground" />
+              Convex Stored Appeal Revisions ({appealVersions.length})
+            </span>
+            <button
+              onClick={() => setShowVersionHistory(false)}
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Hide
+            </button>
+          </div>
+          {appealVersions.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic py-2">
+              No saved revisions yet. Synthesize an appeal brief to store the initial revision in Convex.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+              {appealVersions.map((ver) => {
+                const tier = TIER_METADATA_CONFIG[ver.appealLevel as AppealLevel] || TIER_METADATA_CONFIG.level_1_internal;
+                const isCurrentSelected = (selectedAppealId === ver._id) || (!selectedAppealId && appeal?._id === ver._id);
+
+                return (
+                  <button
+                    key={ver._id}
+                    onClick={() => selectVersion(ver._id)}
+                    className={`p-2.5 rounded-md border text-left transition-all ${
+                      isCurrentSelected
+                        ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/40 shadow-xs"
+                        : "border-border bg-card/60 hover:bg-muted/50 text-muted-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="font-mono text-xs font-semibold text-foreground">
+                        Revision v{ver.version}
+                      </span>
+                      <Badge variant="outline" className={`text-[9px] font-mono px-1 py-0 ${tier.colorClass}`}>
+                        Tier {tier.levelNumber}
+                      </Badge>
+                    </div>
+                    <div className="text-[11px] text-foreground font-medium truncate">
+                      {tier.shortTitle}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground flex items-center justify-between mt-1">
+                      <span>{new Date(ver.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      <span>{ver.fullAppealMarkdown?.length || 0} chars</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Studio Header Toolbar */}
       <Card className="p-3.5 shrink-0 overflow-visible">
@@ -152,11 +388,11 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               <Select
                 value={appealLevel}
                 onChange={(e) => setAppealLevel(e.target.value as AppealLevel)}
-                className="h-8 text-xs font-sans rounded-md w-[180px] sm:w-[200px] bg-background border border-border"
+                className="h-8 text-xs font-sans rounded-md w-[180px] sm:w-[220px] bg-background border border-border"
               >
                 <option value="level_1_internal">Level 1: Internal Appeal (ERISA)</option>
-                <option value="level_2_grievance">Level 2: Formal Grievance</option>
-                <option value="level_3_external_state_review">Level 3: External Review</option>
+                <option value="level_2_grievance">Level 2: Formal Grievance & Peer Panel</option>
+                <option value="level_3_external_state_review">Level 3: External Review (IRO & DOI)</option>
               </Select>
             </div>
 
@@ -212,11 +448,11 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             <Button
               size="sm"
               onClick={handleRunSynthesis}
-              disabled={isSynthesizing || isSaving}
+              disabled={isSynthesizing || isSaving || isEscalating}
               className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
               title="Synthesize cited appeal brief with AI"
             >
-              {isSynthesizing ? (
+              {isSynthesizing || isEscalating ? (
                 <>
                   <CircleNotch className="size-3.5 animate-spin" />
                   <span>Synthesizing...</span>
@@ -396,19 +632,19 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                     </div>
                     <div className="space-y-1 max-w-sm">
                       <div className="text-sm font-semibold text-foreground">
-                        Ready to Synthesize ERISA Appeal Brief
+                        Ready to Synthesize {currentTierConfig.shortTitle} Brief
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        Generate a formal cited appeal brief referencing {evidences.length} clinical policy clauses and 29 CFR § 2560.503-1 federal requirements.
+                        Generate a formal cited appeal brief referencing {evidences.length} clinical policy clauses and {currentTierConfig.keyStatute} federal requirements.
                       </p>
                     </div>
 
                     <Button
                       onClick={handleRunSynthesis}
-                      disabled={isSynthesizing}
+                      disabled={isSynthesizing || isEscalating}
                       className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md mt-2"
                     >
-                      {isSynthesizing ? (
+                      {isSynthesizing || isEscalating ? (
                         <>
                           <CircleNotch className="size-3.5 animate-spin" />
                           <span>Synthesizing Appeal Brief...</span>
@@ -433,6 +669,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             evidences={evidences}
             vectorMatches={vectorMatches}
             isLoadingPrecedents={isLoadingPrecedents}
+            appealLevel={appealLevel}
           />
         </Card>
       </div>
@@ -445,7 +682,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           </Badge>
           <span className="text-xs text-muted-foreground">
             {markdownContent
-              ? `${markdownContent.split(/\s+/).filter(Boolean).length} words • ERISA 29 CFR § 2560.503-1 Cited`
+              ? `${markdownContent.split(/\s+/).filter(Boolean).length} words • ${currentTierConfig.keyStatute} Cited`
               : "Synthesize the appeal brief before dispatching to insurer"}
           </span>
         </div>
@@ -472,6 +709,98 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Statutory Escalation Confirmation Modal */}
+      {showEscalationModal && currentTierConfig.nextTier && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fadeIn">
+          <Card className="w-full max-w-lg p-5 space-y-4 shadow-xl border-border bg-card">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="size-9 rounded-md bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                  <ShieldWarning className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Escalate Statutory Appeal Tier
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Elevate dispute to Tier {TIER_METADATA_CONFIG[currentTierConfig.nextTier].levelNumber}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowEscalationModal(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">Current Tier:</span>
+                  <Badge variant="outline" className="font-mono text-[10px]">
+                    {currentTierConfig.shortTitle}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-foreground">Escalating To:</span>
+                  <Badge className={`font-mono text-[10px] ${TIER_METADATA_CONFIG[currentTierConfig.nextTier].colorClass}`}>
+                    {TIER_METADATA_CONFIG[currentTierConfig.nextTier].title}
+                  </Badge>
+                </div>
+                <div className="pt-2 border-t border-border/60 text-[11px] text-muted-foreground leading-relaxed">
+                  {TIER_METADATA_CONFIG[currentTierConfig.nextTier].description}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <ShieldCheck className="size-3.5 text-primary" />
+                  Statutory Escalation Grounds & Reason (Optional)
+                </label>
+                <Textarea
+                  rows={3}
+                  value={escalationReason}
+                  onChange={(e) => setEscalationReason(e.target.value)}
+                  placeholder="e.g.: Insurer upheld initial adverse determination without physician consultation. Escalating to formal grievance demanding same-specialty board-certified review..."
+                  className="bg-background text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEscalationModal(false)}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmEscalation}
+                disabled={isEscalating}
+                className="text-xs gap-1.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-xs"
+              >
+                {isEscalating ? (
+                  <>
+                    <CircleNotch className="size-3.5 animate-spin" />
+                    <span>Escalating & Synthesizing...</span>
+                  </>
+                ) : (
+                  <>
+                    <TrendUp className="size-3.5" />
+                    <span>Confirm Statutory Escalation</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Export & Print Preview Drawer Modal */}
       <ExportDrawer

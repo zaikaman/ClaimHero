@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Appeal, Claim, AppealLevel } from "../types";
@@ -21,9 +21,17 @@ export function useAppealStudio(claim?: Claim | null) {
     claimId ? { claimId: claimId as any } : "skip"
   ) as Appeal | null | undefined;
 
+  // Real-time query to fetch all historical versions/revisions across tiers
+  const appealVersions = useQuery(
+    convexApi.appeals.listVersions,
+    claimId ? { claimId: claimId as any } : "skip"
+  ) as Appeal[] | undefined;
+
+  const [selectedAppealId, setSelectedAppealId] = useState<string | null>(null);
   const [appealLevel, setAppealLevel] = useState<AppealLevel>("level_1_internal");
   const [markdownContent, setMarkdownContent] = useState<string>("");
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
+  const [isEscalating, setIsEscalating] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [physicianNotes, setPhysicianNotes] = useState<string>(claim?.appealContext?.physicianNotes || "");
@@ -33,24 +41,34 @@ export function useAppealStudio(claim?: Claim | null) {
   const [senderPhone, setSenderPhone] = useState<string>(claim?.appealContext?.sender.phone || "");
 
   const saveDraftMutation = useMutation(convexApi.appeals.saveDraft);
+  const escalateTierMutation = useMutation(convexApi.appeals.escalateTier);
   const synthesizeAction = useAction(
     convexApi["actions/appealSynthesizer"]?.generateAppealBrief ||
     convexApi.actions?.appealSynthesizer?.generateAppealBrief
   );
 
-  // Sync markdown content when appeal is loaded or changed from cloud
-  const initializedClaimRef = useRef<string | null>(null);
+  // Determine active displayed appeal (selected revision or latest)
+  const activeAppeal = useMemo(() => {
+    if (selectedAppealId && appealVersions) {
+      const found = appealVersions.find((a) => a._id === selectedAppealId);
+      if (found) return found;
+    }
+    return latestAppeal || null;
+  }, [selectedAppealId, appealVersions, latestAppeal]);
+
+  // Sync markdown content when active appeal changes
+  const activeAppealIdRef = useRef<string | null>(null);
   const initializedContextClaimRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (latestAppeal && initializedClaimRef.current !== latestAppeal._id) {
-      setMarkdownContent(latestAppeal.fullAppealMarkdown || "");
-      if (latestAppeal.appealLevel) {
-        setAppealLevel(latestAppeal.appealLevel as AppealLevel);
+    if (activeAppeal && activeAppealIdRef.current !== activeAppeal._id) {
+      setMarkdownContent(activeAppeal.fullAppealMarkdown || "");
+      if (activeAppeal.appealLevel) {
+        setAppealLevel(activeAppeal.appealLevel as AppealLevel);
       }
-      initializedClaimRef.current = latestAppeal._id;
+      activeAppealIdRef.current = activeAppeal._id;
     }
-  }, [latestAppeal]);
+  }, [activeAppeal]);
 
   useEffect(() => {
     if (!claim?._id || initializedContextClaimRef.current === claim._id) return;
@@ -82,11 +100,12 @@ export function useAppealStudio(claim?: Claim | null) {
       }
 
       saveTimeoutRef.current = setTimeout(async () => {
-        if (latestAppeal?._id) {
+        const targetId = activeAppeal?._id || latestAppeal?._id;
+        if (targetId) {
           setIsSaving(true);
           try {
             await saveDraftMutation({
-              appealId: latestAppeal._id as any,
+              appealId: targetId as any,
               fullAppealMarkdown: newContent,
               lastEditedBy: "Collaborative Advocate Studio",
             });
@@ -101,7 +120,7 @@ export function useAppealStudio(claim?: Claim | null) {
         }
       }, 1200);
     },
-    [latestAppeal, saveDraftMutation]
+    [activeAppeal, latestAppeal, saveDraftMutation]
   );
 
   // Synthesize a complete clinical appeal brief
@@ -115,11 +134,12 @@ export function useAppealStudio(claim?: Claim | null) {
         throw new Error("No claim selected for appeal synthesis");
       }
 
+      const targetLevel = customLevel || appealLevel;
       setIsSynthesizing(true);
       try {
         const result = await synthesizeAction({
           claimId: claim._id as any,
-          appealLevel: customLevel || appealLevel,
+          appealLevel: targetLevel,
           physicianNotes: customNotes || physicianNotes || undefined,
           senderName: customSender?.name || senderName || undefined,
           senderCredentials: customSender?.credentials || senderCredentials || undefined,
@@ -130,6 +150,9 @@ export function useAppealStudio(claim?: Claim | null) {
         if (result?.fullAppealMarkdown) {
           setMarkdownContent(result.fullAppealMarkdown);
           setSaveStatus("saved");
+          if (result.appealId) {
+            setSelectedAppealId(result.appealId);
+          }
         }
         return result;
       } finally {
@@ -138,6 +161,35 @@ export function useAppealStudio(claim?: Claim | null) {
     },
     [claim, appealLevel, physicianNotes, senderName, senderCredentials, senderEmail, senderPhone, synthesizeAction]
   );
+
+  // Escalate to next statutory tier and synthesize escalated legal brief
+  const escalateTier = useCallback(
+    async (targetLevel: AppealLevel, escalationReason?: string) => {
+      if (!claim?._id) throw new Error("No claim selected for tier escalation");
+
+      setIsEscalating(true);
+      try {
+        await escalateTierMutation({
+          claimId: claim._id as any,
+          targetLevel,
+          escalationReason,
+          actor: senderName || "Advocate Legal Officer",
+        });
+
+        setAppealLevel(targetLevel);
+        const synthResult = await synthesizeAppeal(targetLevel);
+        return synthResult;
+      } finally {
+        setIsEscalating(false);
+      }
+    },
+    [claim, senderName, escalateTierMutation, synthesizeAppeal]
+  );
+
+  // Helper to switch to a specific historical version
+  const selectVersion = useCallback((versionId: string) => {
+    setSelectedAppealId(versionId);
+  }, []);
 
   // Helper to append a citation or note into the editor
   const insertTextAtCursor = useCallback(
@@ -149,7 +201,11 @@ export function useAppealStudio(claim?: Claim | null) {
   );
 
   return {
-    appeal: latestAppeal || null,
+    appeal: activeAppeal,
+    latestAppeal: latestAppeal || null,
+    appealVersions: appealVersions || [],
+    selectedAppealId,
+    selectVersion,
     isLoadingAppeal: claimId ? latestAppeal === undefined : false,
     markdownContent,
     setMarkdownContent: handleUpdateMarkdown,
@@ -166,9 +222,11 @@ export function useAppealStudio(claim?: Claim | null) {
     senderPhone,
     setSenderPhone,
     isSynthesizing,
+    isEscalating,
     isSaving,
     saveStatus,
     synthesizeAppeal,
+    escalateTier,
     insertTextAtCursor,
   };
 }

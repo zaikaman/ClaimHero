@@ -122,6 +122,11 @@ export default defineSchema({
     claimId: v.id("claims"),
     version: v.number(),
     appealLevel: v.string(), // level_1_internal, level_2_grievance, level_3_external_state_review
+    statutoryPosture: v.optional(v.string()), // administrative_reconsideration, procedural_grievance_bad_faith, external_iro_erisa_502_petition
+    targetAuthority: v.optional(v.string()), // Payer Medical Director, Multi-Disciplinary Peer Review Panel, External IRO & State Insurance Commissioner
+    legalAggressiveness: v.optional(v.string()), // standard, elevated_grievance, maximum_statutory_enforcement
+    statutoryAuthorities: v.optional(v.array(v.string())),
+    escalationNotes: v.optional(v.string()),
     executiveSummary: v.string(),
     medicalNecessityArguments: v.string(),
     legalCitations: v.string(),
@@ -129,7 +134,10 @@ export default defineSchema({
     pdfExportStorageId: v.optional(v.id("_storage")),
     lastEditedBy: v.string(),
     updatedAt: v.number(),
-  }).index("by_claim", ["claimId"]),
+  })
+    .index("by_claim", ["claimId"])
+    .index("by_claimId_and_appealLevel", ["claimId", "appealLevel"])
+    .index("by_claimId_and_version", ["claimId", "version"]),
 
   // Autonomous AgentMail Communication Threads
   emailThreads: defineTable({

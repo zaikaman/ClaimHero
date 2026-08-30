@@ -80,8 +80,23 @@ export interface ClinicalFacts {
   recordsAreIncomplete: boolean;
 }
 
-const SAFE_STATUTORY_RIGHTS_NOTICE =
-  "Please process this appeal under the plan's claims and appeals procedure and the instructions in the denial notice. If ERISA applies, please treat this as a request for full and fair review under 29 C.F.R. § 2560.503-1 and provide, upon request, the documents, records, plan provisions, clinical policies or criteria, and other information relevant to this claim. If external review is available, please include the applicable process and deadline in your determination.";
+export const STATUTORY_RIGHTS_NOTICES: Record<string, string> = {
+  level_1_internal:
+    "Please process this appeal under the plan's claims and appeals procedure and the instructions in the denial notice. If ERISA applies, please treat this as a request for full and fair review under 29 C.F.R. § 2560.503-1 and provide, upon request, the documents, records, plan provisions, clinical policies or criteria, and other information relevant to this claim. If external review is available, please include the applicable process and deadline in your determination.",
+  level_2_grievance:
+    "FORMAL GRIEVANCE & ERISA § 503 PROCEDURAL NOTICE: This appeal is submitted under ERISA Section 503 (29 U.S.C. § 1133) and 29 C.F.R. § 2560.503-1(h)(3)(iii). We formally demand that this second-tier grievance be reviewed by an independent medical expert of the same specialty who was not involved in the initial adverse determination. Failure to afford a qualified same-specialty review or withholding clinical review guidelines constitutes a procedural violation and a reservation of rights regarding statutory bad-faith claims handling.",
+  level_3_external_state_review:
+    "STATUTORY BAD-FAITH & ERISA SECTION 502(a)(1)(B) LITIGATION WARNING: Having exhausted available internal administrative appeals without a medically sound determination, notice is hereby given under ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)], 45 C.F.R. § 147.136, and state bad-faith insurance statutes. This matter is submitted for immediate binding external review and formal complaint to the State Insurance Commissioner. If benefits are not disbursed in full with applicable statutory prompt-pay interest, claimant reserves all civil enforcement remedies under ERISA Section 502(a)(1)(B), statutory bad-faith penalties, and attorney's fees under 29 U.S.C. § 1132(g)(1).",
+};
+
+export function getStatutoryRightsNotice(appealLevel?: string): string {
+  if (appealLevel && STATUTORY_RIGHTS_NOTICES[appealLevel]) {
+    return STATUTORY_RIGHTS_NOTICES[appealLevel];
+  }
+  return STATUTORY_RIGHTS_NOTICES.level_1_internal;
+}
+
+const SAFE_STATUTORY_RIGHTS_NOTICE = STATUTORY_RIGHTS_NOTICES.level_1_internal;
 
 function cleanGeneratedSection(value?: string): string {
   if (!value) return "";
@@ -397,7 +412,7 @@ export function formatVectorPrecedentSection(vectorPrecedents?: VectorPrecedentM
 
 export function assembleProfessionalAppealEmail(
   claim: any,
-  _appealLevel: string,
+  appealLevel: string = "level_1_internal",
   result: AppealBriefSynthesisResult,
   evidences: any[],
   physicianNotes?: string,
@@ -425,7 +440,22 @@ export function assembleProfessionalAppealEmail(
     ? `${claim.denialReasonCode}${claim.denialReasonDescription ? ` — ${claim.denialReasonDescription.split(/[.;\n]/)[0].trim()}` : ""}`
     : denialReason;
 
-  let email = `# Appeal of Adverse Benefit Determination\n\n`;
+  // Tier-specific titles, addressees, and salutations
+  let title = `# Appeal of Adverse Benefit Determination`;
+  let salutation = `Dear Appeals and Grievances Team,`;
+  let openingParagraph = `I request reconsideration of the adverse benefit determination for Claim #${claimNumber}, relating to the service provided on ${formatServiceDate(claim.serviceDate)}. The denial notice cites ${primaryDenial}. Please review the submitted clinical records and applicable plan criteria and reprocess the claim if benefits are payable under the plan.`;
+
+  if (appealLevel === "level_2_grievance") {
+    title = `# Appeal of Adverse Benefit Determination — Level 2 Formal Grievance`;
+    salutation = `To the Multi-Disciplinary Peer Review Panel & Grievance Committee,`;
+    openingParagraph = `I hereby submit this Level 2 Formal Grievance escalating the adverse benefit determination for Claim #${claimNumber} (service date: ${formatServiceDate(claim.serviceDate)}). The initial adverse determination cites ${primaryDenial}. We formally challenge the clinical and procedural adequacy of the prior review and demand multi-disciplinary peer review under ERISA Section 503.`;
+  } else if (appealLevel === "level_3_external_state_review") {
+    title = `# Appeal of Adverse Benefit Determination — Level 3 External IRO & State Insurance Commissioner Petition`;
+    salutation = `To the Independent Review Organization (IRO), State Insurance Commissioner, and Plan Administrator,`;
+    openingParagraph = `I hereby submit this Level 3 Petition for External Independent Review and formal administrative complaint regarding Claim #${claimNumber} (service date: ${formatServiceDate(claim.serviceDate)}) regarding the adverse determination citing ${primaryDenial}. Having exhausted internal administrative reviews, this petition demands independent external overturn, regulatory scrutiny, and statutory bad-faith remedies under ERISA Section 502(a)(1)(B).`;
+  }
+
+  let email = `${title}\n\n`;
   email += `**Claim reference:** #${claimNumber}\n\n`;
   email += `**Claim details**\n`;
   email += `- Patient/member: ${patientName}\n`;
@@ -436,8 +466,8 @@ export function assembleProfessionalAppealEmail(
   email += `- Diagnosis code(s): ${icd10Codes}\n`;
   email += `- Denial reason: ${denialReason}\n`;
   email += `- Amount at issue: ${formatMoney(claim.deniedAmount)}\n\n`;
-  email += `Dear Appeals and Grievances Team,\n\n`;
-  email += `I request reconsideration of the adverse benefit determination for Claim #${claimNumber}, relating to the service provided on ${formatServiceDate(claim.serviceDate)}. The denial notice cites ${primaryDenial}. Please review the submitted clinical records and applicable plan criteria and reprocess the claim if benefits are payable under the plan.\n\n`;
+  email += `${salutation}\n\n`;
+  email += `${openingParagraph}\n\n`;
 
   email += `## Clinical basis for reconsideration\n\n`;
   email += `${clinicalBasis ||
@@ -464,10 +494,24 @@ export function assembleProfessionalAppealEmail(
 
   email += `## Review requested\n\n`;
   email += `Please:\n\n`;
-  email += `1. ${buildPaymentRequest(claimNumber)}\n`;
-  email += `2. If the denial is upheld, provide the specific clinical rationale, plan provision, criteria applied, and documents relied upon.\n`;
-  email += `3. Confirm receipt of this appeal and identify the applicable decision timeframe and any further review or external-review instructions.\n\n`;
-  email += `${SAFE_STATUTORY_RIGHTS_NOTICE}\n\n`;
+  if (appealLevel === "level_2_grievance") {
+    email += `1. Convene a Multi-Disciplinary Peer Review Panel and assign an independent, board-certified physician in the same medical specialty pursuant to 29 C.F.R. § 2560.503-1(h)(3)(iii).\n`;
+    email += `2. Produce the name, specialty credentials, and clinical review notes of the initial adverse reviewer.\n`;
+    email += `3. ${buildPaymentRequest(claimNumber)}\n`;
+    email += `4. Issue a formal written determination detailing specific clinical guidelines and criteria applied.\n\n`;
+  } else if (appealLevel === "level_3_external_state_review") {
+    email += `1. Conduct expedited binding external independent review pursuant to ACA 45 C.F.R. § 147.136 and applicable state external review laws.\n`;
+    email += `2. State Insurance Commissioner review for unfair claims settlement practices and statutory bad-faith adjudication.\n`;
+    email += `3. Immediate full disbursement of the denied amount of ${formatMoney(claim.deniedAmount)} plus statutory prompt-pay interest penalties.\n`;
+    email += `4. Notice of civil enforcement rights under ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)] and mandatory fee-shifting under ERISA Section 502(g)(1).\n\n`;
+  } else {
+    email += `1. ${buildPaymentRequest(claimNumber)}\n`;
+    email += `2. If the denial is upheld, provide the specific clinical rationale, plan provision, criteria applied, and documents relied upon.\n`;
+    email += `3. Confirm receipt of this appeal and identify the applicable decision timeframe and any further review or external-review instructions.\n\n`;
+  }
+
+  const statutoryNotice = getStatutoryRightsNotice(appealLevel);
+  email += `${statutoryNotice}\n\n`;
   email += `Thank you for your review. Please reference Claim #${claimNumber} in any response or request for additional information.\n\n`;
   email += buildSignature(providerName, sender);
 
@@ -680,10 +724,56 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       .map((c: PolicyCitationItem) => `- ${c.source} (${c.clause}): ${c.quote}`)
       .join("\n");
 
-    // 6. Persist the generated brief to Convex database
+    // 6. Resolve statutory tier metadata and persist the generated brief to Convex database
+    const tierMeta = {
+      level_1_internal: {
+        statutoryPosture: "administrative_reconsideration",
+        targetAuthority: "Payer Medical Director Review",
+        legalAggressiveness: "standard",
+        statutoryAuthorities: [
+          "ERISA 29 C.F.R. § 2560.503-1 (Full and Fair Review)",
+          "Patient Protection and Affordable Care Act § 2719",
+          "Published Clinical Policy Bulletins (CPB)",
+        ],
+      },
+      level_2_grievance: {
+        statutoryPosture: "procedural_grievance_bad_faith",
+        targetAuthority: "Multi-Disciplinary Peer Review Panel & Appeals Committee",
+        legalAggressiveness: "elevated_grievance",
+        statutoryAuthorities: [
+          "ERISA Section 503 (29 U.S.C. § 1133)",
+          "29 C.F.R. § 2560.503-1(h)(3)(iii) (Mandatory Same-Specialty Peer Review)",
+          "Department of Labor Claims Procedure Regulations",
+        ],
+      },
+      level_3_external_state_review: {
+        statutoryPosture: "external_iro_erisa_502_petition",
+        targetAuthority: "External Independent Review Organization (IRO) & State Insurance Commissioner",
+        legalAggressiveness: "maximum_statutory_enforcement",
+        statutoryAuthorities: [
+          "ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)] (Civil Enforcement & Benefit Recovery)",
+          "ERISA Section 502(g)(1) (Mandatory Attorney's Fees & Cost Shifting)",
+          "45 C.F.R. § 147.136 (ACA Federal External Review Mandate)",
+          "State Insurance Code Unfair Claims Settlement Practices Act",
+          "Statutory Bad-Faith Claims Handling & Prompt-Pay Interest Penalties",
+        ],
+      },
+    }[appealLevel] || {
+      statutoryPosture: "administrative_reconsideration",
+      targetAuthority: "Payer Medical Director Review",
+      legalAggressiveness: "standard",
+      statutoryAuthorities: [
+        "ERISA 29 C.F.R. § 2560.503-1 (Full and Fair Review)",
+      ],
+    };
+
     const appealId: string = await ctx.runMutation((api as any).appeals.createOrUpdateDraft, {
       claimId: args.claimId,
       appealLevel,
+      statutoryPosture: tierMeta.statutoryPosture,
+      targetAuthority: tierMeta.targetAuthority,
+      legalAggressiveness: tierMeta.legalAggressiveness,
+      statutoryAuthorities: tierMeta.statutoryAuthorities,
       executiveSummary: result.executiveSummary,
       medicalNecessityArguments: result.medicalNecessityArguments,
       legalCitations: citationsSummary,

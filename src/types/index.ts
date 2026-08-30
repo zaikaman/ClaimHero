@@ -163,11 +163,28 @@ export interface ClinicalEvidence {
   createdAt: number;
 }
 
+export type StatutoryPosture =
+  | "administrative_reconsideration"
+  | "procedural_grievance_bad_faith"
+  | "external_iro_erisa_502_petition"
+  | string;
+
+export type LegalAggressiveness =
+  | "standard"
+  | "elevated_grievance"
+  | "maximum_statutory_enforcement"
+  | string;
+
 export interface Appeal {
   _id: string;
   claimId: string;
   version: number;
   appealLevel: AppealLevel;
+  statutoryPosture?: StatutoryPosture;
+  targetAuthority?: string;
+  legalAggressiveness?: LegalAggressiveness;
+  statutoryAuthorities?: string[];
+  escalationNotes?: string;
   executiveSummary: string;
   medicalNecessityArguments: string;
   legalCitations: string;
@@ -245,6 +262,11 @@ export interface PolicyCitation {
 }
 
 export interface AppealBriefSynthesisResult {
+  appealId?: string;
+  statutoryPosture?: StatutoryPosture;
+  targetAuthority?: string;
+  legalAggressiveness?: LegalAggressiveness;
+  statutoryAuthorities?: string[];
   executiveSummary: string;
   statutoryRightsNotice: string;
   medicalNecessityArguments: string;

@@ -9,7 +9,7 @@ import {
   Medal,
   CircleNotch,
 } from "@phosphor-icons/react";
-import { ClinicalEvidence, VectorPrecedentMatch } from "../../types";
+import { ClinicalEvidence, VectorPrecedentMatch, AppealLevel } from "../../types";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -19,43 +19,101 @@ interface CitationSidebarProps {
   evidences: ClinicalEvidence[];
   vectorMatches?: VectorPrecedentMatch[];
   isLoadingPrecedents?: boolean;
+  appealLevel?: AppealLevel;
 }
 
 function similarityPercent(score: number): number {
   return Math.round(Math.max(0, Math.min(1, (score + 1) / 2)) * 1000) / 10;
 }
 
-const STATUTORY_LEGAL_AUTHORITIES = [
-  {
-    title: "ERISA 29 CFR § 2560.503-1",
-    sectionTarget: "Section II",
-    category: "Federal Procedural Right",
-    summary: "Mandates full and fair de novo review by an independent physician without deference to prior denial.",
-    fullCitation: `Pursuant to 29 CFR § 2560.503-1(h)(2)(iii), the plan administrator is required to provide full access to and copies of all documents, records, and internal clinical protocols utilized in making the adverse determination. Denial of coverage based on non-disclosed internal guidelines violates the claimant's statutory right to a full and fair review.`,
-  },
-  {
-    title: "Treating Physician Clinical Authority",
-    sectionTarget: "Section I & II",
-    category: "Standard of Review",
-    summary: "Firsthand clinical evaluation by treating physician outweighs non-examining paper reviewers.",
-    fullCitation: `The licensed treating physician possesses firsthand clinical knowledge of the patient's pathology, diagnostic imaging, and functional deterioration. The insurer's non-examining paper reviewer failed to establish any credible medical justification to countermand the treating specialist's clinical determination.`,
-  },
-  {
-    title: "ACA § 2719 External Review Standard",
-    sectionTarget: "Section IV",
-    category: "Appellate Escalation",
-    summary: "Statutory notice of right to petition state insurance commissioner for binding independent external review.",
-    fullCitation: `In the event of an adverse benefit determination upholding this denial, claimant hereby exercises formal notice of intent to file for Independent External Medical Review with the State Insurance Commissioner (45 CFR § 147.136).`,
-  },
-];
+const TIER_STATUTORY_AUTHORITIES: Record<string, Array<{
+  title: string;
+  sectionTarget: string;
+  category: string;
+  summary: string;
+  fullCitation: string;
+}>> = {
+  level_1_internal: [
+    {
+      title: "ERISA 29 CFR § 2560.503-1",
+      sectionTarget: "Administrative Review",
+      category: "Federal Procedural Right",
+      summary: "Mandates full and fair de novo review by an independent physician without deference to prior denial.",
+      fullCitation: `Pursuant to 29 CFR § 2560.503-1(h)(2)(iii), the plan administrator is required to provide full access to and copies of all documents, records, and internal clinical protocols utilized in making the adverse determination. Denial of coverage based on non-disclosed internal guidelines violates the claimant's statutory right to a full and fair review.`,
+    },
+    {
+      title: "Treating Physician Clinical Authority",
+      sectionTarget: "Clinical Findings",
+      category: "Standard of Review",
+      summary: "Firsthand clinical evaluation by treating physician outweighs non-examining paper reviewers.",
+      fullCitation: `The licensed treating physician possesses firsthand clinical knowledge of the patient's pathology, diagnostic imaging, and functional deterioration. The insurer's non-examining paper reviewer failed to establish any credible medical justification to countermand the treating specialist's clinical determination.`,
+    },
+    {
+      title: "ACA § 2719 External Review Standard",
+      sectionTarget: "Statutory Notice",
+      category: "Appellate Escalation",
+      summary: "Statutory notice of right to petition state insurance commissioner for binding independent external review.",
+      fullCitation: `In the event of an adverse benefit determination upholding this denial, claimant hereby exercises formal notice of intent to file for Independent External Medical Review with the State Insurance Commissioner (45 CFR § 147.136).`,
+    },
+  ],
+  level_2_grievance: [
+    {
+      title: "29 CFR § 2560.503-1(h)(3)(iii)",
+      sectionTarget: "Peer Review Panel",
+      category: "Mandatory Same-Specialty Review",
+      summary: "Mandates consultation with an independent health care professional with appropriate board certification in the same specialty.",
+      fullCitation: `Under 29 CFR § 2560.503-1(h)(3)(iii), in deciding an appeal of an adverse benefit determination based in whole or in part on a medical judgment, the plan fiduciary must consult with a health care professional who has appropriate training and experience in the field of medicine involved in the medical judgment and who was not consulted in the initial determination.`,
+    },
+    {
+      title: "ERISA Section 503 (29 U.S.C. § 1133)",
+      sectionTarget: "Procedural Due Process",
+      category: "Statutory Grievance Mandate",
+      summary: "Full and fair review by named fiduciary; requires adequate written notice of specific reasons and relevant plan provisions.",
+      fullCitation: `Every employee benefit plan shall afford a reasonable opportunity to any participant whose claim for benefits has been denied for a full and fair review by the appropriate named fiduciary of the decision denying the claim.`,
+    },
+    {
+      title: "Reviewer Credentials & Notes Disclosure",
+      sectionTarget: "Evidentiary Demand",
+      category: "Bad-Faith Prevention",
+      summary: "Statutory entitlement to reviewer's board certification, medical license state, and complete unredacted clinical rationale.",
+      fullCitation: `Claimant formally demands the curriculum vitae, medical license state and number, and clinical review notes of the initial adverse reviewer to verify compliance with statutory qualification requirements.`,
+    },
+  ],
+  level_3_external_state_review: [
+    {
+      title: "ERISA Section 502(a)(1)(B)",
+      sectionTarget: "Civil Enforcement",
+      category: "Federal Litigation Remedy",
+      summary: "Civil action to recover benefits due under the terms of the plan, to enforce rights, and to clarify rights to future benefits.",
+      fullCitation: `A civil action may be brought by a participant or beneficiary under 29 U.S.C. § 1132(a)(1)(B) to recover benefits due to him under the terms of his plan, to enforce his rights under the terms of the plan, or to clarify his rights to future benefits under the terms of the plan.`,
+    },
+    {
+      title: "ERISA Section 502(g)(1)",
+      sectionTarget: "Fee-Shifting Mandate",
+      category: "Attorney's Fees & Costs",
+      summary: "Court in its discretion may allow reasonable attorney's fees and costs of action to either party.",
+      fullCitation: `Pursuant to 29 U.S.C. § 1132(g)(1), upon prevailing in federal court to recover wrongfully denied medical benefits, the plan administrator is subject to mandatory or discretionary fee-shifting for all legal fees and expert costs incurred.`,
+    },
+    {
+      title: "ACA 45 CFR § 147.136 & State DOI Petition",
+      sectionTarget: "External Binding Review",
+      category: "Independent Review Organization",
+      summary: "Binding external review through accredited IRO and formal regulatory complaint to the State Insurance Commissioner.",
+      fullCitation: `Federal external review regulations (45 CFR § 147.136) and state insurance prompt-pay statutes establish binding external adjudication and regulatory penalties against insurers for bad-faith claim delays and arbitrary coverage denials.`,
+    },
+  ],
+};
 
 export const CitationSidebar: React.FC<CitationSidebarProps> = ({
   evidences,
   vectorMatches = [],
   isLoadingPrecedents = false,
+  appealLevel = "level_1_internal",
 }) => {
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const policyEvidences = evidences.filter((item) => item.sourceType !== "legal_precedent");
+  const activeAuthorities =
+    TIER_STATUTORY_AUTHORITIES[appealLevel] || TIER_STATUTORY_AUTHORITIES.level_1_internal;
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -156,13 +214,22 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
 
       {/* 1. Statutory ERISA Protections */}
       <div className="space-y-2">
-        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-          <Scales className="size-3" />
-          <span>Statutory Authorities ({STATUTORY_LEGAL_AUTHORITIES.length})</span>
+        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Scales className="size-3" />
+            <span>Statutory Authorities ({activeAuthorities.length})</span>
+          </div>
+          <Badge variant="outline" className="text-[9px] font-mono capitalize">
+            {appealLevel === "level_2_grievance"
+              ? "Level 2 Grievance"
+              : appealLevel === "level_3_external_state_review"
+              ? "Level 3 IRO & DOI"
+              : "Level 1 Administrative"}
+          </Badge>
         </div>
 
         <div className="space-y-2">
-          {STATUTORY_LEGAL_AUTHORITIES.map((auth, idx) => (
+          {activeAuthorities.map((auth, idx) => (
             <Card
               key={idx}
               className="p-3 space-y-2 bg-card hover:bg-muted/20 transition-colors"

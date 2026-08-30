@@ -117,6 +117,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 <DialogTitle>Appeal Email Preview</DialogTitle>
                 <DialogDescription className="font-mono">
                   Claim #{claim.claimNumber} • {appeal?.appealLevel?.replace(/_/g, " ").toUpperCase() || "LEVEL 1 INTERNAL"} • Draft v{appeal?.version || 1}
+                  {appeal?.targetAuthority ? ` • ${appeal.targetAuthority}` : ""}
                 </DialogDescription>
               </div>
             </div>
