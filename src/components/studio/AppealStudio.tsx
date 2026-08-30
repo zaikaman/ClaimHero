@@ -121,8 +121,28 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   const [escalationReason, setEscalationReason] = useState<string>("");
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [synthesisError, setSynthesisError] = useState<string | null>(null);
+  const [injectedPenaltiesSuccess, setInjectedPenaltiesSuccess] = useState<boolean>(false);
 
   const currentTierConfig = TIER_METADATA_CONFIG[appealLevel] || TIER_METADATA_CONFIG.level_1_internal;
+
+  const handleInjectErisaPenalties = () => {
+    const penaltyClause = `
+
+## IV. STATUTORY REMEDIES & ERISA § 502(c) CIVIL PENALTIES DEMAND
+1. **Immediate Retroactive Coverage**: Claimant demands immediate and retroactive overturn of the adverse benefit determination for CPT codes (${claim.cptCodes?.join(", ") || "disputed clinical services"}), with prompt reimbursement issued at contractual in-network rates.
+2. **Statutory Non-Disclosure Penalties (29 U.S.C. § 1132(c)(1)(B))**: The Plan Administrator failed to disclose the internal clinical criteria, review protocols, and claim files within 30 days of written demand. Pursuant to 29 C.F.R. § 2560.503-1 and 29 C.F.R. § 2575.502c-1, claimant demands accrued statutory civil penalties at $110.00 per calendar day until full disclosure is rendered.
+3. **Fee-Shifting Notice (29 U.S.C. § 1132(g)(1))**: Notice is hereby given that claimant will petition the United States District Court for full mandatory and discretionary recovery of reasonable attorney's fees, clinical expert expenses, and taxable litigation costs upon judicial enforcement.`;
+
+    if (markdownContent.includes("ERISA § 502(c) CIVIL PENALTIES DEMAND")) {
+      setInjectedPenaltiesSuccess(true);
+      setTimeout(() => setInjectedPenaltiesSuccess(false), 2500);
+      return;
+    }
+
+    setMarkdownContent(markdownContent.trim() + penaltyClause);
+    setInjectedPenaltiesSuccess(true);
+    setTimeout(() => setInjectedPenaltiesSuccess(false), 2500);
+  };
 
   const handleRunSynthesis = async () => {
     setSynthesisError(null);
@@ -375,11 +395,23 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               variant="outline"
               size="sm"
               onClick={() => onNavigateView?.("p2p" as any)}
-              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-primary/40 text-primary hover:bg-primary/10"
+              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
               title="Open 3-Minute Physician Peer-to-Peer Defense Tele-Script & Pocket Cheat Sheet"
             >
               <PhoneCall className="size-3.5" />
-              <span>P2P Tele-Script</span>
+              <span>Doctor P2P Script</span>
+            </Button>
+
+            {/* ERISA Penalties & Financial Liability Navigation */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigateView?.("calculator" as any)}
+              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+              title="Open ERISA 29 U.S.C. § 1132(c) Statutory Penalty Calculator and Out-of-Pocket Liability Audit"
+            >
+              <Scales className="size-3.5" />
+              <span>ERISA Penalties</span>
             </Button>
 
             {/* Export & Preview Trigger */}
@@ -457,6 +489,26 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               >
                 <Eye className="size-3" />
                 <span>Preview</span>
+              </Button>
+              <div className="h-4 w-px bg-border mx-1 hidden sm:block" />
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={handleInjectErisaPenalties}
+                className="gap-1 text-xs text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 h-7"
+                title="Inject accrued ERISA 29 U.S.C. § 1132(c) statutory non-disclosure penalties into Section IV"
+              >
+                {injectedPenaltiesSuccess ? (
+                  <>
+                    <Check className="size-3 text-emerald-400" />
+                    <span className="text-emerald-400 font-mono">Penalties Embedded</span>
+                  </>
+                ) : (
+                  <>
+                    <Scales className="size-3" />
+                    <span>Embed $110/d Penalties</span>
+                  </>
+                )}
               </Button>
             </div>
 

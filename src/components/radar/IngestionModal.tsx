@@ -17,6 +17,9 @@ import {
   ShieldCheck,
   Lock,
   Eye,
+  PhoneCall,
+  Scales,
+  TrendUp,
 } from "@phosphor-icons/react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -1057,101 +1060,181 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
             </div>
           </Card>
         ) : (
-          /* Extraction Result Card */
-          <Card className="p-4 space-y-4 border-emerald-500/30 bg-emerald-500/5">
-            <div className="flex items-center justify-between border-b border-border/60 pb-2">
-              <div className="flex items-center gap-1.5 font-semibold text-xs text-emerald-600 dark:text-emerald-400">
-                <CheckCircle className="size-4" />
-                <span>Case Initialized & Indexed</span>
+          /* Extraction Result Card & Smart Multi-Vector Triage HUD */
+          <Card className="p-4 sm:p-5 space-y-4 border-emerald-500/30 bg-card shadow-xs">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2 font-semibold text-xs text-emerald-600 dark:text-emerald-400">
+                <CheckCircle className="size-4.5" />
+                <span className="text-sm font-semibold">Case Indexed & 3 Defense Vectors Armed</span>
               </div>
               <Badge variant="outline" className="font-mono text-xs">
                 Claim #{extractedResult.claimNumber}
               </Badge>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-muted/20 border border-border/70 rounded-lg p-3">
               <div>
                 <span className="text-[10px] text-muted-foreground block font-mono">Patient</span>
-                <span className="font-semibold text-foreground">{extractedResult.patientName}</span>
+                <span className="font-semibold text-foreground truncate block">{extractedResult.patientName}</span>
               </div>
               <div>
                 <span className="text-[10px] text-muted-foreground block font-mono">Payer</span>
-                <span className="font-semibold text-foreground">{extractedResult.insurancePayer}</span>
+                <span className="font-semibold text-foreground truncate block">{extractedResult.insurancePayer}</span>
               </div>
               <div>
                 <span className="text-[10px] text-muted-foreground block font-mono">Denied Amount</span>
-                <span className="font-bold font-mono text-destructive text-sm">
+                <span className="font-bold font-mono text-destructive text-xs">
                   {formatCurrency(extractedResult.deniedAmount)}
                 </span>
               </div>
               <div>
-                <span className="text-[10px] text-muted-foreground block font-mono">Patient Responsibility</span>
-                <span className="font-bold font-mono text-destructive text-sm">
-                  {formatCurrency(extractedResult.patientOwedAmount)}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] text-muted-foreground block font-mono">CPT Codes</span>
-                <span className="font-mono font-semibold text-foreground">
-                  {extractedResult.cptCodes.join(", ") || "None"}
-                </span>
-              </div>
-              <div>
                 <span className="text-[10px] text-muted-foreground block font-mono">Denial Code</span>
-                <span className="font-mono font-semibold text-destructive">
-                  {extractedResult.denialReasonCode}
+                <span className="font-mono font-semibold text-destructive text-xs">
+                  {extractedResult.denialReasonCode || "CARC-50"}
                 </span>
               </div>
             </div>
 
             <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs text-muted-foreground">
-              <span className="text-foreground font-medium text-[11px] block">Denial Rationale:</span>
-              <p className="mt-0.5">{extractedResult.denialReasonDescription}</p>
+              <span className="text-foreground font-medium text-[11px] block font-mono">Denial Rationale:</span>
+              <p className="mt-0.5 leading-relaxed">{extractedResult.denialReasonDescription}</p>
             </div>
 
-            {extractedResult.pipelineResult ? (
-              <div className="rounded-lg bg-primary/10 border border-primary/30 p-2.5 flex items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-1.5 text-foreground font-semibold">
-                  <Sparkle className="size-3.5 text-primary shrink-0" />
-                  <span>Auto-Pilot: Brief Synthesized & Policy Cited</span>
-                </div>
-                {extractedResult.pipelineResult.overturnProbabilityScore !== undefined && (
-                  <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                    {extractedResult.pipelineResult.overturnProbabilityScore}% Win Score
+            {/* Smart Multi-Vector Armaments HUD */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+                  <Shield className="size-3.5 text-primary" />
+                  Triaged Defense Vectors Ready for Deployment:
+                </span>
+                {extractedResult.pipelineResult?.overturnProbabilityScore !== undefined && (
+                  <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px]">
+                    <TrendUp className="size-3 mr-1" />
+                    {extractedResult.pipelineResult.overturnProbabilityScore}% Overturn Score
                   </Badge>
                 )}
               </div>
-            ) : (
-              <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5 text-xs text-amber-700 dark:text-amber-300">
-                Case context saved. Automated analysis is paused; you can run it later from the Evidence or Appeal Studio view.
-              </div>
-            )}
 
-            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-border/60">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {/* Vector 1: Written Legal Brief */}
+                <div className="p-2.5 rounded-lg border border-border/80 bg-muted/20 flex flex-col justify-between space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[10px] font-mono uppercase text-muted-foreground flex items-center gap-1">
+                        <FileText className="size-3 text-sky-400" />
+                        Vector 1
+                      </span>
+                      <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4 border-sky-500/40 text-sky-400">
+                        Tier 1 Brief
+                      </Badge>
+                    </div>
+                    <span className="text-xs font-semibold text-foreground block">
+                      Written Appeal Brief
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
+                      ERISA 29 CFR § 2560.503-1 cited legal brief with CPB evidence.
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => handleDone("studio")}
+                    className="w-full text-[11px] h-6 justify-between text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 px-1.5"
+                  >
+                    <span>Open Brief</span>
+                    <ArrowRight className="size-3" />
+                  </Button>
+                </div>
+
+                {/* Vector 2: Doctor P2P Copilot */}
+                <div className="p-2.5 rounded-lg border border-border/80 bg-muted/20 flex flex-col justify-between space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[10px] font-mono uppercase text-muted-foreground flex items-center gap-1">
+                        <PhoneCall className="size-3 text-emerald-400" />
+                        Vector 2
+                      </span>
+                      <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4 border-emerald-500/40 text-emerald-400">
+                        14-Day Window
+                      </Badge>
+                    </div>
+                    <span className="text-xs font-semibold text-foreground block">
+                      Doctor P2P Tele-Script
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
+                      3-minute verbal rebuttal & live medical director copilot.
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => handleDone("p2p")}
+                    className="w-full text-[11px] h-6 justify-between text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 px-1.5"
+                  >
+                    <span>Launch P2P Script</span>
+                    <ArrowRight className="size-3" />
+                  </Button>
+                </div>
+
+                {/* Vector 3: Statutory ERISA Penalties */}
+                <div className="p-2.5 rounded-lg border border-border/80 bg-muted/20 flex flex-col justify-between space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[10px] font-mono uppercase text-muted-foreground flex items-center gap-1">
+                        <Scales className="size-3 text-amber-400" />
+                        Vector 3
+                      </span>
+                      <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4 border-amber-500/40 text-amber-400">
+                        $110/Day
+                      </Badge>
+                    </div>
+                    <span className="text-xs font-semibold text-foreground block">
+                      ERISA & Liability Audit
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
+                      29 U.S.C. § 1132(c) statutory default demand & OOP exposure.
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => handleDone("calculator")}
+                    className="w-full text-[11px] h-6 justify-between text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 px-1.5"
+                  >
+                    <span>Audit Penalties</span>
+                    <ArrowRight className="size-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 pt-3 border-t border-border/60">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setExtractedResult(null)}
-                className="text-xs"
+                className="text-xs w-full sm:w-auto"
               >
                 Ingest Another
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleDone("radar")}
-                className="gap-1 text-xs"
-              >
-                <span>View in Radar</span>
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => handleDone(autoPilotEnabled ? "evidence" : "studio")}
-                className="gap-1.5 text-xs bg-primary text-primary-foreground shadow-2xs font-semibold"
-              >
-                <FileMagnifyingGlass className="size-3.5" />
-                <span>Review Evidence & CPB &rarr;</span>
-              </Button>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDone("radar")}
+                  className="gap-1 text-xs"
+                >
+                  <span>Radar</span>
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleDone("evidence")}
+                  className="gap-1.5 text-xs bg-primary text-primary-foreground shadow-2xs font-semibold"
+                >
+                  <FileMagnifyingGlass className="size-3.5" />
+                  <span>Enter Case Workspace &rarr;</span>
+                </Button>
+              </div>
             </div>
           </Card>
         )}

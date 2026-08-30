@@ -36,6 +36,8 @@ import {
   CheckCircle,
   Printer,
   CircleNotch,
+  ArrowRight,
+  Sparkle,
 } from "@phosphor-icons/react";
 
 interface FinancialLiabilityCalculatorProps {
@@ -175,6 +177,21 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               <span>Print Statement</span>
             </Button>
             <Button
+              size="sm"
+              onClick={async () => {
+                await saveToClaim();
+                onNavigateView?.("studio");
+              }}
+              disabled={isSaving}
+              className="gap-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-xs"
+              title="Save calculations and open Appeal Studio to embed statutory penalties in the brief"
+            >
+              <Sparkle className="size-3.5" />
+              <span>Embed in Legal Brief</span>
+              <ArrowRight className="size-3" />
+            </Button>
+            <Button
+              variant="outline"
               size="sm"
               onClick={saveToClaim}
               disabled={isSaving}

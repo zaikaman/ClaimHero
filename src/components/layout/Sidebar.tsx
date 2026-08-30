@@ -21,7 +21,8 @@ import {
   CaretUpDown,
   Trash,
   PhoneCall,
-  Calculator,
+  Shield,
+  Scales,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -124,6 +125,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   // Group 2: Contextual Case Workspace Tools
+  const isDefenseSuiteView =
+    currentView === "studio" || currentView === "p2p" || currentView === "calculator";
+
   const caseWorkspaceItems = [
     {
       id: "evidence" as NavigationView,
@@ -133,21 +137,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: "studio" as NavigationView,
-      label: "Appeal Studio",
-      description: "AI Legal Brief & Cited Arguments",
-      icon: FileText,
-    },
-    {
-      id: "p2p" as NavigationView,
-      label: "P2P Tele-Script",
-      description: "3-Min Verbal Rebuttal & Cheat Sheet",
-      icon: PhoneCall,
-    },
-    {
-      id: "calculator" as NavigationView,
-      label: "Financial & ERISA",
-      description: "OOP Liability & $110/Day Penalties",
-      icon: Calculator,
+      label: "Defense Suite",
+      badge: "3 Vectors",
+      description: "Legal Brief, Doctor P2P & ERISA Penalties",
+      icon: Shield,
+      isDefenseSuite: true,
+      subItems: [
+        {
+          id: "studio" as NavigationView,
+          label: "Legal Appeal Brief",
+          icon: FileText,
+        },
+        {
+          id: "p2p" as NavigationView,
+          label: "Doctor P2P Copilot",
+          icon: PhoneCall,
+        },
+        {
+          id: "calculator" as NavigationView,
+          label: "ERISA Penalties",
+          icon: Scales,
+        },
+      ],
     },
     {
       id: "communications" as NavigationView,
@@ -369,35 +380,75 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {/* Contextual Action Tools */}
-          <nav className="space-y-0.5">
+          <nav className="space-y-1">
             {caseWorkspaceItems.map((item) => {
               const Icon = item.icon;
-              const isActive = currentView === item.id;
+              const isSuite = (item as any).isDefenseSuite;
+              const isActive = isSuite ? isDefenseSuiteView : currentView === item.id;
+
               return (
-                <button
-                  key={item.id}
-                  onClick={() => onSelectView(item.id)}
-                  title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
-                  className={cn(
-                    "w-full flex items-center rounded-md text-xs font-medium transition-colors text-left group cursor-pointer",
-                    isCollapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-1.5",
-                    isActive
-                      ? "bg-secondary/90 text-foreground font-semibold shadow-xs backdrop-blur-sm"
-                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-                  )}
-                >
-                  <Icon
+                <div key={item.id} className="space-y-0.5">
+                  <button
+                    onClick={() => onSelectView(item.id)}
+                    title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
                     className={cn(
-                      "size-4 shrink-0",
-                      isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                      "w-full flex items-center rounded-md text-xs font-medium transition-colors text-left group cursor-pointer",
+                      isCollapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-1.5",
+                      isActive
+                        ? "bg-secondary/90 text-foreground font-semibold shadow-xs backdrop-blur-sm"
+                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                     )}
-                  />
-                  {!isCollapsed && (
-                    <div className="flex items-center justify-between flex-1 truncate">
-                      <span className="truncate">{item.label}</span>
+                  >
+                    <Icon
+                      className={cn(
+                        "size-4 shrink-0",
+                        isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                      )}
+                    />
+                    {!isCollapsed && (
+                      <div className="flex items-center justify-between flex-1 truncate">
+                        <span className="truncate">{item.label}</span>
+                        {(item as any).badge && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 font-medium">
+                            {(item as any).badge}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Sub-items for Defense Suite (Expanded & Active) */}
+                  {!isCollapsed && isSuite && isDefenseSuiteView && (item as any).subItems && (
+                    <div className="ml-4 pl-2 border-l border-border/60 space-y-0.5 pt-0.5">
+                      {((item as any).subItems as Array<{ id: NavigationView; label: string; icon: any }>).map(
+                        (sub) => {
+                          const SubIcon = sub.icon;
+                          const isSubActive = currentView === sub.id;
+                          return (
+                            <button
+                              key={sub.id}
+                              onClick={() => onSelectView(sub.id)}
+                              className={cn(
+                                "w-full flex items-center gap-2 px-2 py-1 rounded-md text-[11px] font-medium transition-colors text-left cursor-pointer",
+                                isSubActive
+                                  ? "bg-primary/15 text-primary font-semibold border border-primary/30 shadow-2xs"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                              )}
+                            >
+                              <SubIcon
+                                className={cn(
+                                  "size-3 shrink-0",
+                                  isSubActive ? "text-primary" : "text-muted-foreground"
+                                )}
+                              />
+                              <span className="truncate">{sub.label}</span>
+                            </button>
+                          );
+                        }
+                      )}
                     </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </nav>
