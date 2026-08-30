@@ -66,12 +66,21 @@ export interface Claim {
   agentMailProvisioningError?: string;
   denialLetterStorageId?: string;
   appealContext?: AppealContext;
+  redactionMetadata?: RedactionMetadata;
   createdAt: number;
   updatedAt: number;
   patient?: Patient;
   latestAppeal?: Appeal | null;
   evidenceCount?: number;
   payerContact?: PayerContact;
+}
+
+export interface RedactionMetadata {
+  isRedacted: boolean;
+  mode: string;
+  redactedEntityCount: number;
+  maskedCategories: string[];
+  appliedAt: number;
 }
 
 export interface AppealSenderDetails {

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Printer,
   DownloadSimple,
@@ -6,6 +6,8 @@ import {
   Check,
   PaperPlaneTilt,
   FileDoc,
+  ShieldCheck,
+  Lock,
 } from "@phosphor-icons/react";
 import { Claim, Appeal } from "../../types";
 import {
@@ -17,6 +19,8 @@ import {
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { AppealBriefRenderer } from "./AppealBriefRenderer";
+import { fastSanitizeText } from "../../lib/redactionEngine";
+import { cn } from "../../lib/utils";
 
 interface ExportDrawerProps {
   isOpen: boolean;
@@ -36,13 +40,24 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
   onProceedToDispatch,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isPublicExhibitRedacted, setIsPublicExhibitRedacted] = useState(false);
+
+  const processedContent = useMemo(() => {
+    if (!isPublicExhibitRedacted) return markdownContent;
+    const res = fastSanitizeText(markdownContent, {
+      standard: "PUBLIC_EXHIBIT",
+      patientName: claim.patient?.name,
+    });
+    return res.sanitizedText;
+  }, [markdownContent, isPublicExhibitRedacted, claim.patient?.name]);
+
   const needsClinicalDocumentation =
-    /does not independently document the patient-specific/i.test(markdownContent) &&
-    !/Treating provider note submitted for review:/i.test(markdownContent);
+    /does not independently document the patient-specific/i.test(processedContent) &&
+    !/Treating provider note submitted for review:/i.test(processedContent);
 
   const getEmailText = () => {
     const printableText = document.querySelector<HTMLElement>(".printable-dossier")?.innerText.trim();
-    return printableText || markdownContent;
+    return printableText || processedContent;
   };
 
   const handleCopy = () => {
@@ -56,7 +71,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Appeal-Email-${claim.claimNumber}.txt`;
+    a.download = `${isPublicExhibitRedacted ? "Redacted-Exhibit-" : "Appeal-Email-"}${claim.claimNumber}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -124,6 +139,22 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
 
             <div className="flex items-center gap-2 flex-wrap shrink-0">
               <Button
+                variant={isPublicExhibitRedacted ? "default" : "outline"}
+                size="sm"
+                onClick={() => setIsPublicExhibitRedacted(!isPublicExhibitRedacted)}
+                className={cn(
+                  "h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 transition-all",
+                  isPublicExhibitRedacted
+                    ? "bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="De-identify all patient direct identifiers, SSN, and member suffixes for public legal exhibits (HIPAA Safe Harbor)"
+              >
+                <ShieldCheck className="size-3.5" />
+                <span>{isPublicExhibitRedacted ? "Exhibit Redacted" : "Redact Exhibit"}</span>
+              </Button>
+
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCopy}
@@ -165,6 +196,13 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
               </Button>
             </div>
           </div>
+
+          {isPublicExhibitRedacted && (
+            <div className="flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-300">
+              <Lock className="size-3.5 shrink-0 text-cyan-400" />
+              <span>Public Exhibit De-identification Active: All patient names, member ID suffixes, SSNs, and direct identifiers are masked under HIPAA Safe Harbor (45 CFR § 164.514).</span>
+            </div>
+          )}
         </DialogHeader>
 
         {needsClinicalDocumentation && (
@@ -177,8 +215,8 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
         <div className="flex-1 overflow-y-auto p-4 bg-muted/30 rounded-xl border border-border print:p-0 print:border-none print:bg-transparent printable-dossier-scroll-area">
           <div className="max-w-3xl mx-auto bg-white text-slate-900 p-8 sm:p-10 rounded-lg shadow-sm font-sans print:p-0 print:shadow-none print:max-w-none print:w-full printable-dossier">
             <div className="text-xs leading-relaxed text-slate-800">
-              {markdownContent ? (
-                <AppealBriefRenderer content={markdownContent} isPrintMode={true} />
+              {processedContent ? (
+                <AppealBriefRenderer content={processedContent} isPrintMode={true} />
               ) : (
                 <div className="text-center py-12 text-slate-400 italic">
                   No appeal email generated yet. Click &quot;Synthesize Brief&quot; in the studio to generate the email.

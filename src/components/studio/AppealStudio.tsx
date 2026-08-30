@@ -6,10 +6,6 @@ import {
   Check,
   Eye,
   PencilSimpleLine,
-  Stethoscope,
-  IdentificationCard,
-  EnvelopeSimple,
-  Phone,
   PhoneCall,
   Printer,
   ArrowRight,
@@ -33,8 +29,6 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Textarea } from "../ui/textarea";
-import { Input } from "../ui/input";
-import { Select } from "../ui/select";
 
 interface AppealStudioProps {
   claim: Claim;
@@ -108,15 +102,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     appealLevel,
     setAppealLevel,
     physicianNotes,
-    setPhysicianNotes,
     senderName,
-    setSenderName,
     senderCredentials,
-    setSenderCredentials,
     senderEmail,
-    setSenderEmail,
     senderPhone,
-    setSenderPhone,
     isSynthesizing,
     isEscalating,
     isSaving,
@@ -127,8 +116,6 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   const { matches: vectorMatches, isLoading: isLoadingPrecedents } = usePrecedents(claim);
 
   const [activeTab, setActiveTab] = useState<"edit" | "preview" | "split">("split");
-  const [showNotesDrawer, setShowNotesDrawer] = useState<boolean>(false);
-  const [showSenderDetails, setShowSenderDetails] = useState<boolean>(false);
   const [showVersionHistory, setShowVersionHistory] = useState<boolean>(false);
   const [showEscalationModal, setShowEscalationModal] = useState<boolean>(false);
   const [escalationReason, setEscalationReason] = useState<string>("");
@@ -168,7 +155,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   };
 
   return (
-    <div className="space-y-3 animate-fadeIn pb-16 min-h-[calc(100vh-6.5rem)] flex flex-col">
+    <div className="space-y-4 animate-fadeIn pb-20 flex flex-col">
       {/* 4-Step Guided Sentinel Stepper */}
       <SentinelFlowStepper
         claim={claim}
@@ -383,43 +370,6 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap 2xl:flex-nowrap shrink-0">
-            {/* Appeal Level Selector */}
-            <div className="shrink-0">
-              <Select
-                value={appealLevel}
-                onChange={(e) => setAppealLevel(e.target.value as AppealLevel)}
-                className="h-8 text-xs font-sans rounded-md w-[180px] sm:w-[220px] bg-background border border-border"
-              >
-                <option value="level_1_internal">Level 1: Internal Appeal (ERISA)</option>
-                <option value="level_2_grievance">Level 2: Formal Grievance & Peer Panel</option>
-                <option value="level_3_external_state_review">Level 3: External Review (IRO & DOI)</option>
-              </Select>
-            </div>
-
-            {/* Treating Physician Notes Toggle */}
-            <Button
-              variant={showNotesDrawer || physicianNotes ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setShowNotesDrawer(!showNotesDrawer)}
-              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
-              title="Treating physician clinical notes and addendum"
-            >
-              <Stethoscope className="size-3.5" />
-              <span>Physician Notes{physicianNotes ? " (Added)" : ""}</span>
-            </Button>
-
-            {/* Submitter / Sender Details Toggle */}
-            <Button
-              variant={showSenderDetails || senderName ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setShowSenderDetails(!showSenderDetails)}
-              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
-              title="Person submitting the appeal"
-            >
-              <IdentificationCard className="size-3.5" />
-              <span>Sender Details{senderName ? " (Added)" : ""}</span>
-            </Button>
-
             {/* P2P Defense Tele-Script Navigation */}
             <Button
               variant="outline"
@@ -473,101 +423,20 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             <AlertDescription>{synthesisError}</AlertDescription>
           </Alert>
         )}
-
-        {/* Optional Physician Notes Panel */}
-        {showNotesDrawer && (
-          <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 space-y-2 animate-fadeIn">
-            <div className="flex items-center justify-between text-xs text-foreground">
-              <span className="flex items-center gap-1.5 font-semibold">
-                <Stethoscope className="size-3.5 text-muted-foreground" />
-                Treating Physician Clinical Addendum & Conservative Therapy Record
-              </span>
-              <button
-                onClick={() => setShowNotesDrawer(false)}
-                className="text-[11px] text-muted-foreground hover:text-foreground"
-              >
-                Hide
-              </button>
-            </div>
-            <Textarea
-              rows={7}
-              value={physicianNotes}
-              onChange={(e) => setPhysicianNotes(e.target.value)}
-              placeholder="Paste physician clinical notes, e.g.: Patient completed 14 weeks of formal physical therapy with Dr. Miller and underwent right knee cortisone injection on 03/10/2026 with no functional relief..."
-              className="bg-background text-xs font-mono leading-relaxed"
-            />
-          </div>
-        )}
-
-        {showSenderDetails && (
-          <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 space-y-2 animate-fadeIn">
-            <div className="flex items-center justify-between text-xs text-foreground">
-              <span className="flex items-center gap-1.5 font-semibold">
-                <IdentificationCard className="size-3.5 text-muted-foreground" />
-                Person submitting the appeal
-              </span>
-              <button
-                onClick={() => setShowSenderDetails(false)}
-                className="text-[11px] text-muted-foreground hover:text-foreground"
-              >
-                Hide
-              </button>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Enter the person who will actually submit the appeal. These details are used only when provided and are not inferred from the treating provider record.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Input
-                value={senderName}
-                onChange={(e) => setSenderName(e.target.value)}
-                placeholder="Name"
-                aria-label="Sender name"
-              />
-              <Input
-                value={senderCredentials}
-                onChange={(e) => setSenderCredentials(e.target.value)}
-                placeholder="Credentials or role (optional)"
-                aria-label="Sender credentials or role"
-              />
-              <div className="relative">
-                <EnvelopeSimple className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
-                <Input
-                  type="email"
-                  value={senderEmail}
-                  onChange={(e) => setSenderEmail(e.target.value)}
-                  placeholder="Email address (optional)"
-                  aria-label="Sender email address"
-                  className="pl-8"
-                />
-              </div>
-              <div className="relative">
-                <Phone className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
-                <Input
-                  type="tel"
-                  value={senderPhone}
-                  onChange={(e) => setSenderPhone(e.target.value)}
-                  placeholder="Phone number (optional)"
-                  aria-label="Sender phone number"
-                  className="pl-8"
-                />
-              </div>
-            </div>
-          </div>
-        )}
       </Card>
 
       {/* Main Studio Dual Pane Editor & Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 overflow-hidden">
-        {/* Left 8 Cols: Markdown Editor & Live Preview */}
-        <Card className="lg:col-span-8 flex flex-col overflow-hidden p-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        {/* Left 8 Cols: Markdown Editor & Live Preview (Fixed height matched with right panel) */}
+        <Card className="lg:col-span-8 h-[640px] xl:h-[700px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden">
           {/* Sub-view Viewport Switcher */}
-          <div className="flex items-center justify-between border-b border-border px-3 py-1.5 bg-muted/30 shrink-0">
-            <div className="flex items-center gap-1">
+          <div className="h-10 shrink-0 flex items-center justify-between border-b border-border px-4 py-2 bg-muted/30">
+            <div className="flex items-center gap-1.5">
               <Button
                 variant={activeTab === "edit" ? "secondary" : "ghost"}
                 size="xs"
                 onClick={() => setActiveTab("edit")}
-                className="gap-1"
+                className="gap-1 font-medium h-7 text-xs"
               >
                 <PencilSimpleLine className="size-3" />
                 <span>Editor</span>
@@ -576,7 +445,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 variant={activeTab === "split" ? "secondary" : "ghost"}
                 size="xs"
                 onClick={() => setActiveTab("split")}
-                className="hidden md:inline-flex"
+                className="hidden md:inline-flex font-medium h-7 text-xs"
               >
                 <span>Split View</span>
               </Button>
@@ -584,49 +453,49 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 variant={activeTab === "preview" ? "secondary" : "ghost"}
                 size="xs"
                 onClick={() => setActiveTab("preview")}
-                className="gap-1"
+                className="gap-1 font-medium h-7 text-xs"
               >
                 <Eye className="size-3" />
                 <span>Preview</span>
               </Button>
             </div>
 
-            <div className="text-[11px] font-mono text-muted-foreground">
-              {markdownContent.length} chars • {markdownContent.split(/\s+/).filter(Boolean).length} words
+            <div className="text-[11px] font-mono text-muted-foreground flex items-center gap-2">
+              <span>{markdownContent.length} chars</span>
+              <span>•</span>
+              <span>{markdownContent.split(/\s+/).filter(Boolean).length} words</span>
             </div>
           </div>
 
-          {/* Editor & Preview Panes */}
-          <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-2">
-            {/* Editor Pane */}
+          {/* Editor & Preview Panes with Internal Scrolling */}
+          <div
+            className={`flex-1 overflow-hidden grid grid-cols-1 ${
+              activeTab === "split"
+                ? "xl:grid-cols-2 divide-y xl:divide-y-0 xl:divide-x divide-border"
+                : ""
+            }`}
+          >
+            {/* Panel 1: Editor Pane */}
             {(activeTab === "edit" || activeTab === "split") && (
-              <div
-                className={`h-full overflow-hidden p-3 ${
-                  activeTab === "split" ? "border-r border-border" : "col-span-2"
-                }`}
-              >
+              <div className="h-full overflow-hidden flex flex-col p-4 sm:p-5">
                 <textarea
                   value={markdownContent}
                   onChange={(e) => setMarkdownContent(e.target.value)}
                   placeholder="The appeal brief will appear here once synthesized, or write manually..."
-                  className="w-full h-full bg-transparent text-foreground text-xs font-mono resize-none focus:outline-none leading-relaxed p-1 placeholder:text-muted-foreground"
+                  className="w-full h-full bg-transparent text-foreground text-xs font-mono resize-none focus:outline-none leading-relaxed placeholder:text-muted-foreground overflow-y-auto"
                 />
               </div>
             )}
 
-            {/* Rendered Markdown Preview Pane */}
+            {/* Panel 2: Rendered Markdown Preview Pane */}
             {(activeTab === "preview" || activeTab === "split") && (
-              <div
-                className={`h-full overflow-y-auto p-4 sm:p-5 bg-background/50 ${
-                  activeTab === "preview" ? "col-span-2" : ""
-                }`}
-              >
+              <div className="h-full overflow-y-auto p-4 sm:p-6 bg-background/40">
                 {markdownContent ? (
-                  <div className="max-w-3xl mx-auto rounded-xl border border-border/80 bg-card/60 p-5 sm:p-6 shadow-sm">
+                  <div className="w-full rounded-xl border border-border/80 bg-card/70 p-5 sm:p-7 shadow-xs">
                     <AppealBriefRenderer content={markdownContent} />
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3 text-muted-foreground my-auto">
+                  <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-3 text-muted-foreground my-auto">
                     <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                       <Sparkle className="size-6" />
                     </div>
@@ -663,14 +532,16 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           </div>
         </Card>
 
-        {/* Right 4 Cols: Citation Sidebar */}
-        <Card className="lg:col-span-4 p-4 overflow-y-auto">
-          <CitationSidebar
-            evidences={evidences}
-            vectorMatches={vectorMatches}
-            isLoadingPrecedents={isLoadingPrecedents}
-            appealLevel={appealLevel}
-          />
+        {/* Panel 3: Right 4 Cols Citation Sidebar (Fixed height matched with left card) */}
+        <Card className="lg:col-span-4 h-[640px] xl:h-[700px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden">
+          <div className="h-full overflow-y-auto p-4">
+            <CitationSidebar
+              evidences={evidences}
+              vectorMatches={vectorMatches}
+              isLoadingPrecedents={isLoadingPrecedents}
+              appealLevel={appealLevel}
+            />
+          </div>
         </Card>
       </div>
 

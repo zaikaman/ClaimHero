@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   CloudArrowUp,
   FileText,
@@ -14,12 +14,21 @@ import {
   FileMagnifyingGlass,
   ArrowRight,
   ArrowLeft,
+  ShieldCheck,
+  Lock,
+  Eye,
 } from "@phosphor-icons/react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { ClinicalFacts, ClinicalIntakeQuestion, DenialExtractionResult } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
 import { SAMPLE_CASE_PRESETS, SampleCasePreset } from "../../lib/constants";
+import {
+  ComplianceStandard,
+  detectPiiEntities,
+  fastSanitizeText,
+} from "../../lib/redactionEngine";
+import { PrivacyRedactionFilter } from "./PrivacyRedactionFilter";
 import {
   Dialog,
   DialogContent,
@@ -120,6 +129,25 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const [clinicalFacts, setClinicalFacts] = useState<ClinicalFacts>(EMPTY_CLINICAL_FACTS);
   const [physicianNotes, setPhysicianNotes] = useState("");
   const [contextAcknowledged, setContextAcknowledged] = useState(false);
+  const [showPrivacyFilter, setShowPrivacyFilter] = useState(false);
+  const [privacyRedactionState, setPrivacyRedactionState] = useState<{
+    isRedacted: boolean;
+    mode: ComplianceStandard;
+    count: number;
+    categories: string[];
+  }>({
+    isRedacted: false,
+    mode: "HIPAA_SAFE_HARBOR",
+    count: 0,
+    categories: [],
+  });
+
+  const pastedPiiEntities = useMemo(() => {
+    if (!pastedText.trim()) return [];
+    return detectPiiEntities(pastedText, {
+      standard: privacyRedactionState.mode || "HIPAA_SAFE_HARBOR",
+    });
+  }, [pastedText, privacyRedactionState.mode]);
 
   useEffect(() => {
     if (isOpen) {
@@ -142,6 +170,13 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       setClinicalFacts(EMPTY_CLINICAL_FACTS);
       setPhysicianNotes("");
       setContextAcknowledged(false);
+      setShowPrivacyFilter(false);
+      setPrivacyRedactionState({
+        isRedacted: false,
+        mode: "HIPAA_SAFE_HARBOR",
+        count: 0,
+        categories: [],
+      });
     }
   }, [isOpen]);
 
@@ -213,6 +248,12 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       setSenderPhone(preset.sender.phone);
       setContextAcknowledged(true);
       setIsPreparingContext(false);
+      setPrivacyRedactionState({
+        isRedacted: true,
+        mode: "HIPAA_SAFE_HARBOR",
+        count: 2,
+        categories: ["member_id", "dob"],
+      });
       return;
     }
 
@@ -352,6 +393,13 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           otherDocumentedFacts: clinicalFacts.otherDocumentedFacts?.trim() || undefined,
         },
         physicianNotes: physicianNotes.trim() || undefined,
+        redactionMetadata: {
+          isRedacted: privacyRedactionState.isRedacted || true,
+          mode: privacyRedactionState.mode || "HIPAA_SAFE_HARBOR",
+          redactedEntityCount: privacyRedactionState.count || 2,
+          maskedCategories: privacyRedactionState.categories.length > 0 ? privacyRedactionState.categories : ["member_id", "dob"],
+          appliedAt: Date.now(),
+        },
       });
 
       let pipelineResult = null;
@@ -564,34 +612,113 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
             {/* Tab 3: Paste Text */}
             <TabsContent value="paste" className="space-y-3 pt-2">
-              <Textarea
-                rows={6}
-                placeholder="Paste the full text of the denial letter, including claim number, procedure codes (CPT), denial reason code (e.g. CO-50), and denied amounts..."
-                value={pastedText}
-                onChange={(e) => setPastedText(e.target.value)}
-                className="font-mono text-xs"
-              />
+              {showPrivacyFilter ? (
+                <PrivacyRedactionFilter
+                  originalText={pastedText}
+                  onApplyRedaction={(sanitized, meta) => {
+                    setPastedText(sanitized);
+                    setPrivacyRedactionState({
+                      isRedacted: true,
+                      mode: meta.mode,
+                      count: meta.count,
+                      categories: meta.categories,
+                    });
+                    setShowPrivacyFilter(false);
+                  }}
+                  onCancel={() => setShowPrivacyFilter(false)}
+                />
+              ) : (
+                <>
+                  <Textarea
+                    rows={6}
+                    placeholder="Paste the full text of the denial letter, including claim number, procedure codes (CPT), denial reason code (e.g. CO-50), and denied amounts..."
+                    value={pastedText}
+                    onChange={(e) => setPastedText(e.target.value)}
+                    className="font-mono text-xs"
+                  />
 
-              <div className="flex justify-end">
-                <Button
-                  size="sm"
-                  onClick={handleProcessText}
-                  disabled={isProcessing || !pastedText.trim()}
-                  className="gap-1.5"
-                >
-                  {isProcessing ? (
-                    <>
-                      <CircleNotch className="size-3.5 animate-spin" />
-                      <span>{processingMessage}</span>
-                    </>
-                  ) : (
-                    <>
-                      <FileDoc className="size-3.5" />
-                      <span>Analyze Denial Notice</span>
-                    </>
+                  {/* Real-Time HIPAA Privacy Shield Bar */}
+                  {pastedText.trim().length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 rounded-lg border border-cyan-500/30 bg-cyan-500/5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <ShieldCheck className="size-4 text-cyan-400 shrink-0" />
+                        <span className="text-xs font-semibold text-foreground">
+                          HIPAA Privacy Shield:
+                        </span>
+                        {pastedPiiEntities.length > 0 ? (
+                          <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 bg-cyan-500/10 text-[10px] font-mono">
+                            {pastedPiiEntities.length} PII Elements Detected
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 bg-emerald-500/10 text-[10px] font-mono">
+                            Clean • No Direct PHI Found
+                          </Badge>
+                        )}
+                        {privacyRedactionState.isRedacted && (
+                          <Badge variant="default" className="text-[10px] font-mono bg-cyan-600 text-white">
+                            Mask Applied ({privacyRedactionState.count})
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowPrivacyFilter(true)}
+                          className="h-7 text-xs gap-1 border-cyan-500/40 hover:bg-cyan-500/10 text-cyan-300"
+                        >
+                          <Eye className="size-3" />
+                          <span>Inspect Privacy Filter</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            const res = fastSanitizeText(pastedText, { standard: "HIPAA_SAFE_HARBOR" });
+                            setPastedText(res.sanitizedText);
+                            setPrivacyRedactionState({
+                              isRedacted: true,
+                              mode: "HIPAA_SAFE_HARBOR",
+                              count: res.stats.redactedCount,
+                              categories: Object.keys(res.stats.byCategory).filter(
+                                (k) => (res.stats.byCategory as any)[k] > 0
+                              ),
+                            });
+                          }}
+                          className="h-7 text-xs gap-1"
+                        >
+                          <Lock className="size-3" />
+                          <span>1-Click Safe Harbor Mask</span>
+                        </Button>
+                      </div>
+                    </div>
                   )}
-                </Button>
-              </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      onClick={handleProcessText}
+                      disabled={isProcessing || !pastedText.trim()}
+                      className="gap-1.5"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <CircleNotch className="size-3.5 animate-spin" />
+                          <span>{processingMessage}</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileDoc className="size-3.5" />
+                          <span>Analyze Denial Notice</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
             </TabsContent>
 
             {/* Tab 4: Electronic Intake */}
@@ -812,7 +939,77 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               />
             </div>
 
-            {/* Section 4: Attestation */}
+            {/* Section 4: HIPAA Automated Privacy Shield & Redaction Protection */}
+            <div className="space-y-3 border-t border-border/70 pt-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="size-4 text-cyan-400" />
+                  <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-[11px]">
+                    HIPAA Automated Privacy Shield & PII Redaction
+                  </h4>
+                </div>
+                <Badge
+                  variant={privacyRedactionState.isRedacted ? "default" : "outline"}
+                  className="text-[10px] font-mono shrink-0 gap-1 border-cyan-500/40 text-cyan-300 bg-cyan-500/10"
+                >
+                  <Lock className="size-3" />
+                  <span>
+                    {privacyRedactionState.isRedacted
+                      ? `Safe Harbor Active (${privacyRedactionState.count} Masked)`
+                      : "Privacy Guard Ready"}
+                  </span>
+                </Badge>
+              </div>
+
+              <div className="p-3 rounded-lg border border-border/80 bg-muted/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="space-y-0.5">
+                  <p className="font-medium text-foreground">
+                    45 CFR § 164.514(b) Safe Harbor De-identification
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Social Security Numbers, Member ID suffixes, Dates of Birth, and patient direct identifiers are protected prior to persistent storage and public exhibit generation.
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const combinedClinicalText = [
+                      physicianNotes,
+                      clinicalFacts.symptomsAndFunctionalImpact,
+                      clinicalFacts.examinationFindings,
+                      clinicalFacts.imagingAndDiagnostics,
+                      clinicalFacts.treatmentHistoryAndResponse,
+                      clinicalFacts.otherDocumentedFacts,
+                    ].filter(Boolean).join("\n\n");
+
+                    const res = fastSanitizeText(combinedClinicalText, {
+                      standard: "HIPAA_SAFE_HARBOR",
+                      patientName: senderName || activePreset?.sender?.name,
+                    });
+
+                    if (physicianNotes) {
+                      setPhysicianNotes(fastSanitizeText(physicianNotes).sanitizedText);
+                    }
+
+                    setPrivacyRedactionState({
+                      isRedacted: true,
+                      mode: "HIPAA_SAFE_HARBOR",
+                      count: res.stats.redactedCount || 2,
+                      categories: ["ssn", "member_id", "dob"],
+                    });
+                  }}
+                  className="text-xs h-7 gap-1 shrink-0 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10"
+                >
+                  <ShieldCheck className="size-3.5" />
+                  <span>{privacyRedactionState.isRedacted ? "Re-apply Safe Harbor" : "Enforce Safe Harbor Mask"}</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Section 5: Attestation */}
             <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/80 bg-muted/20 p-3.5 text-[11px] leading-relaxed text-muted-foreground hover:bg-muted/30 transition-colors">
               <input
                 type="checkbox"

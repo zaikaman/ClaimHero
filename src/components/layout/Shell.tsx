@@ -83,7 +83,7 @@ export const Shell: React.FC<ShellProps> = ({
         />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="mx-auto max-w-7xl h-full flex flex-col">{children}</div>
+          <div className="mx-auto max-w-7xl min-h-full flex flex-col">{children}</div>
         </main>
       </div>
     </div>

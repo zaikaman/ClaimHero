@@ -220,6 +220,15 @@ export const createWithPatient = mutation({
     denialReasonDescription: v.string(),
     appealFilingDeadlineDays: v.optional(v.number()),
     denialLetterStorageId: v.optional(v.id("_storage")),
+    redactionMetadata: v.optional(
+      v.object({
+        isRedacted: v.boolean(),
+        mode: v.string(),
+        redactedEntityCount: v.number(),
+        maskedCategories: v.array(v.string()),
+        appliedAt: v.number(),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -277,6 +286,7 @@ export const createWithPatient = mutation({
       assignedAgentEmail,
       agentMailProvisioningStatus: "pending",
       denialLetterStorageId: args.denialLetterStorageId,
+      redactionMetadata: args.redactionMetadata,
       createdAt: now,
       updatedAt: now,
     });
@@ -794,6 +804,15 @@ export const updateAppealContext = mutation({
       recordsAreIncomplete: v.boolean(),
     }),
     physicianNotes: v.optional(v.string()),
+    redactionMetadata: v.optional(
+      v.object({
+        isRedacted: v.boolean(),
+        mode: v.string(),
+        redactedEntityCount: v.number(),
+        maskedCategories: v.array(v.string()),
+        appliedAt: v.number(),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     const claim = await ctx.db.get(args.claimId);
@@ -818,7 +837,7 @@ export const updateAppealContext = mutation({
     }
 
     const now = Date.now();
-    await ctx.db.patch(args.claimId, {
+    const patchPayload: Record<string, any> = {
       appealContext: {
         sender: {
           name,
@@ -838,7 +857,13 @@ export const updateAppealContext = mutation({
         confirmedAt: now,
       },
       updatedAt: now,
-    });
+    };
+
+    if (args.redactionMetadata) {
+      patchPayload.redactionMetadata = args.redactionMetadata;
+    }
+
+    await ctx.db.patch(args.claimId, patchPayload);
 
     await ctx.db.insert("appealAuditLogs", {
       claimId: args.claimId,
@@ -848,7 +873,53 @@ export const updateAppealContext = mutation({
       timestamp: now,
     });
 
+    if (args.redactionMetadata?.isRedacted) {
+      await ctx.db.insert("appealAuditLogs", {
+        claimId: args.claimId,
+        eventType: "hipaa_redaction_applied",
+        actor: "HIPAA Privacy Filter",
+        details: `Enforced ${args.redactionMetadata.mode} redaction (${args.redactionMetadata.redactedEntityCount} entities masked: ${args.redactionMetadata.maskedCategories.join(", ")})`,
+        timestamp: now,
+      });
+    }
+
     return { confirmedAt: now };
+  },
+});
+
+/**
+ * Explicitly update HIPAA redaction metadata on a claim
+ */
+export const updateRedactionMetadata = mutation({
+  args: {
+    claimId: v.id("claims"),
+    redactionMetadata: v.object({
+      isRedacted: v.boolean(),
+      mode: v.string(),
+      redactedEntityCount: v.number(),
+      maskedCategories: v.array(v.string()),
+      appliedAt: v.number(),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) throw new Error("Claim not found");
+
+    const now = Date.now();
+    await ctx.db.patch(args.claimId, {
+      redactionMetadata: args.redactionMetadata,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("appealAuditLogs", {
+      claimId: args.claimId,
+      eventType: "hipaa_redaction_applied",
+      actor: "HIPAA Privacy Filter",
+      details: `Updated ${args.redactionMetadata.mode} redaction (${args.redactionMetadata.redactedEntityCount} entities masked: ${args.redactionMetadata.maskedCategories.join(", ")})`,
+      timestamp: now,
+    });
+
+    return { success: true };
   },
 });
 

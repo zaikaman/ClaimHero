@@ -92,6 +92,15 @@ export default defineSchema({
         source: v.optional(v.string()),
       })
     ),
+    redactionMetadata: v.optional(
+      v.object({
+        isRedacted: v.boolean(),
+        mode: v.string(), // safe_harbor, balanced_appellate, public_exhibit, custom
+        redactedEntityCount: v.number(),
+        maskedCategories: v.array(v.string()),
+        appliedAt: v.number(),
+      })
+    ),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
