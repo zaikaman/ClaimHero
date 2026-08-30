@@ -571,6 +571,42 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
       "https://provider.example.org/knee-arthroplasty.pdf",
     ]);
   });
+
+  it("recognizes neutral clinical authorities and payer affiliate network domains", async () => {
+    const { isPayerMismatchedSource, NEUTRAL_PUBLIC_HOSTS } = await import("../convex/actions/policyCrawler");
+
+    // Neutral authorities are always allowed across any payer
+    expect(NEUTRAL_PUBLIC_HOSTS.has("spine.org")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("aaos.org")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("acr.org")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("guidelines.carelonmedicalbenefitsmanagement.com")).toBe(true);
+    expect(NEUTRAL_PUBLIC_HOSTS.has("cms.gov")).toBe(true);
+
+    expect(isPayerMismatchedSource("GeoBlue", "https://www.spine.org/guidelines/lumbar-stenosis.pdf")).toBe(false);
+    expect(isPayerMismatchedSource("GeoBlue", "https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery")).toBe(false);
+    expect(isPayerMismatchedSource("GeoBlue", "https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35000")).toBe(false);
+    expect(isPayerMismatchedSource("Molina Healthcare", "https://www.cms.gov/medicare-coverage-database/view/lcd.aspx")).toBe(false);
+
+    // Mismatched private payer domains are rejected
+    expect(isPayerMismatchedSource("Molina Healthcare", "https://www.aetna.com/cpb/medical/data/0743.html")).toBe(true);
+    expect(isPayerMismatchedSource("UnitedHealthcare", "https://www.cigna.com/health-care-providers/coverage-and-claims/policies")).toBe(true);
+  });
+
+  it("extracts focused procedure windows from multi-chapter guidelines without losing headers", async () => {
+    const { extractRelevantDocumentWindow } = await import("../convex/actions/policyCrawler");
+
+    const header = "# CARELON MEDICAL BENEFITS MANAGEMENT MASTER SPINE SURGERY GUIDELINE\nEffective Date: 2026-01-01\n\n";
+    const cervicalSection = "## Section 1: Cervical Spine Surgery\n" + "Cervical laminectomy and fusion criteria... ".repeat(1500);
+    const lumbarSection = "\n\n## Section 3: Lumbar Spine Decompression (CPT 63047)\nMedical necessity for lumbar laminectomy requires documented motor deficit or failure of 6 weeks of conservative therapy.\n" + "Lumbar stenosis decompression indications... ".repeat(500);
+    const fullDoc = header + cervicalSection + lumbarSection;
+
+    expect(fullDoc.length).toBeGreaterThan(60000);
+
+    const windowed = extractRelevantDocumentWindow(fullDoc, ["63047"], 30000);
+    expect(windowed).toContain("CARELON MEDICAL BENEFITS MANAGEMENT MASTER SPINE SURGERY GUIDELINE");
+    expect(windowed).toContain("Section 3: Lumbar Spine Decompression (CPT 63047)");
+    expect(windowed).toContain("Medical necessity for lumbar laminectomy");
+  });
 });
 
 describe("Precedent Vector Archive", () => {

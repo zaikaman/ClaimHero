@@ -114,8 +114,8 @@ interface FirecrawlSearchResult {
   };
 }
 
-const MAX_POLICY_SEARCH_ROUNDS = 1;
-const MAX_POLICY_SOURCE_CANDIDATES = 3;
+const MAX_POLICY_SEARCH_ROUNDS = 2;
+const MAX_POLICY_SOURCE_CANDIDATES = 6;
 const MAX_FIRECRAWL_SCRAPE_ATTEMPTS = 2;
 
 function isAcceptableSourceUrl(value: unknown): value is string {
@@ -249,7 +249,7 @@ export function isPrivateMcgViewerUrl(sourceUrl: string): boolean {
   }
 }
 
-const NEUTRAL_PUBLIC_HOSTS = new Set([
+export const NEUTRAL_PUBLIC_HOSTS = new Set([
   "cms.gov",
   "www.cms.gov",
   "medicare.gov",
@@ -273,20 +273,44 @@ const NEUTRAL_PUBLIC_HOSTS = new Set([
   "www.ecfr.gov",
   "law.cornell.edu",
   "www.law.cornell.edu",
+  "spine.org",
+  "www.spine.org",
+  "aaos.org",
+  "www.aaos.org",
+  "orthoinfo.aaos.org",
+  "acr.org",
+  "www.acr.org",
+  "guidelines.carelonmedicalbenefitsmanagement.com",
+  "carelonmedicalbenefitsmanagement.com",
+  "carelon.com",
+  "www.carelon.com",
+  "aimspecialtyhealth.com",
+  "www.aimspecialtyhealth.com",
+  "evicore.com",
+  "www.evicore.com",
+  "statpearls.com",
+  "www.statpearls.com",
+  "cochranelibrary.com",
+  "www.cochranelibrary.com",
+  "ama-assn.org",
+  "www.ama-assn.org",
+  "guidelinecentral.com",
+  "www.guidelinecentral.com",
+  "orthobullets.com",
+  "www.orthobullets.com",
 ]);
 
-function getPayerHostKeyword(payer: string): string | null {
+export function getPayerHostKeyword(payer: string): string | null {
   const clean = payer.toLowerCase().replace(/[^a-z0-9]/g, "");
   if (clean.includes("molina")) return "molina";
   if (clean.includes("bcbsfl") || clean.includes("bluecrossblueshieldflorida")) return "bcbsfl";
-  if (clean.includes("bcbs") || clean.includes("bluecross") || clean.includes("anthem") || clean.includes("elevance")) return "bcbs";
+  if (clean.includes("geoblue") || clean.includes("geo_blue")) return "geoblue";
+  if (clean.includes("bcbs") || clean.includes("bluecross") || clean.includes("anthem") || clean.includes("elevance") || clean.includes("globalcore")) return "bcbs";
   if (clean.includes("aetna") || clean.includes("cvs")) return "aetna";
   if (clean.includes("cigna") || clean.includes("evernorth")) return "cigna";
   if (clean.includes("united") || clean.includes("uhc") || clean.includes("optum")) return "uhc";
   if (clean.includes("humana")) return "humana";
   if (clean.includes("kaiser")) return "kaiser";
-  if (clean.includes("geoblue") || clean.includes("geo_blue")) return "geo-blue";
-  if (clean.includes("globalcore")) return "globalcore";
   return null;
 }
 
@@ -294,7 +318,7 @@ export function isPayerMismatchedSource(payer: string, sourceUrl: string): boole
   try {
     const url = new URL(sourceUrl);
     const host = url.hostname.toLowerCase();
-    // Neutral public hosts (CMS, FDA, NIH, ECFr, etc.) are payer-agnostic and always allowed.
+    // Neutral public hosts (CMS, FDA, NIH, ECFr, NASS, AAOS, ACR, Carelon, etc.) are payer-agnostic and always allowed.
     if (NEUTRAL_PUBLIC_HOSTS.has(host) || [...NEUTRAL_PUBLIC_HOSTS].some((h) => host.endsWith(`.${h}`) || host === h)) return false;
     // Explicit ECFr / law hosts used for ERISA precedent are neutral.
     if (host.includes("ecfr.gov") || host.includes("law.cornell.edu")) return false;
@@ -302,10 +326,22 @@ export function isPayerMismatchedSource(payer: string, sourceUrl: string): boole
     const payerKeyword = getPayerHostKeyword(payer);
     if (!payerKeyword) return false; // Unknown payer, defer to LLM
 
-    // If the host is a known payer host but does not contain the payer keyword, it's a mismatch.
-    // Example: molina claim + mcgs.bcbsfl.com (contains bcbsfl/bcbs, not molina) → mismatch.
-    // This is generic: any host containing a payer keyword from a different payer is suspect.
-    const knownPayerKeywords = ["molina", "bcbsfl", "bcbs", "aetna", "cigna", "uhc", "humana", "kaiser", "geo-blue", "globalcore", "mcgs"];
+    // If payer is GeoBlue or BCBS, allow BCBS/Carelon/Anthem networks
+    if (
+      (payerKeyword === "geoblue" || payerKeyword === "bcbs" || payerKeyword === "bcbsfl") &&
+      (host.includes("bcbs") ||
+        host.includes("bluecross") ||
+        host.includes("anthem") ||
+        host.includes("elevance") ||
+        host.includes("carelon") ||
+        host.includes("geo-blue") ||
+        host.includes("geoblue") ||
+        host.includes("bcbsglobalcore"))
+    ) {
+      return false;
+    }
+
+    const knownPayerKeywords = ["molina", "bcbsfl", "bcbs", "aetna", "cigna", "uhc", "humana", "kaiser", "geoblue", "globalcore", "mcgs"];
     const hostContainsPayerKeyword = knownPayerKeywords.find((kw) => host.includes(kw));
     if (hostContainsPayerKeyword && !host.includes(payerKeyword)) {
       // Special case: bcbsfl host for bcbs payer is not a mismatch (bcbsfl contains bcbs)
@@ -400,6 +436,20 @@ export function selectFirecrawlPolicyUrls(
         (total, term) => total + (searchableText.includes(term) ? 2 : 0),
         0,
       );
+      const authorityHostScore = [
+        "cms.gov",
+        "spine.org",
+        "aaos.org",
+        "acr.org",
+        "carelon",
+        "evicore",
+        "nccn.org",
+        "nih.gov",
+        "ncbi.nlm.nih.gov",
+      ].reduce(
+        (total, term) => total + (sourceUrl.toLowerCase().includes(term) ? 3 : 0),
+        0,
+      );
       const documentFormatScore = /\.(?:pdf|ashx?)(?:$|[?#])/i.test(sourceUrl) ? 1 : 0;
       const landingPagePenalty = [
         "directory",
@@ -417,7 +467,7 @@ export function selectFirecrawlPolicyUrls(
         0,
       );
       const privateViewerPenalty = isPrivateMcgViewerUrl(sourceUrl) ? 10 : 0;
-      const score = termScore + specificDocumentScore + documentFormatScore - landingPagePenalty - privateViewerPenalty;
+      const score = termScore + specificDocumentScore + authorityHostScore + documentFormatScore - landingPagePenalty - privateViewerPenalty;
 
       if (minimumRelevanceScore <= 0 || score >= minimumRelevanceScore) {
         candidates.push({ sourceUrl, score, position });
@@ -512,14 +562,6 @@ async function scrapeFirecrawlPolicySource(
     throw new Error("Firecrawl returned a document without substantive clinical policy content.");
   }
 
-  // Public accessibility is determined solely via Firecrawl (no direct fetch) per
-  // production constraint: all web retrieval must use Firecrawl. Firecrawl's
-  // headless browser already bypasses Incapsula/Cloudflare bot challenges and
-  // returns the rendered markdown; an additional direct fetch would be redundant
-  // and would incorrectly flag Incapsula-protected payer pages (e.g., horizonblue.com)
-  // as blocked even though Firecrawl succeeded. Trust Firecrawl's statusCode +
-  // markdown checks above as the source of truth.
-
   const scrapedSourceUrl = data && typeof data === "object"
     ? getAcceptableResultUrl({
         url: sourceUrl,
@@ -605,9 +647,7 @@ const CPT_CLINICAL_NAMES: Record<string, string> = {
   "29881": "Arthroscopy Knee Meniscectomy",
 };
 
-function getCptKeywords(cptCodes: string[]): string[] {
-  // Keywords are derived from the CPT's clinical name, not from any payer URL.
-  // This keeps the check generic: a knee policy must mention knee/arthroplasty/TKA, etc.
+export function getCptKeywords(cptCodes: string[]): string[] {
   const terms: string[] = [];
   let hasKnown = false;
   for (const code of cptCodes) {
@@ -625,10 +665,52 @@ function getCptKeywords(cptCodes: string[]): string[] {
       terms.push(code.toLowerCase());
     }
   }
-  // If none of the codes are in the clinical dictionary, let the LLM decide.
-  // Returning an empty set signals "no deterministic gate".
   if (!hasKnown) return [];
   return [...new Set(terms)];
+}
+
+/**
+ * Extracts a procedure-focused window from large multi-chapter guidelines (e.g. 150KB+ Carelon/CMS manuals).
+ * Centers around the procedure code or anatomical terms while preserving the document header.
+ */
+export function extractRelevantDocumentWindow(
+  markdown: string,
+  cptCodes: string[],
+  maxWindowLength = 50000,
+): string {
+  if (!markdown || markdown.length <= maxWindowLength) return markdown;
+
+  const lower = markdown.toLowerCase();
+  const keywords = getCptKeywords(cptCodes);
+  const searchTerms = [...cptCodes, ...keywords].filter((t) => t.length >= 3);
+
+  let bestIndex = -1;
+  let highestScore = 0;
+
+  for (const term of searchTerms) {
+    let pos = 0;
+    while ((pos = lower.indexOf(term.toLowerCase(), pos)) !== -1) {
+      const windowSample = lower.slice(Math.max(0, pos - 2000), Math.min(lower.length, pos + 10000));
+      const score = searchTerms.reduce((sum, st) => sum + (windowSample.includes(st.toLowerCase()) ? 1 : 0), 0);
+      if (score > highestScore) {
+        highestScore = score;
+        bestIndex = pos;
+      }
+      pos += term.length + 50;
+    }
+  }
+
+  if (bestIndex === -1 || highestScore === 0) {
+    return markdown.slice(0, maxWindowLength);
+  }
+
+  const docHeader = markdown.slice(0, 3000);
+  const targetWindowSize = maxWindowLength - 4000;
+  const startOffset = Math.max(0, bestIndex - 4000);
+  const endOffset = Math.min(markdown.length, startOffset + targetWindowSize);
+  const focusedSection = markdown.slice(startOffset, endOffset);
+
+  return `${docHeader}\n\n[... Clinical Guideline Content Truncated for Procedure Alignment ...]\n\n${focusedSection}`;
 }
 
 export function isPolicyAlignedWithClaim(
@@ -657,8 +739,6 @@ async function evaluatePolicySourceRelevance(
   denialReasonCode: string,
   denialReasonDescription: string,
 ): Promise<PolicyRelevanceResponse> {
-  // Hard payer and viewer gates before LLM: these are cheap, deterministic and avoid citing
-  // a different payer's policy or a licensed MCG viewer that is not publicly citable.
   if (isPrivateMcgViewerUrl(policySource.sourceUrl)) {
     return {
       relevant: false,
@@ -672,7 +752,6 @@ async function evaluatePolicySourceRelevance(
     };
   }
 
-  // Provide the LLM with the human-readable CPT meaning so it can compare anatomical sites.
   const cptDescriptions = cptCodes
     .map((code) => {
       const name = CPT_CLINICAL_NAMES[code];
@@ -680,19 +759,20 @@ async function evaluatePolicySourceRelevance(
     })
     .join(", ");
 
+  const windowedMarkdown = extractRelevantDocumentWindow(policySource.markdown, cptCodes, 50000);
+
   const llmResult = await createStructuredCompletion<PolicyRelevanceResponse>({
     systemPrompt: `You are a strict document relevance classifier for health-insurance claim appeals.
-Return relevant=true only when the supplied document is a clinical coverage policy, medical-necessity guideline, utilization-management criterion, or equivalent payer clinical rule that directly addresses the submitted claim's procedure, diagnosis, or denial issue.
+Return relevant=true only when the supplied document is a clinical coverage policy, medical-necessity guideline, utilization-management criterion, specialty society guideline, or equivalent payer clinical rule that directly addresses the submitted claim's procedure, diagnosis, or denial issue.
 
 Relevance requires all of:
-- Payer alignment: the source must be from the claimed payer's own policy domain (e.g., molinahealthcare.com for Molina) or a neutral public guideline (CMS, FDA, NIH, NCCN, ECFr). A BCBSFL or other payer's domain for a Molina claim is NOT relevant unless it is a neutral guideline.
+- Payer or clinical authority alignment: the source must be from the claimed payer's own policy domain, their guideline administrator (e.g. Carelon, EviCore for BCBS/Anthem/GeoBlue), or a neutral public clinical authority (CMS LCD/NCD, NASS spine.org, AAOS aaos.org, ACR acr.org, NCCN nccn.org, FDA, NIH, ECFr).
 - Viewer check: private Milliman Care Guidelines viewers (mcgs.*, /MCG?, mcgId=, pv=false) are NOT publicly citable and must be rejected.
-- Anatomical and procedural alignment: the document must concern the same body site / specialty as the claimed procedure. For example, a foot bunionectomy / hallux valgus policy (foot, hallux, metatarsal, bunion) is NOT relevant to a total knee arthroplasty (knee, arthroplasty, TKA) claim, even though both are orthopedic.
-- The document must address the claimed CPT's clinical category. If the claim is 27447 Total Knee Arthroplasty, a valid document must discuss knee arthroplasty, knee replacement, or TKA — not spinal, foot, or unrelated services.
-- Translate CPT/ICD codes to their clinical meaning when the dictionary mapping is obvious; otherwise require the code string itself to appear.
+- Anatomical and procedural alignment: the document must concern the same body site / specialty as the claimed procedure (e.g., lumbar spine decompression/laminectomy for CPT 63047, knee arthroplasty for CPT 27447, knee MRI for CPT 73721). Multi-chapter guidelines covering both cervical and lumbar spine are relevant if they contain criteria for the claimed anatomical section.
+- The document must provide substantive medical necessity criteria, diagnostic requirements, or conservative therapy standards.
 
-Return relevant=false for billing manuals, EDI companion guides, provider enrollment instructions, claim-submission instructions, general payer pages, search-result pages, access-denied pages, private MCG viewers, wrong-payer domains, or documents that concern a different service or anatomical site.
-Use only the document text and claim identifiers supplied. Do not infer relevance from the payer name alone. If uncertain, return relevant=false. Keep the rationale concise.`,
+Return relevant=false for billing manuals, EDI companion guides, commercial coding blog posts, provider enrollment forms, claim-submission instructions, general landing pages, or documents solely concerning an unrelated anatomical site.
+Keep the rationale concise.`,
     userPrompt: `Evaluate this Firecrawl document before it is used as appeal evidence.
 
 Payer: ${payer}
@@ -703,18 +783,15 @@ Denial description: ${denialReasonDescription || "Not provided"}
 Source URL: ${policySource.sourceUrl}
 
 Document excerpt (title may be first line):
-${policySource.markdown.slice(0, 50000)}`,
+${windowedMarkdown}`,
     schemaName: "PolicyRelevanceResponse",
     schema: POLICY_RELEVANCE_SCHEMA,
     temperature: 0,
   });
 
-  // Deterministic anatomical guard: even if the LLM is permissive, a document whose
-  // title + body contains none of the expected CPT keywords is not citable for that CPT.
-  // This is generic — keywords come from the CPT dictionary, not hard-coded sites.
   if (llmResult.relevant) {
     const titleGuess = policySource.markdown.split("\n")[0]?.slice(0, 300) || "";
-    const alignment = isPolicyAlignedWithClaim(policySource.markdown, titleGuess, cptCodes);
+    const alignment = isPolicyAlignedWithClaim(windowedMarkdown, titleGuess, cptCodes);
     if (!alignment.aligned) {
       return { relevant: false, rationale: alignment.reason };
     }
@@ -732,11 +809,17 @@ async function generatePolicySearchQueries(
   rejectedSearchFeedback = "",
 ): Promise<string[]> {
   const result = await createStructuredCompletion<PolicySearchIntentResponse>({
-    systemPrompt: `Create concise, high-signal web-search queries for locating the official payer clinical coverage policy or medical-necessity guideline relevant to a health-insurance claim.
-Use the supplied payer, procedure codes, diagnosis codes, and denial information. Translate codes into likely clinical terminology only when you are confident; otherwise retain the codes. Every query must seek a clinical policy, coverage guideline, medical-necessity criterion, or utilization-management rule. Do not seek general member pages, EDI or billing manuals, provider enrollment instructions, claim-submission guides, search-result pages, or legal advice. Do not invent URLs, policy numbers, or facts. Return 1-2 distinct English queries; at least one must contain the payer name with clinical context, and for payers with sparse public CPB corpora (e.g., GeoBlue) one may be a neutral query without payer targeting CMS/NASS/AAOS medical necessity criteria for the procedure to ensure Firecrawl still returns citable public guidelines.${rejectedSearchFeedback ? `
+    systemPrompt: `Create concise, high-signal web-search queries for locating official payer clinical coverage policies, medical-necessity criteria, or accredited specialty society guidelines relevant to a health-insurance claim appeal.
+Use the supplied payer, procedure codes, diagnosis codes, and denial information.
+Generate 2-3 distinct English search queries covering diverse retrieval angles:
+1. Payer / Network clinical policy query: Target the insurer name (or its clinical administrator like Carelon for BCBS/GeoBlue) with procedure codes and medical necessity terms.
+2. Clinical Specialty Society / Guideline Clearinghouse query: Target standard clinical guidelines (e.g. North American Spine Society / NASS for spine, AAOS for orthopedics, ACR for imaging, NCCN for oncology, CMS LCDs) without restricting to the payer's domain.
+3. Specific Medical Criteria / CARC exception query: Target the specific clinical indication or emergency/retroactive criteria.
+
+Every query must seek clinical criteria, coverage guidelines, or medical necessity rules. Do NOT seek billing blogs, EDI manuals, or generic sign-in pages.${rejectedSearchFeedback ? `
 The previous search pass produced these rejected results or failures:
 ${rejectedSearchFeedback.slice(0, 6000)}
-Generate materially different queries that correct for those failures.` : ""}`,
+Generate materially different queries that correct for those failures and broaden toward neutral guideline authorities (CMS LCDs, NASS, AAOS, Carelon, ACR).` : ""}`,
     userPrompt: `Build the search plan for this claim.
 
 Payer: ${payer}
@@ -746,7 +829,7 @@ Denial reason code: ${denialReasonCode || "Not provided"}
 Denial description: ${denialReasonDescription || "Not provided"}`,
     schemaName: "PolicySearchIntentResponse",
     schema: POLICY_SEARCH_INTENT_SCHEMA,
-    temperature: 0,
+    temperature: 0.1,
   });
 
   const queries = [...new Set(
@@ -754,7 +837,7 @@ Denial description: ${denialReasonDescription || "Not provided"}`,
       .filter((query): query is string => typeof query === "string")
       .map((query) => query.trim())
       .filter(Boolean),
-  )].slice(0, 2);
+  )].slice(0, 3);
 
   if (!queries.length) {
     throw new Error("Policy search planning returned no usable search queries.");
@@ -834,7 +917,7 @@ export const crawlInsurerPolicy = action({
                 },
                 body: JSON.stringify({
                   query,
-                  limit: 5,
+                  limit: 10,
                   sources: ["web"],
                 }),
               });
@@ -867,9 +950,6 @@ export const crawlInsurerPolicy = action({
               web: successfulSearches.flatMap(({ payload }) => getFirecrawlSearchResults(payload)),
             },
           };
-          // Pre-filter candidates by CPT clinical keywords before spending scrape credits.
-          // Only titles/snippets containing a CPT keyword (knee/arthroplasty/tka for 27447)
-          // will bubble to the top 3, avoiding wasted scrapes on unrelated policies.
           const cptKeywordTerms = getCptKeywords(args.cptCodes);
           const sourceRelevanceTerms = [
             ...args.cptCodes,
@@ -950,11 +1030,11 @@ export const crawlInsurerPolicy = action({
     const policyText = policySource.markdown;
     const policySourceUrl = policySource.sourceUrl;
 
-    // Guard against soft-blocked content that slipped past the fetch gate
-    // (e.g., Firecrawl bypassed WAF but the extracted text is still an error page).
     if (isAccessDeniedDocument(policyText) || isHtmlErrorBody(policyText)) {
       throw new Error("Scraped policy text is an access-denied or error page, not a clinical policy.");
     }
+
+    const windowedPolicyText = extractRelevantDocumentWindow(policyText, args.cptCodes, 50000);
 
     // Use gpt-5-nano to extract precise medical criteria and contradiction clauses.
     const extractedData = await createStructuredCompletion<PolicyExtractionResponse>({
@@ -965,7 +1045,7 @@ For each clause:
 - Assign sourceType: "payer_cpb", "pubmed_study", "fda_package_insert", "nccn_guideline", or "legal_precedent".
 - Extract clear, concise plain text summarizing the exact clinical requirements. Strictly do NOT use markdown bold asterisks (such as **bold**) or formatting tokens in extractedEvidenceMarkdown or title.
 - Assign relevanceScore between 80 and 99.`,
-      userPrompt: `Extract structured clinical evidence clauses from this policy text for CPT codes [${args.cptCodes.join(", ")}] and Payer ${args.payer}:\n\n${policyText}`,
+      userPrompt: `Extract structured clinical evidence clauses from this policy text for CPT codes [${args.cptCodes.join(", ")}] and Payer ${args.payer}:\n\n${windowedPolicyText}`,
       schemaName: "PolicyExtractionResponse",
       schema: POLICY_EXTRACTION_SCHEMA,
       temperature: 0.1,
