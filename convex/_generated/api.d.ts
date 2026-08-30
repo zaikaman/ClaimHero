@@ -27,6 +27,7 @@ import type * as crons from "../crons.js";
 import type * as emails from "../emails.js";
 import type * as http from "../http.js";
 import type * as lib_agentMail from "../lib/agentMail.js";
+import type * as lib_agentMailWebhook from "../lib/agentMailWebhook.js";
 import type * as lib_aiAdjudicator from "../lib/aiAdjudicator.js";
 import type * as lib_appealEmail from "../lib/appealEmail.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   emails: typeof emails;
   http: typeof http;
   "lib/agentMail": typeof lib_agentMail;
+  "lib/agentMailWebhook": typeof lib_agentMailWebhook;
   "lib/aiAdjudicator": typeof lib_aiAdjudicator;
   "lib/appealEmail": typeof lib_appealEmail;
   "lib/embeddings": typeof lib_embeddings;

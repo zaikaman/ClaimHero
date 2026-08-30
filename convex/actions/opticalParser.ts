@@ -76,11 +76,13 @@ export const parseDenialDocument = action({
     rawDocumentText: v.optional(v.string()),
     storageId: v.optional(v.id("_storage")),
     patientState: v.optional(v.string()),
+    patientEmail: v.optional(v.string()),
     autoRunPipeline: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<DenialExtractionResult & { claimId: string; pipelineResult?: any }> => {
     let documentContent = args.rawDocumentText?.trim() || "";
     const imageUrls: string[] = [];
+    const fileInputs: Array<{ fileData: string; filename: string }> = [];
 
     // If storage file was uploaded, fetch and prepare document content
     if (args.storageId) {
@@ -98,10 +100,17 @@ export const parseDenialDocument = action({
           const buffer = Buffer.from(arrayBuffer);
           const base64 = buffer.toString("base64");
           imageUrls.push(`data:${contentType};base64,${base64}`);
-          documentContent = "Extract medical claim denial and Explanation of Benefits (EOB) information from this uploaded image.";
+          documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached image.`.trim();
+        } else if (contentType === "application/pdf" || contentType === "application/octet-stream") {
+          const arrayBuffer = await response.arrayBuffer();
+          fileInputs.push({
+            fileData: `data:${contentType};base64,${Buffer.from(arrayBuffer).toString("base64")}`,
+            filename: "denial-document.pdf",
+          });
+          documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached document.`.trim();
         } else {
           const text = await response.text();
-          documentContent = text;
+          documentContent = [documentContent, text].filter(Boolean).join("\n\n");
         }
       } catch (err) {
         throw new Error(`Failed to read uploaded document from storage: ${String(err)}`);
@@ -125,6 +134,7 @@ Rules:
       schemaName: "DenialExtractionResult",
       schema: DENIAL_EXTRACTION_SCHEMA,
       imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      fileInputs: fileInputs.length > 0 ? fileInputs : undefined,
       temperature: 0.1,
     });
 
@@ -133,7 +143,7 @@ Rules:
     const sanitizedPayer = (extraction.insurancePayer || "payer").toLowerCase().replace(/[^a-z0-9]/g, "");
     const claimId: string = await ctx.runMutation((api as any).claims.createWithPatient, {
       patientName: extraction.patientName,
-      patientEmail: `${sanitizedPatient}-${sanitizedPayer}@example.com`,
+       patientEmail: args.patientEmail?.trim() || `${sanitizedPatient}-${sanitizedPayer}@example.com`,
       memberId: extraction.memberId,
       insurancePayer: extraction.insurancePayer,
       state: args.patientState || "California",

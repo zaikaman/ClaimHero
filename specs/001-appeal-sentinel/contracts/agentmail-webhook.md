@@ -9,10 +9,10 @@
 ## 1. Webhook Endpoint Specification
 
 - **Method**: `POST`
-- **Path**: `/http/agentmail-inbound`
+- **Path**: `/agentmail-webhook`
 - **Headers**:
   - `Content-Type: application/json`
-  - `AgentMail-Signature: <hmac-signature>` (for authenticity verification)
+  - `svix-id`, `svix-timestamp`, and `svix-signature` (provided by AgentMail)
 
 ---
 
@@ -20,23 +20,24 @@
 
 ```json
 {
-  "event": "message.received",
-  "data": {
-    "message_id": "msg_9841029384",
-    "inbox_id": "inbox_appeal_8942",
-    "inbox_address": "appeal-claim-8942@claimhero.agentmail.com",
-    "sender": "grievances@uhc.com",
-    "recipient": "appeal-claim-8942@claimhero.agentmail.com",
-    "subject": "RE: URGENT APPEAL - Claim CLM-8942-UHC - Determination Notice",
-    "timestamp": 1756209420000,
-    "body_text": "We have received your Level 1 Appeal dossier regarding Member ID 984012019. Upon secondary medical director review and evaluation of the submitted CPB criteria, the prior denial has been OVERTURNED. The claim is approved for payment.",
-    "body_html": "<p>We have received your Level 1 Appeal dossier...</p>",
+  "type": "event",
+  "event_type": "message.received",
+  "event_id": "evt_123abc",
+  "message": {
+    "message_id": "<msg_9841029384@agentmail.to>",
+    "thread_id": "thread_123",
+    "inbox_id": "inbox_claimhero_intake",
+    "from_": ["billing@clinic.example"],
+    "to": ["claimhero-intake@agentmail.to"],
+    "subject": "Denial notice for review",
+    "text": "Please review the attached denial notice.",
+    "html": "<p>Please review the attached denial notice.</p>",
     "attachments": [
       {
-        "filename": "determination_letter_CLM8942.pdf",
+        "attachment_id": "att_1029",
+        "filename": "denial_notice.pdf",
         "content_type": "application/pdf",
-        "size_bytes": 149204,
-        "url": "https://api.agentmail.to/v0/messages/msg_9841029384/attachments/att_1029"
+        "size": 149204
       }
     ]
   }
@@ -47,12 +48,11 @@
 
 ## 3. Expected Webhook Response
 
-- **Status Code**: `200 OK`
+- **Status Code**: `202 Accepted`
 - **Response Body**:
 ```json
 {
-  "received": true,
-  "claimId": "k57291048291049281",
-  "statusUpdated": "overturned_won"
+  "accepted": true,
+  "eventId": "evt_123abc"
 }
 ```

@@ -19,17 +19,29 @@ export const list = query({
 
     if (userId) {
       if (args.status && args.status !== "all") {
-        claims = (await ctx.db
+        const ownedClaims = (await ctx.db
           .query("claims")
           .withIndex("by_user_status", (q: any) =>
             q.eq("userId", userId).eq("status", args.status)
           )
           .collect()) as Doc<"claims">[];
+        const sharedIntakeClaims = (await ctx.db
+          .query("claims")
+          .withIndex("by_user_status", (q: any) =>
+            q.eq("userId", undefined).eq("status", args.status)
+          )
+          .collect()) as Doc<"claims">[];
+        claims = [...ownedClaims, ...sharedIntakeClaims];
       } else {
-        claims = (await ctx.db
+        const ownedClaims = (await ctx.db
           .query("claims")
           .withIndex("by_user", (q: any) => q.eq("userId", userId))
           .collect()) as Doc<"claims">[];
+        const sharedIntakeClaims = (await ctx.db
+          .query("claims")
+          .withIndex("by_user", (q: any) => q.eq("userId", undefined))
+          .collect()) as Doc<"claims">[];
+        claims = [...ownedClaims, ...sharedIntakeClaims];
       }
     } else {
       if (args.status && args.status !== "all") {

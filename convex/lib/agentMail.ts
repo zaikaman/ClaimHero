@@ -9,6 +9,11 @@ export interface SharedAgentMailboxes {
   adjudicatorEmail: string;
 }
 
+export interface IntakeAgentMailbox {
+  inboxId: string;
+  email: string;
+}
+
 const AGENTMAIL_API_BASE_URL = "https://api.agentmail.to/v0";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -58,6 +63,17 @@ export function getSharedAgentMailboxes(): SharedAgentMailboxes {
   return { senderInboxId, senderEmail, adjudicatorInboxId, adjudicatorEmail };
 }
 
+export function getIntakeAgentMailbox(): IntakeAgentMailbox {
+  const inboxId = configuredValue("AGENTMAIL_INTAKE_INBOX_ID");
+  const email = configuredValue("AGENTMAIL_INTAKE_EMAIL");
+
+  if (!inboxId || !email) {
+    throw new Error("AgentMail intake is not configured. Set AGENTMAIL_INTAKE_INBOX_ID and AGENTMAIL_INTAKE_EMAIL.");
+  }
+
+  return { inboxId, email: email.toLowerCase() };
+}
+
 async function parseResponse(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) return null;
@@ -101,4 +117,56 @@ export async function sendAgentMailMessage(options: {
   return {
     messageId: responseField(body, "message_id", "messageId", "id"),
   };
+}
+
+export async function getAgentMailMessage(inboxId: string, messageId: string): Promise<Record<string, unknown>> {
+  const response = await fetch(
+    `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${configuredApiKey()}` },
+    }
+  );
+  const body = await parseResponse(response);
+  if (!response.ok || !isRecord(body)) {
+    const detail = typeof body === "string" ? body : JSON.stringify(body);
+    throw new Error(`AgentMail message retrieval failed (${response.status}): ${detail}`);
+  }
+  return body;
+}
+
+export async function downloadAgentMailAttachment(options: {
+  inboxId: string;
+  messageId: string;
+  attachmentId: string;
+}): Promise<{ bytes: ArrayBuffer; contentType?: string }> {
+  const response = await fetch(
+    `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(options.inboxId)}/messages/${encodeURIComponent(options.messageId)}/attachments/${encodeURIComponent(options.attachmentId)}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${configuredApiKey()}` },
+    }
+  );
+
+  if (!response.ok) {
+    const body = await parseResponse(response);
+    const detail = typeof body === "string" ? body : JSON.stringify(body);
+    throw new Error(`AgentMail attachment retrieval failed (${response.status}): ${detail}`);
+  }
+
+  const contentType = response.headers.get("content-type") || undefined;
+  if (contentType?.includes("application/json")) {
+    const metadata = await response.json() as Record<string, unknown>;
+    const downloadUrl = responseField(metadata, "download_url", "downloadUrl", "url");
+    if (!downloadUrl) throw new Error("AgentMail attachment response did not include a download URL.");
+
+    const downloadResponse = await fetch(downloadUrl);
+    if (!downloadResponse.ok) throw new Error(`AgentMail attachment download failed (${downloadResponse.status}).`);
+    return {
+      bytes: await downloadResponse.arrayBuffer(),
+      contentType: downloadResponse.headers.get("content-type") || responseField(metadata, "content_type", "contentType"),
+    };
+  }
+
+  return { bytes: await response.arrayBuffer(), contentType };
 }

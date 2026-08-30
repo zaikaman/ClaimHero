@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -144,5 +144,91 @@ export const insertMessage = mutation({
     });
 
     return messageId;
+  },
+});
+
+export const startInboundIntake = internalMutation({
+  args: {
+    eventId: v.string(),
+    messageId: v.string(),
+    inboxId: v.string(),
+    sender: v.string(),
+    recipient: v.string(),
+    subject: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args): Promise<boolean> => {
+    const existingByEvent = await ctx.db
+      .query("agentMailIntakeEvents")
+      .withIndex("by_event_id", (q) => q.eq("eventId", args.eventId))
+      .first();
+    const existingByMessage = await ctx.db
+      .query("agentMailIntakeEvents")
+      .withIndex("by_message_id", (q) => q.eq("messageId", args.messageId))
+      .first();
+    const existing = existingByEvent || existingByMessage;
+
+    if (existing?.status === "processing" || existing?.status === "completed") return false;
+
+    const now = Date.now();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        eventId: args.eventId,
+        inboxId: args.inboxId,
+        sender: args.sender,
+        recipient: args.recipient,
+        subject: args.subject,
+        status: "processing",
+        error: undefined,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("agentMailIntakeEvents", {
+        ...args,
+        status: "processing",
+        receivedAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return true;
+  },
+});
+
+export const completeInboundIntake = internalMutation({
+  args: { eventId: v.string(), claimId: v.id("claims") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const event = await ctx.db
+      .query("agentMailIntakeEvents")
+      .withIndex("by_event_id", (q) => q.eq("eventId", args.eventId))
+      .first();
+    if (event) {
+      await ctx.db.patch(event._id, {
+        status: "completed",
+        claimId: args.claimId,
+        updatedAt: Date.now(),
+      });
+    }
+    return null;
+  },
+});
+
+export const failInboundIntake = internalMutation({
+  args: { eventId: v.string(), error: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const event = await ctx.db
+      .query("agentMailIntakeEvents")
+      .withIndex("by_event_id", (q) => q.eq("eventId", args.eventId))
+      .first();
+    if (event) {
+      await ctx.db.patch(event._id, {
+        status: "failed",
+        error: args.error.slice(0, 1000),
+        updatedAt: Date.now(),
+      });
+    }
+    return null;
   },
 });

@@ -39,10 +39,45 @@ export async function createStructuredCompletion<T>(options: {
   schemaName: string;
   schema: Record<string, unknown>;
   imageUrls?: string[];
+  fileInputs?: Array<{ fileData: string; filename: string }>;
   temperature?: number;
 }): Promise<T> {
   const { model } = getOpenAIConfig();
   const client = getOpenAIClient();
+
+  if (options.fileInputs && options.fileInputs.length > 0) {
+    const content = [
+      { type: "input_text" as const, text: options.userPrompt },
+      ...options.fileInputs.map((file) => ({
+        type: "input_file" as const,
+        file_data: file.fileData,
+        filename: file.filename,
+      })),
+    ];
+    const response = await client.responses.create({
+      model: model as any,
+      instructions: options.systemPrompt,
+      input: [{ role: "user", content }],
+      text: {
+        format: {
+          type: "json_schema",
+          name: options.schemaName,
+          strict: true,
+          schema: options.schema,
+        },
+      },
+    });
+    const messageContent = response.output_text;
+    if (!messageContent) throw new Error(`OpenAI response empty for schema ${options.schemaName}`);
+
+    try {
+      return JSON.parse(messageContent) as T;
+    } catch (error) {
+      throw new Error(
+        `Failed to parse structured JSON response from model ${model}: ${String(error)}\nRaw Content: ${messageContent}`
+      );
+    }
+  }
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     {

@@ -76,7 +76,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   };
 
   const handleCopyEmail = () => {
-    navigator.clipboard.writeText("intake@claimhero.agentmail.com");
+    navigator.clipboard.writeText("claimhero-intake@agentmail.to");
     setCopiedEmail(true);
     setTimeout(() => {
       setCopiedEmail(false);
@@ -276,7 +276,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
               >
                 <div className="flex items-center gap-2">
                   <Envelope className="size-3.5 text-emerald-500" />
-                  <span>Copy Intake Gateway Address (intake@claimhero.agentmail.com)</span>
+                  <span>Copy Electronic Intake Address (claimhero-intake@agentmail.to)</span>
                 </div>
                 {copiedEmail ? (
                   <Check className="size-3 text-emerald-500" />

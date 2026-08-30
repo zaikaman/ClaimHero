@@ -12,6 +12,7 @@ import {
   INSURERS,
   getPayerAppellateContact,
 } from "../src/lib/constants";
+import { extractEmailAddress, normalizeAgentMailWebhook } from "../convex/lib/agentMailWebhook";
 
 describe("ClaimHero Domain Utilities & Formatting", () => {
   it("formats numerical dollar amounts into standard US healthcare currency", () => {
@@ -545,6 +546,49 @@ describe("Precedent Vector Archive", () => {
 });
 
 describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
+  it("normalizes the current nested AgentMail message.received payload", () => {
+    const event = normalizeAgentMailWebhook({
+      type: "event",
+      event_type: "message.received",
+      event_id: "evt_123",
+      message: {
+        inbox_id: "inb_intake",
+        message_id: "<msg_123@agentmail.to>",
+        thread_id: "thd_123",
+        from_: ["billing@clinic.example"],
+        to: ["ClaimHero Intake <claimhero-intake@agentmail.to>"],
+        subject: "Denial notice",
+        text: "Attached is the denial notice.",
+        attachments: [{
+          attachment_id: "att_123",
+          filename: "denial.pdf",
+          content_type: "application/pdf",
+          size: 2048,
+        }],
+      },
+    });
+
+    expect(event).toMatchObject({
+      eventType: "message.received",
+      eventId: "evt_123",
+      messageId: "<msg_123@agentmail.to>",
+      inboxId: "inb_intake",
+      from: "billing@clinic.example",
+      recipients: ["ClaimHero Intake <claimhero-intake@agentmail.to>"],
+      text: "Attached is the denial notice.",
+    });
+    expect(event?.attachments[0]).toMatchObject({
+      attachmentId: "att_123",
+      filename: "denial.pdf",
+      contentType: "application/pdf",
+    });
+    expect(extractEmailAddress(event?.recipients[0])).toBe("claimhero-intake@agentmail.to");
+  });
+
+  it("rejects webhook payloads without a message identity or recipient", () => {
+    expect(normalizeAgentMailWebhook({ event_type: "message.received" })).toBeNull();
+  });
+
   it("renders appeal correspondence as professional HTML and clean plain text", async () => {
     const { formatAppealEmail, formatCorrespondenceEmail } = await import("../convex/lib/appealEmail");
     const appeal = formatAppealEmail(

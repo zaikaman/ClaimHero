@@ -237,7 +237,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCopyEmail = () => {
-    navigator.clipboard.writeText("intake@claimhero.agentmail.com");
+    navigator.clipboard.writeText("claimhero-intake@agentmail.to");
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
   };
@@ -657,11 +657,11 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <Card className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">
-                    Dedicated Electronic Intake Address
+                    ClaimHero Electronic Intake
                   </span>
                   <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-500/30">
                     <span className="size-1.5 rounded-full bg-emerald-500"></span>
-                    Intake Active
+                    Live inbound digestion
                   </Badge>
                 </div>
 
@@ -669,7 +669,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   <input
                     type="text"
                     readOnly
-                    value="intake@claimhero.agentmail.com"
+                    value="claimhero-intake@agentmail.to"
                     className="flex-1 rounded-lg border border-input bg-muted/40 px-3 py-1.5 text-xs font-mono text-foreground select-all"
                   />
                   <Button
@@ -693,15 +693,15 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 </div>
 
                 <ul className="list-disc list-inside space-y-1 text-xs text-muted-foreground leading-relaxed pt-1">
-                  <li>Patients or clinic billing staff forward denial notices directly to this address.</li>
-                  <li>ClaimHero automatically provisions a dedicated case inbox.</li>
-                  <li>Clinical intelligence extracts CPT codes and immediately initializes the case record.</li>
+                  <li>Forward a denial letter or EOB here from an authorized patient or clinic mailbox.</li>
+                  <li>ClaimHero reads the email body and supported PDF, image, or text attachments.</li>
+                  <li>The denial is extracted into a new case and appears in Case Radar for context confirmation.</li>
                 </ul>
               </Card>
 
               <div className="rounded-lg border border-border bg-muted/20 p-2.5 flex items-center gap-2 text-xs text-muted-foreground">
                 <Shield className="size-4 shrink-0 text-foreground" />
-                <span>HIPAA Data Isolation & TLS End-to-End Encryption active.</span>
+                <span>AgentMail transport and Convex storage handle the inbound document securely. Send only records you are authorized to share.</span>
               </div>
             </TabsContent>
           </Tabs>

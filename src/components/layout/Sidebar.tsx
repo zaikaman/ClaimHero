@@ -91,7 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
 
   const handleCopyEmail = () => {
-    navigator.clipboard.writeText("intake@claimhero.agentmail.com");
+    navigator.clipboard.writeText("claimhero-intake@agentmail.to");
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
   };
