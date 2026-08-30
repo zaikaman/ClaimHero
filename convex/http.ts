@@ -3,6 +3,8 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { normalizeAgentMailWebhook } from "./lib/agentMailWebhook";
+import { registerStaticRoutes } from "@convex-dev/static-hosting";
+import { components } from "./_generated/api";
 
 const http = httpRouter();
 
@@ -79,5 +81,7 @@ http.route({
     }
   }),
 });
+
+registerStaticRoutes(http, components.staticHosting);
 
 export default http;

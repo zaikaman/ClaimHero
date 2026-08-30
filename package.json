@@ -11,11 +11,13 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src convex",
     "test": "vitest run tests",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "deploy": "npx @convex-dev/static-hosting deploy"
   },
   "dependencies": {
     "@auth/core": "^0.41.3",
     "@convex-dev/auth": "^0.0.95",
+    "@convex-dev/static-hosting": "^0.2.1",
     "@mendable/firecrawl-js": "^1.18.1",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-dialog": "^1.1.6",
