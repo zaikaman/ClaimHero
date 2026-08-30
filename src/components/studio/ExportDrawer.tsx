@@ -90,6 +90,10 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
             html, body { margin: 0; background: #fff; color: #0f172a; }
             body { font-family: Arial, Helvetica, sans-serif; }
             .printable-dossier { width: auto !important; max-width: none !important; padding: 14mm 16mm !important; margin: 0 !important; box-shadow: none !important; }
+            h1, h2, h3, h4, h5, h6 { page-break-after: avoid !important; break-after: avoid !important; }
+            blockquote { page-break-inside: avoid !important; break-inside: avoid !important; }
+            p { orphans: 3; widows: 3; }
+            ul, ol { page-break-inside: avoid !important; break-inside: avoid !important; }
           </style>
         </head>
         <body>${printable.outerHTML}</body>

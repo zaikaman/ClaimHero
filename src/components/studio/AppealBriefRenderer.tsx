@@ -49,7 +49,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
         remarkPlugins={[remarkGfm, remarkBreaks]}
         components={{
           h1: ({ children }) => (
-            <div className={`pb-2 mb-3 border-b-2 ${isPrintMode ? "border-slate-900" : "border-border"}`}>
+            <div className={`pb-2 mb-3 border-b-2 [break-after:avoid] [page-break-after:avoid] ${isPrintMode ? "border-slate-900" : "border-border"}`}>
               <h1 className={`text-base sm:text-lg font-bold tracking-tight flex items-center gap-2 ${
                 isPrintMode ? "text-slate-950" : "text-foreground"
               }`}>
@@ -59,7 +59,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
             </div>
           ),
           h2: ({ children }) => (
-            <div className={isPrintMode ? "pt-2 pb-1 mt-3" : "pt-3 pb-1.5 mt-4"}>
+            <div className={`${isPrintMode ? "pt-2 pb-1 mt-3" : "pt-3 pb-1.5 mt-4"} [break-after:avoid] [page-break-after:avoid]`}>
               <h2 className={`text-xs sm:text-sm font-bold tracking-wide flex items-center gap-2 ${
                 isPrintMode ? "text-slate-950 border-b border-slate-300 pb-1" : "text-foreground/95"
               }`}>
@@ -71,7 +71,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
             </div>
           ),
           h3: ({ children }) => (
-            <h3 className={`text-xs font-semibold mt-3 mb-1 ${
+            <h3 className={`text-xs font-semibold mt-3 mb-1 [break-after:avoid] [page-break-after:avoid] ${
               isPrintMode ? "text-slate-800" : "text-foreground/90"
             }`}>
               {children}
@@ -86,7 +86,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
           ),
           blockquote: ({ children }) => (
             <blockquote
-              className={`${isPrintMode ? "my-2 p-2" : "my-3 p-3"} rounded-lg border-l-4 font-sans transition-colors ${
+              className={`${isPrintMode ? "my-2 p-2" : "my-3 p-3"} rounded-lg border-l-4 font-sans transition-colors [break-inside:avoid] [page-break-inside:avoid] ${
                 isPrintMode
                   ? "border-slate-700 bg-slate-100 text-slate-800 text-[11px]"
                   : "border-primary/70 bg-muted/40 text-foreground/90 shadow-sm"

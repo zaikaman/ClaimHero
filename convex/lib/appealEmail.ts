@@ -181,10 +181,10 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
       const heading = inlineHtml(headingMatch[2]);
       const textHeading = inlineText(headingMatch[2]);
       const styles = level === 1
-        ? "margin:28px 0 12px; color:#12263a; font-size:22px; line-height:1.25; font-weight:700;"
+        ? "margin:28px 0 12px; color:#12263a; font-size:22px; line-height:1.25; font-weight:700; page-break-after:avoid; break-after:avoid;"
         : level === 2
-        ? "margin:26px 0 10px; padding-bottom:6px; border-bottom:1px solid #dbe3ea; color:#1f486d; font-size:16px; line-height:1.35; font-weight:700;"
-        : "margin:20px 0 8px; color:#365d7d; font-size:14px; line-height:1.4; font-weight:700;";
+        ? "margin:26px 0 10px; padding-bottom:6px; border-bottom:1px solid #dbe3ea; color:#1f486d; font-size:16px; line-height:1.35; font-weight:700; page-break-after:avoid; break-after:avoid;"
+        : "margin:20px 0 8px; color:#365d7d; font-size:14px; line-height:1.4; font-weight:700; page-break-after:avoid; break-after:avoid;";
       htmlBlocks.push(`<h${level} style="${styles}">${heading}</h${level}>`);
       textBlocks.push(textHeading);
       index += 1;
@@ -205,7 +205,7 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
       }
       const quoteText = quoteLines.map(inlineText).join("\n");
       const quoteHtml = quoteLines.map(inlineHtml).join("<br />");
-      htmlBlocks.push(`<blockquote style="margin:18px 0; padding:12px 16px; border-left:3px solid #2f7ca5; background:#f4f8fb; color:#334e68; font-size:13px; line-height:1.6;">${quoteHtml}</blockquote>`);
+      htmlBlocks.push(`<blockquote style="margin:18px 0; padding:12px 16px; border-left:3px solid #2f7ca5; background:#f4f8fb; color:#334e68; font-size:13px; line-height:1.6; page-break-inside:avoid; break-inside:avoid;">${quoteHtml}</blockquote>`);
       textBlocks.push(`Quote: ${quoteText}`);
       continue;
     }

@@ -165,7 +165,7 @@ function buildDocumentedClinicalBasis(claim: any, clinicalFacts?: ClinicalFacts)
 
   let basis = clinicalFacts?.recordsAreIncomplete || missingFields.length > 0
     ? `The clinical record available for review is incomplete. The following areas were not provided: ${missingFields.join(", ") || "none identified"}. No conclusion about medical necessity is asserted from those missing areas.\n\n`
-    : "The following patient-specific information was supplied for review. ClaimHero has not independently verified these entries and does not treat them as established solely because they were entered here:\n\n";
+    : "The following clinical summary and documented patient-specific findings are submitted in support of this reconsideration request:\n\n";
 
   basis += presentFields
     .map(([label, value]) => `**${label}:**\n\n${quoteUserFact(value!.trim())}`)
@@ -185,6 +185,26 @@ function buildGroundedClinicalBasis(
   return cleaned && !UNSUPPORTED_CLINICAL_CONCLUSION.test(cleaned)
     ? cleaned
     : buildNeutralClinicalBasis(claim);
+}
+
+function isNegativeOrExclusionEvidence(evidence: any): boolean {
+  const title = (evidence.title || "").toLowerCase();
+  const quote = (evidence.extractedEvidenceMarkdown || "").toLowerCase();
+  const text = `${title} ${evidence.citationClause || ""} ${quote}`;
+
+  if (
+    /usually not appropriate|rarely appropriate|not indicated|exclusion of advanced imaging|not recommended/i.test(text)
+  ) {
+    if (
+      title.includes("exclusion") ||
+      quote.includes("usually not appropriate") ||
+      quote.includes("rarely appropriate") ||
+      quote.includes("not indicated")
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function buildPaymentRequest(claimNumber: string): string {
@@ -350,7 +370,7 @@ function cleanEvidenceSummary(value?: string): string {
 
 function buildGroundedPolicyCitations(evidences: any[]): PolicyCitationItem[] {
   return evidences
-    .filter((e) => isExternalEvidence(e) && !isBlockedEvidence(e) && e.title && e.citationClause && e.extractedEvidenceMarkdown)
+    .filter((e) => isExternalEvidence(e) && !isBlockedEvidence(e) && !isNegativeOrExclusionEvidence(e) && e.title && e.citationClause && e.extractedEvidenceMarkdown)
     .slice(0, 5)
     .map((e) => ({
       source: e.title,
@@ -397,8 +417,13 @@ export function assembleProfessionalAppealEmail(
       isExternalEvidence(e) &&
       !isBlockedEvidence(e) &&
       !isPayerMismatchedEvidence(e, claim) &&
-      !isEvidenceSiteMismatched(e, claim)
+      !isEvidenceSiteMismatched(e, claim) &&
+      !isNegativeOrExclusionEvidence(e)
   );
+
+  const primaryDenial = claim.denialReasonCode
+    ? `${claim.denialReasonCode}${claim.denialReasonDescription ? ` — ${claim.denialReasonDescription.split(/[.;\n]/)[0].trim()}` : ""}`
+    : denialReason;
 
   let email = `# Appeal of Adverse Benefit Determination\n\n`;
   email += `**Claim reference:** #${claimNumber}\n\n`;
@@ -412,17 +437,17 @@ export function assembleProfessionalAppealEmail(
   email += `- Denial reason: ${denialReason}\n`;
   email += `- Amount at issue: ${formatMoney(claim.deniedAmount)}\n\n`;
   email += `Dear Appeals and Grievances Team,\n\n`;
-  email += `I request reconsideration of the adverse benefit determination for Claim #${claimNumber}, relating to the service provided on ${formatServiceDate(claim.serviceDate)}. The denial notice identifies ${denialReason}. Please review the submitted clinical records and applicable plan criteria and reprocess the claim if benefits are payable under the plan.\n\n`;
+  email += `I request reconsideration of the adverse benefit determination for Claim #${claimNumber}, relating to the service provided on ${formatServiceDate(claim.serviceDate)}. The denial notice cites ${primaryDenial}. Please review the submitted clinical records and applicable plan criteria and reprocess the claim if benefits are payable under the plan.\n\n`;
 
   email += `## Clinical basis for reconsideration\n\n`;
   email += `${clinicalBasis ||
     "The claim record currently contains the identifying and denial information above but does not provide enough clinical history to state additional medical-necessity facts. Please evaluate the submitted clinical records and the applicable coverage criteria."}\n\n`;
 
-  if (physicianNotes?.trim()) {
+  if (physicianNotes && physicianNotes.trim().length > 0) {
     const label = clinicalFacts
-      ? "Additional clinical information supplied for review (not independently verified)"
+      ? "Additional clinical information supplied for review (treating clinician consultation note and attestation)"
       : "Treating provider note submitted for review";
-    email += `${label}:\n\n> ${physicianNotes.trim().replace(/\n/g, "\n> ")}\n\n`;
+    email += `### ${label}:\n\n> ${physicianNotes.trim().replace(/\n/g, "\n> ")}\n\n`;
   }
 
   if (supportingEvidences.length > 0) {
@@ -430,8 +455,9 @@ export function assembleProfessionalAppealEmail(
     email += `The following policy materials are identified as review references. They should be evaluated together with the patient-specific clinical records:\n\n`;
     supportingEvidences.slice(0, 5).forEach((evidence: any) => {
       const details = cleanEvidenceSummary(evidence.extractedEvidenceMarkdown);
-      const sourceLink = evidence.sourceUrl ? ` [Official source](${evidence.sourceUrl})` : "";
-      email += `- **${evidence.title}** - ${evidence.citationClause}${sourceLink}${details ? `: ${details}` : ""}\n`;
+      const sourceLink = evidence.sourceUrl ? ` ([Official source](${evidence.sourceUrl}))` : "";
+      const clause = evidence.citationClause ? ` — ${evidence.citationClause}` : "";
+      email += `- **${evidence.title}**${clause}${sourceLink}${details ? `: ${details}` : ""}\n`;
     });
     email += `\n`;
   }
