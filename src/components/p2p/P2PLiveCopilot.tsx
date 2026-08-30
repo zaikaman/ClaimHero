@@ -23,11 +23,13 @@ import {
   CircleNotch,
   ArrowCounterClockwise,
   ArrowsLeftRight,
+  FileText,
 } from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 import { cn } from "../../lib/utils";
+import { P2PEncounterSummaryModal } from "./P2PEncounterSummaryModal";
 
 interface P2PLiveCopilotProps {
   claim: Claim;
@@ -60,6 +62,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
 
   const [manualInput, setManualInput] = useState<string>("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState<boolean>(false);
   const transcriptContainerRef = useRef<HTMLDivElement | null>(null);
   const prevTranscriptsLengthRef = useRef<number>(0);
   const userHasScrolledUpRef = useRef<boolean>(false);
@@ -267,6 +270,18 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                 <span>Reviewer Speaking...</span>
               </Button>
             )}
+
+            {/* Encounter Summary Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSummaryModalOpen(true)}
+              className="h-8 rounded-md px-2.5 text-xs font-medium gap-1.5 border-border/70 text-foreground hover:bg-muted/60 cursor-pointer shadow-2xs"
+              title="View, export or print complete EHR post-call clinical encounter addendum"
+            >
+              <FileText className="size-3.5 text-primary" />
+              <span>Encounter Summary</span>
+            </Button>
 
             {/* Mic / Live Call Toggle */}
             {isCallLive ? (
@@ -735,6 +750,14 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
           </div>
         </div>
       </div>
+
+      {/* Post-Call Encounter Summary & EHR Addendum Modal */}
+      <P2PEncounterSummaryModal
+        isOpen={isSummaryModalOpen}
+        onClose={() => setIsSummaryModalOpen(false)}
+        claim={claim}
+        session={session}
+      />
     </div>
   );
 };

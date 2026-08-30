@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-30T17:47:00Z
+- **Last updated:** 2026-08-31T01:10:00Z
 
 ## Log
 
@@ -249,6 +249,9 @@ Hardened vector embedding pipeline by removing silent deterministic hash fallbac
 
 ### 2026-08-30 - 1c0450c
 Maximized Convex All Gas Hackathon judging criteria across Components, Full-Stack Depth, and Scalability by integrating `@convex-dev/rate-limiter`, native Convex Full-Text `searchIndex` (hybrid with 1536-d `vectorIndex`), and `@convex-dev/aggregate` TableAggregate. Mounted `rateLimiter` and `aggregate` official components in `convex/convex.config.ts`. Defined token-bucket rate limits (`convex/lib/rateLimiter.ts`) guarding heavy AI, optical parsing, Firecrawl scraping, and AgentMail dispatch actions (`sentinelPipeline.ts`, `opticalParser.ts`, `policyCrawler.ts`, `appealSynthesizer.ts`, `p2pDefenseGenerator.ts`, `mailDispatcher.ts`). Added native Convex full-text `.searchIndex()` definitions to `claims` (`search_claims`), `clinicalEvidences` (`search_evidence`), and `precedents` (`search_precedents`) in `convex/schema.ts`, exposing high-performance lexical search endpoints (`claims:search`, `clinicalEvidences:searchEvidence`, `precedents:searchTextPrecedents`). Configured real-time `TableAggregate` (`convex/lib/aggregates.ts`) tracking claims portfolio amounts and case volume atomically in mutations (`claims.ts`). Expanded test suite (`tests/claimhero.test.ts`) to 116 passing tests. Verified 100% clean with `npm run verify` (typecheck, lint, 116/116 unit tests, production build). Convex features: components, rate-limiter, aggregate, full-text search, vector search, database schema, mutations, queries, actions.
+
+### 2026-08-30 - working tree
+Implemented 5 platform enhancements maximizing real-world utility, clinical workflow polish, and appellate practice management: (1) **Case Radar Multi-Format Export**: Upgraded CSV generation in `CaseRadar.tsx` to strict RFC 4180 compliance with comprehensive header rows and quoted escaping alongside JSON portfolio export dropdown options; (2) **Portfolio Analytics Executive Report Suite**: Built `ExecutiveReportModal.tsx` and wired into `AnalyticsMetrics.tsx` with printable white-paper letterheads, macro KPI summary grids, insurer win-rate tables, statutory 180-day countdown risk breakdowns, plain-text copying, and CSV download; (3) **P2P Live Call Copilot Encounter Summary & EHR Addendum**: Built `P2PEncounterSummaryModal.tsx` in `P2PLiveCopilot.tsx` compiling verbal tele-transcripts, duration, AI Medical Director challenges, physician responses, and statutory checklist verifications (29 CFR § 2560.503-1) into a copyable EHR note (Epic/Cerner) with `.txt` export and print actions; (4) **Appeal Studio Section Outline Jump Bar**: Built an interactive horizontal outline jump bar in `AppealStudio.tsx` allowing smooth scrolling navigation between formal Transmission Headers, Case Metadata, Clinical Chronology, CPB Alignment Tables, ERISA § 502 Remedies, and Physician Attestation; (5) **Clinical Evidence Matrix Category Filter Tabs**: Upgraded `PolicyViewer.tsx` in `EvidenceMatrix.tsx` with interactive category filter pill buttons (`All Evidence`, `Insurer CPB`, `PubMed Trials`, `FDA Labels`, `ERISA Law`) with live count badges and search filtering. Validated with `npm run verify` (100% typecheck, lint, 116/116 unit tests, production build). Convex features: database schema, queries, mutations, actions, reactive subscriptions, static hosting.
 
 
 

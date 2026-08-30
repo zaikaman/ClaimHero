@@ -111,16 +111,16 @@ In `Payer Communications` (`AgentMailDrawer.tsx`), select:
 | Surface | What it does | Why it matters |
 |---|---|---|
 | **Cinematic Landing Hero** (`src/components/landing/CinematicHero.tsx`) | Full-viewport ambient video, liquid-glass CTAs, 3-slide showcase, `CinematicHero.tsx:135` | First-impression polish for judges; routes to `/` vs `/app/*` via `useRouterView.ts` |
-| **Case Radar** (`src/components/radar/CaseRadar.tsx`) | Reactive table of all claims, status tabs, payer filter, search, `DeadlineCountdown.tsx` circular gauge | Portfolio at a glance; ERISA urgency is visually unmissable |
-| **Evidence Matrix** (`src/components/evidence/EvidenceMatrix.tsx`) | Side-by-side denial vs insurer CPB inspector, overturn score with breakdown bars, `PolicyViewer.tsx` clause viewer, `PrecedentFeed.tsx` live vector hits | Turns a 150KB policy into 5 citable clauses |
-| **Defense Suite** (3 vectors under one stepper) | **Legal Appeal Brief** (`AppealStudio.tsx`) + **Doctor P2P Script** (`P2PDefenseStudio.tsx`) + **ERISA Penalties** (`FinancialLiabilityCalculator.tsx`) via `SentinelFlowStepper.tsx` | One pipeline arms three enforcement vectors; cross-embeds $110/day damages into Section IV with one click |
+| **Case Radar** (`src/components/radar/CaseRadar.tsx`) | Reactive table of all claims, status tabs, payer filter, search, `DeadlineCountdown.tsx` circular gauge, RFC 4180 CSV & JSON multi-field portfolio export dropdown | Portfolio at a glance; ERISA urgency is visually unmissable |
+| **Evidence Matrix** (`src/components/evidence/EvidenceMatrix.tsx`) | Side-by-side denial vs insurer CPB inspector, overturn score with breakdown bars, `PolicyViewer.tsx` clause viewer with multi-source category filter pills (CPB / PubMed / FDA / ERISA), `PrecedentFeed.tsx` live vector hits | Turns a 150KB policy into 5 citable clauses with instant category slicing |
+| **Defense Suite** (3 vectors under one stepper) | **Legal Appeal Brief** (`AppealStudio.tsx` with Section Outline Jump Bar) + **Doctor P2P Script** (`P2PDefenseStudio.tsx`) + **ERISA Penalties** (`FinancialLiabilityCalculator.tsx`) via `SentinelFlowStepper.tsx` | One pipeline arms three enforcement vectors; cross-embeds $110/day damages into Section IV with one click |
 | **Clinical Research Console** (`ClinicalResearchConsole.tsx`) | PubMed / ClinicalTrials.gov and FDA package insert crawls beyond the payer CPB | Proves standard-of-care for experimental/investigational denials |
 | **Court-Ready Dossier Binder** (`src/components/studio/dossier/`) | Cover page, TOC, statutory summary, exhibit index, Exhibit A/B/C, physician attestation — mode switch between Binder vs Expedited Brief, HTML/TXT export, isolated `@media print` pagination (`src/index.css:208`) | Physical mail packet that survives a clerk's desk |
-| **P2P Live Call Copilot** (`P2PLiveCopilot.tsx`) | Web Speech STT streaming, AI Medical Director trap questions, instant Fast Answer rebuttal cards, checklist progress, win-score HUD | Real-time defense during the 3-minute payer peer-to-peer call |
+| **P2P Live Call Copilot** (`P2PLiveCopilot.tsx`) | Web Speech STT streaming, AI Medical Director trap questions, instant Fast Answer rebuttal cards, checklist progress, win-score HUD, and `P2PEncounterSummaryModal.tsx` for post-call EHR notes (Epic/Cerner) | Real-time defense during the 3-minute payer peer-to-peer call + instant clinical documentation |
 | **Financial Liability Calculator** (`src/lib/liabilityCalculator.ts`) | Deductible/coinsurance/OOP-max, No Surprises Act, $110/day §502(c) penalties, 18% prompt-pay interest, Lodestar fee-shifting; trajectory tables + printable audit statement | Quantifies exposure and creates statutory leverage |
 | **Payer Dispatch Gateway** (`AgentMailDrawer.tsx`) | Multi-channel (email / portal / fax / certified mail), 1-click portal launch, brief copy, PDF print, 3-mode recipient switcher with provenance badges | Meets payers where they actually accept appeals |
 | **Audit Timeline** (`AuditTimeline.tsx`) | Immutable `appealAuditLogs` ledger per claim | Every state transition is cryptographically ordered |
-| **Portfolio Analytics** (`AnalyticsMetrics.tsx`) | Total disputed, recovered, win rate, payer breakdown, confidence distribution (`convex/claims.ts:478`) | Proves ROI; accountability per payer |
+| **Portfolio Analytics** (`AnalyticsMetrics.tsx`) | Total disputed, recovered, win rate, payer breakdown, confidence distribution (`convex/claims.ts:478`), and `ExecutiveReportModal.tsx` for practice audit statements & CSV/print exports | Proves ROI; executive accountability per payer |
 | **HIPAA Privacy Filter** (`PrivacyRedactionFilter.tsx`) | Deterministic PII detection (SSN, MRN, DOB, phone, address, custom terms) with 3 presets: Safe Harbor, Balanced Appellate, Public Legal Exhibit | Redact before you dispatch or publish precedent |
 
 ---
@@ -311,6 +311,7 @@ Indexes are named canonically (`by_user_status`, `by_claimId_and_appealLevel`, `
 
 * Tier stepper (Tier 1 sky / Tier 2 amber / Tier 3 rose) with `statutoryPosture`, `targetAuthority`, `legalAggressiveness` from `TIER_METADATA_CONFIG:42`.
 * Split-pane Editor / Preview / Split view with `AppealBriefRenderer.tsx` (`react-markdown` + `remark-gfm` + `remark-breaks`, safe link validation via `safeExternalHref`/`safeLinkHref`).
+* **Section Outline Jump Bar** (`Transmission` → `Case Summary` → `Clinical Facts` → `CPB Alignment` → `ERISA Remedies` → `Attestation`) with smooth scrolling sync across editor and rendered preview panes.
 * One-click **Embed $110/d Penalties** into Section IV (`handleInjectErisaPenalties:128`) — inserts 29 U.S.C. §1132(c)(1)(B) / §2560.503-1 language.
 * **Escalate Legal Tier** modal preserves historical revisions (`appeals.ts:createOrUpdateDraft` with `by_claimId_and_version`).
 
@@ -323,6 +324,7 @@ Indexes are named canonically (`by_user_status`, `by_claimId_and_appealLevel`, `
 
 * Turn-taking practice: AI Medical Director speaks a denial challenge, pauses, listens via Web Speech STT, streams transcript, returns ranked Fast Answer rebuttal cards with chart proof and regulatory leverage.
 * Checklist auto-completion and live win-score HUD; persisted in `p2pCallSessions`.
+* **Post-Call Encounter Summary & EHR Addendum** (`P2PEncounterSummaryModal.tsx`) — compiles dialogue, call duration, verified statutory mandates (29 CFR § 2560.503-1), and physician attestation into a copyable EHR clinical note (Epic/Cerner) with `.txt` export and clean paper print formatting.
 
 ### Financial Liability Calculator (`src/components/calculator/FinancialLiabilityCalculator.tsx`)
 
@@ -420,10 +422,10 @@ ClaimHero/
 │   │   ├── radar/ (CaseRadar, IngestionModal, PrivacyRedactionFilter, DeadlineCountdown)
 │   │   ├── evidence/ (EvidenceMatrix, PolicyViewer, PrecedentFeed, ClinicalResearchConsole)
 │   │   ├── studio/ (AppealStudio, CitationSidebar, ExportDrawer, AppealBriefRenderer, dossier/*)
-│   │   ├── p2p/ (P2PDefenseStudio, P2PLiveCopilot)
+│   │   ├── p2p/ (P2PDefenseStudio, P2PLiveCopilot, P2PEncounterSummaryModal)
 │   │   ├── calculator/ (FinancialLiabilityCalculator, FinancialStatementModal)
 │   │   ├── communications/ (AgentMailDrawer, AuditTimeline)
-│   │   ├── analytics/AnalyticsMetrics.tsx
+│   │   ├── analytics/ (AnalyticsMetrics, ExecutiveReportModal)
 │   │   ├── layout/ (Shell, Sidebar, Header) + ui/* (Button, Card, Badge, Dialog, Select, Silk)
 │   │   └── onboarding/ (OnboardingWizard, OnboardingChecklist)
 │   └── types/index.ts

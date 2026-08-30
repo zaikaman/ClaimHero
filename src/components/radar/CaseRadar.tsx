@@ -20,6 +20,8 @@ import {
   Sparkle,
   CircleNotch,
   PhoneCall,
+  FileCode,
+  CaretDown,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -339,28 +341,94 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const csv = filtered
-                    .map(
-                      (c) =>
-                        `${c.claimNumber},${c.patient?.name},${c.patient?.insurancePayer},${c.deniedAmount},${c.denialReasonCode},${c.daysRemaining}`
-                    )
-                    .join("\n");
-                  const blob = new Blob([csv], { type: "text/csv" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = "claims-export.csv";
-                  a.click();
-                }}
-                className="gap-1.5 text-xs h-8"
-              >
-                <DownloadSimple className="size-3.5" />
-                <span>Export CSV</span>
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs h-8"
+                  >
+                    <DownloadSimple className="size-3.5" />
+                    <span>Export</span>
+                    <CaretDown className="size-3 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel className="text-[11px] text-muted-foreground">Portfolio Export ({filtered.length} cases)</DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const escapeCsv = (val: any) => {
+                        if (val === undefined || val === null) return '""';
+                        const str = String(val).replace(/"/g, '""');
+                        return `"${str}"`;
+                      };
+
+                      const headers = [
+                        "Claim Number",
+                        "Patient Name",
+                        "Member ID",
+                        "Insurer / Payer",
+                        "CPT Codes",
+                        "CARC Denial Code",
+                        "Denial Reason Description",
+                        "Denied Amount ($)",
+                        "Patient Share ($)",
+                        "Service Date",
+                        "Statutory Deadline",
+                        "Days Remaining",
+                        "Overturn Probability (%)",
+                        "Status",
+                      ];
+
+                      const rows = filtered.map((c) => [
+                        escapeCsv(c.claimNumber),
+                        escapeCsv(c.patient?.name || ""),
+                        escapeCsv(c.patient?.memberId || ""),
+                        escapeCsv(c.patient?.insurancePayer || ""),
+                        escapeCsv(c.cptCodes?.join("; ") || ""),
+                        escapeCsv(c.denialReasonCode || ""),
+                        escapeCsv(c.denialReasonDescription || ""),
+                        escapeCsv(c.deniedAmount || 0),
+                        escapeCsv(c.patientOwedAmount || 0),
+                        escapeCsv(c.serviceDate || ""),
+                        escapeCsv(c.statutoryDeadline ? new Date(c.statutoryDeadline).toISOString().split("T")[0] : ""),
+                        escapeCsv(c.daysRemaining),
+                        escapeCsv(c.overturnProbabilityScore ?? "N/A"),
+                        escapeCsv(c.status),
+                      ]);
+
+                      const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+                      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `claimhero-cases-${new Date().toISOString().split("T")[0]}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="gap-2 text-xs cursor-pointer"
+                  >
+                    <FileText className="size-3.5 text-primary" />
+                    <span>Export as CSV (.csv)</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const jsonContent = JSON.stringify(filtered, null, 2);
+                      const blob = new Blob([jsonContent], { type: "application/json;charset=utf-8;" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `claimhero-cases-${new Date().toISOString().split("T")[0]}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="gap-2 text-xs cursor-pointer"
+                  >
+                    <FileCode className="size-3.5 text-cyan-400" />
+                    <span>Export as JSON (.json)</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <Button
                 size="sm"

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   TrendUp,
   CurrencyDollar,
@@ -9,6 +9,7 @@ import {
   Clock,
   ArrowUpRight,
   ShieldWarning,
+  FileText,
 } from "@phosphor-icons/react";
 import { formatCurrency } from "../../lib/utils";
 import { Card } from "../ui/card";
@@ -23,6 +24,7 @@ import {
   TableHead,
   TableCell,
 } from "../ui/table";
+import { ExecutiveReportModal } from "./ExecutiveReportModal";
 
 interface PayerStatItem {
   payer: string;
@@ -60,6 +62,8 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
   onSelectPayerFilter,
   onNavigateToRadar,
 }) => {
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
   if (isLoading) {
     return (
       <div className="p-12 text-center text-xs font-mono text-muted-foreground animate-pulse">
@@ -94,10 +98,19 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
 
           <div className="flex items-center gap-2">
             <Button
+              size="sm"
+              onClick={() => setIsReportModalOpen(true)}
+              className="gap-1.5 bg-primary text-primary-foreground shadow-xs text-xs h-8"
+            >
+              <FileText className="size-3.5" />
+              <span>Executive Audit Statement</span>
+            </Button>
+
+            <Button
               variant="outline"
               size="sm"
               onClick={onNavigateToRadar}
-              className="gap-1.5"
+              className="gap-1.5 text-xs h-8"
             >
               <span>View Case Radar</span>
               <ArrowUpRight className="size-3.5 text-muted-foreground" />
@@ -105,6 +118,13 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
           </div>
         </div>
       </Card>
+
+      {/* Executive Report Modal */}
+      <ExecutiveReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        stats={stats}
+      />
 
       {/* Top 4 KPI Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

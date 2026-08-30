@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   FileText,
   ArrowSquareOut,
@@ -9,14 +9,16 @@ import {
   MagnifyingGlass,
   Trash,
   Globe,
+  Flask,
+  ShieldCheck,
+  Scales,
 } from "@phosphor-icons/react";
 import { ClinicalEvidence, EvidenceSourceType } from "../../types";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Select } from "../ui/select";
-import { stripMarkdownFormatting } from "../../lib/utils";
+import { stripMarkdownFormatting, cn } from "../../lib/utils";
 
 interface PolicyViewerProps {
   evidences: ClinicalEvidence[];
@@ -67,6 +69,22 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const sourceCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: evidences.length,
+      payer_cpb: 0,
+      pubmed_study: 0,
+      fda_package_insert: 0,
+      legal_precedent: 0,
+    };
+    evidences.forEach((e) => {
+      if (counts[e.sourceType] !== undefined) {
+        counts[e.sourceType]++;
+      }
+    });
+    return counts;
+  }, [evidences]);
+
   const filtered = evidences.filter((e) => {
     if (filterSource !== "all" && e.sourceType !== filterSource) return false;
     if (searchQuery) {
@@ -80,41 +98,69 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
     return true;
   });
 
-  return (
-    <div className="space-y-3">
-      {/* Search & Filter Header */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-card border border-border p-2.5 rounded-xl">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <BookOpen className="size-4 text-muted-foreground shrink-0" />
-          <span className="text-xs font-semibold text-foreground">
-            Indexed Clinical Clauses ({filtered.length})
-          </span>
-        </div>
+  const categoryTabs = [
+    { id: "all", label: "All Evidence", icon: BookOpen, count: sourceCounts.all },
+    { id: "payer_cpb", label: "Insurer CPB", icon: BookOpen, count: sourceCounts.payer_cpb },
+    { id: "pubmed_study", label: "PubMed Trials", icon: Flask, count: sourceCounts.pubmed_study },
+    { id: "fda_package_insert", label: "FDA Labels", icon: ShieldCheck, count: sourceCounts.fda_package_insert },
+    { id: "legal_precedent", label: "ERISA Law", icon: Scales, count: sourceCounts.legal_precedent },
+  ];
 
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-48">
+  return (
+    <div className="space-y-3 font-sans">
+      {/* Category Filter Pills & Search Header */}
+      <div className="space-y-2 bg-card border border-border p-3 rounded-xl shadow-2xs">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <BookOpen className="size-4 text-primary shrink-0" />
+            <span className="text-xs font-semibold text-foreground">
+              Clinical Evidence Dossier ({filtered.length} of {evidences.length})
+            </span>
+          </div>
+
+          <div className="relative w-44 sm:w-56">
             <MagnifyingGlass className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search clause..."
+              placeholder="Search clauses..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 h-7 text-xs"
             />
           </div>
+        </div>
 
-          <Select
-            value={filterSource}
-            onChange={(e) => setFilterSource(e.target.value)}
-            className="h-7 text-xs font-sans"
-          >
-            <option value="all">All Sources</option>
-            <option value="payer_cpb">Insurer CPB</option>
-            <option value="pubmed_study">PubMed Trials</option>
-            <option value="fda_package_insert">FDA Labels</option>
-            <option value="nccn_guideline">NCCN Guidelines</option>
-            <option value="legal_precedent">ERISA / Law</option>
-          </Select>
+        {/* Category Pill Buttons */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none pt-1">
+          {categoryTabs.map((tab) => {
+            const isSelected = filterSource === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setFilterSource(tab.id)}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all cursor-pointer border",
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-transparent font-semibold shadow-2xs"
+                    : "bg-muted/30 hover:bg-muted/70 text-muted-foreground hover:text-foreground border-border/70"
+                )}
+              >
+                <Icon className="size-3 shrink-0" />
+                <span>{tab.label}</span>
+                <span
+                  className={cn(
+                    "text-[10px] font-mono px-1.5 py-0.2 rounded-md font-semibold",
+                    isSelected
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

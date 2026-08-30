@@ -519,6 +519,77 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             </div>
           </div>
 
+          {/* Quick Outline Section Jump Bar */}
+          {markdownContent.trim().length > 0 && (
+            <div className="h-8 shrink-0 flex items-center gap-1.5 overflow-x-auto px-4 py-1 bg-muted/20 border-b border-border/60 scrollbar-none text-[11px] font-mono">
+              <span className="text-muted-foreground uppercase text-[9px] font-semibold tracking-wider shrink-0 mr-1">
+                Jump To:
+              </span>
+              {[
+                { label: "Header", pattern: /appeal of adverse|claim reference|^# /i, id: "jump-trans" },
+                { label: "Case Details", pattern: /claim details|patient\/member|date of service/i, id: "jump-meta" },
+                { label: "Clinical Basis", pattern: /clinical basis|additional clinical|medical necessity|treating provider/i, id: "jump-facts" },
+                { label: "Supporting Evidence", pattern: /supporting documentation|review references|policy materials|evidence/i, id: "jump-cpb" },
+                { label: "Review & ERISA", pattern: /review requested|if erisa applies|statutory remedies|statutory rights/i, id: "jump-remedies" },
+                { label: "Signature", pattern: /sincerely|submitted by|treating provider:|authorized representative|attending physician/i, id: "jump-attest" },
+              ].map((sec) => (
+                <button
+                  key={sec.id}
+                  onClick={() => {
+                    const editorEl = document.querySelector(".studio-editor-textarea") as HTMLTextAreaElement | null;
+                    const previewEl = document.querySelector(".studio-preview-pane") as HTMLDivElement | null;
+                    
+                    if (editorEl) {
+                      if (sec.id === "jump-trans") {
+                        editorEl.scrollTo({ top: 0, behavior: "smooth" });
+                        editorEl.focus();
+                        editorEl.setSelectionRange(0, 0);
+                      } else {
+                        const match = editorEl.value.search(sec.pattern);
+                        if (match !== -1) {
+                          editorEl.focus();
+                          editorEl.setSelectionRange(match, match + 20);
+                          const charRatio = match / Math.max(1, editorEl.value.length);
+                          const maxScroll = Math.max(0, editorEl.scrollHeight - editorEl.clientHeight);
+                          editorEl.scrollTo({ top: charRatio * maxScroll, behavior: "smooth" });
+                        }
+                      }
+                    }
+                    if (previewEl) {
+                      if (sec.id === "jump-trans") {
+                        previewEl.scrollTo({ top: 0, behavior: "smooth" });
+                      } else {
+                        // Query specific leaf/heading elements to avoid container div matching
+                        const specificElements = Array.from(
+                          previewEl.querySelectorAll("h1, h2, h3, h4, h5, strong, p, blockquote, li")
+                        );
+                        
+                        let targetEl: Element | null = null;
+                        for (const el of specificElements) {
+                          const text = el.textContent?.trim() || "";
+                          if (sec.pattern.test(text)) {
+                            targetEl = el;
+                            break;
+                          }
+                        }
+
+                        if (targetEl) {
+                          const previewRect = previewEl.getBoundingClientRect();
+                          const elRect = targetEl.getBoundingClientRect();
+                          const targetScroll = previewEl.scrollTop + (elRect.top - previewRect.top) - 16;
+                          previewEl.scrollTo({ top: Math.max(0, targetScroll), behavior: "smooth" });
+                        }
+                      }
+                    }
+                  }}
+                  className="px-2 py-0.5 rounded border border-border/60 bg-background/60 hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 cursor-pointer transition-all text-[10px]"
+                >
+                  {sec.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Editor & Preview Panes with Internal Scrolling */}
           <div
             className={`flex-1 overflow-hidden grid grid-cols-1 ${
@@ -534,14 +605,14 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   value={markdownContent}
                   onChange={(e) => setMarkdownContent(e.target.value)}
                   placeholder="The appeal brief will appear here once synthesized, or write manually..."
-                  className="w-full h-full bg-transparent text-foreground text-xs font-mono resize-none focus:outline-none leading-relaxed placeholder:text-muted-foreground overflow-y-auto"
+                  className="studio-editor-textarea w-full h-full bg-transparent text-foreground text-xs font-mono resize-none focus:outline-none leading-relaxed placeholder:text-muted-foreground overflow-y-auto"
                 />
               </div>
             )}
 
             {/* Panel 2: Rendered Markdown Preview Pane */}
             {(activeTab === "preview" || activeTab === "split") && (
-              <div className="h-full overflow-y-auto p-4 sm:p-6 bg-background/40">
+              <div className="studio-preview-pane h-full overflow-y-auto p-4 sm:p-6 bg-background/40">
                 {markdownContent ? (
                   <div className="w-full rounded-xl border border-border/80 bg-card/70 p-5 sm:p-7 shadow-xs">
                     <AppealBriefRenderer content={markdownContent} />
