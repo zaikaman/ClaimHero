@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-30T15:32:00Z
+- **Last updated:** 2026-08-30T23:59:00Z
 
 ## Log
 
@@ -235,8 +235,11 @@ Implemented Feature H (Financial Liability & Statutory ERISA Penalty Calculator)
 ### 2026-08-30 - 42b5cb6
 Fixed duplicate precedent retrieval audit logging and vector search match collation: Added an idempotency guard to `attachMatchesToClaim` (`convex/precedents.ts`) verifying that a `precedent_vectors_retrieved` event does not already exist for the claim before appending to `appealAuditLogs`. Deduplicated matched authorities by unique citation and title in `rankPrecedentHits` (`convex/lib/embeddings.ts`), preventing repeated identical citations from appearing in the vector search results and audit timeline logs. Added unit test coverage for precedent match deduplication (`tests/claimhero.test.ts`). Validated with `npm run verify`: 100% clean typecheck, lint, 112/112 passing unit tests across all 7 suites, and production build. Convex features: vector search, database schema, mutations, audit logs.
 
-### 2026-08-30 - working tree
+### 2026-08-30 - 4a7d3c3
 Unified Physician Peer-to-Peer (P2P) Defense and ERISA Statutory Penalty Calculator into a cohesive Case Defense Suite connected directly to the denial ingestion pipeline. Previously, `/p2p` and `/calculator` existed as isolated standalone pages disjointed from the core claim lifecycle. Re-architected the clinical claim lifecycle into a unified 3-step workflow with 3 strategic defense vectors: Step 1 (Evidence & CPB), Step 2 (Defense Suite: Legal Appeal Brief, Doctor P2P Copilot, and ERISA $110/Day Penalties & Liability Audit), and Step 3 (Payer Dispatch). Upgraded `SentinelFlowStepper.tsx` across the application with an embedded Defense Vector sub-bar for instant, seamless tab switching between the Written Brief, Doctor P2P Script, and ERISA Financial Audit. Enhanced the Ingestion Modal (`IngestionModal.tsx`) with a Smart Multi-Vector Triage HUD that automatically categorizes denial codes, arms all 3 defense vectors simultaneously upon document extraction, and offers 1-click execution into the brief, P2P script, or penalty audit. Built cross-tool interoperability in `FinancialLiabilityCalculator.tsx` and `AppealStudio.tsx`, enabling 1-click embedding of accrued ERISA $110/day statutory non-disclosure damages (29 U.S.C. § 1132(c)(1)(B)) directly into Section IV (Statutory Remedies & Relief) of the formal appeal brief. Reorganized the Collapsible Sidebar (`Sidebar.tsx`) into a clean, hierarchical Case Workspace layout highlighting the unified Defense Suite with expandable sub-items. Validated with `npm run verify`: 100% clean typecheck, lint, 112/112 passing unit tests across all 7 test suites, and production build. Convex features: database schema, queries, mutations, actions, reactive subscriptions, audit logs.
+
+### 2026-08-30 - working tree
+Authored the definitive Convex All Gas judges README (`README.md`) for `BRIEF.md`. Built a 581-line production brief anchored on the 4 pillars (Convex, Firecrawl, AgentMail, OpenAI) with a 60-second judge quickstart (3 1-click presets `molina_knee`/`geoblue_spine`/`bcbsglobal_mri`), Feature Atlas, ASCII + Mermaid architecture, 4-pillar deep dive with `file:line` call sites (`convex/schema.ts:5`, `convex/schema.ts:271`, `convex/claims.ts:478`, `convex/http.ts:17`, `convex/crons.ts:10`, `convex/actions/policyCrawler.ts:314`, `convex/actions/appealSynthesizer.ts:527`), 6-layer anti-hallucination guardrails, grounded synthesis rules, HIPAA Safe Harbor privacy filter, Data Model, Defense Suite (Appeal Studio / P2P Script & Live Copilot / ERISA $110/day Calculator / Court-Ready Dossier), Security/Privacy, Tech Stack, Project Structure, Local Development, Verification (112/112 tests), Convex Hosting, Build Log, Submission Checklist (BRIEF.md §5), and Judging Criteria mapping (BRIEF.md §6). Previous `working tree` entry reconciled to `4a7d3c3` via `git log --oneline`. Verified with `npm run verify` readiness (typecheck, lint, 112/112 tests, production build). Convex features: documentation, static hosting.
 
 
 
