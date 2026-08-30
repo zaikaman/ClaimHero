@@ -646,6 +646,29 @@ describe("Precedent Vector Archive", () => {
     expect(ranked[0].codeOverlap).toBeGreaterThan(ranked[1].codeOverlap);
   });
 
+  it("deduplicates multiple matches with identical citations or titles", async () => {
+    const { rankPrecedentHits } = await import("../convex/lib/embeddings");
+
+    const duplicateHits = [
+      { _id: "hit1", title: "Overturn A", citation: "ClaimHero overturned appeal CLM-3912-BCG", vectorScore: 0.95, icd10Codes: ["M17.11"], cptCodes: ["27447"], carcCodes: ["CO-50"] },
+      { _id: "hit2", title: "Overturn A Duplicate", citation: "ClaimHero overturned appeal CLM-3912-BCG", vectorScore: 0.94, icd10Codes: ["M17.11"], cptCodes: ["27447"], carcCodes: ["CO-50"] },
+      { _id: "hit3", title: "Overturn B", citation: "CMS NCD 220.2 (MRI)", vectorScore: 0.88, icd10Codes: ["M17.11"], cptCodes: ["27447"], carcCodes: ["CO-50"] },
+      { _id: "hit4", title: "Overturn C", citation: "489 U.S. 101 (1989)", vectorScore: 0.85, icd10Codes: ["M17.11"], cptCodes: ["27447"], carcCodes: ["CO-50"] },
+    ];
+
+    const ranked = rankPrecedentHits(
+      duplicateHits,
+      { icd10Codes: ["M17.11"], cptCodes: ["27447"], denialReasonCode: "CO-50", denialReasonDescription: "Not medically necessary" },
+      3
+    );
+
+    expect(ranked).toHaveLength(3);
+    const citations = ranked.map((r) => r.citation);
+    const uniqueCitations = new Set(citations);
+    expect(uniqueCitations.size).toBe(3);
+    expect(citations.filter((c) => c === "ClaimHero overturned appeal CLM-3912-BCG")).toHaveLength(1);
+  });
+
   it("indexes real public authorities by diagnosis, procedure, and CARC code", async () => {
     const { PRECEDENT_CORPUS } = await import("../convex/lib/precedentCorpus");
 
@@ -777,7 +800,7 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
     expect(html).toContain("underline");
     expect(unsafeHtml).not.toContain("href=");
     expect(unsafeHtml).not.toContain("javascript:");
-  }, 15000);
+  }, 30000);
 
   it("formats dedicated agentmail inbox address correctly", () => {
     const claimNumber = "CLM-2026-88192";

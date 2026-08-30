@@ -188,7 +188,19 @@ export function rankPrecedentHits<T extends RankablePrecedentHit>(
   });
 
   scored.sort((a, b) => b.combinedScore - a.combinedScore);
-  return scored.slice(0, limit);
+
+  const seen = new Set<string>();
+  const deduplicated: Array<T & { combinedScore: number; codeOverlap: number }> = [];
+  for (const item of scored) {
+    const key = ((item as any).citation || (item as any).title || String(item._id)).trim().toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduplicated.push(item);
+      if (deduplicated.length >= limit) break;
+    }
+  }
+
+  return deduplicated;
 }
 
 export function formatPrecedentInsertion(match: {

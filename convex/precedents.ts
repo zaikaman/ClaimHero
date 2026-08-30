@@ -198,13 +198,24 @@ export const attachMatchesToClaim = internalMutation({
       }
     }
 
-    await ctx.db.insert("appealAuditLogs", {
-      claimId: args.claimId,
-      eventType: "precedent_vectors_retrieved",
-      actor: "Precedent Vector Archive",
-      details: `Convex vector search returned ${args.matches.length} controlling authorities: ${args.matches.map((m) => m.citation).join("; ")}.`,
-      timestamp: now,
-    });
+    const existingLog = await ctx.db
+      .query("appealAuditLogs")
+      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .filter((q) => q.eq(q.field("eventType"), "precedent_vectors_retrieved"))
+      .first();
+
+    if (!existingLog && args.matches.length > 0) {
+      const uniqueCitations = Array.from(
+        new Set(args.matches.map((m) => m.citation.trim()).filter(Boolean))
+      );
+      await ctx.db.insert("appealAuditLogs", {
+        claimId: args.claimId,
+        eventType: "precedent_vectors_retrieved",
+        actor: "Precedent Vector Archive",
+        details: `Convex vector search returned ${args.matches.length} controlling authorities: ${uniqueCitations.join("; ")}.`,
+        timestamp: now,
+      });
+    }
 
     return inserted;
   },
