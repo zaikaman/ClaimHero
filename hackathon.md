@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-30T16:48:14Z
+- **Last updated:** 2026-08-30T17:18:30Z
 
 ## Log
 
@@ -242,7 +242,10 @@ Unified Physician Peer-to-Peer (P2P) Defense and ERISA Statutory Penalty Calcula
 Authored the definitive Convex All Gas judges README (`README.md`) for `BRIEF.md`. Built a 581-line production brief anchored on the 4 pillars (Convex, Firecrawl, AgentMail, OpenAI) with a 60-second judge quickstart (3 1-click presets `molina_knee`/`geoblue_spine`/`bcbsglobal_mri`), Feature Atlas, ASCII + Mermaid architecture, 4-pillar deep dive with `file:line` call sites (`convex/schema.ts:5`, `convex/schema.ts:271`, `convex/claims.ts:478`, `convex/http.ts:17`, `convex/crons.ts:10`, `convex/actions/policyCrawler.ts:314`, `convex/actions/appealSynthesizer.ts:527`), 6-layer anti-hallucination guardrails, grounded synthesis rules, HIPAA Safe Harbor privacy filter, Data Model, Defense Suite (Appeal Studio / P2P Script & Live Copilot / ERISA $110/day Calculator / Court-Ready Dossier), Security/Privacy, Tech Stack, Project Structure, Local Development, Verification (112/112 tests), Convex Hosting, Build Log, Submission Checklist (BRIEF.md §5), and Judging Criteria mapping (BRIEF.md §6). Previous `working tree` entry reconciled to `4a7d3c3` via `git log --oneline`. Verified with `npm run verify` readiness (typecheck, lint, 112/112 tests, production build). Convex features: documentation, static hosting.
 
 ### 2026-08-30 - b3bdf99
-Deployed production frontend to Convex static hosting at `https://usable-sturgeon-376.convex.site` via `@convex-dev/static-hosting`. Added component registration (`convex/convex.config.ts:1` with `app.use(staticHosting)`), preserved existing root routes (`/agentmail-webhook`, `/api/auth`) via app-owned `registerStaticRoutes` (`convex/http.ts:6`, `convex/http.ts:85`), fixed cron to `crons.cron("0 0 * * *")` (`convex/crons.ts:10`), added `deploy` script (`package.json:14`), synced 18 prod env vars (`SITE_URL=https://usable-sturgeon-376.convex.site`), and ran `npx @convex-dev/static-hosting deploy` with `CONVEX_DEPLOY_KEY` to build Vite with `VITE_CONVEX_URL=https://usable-sturgeon-376.convex.cloud`, upload 4 files to Convex storage, and atomically publish with SPA fallback. Verified `200 OK` on `/`, `/app`, `/evidence` and `400` webhook guard. Convex features: HTTP actions, crons, static hosting component.
+Synchronized production live app links and deployment endpoints across `README.md` and `hackathon.md` to point to `https://usable-sturgeon-376.convex.site`.
+
+### 2026-08-30 - working tree
+Hardened vector embedding pipeline by removing silent deterministic hash fallbacks from `convex/lib/openai.ts:createEmbedding`. Unset `OPENAI_EMBEDDING_MODEL` environment variable now fails hard with an explicit descriptive error (`OPENAI_EMBEDDING_MODEL is not configured`) and OpenAI API errors bubble up rather than silently generating synthetic pseudo-embeddings. Updated `.env.example` and `README.md` to document `OPENAI_EMBEDDING_MODEL=text-embedding-3-small` as required for authentic vector similarity searches across the Precedent Vector Archive (`convex/lib/embeddings.ts`, `convex/actions/precedentArchive.ts`). Added dedicated unit tests (`tests/claimhero.test.ts`) validating fail-hard error semantics. Validated complete test suite and production build with `npm run verify` (100% clean typecheck, lint, 113/113 passing unit tests, and production build). Convex features: vector search, actions, configuration.
 
 
 

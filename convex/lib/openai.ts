@@ -2,7 +2,6 @@ import OpenAI from "openai";
 import {
   EMBEDDING_DIMENSIONS,
   fitDimensions,
-  hashEmbed,
 } from "./embeddings";
 
 /**
@@ -161,37 +160,35 @@ export async function createChatCompletion(options: {
 }
 
 /**
- * Produce a 1536-d embedding. Embedding generation is opt-in because the
- * configured chat gateway may not implement /v1/embeddings. The deterministic
- * hash is the canonical fallback and keeps archive/index vectors in one space.
+ * Produce a 1536-d embedding via OpenAI embeddings API.
+ * Requires OPENAI_EMBEDDING_MODEL environment variable to be explicitly configured.
+ * Fails hard without fallback if unset or if the API call fails.
  */
 export async function createEmbedding(
   text: string,
-  extraWeightedTokens: string[] = []
+  _extraWeightedTokens: string[] = []
 ): Promise<number[]> {
   const input = text.slice(0, 8000);
   const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL?.trim();
 
-  // Do not send a chat model to /v1/embeddings. Chat-only proxies can leave
-  // that request pending for minutes before the old fallback is reached.
   if (!embeddingModel) {
-    return hashEmbed(input, extraWeightedTokens);
+    throw new Error(
+      "OPENAI_EMBEDDING_MODEL is not configured. Vector embedding operations require OPENAI_EMBEDDING_MODEL (e.g. text-embedding-3-small) to be set in environment variables."
+    );
   }
 
-  const client = getOpenAIClient({ timeout: 10_000, maxRetries: 0 });
+  const client = getOpenAIClient({ timeout: 10_000, maxRetries: 2 });
+  const response = await client.embeddings.create({
+    model: embeddingModel,
+    input,
+  });
 
-  try {
-    const response = await client.embeddings.create({
-      model: embeddingModel,
-      input,
-    });
-    const embedding = response.data[0]?.embedding;
-    if (Array.isArray(embedding) && embedding.length > 0) {
-      return fitDimensions(embedding, EMBEDDING_DIMENSIONS);
-    }
-  } catch {
-    // Chat-only proxies and non-embedding chat models land here.
+  const embedding = response.data[0]?.embedding;
+  if (!Array.isArray(embedding) || embedding.length === 0) {
+    throw new Error(
+      `OpenAI embeddings API returned an empty or invalid embedding vector for model ${embeddingModel}.`
+    );
   }
 
-  return hashEmbed(input, extraWeightedTokens);
+  return fitDimensions(embedding, EMBEDDING_DIMENSIONS);
 }

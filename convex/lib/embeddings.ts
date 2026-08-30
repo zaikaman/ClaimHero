@@ -1,10 +1,8 @@
 /**
- * Deterministic 1536-d embedding helpers for the Precedent Vector Archive.
+ * 1536-d embedding normalization and ranking helpers for the Precedent Vector Archive.
  *
- * Primary path (createEmbedding in openai.ts) calls the OpenAI embeddings
- * endpoint with OPENAI_MODEL. Proxies that only expose chat completions fall
- * back to signed feature hashing of the same canonical text so index and query
- * stay in one vector space.
+ * Primary path (createEmbedding in openai.ts) calls the OpenAI embeddings endpoint
+ * with OPENAI_EMBEDDING_MODEL (e.g. text-embedding-3-small) and fits dimensions to 1536.
  */
 
 export const EMBEDDING_DIMENSIONS = 1536;

@@ -627,6 +627,22 @@ describe("Precedent Vector Archive", () => {
     expect(padded[1]).toBeCloseTo(0.8, 5);
   });
 
+  it("fails hard with an explicit error when OPENAI_EMBEDDING_MODEL is unset", async () => {
+    const { createEmbedding } = await import("../convex/lib/openai");
+    const originalModel = process.env.OPENAI_EMBEDDING_MODEL;
+    delete process.env.OPENAI_EMBEDDING_MODEL;
+
+    try {
+      await expect(createEmbedding("sample medical necessity query")).rejects.toThrow(
+        "OPENAI_EMBEDDING_MODEL is not configured"
+      );
+    } finally {
+      if (originalModel !== undefined) {
+        process.env.OPENAI_EMBEDDING_MODEL = originalModel;
+      }
+    }
+  });
+
   it("re-ranks vector hits by ICD-10, CPT, and CARC overlap and returns the top 3", async () => {
     const { rankPrecedentHits } = await import("../convex/lib/embeddings");
 

@@ -103,7 +103,7 @@ No seed data is required. The fastest path to *wow*:
 
 In `Payer Communications` (`AgentMailDrawer.tsx`), select:
 
-* **AI Adjudicator** (`*-adjudication@claimhero.agentmail.com`) — OpenAI reviews your brief against CPB criteria and returns a formal inbound determination that auto-updates the case to `won` and is indexed into the Precedent Vector Archive.
+* **AI Adjudicator** (`claimhero-adjudicator@agentmail.to`) — OpenAI reviews your brief against CPB criteria and returns a formal inbound determination that auto-updates the case to `won` and is indexed into the Precedent Vector Archive.
 * **Custom Email** — enter your own address; receive the real HTML + plain-text appeal via AgentMail REST (`api.agentmail.to/v0/inboxes/{inbox_id}/messages/send`) and reply to see two-way threading.
 * **Official Payer** — Molina / GeoBlue / BCBS Global Core routes to verified intake emails (`src/lib/constants.ts:20`), others show portal/fax/PO box with source provenance badges.
 
@@ -231,12 +231,15 @@ Secondary crawlers share the same hardening:
 
 ### 6.3 AgentMail — Autonomous Communications
 
-ClaimHero respects the free-tier **two-inbox limit** with shared inboxes (`convex/actions/agentMail.ts`, `convex/lib/agentMail.ts`).
+ClaimHero configures dedicated AgentMail inboxes (`convex/actions/agentMail.ts`, `convex/lib/agentMail.ts`) across 3 endpoints:
+* `AGENTMAIL_INTAKE_EMAIL=claimhero-intake@agentmail.to` — Inbound denial ingestion & webhook processing
+* `AGENTMAIL_SENDER_EMAIL=claimhero-sender@agentmail.to` — Outbound appellate packet & addendum dispatch
+* `AGENTMAIL_ADJUDICATOR_EMAIL=claimhero-adjudicator@agentmail.to` — Autonomous AI Payer Adjudicator mailbox
 
 | Mode | Recipient | Transport | What the judge sees |
 |---|---|---|---|
-| **AI Adjudicator** (`ai_adjudicator`) | `molinahealthcare-adjudication@claimhero.agentmail.com` | AgentMail REST `api.agentmail.to/v0/inboxes/{inbox_id}/messages/send` -> `payer-review@claimhero.agentmail.com` -> OpenAI structured review -> inbound determination insert | Claim flips to `won` live in docket; transcript available |
-| **Custom Email** (`custom_email`) | Any address you type (e.g., `judge@hackathon.com`) | Same REST path; thread `agentEmail`/`payerEmail` tracking | Real email in your inbox; reply and watch `/agentmail-webhook` append it to the thread |
+| **AI Adjudicator** (`ai_adjudicator`) | `claimhero-adjudicator@agentmail.to` | AgentMail REST `api.agentmail.to/v0/inboxes/{inbox_id}/messages/send` from `claimhero-sender@agentmail.to` -> `claimhero-adjudicator@agentmail.to` -> OpenAI structured review -> inbound determination insert | Claim flips to `won` live in docket; transcript available |
+| **Custom Email** (`custom_email`) | Any address you type (e.g., `judge@hackathon.com`) | Same REST path from `claimhero-sender@agentmail.to`; thread `agentEmail`/`payerEmail` tracking | Real email in your inbox; reply and watch `/agentmail-webhook` append it to the thread |
 | **Official Payer** (`official_payer`) | Verified `payerContact.officialAppealsEmail` (Molina, GeoBlue, BCBS Global Core) or portal/fax/PO box badge if `undefined` (`src/lib/constants.ts:20`) | Guarded `dispatchAppealPacket` (`mailDispatcher.ts:9`) refuses to email `unknown@` and switches CTA to *Copy Brief for Portal / Print Docket* | Truthful *Email Prohibited by Payer under HIPAA* state when appropriate (`AgentMailDrawer.tsx`) |
 
 **Inbound:**
@@ -254,7 +257,7 @@ Follow-up addenda to adjudication addresses reload full thread history and re-ru
 * **Precedent Matcher** (`precedentMatcher.ts`) — Deterministic 4-pillar rubric: CPB Indication Alignment 35% + Clinical Documentation & Step-Therapy 25% + ERISA §2560.503-1 Procedural 20% + External Precedent Benchmark 20% = 100 (`tests/claimhero.test.ts:115`). `temperature: 0.0`, mathematical summation, persisted in `claims.scoringBreakdown`.
 * **Appeal Synthesizer** (`appealSynthesizer.ts:527` `generateAppealBrief`) — Produces *concise payer correspondence*, not a litigation memo. Structured `AppealBriefSynthesisResult` (6 fields), then `assembleProfessionalAppealEmail` enforces grounded assembly: only human-confirmed `clinicalFacts`, `isBlockedEvidence`/`isPayerMismatchedEvidence`/`isEvidenceSiteMismatched` filtering, conditional ERISA language (`If ERISA applies...`), HTML+text via `lib/appealEmail.ts`, and tier-specific posture.
 * **P2P Defense Generator** (`p2pDefenseGenerator.ts`) + **Live Copilot** (`p2pLiveCopilot.ts`) — Structured outputs for trap-question counters, statutory demands, and real-time rebuttal cards.
-* **Embeddings** (`lib/embeddings.ts`, `lib/openai.ts:168`) — 1536-d, L2-normalized. Remote embeddings are opt-in via `OPENAI_EMBEDDING_MODEL`; chat-only proxies fall back to deterministic `hashEmbed` to keep archive and query vectors in one space.
+* **Embeddings** (`lib/embeddings.ts`, `lib/openai.ts:168`) — 1536-d, L2-normalized via OpenAI `OPENAI_EMBEDDING_MODEL` (e.g. `text-embedding-3-small`). Fails hard when unset to guarantee authentic OpenAI vector embeddings in the Precedent Vector Archive.
 
 ---
 
@@ -474,7 +477,7 @@ JWT_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-5-nano
 OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_EMBEDDING_MODEL=           # optional; if unset, deterministic hash fallback is used
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small # Required for Precedent Vector Archive embeddings
 
 # Firecrawl (Convex env)
 FIRECRAWL_API_KEY=fc-...
@@ -483,11 +486,13 @@ FIRECRAWL_API_KEY=fc-...
 AGENTMAIL_API_KEY=am_...
 AGENTMAIL_INTAKE_INBOX_ID=inb_...
 AGENTMAIL_INTAKE_EMAIL=claimhero-intake@agentmail.to
-AGENTMAIL_INBOX_ID=inb_shared_sender
+AGENTMAIL_SENDER_INBOX_ID=inb_shared_sender
+AGENTMAIL_SENDER_EMAIL=claimhero-sender@agentmail.to
 AGENTMAIL_ADJUDICATOR_INBOX_ID=inb_shared_adjudicator
+AGENTMAIL_ADJUDICATOR_EMAIL=claimhero-adjudicator@agentmail.to
 ```
 
-> The intake inbox (`AGENTMAIL_INTAKE_EMAIL`) is what you forward denial emails to and what `Sidebar -> Copy Inbound Intake Address` copies (`Sidebar.tsx:99`). The two shared inboxes satisfy the free-tier limit while routing every claim correctly by claim number.
+> The intake inbox (`AGENTMAIL_INTAKE_EMAIL`) is what you forward denial emails to and what `Sidebar -> Copy Inbound Intake Address` copies (`Sidebar.tsx:99`). The sender inbox (`AGENTMAIL_SENDER_EMAIL`) transmits outbound appeals, and the adjudicator inbox (`AGENTMAIL_ADJUDICATOR_EMAIL`) processes simulated payer reviews.
 
 ---
 
