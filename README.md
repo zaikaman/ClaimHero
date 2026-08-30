@@ -371,7 +371,7 @@ ClaimHero ships with six independent anti-hallucination layers:
 | **Frontend** | React 18 + TypeScript (strict) + Vite 6 + Tailwind CSS 3.4 |
 | **UI** | Radix Primitives, Phosphor Icons (`@phosphor-icons/react`), `react-markdown` + `remark-gfm`/`remark-breaks`, `three`/`@react-three/fiber` Silk shader, `canvas-confetti` (removed from UX — retained dep) |
 | **State** | Convex reactive hooks (`useQuery`, `useMutation`, `useAction`, `useConvexAuth`) + custom hooks (`useClaims`, `useEvidence`, `useAppealStudio`, `useLiveCallCopilot`, `useLiabilityCalculator`) |
-| **Tests** | Vitest 3 + `convex-test` pattern, 112 unit tests across 7 suites |
+| **Tests** | Vitest 3 + `convex-test` pattern, 116 unit tests across 7 suites |
 
 Theme: **Precision Medical Dark Mode** — obsidian `#0b0f17` canvas, cyan `#0ea5e9` primary, emerald/amber/crimson semantic tokens, glassmorphism (`backdrop-blur-md`, `bg-card/75`), tabular-nums for monetary values (`src/index.css:7`, `tailwind.config.js`).
 
@@ -427,7 +427,7 @@ ClaimHero/
 │   │   ├── layout/ (Shell, Sidebar, Header) + ui/* (Button, Card, Badge, Dialog, Select, Silk)
 │   │   └── onboarding/ (OnboardingWizard, OnboardingChecklist)
 │   └── types/index.ts
-├── tests/                        # 112 unit tests (vitest)
+├── tests/                        # 116 unit tests (vitest)
 ├── .env.example                  # all required keys documented
 ├── convex.json / vite.config.ts / tailwind.config.js / tsconfig.json
 ├── BRIEF.md / hackathon.md / README.md
@@ -499,12 +499,12 @@ AGENTMAIL_ADJUDICATOR_EMAIL=claimhero-adjudicator@agentmail.to
 ```bash
 npm run typecheck   # tsc --noEmit (strict)
 npm run lint        # eslint src convex
-npm run test        # vitest run tests  (112 tests)
+npm run test        # vitest run tests  (116 tests)
 npm run build       # tsc --noEmit && vite build
 npm run verify      # typecheck + lint + test + build — must be 100% clean before every commit
 ```
 
-Current: **112/112 passing** across 7 suites (`tests/claimhero.test.ts` + `tests/statutoryEscalation.test.ts` + others). Suites cover:
+Current: **116/116 passing** across 7 suites (`tests/claimhero.test.ts` + `tests/statutoryEscalation.test.ts` + others). Suites cover:
 
 * Currency/deadline formatting, score color gradients, risk bands
 * CARC/CPT dictionaries, ERISA 180-day rules, payer directory resolution
@@ -561,7 +561,7 @@ The chronological, evidence-based build log lives at **`hackathon.md`** (repo ro
 |---|---|
 | **Real-World Utility** | Solves a $1.5B/year denial crisis for providers, advocates, and patients. Every output is a *sendable* artifact (email, portal paste, certified mail PDF, P2P script) — not a demo. Preset cases mirror real EOBs with statutory intake language. |
 | **Full-Stack Integration Depth** | **Convex** (9 tables, vector search, crons, file storage, httpRouter, auth) + **Firecrawl** (live `v2/search`+`v2/scrape` with 2-round adaptive retrieval, document windowing, payer/anatomical guards) + **AgentMail** (3-mode dispatch, 2 shared inboxes, idempotent intake + reply webhooks, REST `api.agentmail.to`) + **OpenAI** (Vision OCR, structured `DenialExtractionResult`/`PolicyExtractionResponse`/`AppealBriefSynthesisResult`, deterministic scoring, grounded synthesis). No pillar is decorative — pull any one and the product stops working. |
-| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 112 tests + production build). Strict TypeScript, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette, and zero confetti. |
+| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 116 tests + production build). Strict TypeScript, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette, and zero confetti. |
 | **Transparency & Process** | `hackathon.md` is the source of truth: 40+ dated entries, file-level diffs, Convex feature tags per entry, and honest failure notes (Incapsula blocks, MCG private viewers, chat-gateway embedding fallback). `npm run verify` is the gate before every commit. |
 
 ---
