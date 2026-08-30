@@ -10,6 +10,17 @@ interface AppealBriefRendererProps {
   className?: string;
 }
 
+function safeExternalHref(href?: string): string | undefined {
+  if (!href) return undefined;
+
+  try {
+    const url = new URL(href);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
   content,
   isPrintMode = false,
@@ -173,6 +184,23 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
               {children}
             </strong>
           ),
+          a: ({ href, children }) => {
+            const safeHref = safeExternalHref(href);
+            if (!safeHref) return <span>{children}</span>;
+
+            return (
+              <a
+                href={safeHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={isPrintMode
+                  ? "font-medium text-blue-800 underline decoration-1 underline-offset-2 hover:text-blue-950"
+                  : "font-medium text-primary underline decoration-1 underline-offset-2 hover:text-primary/80"}
+              >
+                {children}
+              </a>
+            );
+          },
         }}
       >
         {content}

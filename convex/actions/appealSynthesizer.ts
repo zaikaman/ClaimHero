@@ -218,6 +218,124 @@ function isExternalEvidence(evidence: any): boolean {
     !/(?:vector similarity|combined score|winning brief|claimhero overturned)/i.test(searchableText);
 }
 
+function isBlockedEvidence(evidence: any): boolean {
+  const text = [evidence.title, evidence.citationClause, evidence.extractedEvidenceMarkdown, evidence.sourceUrl]
+    .filter(Boolean)
+    .join(" ");
+  // Generic soft-block + unreachable signatures: no payer or URL is hardcoded.
+  if (/access denied|you don't have permission|403 forbidden|request blocked|blocked by|not authorized|unauthorized|sign in required|captcha|reference\s*#\s*[a-z0-9.-]+\.[a-z0-9.-]+|edgesuite\.net|akamaighost|akamai|failover|error from edge|attention required|checking your browser|this site can.t be reached|took too long to respond|err_connection_timed_out|err_name_not_resolved|dns_probe|unable to reach|not reachable|site can.t be reached|connection timed out|timed out|err_connection_refused/i.test(text)) {
+    return true;
+  }
+  // PDF handler that returned HTML
+  if (evidence.sourceUrl && /\.(pdf|ashx)(\?|#|$)/i.test(evidence.sourceUrl) && /<html|<title>access denied/i.test(text)) {
+    return true;
+  }
+  // Private Milliman MCG viewer URLs are licensed and not publicly reachable
+  if (evidence.sourceUrl && /mcgs\.|MCG\?|mcgId=|pv=false/i.test(evidence.sourceUrl)) {
+    return true;
+  }
+  return false;
+}
+
+function isPayerMismatchedEvidence(evidence: any, claim: any): boolean {
+  const payer: string = claim?.patient?.insurancePayer || claim?.payer || "";
+  const sourceUrl: string | undefined = evidence.sourceUrl;
+  if (!payer || !sourceUrl) return false;
+  try {
+    const url = new URL(sourceUrl);
+    const host = url.hostname.toLowerCase();
+    const neutralHosts = new Set([
+      "cms.gov",
+      "medicare.gov",
+      "medicaid.gov",
+      "fda.gov",
+      "nih.gov",
+      "ncbi.nlm.nih.gov",
+      "pubmed.ncbi.nlm.nih.gov",
+      "nccn.org",
+      "cdc.gov",
+      "cancer.gov",
+      "ecfr.gov",
+      "law.cornell.edu",
+    ]);
+    if (neutralHosts.has(host) || [...neutralHosts].some((h) => host.endsWith(`.${h}`) || host === h)) return false;
+    if (host.includes("ecfr.gov") || host.includes("law.cornell.edu")) return false;
+    const getKw = (p: string): string | null => {
+      const clean = p.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (clean.includes("molina")) return "molina";
+      if (clean.includes("bcbsfl")) return "bcbsfl";
+      if (clean.includes("bcbs") || clean.includes("bluecross") || clean.includes("anthem") || clean.includes("elevance")) return "bcbs";
+      if (clean.includes("aetna") || clean.includes("cvs")) return "aetna";
+      if (clean.includes("cigna")) return "cigna";
+      if (clean.includes("united") || clean.includes("uhc") || clean.includes("optum")) return "uhc";
+      if (clean.includes("humana")) return "humana";
+      if (clean.includes("kaiser")) return "kaiser";
+      if (clean.includes("geoblue")) return "geo-blue";
+      if (clean.includes("globalcore")) return "globalcore";
+      return null;
+    };
+    const payerKw = getKw(payer);
+    if (!payerKw) return false;
+    const knownKeywords = ["molina", "bcbsfl", "bcbs", "aetna", "cigna", "uhc", "humana", "kaiser", "geo-blue", "globalcore", "mcgs"];
+    const hostKw = knownKeywords.find((kw) => host.includes(kw));
+    if (hostKw && !host.includes(payerKw)) {
+      if (payerKw === "bcbs" && (host.includes("bcbsfl") || host.includes("bcbs"))) return false;
+      if (payerKw === "bcbsfl" && host.includes("bcbs")) return false;
+      return true;
+    }
+    if (host.startsWith("mcgs.") && !host.includes(payerKw)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+const CPT_EXPECTED_SITES: Record<string, string[]> = {
+  "27447": ["knee", "arthroplasty", "tka", "27447"],
+  "63047": ["spine", "lumbar", "laminectomy", "facetectomy", "63047"],
+  "73721": ["mri", "73721"],
+  "29881": ["knee", "meniscectomy", "arthroscopy", "29881"],
+};
+
+function isEvidenceSiteMismatched(evidence: any, claim: any): boolean {
+  const cptCodes: string[] = claim?.cptCodes || [];
+  const hasKnown = cptCodes.some((c) => CPT_EXPECTED_SITES[c]);
+  if (!hasKnown) return false;
+  const expected = new Set(cptCodes.flatMap((c) => CPT_EXPECTED_SITES[c] || [c.toLowerCase()]));
+  const haystack = [evidence.title, evidence.citationClause, evidence.extractedEvidenceMarkdown, evidence.sourceUrl]
+    .join(" ")
+    .toLowerCase();
+  const hasExpected = [...expected].some((kw) => haystack.includes(kw));
+  if (hasExpected) return false;
+  // If the excerpt is generic and mentions no anatomical site at all, do not treat it as mismatched;
+  // the full policy document was already vetted at crawl time. Only flag when it clearly
+  // mentions a different site (foot/bunion vs knee, etc.).
+  const anatomicalLexicon = [
+    "knee",
+    "hip",
+    "spine",
+    "lumbar",
+    "cervical",
+    "shoulder",
+    "foot",
+    "ankle",
+    "hallux",
+    "bunion",
+    "bunionectomy",
+    "metatarsal",
+    "intermetatarsal",
+    "mtp",
+    "valgus",
+    "hand",
+    "wrist",
+    "elbow",
+    "femur",
+    "tibia",
+  ];
+  const mentionsOtherSite = anatomicalLexicon.some((site) => !expected.has(site) && haystack.includes(site));
+  return mentionsOtherSite;
+}
+
 function cleanEvidenceSummary(value?: string): string {
   const summary = cleanGeneratedSection(value)
     .split("\n")
@@ -232,7 +350,7 @@ function cleanEvidenceSummary(value?: string): string {
 
 function buildGroundedPolicyCitations(evidences: any[]): PolicyCitationItem[] {
   return evidences
-    .filter((e) => isExternalEvidence(e) && e.title && e.citationClause && e.extractedEvidenceMarkdown)
+    .filter((e) => isExternalEvidence(e) && !isBlockedEvidence(e) && e.title && e.citationClause && e.extractedEvidenceMarkdown)
     .slice(0, 5)
     .map((e) => ({
       source: e.title,
@@ -274,7 +392,13 @@ export function assembleProfessionalAppealEmail(
   const icd10Codes = claim.icd10Codes.join(", ");
   const denialReason = formatDenialReason(claim.denialReasonCode, claim.denialReasonDescription);
   const clinicalBasis = buildGroundedClinicalBasis(result.medicalNecessityArguments, claim, clinicalFacts);
-  const supportingEvidences = evidences.filter(isExternalEvidence);
+  const supportingEvidences = evidences.filter(
+    (e) =>
+      isExternalEvidence(e) &&
+      !isBlockedEvidence(e) &&
+      !isPayerMismatchedEvidence(e, claim) &&
+      !isEvidenceSiteMismatched(e, claim)
+  );
 
   let email = `# Appeal of Adverse Benefit Determination\n\n`;
   email += `**Claim reference:** #${claimNumber}\n\n`;
@@ -372,7 +496,9 @@ export const generateAppealBrief = action({
       claimId: args.claimId,
     });
 
-    const externalEvidences = evidences.filter(isExternalEvidence);
+    const externalEvidences = evidences.filter(
+      (e) => isExternalEvidence(e) && !isBlockedEvidence(e) && !isPayerMismatchedEvidence(e, claim) && !isEvidenceSiteMismatched(e, claim)
+    );
     const persistedContext = claim.appealContext;
     const clinicalFacts: ClinicalFacts | undefined = args.clinicalFacts || persistedContext?.clinicalFacts;
     const sender: AppealSenderDetails | undefined = args.senderName?.trim()

@@ -33,8 +33,32 @@ function cleanInlineText(value: string): string {
     .trim();
 }
 
+function safeLinkHref(value: string): string | undefined {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function inlineHtml(value: string): string {
-  return escapeHtml(cleanInlineText(value));
+  const linkPattern = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+  let html = "";
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = linkPattern.exec(value)) !== null) {
+    html += escapeHtml(cleanInlineText(value.slice(lastIndex, match.index)));
+    const label = escapeHtml(cleanInlineText(match[1] || ""));
+    const href = safeLinkHref(match[2] || "");
+    html += href
+      ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" style="color:#1f6d9c; text-decoration:underline; text-underline-offset:2px;">${label}</a>`
+      : label;
+    lastIndex = match.index + match[0].length;
+  }
+
+  return html + escapeHtml(cleanInlineText(value.slice(lastIndex)));
 }
 
 function inlineText(value: string): string {
@@ -180,7 +204,8 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
         index += 1;
       }
       const quoteText = quoteLines.map(inlineText).join("\n");
-      htmlBlocks.push(`<blockquote style="margin:18px 0; padding:12px 16px; border-left:3px solid #2f7ca5; background:#f4f8fb; color:#334e68; font-size:13px; line-height:1.6;">${escapeHtml(quoteText).replace(/\n/g, "<br />")}</blockquote>`);
+      const quoteHtml = quoteLines.map(inlineHtml).join("<br />");
+      htmlBlocks.push(`<blockquote style="margin:18px 0; padding:12px 16px; border-left:3px solid #2f7ca5; background:#f4f8fb; color:#334e68; font-size:13px; line-height:1.6;">${quoteHtml}</blockquote>`);
       textBlocks.push(`Quote: ${quoteText}`);
       continue;
     }
@@ -211,7 +236,8 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
     }
     const paragraphText = paragraphLines.map(inlineText).join("\n");
     if (paragraphText) {
-      htmlBlocks.push(`<p style="margin:0 0 14px; color:#253342; font-size:13px; line-height:1.7;">${escapeHtml(paragraphText).replace(/\n/g, "<br />")}</p>`);
+      const paragraphHtml = paragraphLines.map(inlineHtml).join("<br />");
+      htmlBlocks.push(`<p style="margin:0 0 14px; color:#253342; font-size:13px; line-height:1.7;">${paragraphHtml}</p>`);
       textBlocks.push(paragraphText);
     } else {
       index += 1;

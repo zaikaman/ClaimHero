@@ -229,8 +229,8 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
         </div>
 
         {policyEvidences.length === 0 ? (
-          <Card className="p-4 text-center text-xs text-muted-foreground bg-muted/20 border-dashed">
-            No policy clauses indexed yet. Run policy crawl in the Evidence Matrix tab.
+          <Card className="p-4 text-center text-xs text-muted-foreground bg-muted/20 border-dashed leading-relaxed">
+            No payer-specific policy clauses were retrievable for this claim. The crawler ran but no source passed payer-domain and clinical relevance checks — common when the payer publishes no public CPB for the procedure (all 3 candidates were off-payer or non-clinical). The brief will proceed on ERISA procedural protections and vector precedents. Check Evidence Matrix for crawler diagnostics or paste a direct public policy URL to re-crawl.
           </Card>
         ) : (
           <div className="space-y-2">

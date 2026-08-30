@@ -22,13 +22,22 @@ export const getLatestByClaim = query({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args): Promise<Doc<"appeals"> | null> => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim || claim.status === "analyzing" || claim.status === "parsing" || claim.status === "ingested") {
+      return null;
+    }
+
     const list = await ctx.db
       .query("appeals")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
       .collect();
 
     if (list.length === 0) return null;
-    return list.sort((a, b) => b.version - a.version)[0] || null;
+
+    const latest = list.sort((a, b) => b.version - a.version)[0] || null;
+    if (!latest) return null;
+
+    return latest;
   },
 });
 

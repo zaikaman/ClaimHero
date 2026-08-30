@@ -268,8 +268,8 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       setProcessingMessage("Step 3/3: Synthesizing cited ERISA medical appeal brief...");
       return pipelineRes;
     } catch (pipelineErr) {
-      console.warn("Pipeline error, falling back to basic extraction:", pipelineErr);
-      return null;
+      console.warn("Pipeline stopped because clinical policy evidence could not be retrieved:", pipelineErr);
+      throw pipelineErr;
     }
   };
 

@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect } from "vitest";
 import {
   formatCurrency,
@@ -244,6 +245,7 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
       {
         sourceType: "payer_cpb",
         title: "Molina Healthcare CPB MCP-082",
+        sourceUrl: "https://example.com/policy",
         citationClause: "Section 1.A",
         extractedEvidenceMarkdown: "Radiographic evidence of severe osteoarthritis (Kellgren-Lawrence Grade 3 or 4) with joint space narrowing.",
       },
@@ -321,6 +323,7 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
     // Verify source summaries without an exhibit table
     expect(brief).toContain("## Supporting documentation for review");
     expect(brief).toContain("Molina Healthcare CPB MCP-082");
+    expect(brief).toContain("[Official source](https://example.com/policy)");
     expect(brief).toContain("## Supporting documentation for review\n\n");
     expect(brief).not.toContain("Winning brief — CPT 27447 / CO-50 overturn");
     expect(brief).not.toContain("Vector similarity:");
@@ -481,6 +484,92 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
     expect(brief).not.toContain("treatment was medically appropriate");
     expect(brief).toContain("Jordan Lee");
   });
+
+  it("accepts only scraped Firecrawl documents with direct source URLs", async () => {
+    const { isAccessDeniedDocument, selectFirecrawlPolicySource, selectFirecrawlPolicyUrl, selectFirecrawlPolicyUrls } = await import("../convex/actions/policyCrawler");
+
+    expect(isAccessDeniedDocument("<html><title>Access Denied</title>You don't have permission to access this resource. Reference #18.e507fab.1788066210</html>")).toBe(true);
+    expect(isAccessDeniedDocument("Clinical coverage policy: the requested service was denied under the following criteria.")).toBe(false);
+
+    expect(selectFirecrawlPolicySource({
+      data: {
+        web: [
+          {
+            url: "https://www.google.com/search?q=policy",
+            markdown: "Search results, not a policy document",
+          },
+          {
+            url: "https://files.example.org/policy.pdf",
+            markdown: "Official policy document content",
+            metadata: { sourceURL: "https://files.example.org/policy.pdf" },
+          },
+        ],
+      },
+    })).toEqual({
+      markdown: "Official policy document content",
+      sourceUrl: "https://files.example.org/policy.pdf",
+    });
+
+    expect(selectFirecrawlPolicySource({
+      data: {
+        web: [{
+          url: "https://www.google.com/search?q=policy",
+          markdown: "Search results, not a policy document",
+        }],
+      },
+    })).toBeNull();
+
+    expect(selectFirecrawlPolicyUrl({
+      data: {
+        web: [{
+          url: "https://provider.example.org/policy.pdf",
+          metadata: { sourceURL: "https://www.google.com/search?q=policy" },
+        }],
+      },
+    })).toBe("https://provider.example.org/policy.pdf");
+
+    expect(selectFirecrawlPolicyUrls({
+      data: {
+        web: [
+          { url: "https://provider.example.org/blocked.pdf?token=temporary" },
+          { url: "https://provider.example.org/public-policy.pdf" },
+          { url: "https://provider.example.org/public-policy.pdf" },
+        ],
+      },
+    })).toEqual(["https://provider.example.org/public-policy.pdf"]);
+
+    expect(selectFirecrawlPolicyUrls({
+      data: {
+        web: [
+          { title: "Spinal manipulation companion guide", url: "https://provider.example.org/spinal-guide.pdf" },
+          { title: "Medical policy: total knee arthroplasty", url: "https://provider.example.org/knee-policy.pdf" },
+        ],
+      },
+    }, ["27447", "medical policy"])).toEqual([
+      "https://provider.example.org/knee-policy.pdf",
+      "https://provider.example.org/spinal-guide.pdf",
+    ]);
+
+    expect(selectFirecrawlPolicyUrls({
+      data: {
+        web: [
+          { title: "Molina 5010 companion guide", url: "https://provider.example.org/spinal-guide.pdf" },
+          { title: "Molina medical policy for CPT 27447", url: "https://provider.example.org/knee-policy.pdf" },
+        ],
+      },
+    }, ["27447", "medical policy"], 1)).toEqual(["https://provider.example.org/knee-policy.pdf"]);
+
+    expect(selectFirecrawlPolicyUrls({
+      data: {
+        web: [
+          { title: "Clinical policy directory", url: "https://provider.example.org/policies/index.aspx" },
+          { title: "Medical policy: knee arthroplasty", url: "https://provider.example.org/knee-arthroplasty.pdf" },
+        ],
+      },
+    }, ["Molina", "knee", "arthroplasty", "medical policy"], 0, 1)).toEqual([
+      "https://provider.example.org/knee-arthroplasty.pdf",
+    ]);
+  });
 });
 
 describe("Precedent Vector Archive", () => {
@@ -592,7 +681,7 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
   it("renders appeal correspondence as professional HTML and clean plain text", async () => {
     const { formatAppealEmail, formatCorrespondenceEmail } = await import("../convex/lib/appealEmail");
     const appeal = formatAppealEmail(
-      "# Formal Medical Appeal\n\n## Clinical Basis\n\nThe record supports **medical necessity**.\n\n| Criterion | Record |\n| :--- | :--- |\n| Imaging | Exhibit A |\n\n- Request independent review\n- Confirm payment\n\n<script>alert('unsafe')</script>",
+      "# Formal Medical Appeal\n\n## Clinical Basis\n\nThe record supports **medical necessity**.\n\n| Criterion | Record |\n| :--- | :--- |\n| Imaging | Exhibit A |\n\n- Request independent review\n- Confirm payment\n\nSupporting [official policy source](https://example.com/policy).\n\nUnsafe [link](javascript:alert).\n\n<script>alert('unsafe')</script>",
       {
         claimNumber: "CLM-EMAIL-001",
         payer: "Molina Healthcare",
@@ -612,6 +701,9 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
     expect(appeal.html).toContain("Appeal of Adverse Benefit Determination");
     expect(appeal.html).toContain("<table");
     expect(appeal.html).toContain("&lt;script&gt;");
+    expect(appeal.html).toContain('href="https://example.com/policy"');
+    expect(appeal.html).toContain(">official policy source</a>");
+    expect(appeal.html).not.toContain("javascript:");
     expect(appeal.html).not.toContain("**");
     expect(appeal.html).not.toContain("| Criterion | Record |");
     expect(appeal.text).toContain("Claim reference: CLM-EMAIL-001");
@@ -620,9 +712,34 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
     expect(appeal.text.match(/Appeal of Adverse Benefit Determination/g)).toHaveLength(1);
     expect(appeal.text).not.toContain("# Formal Medical Appeal");
     expect(appeal.text).not.toContain("*");
+    expect(appeal.text).toContain("Supporting official policy source.");
+    expect(appeal.text).not.toContain("https://example.com/policy");
     expect(addendum.html).toContain("Appeal Correspondence");
     expect(addendum.text).toContain("clinical addendum");
     expect(addendum.text).not.toContain("*");
+  });
+
+  it("renders official sources as clickable links in the PDF preview", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { AppealBriefRenderer } = await import("../src/components/studio/AppealBriefRenderer");
+
+    const html = renderToStaticMarkup(
+      React.createElement(AppealBriefRenderer, {
+        content: "Supporting [official policy source](https://example.com/policy).",
+        isPrintMode: true,
+      })
+    );
+    const unsafeHtml = renderToStaticMarkup(
+      React.createElement(AppealBriefRenderer, {
+        content: "Unsafe [link](javascript:alert).",
+        isPrintMode: true,
+      })
+    );
+
+    expect(html).toContain('href="https://example.com/policy"');
+    expect(html).toContain("underline");
+    expect(unsafeHtml).not.toContain("href=");
+    expect(unsafeHtml).not.toContain("javascript:");
   });
 
   it("formats dedicated agentmail inbox address correctly", () => {
