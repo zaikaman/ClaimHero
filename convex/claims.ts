@@ -755,6 +755,85 @@ export const updatePayerContact = mutation({
 });
 
 /**
+ * Persist the human-confirmed sender identity and clinical record context used
+ * to prepare an appeal. The clinical fields are evidence supplied for review;
+ * they are never treated as proof merely because a user entered them.
+ */
+export const updateAppealContext = mutation({
+  args: {
+    claimId: v.id("claims"),
+    sender: v.object({
+      name: v.string(),
+      credentials: v.optional(v.string()),
+      email: v.optional(v.string()),
+      phone: v.optional(v.string()),
+    }),
+    clinicalFacts: v.object({
+      symptomsAndFunctionalImpact: v.optional(v.string()),
+      examinationFindings: v.optional(v.string()),
+      imagingAndDiagnostics: v.optional(v.string()),
+      treatmentHistoryAndResponse: v.optional(v.string()),
+      otherDocumentedFacts: v.optional(v.string()),
+      recordsAreIncomplete: v.boolean(),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) throw new Error("Claim not found");
+
+    const clean = (value: string | undefined, maxLength: number) => {
+      const normalized = value?.trim() || undefined;
+      if (normalized && normalized.length > maxLength) {
+        throw new Error(`Appeal context fields must be ${maxLength} characters or fewer`);
+      }
+      return normalized;
+    };
+
+    const name = args.sender.name.trim();
+    if (!name) throw new Error("Enter the name of the person submitting the appeal");
+    if (name.length > 200) throw new Error("Sender name must be 200 characters or fewer");
+
+    const email = clean(args.sender.email, 320);
+    const phone = clean(args.sender.phone, 80);
+    if (!email && !phone) {
+      throw new Error("Add an email address or phone number so the payer can contact the sender");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.claimId, {
+      appealContext: {
+        sender: {
+          name,
+          credentials: clean(args.sender.credentials, 200),
+          email,
+          phone,
+        },
+        clinicalFacts: {
+          symptomsAndFunctionalImpact: clean(args.clinicalFacts.symptomsAndFunctionalImpact, 10000),
+          examinationFindings: clean(args.clinicalFacts.examinationFindings, 10000),
+          imagingAndDiagnostics: clean(args.clinicalFacts.imagingAndDiagnostics, 10000),
+          treatmentHistoryAndResponse: clean(args.clinicalFacts.treatmentHistoryAndResponse, 10000),
+          otherDocumentedFacts: clean(args.clinicalFacts.otherDocumentedFacts, 10000),
+          recordsAreIncomplete: args.clinicalFacts.recordsAreIncomplete,
+        },
+        confirmedAt: now,
+      },
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("appealAuditLogs", {
+      claimId: args.claimId,
+      eventType: "appeal_context_completed",
+      actor: name,
+      details: "Confirmed sender identity and documented clinical context before appeal drafting.",
+      timestamp: now,
+    });
+
+    return { confirmedAt: now };
+  },
+});
+
+/**
  * Record an audit log entry for a claim
  */
 export const recordAuditLog = mutation({

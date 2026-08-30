@@ -71,6 +71,15 @@ export interface AppealSenderDetails {
   phone?: string;
 }
 
+export interface ClinicalFacts {
+  symptomsAndFunctionalImpact?: string;
+  examinationFindings?: string;
+  imagingAndDiagnostics?: string;
+  treatmentHistoryAndResponse?: string;
+  otherDocumentedFacts?: string;
+  recordsAreIncomplete: boolean;
+}
+
 const SAFE_STATUTORY_RIGHTS_NOTICE =
   "Please process this appeal under the plan's claims and appeals procedure and the instructions in the denial notice. If ERISA applies, please treat this as a request for full and fair review under 29 C.F.R. § 2560.503-1 and provide, upon request, the documents, records, plan provisions, clinical policies or criteria, and other information relevant to this claim. If external review is available, please include the applicable process and deadline in your determination.";
 
@@ -122,7 +131,7 @@ function formatDenialReason(code?: string, description?: string): string {
 }
 
 const UNSUPPORTED_CLINICAL_CONCLUSION =
-  /clinical documentation confirms|meets? (?:the |applicable )?criteria|does not present with|no (?:absolute )?contraindications?|absence of (?:an )?(?:active )?(?:joint|systemic) infection|(?:failed|failure of|exhausted) conservative|end[- ]stage|bone[- ]on[- ]bone|supports? (?:the )?medical necessity|is medically necessary/i;
+  /clinical documentation confirms|meets? (?:the |applicable )?criteria|does not present with|does not document (?:any )?active joint or systemic infection|does not document (?:any )?(?:active )?(?:joint|systemic) infection|no (?:absolute )?contraindications?|absence of (?:an )?(?:active )?(?:joint|systemic) infection|(?:failed|failure of|exhausted) conservative|end[- ]stage|bone[- ]on[- ]bone|necessitated the surgical intervention|supports? (?:the )?medical necessity|is medically appropriate|is medically necessary|we maintain that treatment was medically appropriate/i;
 
 function buildNeutralClinicalBasis(claim: any): string {
   const procedureCodes = claim.cptCodes?.join(", ") || "the procedure listed on the claim";
@@ -131,7 +140,47 @@ function buildNeutralClinicalBasis(claim: any): string {
   return `The claim record identifies procedure code(s) ${procedureCodes} and diagnosis code(s) ${diagnosisCodes}. The available claim record does not independently document the patient-specific examination findings, imaging, functional limitations, or treatment history needed to state additional medical-necessity facts. Please evaluate the clinical records submitted with this appeal against the applicable plan criteria.`;
 }
 
-function buildGroundedClinicalBasis(value: string | undefined, claim: any): string {
+function quoteUserFact(value: string): string {
+  return value
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
+}
+
+function buildDocumentedClinicalBasis(claim: any, clinicalFacts?: ClinicalFacts): string {
+  const fields: Array<[string, string | undefined]> = [
+    ["Symptoms and functional impact", clinicalFacts?.symptomsAndFunctionalImpact],
+    ["Examination findings", clinicalFacts?.examinationFindings],
+    ["Imaging and diagnostic findings", clinicalFacts?.imagingAndDiagnostics],
+    ["Treatment history and response", clinicalFacts?.treatmentHistoryAndResponse],
+    ["Other documented facts", clinicalFacts?.otherDocumentedFacts],
+  ];
+  const presentFields = fields.filter(([, value]) => value?.trim());
+  const missingFields = fields.filter(([, value]) => !value?.trim()).map(([label]) => label.toLowerCase());
+
+  if (presentFields.length === 0) {
+    return `${buildNeutralClinicalBasis(claim)} No conclusion about medical necessity is asserted because the patient-specific clinical record was not provided to ClaimHero.`;
+  }
+
+  let basis = clinicalFacts?.recordsAreIncomplete || missingFields.length > 0
+    ? `The clinical record available for review is incomplete. The following areas were not provided: ${missingFields.join(", ") || "none identified"}. No conclusion about medical necessity is asserted from those missing areas.\n\n`
+    : "The following patient-specific information was supplied for review. ClaimHero has not independently verified these entries and does not treat them as established solely because they were entered here:\n\n";
+
+  basis += presentFields
+    .map(([label, value]) => `**${label}:**\n\n${quoteUserFact(value!.trim())}`)
+    .join("\n\n");
+
+  return basis;
+}
+
+function buildGroundedClinicalBasis(
+  value: string | undefined,
+  claim: any,
+  clinicalFacts?: ClinicalFacts
+): string {
+  if (clinicalFacts) return buildDocumentedClinicalBasis(claim, clinicalFacts);
+
   const cleaned = cleanGeneratedSection(value);
   return cleaned && !UNSUPPORTED_CLINICAL_CONCLUSION.test(cleaned)
     ? cleaned
@@ -215,7 +264,8 @@ export function assembleProfessionalAppealEmail(
   evidences: any[],
   physicianNotes?: string,
   _vectorPrecedents?: VectorPrecedentMatch[],
-  sender?: AppealSenderDetails
+  sender?: AppealSenderDetails,
+  clinicalFacts?: ClinicalFacts
 ): string {
   const providerName = claim.providerName;
   const patientName = claim.patient.name;
@@ -223,7 +273,7 @@ export function assembleProfessionalAppealEmail(
   const cptCodes = claim.cptCodes.join(", ");
   const icd10Codes = claim.icd10Codes.join(", ");
   const denialReason = formatDenialReason(claim.denialReasonCode, claim.denialReasonDescription);
-  const clinicalBasis = buildGroundedClinicalBasis(result.medicalNecessityArguments, claim);
+  const clinicalBasis = buildGroundedClinicalBasis(result.medicalNecessityArguments, claim, clinicalFacts);
   const supportingEvidences = evidences.filter(isExternalEvidence);
 
   let email = `# Appeal of Adverse Benefit Determination\n\n`;
@@ -245,7 +295,10 @@ export function assembleProfessionalAppealEmail(
     "The claim record currently contains the identifying and denial information above but does not provide enough clinical history to state additional medical-necessity facts. Please evaluate the submitted clinical records and the applicable coverage criteria."}\n\n`;
 
   if (physicianNotes?.trim()) {
-    email += `Treating provider note submitted for review:\n\n> ${physicianNotes.trim().replace(/\n/g, "\n> ")}\n\n`;
+    const label = clinicalFacts
+      ? "Additional clinical information supplied for review (not independently verified)"
+      : "Treating provider note submitted for review";
+    email += `${label}:\n\n> ${physicianNotes.trim().replace(/\n/g, "\n> ")}\n\n`;
   }
 
   if (supportingEvidences.length > 0) {
@@ -286,6 +339,16 @@ export const generateAppealBrief = action({
     senderCredentials: v.optional(v.string()),
     senderEmail: v.optional(v.string()),
     senderPhone: v.optional(v.string()),
+    clinicalFacts: v.optional(
+      v.object({
+        symptomsAndFunctionalImpact: v.optional(v.string()),
+        examinationFindings: v.optional(v.string()),
+        imagingAndDiagnostics: v.optional(v.string()),
+        treatmentHistoryAndResponse: v.optional(v.string()),
+        otherDocumentedFacts: v.optional(v.string()),
+        recordsAreIncomplete: v.boolean(),
+      })
+    ),
     customInstructions: v.optional(v.string()),
     vectorPrecedents: v.optional(v.array(precedentMatchValidator)),
   },
@@ -310,6 +373,28 @@ export const generateAppealBrief = action({
     });
 
     const externalEvidences = evidences.filter(isExternalEvidence);
+    const persistedContext = claim.appealContext;
+    const clinicalFacts: ClinicalFacts | undefined = args.clinicalFacts || persistedContext?.clinicalFacts;
+    const sender: AppealSenderDetails | undefined = args.senderName?.trim()
+      ? {
+          name: args.senderName,
+          credentials: args.senderCredentials,
+          email: args.senderEmail,
+          phone: args.senderPhone,
+        }
+      : persistedContext?.sender || {
+      name: args.senderName,
+      credentials: args.senderCredentials,
+      email: args.senderEmail,
+      phone: args.senderPhone,
+    };
+
+    if (!sender?.name?.trim() || (!sender.email?.trim() && !sender.phone?.trim())) {
+      throw new Error("Complete sender details before generating an appeal");
+    }
+    if (!clinicalFacts) {
+      throw new Error("Confirm the available clinical record before generating an appeal");
+    }
     const evidenceText = externalEvidences.length > 0
       ? externalEvidences.map((e: any, idx: number) => `[Source ${idx + 1}] (${e.sourceType.toUpperCase()} - ${e.title} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
       : "Standard national clinical practice guideline and ERISA disclosure rules apply.";
@@ -382,7 +467,8 @@ Internal precedent retrieval context. Use only to identify potentially relevant 
 ${precedentText}
 
 ${args.physicianNotes ? `Treating Physician Clinical Notes / Addendum:\n${args.physicianNotes}\n` : ""}
-${args.senderName ? `Sender details for the closing (use only as provided):\n- Name: ${args.senderName}\n- Credentials or role: ${args.senderCredentials || "Not provided"}\n- Email: ${args.senderEmail || "Not provided"}\n- Phone: ${args.senderPhone || "Not provided"}\n` : ""}
+${clinicalFacts ? `Human-confirmed clinical intake facts. Quote or accurately summarize only these entries; do not infer additional facts:\n${JSON.stringify(clinicalFacts)}\n` : "No patient-specific clinical intake facts were provided. State that the clinical record is incomplete.\n"}
+${sender?.name ? `Sender details for the closing (use only as provided):\n- Name: ${sender.name}\n- Credentials or role: ${sender.credentials || "Not provided"}\n- Email: ${sender.email || "Not provided"}\n- Phone: ${sender.phone || "Not provided"}\n` : ""}
 ${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstructions}\n` : ""}
 
 Return a short, evidence-grounded email draft in the structured fields. If a clinical detail is not present, say that the current record does not provide it rather than filling the gap.`,
@@ -405,7 +491,8 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
     const groundedPolicyCitations = buildGroundedPolicyCitations(evidences);
     const groundedMedicalNecessityArguments = buildGroundedClinicalBasis(
       rawResult.medicalNecessityArguments,
-      claim
+      claim,
+      clinicalFacts
     );
     const safeResult: AppealBriefSynthesisResult = {
       ...rawResult,
@@ -426,12 +513,8 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       evidences,
       args.physicianNotes,
       vectorPrecedents,
-      {
-        name: args.senderName,
-        credentials: args.senderCredentials,
-        email: args.senderEmail,
-        phone: args.senderPhone,
-      }
+      sender,
+      clinicalFacts
     );
 
     const result: AppealBriefSynthesisResult = {

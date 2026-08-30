@@ -10,6 +10,7 @@
 
 import type * as actions_agentMail from "../actions/agentMail.js";
 import type * as actions_appealSynthesizer from "../actions/appealSynthesizer.js";
+import type * as actions_clinicalIntake from "../actions/clinicalIntake.js";
 import type * as actions_mailDispatcher from "../actions/mailDispatcher.js";
 import type * as actions_opticalParser from "../actions/opticalParser.js";
 import type * as actions_payerContactResolver from "../actions/payerContactResolver.js";
@@ -44,6 +45,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "actions/agentMail": typeof actions_agentMail;
   "actions/appealSynthesizer": typeof actions_appealSynthesizer;
+  "actions/clinicalIntake": typeof actions_clinicalIntake;
   "actions/mailDispatcher": typeof actions_mailDispatcher;
   "actions/opticalParser": typeof actions_opticalParser;
   "actions/payerContactResolver": typeof actions_payerContactResolver;

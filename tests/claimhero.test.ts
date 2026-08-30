@@ -433,6 +433,53 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
     expect(brief).not.toContain("Clinical evidence. Clinical evidence.");
     expect(brief).not.toContain("Precedent **source**");
   });
+
+  it("uses confirmed clinical fields and rejects unsupported necessity conclusions", async () => {
+    const { assembleProfessionalMemorandum } = await import("../convex/actions/appealSynthesizer");
+    const brief = assembleProfessionalMemorandum(
+      {
+        claimNumber: "CLM-GROUNDED-001",
+        serviceDate: "2026-06-12",
+        deniedAmount: 24500,
+        patientOwedAmount: 24500,
+        providerName: "Dr. Langston",
+        cptCodes: ["27447"],
+        icd10Codes: ["M17.11"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+        patient: { name: "Test Patient", memberId: "M-1", insurancePayer: "Molina Healthcare" },
+      },
+      "level_1_internal",
+      {
+        executiveSummary: "Review the denial.",
+        medicalNecessityArguments: "The procedure necessitated the surgical intervention; the record does not document any active joint or systemic infection; treatment was medically appropriate.",
+        statutoryRightsNotice: "Review the applicable process.",
+        policyCitations: [],
+        formalDemandForPayment: "Reconsider the claim.",
+        fullAppealMarkdown: "",
+      },
+      [],
+      undefined,
+      undefined,
+      { name: "Jordan Lee", credentials: "Appeals Coordinator", email: "jordan@example.com" },
+      {
+        symptomsAndFunctionalImpact: "The record describes pain with stairs and walking.",
+        examinationFindings: "",
+        imagingAndDiagnostics: "Weight-bearing radiographs dated 2026-03-01 describe joint-space narrowing.",
+        treatmentHistoryAndResponse: "",
+        otherDocumentedFacts: "",
+        recordsAreIncomplete: true,
+      }
+    );
+
+    expect(brief).toContain("The clinical record available for review is incomplete");
+    expect(brief).toContain("pain with stairs and walking");
+    expect(brief).toContain("Weight-bearing radiographs dated 2026-03-01");
+    expect(brief).not.toContain("necessitated the surgical intervention");
+    expect(brief).not.toContain("does not document any active joint or systemic infection");
+    expect(brief).not.toContain("treatment was medically appropriate");
+    expect(brief).toContain("Jordan Lee");
+  });
 });
 
 describe("Precedent Vector Archive", () => {

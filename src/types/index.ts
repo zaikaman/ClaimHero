@@ -65,12 +65,43 @@ export interface Claim {
     agentMailProvisioningStatus?: "pending" | "shared" | "provisioned" | "not_configured" | "failed" | string;
   agentMailProvisioningError?: string;
   denialLetterStorageId?: string;
+  appealContext?: AppealContext;
   createdAt: number;
   updatedAt: number;
   patient?: Patient;
   latestAppeal?: Appeal | null;
   evidenceCount?: number;
   payerContact?: PayerContact;
+}
+
+export interface AppealSenderDetails {
+  name: string;
+  credentials?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface ClinicalFacts {
+  symptomsAndFunctionalImpact?: string;
+  examinationFindings?: string;
+  imagingAndDiagnostics?: string;
+  treatmentHistoryAndResponse?: string;
+  otherDocumentedFacts?: string;
+  recordsAreIncomplete: boolean;
+}
+
+export interface AppealContext {
+  sender: AppealSenderDetails;
+  clinicalFacts: ClinicalFacts;
+  confirmedAt: number;
+}
+
+export type ClinicalIntakeField = keyof Omit<ClinicalFacts, "recordsAreIncomplete">;
+
+export interface ClinicalIntakeQuestion {
+  field: ClinicalIntakeField;
+  question: string;
+  whyItMatters: string;
 }
 
 export interface PayerContact {

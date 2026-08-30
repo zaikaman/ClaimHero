@@ -49,6 +49,11 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     Boolean(claim.latestAppeal) ||
     claim.status === "ready_for_review" ||
     isDispatched;
+  const hasAppealContext = Boolean(
+    claim.appealContext?.confirmedAt &&
+      claim.appealContext.sender.name &&
+      (claim.appealContext.sender.email || claim.appealContext.sender.phone)
+  );
 
   const steps = [
     {
@@ -129,7 +134,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
           {(!hasEvidence || !hasBrief) && onRunAutonomousPipeline && (
             <Button
               size="xs"
-              onClick={onRunAutonomousPipeline}
+              onClick={() => hasAppealContext ? onRunAutonomousPipeline() : onNavigateView("studio")}
               disabled={isProcessing}
               className="gap-1.5 h-7 px-2.5 bg-primary text-primary-foreground text-xs shadow-2xs"
             >
@@ -141,7 +146,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
               ) : (
                 <>
                   <Sparkle className="size-3" />
-                  <span>1-Click Auto-Pilot</span>
+                  <span>{hasAppealContext ? "1-Click Auto-Pilot" : "Complete case context"}</span>
                 </>
               )}
             </Button>

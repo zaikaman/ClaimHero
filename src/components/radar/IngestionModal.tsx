@@ -12,10 +12,12 @@ import {
   WarningCircle,
   Sparkle,
   FileMagnifyingGlass,
+  ArrowRight,
+  ArrowLeft,
 } from "@phosphor-icons/react";
-import { useAction } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { DenialExtractionResult } from "../../types";
+import { ClinicalFacts, ClinicalIntakeQuestion, DenialExtractionResult } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
 import {
   Dialog,
@@ -30,8 +32,46 @@ import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 import { Textarea } from "../ui/textarea";
 import { Select } from "../ui/select";
+import { Input } from "../ui/input";
 
 const convexApi = api as any;
+
+const DEFAULT_CLINICAL_QUESTIONS: ClinicalIntakeQuestion[] = [
+  {
+    field: "symptomsAndFunctionalImpact",
+    question: "What symptoms or day-to-day functional limitations are explicitly described in the available record?",
+    whyItMatters: "This captures the documented presentation without inferring severity from a code.",
+  },
+  {
+    field: "examinationFindings",
+    question: "What examination findings are documented by a treating clinician?",
+    whyItMatters: "The appeal can reference findings only when they appear in the record.",
+  },
+  {
+    field: "imagingAndDiagnostics",
+    question: "What imaging, laboratory, or other diagnostic findings are documented, including dates if available?",
+    whyItMatters: "Objective results may help the payer compare the record with its stated criteria.",
+  },
+  {
+    field: "treatmentHistoryAndResponse",
+    question: "What prior treatments are documented, and what response or outcome is recorded?",
+    whyItMatters: "This preserves treatment history as reported instead of assuming that treatment failed.",
+  },
+  {
+    field: "otherDocumentedFacts",
+    question: "Are there any other documented facts relevant to the denial, such as authorization communications or an urgent-care rationale?",
+    whyItMatters: "This gives the record a place for denial-specific facts that do not fit the clinical categories above.",
+  },
+];
+
+const EMPTY_CLINICAL_FACTS: ClinicalFacts = {
+  symptomsAndFunctionalImpact: "",
+  examinationFindings: "",
+  imagingAndDiagnostics: "",
+  treatmentHistoryAndResponse: "",
+  otherDocumentedFacts: "",
+  recordsAreIncomplete: true,
+};
 
 interface IngestionModalProps {
   isOpen: boolean;
@@ -174,11 +214,25 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     (DenialExtractionResult & { claimId: string; pipelineResult?: any }) | null
   >(null);
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const [contextSubmitted, setContextSubmitted] = useState(false);
+  const [isPreparingContext, setIsPreparingContext] = useState(false);
+  const [intakeQuestions, setIntakeQuestions] = useState<ClinicalIntakeQuestion[]>(DEFAULT_CLINICAL_QUESTIONS);
+  const [senderName, setSenderName] = useState("");
+  const [senderCredentials, setSenderCredentials] = useState("");
+  const [senderEmail, setSenderEmail] = useState("");
+  const [senderPhone, setSenderPhone] = useState("");
+  const [clinicalFacts, setClinicalFacts] = useState<ClinicalFacts>(EMPTY_CLINICAL_FACTS);
+  const [contextAcknowledged, setContextAcknowledged] = useState(false);
 
   const runPipelineAction = useAction(
     convexApi["actions/sentinelPipeline"]?.runAutonomousPipeline ||
     convexApi.actions?.sentinelPipeline?.runAutonomousPipeline
   );
+  const generateIntakeQuestionsAction = useAction(
+    convexApi["actions/clinicalIntake"]?.generateClinicalIntakeQuestions ||
+    convexApi.actions?.clinicalIntake?.generateClinicalIntakeQuestions
+  );
+  const updateAppealContextMutation = useMutation(convexApi.claims.updateAppealContext);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -201,12 +255,51 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
     setProcessingMessage("Step 2/3: Indexing Insurer CPB & Evaluating Win Score...");
     try {
-      const pipelineRes = await runPipelineAction({ claimId: claimId as any });
+      const pipelineRes = await runPipelineAction({
+        claimId: claimId as any,
+        sender: {
+          name: senderName.trim(),
+          credentials: senderCredentials.trim() || undefined,
+          email: senderEmail.trim() || undefined,
+          phone: senderPhone.trim() || undefined,
+        },
+        clinicalFacts,
+      });
       setProcessingMessage("Step 3/3: Synthesizing cited ERISA medical appeal brief...");
       return pipelineRes;
     } catch (pipelineErr) {
       console.warn("Pipeline error, falling back to basic extraction:", pipelineErr);
       return null;
+    }
+  };
+
+  const prepareContextReview = async (result: DenialExtractionResult & { claimId: string }) => {
+    setExtractedResult({ ...result, pipelineResult: null });
+    setContextSubmitted(false);
+    setContextAcknowledged(false);
+    setIntakeQuestions(DEFAULT_CLINICAL_QUESTIONS);
+    setClinicalFacts({ ...EMPTY_CLINICAL_FACTS });
+    setSenderName("");
+    setSenderCredentials("");
+    setSenderEmail("");
+    setSenderPhone("");
+    setIsPreparingContext(true);
+
+    try {
+      if (generateIntakeQuestionsAction) {
+        const generated = await generateIntakeQuestionsAction({
+          denialReasonCode: result.denialReasonCode,
+          denialReasonDescription: result.denialReasonDescription,
+          cptCodes: result.cptCodes,
+          icd10Codes: result.icd10Codes,
+        });
+        if (generated?.questions?.length) setIntakeQuestions(generated.questions);
+      }
+    } catch (questionErr) {
+      console.warn("Using neutral clinical intake questions:", questionErr);
+      setIntakeQuestions(DEFAULT_CLINICAL_QUESTIONS);
+    } finally {
+      setIsPreparingContext(false);
     }
   };
 
@@ -222,11 +315,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
     try {
       const result = await onUploadFile(selectedFile, patientState);
-      let pipelineResult = null;
-      if (autoPilotEnabled && result?.claimId) {
-        pipelineResult = await executePostExtractionPipeline(result.claimId);
-      }
-      setExtractedResult({ ...result, pipelineResult });
+      await prepareContextReview(result);
     } catch (err: any) {
       setErrorMessage(
         err?.message ||
@@ -244,11 +333,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
     try {
       const result = await onParseText(presetContent, patientState);
-      let pipelineResult = null;
-      if (autoPilotEnabled && result?.claimId) {
-        pipelineResult = await executePostExtractionPipeline(result.claimId);
-      }
-      setExtractedResult({ ...result, pipelineResult });
+      await prepareContextReview(result);
     } catch (err: any) {
       setErrorMessage(
         err?.message ||
@@ -273,16 +358,66 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
     try {
       const result = await onParseText(pastedText, patientState);
-      let pipelineResult = null;
-      if (autoPilotEnabled && result?.claimId) {
-        pipelineResult = await executePostExtractionPipeline(result.claimId);
-      }
-      setExtractedResult({ ...result, pipelineResult });
+      await prepareContextReview(result);
     } catch (err: any) {
       setErrorMessage(
         err?.message ||
           "Failed to extract claim information. Please check your document text."
       );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConfirmContext = async () => {
+    if (!extractedResult?.claimId) return;
+
+    const normalizedEmail = senderEmail.trim();
+    const normalizedPhone = senderPhone.trim();
+    if (!senderName.trim()) {
+      setErrorMessage("Enter the name of the person who will submit the appeal.");
+      return;
+    }
+    if (!normalizedEmail && !normalizedPhone) {
+      setErrorMessage("Add an email address or phone number so the payer can contact the sender.");
+      return;
+    }
+    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setErrorMessage("Enter a valid sender email address or leave it blank when a phone number is provided.");
+      return;
+    }
+    if (!contextAcknowledged) {
+      setErrorMessage("Confirm that the entries are drawn from the available record and that blanks mean unavailable.");
+      return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage(null);
+    try {
+      await updateAppealContextMutation({
+        claimId: extractedResult.claimId as any,
+        sender: {
+          name: senderName.trim(),
+          credentials: senderCredentials.trim() || undefined,
+          email: normalizedEmail || undefined,
+          phone: normalizedPhone || undefined,
+        },
+        clinicalFacts: {
+          ...clinicalFacts,
+          symptomsAndFunctionalImpact: clinicalFacts.symptomsAndFunctionalImpact?.trim() || undefined,
+          examinationFindings: clinicalFacts.examinationFindings?.trim() || undefined,
+          imagingAndDiagnostics: clinicalFacts.imagingAndDiagnostics?.trim() || undefined,
+          treatmentHistoryAndResponse: clinicalFacts.treatmentHistoryAndResponse?.trim() || undefined,
+          otherDocumentedFacts: clinicalFacts.otherDocumentedFacts?.trim() || undefined,
+        },
+      });
+
+      let pipelineResult = null;
+      if (autoPilotEnabled) pipelineResult = await executePostExtractionPipeline(extractedResult.claimId);
+      setExtractedResult((current) => current ? { ...current, pipelineResult } : current);
+      setContextSubmitted(true);
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Could not save the case context. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -570,6 +705,162 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               </div>
             </TabsContent>
           </Tabs>
+        ) : !contextSubmitted ? (
+          <Card className="p-4 space-y-4 border-amber-500/30 bg-amber-500/5">
+            <div className="flex items-start justify-between gap-3 border-b border-border/60 pb-3">
+              <div className="flex items-start gap-2.5">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                  <Shield className="size-4" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-semibold text-foreground">Confirm case context before drafting</h3>
+                    <Badge variant="outline" className="border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px]">
+                      Drafting paused
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    The denial has been extracted. Answer what the available records actually say; leave a field blank when it is unavailable. ClaimHero will not infer clinical facts from diagnosis or procedure codes.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-semibold text-foreground">Person submitting the appeal</h4>
+                  <p className="text-[11px] text-muted-foreground">Required for a sendable signature. Use the actual sender, not the treating provider unless that person is submitting it.</p>
+                </div>
+                <Badge variant="secondary" className="text-[10px] shrink-0">Required</Badge>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="ingest-sender-name" className="mb-1 block text-[11px] font-medium text-foreground">Full name</label>
+                  <Input
+                    id="ingest-sender-name"
+                    value={senderName}
+                    onChange={(e) => setSenderName(e.target.value)}
+                    placeholder="Jordan Lee"
+                    maxLength={200}
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="ingest-sender-role" className="mb-1 block text-[11px] font-medium text-foreground">Credentials or role <span className="font-normal text-muted-foreground">(optional)</span></label>
+                  <Input
+                    id="ingest-sender-role"
+                    value={senderCredentials}
+                    onChange={(e) => setSenderCredentials(e.target.value)}
+                    placeholder="Appeals Coordinator"
+                    maxLength={200}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="ingest-sender-email" className="mb-1 block text-[11px] font-medium text-foreground">Email address <span className="font-normal text-muted-foreground">(or phone)</span></label>
+                  <Input
+                    id="ingest-sender-email"
+                    type="email"
+                    value={senderEmail}
+                    onChange={(e) => setSenderEmail(e.target.value)}
+                    placeholder="jordan.lee@clinic.org"
+                    maxLength={320}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="ingest-sender-phone" className="mb-1 block text-[11px] font-medium text-foreground">Phone number <span className="font-normal text-muted-foreground">(or email)</span></label>
+                  <Input
+                    id="ingest-sender-phone"
+                    type="tel"
+                    value={senderPhone}
+                    onChange={(e) => setSenderPhone(e.target.value)}
+                    placeholder="(555) 010-0142"
+                    maxLength={80}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 border-t border-border/60 pt-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-semibold text-foreground">Documented clinical context</h4>
+                  <p className="text-[11px] text-muted-foreground">These prompts are tailored to this denial. Paste exact record language or a concise factual summary; do not use a diagnosis code as a substitute for a finding.</p>
+                </div>
+                <Badge variant="outline" className="gap-1 text-[10px] shrink-0">
+                  <Sparkle className="size-3" /> AI prompts
+                </Badge>
+              </div>
+
+              {isPreparingContext ? (
+                <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground" role="status">
+                  <CircleNotch className="size-3.5 animate-spin text-primary" />
+                  <span>Preparing denial-specific questions...</span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {intakeQuestions.map((question) => (
+                    <div key={question.field}>
+                      <label htmlFor={`clinical-${question.field}`} className="mb-1 block text-xs font-medium leading-relaxed text-foreground">
+                        {question.question}
+                      </label>
+                      <p className="mb-1.5 text-[10px] leading-relaxed text-muted-foreground">{question.whyItMatters}</p>
+                      <Textarea
+                        id={`clinical-${question.field}`}
+                        rows={2}
+                        value={clinicalFacts[question.field] || ""}
+                        onChange={(e) => setClinicalFacts((current) => ({ ...current, [question.field]: e.target.value }))}
+                        placeholder="Leave blank if this is not in the records you have."
+                        maxLength={10000}
+                        className="bg-background text-xs"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-[11px] leading-relaxed text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={contextAcknowledged}
+                onChange={(e) => setContextAcknowledged(e.target.checked)}
+                className="mt-0.5 size-3.5 shrink-0 accent-primary"
+              />
+              <span>I confirm that the entries above reflect the available record or are clearly identified as reported information. Blank sections mean the information is unavailable; ClaimHero must not fill those gaps or infer medical necessity.</span>
+            </label>
+
+            <div className="flex flex-col-reverse justify-between gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setExtractedResult(null)}
+                disabled={isProcessing}
+                className="gap-1.5 text-xs"
+              >
+                <ArrowLeft className="size-3.5" />
+                <span>Back to intake</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmContext}
+                disabled={isProcessing || isPreparingContext || !contextAcknowledged}
+                className="gap-1.5 text-xs font-semibold"
+              >
+                {isProcessing ? (
+                  <>
+                    <CircleNotch className="size-3.5 animate-spin" />
+                    <span>{autoPilotEnabled ? "Saving context & analyzing..." : "Saving context..."}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{autoPilotEnabled ? "Save context & run analysis" : "Save context"}</span>
+                    <ArrowRight className="size-3.5" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </Card>
         ) : (
           /* Extraction Result Card */
           <Card className="p-4 space-y-4 border-emerald-500/30 bg-emerald-500/5">
@@ -623,7 +914,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <p className="mt-0.5">{extractedResult.denialReasonDescription}</p>
             </div>
 
-            {extractedResult.pipelineResult && (
+            {extractedResult.pipelineResult ? (
               <div className="rounded-lg bg-primary/10 border border-primary/30 p-2.5 flex items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-1.5 text-foreground font-semibold">
                   <Sparkle className="size-3.5 text-primary shrink-0" />
@@ -634,6 +925,10 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     {extractedResult.pipelineResult.overturnProbabilityScore}% Win Score
                   </Badge>
                 )}
+              </div>
+            ) : (
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5 text-xs text-amber-700 dark:text-amber-300">
+                Case context saved. Automated analysis is paused; you can run it later from the Evidence or Appeal Studio view.
               </div>
             )}
 
@@ -656,7 +951,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               </Button>
               <Button
                 size="sm"
-                onClick={() => handleDone("evidence")}
+                onClick={() => handleDone(autoPilotEnabled ? "evidence" : "studio")}
                 className="gap-1.5 text-xs bg-primary text-primary-foreground shadow-2xs font-semibold"
               >
                 <FileMagnifyingGlass className="size-3.5" />

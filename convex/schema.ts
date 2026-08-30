@@ -58,6 +58,25 @@ export default defineSchema({
       agentMailProvisioningStatus: v.optional(v.string()), // pending, shared, provisioned, not_configured, failed
     agentMailProvisioningError: v.optional(v.string()),
     denialLetterStorageId: v.optional(v.id("_storage")),
+    appealContext: v.optional(
+      v.object({
+        sender: v.object({
+          name: v.string(),
+          credentials: v.optional(v.string()),
+          email: v.optional(v.string()),
+          phone: v.optional(v.string()),
+        }),
+        clinicalFacts: v.object({
+          symptomsAndFunctionalImpact: v.optional(v.string()),
+          examinationFindings: v.optional(v.string()),
+          imagingAndDiagnostics: v.optional(v.string()),
+          treatmentHistoryAndResponse: v.optional(v.string()),
+          otherDocumentedFacts: v.optional(v.string()),
+          recordsAreIncomplete: v.boolean(),
+        }),
+        confirmedAt: v.number(),
+      })
+    ),
     payerContact: v.optional(
       v.object({
         officialAppealsEmail: v.optional(v.string()),

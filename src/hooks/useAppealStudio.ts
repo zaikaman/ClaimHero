@@ -27,10 +27,10 @@ export function useAppealStudio(claim?: Claim | null) {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [physicianNotes, setPhysicianNotes] = useState<string>("");
-  const [senderName, setSenderName] = useState<string>("");
-  const [senderCredentials, setSenderCredentials] = useState<string>("");
-  const [senderEmail, setSenderEmail] = useState<string>("");
-  const [senderPhone, setSenderPhone] = useState<string>("");
+  const [senderName, setSenderName] = useState<string>(claim?.appealContext?.sender.name || "");
+  const [senderCredentials, setSenderCredentials] = useState<string>(claim?.appealContext?.sender.credentials || "");
+  const [senderEmail, setSenderEmail] = useState<string>(claim?.appealContext?.sender.email || "");
+  const [senderPhone, setSenderPhone] = useState<string>(claim?.appealContext?.sender.phone || "");
 
   const saveDraftMutation = useMutation(convexApi.appeals.saveDraft);
   const synthesizeAction = useAction(
@@ -40,6 +40,7 @@ export function useAppealStudio(claim?: Claim | null) {
 
   // Sync markdown content when appeal is loaded or changed from cloud
   const initializedClaimRef = useRef<string | null>(null);
+  const initializedContextClaimRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (latestAppeal && initializedClaimRef.current !== latestAppeal._id) {
@@ -50,6 +51,18 @@ export function useAppealStudio(claim?: Claim | null) {
       initializedClaimRef.current = latestAppeal._id;
     }
   }, [latestAppeal]);
+
+  useEffect(() => {
+    if (!claim?._id || initializedContextClaimRef.current === claim._id) return;
+    const sender = claim.appealContext?.sender;
+    if (sender) {
+      setSenderName(sender.name || "");
+      setSenderCredentials(sender.credentials || "");
+      setSenderEmail(sender.email || "");
+      setSenderPhone(sender.phone || "");
+    }
+    initializedContextClaimRef.current = claim._id;
+  }, [claim]);
 
   // Debounced auto-save markdown changes
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);

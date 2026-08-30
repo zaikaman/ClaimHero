@@ -29,6 +29,24 @@ export const runAutonomousPipeline = action({
     customPolicyUrl: v.optional(v.string()),
     physicianNotes: v.optional(v.string()),
     appealLevel: v.optional(v.string()),
+    sender: v.optional(
+      v.object({
+        name: v.string(),
+        credentials: v.optional(v.string()),
+        email: v.optional(v.string()),
+        phone: v.optional(v.string()),
+      })
+    ),
+    clinicalFacts: v.optional(
+      v.object({
+        symptomsAndFunctionalImpact: v.optional(v.string()),
+        examinationFindings: v.optional(v.string()),
+        imagingAndDiagnostics: v.optional(v.string()),
+        treatmentHistoryAndResponse: v.optional(v.string()),
+        otherDocumentedFacts: v.optional(v.string()),
+        recordsAreIncomplete: v.boolean(),
+      })
+    ),
   },
   handler: async (ctx, args): Promise<PipelineResult> => {
     // 1. Fetch current claim details
@@ -41,6 +59,16 @@ export const runAutonomousPipeline = action({
     }
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
+    const context = claim.appealContext;
+    const sender = args.sender || context?.sender;
+    const clinicalFacts = args.clinicalFacts || context?.clinicalFacts;
+
+    if (!sender?.name?.trim() || (!sender.email?.trim() && !sender.phone?.trim())) {
+      throw new Error("Complete the sender details before running appeal analysis");
+    }
+    if (!clinicalFacts) {
+      throw new Error("Confirm the available clinical record before running appeal analysis");
+    }
 
     // Auto-resolve payer intake gateway if not yet cached
     if (!claim.payerContact) {
@@ -120,6 +148,11 @@ export const runAutonomousPipeline = action({
         claimId: args.claimId,
         appealLevel: args.appealLevel || "level_1_internal",
         physicianNotes: args.physicianNotes,
+        senderName: sender.name,
+        senderCredentials: sender.credentials,
+        senderEmail: sender.email,
+        senderPhone: sender.phone,
+        clinicalFacts,
         vectorPrecedents,
       }
     );
