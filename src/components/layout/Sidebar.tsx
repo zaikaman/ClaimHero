@@ -20,6 +20,7 @@ import {
   User,
   CaretUpDown,
   Trash,
+  PhoneCall,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -43,6 +44,7 @@ export type NavigationView =
   | "radar"
   | "evidence"
   | "studio"
+  | "p2p"
   | "communications"
   | "audit"
   | "analytics"
@@ -132,6 +134,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: "Appeal Studio",
       description: "AI Legal Brief & Cited Arguments",
       icon: FileText,
+    },
+    {
+      id: "p2p" as NavigationView,
+      label: "P2P Tele-Script",
+      description: "3-Min Verbal Rebuttal & Cheat Sheet",
+      icon: PhoneCall,
     },
     {
       id: "communications" as NavigationView,

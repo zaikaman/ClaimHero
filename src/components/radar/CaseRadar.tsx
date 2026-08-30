@@ -19,6 +19,7 @@ import {
   Envelope,
   Sparkle,
   CircleNotch,
+  PhoneCall,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -55,7 +56,7 @@ interface CaseRadarProps {
   onSelectClaim: (claimId: string) => void;
   onOpenIngestion: () => void;
   onNavigateView: (
-    view: "radar" | "evidence" | "studio" | "communications" | "audit"
+    view: "radar" | "evidence" | "studio" | "p2p" | "communications" | "audit"
   ) => void;
   onDeleteCase?: (claimId: string) => Promise<any>;
   onRunAutonomousPipeline?: (claimId: string) => Promise<any>;
@@ -728,6 +729,16 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                               >
                                 <FileText className="size-3.5" />
                                 <span>Open Appeal Studio</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  onSelectClaim(claim._id);
+                                  onNavigateView("p2p");
+                                }}
+                                className="gap-2 text-xs cursor-pointer text-primary font-medium"
+                              >
+                                <PhoneCall className="size-3.5" />
+                                <span>P2P Defense Tele-Script</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => {

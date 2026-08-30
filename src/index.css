@@ -214,15 +214,20 @@
   }
 
   /* Hide entire dashboard shell, sidebars, navigations, shaders, overlays, floating elements */
-  #root,
   .no-print,
   [data-radix-popper-content-wrapper],
   [data-radix-dialog-overlay],
   .dialog-backdrop,
   header,
+  aside,
   nav,
   button,
   canvas {
+    display: none !important;
+  }
+
+  /* When printing dialog dossier */
+  body:has([role="dialog"]) #root {
     display: none !important;
   }
 
@@ -272,6 +277,32 @@
     border: none !important;
     background: #ffffff !important;
     color: #0f172a !important;
+  }
+
+  /* Printable P2P Pocket Cheat Sheet for rapid clinic printing */
+  .printable-p2p-cheatsheet {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 10mm 12mm !important;
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .printable-p2p-cheatsheet * {
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+    background-color: transparent !important;
+  }
+
+  .printable-p2p-cheatsheet h2 {
+    color: #020617 !important;
+    font-size: 14pt !important;
   }
 
   /* Page breaks & typography */

@@ -325,3 +325,104 @@ export interface FdaScrapeResult {
   }>;
 }
 
+// Physician Peer-to-Peer (P2P) Defense Types
+export interface PolicyCitationScriptItem {
+  cpbTitle: string;
+  section: string;
+  criteriaMetText: string;
+  rebuttalBullet: string;
+  sourceUrl?: string;
+}
+
+export interface DisqualificationCounter {
+  insurerTrapQuestion: string;
+  physicianDirectRebuttal: string;
+  clinicalRationale: string;
+  regulatoryLeverage?: string;
+}
+
+export interface CondensedCheatSheet {
+  rapidChecklist: string[];
+  keyDiagnosisCodes: string[];
+  keyProcedureCodes: string[];
+  mustSayPoints: string[];
+  doNotConcedePoints: string[];
+  closingDemandStatement: string;
+}
+
+export interface P2PScript {
+  _id: string;
+  claimId: string;
+  version: number;
+  physicianName: string;
+  physicianSpecialty?: string;
+  medicalDirectorRole?: string;
+  estimatedCallDuration: string;
+  openingStatutoryStatement: string;
+  clinicalPolicyCitations: PolicyCitationScriptItem[];
+  disqualificationCounters: DisqualificationCounter[];
+  statutoryDemands: string;
+  condensedCheatSheet: CondensedCheatSheet;
+  fullScriptMarkdown: string;
+  lastEditedBy: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface P2PDefenseSynthesisResult {
+  openingStatutoryStatement: string;
+  clinicalPolicyCitations: PolicyCitationScriptItem[];
+  disqualificationCounters: DisqualificationCounter[];
+  statutoryDemands: string;
+  condensedCheatSheet: CondensedCheatSheet;
+  fullScriptMarkdown: string;
+}
+
+// Real-Time P2P Live Call Copilot Types
+export type CallSpeaker = "physician" | "insurer" | "system";
+
+export interface CallTranscriptItem {
+  id: string;
+  speaker: CallSpeaker;
+  text: string;
+  timestamp: number;
+  detectedIntent?: string;
+  isFinal: boolean;
+}
+
+export interface LiveFastAnswer {
+  id: string;
+  trapQuestion: string;
+  suggestedQuote: string;
+  chartProof: string;
+  cpbCitation: string;
+  regulatoryLeverage?: string;
+  confidenceScore: number;
+  timestamp: number;
+}
+
+export interface LiveCallChecklistItem {
+  id: string;
+  label: string;
+  category: string;
+  isCompleted: boolean;
+  completedAt?: number;
+}
+
+export interface P2PCallSession {
+  _id: string;
+  claimId: string;
+  sessionStatus: "idle" | "live" | "paused" | "completed";
+  startedAt: number;
+  endedAt?: number;
+  durationSeconds: number;
+  transcripts: CallTranscriptItem[];
+  fastAnswers: LiveFastAnswer[];
+  checklistProgress: LiveCallChecklistItem[];
+  winScore: number;
+  summaryNotes?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+

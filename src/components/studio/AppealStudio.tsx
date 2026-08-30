@@ -10,6 +10,7 @@ import {
   IdentificationCard,
   EnvelopeSimple,
   Phone,
+  PhoneCall,
   Printer,
   ArrowRight,
 } from "@phosphor-icons/react";
@@ -181,6 +182,18 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             >
               <IdentificationCard className="size-3.5" />
               <span>Sender Details{senderName ? " (Added)" : ""}</span>
+            </Button>
+
+            {/* P2P Defense Tele-Script Navigation */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigateView?.("p2p" as any)}
+              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-primary/40 text-primary hover:bg-primary/10"
+              title="Open 3-Minute Physician Peer-to-Peer Defense Tele-Script & Pocket Cheat Sheet"
+            >
+              <PhoneCall className="size-3.5" />
+              <span>P2P Tele-Script</span>
             </Button>
 
             {/* Export & Preview Trigger */}

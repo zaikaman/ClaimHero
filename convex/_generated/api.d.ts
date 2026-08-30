@@ -13,6 +13,8 @@ import type * as actions_appealSynthesizer from "../actions/appealSynthesizer.js
 import type * as actions_clinicalIntake from "../actions/clinicalIntake.js";
 import type * as actions_mailDispatcher from "../actions/mailDispatcher.js";
 import type * as actions_opticalParser from "../actions/opticalParser.js";
+import type * as actions_p2pDefenseGenerator from "../actions/p2pDefenseGenerator.js";
+import type * as actions_p2pLiveCopilot from "../actions/p2pLiveCopilot.js";
 import type * as actions_payerContactResolver from "../actions/payerContactResolver.js";
 import type * as actions_policyCrawler from "../actions/policyCrawler.js";
 import type * as actions_precedentArchive from "../actions/precedentArchive.js";
@@ -34,6 +36,8 @@ import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_openai from "../lib/openai.js";
 import type * as lib_precedentCorpus from "../lib/precedentCorpus.js";
 import type * as lib_precedentValidators from "../lib/precedentValidators.js";
+import type * as p2pCallSessions from "../p2pCallSessions.js";
+import type * as p2pScripts from "../p2pScripts.js";
 import type * as precedents from "../precedents.js";
 import type * as users from "../users.js";
 
@@ -49,6 +53,8 @@ declare const fullApi: ApiFromModules<{
   "actions/clinicalIntake": typeof actions_clinicalIntake;
   "actions/mailDispatcher": typeof actions_mailDispatcher;
   "actions/opticalParser": typeof actions_opticalParser;
+  "actions/p2pDefenseGenerator": typeof actions_p2pDefenseGenerator;
+  "actions/p2pLiveCopilot": typeof actions_p2pLiveCopilot;
   "actions/payerContactResolver": typeof actions_payerContactResolver;
   "actions/policyCrawler": typeof actions_policyCrawler;
   "actions/precedentArchive": typeof actions_precedentArchive;
@@ -70,6 +76,8 @@ declare const fullApi: ApiFromModules<{
   "lib/openai": typeof lib_openai;
   "lib/precedentCorpus": typeof lib_precedentCorpus;
   "lib/precedentValidators": typeof lib_precedentValidators;
+  p2pCallSessions: typeof p2pCallSessions;
+  p2pScripts: typeof p2pScripts;
   precedents: typeof precedents;
   users: typeof users;
 }>;

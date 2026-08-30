@@ -12,6 +12,7 @@ import {
   Check,
   User,
   Trash,
+  PhoneCall,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -93,6 +94,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   const caseTools = [
     { id: "evidence" as NavigationView, label: "Evidence Matrix", icon: FileMagnifyingGlass, desc: "CPBs & Win Score" },
     { id: "studio" as NavigationView, label: "Appeal Studio", icon: FileText, desc: "AI Brief Synthesis" },
+    { id: "p2p" as NavigationView, label: "P2P Tele-Script", icon: PhoneCall, desc: "3-Min Verbal Rebuttal & Cheat Sheet" },
     { id: "communications" as NavigationView, label: "Payer Communications", icon: Envelope, desc: "Payer Transmissions" },
   ];
 

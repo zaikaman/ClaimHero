@@ -218,11 +218,97 @@ export default defineSchema({
   // Immutable Event Audit Trail
   appealAuditLogs: defineTable({
     claimId: v.id("claims"),
-    eventType: v.string(), // denial_ingested, policy_crawled, overturn_score_computed, appeal_edited, appeal_dispatched, decision_recorded
+    eventType: v.string(), // denial_ingested, policy_crawled, overturn_score_computed, appeal_edited, appeal_dispatched, decision_recorded, p2p_script_generated, p2p_live_call_completed
     actor: v.string(),
     details: v.string(),
     timestamp: v.number(),
   })
     .index("by_claim", ["claimId"])
     .index("by_timestamp", ["timestamp"]),
+
+  // Physician Peer-to-Peer (P2P) Defense Tele-Scripts
+  p2pScripts: defineTable({
+    claimId: v.id("claims"),
+    version: v.number(),
+    physicianName: v.string(),
+    physicianSpecialty: v.optional(v.string()),
+    medicalDirectorRole: v.optional(v.string()),
+    estimatedCallDuration: v.string(),
+    openingStatutoryStatement: v.string(),
+    clinicalPolicyCitations: v.array(
+      v.object({
+        cpbTitle: v.string(),
+        section: v.string(),
+        criteriaMetText: v.string(),
+        rebuttalBullet: v.string(),
+        sourceUrl: v.optional(v.string()),
+      })
+    ),
+    disqualificationCounters: v.array(
+      v.object({
+        insurerTrapQuestion: v.string(),
+        physicianDirectRebuttal: v.string(),
+        clinicalRationale: v.string(),
+        regulatoryLeverage: v.optional(v.string()),
+      })
+    ),
+    statutoryDemands: v.string(),
+    condensedCheatSheet: v.object({
+      rapidChecklist: v.array(v.string()),
+      keyDiagnosisCodes: v.array(v.string()),
+      keyProcedureCodes: v.array(v.string()),
+      mustSayPoints: v.array(v.string()),
+      doNotConcedePoints: v.array(v.string()),
+      closingDemandStatement: v.string(),
+    }),
+    fullScriptMarkdown: v.string(),
+    lastEditedBy: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_claim", ["claimId"]),
+
+  // Real-Time P2P Live Call Copilot Sessions
+  p2pCallSessions: defineTable({
+    claimId: v.id("claims"),
+    sessionStatus: v.string(), // idle, live, paused, completed
+    startedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    durationSeconds: v.number(),
+    transcripts: v.array(
+      v.object({
+        id: v.string(),
+        speaker: v.string(), // physician, insurer, system
+        text: v.string(),
+        timestamp: v.number(),
+        detectedIntent: v.optional(v.string()),
+        isFinal: v.boolean(),
+      })
+    ),
+    fastAnswers: v.array(
+      v.object({
+        id: v.string(),
+        trapQuestion: v.string(),
+        suggestedQuote: v.string(),
+        chartProof: v.string(),
+        cpbCitation: v.string(),
+        regulatoryLeverage: v.optional(v.string()),
+        confidenceScore: v.number(),
+        timestamp: v.number(),
+      })
+    ),
+    checklistProgress: v.array(
+      v.object({
+        id: v.string(),
+        label: v.string(),
+        category: v.string(),
+        isCompleted: v.boolean(),
+        completedAt: v.optional(v.number()),
+      })
+    ),
+    winScore: v.number(),
+    summaryNotes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_claim", ["claimId"]),
 });
+
