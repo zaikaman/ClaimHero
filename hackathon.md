@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-31T02:37:00Z
+- **Last updated:** 2026-08-31T02:41:30Z
 
 ## Log
 
@@ -259,8 +259,12 @@ Hardened Physician Peer-to-Peer (P2P) Live Call Practice Simulator with a realis
 ### 2026-08-31 - 588778f
 Refined ERISA § 502(c) statutory non-disclosure penalty embedding in Appeal Studio (`src/components/studio/AppealStudio.tsx`). Replaced naive end-of-file appending with intelligent placement preceding formal closing signatures (`Sincerely,`, `Respectfully,`, `Regards,`, `Submitted by`, `Authorized Representative:`), preserving the signer's identity and credentials at the bottom of the brief. Standardized the section heading to un-numbered title case (`## Statutory remedies & ERISA § 502(c) civil penalties demand`), eliminating the arbitrary Roman numeral prefix to match the rest of the generated brief. Convex features: static hosting, reactive subscriptions.
 
-### 2026-08-31 - working tree
+### 2026-08-31 - c6a75e8
 Optimized user session hydration across the application to achieve instant 0ms rendering of authenticated state without layout shifts, flash of unauthenticated buttons, or blocking session verification screens. Built `useCurrentUser` hook (`src/hooks/useCurrentUser.ts`) providing synchronous local cache resolution from stored `@convex-dev/auth` JWT tokens and cached profile records (`claimhero_cached_viewer`) on first render, seamlessly hydrating with real-time Convex `api.users.viewer` queries in the background. Updated `CinematicHero.tsx`, `Header.tsx`, `Sidebar.tsx`, `AuthPage.tsx`, and `App.tsx` to utilize optimistic session state, eliminating the 2-3 second delay on initial load and route transitions. Validated with `npm run verify` (100% clean typecheck, lint, 116/116 passing unit tests, and production build). Convex features: auth, queries, static hosting.
+
+### 2026-08-31 - working tree
+Streamlined top navigation and profile accessibility by removing redundant top-right avatar buttons that redirected to Case Radar (`src/components/layout/Header.tsx`, `src/components/landing/CinematicHero.tsx`). User profile status, account details, and session controls remain centrally managed via the interactive sidebar footer dropdown and authenticated console navigation. Validated with `npm run verify` (100% clean typecheck, lint, 116/116 passing unit tests, and production build). Convex features: static hosting, auth.
+
 
 
 

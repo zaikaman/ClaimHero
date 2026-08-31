@@ -18,7 +18,6 @@ import {
 } from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
 import { BrandLogo } from "../common/BrandLogo";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
 interface CinematicHeroProps {
   onEnterConsole: (view?: NavigationView) => void;
@@ -74,7 +73,7 @@ const HERO_SLIDES: ShowcaseSlide[] = [
 export const CinematicHero: React.FC<CinematicHeroProps> = ({
   onEnterConsole,
 }) => {
-  const { viewer, isAuthenticated, userName, userInitial } = useCurrentUser();
+  const { isAuthenticated } = useCurrentUser();
 
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -172,30 +171,15 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
         {/* Right: Console Launch Actions */}
         <div className="flex items-center gap-3">
           {isAuthenticated ? (
-            <>
-              {/* Open Console Button */}
-              <button
-                onClick={() => onEnterConsole("radar")}
-                className="hidden sm:flex animate-blur-fade-up liquid-glass items-center gap-2 rounded-md px-4 md:px-5 py-2 text-sm text-white/90 hover:text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95"
-                style={{ animationDelay: "350ms" }}
-              >
-                <span>Sentinel Console</span>
-                <Compass className="size-[18px] text-white/80" />
-              </button>
-
-              {/* User Profile Avatar */}
-              <button
-                onClick={() => onEnterConsole("radar")}
-                className="hidden sm:flex animate-blur-fade-up size-10 rounded-md border border-white/20 items-center justify-center text-white/90 hover:text-white transition-all cursor-pointer overflow-hidden active:scale-95 bg-white/10"
-                style={{ animationDelay: "400ms" }}
-                title={`Signed in as ${userName}`}
-              >
-                <Avatar size="default" className="size-full border-0 bg-transparent rounded-md">
-                  {viewer?.image && <AvatarImage src={viewer.image} alt={userName} className="rounded-md" />}
-                  <AvatarFallback className="text-xs font-semibold text-white/90 rounded-md">{userInitial}</AvatarFallback>
-                </Avatar>
-              </button>
-            </>
+            /* Open Console Button */
+            <button
+              onClick={() => onEnterConsole("radar")}
+              className="hidden sm:flex animate-blur-fade-up liquid-glass items-center gap-2 rounded-md px-4 md:px-5 py-2 text-sm text-white/90 hover:text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95"
+              style={{ animationDelay: "350ms" }}
+            >
+              <span>Sentinel Console</span>
+              <Compass className="size-[18px] text-white/80" />
+            </button>
           ) : (
             <>
               {/* Sign In Button */}
