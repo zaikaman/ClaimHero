@@ -156,6 +156,21 @@ describe("Feature G: Court-Ready Appeal Dossier & Exhibit PDF Binder", () => {
       expect(dossier.patientLiability).toBe(48500);
     });
 
+    it("formats ISO date strings, numbers, undefined, and pre-formatted strings into uniform appellate dates", () => {
+      expect(formatDossierDate("2026-06-12")).toBe("June 12, 2026");
+      expect(formatDossierDate(1770000000000)).toContain("2026");
+      expect(formatDossierDate(undefined)).toBeDefined();
+      expect(formatDossierDate("Already Formatted Date")).toBe("Already Formatted Date");
+    });
+
+    it("resolves payer EDI identifiers across explicit, directory match, fuzzy match, and fallback prefixes", () => {
+      expect(resolvePayerEdiId("Molina Healthcare", "CUSTOM_EDI_999")).toBe("CUSTOM_EDI_999");
+      expect(resolvePayerEdiId("Molina Healthcare")).toBe("51062");
+      expect(resolvePayerEdiId("GeoBlue Spine Division")).toBe("GEO01");
+      expect(resolvePayerEdiId("Acme Healthcare")).toBe("EDI-ACME");
+      expect(resolvePayerEdiId("")).toBe("EDI-GENERIC");
+    });
+
     it("populates Exhibit A, B, and C collections accurately", () => {
       const dossier = buildDossierData(mockClaim, mockAppeal, mockEvidences, false);
 
@@ -191,13 +206,18 @@ describe("Feature G: Court-Ready Appeal Dossier & Exhibit PDF Binder", () => {
   describe("Criteria Violations & Contradictions Extraction", () => {
     it("extracts specific criteria violations from policy evidence and claim denial reason", () => {
       const violations = extractCriteriaViolations(
-        "Total knee arthroplasty criteria met when radiographic joint space narrowing is present. Fails to consider conservative therapy trial failure.",
+        "Total knee arthroplasty criteria met when radiographic joint space narrowing is present. Standard of care and medical necessity criteria met. Fails to consider conservative therapy trial failure. Peer-to-peer review by same specialty required.",
         "CO-50: Service not deemed medically necessary"
       );
 
       expect(violations.length).toBeGreaterThan(0);
       expect(violations.some((v) => v.toLowerCase().includes("conservative"))).toBe(true);
       expect(violations.some((v) => v.toLowerCase().includes("generic denial code"))).toBe(true);
+      expect(violations.some((v) => v.toLowerCase().includes("same-specialty"))).toBe(true);
+      expect(violations.some((v) => v.toLowerCase().includes("explicit indications"))).toBe(true);
+
+      const fallbackViolations = extractCriteriaViolations("Unspecified evidence text", "CO-99");
+      expect(fallbackViolations.length).toBeGreaterThan(0);
     });
   });
 
@@ -236,6 +256,61 @@ describe("Feature G: Court-Ready Appeal Dossier & Exhibit PDF Binder", () => {
       expect(text).toContain("Physician Signature: _________________________________________");
       expect(text).toContain("Dr. Sarah Jenkins, MD, FAAOS");
       expect(text).toContain("National Provider ID: 1982736450");
+    });
+
+    it("generates default Exhibit B and Exhibit C when no live clinical evidence is attached", () => {
+      const minimalClaim: Claim = {
+        ...mockClaim,
+        appealContext: undefined,
+        cptCodes: [],
+        icd10Codes: [],
+        claimNumber: "998877",
+      };
+
+      const dossier = buildDossierData(minimalClaim, null, [], false);
+      expect(dossier.docketNumber).toBe("CLM-998877");
+      expect(dossier.exhibitB_PolicyBulletins).toHaveLength(1);
+      expect(dossier.exhibitB_PolicyBulletins[0].id).toBe("cpb-default-1");
+      expect(dossier.exhibitC_MedicalLiterature).toHaveLength(1);
+      expect(dossier.exhibitC_MedicalLiterature[0].id).toBe("lit-default-1");
+
+      const plainText = generatePlainTextDossier(dossier);
+      expect(plainText).toContain("Molina Healthcare Clinical Policy Bulletin: Medical Necessity Criteria for CPT 27447");
+    });
+
+    it("handles level 1 internal, level 2 grievance, and level 3 external review statutory postures", () => {
+      const externalAppeal: Appeal = {
+        ...mockAppeal,
+        appealLevel: "level_3_external_state_review",
+        statutoryPosture: undefined,
+        statutoryAuthorities: undefined,
+      };
+      const externalDossier = buildDossierData(mockClaim, externalAppeal, mockEvidences, false);
+      expect(externalDossier.statutoryLevelLabel).toContain("Level 3 External IRO");
+      expect(externalDossier.statutoryPosture).toBe("external_iro_erisa_502_petition");
+      expect(externalDossier.statutoryAuthorities).toBeDefined();
+      expect(externalDossier.statutoryAuthorities[0]).toContain("ERISA Section 502(a)(1)(B)");
+
+      const level2Appeal: Appeal = {
+        ...mockAppeal,
+        appealLevel: "level_2_grievance",
+        statutoryPosture: undefined,
+        statutoryAuthorities: undefined,
+      };
+      const level2Dossier = buildDossierData(mockClaim, level2Appeal, mockEvidences, false);
+      expect(level2Dossier.statutoryPosture).toBe("procedural_grievance_bad_faith");
+      expect(level2Dossier.statutoryAuthorities[0]).toContain("ERISA Section 503");
+
+      const level1Appeal: Appeal = {
+        ...mockAppeal,
+        appealLevel: "level_1_internal",
+        statutoryPosture: undefined,
+        statutoryAuthorities: undefined,
+      };
+      const level1Dossier = buildDossierData(mockClaim, level1Appeal, mockEvidences, false);
+      expect(level1Dossier.statutoryLevelLabel).toContain("Level 1 Internal Administrative Appeal");
+      expect(level1Dossier.statutoryPosture).toBe("administrative_reconsideration");
+      expect(level1Dossier.statutoryAuthorities[0]).toContain("ERISA 29 C.F.R. § 2560.503-1");
     });
   });
 });

@@ -128,7 +128,7 @@ function isStructuralLine(line: string): boolean {
     isHorizontalRule(line) ||
     isBlockquote(line) ||
     Boolean(listMatch(line)) ||
-    (isTableRow(line) && isTableSeparator(line))
+    isTableRow(line)
   );
 }
 
@@ -235,13 +235,9 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
       index += 1;
     }
     const paragraphText = paragraphLines.map(inlineText).join("\n");
-    if (paragraphText) {
-      const paragraphHtml = paragraphLines.map(inlineHtml).join("<br />");
-      htmlBlocks.push(`<p style="margin:0 0 14px; color:#253342; font-size:13px; line-height:1.7;">${paragraphHtml}</p>`);
-      textBlocks.push(paragraphText);
-    } else {
-      index += 1;
-    }
+    const paragraphHtml = paragraphLines.map(inlineHtml).join("<br />");
+    htmlBlocks.push(`<p style="margin:0 0 14px; color:#253342; font-size:13px; line-height:1.7;">${paragraphHtml}</p>`);
+    textBlocks.push(paragraphText);
   }
 
   return {

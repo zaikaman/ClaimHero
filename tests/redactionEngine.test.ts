@@ -7,6 +7,8 @@ import {
   maskMemberId,
   maskDob,
   maskPatientName,
+  maskMrn,
+  maskAddress,
 } from "../src/lib/redactionEngine";
 
 describe("HIPAA-Compliant Automated Redaction Engine", () => {
@@ -16,6 +18,14 @@ describe("HIPAA-Compliant Automated Redaction Engine", () => {
       expect(maskSsn(ssn, "HIPAA_SAFE_HARBOR")).toBe("***-**-****");
       expect(maskSsn(ssn, "BALANCED_APPELLATE")).toBe("***-**-6789");
       expect(maskSsn(ssn, "PUBLIC_EXHIBIT")).toBe("[REDACTED SSN]");
+      expect(maskSsn("12345", "BALANCED_APPELLATE")).toBe("[REDACTED SSN]");
+    });
+
+    it("masks MRN and address across compliance standards", () => {
+      expect(maskMrn("MRN-984210", "BALANCED_APPELLATE")).toBe("MRN-***-210");
+      expect(maskMrn("123", "BALANCED_APPELLATE")).toBe("[REDACTED MRN]");
+      expect(maskMrn("MRN-984210", "PUBLIC_EXHIBIT")).toBe("[REDACTED MRN]");
+      expect(maskAddress("123 Main St", "HIPAA_SAFE_HARBOR")).toBe("[REDACTED ADDRESS]");
     });
 
     it("masks Member ID suffixes correctly across compliance standards", () => {
@@ -23,6 +33,12 @@ describe("HIPAA-Compliant Automated Redaction Engine", () => {
       expect(maskMemberId(memberWithSuffix, "BALANCED_APPELLATE")).toBe("MBN9823412-**");
       expect(maskMemberId(memberWithSuffix, "PUBLIC_EXHIBIT")).toBe("[REDACTED MEMBER ID]");
       expect(maskMemberId(memberWithSuffix, "HIPAA_SAFE_HARBOR")).toBe("MBN***-**");
+      expect(maskMemberId(memberWithSuffix, "CUSTOM")).toBe("MBN9823412-**");
+
+      // Member IDs without suffix
+      expect(maskMemberId("MBN9823412", "HIPAA_SAFE_HARBOR")).toBe("MBN***");
+      expect(maskMemberId("MBN9823412", "BALANCED_APPELLATE")).toBe("MBN9823***");
+      expect(maskMemberId("MBN", "BALANCED_APPELLATE")).toBe("[REDACTED ID]");
     });
 
     it("masks Date of Birth correctly across compliance standards", () => {
@@ -35,6 +51,7 @@ describe("HIPAA-Compliant Automated Redaction Engine", () => {
     it("masks Patient Name correctly across compliance standards", () => {
       const name = "Jordan Lee Taylor";
       expect(maskPatientName(name, "BALANCED_APPELLATE")).toBe("J. T.");
+      expect(maskPatientName("Cher", "BALANCED_APPELLATE")).toBe("C.");
       expect(maskPatientName(name, "PUBLIC_EXHIBIT")).toBe("[PATIENT NAME REDACTED]");
       expect(maskPatientName(name, "HIPAA_SAFE_HARBOR")).toBe("[PATIENT REDACTED]");
     });
@@ -115,11 +132,12 @@ describe("HIPAA-Compliant Automated Redaction Engine", () => {
     const complexDocument = `EXPLANATION OF BENEFITS / DENIAL NOTICE
 Patient Name: Eleanor Vance
 Member ID: MBN9823412-01
+MRN: MRN-984210
 DOB: 05/14/1978
 SSN: 123-45-6789
 Phone: (555) 019-2834
 Email: eleanor.vance@mymail.com
-Street Address: 742 Evergreen Terrace, Springfield
+Street Address: 742 Evergreen Blvd, Springfield
 Diagnosis: M17.11 (Osteoarthritis)
 CPT: 27447 (Total Knee Arthroplasty) - Denied $24,500.00`;
 
@@ -135,10 +153,11 @@ CPT: 27447 (Total Knee Arthroplasty) - Denied $24,500.00`;
       expect(result.sanitizedText).not.toContain("(555) 019-2834");
       expect(result.sanitizedText).not.toContain("eleanor.vance@mymail.com");
       expect(result.sanitizedText).not.toContain("Eleanor Vance");
+      expect(result.sanitizedText).toContain("[REDACTED ADDRESS]");
       // Clinical CPT and CARC should remain completely untouched
       expect(result.sanitizedText).toContain("CPT: 27447");
       expect(result.sanitizedText).toContain("M17.11");
-      expect(result.stats.redactedCount).toBeGreaterThanOrEqual(5);
+      expect(result.stats.redactedCount).toBeGreaterThanOrEqual(6);
     });
 
     it("executes Balanced Appellate Mode preserving last 4 SSN and Member root ID", () => {
@@ -149,8 +168,10 @@ CPT: 27447 (Total Knee Arthroplasty) - Denied $24,500.00`;
 
       expect(result.sanitizedText).toContain("***-**-6789");
       expect(result.sanitizedText).toContain("MBN9823412-**");
+      expect(result.sanitizedText).toContain("MRN-***-210");
       expect(result.sanitizedText).toContain("**/**/1978");
       expect(result.sanitizedText).toContain("E. V.");
+      expect(result.sanitizedText).toContain("[REDACTED ADDRESS]");
     });
 
     it("executes Public Legal Exhibit Mode with total anonymization tags", () => {
@@ -161,8 +182,10 @@ CPT: 27447 (Total Knee Arthroplasty) - Denied $24,500.00`;
 
       expect(result.sanitizedText).toContain("[REDACTED SSN]");
       expect(result.sanitizedText).toContain("[REDACTED MEMBER ID]");
+      expect(result.sanitizedText).toContain("[REDACTED MRN]");
       expect(result.sanitizedText).toContain("[REDACTED DOB]");
       expect(result.sanitizedText).toContain("[PATIENT NAME REDACTED]");
+      expect(result.sanitizedText).toContain("[REDACTED ADDRESS]");
     });
 
     it("respects selective entity overrides when individual entities are disabled", () => {
@@ -196,6 +219,16 @@ CPT: 27447 (Total Knee Arthroplasty) - Denied $24,500.00`;
       const cleanRes = fastSanitizeText(cleanClinicalNote);
       expect(cleanRes.stats.totalEntities).toBe(0);
       expect(cleanRes.sanitizedText).toBe(cleanClinicalNote);
+
+      const textWithAddress = "Patient resides at 1234 Medical Center Blvd Suite 500 and visited Confidential Clinic at 789 Health Park Ave.";
+      const addressEntities = detectPiiEntities(textWithAddress, {
+        customTerms: ["Confidential Clinic"],
+      });
+      expect(addressEntities.some((e) => e.category === "address")).toBe(true);
+      expect(addressEntities.some((e) => e.category === "custom")).toBe(true);
+
+      const sanitizedAddress = fastSanitizeText(textWithAddress);
+      expect(sanitizedAddress.sanitizedText).toContain("[REDACTED ADDRESS]");
     });
   });
 });

@@ -1,20 +1,20 @@
 # ClaimHero — Autonomous Medical & Health Insurance Appeal Sentinel
 
-> **Alternative Concept for Convex "All Gas" Hackathon**  
-> Built with **Convex** (Reactive Case DB, Crons, Vector Search & Realtime Collaboration), **Firecrawl** (Insurer Clinical Policy & Medical Research Crawler), **AgentMail** (Autonomous Dedicated Appeal Inboxes & Payer Transmissions), and **OpenAI** (Clinical Reason Extraction & Cited Appeal Generation).
+> **Autonomous Appeal Sentinel for Convex "All Gas" Hackathon**  
+> Built with **Convex** (Reactive Database, Native 1536-d Vector Search, Full-Text Search Indexes, Scheduled Crons, File Storage, Auth & Official Components), **Firecrawl** (Live Insurer Clinical Policy Bulletins, PubMed & FDA Indications Crawler), **AgentMail** (Dedicated Two-Way Inbound/Outbound Appellate Inboxes & Autonomous Payer Gateways), and **OpenAI** (Vision Denial Extraction, Deterministic 4-Pillar Scoring & Grounded Appeal Synthesis).
 
 ---
 
 ## 1. Executive Summary & Problem Statement
 
-In the US healthcare system, **over $200 Billion** in medical claims and prior authorizations are improperly denied every year by health insurers (Aetna, Cigna, UnitedHealthcare, Blue Cross Blue Shield, Humana, Medicare Advantage).
+In the U.S. healthcare system, health insurers improperly deny approximately **1.5 Billion medical claims and prior authorizations** every year, denying over **$200 Billion** in care (Aetna, Cigna, UnitedHealthcare, Blue Cross Blue Shield, Humana, Molina, Medicare Advantage).
 
-### The Real-World Friction
-1. **Asymmetric Information & Buried Clinical Policies**: Insurers reject claims citing vague internal codes (e.g., *"CO-50: Non-covered service / Not Medically Necessary"*, *"Experimental/Investigational"*). The actual criteria are buried inside 80-page Clinical Policy Bulletins (CPBs) that patients cannot find.
-2. **Statutory Time Bombs**: Patients and independent medical practices have strict statutory appeal windows (e.g., **ERISA 180-day federal deadline**, state 30-day external review clocks). Missing a deadline by 24 hours forfeits the right to recover thousands of dollars.
-3. **High Overturn Rate, Low Appeal Rate**: Over **70% of formally appealed insurance denials are overturned and paid** when backed by exact payer policy citations, FDA labels, and peer-reviewed clinical studies. Yet less than **1% of patients appeal** due to exhaustion and legal complexity.
+### The Real-World Crisis
+1. **Asymmetric Information & Buried Clinical Policies**: Insurers reject claims citing opaque codes (e.g., *CO-50: Non-covered service / Not Medically Necessary*, *CO-197: Prior-authorization absent*, *CO-16: Lacks information*). The actual criteria are buried inside 150KB+ Clinical Policy Bulletins (CPBs) and MCG/Carelon manuals that patients and clinic staff cannot easily find.
+2. **Statutory Time Bombs**: Patients and healthcare providers have strict statutory appeal windows (**ERISA 180-day federal deadline** under 29 CFR § 2560.503-1, state 30-day external review clocks). Missing a deadline forfeits all rights to recover tens of thousands of dollars.
+3. **High Overturn Rate, Low Appeal Rate**: Over **70% of formally appealed denials are overturned and paid** when backed by specific payer policy citations, FDA package inserts, and peer-reviewed clinical guidelines. Yet less than **1% of patients appeal** due to administrative exhaustion and legal complexity.
 
-**ClaimHero** levels the playing field: an autonomous medical appeal sentinel that ingests denial letters via email, crawls insurer policy bulletins and clinical trials, tracks statutory deadlines with Convex crons, and dispatches legally airtight, cited appeal briefs directly to payer grievance departments.
+**ClaimHero** turns every denial into a cited, dispatch-ready appeal packet in under 90 seconds: an autonomous sentinel that ingests denial notices, crawls live insurer policy bulletins, matches 1536-d legal precedents, scores overturn probability with a deterministic 4-pillar rubric, synthesizes multi-tier ERISA briefs, arms physicians with real-time P2P Live Call Copilots, audits statutory $110/day failure-to-disclose penalties, de-identifies HIPAA PII, compiles court-ready exhibit binders, and autonomously transmits dossiers through dedicated AgentMail gateways.
 
 ---
 
@@ -22,121 +22,172 @@ In the US healthcare system, **over $200 Billion** in medical claims and prior a
 
 ```mermaid
 flowchart TD
-    subgraph Intake ["1. Intake & Communication (AgentMail)"]
-        A1["Patient forwards Denial / EOB PDF to appeal-xyz@claimhero.agentmail.com"] --> A2["Ingest Inbound PDF & Extract Metadata"]
-        A3["Outbound Transmit Formal Appeal Dossier to Payer Grievance Dept"]
-        A4["Receive Insurer Addendum / Determination Letters"]
+    subgraph Intake ["1. Ingestion & Communication (AgentMail + Vision)"]
+        A1["Forward Denial PDF to claimhero-intake@agentmail.to / Ingestion Modal"] --> A2["Vision Optical Parser (CPT / ICD-10 / CARC / Amounts)"]
+        A3["Outbound 3-Mode Dispatch (AI Adjudicator / Custom / Official Payer)"]
+        A4["Inbound Payer Determination / Addendum Webhook (/agentmail-webhook)"]
     end
 
     subgraph Brain ["2. Reactive Nervous System (Convex)"]
-        C1["Real-time Case Radar & Status Pipeline"]
-        C2["Vector Search (Denial Code vs Past Overturned Precedents)"]
-        C3["Statutory Deadline Alarm (30-day / 180-day Cron Countdown)"]
-        C4["Collaborative Clinical Appeal Studio"]
-        C5["Case Audit Trail & Activity Log"]
+        C1["Real-time Case Radar & Portfolio Aggregates (TableAggregate)"]
+        C2["Native Vector Search (1536-d by_embedding vs Overturned Precedents)"]
+        C3["Native Full-Text Search Indexes (search_claims, search_evidence)"]
+        C4["Statutory Deadline Sweeper (Daily Cron @ 00:00 UTC)"]
+        C5["Rate Limiter Component (@convex-dev/rate-limiter)"]
+        C6["Immutable Audit Ledger (appealAuditLogs)"]
     end
 
-    subgraph Senses ["3. Deep Evidence Ingestion (Firecrawl)"]
-        F1["Crawl Insurer Clinical Policy Bulletins (CPBs)"]
-        F2["Scrape FDA Indications & PubMed Clinical Trial Precedents"]
+    subgraph Senses ["3. Deep Clinical Retrieval (Firecrawl)"]
+        F1["Live Insurer CPB Retrieval (2-Round Adaptive Search + Scrape)"]
+        F2["Document Windowing & MCG/Incapsula Access-Denied Guardrails"]
+        F3["PubMed Trials & FDA Package Insert Crawlers"]
     end
 
     subgraph Intelligence ["4. Clinical & Legal Reasoning (OpenAI)"]
-        O1["Extract Denial Codes, CPT/ICD-10 Mappings & Disqualifiers"]
-        O2["Calculate Overturn Probability Score (0–100%)"]
-        O3["Synthesize Formal Cited Appeal Brief with Exhibit Backlinks"]
+        O1["Vision Extraction & Denial Parameter Normalization"]
+        O2["Deterministic 4-Pillar Overturn Probability Scoring (0–100)"]
+        O3["Grounded 3-Tier ERISA Appeal Synthesis with Clause Citations"]
+        O4["P2P Tele-Script & Real-Time Live Call Copilot (Web Speech STT)"]
     end
 
+    A1 --> A2
     A2 --> C1
     C1 --> O1
     O1 --> F1
     F1 --> F2
-    F2 --> C2
+    F2 --> F3
+    F3 --> C2
     C2 --> O2
-    O2 --> C4
-    C4 <--> O3
-    C3 --> A3
-    A4 --> C5
+    O2 --> O3
+    O3 --> A3
+    C4 --> C6
+    A4 --> C1
+    A4 --> C6
 ```
 
-### Component Synergy
+### Component Synergy Across the 4 Pillars
 * **Convex**:
-  * **Reactive Subscriptions (`useQuery`)**: Live appeal case tracker updating instantly as clinical evidence is ingested and appeal drafts evolve.
-  * **Vector Embeddings & Search**: Compares denied diagnosis/treatment codes (ICD-10, CPT) against a vector index of **past winning appeal strategies, overturned case templates, and clinical precedents**.
-  * **Scheduled Actions & Crons**: Automated deadline trackers enforcing strict statutory appeal countdowns with escalation notifications.
-  * **Collaborative Appeal Studio**: Live multi-user review where patients, doctors, and advocates edit appeal briefs with real-time cursor presence.
+  * **Reactive Subscriptions (`useQuery`)**: Live appeal case tracker, evidence matrix, countdown timers, and portfolio metrics updating in real time with zero polling.
+  * **Native Vector Search (`precedents.vectorIndex`)**: 1536-d cosine vector index (`by_embedding`) matching denied CPT/ICD/CARC codes against historical winning legal precedents, ranked by code overlap.
+  * **Native Full-Text Search (`searchIndex`)**: Server-side lexical search on `claims` (`search_claims`), `clinicalEvidences` (`search_evidence`), and `precedents` (`search_precedents`).
+  * **Official Components**: `@convex-dev/rate-limiter` for token-bucket API protection, `@convex-dev/aggregate` TableAggregate for O(log N) portfolio statistics, `@convex-dev/auth` for Google OAuth and password authentication.
+  * **Scheduled Crons & Actions**: Nightly statutory deadline sweepers recalculating remaining appeal days and emitting critical alerts.
+  * **Convex File Storage**: Secure storage for uploaded denial letters, generated exhibit PDFs, and AgentMail attachments.
 * **Firecrawl**:
-  * Scrapes and parses major insurer Clinical Policy Bulletins (CPBs) for specific medical necessity criteria (e.g., Aetna CPB 0321, UHC Medical Policy 2024T001).
-  * Ingests latest FDA drug indications, NCCN oncology guidelines, and PubMed clinical trial abstracts to prove standard of care.
+  * Scrapes live insurer Clinical Policy Bulletins (e.g. Molina, Carelon, Aetna, UHC, Cigna, BCBS) using `v2/search` and `v2/scrape`.
+  * Multi-layer hardening: document windowing for 150KB+ clinical manuals, private MCG viewer rejection, payer domain verification, and Incapsula/CAPTCHA access-denied filtering.
+  * Specialized secondary crawlers for PubMed/ClinicalTrials.gov literature and FDA package inserts (`accessdata.fda.gov`).
 * **AgentMail**:
-  * Creates an autonomous dedicated email inbox for every claim (e.g. `appeal-claim-9402@claimhero.agentmail.com`).
-  * **Inbound**: Listens for patient forwards (EOB attachments, medical records) and insurer decision letters.
-  * **Outbound**: Automatically dispatches formal, HIPAA-compliant appeal packets with attached clinical exhibits directly to the insurer’s appeals department.
+  * Dedicated autonomous mailboxes: Intake (`claimhero-intake@agentmail.to`), Outbound Sender (`claimhero-sender@agentmail.to`), and AI Adjudicator (`claimhero-adjudicator@agentmail.to`).
+  * **Inbound**: Fast asynchronous webhook (`/agentmail-webhook`) processing forwarded denials and insurer determinations.
+  * **Outbound**: 3-mode appellate transmission gateway (AI Adjudicator simulation, custom test email, or verified official payer address with portal/fax/PO box routing).
 * **OpenAI**:
-  * Parses complex medical explanation of benefits (EOBs), extracting claim numbers, disputed amounts, and denial reason codes.
-  * Generates legal and medical appeal briefs citing exact insurer CPB clause numbers and statutory ERISA/state consumer protection statutes.
+  * `gpt-5-nano` structured extraction for EOB parameters (claim number, provider, denied amount, patient liability, CPT, ICD-10, CARC codes, deadlines).
+  * Deterministic 4-pillar scoring algorithm (35% CPB + 25% Step-Therapy + 20% ERISA + 20% Precedents = 100).
+  * Grounded legal brief synthesis using verified clinical facts and cited policy clauses, with automatic 3-tier escalation posture.
+  * Real-time P2P Live Call Copilot generating instant Fast Answer rebuttal cards against AI Medical Director challenge traps.
 
 ---
 
 ## 3. Data Schema Design (Convex)
 
-### Tables:
-1. `patients` / `providers`:
-   * `name`, `email`, `memberId`, `groupNumber`, `insurancePayer` (e.g., "Aetna", "UnitedHealthcare", "BCBS"), `state`.
-2. `claims` (The Core Appeal Case):
-   * `patientId`, `claimNumber`, `serviceDate`, `providerName`, `deniedAmount`, `patientOwedAmount`.
-   * `cptCodes` (procedure codes), `icd10Codes` (diagnosis codes), `denialReasonCode` (e.g., "CO-50", "CO-197").
-   * `status` (`intake_received`, `analyzing_policy`, `evidence_assembled`, `appeal_drafted`, `dispatched`, `under_review`, `overturned_won`, `escalated_external`).
-   * `statutoryDeadline` (timestamp), `daysRemaining` (computed via Convex cron).
-   * `overturnProbabilityScore` (0–100), `riskLevel` (`high_confidence`, `moderate`, `complex_litigation`).
-   * `assignedAgentEmail` (e.g., `appeal-case-8921@claimhero.agentmail.com`).
-   * `denialLetterStorageId` (Convex File Storage ID for the original denial PDF).
-3. `clinicalEvidences`:
-   * `claimId`, `sourceType` (`payer_cpb`, `fda_package_insert`, `pubmed_study`, `nccn_guideline`).
-   * `title`, `sourceUrl`, `citationClause`, `extractedEvidenceMarkdown`, `relevanceScore`, `vectorEmbedding`.
-4. `appeals`:
-   * `claimId`, `version`, `appealLevel` (`level_1_internal`, `level_2_grievance`, `level_3_external_state_review`).
-   * `executiveSummary`, `medicalNecessityArguments`, `legalCitations`, `fullAppealMarkdown`, `pdfExportStorageId`, `lastEditedBy`.
-5. `emailThreads` & `emailMessages`:
-   * `claimId`, `agentEmail`, `payerEmail`, `officerName`, `subject`, `direction` (`inbound` / `outbound`), `bodyHtml`, `bodyText`, `hasAttachments`, `receivedAt`.
-6. `appealAuditLogs`:
-   * `claimId`, `eventType` (`denial_ingested`, `policy_crawled`, `overturn_score_computed`, `appeal_sent`, `decision_received`), `timestamp`, `details`.
+`convex/schema.ts` defines 9 core domain tables with secondary indexes, full-text search indexes, and vector indexes:
+
+1. **`patients`**:
+   * `userId`, `name`, `email`, `memberId`, `groupNumber`, `insurancePayer`, `state`, `createdAt`.
+   * Indexes: `by_user`, `by_member_id`, `by_insurance_payer`.
+2. **`claims`**:
+   * `userId`, `patientId`, `claimNumber`, `serviceDate`, `providerName`, `deniedAmount`, `patientOwedAmount`.
+   * `cptCodes`, `icd10Codes`, `denialReasonCode`, `denialReasonDescription`, `status`, `statutoryDeadline`, `daysRemaining`.
+   * `overturnProbabilityScore`, `riskLevel`, `scoringBreakdown`, `assignedAgentEmail`, `agentMailInboxId`, `agentMailInboxEmail`.
+   * `denialLetterStorageId`, `appealContext` (sender, clinicalFacts, physicianNotes), `payerContact` (officialAppealsEmail, intakePortalUrl, appealsFax, statutoryPoBox, ediPayerId).
+   * `redactionMetadata`, `financialLiability`, `erisaPenalties`.
+   * Indexes: `by_user`, `by_user_status`, `by_patient`, `by_claim_number`, `by_status`, `by_deadline`, searchIndex `search_claims`.
+3. **`clinicalEvidences`**:
+   * `claimId`, `sourceType` (`payer_cpb`, `pubmed_study`, `fda_label`, `legal_precedent`), `title`, `sourceUrl`, `citationClause`, `extractedEvidenceMarkdown`, `relevanceScore`.
+   * Indexes: `by_claim`, searchIndex `search_evidence`.
+4. **`appeals`**:
+   * `claimId`, `version`, `appealLevel` (`level_1_internal`, `level_2_grievance`, `level_3_external_state_review`), `statutoryPosture`, `targetAuthority`, `legalAggressiveness`, `statutoryAuthorities`.
+   * `executiveSummary`, `medicalNecessityArguments`, `legalCitations`, `fullAppealMarkdown`, `pdfExportStorageId`.
+   * Indexes: `by_claim`, `by_claimId_and_version`, `by_claimId_and_appealLevel`.
+5. **`emailThreads` & `emailMessages`**:
+   * `claimId`, `agentEmail`, `payerEmail`, `subject`, `status`.
+   * `threadId`, `direction` (`inbound`, `outbound`), `sender`, `recipient`, `bodyHtml`, `bodyText`, `sentAt`.
+   * Indexes: `by_claim`, `by_thread`.
+6. **`agentMailIntakeEvents`**:
+   * `eventId`, `messageId`, `inboxId`, `sender`, `recipient`, `subject`, `status`, `claimId`.
+   * Indexes: `by_event_id`, `by_message_id`.
+7. **`precedents`** (Vector Archive):
+   * `sourceKind`, `title`, `citation`, `jurisdiction`, `icd10Codes`, `cptCodes`, `carcCodes`, `outcome`, `winningArgument`, `statutoryLanguage`, `embedding` (1536 dimensions), `corpusKey`.
+   * Indexes: `by_corpus_key`, `by_primary_cpt`, `by_primary_carc`, searchIndex `search_precedents`, vectorIndex `by_embedding` (1536-d, cosine).
+8. **`appealAuditLogs`**:
+   * `claimId`, `eventType`, `actor`, `details`, `timestamp`.
+   * Indexes: `by_claim`, `by_event_type`.
+9. **`p2pScripts` & `p2pCallSessions`**:
+   * `claimId`, `version`, `openingStatutoryStatement`, `clinicalPolicyCitations`, `disqualificationCounters`, `badFaithDemands`, `closingDemand`.
+   * `sessionStatus`, `transcripts`, `fastAnswers`, `checklistProgress`, `winScore`.
+   * Indexes: `by_claim`, `by_session`.
 
 ---
 
 ## 4. UI / UX Design: Clinical Defense Command Center
 
-### Aesthetic Direction: Precision Medical Dark-Mode
-* **Palette**: Deep slate-charcoal canvas (`#0b0f17`), cyber cyan accents (`#00e5ff`), medical emerald victory highlights (`#10b981`), critical statutory crimson (`#f43f5e`), and amber warning badges (`#f59e0b`).
-* **Typography**: Clean, ultra-crisp typography (Inter / Mono data tags) with high-contrast badge indicators.
+### Aesthetic Direction: Precision Medical Dark Mode
+* **Palette**: Obsidian canvas (`#0b0f17`), cyan primary (`#0ea5e9`), emerald victory highlights (`#10b981`), amber warning badges (`#f59e0b`), and crimson statutory alerts (`#f43f5e`).
+* **Glassmorphism**: Backdrop blur filters (`backdrop-blur-md`, `bg-card/75`), thin border styling (`border-border/50`), and mono tabular numbers (`tabular-nums`) for currency and date precision.
 
-### Key Layout Views:
-1. **Live Claim Ingestion Radar**:
-   * Real-time stream of incoming denial letters forwarded by patients/clinics with instant optical parsing status.
-2. **Clinical Evidence Matrix & CPB Inspector**:
-   * Side-by-side view of the Insurer Denial vs. Extracted Medical Policy Bulletin clauses (showing where the insurer violated their own published standards).
-3. **Statutory Deadline Countdown Engine**:
-   * Dynamic circular dials showing days remaining before ERISA / State Insurance Commissioner appeal rights expire.
-4. **Autonomous AgentMail Case Drawer**:
-   * Two-way chronological message feed tracking outbound appeal packets and inbound insurer acknowledgment/response letters.
-5. **Interactive Bid/Appeal Studio**:
-   * Real-time collaborative document editor with AI assistant ("Add FDA Clinical Trial Precedent", "Insert Physician Letter of Medical Necessity", "Cite ERISA 29 CFR § 2560.503-1").
-6. **Real-time Case Analytics & Portfolio Oversight**:
-   * Unified dashboard computing total disputed pipeline, won/recovered amounts, average overturn probabilities, and critical statutory deadline alerts across all live claims with zero hardcoded values.
+### Key Layout Modules
+1. **Cinematic Hero**: Full-screen ambient medical background video, showcase navigation, liquid-glass CTAs, and instant authentication routing.
+2. **Case Radar & Real-Time Pipeline**: Filterable table of all active claims, status tabs, payer breakdown, circular statutory countdown gauges (`DeadlineCountdown.tsx`), and RFC 4180 CSV / JSON portfolio export.
+3. **Clinical Evidence Matrix**: Side-by-side denial vs. CPB inspector, 4-pillar score breakdown bars, category filter pills (CPB / PubMed / FDA / ERISA), and live 1536-d vector precedent feed.
+4. **Defense Suite**:
+   * **Legal Appeal Brief (`AppealStudio.tsx`)**: Split-pane markdown editor and preview, 3-tier escalation stepper, Section Outline Jump Bar, and 1-click ERISA § 502(c) penalty embedding.
+   * **Doctor P2P Defense Studio (`P2PDefenseStudio.tsx`)**: 3-minute tele-script, bad-faith written denial demands, and Pocket Clinic Cheat Sheet with dedicated `@media print` styling.
+   * **P2P Live Call Copilot (`P2PLiveCopilot.tsx`)**: Web Speech STT real-time transcription, AI Medical Director 3-stage challenge loop, Fast Answer rebuttal cards, win-score HUD, and copyable EHR Encounter Summary addendums (Epic/Cerner).
+   * **Financial Liability Calculator (`FinancialLiabilityCalculator.tsx`)**: OOP-max capping, No Surprises Act balance billing protection, $110/day ERISA failure-to-disclose penalty trajectory, and printable audit statements.
+   * **Court-Ready Dossier Binder (`dossier/`)**: Complete 8-page packet (Cover, TOC, Statutory Summary, Exhibit Index, Exhibits A-C, Attestation) with US Letter / A4 print isolation.
+5. **Payer Communications Drawer (`AgentMailDrawer.tsx`)**: Multi-channel gateway (email / portal / fax / mail) with 3-mode recipient switching, verified payer routing, and threaded two-way correspondence.
+6. **Portfolio Analytics (`AnalyticsMetrics.tsx`)**: Practice-wide disputed vs. recovered amounts, insurer win rates, confidence distribution, and printable Executive Report statements.
+7. **HIPAA Privacy Redaction Engine (`PrivacyRedactionFilter.tsx`)**: Deterministic PII masking across Safe Harbor, Balanced Appellate, and Public Exhibit standards.
 
 ---
 
-## 5. Judge Presentation & 3-Minute Demo Video Blueprint
+## 5. Verification & Test Engineering
 
-* **0:00 – 0:30 (The Trillion-Dollar Healthcare Injustice)**:
-  * Highlight the staggering statistic: $200B in medical denials, 70% winnable on appeal, but 99% abandoned due to bureaucracy.
-* **0:30 – 1:30 (The Live Autonomous Sentinel Flow)**:
-  1. Patient forwards denial PDF to `appeal-8492@claimhero.agentmail.com`.
-  2. Firecrawl crawls insurer’s official Clinical Policy Bulletin in real-time, uncovering the exact medical necessity loophole.
-  3. Convex computes a 91% Overturn Probability and initiates the 30-day statutory countdown timer.
-  4. OpenAI synthesizes a bulletproof appeal brief with legal citations.
-  5. AgentMail transmits the packet directly to the insurer.
-* **1:30 – 2:30 (Under the Hood: Convex Architecture)**:
-  * Showcase Convex reactive queries, vector search over legal/clinical templates, scheduled deadline crons, and zero-latency collaborative presence.
-* **2:30 – 3:00 (Human & Commercial Impact)**:
-  * Empowering everyday families and healthcare providers to reclaim denied healthcare dollars.
+ClaimHero enforces **100% line coverage** and strict quality verification across every tier:
+
+```bash
+npm run typecheck       # Strict TypeScript typechecking (tsc --noEmit)
+npm run lint            # ESLint static code analysis
+npm run test            # Vitest automated test execution (161 tests)
+npm run test:coverage   # Vitest with @vitest/coverage-v8 (100% line coverage gate)
+npm run build           # Vite production bundle build
+npm run verify          # Full automated gate (typecheck + lint + test:coverage + build)
+```
+
+### Verified Test Suites (161 Tests / 10 Suites)
+* `tests/claimhero.test.ts` (62 tests): End-to-end integration, 4-pillar scoring rubric, ERISA deadline sweeps, and portfolio aggregates.
+* `tests/redactionEngine.test.ts` (17 tests): HIPAA Safe Harbor 18-identifier detection, boundary masking, street addresses, and custom terms.
+* `tests/openai.test.ts` (15 tests): Structured completions, Vision OCR extraction, 1536-d vector embeddings, and ranking.
+* `tests/financialErisaCalculator.test.ts` (15 tests): ERISA § 502(c) statutory penalties, cost-sharing calculations, and severity tiers.
+* `tests/agentMail.test.ts` (12 tests): AgentMail outbound dispatch, webhook normalization, email styling, and AI adjudicator addressing.
+* `tests/utils.test.ts` (11 tests): Healthcare currency formatting, statutory countdown math, and risk badge resolvers.
+* `tests/appealDossierBinder.test.ts` (11 tests): Dossier serialization, fallback exhibits, criteria violations, and 3-tier appellate escalation.
+* `tests/p2pLiveCopilot.test.ts` (7 tests): AI Medical Director 3-turn lifecycle, Fast Answer cards, and STT tolerance.
+* `tests/p2pDefense.test.ts` (6 tests): Tele-script generation, statutory openings, and pocket cheat sheet formatting.
+* `tests/statutoryEscalation.test.ts` (5 tests): 180-day internal appeal to Level 3 DOI escalation state machine.
+
+---
+
+## 6. Hackathon Alignment & Impact
+
+| Judging Criterion | Alignment & Technical Depth |
+|---|---|
+| **Real-World Utility** | Directly tackles a $200B/year denial crisis. Produces production-ready, sendable artifacts (formal briefs, P2P call scripts, EHR clinical notes, and court dossiers) rather than generic chat summaries. |
+| **Full-Stack Integration Depth** | All 4 sponsor platforms are deeply integrated: **Convex** (reactive DB, 1536-d vector search, searchIndex, scheduled crons, components), **Firecrawl** (live CPB scraping, PubMed, FDA), **AgentMail** (inbound webhooks, outbound dispatch, AI adjudicator), and **OpenAI** (Vision extraction, 4-pillar scoring, grounded synthesis). |
+| **Technical Rigor & Polish** | 100% clean `npm run verify` gate, 161 automated unit tests with 100% line coverage, strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
+| **Transparency & Build Process** | Comprehensive `hackathon.md` log with UTC timestamps, reconciled 7-character commit hashes, and detailed milestone notes. |
+
+---
+
+<p align="center"><strong>ClaimHero — Turn Every Denial into a Cited, Dispatch-Ready Appeal in Under 90 Seconds.</strong></p>

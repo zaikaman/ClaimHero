@@ -109,6 +109,38 @@ describe("Feature H: Financial Liability & Statutory ERISA Penalty Calculator", 
       expect(result.payerExpectedObligation).toBe(48500);
     });
 
+    it("calculates out-of-network cost-sharing without No Surprises Act protection", () => {
+      const result = calculateFinancialLiability({
+        billedAmount: 24500,
+        allowedAmount: 18000,
+        deductibleTotal: 2000,
+        deductibleMet: 2000,
+        coinsuranceRate: 30, // 30%
+        copayAmount: 0,
+        outOfPocketMax: 10000,
+        outOfPocketSpent: 0,
+        networkStatus: "out_of_network",
+        noSurprisesActProtected: false,
+      });
+
+      expect(result.data.balanceBillingAmount).toBe(6500); // 24500 - 18000
+      expect(result.data.totalPatientLiabilityOverturned).toBe(5400 + 6500); // Coinsurance + balance billing
+
+      const inNetworkNoNsa = calculateFinancialLiability({
+        billedAmount: 24500,
+        allowedAmount: 20000,
+        deductibleTotal: 1000,
+        deductibleMet: 1000,
+        coinsuranceRate: 20,
+        copayAmount: 25,
+        outOfPocketMax: 5000,
+        outOfPocketSpent: 0,
+        networkStatus: "in_network",
+        noSurprisesActProtected: false,
+      });
+      expect(inNetworkNoNsa.data.balanceBillingAmount).toBe(0);
+    });
+
     it("evaluates out-of-network balance billing exposure when No Surprises Act does not apply", () => {
       const result = calculateFinancialLiability({
         billedAmount: 30000,
@@ -309,6 +341,30 @@ describe("Feature H: Financial Liability & Statutory ERISA Penalty Calculator", 
       expect(defaultErisa.daysInDefault).toBeGreaterThan(0);
       expect(defaultErisa.accruedPenaltyAmount).toBeGreaterThan(0);
       expect(defaultErisa.statutoryDemandLanguage).toContain("29 U.S.C. § 1132(c)(1)(B)");
+    });
+
+    it("evaluates severity tiers across grace period, actionable default, egregious noncompliance, and bad faith enforcement", () => {
+      const grace = getSeverityTierMeta("grace_period");
+      expect(grace.label).toContain("30-Day Statutory Grace Window");
+      expect(grace.badgeVariant).toBe("info");
+
+      const act = getSeverityTierMeta("actionable_default");
+      expect(act.label).toContain("Actionable ERISA");
+
+      const egreg = getSeverityTierMeta("egregious_noncompliance");
+      expect(egreg.label).toContain("Egregious Fiduciary");
+
+      const badFaith = getSeverityTierMeta("bad_faith_enforcement");
+      expect(badFaith.label).toContain("Federal Civil Enforcement Threshold");
+      expect(badFaith.badgeVariant).toBe("destructive");
+
+      // Non-hyphenated date format test
+      const calcWithSlashDate = calculateErisaPenalties({
+        documentRequestDate: "2026/05/01",
+        calculationDate: "2026/08/25",
+        complianceStatus: "defaulted",
+      });
+      expect(calcWithSlashDate.data.daysInDefault).toBeGreaterThan(0);
     });
   });
 });

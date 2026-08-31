@@ -1,5 +1,5 @@
 import { Claim, Appeal, ClinicalEvidence, AppealLevel, FinancialLiabilityData, ErisaPenaltyData } from "../types";
-import { VERIFIED_PAYER_DIRECTORY, getPayerAppellateContact } from "./constants";
+import { getPayerAppellateContact } from "./constants";
 import { fastSanitizeText } from "./redactionEngine";
 import { formatCurrency } from "./utils";
 
@@ -90,19 +90,13 @@ export interface DossierData {
   isRedacted: boolean;
 }
 
-export function resolvePayerEdiId(payerName?: string, existingEdi?: string): string {
-  if (existingEdi && existingEdi.trim()) return existingEdi.trim();
+export function resolvePayerEdiId(payerName?: string, explicitEdiId?: string): string {
+  if (explicitEdiId && explicitEdiId.trim()) return explicitEdiId.trim();
   if (!payerName) return "EDI-GENERIC";
 
   const contact = getPayerAppellateContact(payerName);
-  if (contact?.ediPayerId) return contact.ediPayerId;
-
-  const clean = payerName.toLowerCase().replace(/[^a-z0-9]/g, "");
-  for (const key of Object.keys(VERIFIED_PAYER_DIRECTORY)) {
-    if (clean.includes(key) || key.includes(clean)) {
-      const entry = VERIFIED_PAYER_DIRECTORY[key];
-      if (entry?.ediPayerId) return entry.ediPayerId;
-    }
+  if (contact?.ediPayerId && contact.ediPayerId !== "EDI-UNKNOWN" && contact.ediPayerId !== "EDI-AUTO") {
+    return contact.ediPayerId;
   }
 
   return "EDI-" + payerName.slice(0, 4).toUpperCase();
