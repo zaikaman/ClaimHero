@@ -196,7 +196,7 @@ async function deliverAiAdjudication(
     html: determinationEmail.html,
   });
 
-  await ctx.runMutation((api as any).emails.insertMessage, withAgentMailMessageId({
+  await ctx.runMutation((internal as any).emails.insertMessageInternal, withAgentMailMessageId({
     threadId,
     claimId: claim._id,
     direction: "inbound",
@@ -209,7 +209,7 @@ async function deliverAiAdjudication(
   }, liveReply.messageId));
 
   if (adjudicationResult.determination === "OVERTURNED_APPROVED") {
-    await ctx.runMutation((api as any).claims.updateStatus, {
+    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
       claimId: claim._id,
       status: "won",
       actor: `${payer} Chief Medical Officer`,
@@ -240,7 +240,7 @@ export const dispatchAppealPacket = action({
     args
   ): Promise<DispatchReceipt> => {
     // 1. Fetch claim & appeal details
-    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -260,12 +260,12 @@ export const dispatchAppealPacket = action({
 
     let appeal: any = null;
     if (args.appealId) {
-      appeal = await ctx.runQuery((api as any).appeals.getById, {
+      appeal = await ctx.runQuery((internal as any).appeals.getById, {
         appealId: args.appealId,
       });
     }
     if (!appeal) {
-      appeal = await ctx.runQuery((api as any).appeals.getLatestByClaim, {
+      appeal = await ctx.runQuery((internal as any).appeals.getLatestByClaimInternal, {
         claimId: args.claimId,
       });
     }
@@ -327,7 +327,7 @@ export const dispatchAppealPacket = action({
     });
 
     // 3. Ensure email thread exists
-    const threadId: any = await ctx.runMutation((api as any).emails.getOrCreateThread, {
+    const threadId: any = await ctx.runMutation((internal as any).emails.getOrCreateThreadInternal, {
       claimId: args.claimId,
       agentEmail: sender,
       payerEmail: finalRecipient,
@@ -335,7 +335,7 @@ export const dispatchAppealPacket = action({
     });
 
     // 4. Record outbound message in database
-    await ctx.runMutation((api as any).emails.insertMessage, withAgentMailMessageId({
+    await ctx.runMutation((internal as any).emails.insertMessageInternal, withAgentMailMessageId({
       threadId,
       claimId: args.claimId,
       direction: "outbound",
@@ -348,7 +348,7 @@ export const dispatchAppealPacket = action({
     }, liveTransmission.messageId));
 
     // 5. Update claim status to dispatched
-    await ctx.runMutation((api as any).claims.updateStatus, {
+    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "dispatched",
       actor: mode === "ai_adjudicator" ? "Autonomous AI Payer Gateway" : "AgentMail Outbound Dispatcher",
@@ -404,7 +404,7 @@ export const sendOutboundMessage = action({
     customSubject: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -457,14 +457,14 @@ export const sendOutboundMessage = action({
       html: correspondenceEmail.html,
     });
 
-    const threadId: any = await ctx.runMutation((api as any).emails.getOrCreateThread, {
+    const threadId: any = await ctx.runMutation((internal as any).emails.getOrCreateThreadInternal, {
       claimId: args.claimId,
       agentEmail: sender,
       payerEmail: resolvedRecipient,
       subject,
     });
 
-    await ctx.runMutation((api as any).emails.insertMessage, withAgentMailMessageId({
+    await ctx.runMutation((internal as any).emails.insertMessageInternal, withAgentMailMessageId({
       threadId,
       claimId: args.claimId,
       direction: "outbound",

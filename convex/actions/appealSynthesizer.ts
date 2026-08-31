@@ -3,7 +3,7 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { precedentMatchValidator } from "../lib/precedentValidators";
 import { rateLimiter } from "../lib/rateLimiter";
 
@@ -554,7 +554,7 @@ export const generateAppealBrief = action({
     const appealLevel = args.appealLevel || "level_1_internal";
 
     // 1. Fetch claim details with joined patient data
-    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -573,7 +573,7 @@ export const generateAppealBrief = action({
     }
 
     // 2. Fetch indexed clinical evidence clauses
-    const evidences: any[] = await ctx.runQuery((api as any).clinicalEvidences.listByClaim, {
+    const evidences: any[] = await ctx.runQuery((internal as any).clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
     });
 
@@ -778,7 +778,7 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       ],
     };
 
-    const appealId: string = await ctx.runMutation((api as any).appeals.createOrUpdateDraft, {
+    const appealId: string = await ctx.runMutation((internal as any).appeals.createOrUpdateDraftInternal, {
       claimId: args.claimId,
       appealLevel,
       statutoryPosture: tierMeta.statutoryPosture,

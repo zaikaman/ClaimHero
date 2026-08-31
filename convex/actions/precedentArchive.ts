@@ -3,7 +3,7 @@
 import { action, internalAction } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { createEmbedding } from "../lib/openai";
 import { PRECEDENT_CORPUS } from "../lib/precedentCorpus";
@@ -144,7 +144,7 @@ export const retrieveTopPrecedents = action({
     combinedScore: number;
     codeOverlap: number;
   }>> => {
-    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
       claimId: args.claimId,
     });
     if (!claim) {
@@ -299,14 +299,14 @@ export const indexWonAppeal = internalAction({
       return already;
     }
 
-    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
       claimId: args.claimId,
     });
     if (!claim) {
       return null;
     }
 
-    const appeal: any = await ctx.runQuery((api as any).appeals.getLatestByClaim, {
+    const appeal: any = await ctx.runQuery((internal as any).appeals.getLatestByClaimInternal, {
       claimId: args.claimId,
     });
     if (!appeal?.fullAppealMarkdown) {

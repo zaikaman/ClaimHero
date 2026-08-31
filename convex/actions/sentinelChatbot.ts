@@ -711,7 +711,7 @@ export const sendMessageWithTools = action({
       if (!ok) {
         const rateLimitReply =
           "Sentinel Copilot is currently handling peak analytical volume. Please allow a few seconds before submitting another clinical query.";
-        await ctx.runMutation(api.chatbot.addMessage, {
+        await ctx.runMutation((internal as any).chatbot.addMessageInternal, {
           sessionId: args.sessionId,
           role: "assistant",
           content: rateLimitReply,
@@ -724,17 +724,17 @@ export const sendMessageWithTools = action({
 
 
     // 2. Persist user message to session
-    await ctx.runMutation(api.chatbot.addMessage, {
+    await ctx.runMutation((internal as any).chatbot.addMessageInternal, {
       sessionId: args.sessionId,
       role: "user",
       content: args.userMessage,
     });
 
     // 3. Fetch session history and existing summary
-    const session = await ctx.runQuery(api.chatbot.getSession, {
+    const session = await ctx.runQuery((internal as any).chatbot.getSessionInternal, {
       sessionId: args.sessionId,
     });
-    const history = await ctx.runQuery(api.chatbot.listMessages, {
+    const history = await ctx.runQuery((internal as any).chatbot.listMessagesInternal, {
       sessionId: args.sessionId,
     });
 
@@ -748,7 +748,7 @@ export const sendMessageWithTools = action({
     });
 
     // 5. Build recent message window (last 8 messages)
-    const recentMessages = history.slice(-8).map((m) => ({
+    const recentMessages = history.slice(-8).map((m: any) => ({
       role: m.role as "user" | "assistant" | "system",
       content: m.content,
     }));
@@ -917,7 +917,7 @@ Select an active claim or ask any clinical or legal question to begin.`;
     }
 
     // 6. Save assistant response + tool call metadata to database
-    await ctx.runMutation(api.chatbot.addMessage, {
+    await ctx.runMutation((internal as any).chatbot.addMessageInternal, {
       sessionId: args.sessionId,
       role: "assistant",
       content: finalReply,

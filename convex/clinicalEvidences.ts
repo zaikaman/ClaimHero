@@ -1,6 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
+import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
 
 /**
  * Format and sanitize citation clauses into clean, concise identifiers
@@ -38,9 +39,38 @@ export function sanitizeCitationClause(raw: string | undefined): string {
 }
 
 /**
- * List all clinical evidence items for a given claim, ordered by relevance
+ * List all clinical evidence items for a given claim, ordered by relevance, strictly scoped to authorized claim owner
  */
 export const listByClaim = query({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args): Promise<Doc<"clinicalEvidences">[]> => {
+    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!authorized) return [];
+
+    const evidences = await ctx.db
+      .query("clinicalEvidences")
+      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .collect();
+
+    // Sort by relevance score descending and sanitize raw formatting
+    return evidences
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .map((item) => ({
+        ...item,
+        title: item.title?.replace(/\*\*/g, "") || "",
+        citationClause: sanitizeCitationClause(item.citationClause),
+        extractedEvidenceMarkdown:
+          item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
+      }));
+  },
+});
+
+/**
+ * Internal query for background actions to retrieve clinical evidence items
+ */
+export const listByClaimInternal = internalQuery({
   args: {
     claimId: v.id("claims"),
   },
@@ -50,7 +80,6 @@ export const listByClaim = query({
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
       .collect();
 
-    // Sort by relevance score descending and sanitize raw formatting
     return evidences
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
       .map((item) => ({
@@ -72,6 +101,9 @@ export const listByClaimAndSource = query({
     sourceType: v.string(),
   },
   handler: async (ctx, args): Promise<Doc<"clinicalEvidences">[]> => {
+    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!authorized) return [];
+
     const evidences = await ctx.db
       .query("clinicalEvidences")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
@@ -88,6 +120,42 @@ export const listByClaimAndSource = query({
       }));
   },
 });
+
+async function applyBatchInsert(ctx: any, args: any): Promise<Id<"clinicalEvidences">[]> {
+  const claim = await ctx.db.get(args.claimId);
+  if (!claim) {
+    console.warn(`Claim ${args.claimId} not found during insertBatch; skipping.`);
+    return [];
+  }
+
+  const now = Date.now();
+  const insertedIds: Id<"clinicalEvidences">[] = [];
+
+  for (const item of args.evidences) {
+    const id = await ctx.db.insert("clinicalEvidences", {
+      claimId: args.claimId,
+      sourceType: item.sourceType,
+      title: item.title.replace(/\*\*/g, ""),
+      sourceUrl: item.sourceUrl,
+      citationClause: sanitizeCitationClause(item.citationClause),
+      extractedEvidenceMarkdown: item.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
+      relevanceScore: item.relevanceScore,
+      createdAt: now,
+    });
+    insertedIds.push(id);
+  }
+
+  // Append audit log event
+  await ctx.db.insert("appealAuditLogs", {
+    claimId: args.claimId,
+    eventType: "policy_crawled",
+    actor: "Firecrawl & Policy Engine",
+    details: `Indexed ${args.evidences.length} clinical policy clauses and medical precedents.`,
+    timestamp: now,
+  });
+
+  return insertedIds;
+}
 
 /**
  * Insert a batch of extracted clinical evidence items for a claim
@@ -107,41 +175,43 @@ export const insertBatch = mutation({
     ),
   },
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">[]> => {
-    const claim = await ctx.db.get(args.claimId);
-    if (!claim) {
-      console.warn(`Claim ${args.claimId} not found during insertBatch; skipping.`);
-      return [];
-    }
-
-    const now = Date.now();
-    const insertedIds: Id<"clinicalEvidences">[] = [];
-
-    for (const item of args.evidences) {
-      const id = await ctx.db.insert("clinicalEvidences", {
-        claimId: args.claimId,
-        sourceType: item.sourceType,
-        title: item.title.replace(/\*\*/g, ""),
-        sourceUrl: item.sourceUrl,
-        citationClause: sanitizeCitationClause(item.citationClause),
-        extractedEvidenceMarkdown: item.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
-        relevanceScore: item.relevanceScore,
-        createdAt: now,
-      });
-      insertedIds.push(id);
-    }
-
-    // Append audit log event
-    await ctx.db.insert("appealAuditLogs", {
-      claimId: args.claimId,
-      eventType: "policy_crawled",
-      actor: "Firecrawl & Policy Engine",
-      details: `Indexed ${args.evidences.length} clinical policy clauses and medical precedents.`,
-      timestamp: now,
-    });
-
-    return insertedIds;
+    await requireClaimOwner(ctx, args.claimId);
+    return await applyBatchInsert(ctx, args);
   },
 });
+
+/**
+ * Internal mutation for background actions to insert batches of extracted clinical evidence
+ */
+export const insertBatchInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    evidences: v.array(
+      v.object({
+        sourceType: v.string(),
+        title: v.string(),
+        sourceUrl: v.optional(v.string()),
+        citationClause: v.string(),
+        extractedEvidenceMarkdown: v.string(),
+        relevanceScore: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args): Promise<Id<"clinicalEvidences">[]> => {
+    return await applyBatchInsert(ctx, args);
+  },
+});
+
+async function applyClearByClaim(ctx: any, claimId: Id<"claims">) {
+  const existing = await ctx.db
+    .query("clinicalEvidences")
+    .withIndex("by_claim", (q: any) => q.eq("claimId", claimId))
+    .collect();
+
+  for (const item of existing) {
+    await ctx.db.delete(item._id);
+  }
+}
 
 /**
  * Remove all clinical evidences for a claim (used before re-analyzing)
@@ -151,14 +221,20 @@ export const clearByClaim = mutation({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("clinicalEvidences")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
+    await requireClaimOwner(ctx, args.claimId);
+    await applyClearByClaim(ctx, args.claimId);
+  },
+});
 
-    for (const item of existing) {
-      await ctx.db.delete(item._id);
-    }
+/**
+ * Internal mutation for background actions to clear clinical evidences
+ */
+export const clearByClaimInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    await applyClearByClaim(ctx, args.claimId);
   },
 });
 
@@ -173,6 +249,7 @@ export const deleteEvidence = mutation({
     const evidence = await ctx.db.get(args.evidenceId);
     if (!evidence) return null;
 
+    await requireClaimOwner(ctx, evidence.claimId);
     await ctx.db.delete(args.evidenceId);
 
     // Audit log
@@ -188,6 +265,31 @@ export const deleteEvidence = mutation({
   },
 });
 
+async function applyInsertSingle(ctx: any, args: any): Promise<Id<"clinicalEvidences">> {
+  const now = Date.now();
+  const cleanClause = sanitizeCitationClause(args.citationClause);
+  const id = await ctx.db.insert("clinicalEvidences", {
+    claimId: args.claimId,
+    sourceType: args.sourceType,
+    title: args.title.replace(/\*\*/g, ""),
+    sourceUrl: args.sourceUrl,
+    citationClause: cleanClause,
+    extractedEvidenceMarkdown: args.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
+    relevanceScore: args.relevanceScore,
+    createdAt: now,
+  });
+
+  await ctx.db.insert("appealAuditLogs", {
+    claimId: args.claimId,
+    eventType: "evidence_added",
+    actor: "Clinical Research Hub",
+    details: `Added ${args.sourceType} evidence clause: ${args.title} (${cleanClause}).`,
+    timestamp: now,
+  });
+
+  return id;
+}
+
 /**
  * Insert a single clinical evidence item
  */
@@ -202,28 +304,26 @@ export const insertSingle = mutation({
     relevanceScore: v.number(),
   },
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">> => {
-    const now = Date.now();
-    const cleanClause = sanitizeCitationClause(args.citationClause);
-    const id = await ctx.db.insert("clinicalEvidences", {
-      claimId: args.claimId,
-      sourceType: args.sourceType,
-      title: args.title.replace(/\*\*/g, ""),
-      sourceUrl: args.sourceUrl,
-      citationClause: cleanClause,
-      extractedEvidenceMarkdown: args.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
-      relevanceScore: args.relevanceScore,
-      createdAt: now,
-    });
+    await requireClaimOwner(ctx, args.claimId);
+    return await applyInsertSingle(ctx, args);
+  },
+});
 
-    await ctx.db.insert("appealAuditLogs", {
-      claimId: args.claimId,
-      eventType: "evidence_added",
-      actor: "Clinical Research Hub",
-      details: `Added ${args.sourceType} evidence clause: ${args.title} (${cleanClause}).`,
-      timestamp: now,
-    });
-
-    return id;
+/**
+ * Internal mutation for background actions to insert a single clinical evidence item
+ */
+export const insertSingleInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    sourceType: v.string(),
+    title: v.string(),
+    sourceUrl: v.optional(v.string()),
+    citationClause: v.string(),
+    extractedEvidenceMarkdown: v.string(),
+    relevanceScore: v.number(),
+  },
+  handler: async (ctx, args): Promise<Id<"clinicalEvidences">> => {
+    return await applyInsertSingle(ctx, args);
   },
 });
 
@@ -235,6 +335,20 @@ export const listSourcesSummary = query({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
+    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!authorized) {
+      return {
+        total: 0,
+        bySource: {
+          payer_cpb: 0,
+          pubmed_study: 0,
+          fda_package_insert: 0,
+          nccn_guideline: 0,
+          legal_precedent: 0,
+        },
+      };
+    }
+
     const evidences = await ctx.db
       .query("clinicalEvidences")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
@@ -270,17 +384,17 @@ export const searchEvidence = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    if (!args.query.trim()) {
+    if (!args.query.trim() || !args.claimId) {
       return [];
     }
+
+    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!authorized) return [];
 
     const results = await ctx.db
       .query("clinicalEvidences")
       .withSearchIndex("search_evidence", (q) => {
-        let builder = q.search("extractedEvidenceMarkdown", args.query);
-        if (args.claimId) {
-          builder = builder.eq("claimId", args.claimId);
-        }
+        let builder = q.search("extractedEvidenceMarkdown", args.query).eq("claimId", args.claimId!);
         if (args.sourceType && args.sourceType !== "all") {
           builder = builder.eq("sourceType", args.sourceType);
         }
@@ -295,4 +409,3 @@ export const searchEvidence = query({
     }));
   },
 });
-

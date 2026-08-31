@@ -1,15 +1,20 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
+import { getAuthUserId } from "@convex-dev/auth/server";
+import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
 
 /**
- * List chronological audit trail events for a specific claim
+ * List chronological audit trail events for a specific claim, checking authorization
  */
 export const listByClaim = query({
   args: {
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
+    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!authorized) return [];
+
     const logs = await ctx.db
       .query("appealAuditLogs")
       .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
@@ -20,7 +25,7 @@ export const listByClaim = query({
 });
 
 /**
- * Append an immutable event to the appeal audit log
+ * Append an immutable event to the appeal audit log, checking claim ownership
  */
 export const logEvent = mutation({
   args: {
@@ -30,6 +35,8 @@ export const logEvent = mutation({
     details: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireClaimOwner(ctx, args.claimId);
+
     const timestamp = Date.now();
 
     const logId = await ctx.db.insert("appealAuditLogs", {
@@ -73,17 +80,30 @@ export const logEventInternal = internalMutation({
 });
 
 /**
- * List the most recent audit events across all claims for the live activity feed
+ * List the most recent audit events strictly across the authenticated user's claims
  */
 export const listRecent = query({
   args: {
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
     const limit = args.limit || 15;
-    const logs = await ctx.db.query("appealAuditLogs").collect();
+
+    const userClaims = await ctx.db
+      .query("claims")
+      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .collect();
+
+    const userClaimIds = new Set(userClaims.map((c) => c._id));
+    if (userClaimIds.size === 0) return [];
+
+    const logs = await ctx.db.query("appealAuditLogs").take(100);
 
     return (logs as Doc<"appealAuditLogs">[])
+      .filter((l) => userClaimIds.has(l.claimId))
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
   },

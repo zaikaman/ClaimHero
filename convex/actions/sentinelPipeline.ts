@@ -2,7 +2,7 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 
 export interface PipelineResult {
@@ -51,7 +51,7 @@ export const runAutonomousPipeline = action({
   },
   handler: async (ctx, args): Promise<PipelineResult> => {
     // 1. Fetch current claim details
-    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -99,7 +99,7 @@ export const runAutonomousPipeline = action({
       console.warn(`Pipeline sender fallback used for claim ${claim.claimNumber}: ${sender.name}`);
       // Persist fallback so subsequent steps and audit reflect it
       try {
-        await ctx.runMutation((api as any).claims.updateAppealContext, {
+        await ctx.runMutation((internal as any).claims.updateAppealContextInternal, {
           claimId: args.claimId,
           sender: {
             name: sender.name,
@@ -126,7 +126,7 @@ export const runAutonomousPipeline = action({
       clinicalFacts = { recordsAreIncomplete: true } as any;
       console.warn(`Pipeline clinicalFacts fallback used for claim ${claim.claimNumber}: recordsAreIncomplete=true`);
       try {
-        await ctx.runMutation((api as any).claims.updateAppealContext, {
+        await ctx.runMutation((internal as any).claims.updateAppealContextInternal, {
           claimId: args.claimId,
           sender: sender as any,
           clinicalFacts: clinicalFacts as any,
@@ -149,7 +149,7 @@ export const runAutonomousPipeline = action({
     }
 
     // Step 1: Policy Crawling & Evidence Extraction
-    await ctx.runMutation((api as any).claims.updateStatus, {
+    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "analyzing",
       actor: "Autonomous Sentinel Pipeline",
@@ -177,7 +177,7 @@ export const runAutonomousPipeline = action({
       // can be synthesized without citing an inaccessible or irrelevant URL.
       // The crawler already cleared prior evidences, so we insert the fallback.
       try {
-        await ctx.runMutation((api as any).clinicalEvidences.insertBatch, {
+        await ctx.runMutation((internal as any).clinicalEvidences.insertBatchInternal, {
           claimId: args.claimId,
           evidences: [
             {
@@ -194,7 +194,7 @@ export const runAutonomousPipeline = action({
       } catch (e) {
         console.warn("Fallback ERISA insertion note:", e);
       }
-      await ctx.runMutation((api as any).claims.updateStatus, {
+      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
         actor: "Autonomous Sentinel Pipeline",
@@ -204,7 +204,7 @@ export const runAutonomousPipeline = action({
     }
 
     // Step 2: Precedent Matching & Overturn Probability Scoring
-    await ctx.runMutation((api as any).claims.updateStatus, {
+    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "analyzing",
       actor: "Autonomous Sentinel Pipeline",
@@ -218,7 +218,7 @@ export const runAutonomousPipeline = action({
       }
     );
 
-    await ctx.runMutation((api as any).claims.updateStatus, {
+    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "precedent_matched",
       actor: "Autonomous Sentinel Pipeline",
@@ -236,7 +236,7 @@ export const runAutonomousPipeline = action({
     }
 
     // Step 3: Formal ERISA Appeal Brief Synthesis
-    await ctx.runMutation((api as any).claims.updateStatus, {
+    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "drafting",
       actor: "Autonomous Sentinel Pipeline",
@@ -259,7 +259,7 @@ export const runAutonomousPipeline = action({
     );
 
     // Step 4: Final status update to ready_for_review
-    await ctx.runMutation((api as any).claims.updateStatus, {
+    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "ready_for_review",
       actor: "Autonomous Sentinel Pipeline",

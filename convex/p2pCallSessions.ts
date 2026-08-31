@@ -1,11 +1,15 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
+import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
 
 export const getLatestByClaim = query({
   args: {
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
+    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!authorized) return null;
+
     return await ctx.db
       .query("p2pCallSessions")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
@@ -19,7 +23,13 @@ export const getById = query({
     sessionId: v.id("p2pCallSessions"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.sessionId);
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) return null;
+
+    const authorized = await getClaimIfAuthorized(ctx, session.claimId);
+    if (!authorized) return null;
+
+    return session;
   },
 });
 
@@ -28,6 +38,8 @@ export const startSession = mutation({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
+    await requireClaimOwner(ctx, args.claimId);
+
     const defaultChecklist = [
       {
         id: "reviewer_credentials",
@@ -102,6 +114,8 @@ export const appendTranscript = mutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
 
+    await requireClaimOwner(ctx, session.claimId);
+
     const existingIndex = session.transcripts.findIndex((t) => t.id === args.transcriptItem.id);
     let updatedTranscripts = [...session.transcripts];
 
@@ -124,6 +138,22 @@ export const appendTranscript = mutation({
   },
 });
 
+async function applyAddFastAnswer(ctx: any, args: any) {
+  const session = await ctx.db.get(args.sessionId);
+  if (!session) return;
+
+  const fastAnswers = [args.fastAnswer, ...(session.fastAnswers || [])].slice(0, 30);
+
+  // Dynamic boost to win score when high confidence fast answer is available
+  const newWinScore = Math.min(100, Math.max(0, session.winScore + 5));
+
+  await ctx.db.patch(args.sessionId, {
+    fastAnswers,
+    winScore: newWinScore,
+    updatedAt: Date.now(),
+  });
+}
+
 export const addFastAnswer = mutation({
   args: {
     sessionId: v.id("p2pCallSessions"),
@@ -142,16 +172,27 @@ export const addFastAnswer = mutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
 
-    const fastAnswers = [args.fastAnswer, ...(session.fastAnswers || [])].slice(0, 30);
+    await requireClaimOwner(ctx, session.claimId);
+    await applyAddFastAnswer(ctx, args);
+  },
+});
 
-    // Dynamic boost to win score when high confidence fast answer is available
-    const newWinScore = Math.min(100, Math.max(0, session.winScore + 5));
-
-    await ctx.db.patch(args.sessionId, {
-      fastAnswers,
-      winScore: newWinScore,
-      updatedAt: Date.now(),
-    });
+export const addFastAnswerInternal = internalMutation({
+  args: {
+    sessionId: v.id("p2pCallSessions"),
+    fastAnswer: v.object({
+      id: v.string(),
+      trapQuestion: v.string(),
+      suggestedQuote: v.string(),
+      chartProof: v.string(),
+      cpbCitation: v.string(),
+      regulatoryLeverage: v.optional(v.string()),
+      confidenceScore: v.number(),
+      timestamp: v.number(),
+    }),
+  },
+  handler: async (ctx, args) => {
+    await applyAddFastAnswer(ctx, args);
   },
 });
 
@@ -164,6 +205,8 @@ export const updateChecklist = mutation({
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
+
+    await requireClaimOwner(ctx, session.claimId);
 
     const updatedChecklist = session.checklistProgress.map((item) => {
       if (item.id === args.checklistId) {
@@ -197,6 +240,8 @@ export const completeSession = mutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
 
+    await requireClaimOwner(ctx, session.claimId);
+
     const now = Date.now();
     await ctx.db.patch(args.sessionId, {
       sessionStatus: "completed",
@@ -227,6 +272,8 @@ export const updateTranscriptSpeaker = mutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
 
+    await requireClaimOwner(ctx, session.claimId);
+
     const updatedTranscripts = session.transcripts.map((t) => {
       if (t.id === args.transcriptId) {
         return {
@@ -243,4 +290,3 @@ export const updateTranscriptSpeaker = mutation({
     });
   },
 });
-

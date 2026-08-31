@@ -1,9 +1,10 @@
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { claimsAggregate } from "./lib/aggregates";
+import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner } from "./lib/auth";
 
 /**
  * Full-text search across claims using Convex native searchIndex
@@ -16,17 +17,14 @@ export const search = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!args.query.trim()) {
+    if (!userId || !args.query.trim()) {
       return [];
     }
 
     const results = await ctx.db
       .query("claims")
       .withSearchIndex("search_claims", (q) => {
-        let builder = q.search("denialReasonDescription", args.query);
-        if (userId) {
-          builder = builder.eq("userId", userId);
-        }
+        let builder = q.search("denialReasonDescription", args.query).eq("userId", userId);
         if (args.status && args.status !== "all") {
           builder = builder.eq("status", args.status);
         }
@@ -47,7 +45,7 @@ export const search = query({
 });
 
 /**
- * List all claims with optional status and payer filters, scoped to the authenticated user
+ * List all claims with optional status and payer filters, strictly scoped to the authenticated user
  */
 export const list = query({
   args: {
@@ -57,43 +55,24 @@ export const list = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return [];
+    }
+
     let claims: Doc<"claims">[];
 
-    if (userId) {
-      if (args.status && args.status !== "all") {
-        const ownedClaims = (await ctx.db
-          .query("claims")
-          .withIndex("by_user_status", (q: any) =>
-            q.eq("userId", userId).eq("status", args.status)
-          )
-          .collect()) as Doc<"claims">[];
-        const sharedIntakeClaims = (await ctx.db
-          .query("claims")
-          .withIndex("by_user_status", (q: any) =>
-            q.eq("userId", undefined).eq("status", args.status)
-          )
-          .collect()) as Doc<"claims">[];
-        claims = [...ownedClaims, ...sharedIntakeClaims];
-      } else {
-        const ownedClaims = (await ctx.db
-          .query("claims")
-          .withIndex("by_user", (q: any) => q.eq("userId", userId))
-          .collect()) as Doc<"claims">[];
-        const sharedIntakeClaims = (await ctx.db
-          .query("claims")
-          .withIndex("by_user", (q: any) => q.eq("userId", undefined))
-          .collect()) as Doc<"claims">[];
-        claims = [...ownedClaims, ...sharedIntakeClaims];
-      }
+    if (args.status && args.status !== "all") {
+      claims = (await ctx.db
+        .query("claims")
+        .withIndex("by_user_status", (q: any) =>
+          q.eq("userId", userId).eq("status", args.status)
+        )
+        .collect()) as Doc<"claims">[];
     } else {
-      if (args.status && args.status !== "all") {
-        claims = (await ctx.db
-          .query("claims")
-          .withIndex("by_status", (q: any) => q.eq("status", args.status))
-          .collect()) as Doc<"claims">[];
-      } else {
-        claims = (await ctx.db.query("claims").collect()) as Doc<"claims">[];
-      }
+      claims = (await ctx.db
+        .query("claims")
+        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .collect()) as Doc<"claims">[];
     }
 
     // Join with patient details, latest appeal draft, and evidence count
@@ -148,6 +127,41 @@ export const getById = query({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
+    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!authorized) return null;
+    const claim = authorized.claim;
+
+    const patient = (await ctx.db.get(claim.patientId)) as Doc<"patients"> | null;
+
+    const evidences = await ctx.db
+      .query("clinicalEvidences")
+      .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+      .collect();
+
+    const appeals = await ctx.db
+      .query("appeals")
+      .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+      .collect();
+
+    const latestAppeal = appeals.sort((a, b) => b.version - a.version)[0] || null;
+
+    return {
+      ...claim,
+      patient: patient || undefined,
+      evidenceCount: evidences.length,
+      latestAppeal,
+    };
+  },
+});
+
+/**
+ * Internal query for background actions to retrieve a complete claim record
+ */
+export const getByIdInternal = internalQuery({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
     const claim = (await ctx.db.get(args.claimId)) as Doc<"claims"> | null;
     if (!claim) return null;
 
@@ -175,6 +189,18 @@ export const getById = query({
 });
 
 /**
+ * Internal query for webhook processors and background actions to list claims
+ */
+export const listAllInternal = internalQuery({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.query("claims").take(args.limit || 500);
+  },
+});
+
+/**
  * Create a new claim for an existing patient
  */
 export const create = mutation({
@@ -193,14 +219,14 @@ export const create = mutation({
     denialLetterStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuthUser(ctx);
     const now = Date.now();
     const deadlineDays = args.appealFilingDeadlineDays || 180;
     const statutoryDeadline = now + deadlineDays * 86400000;
     const assignedAgentEmail = `appeal-claim-${args.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
 
     const claimId = await ctx.db.insert("claims", {
-      userId: userId ?? undefined,
+      userId,
       patientId: args.patientId,
       claimNumber: args.claimNumber,
       serviceDate: args.serviceDate,
@@ -282,20 +308,23 @@ export const createWithPatient = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuthUser(ctx);
     const now = Date.now();
 
-    // Check if patient already exists by memberId or email
+    // Check if patient already exists by email for this user
     const existingPatients = (await ctx.db
       .query("patients")
       .withIndex("by_email", (q: any) => q.eq("email", args.patientEmail))
       .collect()) as Doc<"patients">[];
 
+    const matchingPatient = existingPatients.find((p) => p.userId === userId || !p.userId);
+
     let patientId: Id<"patients">;
 
-    if (existingPatients.length > 0 && existingPatients[0]) {
-      patientId = existingPatients[0]._id;
+    if (matchingPatient) {
+      patientId = matchingPatient._id;
       await ctx.db.patch(patientId, {
+        userId,
         name: args.patientName,
         memberId: args.memberId,
         groupNumber: args.groupNumber,
@@ -304,7 +333,7 @@ export const createWithPatient = mutation({
       });
     } else {
       patientId = await ctx.db.insert("patients", {
-        userId: userId ?? undefined,
+        userId,
         name: args.patientName,
         email: args.patientEmail,
         memberId: args.memberId,
@@ -320,7 +349,7 @@ export const createWithPatient = mutation({
     const assignedAgentEmail = `appeal-claim-${args.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
 
     const claimId = await ctx.db.insert("claims", {
-      userId: userId ?? undefined,
+      userId,
       patientId,
       claimNumber: args.claimNumber,
       serviceDate: args.serviceDate,
@@ -399,7 +428,6 @@ export const setAgentMailInboxes = internalMutation({
     }
     if (args.claimInboxEmail !== undefined) {
       patchData.agentMailInboxEmail = args.claimInboxEmail;
-      // Keep the existing UI and webhook contract pointed at the real inbox.
       patchData.assignedAgentEmail = args.claimInboxEmail;
     }
     if (args.adjudicatorInboxId !== undefined) {
@@ -412,6 +440,50 @@ export const setAgentMailInboxes = internalMutation({
     return null;
   },
 });
+
+async function applyStatusUpdate(ctx: any, args: any) {
+  const now = Date.now();
+  const claim = await ctx.db.get(args.claimId);
+  if (!claim) {
+    console.warn(`Claim ${args.claimId} not found during updateStatus; skipping.`);
+    return null;
+  }
+
+  const patchData: Record<string, any> = {
+    status: args.status,
+    updatedAt: now,
+  };
+
+  if (args.overturnProbabilityScore !== undefined) {
+    patchData.overturnProbabilityScore = args.overturnProbabilityScore;
+  }
+  if (args.riskLevel !== undefined) {
+    patchData.riskLevel = args.riskLevel;
+  }
+  if (args.scoringBreakdown !== undefined) {
+    patchData.scoringBreakdown = args.scoringBreakdown;
+  }
+
+  await ctx.db.patch(args.claimId, patchData);
+
+  await ctx.db.insert("appealAuditLogs", {
+    claimId: args.claimId,
+    eventType: `status_changed_to_${args.status}`,
+    actor: args.actor || "ClaimHero Sentinel",
+    details: args.details || `Case status updated to ${args.status}`,
+    timestamp: now,
+  });
+
+  if (args.status === "won") {
+    await ctx.scheduler.runAfter(
+      0,
+      (internal as any)["actions/precedentArchive"].indexWonAppeal,
+      { claimId: args.claimId }
+    );
+  }
+
+  return null;
+}
 
 /**
  * Update claim status and record an audit log event
@@ -438,47 +510,37 @@ export const updateStatus = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const claim = await ctx.db.get(args.claimId);
-    if (!claim) {
-      console.warn(`Claim ${args.claimId} not found during updateStatus; skipping.`);
-      return null;
-    }
+    await requireClaimOwner(ctx, args.claimId);
+    return await applyStatusUpdate(ctx, args);
+  },
+});
 
-    const patchData: Record<string, any> = {
-      status: args.status,
-      updatedAt: now,
-    };
-
-    if (args.overturnProbabilityScore !== undefined) {
-      patchData.overturnProbabilityScore = args.overturnProbabilityScore;
-    }
-    if (args.riskLevel !== undefined) {
-      patchData.riskLevel = args.riskLevel;
-    }
-    if (args.scoringBreakdown !== undefined) {
-      patchData.scoringBreakdown = args.scoringBreakdown;
-    }
-
-    await ctx.db.patch(args.claimId, patchData);
-
-    await ctx.db.insert("appealAuditLogs", {
-      claimId: args.claimId,
-      eventType: `status_changed_to_${args.status}`,
-      actor: args.actor || "ClaimHero Sentinel",
-      details: args.details || `Case status updated to ${args.status}`,
-      timestamp: now,
-    });
-
-    if (args.status === "won") {
-      await ctx.scheduler.runAfter(
-        0,
-        (internal as any)["actions/precedentArchive"].indexWonAppeal,
-        { claimId: args.claimId }
-      );
-    }
-
-    return null;
+/**
+ * Internal mutation for background actions to update claim status
+ */
+export const updateStatusInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    status: v.string(),
+    details: v.optional(v.string()),
+    actor: v.optional(v.string()),
+    overturnProbabilityScore: v.optional(v.number()),
+    riskLevel: v.optional(v.string()),
+    scoringBreakdown: v.optional(
+      v.array(
+        v.object({
+          category: v.string(),
+          criterion: v.string(),
+          score: v.number(),
+          maxScore: v.number(),
+          status: v.string(),
+          rationale: v.string(),
+        })
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    return await applyStatusUpdate(ctx, args);
   },
 });
 
@@ -488,14 +550,15 @@ export const updateStatus = mutation({
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireAuthUser(ctx);
     return await ctx.storage.generateUploadUrl();
   },
 });
 
 /**
- * Sweep and recalculate statutory deadlines across all open claims
+ * Sweep and recalculate statutory deadlines across all open claims (Invoked by cron)
  */
-export const sweepDeadlines = mutation({
+export const sweepDeadlines = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
@@ -533,22 +596,46 @@ export const sweepDeadlines = mutation({
 });
 
 /**
- * Retrieve comprehensive portfolio analytics and financial metrics computed across all claims
+ * Retrieve comprehensive portfolio analytics and financial metrics strictly computed across the authenticated user's claims
  */
 export const getPortfolioStats = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    let claims: Doc<"claims">[];
-
-    if (userId) {
-      claims = (await ctx.db
-        .query("claims")
-        .withIndex("by_user", (q: any) => q.eq("userId", userId))
-        .collect()) as Doc<"claims">[];
-    } else {
-      claims = (await ctx.db.query("claims").collect()) as Doc<"claims">[];
+    if (!userId) {
+      return {
+        totalClaims: 0,
+        totalDisputedAmount: 0,
+        activeDisputedAmount: 0,
+        overturnedWonAmount: 0,
+        averageWinScore: 0,
+        recoveryRatePercent: 0,
+        criticalDeadlinesCount: 0,
+        urgentDeadlinesCount: 0,
+        claimsByStatus: {
+          ingested: 0,
+          parsing: 0,
+          analyzing: 0,
+          precedent_matched: 0,
+          drafting: 0,
+          ready_for_review: 0,
+          dispatched: 0,
+          won: 0,
+          lost: 0,
+        },
+        claimsByRisk: {
+          high_confidence: 0,
+          moderate: 0,
+          complex_litigation: 0,
+        },
+        payerBreakdown: [],
+      };
     }
+
+    const claims = (await ctx.db
+      .query("claims")
+      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .collect()) as Doc<"claims">[];
 
     const patients = await ctx.db.query("patients").collect();
     const patientMap = new Map(patients.map((p) => [p._id, p]));
@@ -674,8 +761,7 @@ export const getPortfolioStats = query({
 export const claimLegacyCases = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Must be authenticated to claim legacy records");
+    const userId = await requireAuthUser(ctx);
 
     const allClaims = await ctx.db.query("claims").collect();
     const unassigned = allClaims.filter((c) => !c.userId);
@@ -694,6 +780,8 @@ export const claimLegacyCases = mutation({
 export const clearUnassignedDemoCases = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireAuthUser(ctx);
+
     const allClaims = await ctx.db.query("claims").collect();
     const unassigned = allClaims.filter((c) => !c.userId);
 
@@ -719,16 +807,7 @@ export const deleteCase = mutation({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    const claim = (await ctx.db.get(args.claimId)) as Doc<"claims"> | null;
-    if (!claim) {
-      throw new Error("Case not found or already deleted");
-    }
-
-    // Ownership verification: user can only delete their own cases (or unassigned demo cases)
-    if (claim.userId && userId && claim.userId !== userId) {
-      throw new Error("Unauthorized: You do not have permission to delete this case");
-    }
+    const { claim } = await requireClaimOwner(ctx, args.claimId);
 
     // 1. Cascade delete associated clinical evidences
     const evidences = await ctx.db
@@ -795,7 +874,6 @@ export const deleteCase = mutation({
     try {
       await claimsAggregate.delete(ctx, claim);
     } catch (err) {
-      // Document may not be tracked in aggregate if created prior to aggregate initialization
       console.warn("Could not delete claim from aggregate:", err);
     }
 
@@ -811,6 +889,26 @@ export const deleteCase = mutation({
     };
   },
 });
+
+async function applyPayerContactUpdate(ctx: any, args: any) {
+  await ctx.db.patch(args.claimId, {
+    payerContact: args.payerContact,
+    updatedAt: Date.now(),
+  });
+
+  const thread = await ctx.db
+    .query("emailThreads")
+    .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+    .first();
+
+  if (thread && args.payerContact.officialAppealsEmail) {
+    await ctx.db.patch(thread._id, {
+      payerEmail: args.payerContact.officialAppealsEmail,
+    });
+  }
+
+  return { success: true };
+}
 
 /**
  * Update claim with dynamically discovered payer contact information (e.g. via Firecrawl or OCR)
@@ -832,30 +930,110 @@ export const updatePayerContact = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.claimId, {
-      payerContact: args.payerContact,
-      updatedAt: Date.now(),
-    });
-
-    const thread = await ctx.db
-      .query("emailThreads")
-      .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
-      .first();
-
-    if (thread && args.payerContact.officialAppealsEmail) {
-      await ctx.db.patch(thread._id, {
-        payerEmail: args.payerContact.officialAppealsEmail,
-      });
-    }
-
-    return { success: true };
+    await requireClaimOwner(ctx, args.claimId);
+    return await applyPayerContactUpdate(ctx, args);
   },
 });
 
 /**
+ * Internal mutation for background actions to update payer contact info
+ */
+export const updatePayerContactInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    payerContact: v.object({
+      officialAppealsEmail: v.optional(v.string()),
+      intakePortalUrl: v.optional(v.string()),
+      portalName: v.optional(v.string()),
+      appealsFax: v.optional(v.string()),
+      statutoryPoBox: v.optional(v.string()),
+      ediPayerId: v.optional(v.string()),
+      tollFreeHelpline: v.optional(v.string()),
+      isVerified: v.boolean(),
+      submissionPolicyNote: v.optional(v.string()),
+      source: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    return await applyPayerContactUpdate(ctx, args);
+  },
+});
+
+async function applyAppealContextUpdate(ctx: any, args: any) {
+  const claim = await ctx.db.get(args.claimId);
+  if (!claim) throw new Error("Claim not found");
+
+  const clean = (value: string | undefined, maxLength: number) => {
+    const normalized = value?.trim() || undefined;
+    if (normalized && normalized.length > maxLength) {
+      throw new Error(`Appeal context fields must be ${maxLength} characters or fewer`);
+    }
+    return normalized;
+  };
+
+  const name = args.sender.name.trim();
+  if (!name) throw new Error("Enter the name of the person submitting the appeal");
+  if (name.length > 200) throw new Error("Sender name must be 200 characters or fewer");
+
+  const email = clean(args.sender.email, 320);
+  const phone = clean(args.sender.phone, 80);
+  if (!email && !phone) {
+    throw new Error("Add an email address or phone number so the payer can contact the sender");
+  }
+
+  const now = Date.now();
+  const patchPayload: Record<string, any> = {
+    appealContext: {
+      sender: {
+        name,
+        credentials: clean(args.sender.credentials, 200),
+        email,
+        phone,
+      },
+      clinicalFacts: {
+        symptomsAndFunctionalImpact: clean(args.clinicalFacts.symptomsAndFunctionalImpact, 10000),
+        examinationFindings: clean(args.clinicalFacts.examinationFindings, 10000),
+        imagingAndDiagnostics: clean(args.clinicalFacts.imagingAndDiagnostics, 10000),
+        treatmentHistoryAndResponse: clean(args.clinicalFacts.treatmentHistoryAndResponse, 10000),
+        otherDocumentedFacts: clean(args.clinicalFacts.otherDocumentedFacts, 10000),
+        recordsAreIncomplete: args.clinicalFacts.recordsAreIncomplete,
+      },
+      physicianNotes: clean(args.physicianNotes, 15000),
+      confirmedAt: now,
+    },
+    updatedAt: now,
+  };
+
+  if (args.redactionMetadata) {
+    patchPayload.redactionMetadata = args.redactionMetadata;
+  }
+
+  await ctx.db.patch(args.claimId, patchPayload);
+
+  await ctx.db.insert("appealAuditLogs", {
+    claimId: args.claimId,
+    eventType: "appeal_context_completed",
+    actor: name,
+    details: "Confirmed sender identity and documented clinical context before appeal drafting.",
+    timestamp: now,
+  });
+
+  if (args.redactionMetadata?.isRedacted) {
+    await ctx.db.insert("appealAuditLogs", {
+      claimId: args.claimId,
+      eventType: "hipaa_redaction_applied",
+      actor: "HIPAA Privacy Filter",
+      details: `Enforced ${args.redactionMetadata.mode} redaction (${args.redactionMetadata.redactedEntityCount} entities masked: ${args.redactionMetadata.maskedCategories.join(", ")})`,
+      timestamp: now,
+    });
+  }
+
+  return { confirmedAt: now };
+}
+
+/**
  * Persist the human-confirmed sender identity and clinical record context used
- * to prepare an appeal. The clinical fields are evidence supplied for review;
- * they are never treated as proof merely because a user entered them.
+ * to prepare an appeal.
  */
 export const updateAppealContext = mutation({
   args: {
@@ -886,75 +1064,44 @@ export const updateAppealContext = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const claim = await ctx.db.get(args.claimId);
-    if (!claim) throw new Error("Claim not found");
+    await requireClaimOwner(ctx, args.claimId);
+    return await applyAppealContextUpdate(ctx, args);
+  },
+});
 
-    const clean = (value: string | undefined, maxLength: number) => {
-      const normalized = value?.trim() || undefined;
-      if (normalized && normalized.length > maxLength) {
-        throw new Error(`Appeal context fields must be ${maxLength} characters or fewer`);
-      }
-      return normalized;
-    };
-
-    const name = args.sender.name.trim();
-    if (!name) throw new Error("Enter the name of the person submitting the appeal");
-    if (name.length > 200) throw new Error("Sender name must be 200 characters or fewer");
-
-    const email = clean(args.sender.email, 320);
-    const phone = clean(args.sender.phone, 80);
-    if (!email && !phone) {
-      throw new Error("Add an email address or phone number so the payer can contact the sender");
-    }
-
-    const now = Date.now();
-    const patchPayload: Record<string, any> = {
-      appealContext: {
-        sender: {
-          name,
-          credentials: clean(args.sender.credentials, 200),
-          email,
-          phone,
-        },
-        clinicalFacts: {
-          symptomsAndFunctionalImpact: clean(args.clinicalFacts.symptomsAndFunctionalImpact, 10000),
-          examinationFindings: clean(args.clinicalFacts.examinationFindings, 10000),
-          imagingAndDiagnostics: clean(args.clinicalFacts.imagingAndDiagnostics, 10000),
-          treatmentHistoryAndResponse: clean(args.clinicalFacts.treatmentHistoryAndResponse, 10000),
-          otherDocumentedFacts: clean(args.clinicalFacts.otherDocumentedFacts, 10000),
-          recordsAreIncomplete: args.clinicalFacts.recordsAreIncomplete,
-        },
-        physicianNotes: clean(args.physicianNotes, 15000),
-        confirmedAt: now,
-      },
-      updatedAt: now,
-    };
-
-    if (args.redactionMetadata) {
-      patchPayload.redactionMetadata = args.redactionMetadata;
-    }
-
-    await ctx.db.patch(args.claimId, patchPayload);
-
-    await ctx.db.insert("appealAuditLogs", {
-      claimId: args.claimId,
-      eventType: "appeal_context_completed",
-      actor: name,
-      details: "Confirmed sender identity and documented clinical context before appeal drafting.",
-      timestamp: now,
-    });
-
-    if (args.redactionMetadata?.isRedacted) {
-      await ctx.db.insert("appealAuditLogs", {
-        claimId: args.claimId,
-        eventType: "hipaa_redaction_applied",
-        actor: "HIPAA Privacy Filter",
-        details: `Enforced ${args.redactionMetadata.mode} redaction (${args.redactionMetadata.redactedEntityCount} entities masked: ${args.redactionMetadata.maskedCategories.join(", ")})`,
-        timestamp: now,
-      });
-    }
-
-    return { confirmedAt: now };
+/**
+ * Internal mutation for background actions to update appeal context
+ */
+export const updateAppealContextInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    sender: v.object({
+      name: v.string(),
+      credentials: v.optional(v.string()),
+      email: v.optional(v.string()),
+      phone: v.optional(v.string()),
+    }),
+    clinicalFacts: v.object({
+      symptomsAndFunctionalImpact: v.optional(v.string()),
+      examinationFindings: v.optional(v.string()),
+      imagingAndDiagnostics: v.optional(v.string()),
+      treatmentHistoryAndResponse: v.optional(v.string()),
+      otherDocumentedFacts: v.optional(v.string()),
+      recordsAreIncomplete: v.boolean(),
+    }),
+    physicianNotes: v.optional(v.string()),
+    redactionMetadata: v.optional(
+      v.object({
+        isRedacted: v.boolean(),
+        mode: v.string(),
+        redactedEntityCount: v.number(),
+        maskedCategories: v.array(v.string()),
+        appliedAt: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    return await applyAppealContextUpdate(ctx, args);
   },
 });
 
@@ -973,8 +1120,7 @@ export const updateRedactionMetadata = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const claim = await ctx.db.get(args.claimId);
-    if (!claim) throw new Error("Claim not found");
+    await requireClaimOwner(ctx, args.claimId);
 
     const now = Date.now();
     await ctx.db.patch(args.claimId, {
@@ -1005,6 +1151,8 @@ export const recordAuditLog = mutation({
     details: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireClaimOwner(ctx, args.claimId);
+
     const timestamp = Date.now();
     const logId = await ctx.db.insert("appealAuditLogs", {
       claimId: args.claimId,
@@ -1050,8 +1198,7 @@ export const updateFinancialLiability = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const claim = await ctx.db.get(args.claimId);
-    if (!claim) throw new Error("Claim not found");
+    await requireClaimOwner(ctx, args.claimId);
 
     const now = Date.now();
     await ctx.db.patch(args.claimId, {
@@ -1097,8 +1244,7 @@ export const updateErisaPenalties = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const claim = await ctx.db.get(args.claimId);
-    if (!claim) throw new Error("Claim not found");
+    await requireClaimOwner(ctx, args.claimId);
 
     const now = Date.now();
     await ctx.db.patch(args.claimId, {
@@ -1117,4 +1263,3 @@ export const updateErisaPenalties = mutation({
     return { success: true };
   },
 });
-

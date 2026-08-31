@@ -2,7 +2,7 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { api, components } from "../_generated/api";
+import { components, internal } from "../_generated/api";
 import { createStructuredCompletion } from "../lib/openai";
 import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
 
@@ -65,7 +65,7 @@ export const resolvePayerGateway = action({
   },
   handler: async (ctx, args): Promise<ResolvedPayerContact> => {
     // 1. Fetch claim context
-    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -272,13 +272,13 @@ Extract or resolve the official appeals/grievance/claims intake gateway details 
     }
 
     // 5. Persist the discovered contact to the claim record
-    await ctx.runMutation((api as any).claims.updatePayerContact, {
+    await ctx.runMutation((internal as any).claims.updatePayerContactInternal, {
       claimId: args.claimId,
       payerContact: resolvedContact,
     });
 
     // 6. Record audit log
-    await ctx.runMutation((api as any).auditLogs.logEvent, {
+    await ctx.runMutation((internal as any).auditLogs.logEventInternal, {
       claimId: args.claimId,
       eventType: "policy_crawled",
       actor: resolvedContact.source === "firecrawl_live" ? "Firecrawl Web Crawler" : "Payer Gateway Resolver",

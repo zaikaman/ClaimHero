@@ -2,7 +2,7 @@
 
 import { v } from "convex/values";
 import { action } from "../_generated/server";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { createStructuredCompletion } from "../lib/openai";
 
 export interface LiveFastAnswerResult {
@@ -24,7 +24,7 @@ export const generateLiveFastAnswer = action({
     speakerContext: v.optional(v.string()), // e.g. "insurer"
   },
   handler: async (ctx, args): Promise<LiveFastAnswerResult> => {
-    const claim = await ctx.runQuery(api.claims.getById, {
+    const claim = await ctx.runQuery((internal as any).claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -32,7 +32,7 @@ export const generateLiveFastAnswer = action({
       throw new Error(`Claim not found: ${args.claimId}`);
     }
 
-    const evidences = await ctx.runQuery(api.clinicalEvidences.listByClaim, {
+    const evidences = await ctx.runQuery((internal as any).clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
     });
 
@@ -58,20 +58,13 @@ The medical director just made an objection, posed a trap question, or challenge
 Your mission: Deliver a sub-second, devastatingly precise, 1-2 sentence spoken rebuttal card that the physician can read ALOUD RIGHT NOW.
 
 Case Context:
-- Patient: ${claim.patient?.name || "Patient"} (Member ID: ${claim.patient?.memberId || "on file"})
-- Payer: ${payer}
-- Jurisdiction: ${state}
-- Disputed CPT Codes: ${cptList}
-- Diagnosis Codes: ${icdList}
-- Denial Code/Reason: ${claim.denialReasonCode || "CO-50"}: ${claim.denialReasonDescription || "Medical Necessity"}
-- Documented Clinical Facts:
-  * Symptoms & Functional Impact: ${clinicalFacts?.symptomsAndFunctionalImpact || "Severe functional impairment"}
-  * Physical Exam Findings: ${clinicalFacts?.examinationFindings || "Objective positive exam findings"}
-  * Imaging & Diagnostics: ${clinicalFacts?.imagingAndDiagnostics || "Diagnostic imaging confirmed pathology"}
-  * Prior Conservative History: ${clinicalFacts?.treatmentHistoryAndResponse || "Failed prior conservative therapies"}
-- Treating Physician Notes: ${physicianNotes || "Urgent standard of care intervention indicated to prevent permanent deterioration"}
-- Insurer Published Policy Criteria:
-${evidenceList || "Published clinical policy bulletin authorizes coverage when documented conservative therapy fails or acute functional impairment is present."}
+- Patient: ${claim.patient?.name || "Patient"} | Payer: ${payer} | State: ${state}
+- Procedure: ${cptList} | Diagnosis: ${icdList}
+- Denial Reason: ${claim.denialReasonCode || "CO-50"}: ${claim.denialReasonDescription || "Medical Necessity"}
+- Clinical Findings: ${clinicalFacts?.examinationFindings || "Documented clinical necessity"}
+- Physician Notes: ${physicianNotes || "Immediate intervention indicated"}
+- Relevant CPB Evidence:
+${evidenceList || "Published policy criteria support coverage upon documented clinical necessity."}
 
 Rules:
 1. "suggestedQuote": Write EXACTLY what the physician should say aloud into the phone. Must be 1 to 2 crisp, firm sentences citing patient findings and policy criteria.
@@ -205,7 +198,7 @@ export const generateInteractiveReviewerPushback = action({
     ),
   },
   handler: async (ctx, args): Promise<InteractiveReviewerPushbackResult> => {
-    const claim = await ctx.runQuery(api.claims.getById, {
+    const claim = await ctx.runQuery((internal as any).claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -213,7 +206,7 @@ export const generateInteractiveReviewerPushback = action({
       throw new Error(`Claim not found: ${args.claimId}`);
     }
 
-    const evidences = await ctx.runQuery(api.clinicalEvidences.listByClaim, {
+    const evidences = await ctx.runQuery((internal as any).clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
     });
 

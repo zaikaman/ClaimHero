@@ -2,6 +2,7 @@ import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { precedentMatchValidator } from "./lib/precedentValidators";
+import { getClaimIfAuthorized } from "./lib/auth";
 
 export { precedentMatchValidator };
 
@@ -230,6 +231,9 @@ export const listAttachedForClaim = query({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
+    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!authorized) return [];
+
     const rows = await ctx.db
       .query("clinicalEvidences")
       .withIndex("by_claim_source", (q) =>

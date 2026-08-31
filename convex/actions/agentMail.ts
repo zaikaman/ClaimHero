@@ -22,7 +22,7 @@ export const provisionClaimInboxes = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -165,13 +165,13 @@ export const processInboundIntake = internalAction({
         patientEmail: senderEmail,
       });
 
-      const threadId = await ctx.runMutation((api as any).emails.getOrCreateThread, {
+      const threadId = await ctx.runMutation((internal as any).emails.getOrCreateThreadInternal, {
         claimId: extraction.claimId,
         agentEmail: intakeMailbox.email,
         payerEmail: senderEmail,
         subject: normalized.subject || "Claim denial document intake",
       });
-      await ctx.runMutation((api as any).emails.insertMessage, {
+      await ctx.runMutation((internal as any).emails.insertMessageInternal, {
         threadId,
         claimId: extraction.claimId,
         direction: "inbound",
@@ -183,7 +183,7 @@ export const processInboundIntake = internalAction({
         hasAttachments: normalized.attachments.length > 0,
         agentMailMessageId: normalized.messageId,
       });
-      await ctx.runMutation((api as any).claims.updateStatus, {
+      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
         claimId: extraction.claimId,
         status: "ingested",
         actor: "AgentMail Intake Digest",
@@ -231,7 +231,7 @@ export const processInboundClaimReply = internalAction({
 
     const subject = normalized.subject || "Adjudication Update";
     const bodyContent = normalized.text || normalized.html || "";
-    const claims: any[] = await ctx.runQuery((api as any).claims.list, { limit: 500 });
+    const claims: any[] = await ctx.runQuery((internal as any).claims.listAllInternal, { limit: 500 });
     const claimMatch = claims.find(
       (claim: any) =>
         claim.claimNumber &&
@@ -254,13 +254,13 @@ export const processInboundClaimReply = internalAction({
     }
 
     const sender = normalized.from || "Insurance Payer";
-    const threadId = await ctx.runMutation((api as any).emails.getOrCreateThread, {
+    const threadId = await ctx.runMutation((internal as any).emails.getOrCreateThreadInternal, {
       claimId: matchingClaim._id,
       agentEmail: normalized.recipients[0] || "",
       payerEmail: extractEmailAddress(sender) || sender,
       subject,
     });
-    await ctx.runMutation((api as any).emails.insertMessage, {
+    await ctx.runMutation((internal as any).emails.insertMessageInternal, {
       threadId,
       claimId: matchingClaim._id,
       direction: "inbound",
@@ -280,14 +280,14 @@ export const processInboundClaimReply = internalAction({
       lowerText.includes("payment issued") ||
       lowerText.includes("reimbursed")
     ) {
-      await ctx.runMutation((api as any).claims.updateStatus, {
+      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
         claimId: matchingClaim._id,
         status: "won",
         actor: "AgentMail Autonomous Adjudicator",
         details: `Payer approval received for claim ${matchingClaim.claimNumber}.`,
       });
     } else {
-      await ctx.runMutation((api as any).claims.updateStatus, {
+      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
         claimId: matchingClaim._id,
         status: "dispatched",
         actor: "AgentMail Webhook",

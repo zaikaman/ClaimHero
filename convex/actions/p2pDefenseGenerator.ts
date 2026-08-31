@@ -3,7 +3,7 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
-import { api } from "../_generated/api";
+import { internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 
 const P2P_DEFENSE_SCHEMA = {
@@ -310,7 +310,7 @@ export const generateP2PScript = action({
     args
   ): Promise<P2PDefenseSynthesisResult & { scriptId: string }> => {
     // 1. Fetch claim details
-    const claim: any = await ctx.runQuery((api as any).claims.getById, {
+    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -330,7 +330,7 @@ export const generateP2PScript = action({
 
     // 2. Fetch clinical evidence
     const evidences: any[] = await ctx.runQuery(
-      (api as any).clinicalEvidences.listByClaim,
+      (internal as any).clinicalEvidences.listByClaimInternal,
       { claimId: args.claimId }
     );
 
@@ -426,7 +426,7 @@ Return the structured P2P defense tele-script and condensed pocket cheat sheet.`
 
     // Persist to Convex database
     const scriptId: any = await ctx.runMutation(
-      (api as any).p2pScripts.createOrUpdateScript,
+      (internal as any).p2pScripts.createOrUpdateScriptInternal,
       {
         claimId: args.claimId,
         physicianName,

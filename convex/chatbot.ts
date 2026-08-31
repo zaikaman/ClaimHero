@@ -1,7 +1,12 @@
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-
+import {
+  getChatbotSessionIfAuthorized,
+  requireAuthUser,
+  requireChatbotSessionOwner,
+  requireClaimOwner,
+} from "./lib/auth";
 
 /**
  * List all chatbot sessions for the authenticated user
@@ -11,11 +16,7 @@ export const listSessions = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      // Return public / demo sessions
-      return await ctx.db
-        .query("chatbotSessions")
-        .order("desc")
-        .take(20);
+      return [];
     }
 
     return await ctx.db
@@ -34,23 +35,19 @@ export const getOrCreateSession = mutation({
     activeClaimId: v.optional(v.id("claims")),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuthUser(ctx);
     const now = Date.now();
 
-    // Check if there is an existing recent session
-    let existingSession = null;
-    if (userId) {
-      existingSession = await ctx.db
-        .query("chatbotSessions")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .order("desc")
-        .first();
-    } else {
-      existingSession = await ctx.db
-        .query("chatbotSessions")
-        .order("desc")
-        .first();
+    if (args.activeClaimId) {
+      await requireClaimOwner(ctx, args.activeClaimId);
     }
+
+    // Check if there is an existing recent session
+    const existingSession = await ctx.db
+      .query("chatbotSessions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .first();
 
     if (existingSession) {
       // If claimId changed and was provided, patch the session
@@ -65,7 +62,7 @@ export const getOrCreateSession = mutation({
 
     // Create a new session
     const sessionId = await ctx.db.insert("chatbotSessions", {
-      userId: userId ?? undefined,
+      userId,
       title: "Clinical & Appellate Inquiry",
       activeClaimId: args.activeClaimId,
       messageCount: 0,
@@ -78,9 +75,21 @@ export const getOrCreateSession = mutation({
 });
 
 /**
- * Get a specific chatbot session
+ * Get a specific chatbot session, strictly verifying ownership
  */
 export const getSession = query({
+  args: {
+    sessionId: v.id("chatbotSessions"),
+  },
+  handler: async (ctx, args) => {
+    return await getChatbotSessionIfAuthorized(ctx, args.sessionId);
+  },
+});
+
+/**
+ * Internal query for background actions to retrieve a chatbot session
+ */
+export const getSessionInternal = internalQuery({
   args: {
     sessionId: v.id("chatbotSessions"),
   },
@@ -90,9 +99,28 @@ export const getSession = query({
 });
 
 /**
- * List all messages in a session
+ * List all messages in a session, verifying session ownership
  */
 export const listMessages = query({
+  args: {
+    sessionId: v.id("chatbotSessions"),
+  },
+  handler: async (ctx, args) => {
+    const session = await getChatbotSessionIfAuthorized(ctx, args.sessionId);
+    if (!session) return [];
+
+    return await ctx.db
+      .query("chatbotMessages")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .order("asc")
+      .take(100);
+  },
+});
+
+/**
+ * Internal query for chatbot actions to list messages
+ */
+export const listMessagesInternal = internalQuery({
   args: {
     sessionId: v.id("chatbotSessions"),
   },
@@ -104,6 +132,35 @@ export const listMessages = query({
       .take(100);
   },
 });
+
+async function applyAddMessage(ctx: any, args: any) {
+  const session = await ctx.db.get(args.sessionId);
+  if (!session) throw new Error("Chatbot session not found");
+
+  const now = Date.now();
+  const messageId = await ctx.db.insert("chatbotMessages", {
+    sessionId: args.sessionId,
+    role: args.role,
+    content: args.content,
+    toolCalls: args.toolCalls,
+    createdAt: now,
+  });
+
+  // Auto update title if this is the first user message
+  let title = session.title;
+  if (session.messageCount === 0 && args.role === "user") {
+    title = args.content.slice(0, 45).trim();
+    if (args.content.length > 45) title += "...";
+  }
+
+  await ctx.db.patch(args.sessionId, {
+    title,
+    messageCount: (session.messageCount || 0) + 1,
+    updatedAt: now,
+  });
+
+  return messageId;
+}
 
 /**
  * Add a message to a session
@@ -125,32 +182,32 @@ export const addMessage = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const session = await ctx.db.get(args.sessionId);
-    if (!session) throw new Error("Chatbot session not found");
+    await requireChatbotSessionOwner(ctx, args.sessionId);
+    return await applyAddMessage(ctx, args);
+  },
+});
 
-    const now = Date.now();
-    const messageId = await ctx.db.insert("chatbotMessages", {
-      sessionId: args.sessionId,
-      role: args.role,
-      content: args.content,
-      toolCalls: args.toolCalls,
-      createdAt: now,
-    });
-
-    // Auto update title if this is the first user message
-    let title = session.title;
-    if (session.messageCount === 0 && args.role === "user") {
-      title = args.content.slice(0, 45).trim();
-      if (args.content.length > 45) title += "...";
-    }
-
-    await ctx.db.patch(args.sessionId, {
-      title,
-      messageCount: (session.messageCount || 0) + 1,
-      updatedAt: now,
-    });
-
-    return messageId;
+/**
+ * Internal mutation for background chatbot action to add assistant and tool responses
+ */
+export const addMessageInternal = internalMutation({
+  args: {
+    sessionId: v.id("chatbotSessions"),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system"), v.literal("tool")),
+    content: v.string(),
+    toolCalls: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          name: v.string(),
+          arguments: v.string(),
+          output: v.optional(v.string()),
+        })
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    return await applyAddMessage(ctx, args);
   },
 });
 
@@ -162,9 +219,11 @@ export const clearSession = mutation({
     sessionId: v.id("chatbotSessions"),
   },
   handler: async (ctx, args) => {
+    await requireChatbotSessionOwner(ctx, args.sessionId);
+
     const messages = await ctx.db
       .query("chatbotMessages")
-      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .withIndex("by_session", (q: any) => q.eq("sessionId", args.sessionId))
       .take(200);
 
     for (const msg of messages) {
@@ -299,7 +358,6 @@ export const searchClaimsForChatbot = internalQuery({
         };
       })
     );
-
 
     if (args.searchTerm && args.searchTerm.trim() !== "") {
       const term = args.searchTerm.toLowerCase();

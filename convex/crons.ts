@@ -1,5 +1,5 @@
 import { cronJobs } from "convex/server";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
@@ -10,7 +10,7 @@ const crons = cronJobs();
 crons.cron(
   "statutory-deadline-daily-sweep",
   "0 0 * * *",
-  (api as any).claims.sweepDeadlines
+  (internal as any).claims.sweepDeadlines
 );
 
 export default crons;

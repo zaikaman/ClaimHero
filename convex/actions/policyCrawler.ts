@@ -3,7 +3,7 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
-import { api, components } from "../_generated/api";
+import { api, components, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
 
@@ -1020,7 +1020,7 @@ export const crawlInsurerPolicy = action({
 
     // Do not leave stale, previously accepted citations visible while a new
     // source-only crawl is in progress or when the crawl fails.
-    await ctx.runMutation((api as any).clinicalEvidences.clearByClaim, {
+    await ctx.runMutation((internal as any).clinicalEvidences.clearByClaimInternal, {
       claimId: args.claimId,
     });
 
@@ -1230,13 +1230,13 @@ For each clause:
       relevanceScore: 95,
     });
 
-    await ctx.runMutation((api as any).clinicalEvidences.insertBatch, {
+    await ctx.runMutation((internal as any).clinicalEvidences.insertBatchInternal, {
       claimId: args.claimId,
       evidences: evidencesToInsert,
     });
 
     // Update claim status to analyzing
-    await ctx.runMutation((api as any).claims.updateStatus, {
+    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "analyzing",
       details: `Firecrawl indexed ${evidencesToInsert.length} clinical policy clauses for ${args.payer}.`,
@@ -1434,12 +1434,12 @@ Assign relevanceScore between 85 and 99.`,
     });
 
     if (evidencesToInsert.length > 0) {
-      await ctx.runMutation((api as any).clinicalEvidences.insertBatch, {
+      await ctx.runMutation((internal as any).clinicalEvidences.insertBatchInternal, {
         claimId: args.claimId,
         evidences: evidencesToInsert,
       });
 
-      await ctx.runMutation((api as any).claims.updateStatus, {
+      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
         details: `Firecrawl indexed ${evidencesToInsert.length} PubMed study clauses (${extracted.identifier || "Clinical Trial"}).`,
@@ -1554,12 +1554,12 @@ Assign relevanceScore between 88 and 99.`,
     });
 
     if (evidencesToInsert.length > 0) {
-      await ctx.runMutation((api as any).clinicalEvidences.insertBatch, {
+      await ctx.runMutation((internal as any).clinicalEvidences.insertBatchInternal, {
         claimId: args.claimId,
         evidences: evidencesToInsert,
       });
 
-      await ctx.runMutation((api as any).claims.updateStatus, {
+      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
         details: `Firecrawl indexed ${evidencesToInsert.length} FDA label & indication clauses (${extracted.productName}).`,
@@ -1618,12 +1618,12 @@ Assign relevanceScore between 80 and 99.`,
     }));
 
     if (evidencesToInsert.length > 0) {
-      await ctx.runMutation((api as any).clinicalEvidences.insertBatch, {
+      await ctx.runMutation((internal as any).clinicalEvidences.insertBatchInternal, {
         claimId: args.claimId,
         evidences: evidencesToInsert,
       });
 
-      await ctx.runMutation((api as any).claims.updateStatus, {
+      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
         details: `Firecrawl extracted ${evidencesToInsert.length} clauses from custom URL: ${extracted.documentTitle}.`,
@@ -1656,7 +1656,7 @@ export const crawlMultiSourceHub = action({
   },
   handler: async (ctx, args) => {
     // Clear prior evidence to start fresh multi-source sweep
-    await ctx.runMutation((api as any).clinicalEvidences.clearByClaim, {
+    await ctx.runMutation((internal as any).clinicalEvidences.clearByClaimInternal, {
       claimId: args.claimId,
     });
 
@@ -1710,7 +1710,7 @@ export const crawlMultiSourceHub = action({
     }
 
     // Ensure ERISA statutory legal precedent is always present
-    await ctx.runMutation((api as any).clinicalEvidences.insertSingle, {
+    await ctx.runMutation((internal as any).clinicalEvidences.insertSingleInternal, {
       claimId: args.claimId,
       sourceType: "legal_precedent",
       title: "ERISA Full & Fair Review Statutory Protocol",

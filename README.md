@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-177%2F177%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-191%2F191%20passing-0ea5e9?style=flat-square" />
   <img alt="Coverage" src="https://img.shields.io/badge/coverage-100%25%20lines-10b981?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
@@ -362,9 +362,8 @@ ClaimHero ships with six independent anti-hallucination layers:
 ---
 
 ## 11. Security, Privacy & HIPAA
-
-* **Auth** — `@convex-dev/auth` with Google OAuth + Email/Password (`convex/auth.ts`, `convex/auth.config.ts`), deterministic RS256 JWT, `ConvexProviderWithAuth`.
-* **Ownership** — Every `claims`/`patients` row carries `userId`; reads/writes call `getAuthUserId(ctx)` (`claims.ts:18`, `claims.ts:536`, `deleteCase:708`).
+ 
+* **Auth & Server-Side Multi-Tenant Authorization** — `@convex-dev/auth` with Google OAuth + Email/Password (`convex/auth.ts`, `convex/auth.config.ts`), deterministic RS256 JWT, and centralized authorization primitives in `convex/lib/auth.ts` / `convex/model/auth.ts` (`requireAuthUser`, `requireIdentity`, `requireClaimOwner`, `getClaimIfAuthorized`, `requireChatbotSessionOwner`, `requireOwner`). All queries and mutations strictly verify authenticated identity and document ownership (`claim.userId === userId`), ensuring zero unauthenticated PHI leakage and full compliance with `convex-authz` audits.
 * **Redaction Engine** (`src/lib/redactionEngine.ts`) — Deterministic PII detection: SSN (hyphen/space/labeled), Member ID suffix (`MBN9823412-01 -> MBN9823412-**`), DOB, MRN, phone, email, street address, plus user-defined terms. Three presets: **HIPAA Safe Harbor** (45 CFR §164.514(b)(2)), **Balanced Appellate**, **Public Legal Exhibit**. Persisted in `claims.redactionMetadata` with `appealAuditLogs:hipaa_redaction_applied`.
 * **Transport** — AgentMail REST uses `Authorization: Bearer` with `AGENTMAIL_API_KEY`; Convex dashboard env vars are never exposed to the client.
 * **Webhook Security & Replay Prevention** — Inbound AgentMail (`POST /agentmail-webhook`, `AGENTMAIL_WEBHOOK_SECRET`) and Firecrawl (`/firecrawl/*`, `FIRECRAWL_WEBHOOK_SECRET`) endpoints enforce cryptographic HMAC-SHA256 signature verification (`svix-signature` / `svix-timestamp` / `svix-id`) with 300-second timestamp drift tolerances and timing-safe equality checks to eliminate forged intake or replay attacks.
@@ -377,14 +376,14 @@ ClaimHero ships with six independent anti-hallucination layers:
 | Layer | Technology |
 |---|---|
 | **Backend** | Convex (DB, Queries/Mutations/Actions, Vector Search, File Storage, Crons, HTTP Router) |
-| **Auth** | `@convex-dev/auth` (Google OAuth + Password), `convex/auth.config.ts` |
+| **Auth** | `@convex-dev/auth` (Google OAuth + Password), `convex/auth.config.ts`, `convex/lib/auth.ts` |
 | **Crawl** | `@firecrawl/firecrawl-convex` (official Convex component) / Firecrawl v2 API |
 | **Email** | AgentMail REST `api.agentmail.to`, inbound `POST /agentmail-webhook` |
 | **AI** | OpenAI `gpt-5.4-nano` (Structured Outputs, Vision, Embeddings 1536-d) via `openai` SDK |
 | **Frontend** | React 18 + TypeScript (strict) + Vite 6 + Tailwind CSS 3.4 |
 | **UI** | Radix Primitives, Phosphor Icons (`@phosphor-icons/react`), `react-markdown` + `remark-gfm`/`remark-breaks`, `three`/`@react-three/fiber` Silk shader |
 | **State** | Convex reactive hooks (`useQuery`, `useMutation`, `useAction`, `useConvexAuth`) + custom hooks (`useClaims`, `useEvidence`, `useAppealStudio`, `useLiveCallCopilot`, `useLiabilityCalculator`) |
-| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 177 unit tests across 11 suites, 100% line coverage in backend libs and core utils |
+| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 191 unit tests across 12 suites, 100% line coverage in backend libs and core utils |
 
 Theme: **Precision Medical Dark Mode** — obsidian `#0b0f17` canvas, cyan `#0ea5e9` primary, emerald/amber/crimson semantic tokens, glassmorphism (`backdrop-blur-md`, `bg-card/75`), tabular-nums for monetary values (`src/index.css:7`, `tailwind.config.js`).
 
@@ -402,8 +401,12 @@ ClaimHero/
 │   ├── emails.ts / auditLogs.ts  # threads/messages + immutable ledger
 │   ├── precedents.ts             # vector corpus attach + retrieval
 │   ├── p2pScripts.ts / p2pCallSessions.ts
+│   ├── chatbot.ts                # persistent Sentinel Copilot sessions & messages
 │   ├── auth.ts / auth.config.ts / http.ts / crons.ts
+│   ├── model/
+│   │   └── auth.ts               # canonical authorization re-exports for convex-authz
 │   ├── lib/
+│   │   ├── auth.ts               # requireAuthUser, requireClaimOwner, getClaimIfAuthorized
 │   │   ├── openai.ts             # unified client + structured completions + embeddings
 │   │   ├── embeddings.ts         # hashEmbed, l2Normalize, rankPrecedentHits
 │   │   ├── appealEmail.ts        # HTML+text rendering with safe link validation
@@ -419,6 +422,7 @@ ClaimHero/
 │       ├── precedentArchive.ts   # vector search + reindex
 │       ├── appealSynthesizer.ts  # grounded email assembly + tier escalation
 │       ├── sentinelPipeline.ts   # master 4-step orchestrator
+│       ├── sentinelChatbot.ts    # agentic chatbot with 10 tools & rolling summarization
 │       ├── p2pDefenseGenerator.ts / p2pLiveCopilot.ts
 │       ├── mailDispatcher.ts     # 3-mode dispatch + AI adjudication
 │       ├── agentMail.ts          # intake + reply processing + shared inboxes
@@ -442,7 +446,7 @@ ClaimHero/
 │   │   ├── layout/ (Shell, Sidebar, Header) + ui/* (Button, Card, Badge, Dialog, Select, Silk)
 │   │   └── onboarding/ (OnboardingWizard, OnboardingChecklist)
 │   └── types/index.ts
-├── tests/                        # 177 unit tests across 11 suites (vitest + v8 coverage)
+├── tests/                        # 191 unit tests across 12 suites (vitest + v8 coverage)
 ├── .env.example                  # all required keys documented
 ├── convex.json / vite.config.ts / tailwind.config.js / tsconfig.json
 ├── BRIEF.md / hackathon.md / README.md
@@ -530,13 +534,13 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex
-npm run test            # vitest run tests  (177 tests)
+npm run test            # vitest run tests  (191 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run build           # tsc --noEmit && vite build
 npm run verify          # typecheck + lint + test + build — must be 100% clean before every commit
 ```
 
-Current: **177/177 passing** across 11 suites with **100% line coverage** across backend libraries and core business utilities:
+Current: **191/191 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
@@ -545,6 +549,7 @@ Current: **177/177 passing** across 11 suites with **100% line coverage** across
 | [`tests/redactionEngine.test.ts`](file:///d:/ClaimHero/tests/redactionEngine.test.ts) | 17 | HIPAA Safe Harbor 18-identifier redaction, boundary masking, regex patterns |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking |
 | [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest |
+| [`tests/authorization.test.ts`](file:///d:/ClaimHero/tests/authorization.test.ts) | 14 | Convex multi-tenant authorization, claim ownership verification, unauthenticated rejection, session isolation |
 | [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting, statutory countdown math, risk badge styling |
 | [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, 3-tier appellate escalation |
 | [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, STT tolerance |
@@ -596,7 +601,7 @@ The chronological, evidence-based build log lives at **`hackathon.md`** (repo ro
 |---|---|
 | **Real-World Utility** | Solves a $1.5B/year denial crisis for providers, advocates, and patients. Every output is a *sendable* artifact (email, portal paste, certified mail PDF, P2P script) — not a demo. Preset cases mirror real EOBs with statutory intake language. |
 | **Full-Stack Integration Depth** | **Convex** (9 tables, vector search, crons, file storage, httpRouter, auth) + **Firecrawl** (live search and scrape with adaptive clearinghouse retrieval, residential stealth proxies, document windowing, payer/anatomical guards) + **AgentMail** (3-mode dispatch, 2 shared inboxes, idempotent intake + reply webhooks, REST `api.agentmail.to`) + **OpenAI** (Vision OCR, structured `DenialExtractionResult`/`PolicyExtractionResponse`/`AppealBriefSynthesisResult`, deterministic scoring, grounded synthesis). No pillar is decorative — pull any one and the product stops working. |
-| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 166 tests + 100% line coverage + production build). Strict TypeScript, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette. |
+| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 191 tests + 100% line coverage + production build). Strict TypeScript, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette. |
 | **Transparency & Process** | `hackathon.md` is the source of truth: 40+ dated entries, file-level diffs, Convex feature tags per entry, and transparent handling of private MCG portals and vector precedents. `npm run verify` is the gate before every commit. |
 
 ---
