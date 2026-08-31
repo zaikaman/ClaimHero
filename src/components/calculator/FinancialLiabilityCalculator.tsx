@@ -130,52 +130,88 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
       />
 
       {/* Top Header Card */}
-      <Card className="p-4 bg-card/75 backdrop-blur-xl border-border/60 shadow-xs">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-primary/15 text-primary border border-primary/30 shadow-xs">
-              <Calculator className="size-6" />
+      <Card className="p-3.5 shrink-0 overflow-visible no-print">
+        <div className="flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-3">
+          {/* Left: Case & Engine Info */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground shrink-0 shadow-xs">
+              <Calculator className="size-4.5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-base font-bold text-foreground">
+                <h2 className="text-sm font-semibold text-foreground font-sans truncate">
                   Financial Liability & Statutory ERISA Penalty Calculator
-                </h1>
+                </h2>
                 <Badge variant="outline" className="font-mono text-[10px] text-cyan-400 border-cyan-500/30">
                   29 U.S.C. § 1132(c) Engine
                 </Badge>
-                <Badge variant="secondary" className="font-mono text-[10px]">
+                <Badge variant="outline" className="font-mono text-[10px]">
                   {claim.claimNumber}
                 </Badge>
+                {isSaving && (
+                  <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground animate-pulse">
+                    <CircleNotch className="size-3 animate-spin" />
+                    <span>Saving...</span>
+                  </span>
+                )}
+                {saveSuccess && (
+                  <span className="flex items-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
+                    <Check className="size-3" />
+                    <span>Synced</span>
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-xs text-muted-foreground truncate">
                 Patient out-of-pocket exposure modeling vs annual plan maximums and accrued $110/day failure-to-disclose penalties
               </p>
             </div>
           </div>
 
-          {/* Quick Action Toolbar */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Right: Actions Toolbar */}
+          <div className="flex items-center gap-2 flex-wrap 2xl:flex-nowrap shrink-0">
             <Button
               variant="outline"
               size="sm"
               onClick={handleCopySummary}
-              className="gap-1.5 text-xs font-mono"
+              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-border/70"
               title="Copy audit summary to clipboard"
             >
-              {copiedSummary ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-              <span>{copiedSummary ? "Copied Report" : "Copy Audit"}</span>
+              {copiedSummary ? (
+                <Check className="size-3.5 text-emerald-400" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+              <span>{copiedSummary ? "Copied" : "Copy Audit"}</span>
             </Button>
+
             <Button
               variant="outline"
               size="sm"
               onClick={() => setIsPrintModalOpen(true)}
-              className="gap-1.5 text-xs font-mono"
+              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-border/70 text-foreground"
               title="Inspect and print formal statement"
             >
               <Printer className="size-3.5" />
               <span>Print Statement</span>
             </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={saveToClaim}
+              disabled={isSaving}
+              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-border/70"
+            >
+              {isSaving ? (
+                <CircleNotch className="size-3.5 animate-spin" />
+              ) : saveSuccess ? (
+                <Check className="size-3.5 text-emerald-400" />
+              ) : (
+                <FloppyDisk className="size-3.5" />
+              )}
+              <span>{saveSuccess ? "Saved" : "Save & Sync"}</span>
+            </Button>
+
             <Button
               size="sm"
               onClick={async () => {
@@ -183,28 +219,12 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
                 onNavigateView?.("studio");
               }}
               disabled={isSaving}
-              className="gap-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-xs"
+              className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
               title="Save calculations and open Appeal Studio to embed statutory penalties in the brief"
             >
               <Sparkle className="size-3.5" />
               <span>Embed in Legal Brief</span>
               <ArrowRight className="size-3" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={saveToClaim}
-              disabled={isSaving}
-              className="gap-1.5 text-xs font-medium"
-            >
-              {isSaving ? (
-                <CircleNotch className="size-3.5 animate-spin" />
-              ) : saveSuccess ? (
-                <Check className="size-3.5 text-emerald-300" />
-              ) : (
-                <FloppyDisk className="size-3.5" />
-              )}
-              <span>{saveSuccess ? "Saved to Case" : "Save & Sync"}</span>
             </Button>
           </div>
         </div>

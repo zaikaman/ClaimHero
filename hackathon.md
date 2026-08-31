@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-31T02:47:45Z
+- **Last updated:** 2026-08-31T04:03:30Z
 
 ## Log
 
@@ -268,8 +268,12 @@ Streamlined top navigation and profile accessibility by removing redundant top-r
 ### 2026-08-31 - 73cf458
 Configured production-grade GitHub Actions CI/CD automation and automated security monitoring (`.github/workflows/ci.yml`, `.github/workflows/deploy.yml`, `.github/dependabot.yml`). Implemented a multi-stage pull request CI quality gate running strict TypeScript typechecking, ESLint analysis, Vitest automated test suite (116 tests), and production bundle builds in parallel. Created continuous deployment pipeline targeting Convex Static Hosting with concurrency locking, automated pre-flight `verify` checks, `CONVEX_DEPLOY_KEY` authentication, synthetic post-deploy health probes, and structured GitHub Step Summaries. Convex features: static hosting.
 
-### 2026-08-31 - working tree
+### 2026-08-31 - 97f369a
 Established comprehensive test coverage instrumentation and expanded automated unit testing suite across backend infrastructure and domain libraries to achieve 100% line coverage (`package.json`, `vitest.config.ts`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`). Configured `@vitest/coverage-v8` with text, JSON, and HTML reporting and hard thresholds (100% lines, 100% statements). Created and expanded dedicated test suites for AgentMail and webhook normalizers (`tests/agentMail.test.ts`), OpenAI structured outputs, chat completions, and 1536-d vector embeddings (`tests/openai.test.ts`), healthcare utility formatters and statutory constants (`tests/utils.test.ts`), HIPAA redaction engine with address masking and custom overrides (`tests/redactionEngine.test.ts`), financial liability calculator with out-of-network balance billing and severity tiers (`tests/financialErisaCalculator.test.ts`), and court-ready dossier binders with EDI resolution and statutory postures (`tests/appealDossierBinder.test.ts`). Achieved **100% line coverage** across all files in backend libraries (`convex/lib/`) and core utilities (`src/lib/`) with **161 passing unit tests across 10 suites**. Upgraded CI/CD pipelines to enforce the 100% coverage gate on pull requests, generate markdown summary tables in `$GITHUB_STEP_SUMMARY`, and upload test coverage artifacts. Synchronized line-by-line citation references across `README.md`. Validated with `npm run verify` (100% clean typecheck, lint, 161/161 unit tests, and production build). Convex features: vector search, rate-limiter, aggregate, static hosting.
+
+### 2026-08-31 - working tree
+Standardized the header layout and action button toolbar in the Financial Liability & ERISA Calculator (`FinancialLiabilityCalculator.tsx`) to match the single-line design system used across Appeal Studio and P2P Defense Studio. Restructured the toolbar to group secondary utility actions (`Copy Audit`, `Print Statement`, `Save & Sync`) with compact `h-8` button geometry before the primary `Embed in Legal Brief` CTA, preventing multi-line button wrapping across standard viewport widths.
+
 
 
 
