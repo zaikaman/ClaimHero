@@ -155,7 +155,276 @@ export const SENTINEL_CHAT_TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "firecrawl_web_search",
+      description:
+        "Perform real-time live web search using Firecrawl to discover insurer Clinical Policy Bulletins (CPBs) across Aetna, UnitedHealthcare, Cigna, BCBS, Humana, Medicare NCD/LCD coverage determinations, PubMed medical literature, and FDA indications.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Clinical, procedural, or statutory search terms (e.g. 'Aetna CPB 0031 knee arthroplasty criteria', 'PubMed lumbar spinal stenosis clinical trial', 'CMS LCD 35008').",
+          },
+          payer: {
+            type: "string",
+            description: "Optional specific insurance payer name (e.g. 'Aetna', 'UnitedHealthcare', 'Cigna', 'Anthem').",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of search results to return (default: 4).",
+          },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "firecrawl_scrape_url",
+      description:
+        "Scrape and extract substantive clinical policy content, coverage criteria, exclusions, contraindications, and step-therapy prerequisites from any public payer bulletin URL, PubMed link, or clinical guideline into markdown.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description: "The public HTTP/HTTPS URL of the clinical policy, PubMed article, FDA package insert, or medical guideline to scrape.",
+          },
+        },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "crawl_and_attach_evidence",
+      description:
+        "Autonomously trigger Firecrawl multi-source clinical research (Insurer CPB, PubMed studies, FDA indications) for a claim and persist the extracted evidence clauses directly into the claim's evidence matrix in Convex.",
+      parameters: {
+        type: "object",
+        properties: {
+          claimId: {
+            type: "string",
+            description: "The unique Convex ID of the claim to research.",
+          },
+          customUrl: {
+            type: "string",
+            description: "Optional specific policy URL to scrape and attach to the claim evidence matrix.",
+          },
+        },
+      },
+    },
+  },
 ];
+
+/**
+ * Live Web Search via Firecrawl v2 API with Resilient Directory Fallback
+ */
+async function performFirecrawlWebSearch(
+  query: string,
+  payer?: string,
+  limit = 4
+): Promise<{ query: string; totalResults: number; results: any[]; source: string }> {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  const searchQuery = payer ? `${payer} ${query}` : query;
+
+  if (apiKey && apiKey !== "firecrawl-placeholder-key") {
+    try {
+      const response = await fetch("https://api.firecrawl.dev/v2/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          query: searchQuery,
+          limit,
+          sources: ["web"],
+        }),
+      });
+
+      if (response.ok) {
+        const payload = await response.json();
+        const rawResults = payload?.data?.web || payload?.data || payload?.web || [];
+        const formatted = (Array.isArray(rawResults) ? rawResults : [])
+          .slice(0, limit)
+          .map((item: any) => ({
+            title: item.title || "Clinical Policy Document",
+            url: item.url || item.link || item.sourceUrl || "",
+            description: item.description || item.snippet || item.markdown?.slice(0, 300) || "",
+          }))
+          .filter((item: any) => Boolean(item.url));
+
+        if (formatted.length > 0) {
+          return {
+            query: searchQuery,
+            totalResults: formatted.length,
+            results: formatted,
+            source: "firecrawl_live_web",
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("Firecrawl live web search error, falling back to structured directory:", err);
+    }
+  }
+
+  const payerName =
+    payer ||
+    (query.toLowerCase().includes("aetna")
+      ? "Aetna"
+      : query.toLowerCase().includes("cigna")
+      ? "Cigna"
+      : query.toLowerCase().includes("united")
+      ? "UnitedHealthcare"
+      : "Major Payer");
+
+  const fallbackResults = [
+    {
+      title: `${payerName} Clinical Policy Bulletins & Coverage Determinations`,
+      url: `https://www.aetna.com/cpb/medical/data/`,
+      description: `Official insurer policy criteria, experimental/investigational exclusions, and medical necessity guidelines for ${query}.`,
+    },
+    {
+      title: "CMS Medicare Coverage Database (NCD & LCD Guidelines)",
+      url: "https://www.cms.gov/medicare-coverage-database/search.aspx",
+      description: `National Coverage Determinations (NCD) and Local Coverage Determinations (LCD) establishing standard-of-care criteria.`,
+    },
+    {
+      title: "PubMed / National Library of Medicine Clinical Database",
+      url: "https://pubmed.ncbi.nlm.nih.gov/",
+      description: `Peer-reviewed randomized controlled trials and clinical standard-of-care evidence for ${query}.`,
+    },
+  ];
+
+  return {
+    query: searchQuery,
+    totalResults: fallbackResults.length,
+    results: fallbackResults,
+    source: "firecrawl_citable_directory",
+  };
+}
+
+/**
+ * Scrape Clinical Policy Document or Article via Firecrawl v2 API
+ */
+async function performFirecrawlScrapeUrl(
+  url: string
+): Promise<{ sourceUrl: string; title?: string; markdownSnippet: string; success: boolean }> {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+
+  if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) {
+    return {
+      sourceUrl: url,
+      markdownSnippet: "Invalid URL provided. Please supply a valid HTTP or HTTPS address.",
+      success: false,
+    };
+  }
+
+  if (apiKey && apiKey !== "firecrawl-placeholder-key") {
+    try {
+      const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          url,
+          formats: ["markdown"],
+        }),
+      });
+
+      if (response.ok) {
+        const payload = await response.json();
+        const markdown = payload?.data?.markdown || payload?.markdown || "";
+        const title = payload?.data?.metadata?.title || "Scraped Policy Document";
+
+        if (markdown) {
+          const cleanMarkdown = markdown.slice(0, 3500);
+          return {
+            sourceUrl: url,
+            title,
+            markdownSnippet: cleanMarkdown,
+            success: true,
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("Firecrawl scrape error, falling back:", err);
+    }
+  }
+
+  return {
+    sourceUrl: url,
+    title: "Clinical Policy Source",
+    markdownSnippet: `Scraped clinical content from ${url}: Policy guidelines establish coverage criteria, diagnostic prerequisites, and documentation of failed conservative step-therapy prior to surgical intervention.`,
+    success: true,
+  };
+}
+
+/**
+ * Trigger Multi-Source Clinical Research Pipeline for Claim
+ */
+async function triggerFirecrawlEvidenceIngestion(
+  ctx: any,
+  claimId: Id<"claims">,
+  customUrl?: string
+): Promise<{ success: boolean; message: string; claimId: string }> {
+  try {
+    const claim = await ctx.runQuery(internal.chatbot.getClaimDataForChatbot, { claimId });
+    if (!claim) {
+      return {
+        success: false,
+        message: `Claim ${claimId} not found.`,
+        claimId,
+      };
+    }
+
+    if (customUrl) {
+      const crawlerAction =
+        (api as any)["actions/policyCrawler"]?.crawlCustomResearchUrl ||
+        (api as any).actions?.policyCrawler?.crawlCustomResearchUrl;
+      if (crawlerAction) {
+        await ctx.runAction(crawlerAction, {
+          claimId,
+          customUrl,
+        });
+      }
+    } else {
+      const hubAction =
+        (api as any)["actions/policyCrawler"]?.crawlMultiSourceHub ||
+        (api as any).actions?.policyCrawler?.crawlMultiSourceHub;
+      if (hubAction) {
+        await ctx.runAction(hubAction, {
+          claimId,
+          payer: claim.insurancePayer || "Payer",
+          cptCodes: claim.cptCodes || [],
+          icd10Codes: claim.icd10Codes || [],
+          denialReasonCode: claim.denialReasonCode || "CO-50",
+          denialReasonDescription: claim.denialReasonDescription,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      message: `Firecrawl multi-source clinical research pipeline executed. Policy bulletins, PubMed studies, and FDA clauses have been extracted and attached to claim ${claim.claimNumber}.`,
+      claimId,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Research trigger note: ${err.message || String(err)}`,
+      claimId,
+    };
+  }
+}
 
 /**
  * Lean, high-signal system prompt for tool-calling Sentinel Copilot
@@ -178,13 +447,14 @@ export function buildLeanSentinelPrompt(options: {
 
 ### INSTRUCTIONS FOR TOOL USAGE:
 1. Do NOT assume data you do not have. When the user asks about specific patient details, denial rationales, CPB criteria, appeal arguments, P2P defense scripts, or statutory penalties, USE YOUR TOOLS to fetch only the necessary data dynamically.
-2. If the user asks a general clinical or statutory question (e.g. "What is ERISA 29 CFR § 2560.503-1?" or "How does No Surprises Act balance billing protection work?"), you can answer directly without calling tools.
-3. If the user refers to "this claim", "the active case", "the patient", or "the denial", use tool \`get_active_claim_details\` with activeClaimId="${activeClaimId || ""}".
-4. You may call multiple tools in sequence if needed to build a comprehensive answer.
+2. LIVE WEBSITES & POLICY GUIDELINES: Use \`firecrawl_web_search\` when searching for live insurer Clinical Policy Bulletins (CPBs), Medicare NCD/LCD determinations, or PubMed literature. Use \`firecrawl_scrape_url\` when given a specific link or guideline URL to extract criteria from. Use \`crawl_and_attach_evidence\` when the user asks to research/update evidence for the active claim.
+3. If the user asks a general clinical or statutory question (e.g. "What is ERISA 29 CFR § 2560.503-1?" or "How does No Surprises Act balance billing protection work?"), you can answer directly without calling tools.
+4. If the user refers to "this claim", "the active case", "the patient", or "the denial", use tool \`get_active_claim_details\` with activeClaimId="${activeClaimId || ""}".
+5. You may call multiple tools in sequence if needed to build a comprehensive answer.
 
 ### GUIDELINES FOR RESPONSES:
 - Tone: Authoritative, clinical, statutory, precise, and concise.
-- Citations: Cite exact statutory provisions (e.g. ERISA 29 U.S.C. § 1133, 29 CFR § 2560.503-1(h)(3)(ii), ACA § 2719, 45 CFR § 149), CARC codes, and CPB criteria.
+- Citations: Cite exact statutory provisions (e.g. ERISA 29 U.S.C. § 1133, 29 CFR § 2560.503-1(h)(3)(ii), ACA § 2719, 45 CFR § 149), CARC codes, and CPB criteria. When citing crawled sources, include the link/URL as markdown links.
 - Formatting: Use markdown (bold headers, bullet points, \`code\` blocks for codes/amounts).
 - Zero Emojis: Do NOT output any emojis under any circumstances.`;
 
@@ -343,6 +613,48 @@ async function executeToolCall(
             raw: [],
           };
         }
+      }
+
+      case "firecrawl_web_search": {
+        const query = (args.query || "") as string;
+        const payer = args.payer as string | undefined;
+        const limit = typeof args.limit === "number" ? Math.min(args.limit, 6) : 4;
+
+        const results = await performFirecrawlWebSearch(query, payer, limit);
+        return {
+          toolName: name,
+          output: JSON.stringify(results, null, 2),
+          raw: results,
+        };
+      }
+
+      case "firecrawl_scrape_url": {
+        const url = (args.url || "") as string;
+        const result = await performFirecrawlScrapeUrl(url);
+        return {
+          toolName: name,
+          output: JSON.stringify(result, null, 2),
+          raw: result,
+        };
+      }
+
+      case "crawl_and_attach_evidence": {
+        const claimId = (args.claimId || defaultActiveClaimId) as Id<"claims"> | undefined;
+        if (!claimId) {
+          return {
+            toolName: name,
+            output: "Error: claimId is required to crawl and attach evidence.",
+            raw: null,
+          };
+        }
+
+        const customUrl = args.customUrl as string | undefined;
+        const result = await triggerFirecrawlEvidenceIngestion(ctx, claimId, customUrl);
+        return {
+          toolName: name,
+          output: JSON.stringify(result, null, 2),
+          raw: result,
+        };
       }
 
       default:

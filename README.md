@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-161%2F161%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-166%2F166%20passing-0ea5e9?style=flat-square" />
   <img alt="Coverage" src="https://img.shields.io/badge/coverage-100%25%20lines-10b981?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
@@ -126,7 +126,7 @@ In `Payer Communications` (`AgentMailDrawer.tsx`), select:
 | **Audit Timeline** (`AuditTimeline.tsx`) | Immutable `appealAuditLogs` ledger per claim | Every state transition is cryptographically ordered |
 | **Portfolio Analytics** (`AnalyticsMetrics.tsx`) | Total disputed, recovered, win rate, payer breakdown, confidence distribution (`convex/claims.ts:530`), and `ExecutiveReportModal.tsx` for practice audit statements & CSV/print exports | Proves ROI; executive accountability per payer |
 | **HIPAA Privacy Filter** (`PrivacyRedactionFilter.tsx`) | Deterministic PII detection (SSN, MRN, DOB, phone, address, custom terms) with 3 presets: Safe Harbor, Balanced Appellate, Public Legal Exhibit | Redact before you dispatch or publish precedent |
-| **Sentinel AI Copilot Widget** (`SentinelChatbot.tsx`, `⌘J`) | Autonomous clinical & legal chatbot with agentic OpenAI tool calling (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`), persistent `chatbotSessions`/`chatbotMessages` tables, rolling context window summarization, and collapsible tool execution traces | On-demand conversational intelligence across all cases, CPB criteria, and statutory ERISA mandates |
+| **Sentinel AI Copilot Widget** (`SentinelChatbot.tsx`, `⌘J`) | Autonomous clinical & legal chatbot with 10 agentic OpenAI tool calling capabilities across Convex database records (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) and live Firecrawl web intelligence (`firecrawl_web_search`, `firecrawl_scrape_url`, `crawl_and_attach_evidence`), persistent `chatbotSessions`/`chatbotMessages` tables, rolling context window summarization, and collapsible tool execution traces | On-demand conversational intelligence across all cases, live insurer CPB criteria, and statutory ERISA mandates |
 
 
 ---
@@ -439,7 +439,7 @@ ClaimHero/
 │   │   ├── layout/ (Shell, Sidebar, Header) + ui/* (Button, Card, Badge, Dialog, Select, Silk)
 │   │   └── onboarding/ (OnboardingWizard, OnboardingChecklist)
 │   └── types/index.ts
-├── tests/                        # 154 unit tests across 10 suites (vitest + v8 coverage)
+├── tests/                        # 166 unit tests across 11 suites (vitest + v8 coverage)
 ├── .env.example                  # all required keys documented
 ├── convex.json / vite.config.ts / tailwind.config.js / tsconfig.json
 ├── BRIEF.md / hackathon.md / README.md
@@ -511,13 +511,13 @@ AGENTMAIL_ADJUDICATOR_EMAIL=claimhero-adjudicator@agentmail.to
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex
-npm run test            # vitest run tests  (161 tests)
+npm run test            # vitest run tests  (166 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run build           # tsc --noEmit && vite build
 npm run verify          # typecheck + lint + test + build — must be 100% clean before every commit
 ```
 
-Current: **161/161 passing** across 10 suites with **100% line coverage** across backend libraries and core business utilities:
+Current: **166/166 passing** across 11 suites with **100% line coverage** across backend libraries and core business utilities:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
@@ -530,6 +530,7 @@ Current: **161/161 passing** across 10 suites with **100% line coverage** across
 | [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, 3-tier appellate escalation |
 | [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, STT tolerance |
 | [`tests/p2pDefense.test.ts`](file:///d:/ClaimHero/tests/p2pDefense.test.ts) | 6 | Physician tele-script generator, statutory opening, pocket cheat sheet print |
+| [`tests/sentinelChatbot.test.ts`](file:///d:/ClaimHero/tests/sentinelChatbot.test.ts) | 5 | Agentic OpenAI tool calling (10 tools), Firecrawl live search/scrape schemas, lean prompt builder |
 | [`tests/statutoryEscalation.test.ts`](file:///d:/ClaimHero/tests/statutoryEscalation.test.ts) | 5 | 180-day internal appeal to Level 3 DOI escalation state machine |
 
 ---

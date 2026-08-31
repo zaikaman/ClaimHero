@@ -127,6 +127,10 @@ flowchart TD
    * `claimId`, `version`, `openingStatutoryStatement`, `clinicalPolicyCitations`, `disqualificationCounters`, `badFaithDemands`, `closingDemand`.
    * `sessionStatus`, `transcripts`, `fastAnswers`, `checklistProgress`, `winScore`.
    * Indexes: `by_claim`, `by_session`.
+10. **`chatbotSessions` & `chatbotMessages`**:
+    * `sessionId`, `userId`, `claimId`, `title`, `summary`, `status`.
+    * `role` (`user`, `assistant`, `system`), `content`, `toolCalls` (name, arguments, output).
+    * Indexes: `by_user`, `by_claim`, `by_session`.
 
 ---
 
@@ -149,7 +153,7 @@ flowchart TD
 5. **Payer Communications Drawer (`AgentMailDrawer.tsx`)**: Multi-channel gateway (email / portal / fax / mail) with 3-mode recipient switching, verified payer routing, and threaded two-way correspondence.
 6. **Portfolio Analytics (`AnalyticsMetrics.tsx`)**: Practice-wide disputed vs. recovered amounts, insurer win rates, confidence distribution, and printable Executive Report statements.
 7. **HIPAA Privacy Redaction Engine (`PrivacyRedactionFilter.tsx`)**: Deterministic PII masking across Safe Harbor, Balanced Appellate, and Public Exhibit standards.
-8. **Sentinel AI Copilot Widget (`SentinelChatbot.tsx`, `⌘J`)**: Autonomous clinical & statutory chatbot with agentic OpenAI tool calling (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`), persistent `chatbotSessions`/`chatbotMessages` Convex tables, rolling context window summarization, and collapsible tool execution traces.
+8. **Sentinel AI Copilot Widget (`SentinelChatbot.tsx`, `⌘J`)**: Autonomous clinical & legal chatbot with 10 agentic OpenAI tool calling capabilities across Convex database records (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) and live Firecrawl web intelligence (`firecrawl_web_search`, `firecrawl_scrape_url`, `crawl_and_attach_evidence`), persistent `chatbotSessions`/`chatbotMessages` Convex tables, rolling context window summarization, and collapsible tool execution traces.
 
 ---
 
@@ -160,13 +164,13 @@ ClaimHero enforces **100% line coverage** and strict quality verification across
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (tsc --noEmit)
 npm run lint            # ESLint static code analysis
-npm run test            # Vitest automated test execution (165 tests)
+npm run test            # Vitest automated test execution (166 tests)
 npm run test:coverage   # Vitest with @vitest/coverage-v8 (100% line coverage gate)
 npm run build           # Vite production bundle build
 npm run verify          # Full automated gate (typecheck + lint + test:coverage + build)
 ```
 
-### Verified Test Suites (165 Tests / 11 Suites)
+### Verified Test Suites (166 Tests / 11 Suites)
 * `tests/claimhero.test.ts` (62 tests): End-to-end integration, 4-pillar scoring rubric, ERISA deadline sweeps, and portfolio aggregates.
 * `tests/redactionEngine.test.ts` (17 tests): HIPAA Safe Harbor 18-identifier detection, boundary masking, street addresses, and custom terms.
 * `tests/openai.test.ts` (15 tests): Structured completions, Vision OCR extraction, 1536-d vector embeddings, and ranking.
@@ -176,9 +180,8 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/appealDossierBinder.test.ts` (11 tests): Dossier serialization, fallback exhibits, criteria violations, and 3-tier appellate escalation.
 * `tests/p2pLiveCopilot.test.ts` (7 tests): AI Medical Director 3-turn lifecycle, Fast Answer cards, and STT tolerance.
 * `tests/p2pDefense.test.ts` (6 tests): Tele-script generation, statutory openings, and pocket cheat sheet formatting.
+* `tests/sentinelChatbot.test.ts` (5 tests): Agentic tool definitions (10 tools), Firecrawl live search/scrape parameter schemas, and lean prompt construction.
 * `tests/statutoryEscalation.test.ts` (5 tests): 180-day internal appeal to Level 3 DOI escalation state machine.
-* `tests/sentinelChatbot.test.ts` (4 tests): Agentic tool definitions, parameter schemas, and lean prompt construction.
-
 
 ---
 
@@ -188,7 +191,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 |---|---|
 | **Real-World Utility** | Directly tackles a $200B/year denial crisis. Produces production-ready, sendable artifacts (formal briefs, P2P call scripts, EHR clinical notes, and court dossiers) rather than generic chat summaries. |
 | **Full-Stack Integration Depth** | All 4 sponsor platforms are deeply integrated: **Convex** (reactive DB, 1536-d vector search, searchIndex, scheduled crons, components), **Firecrawl** (live CPB scraping, PubMed, FDA), **AgentMail** (inbound webhooks, outbound dispatch, AI adjudicator), and **OpenAI** (Vision extraction, 4-pillar scoring, grounded synthesis). |
-| **Technical Rigor & Polish** | 100% clean `npm run verify` gate, 161 automated unit tests with 100% line coverage, strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
+| **Technical Rigor & Polish** | 100% clean `npm run verify` gate, 166 automated unit tests with 100% line coverage, strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
 | **Transparency & Build Process** | Comprehensive `hackathon.md` log with UTC timestamps, reconciled 7-character commit hashes, and detailed milestone notes. |
 
 ---

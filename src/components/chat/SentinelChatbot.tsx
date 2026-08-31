@@ -13,8 +13,8 @@ import {
   ShieldCheck,
   CircleNotch,
   Scales,
-  FileText,
   FileMagnifyingGlass,
+  Globe,
 } from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -178,6 +178,9 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
     if (!input.trim() || isSending) return;
     sendMessage(input);
     setInput("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -236,6 +239,11 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
     if (selectedClaim) {
       return [
         {
+          label: "Live CPB Research",
+          prompt: `Use Firecrawl to search live insurer Clinical Policy Bulletins for ${selectedClaim.patient?.insurancePayer || "payer"} regarding CPT ${selectedClaim.cptCodes?.[0] || "procedure"} and denial reason ${selectedClaim.denialReasonCode}.`,
+          icon: Globe,
+        },
+        {
           label: "Analyze Denial Reason",
           prompt: `Analyze the denial reason code ${selectedClaim.denialReasonCode} and outline our clinical rebuttal strategy for claim ${selectedClaim.claimNumber}.`,
           icon: FileMagnifyingGlass,
@@ -250,15 +258,15 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
           prompt: `Draft a 3-point Peer-to-Peer (P2P) tele-script counter for Dr. Reviewer on claim ${selectedClaim.claimNumber}.`,
           icon: ShieldCheck,
         },
-        {
-          label: "Audit $110/Day Penalties",
-          prompt: `Calculate our accrued statutory failure-to-disclose exposure under ERISA § 502(c) for claim ${selectedClaim.claimNumber}.`,
-          icon: FileText,
-        },
       ];
     }
 
     return [
+      {
+        label: "Live Payer CPB Search",
+        prompt: "Use Firecrawl to search latest clinical policy bulletins and coverage criteria for knee arthroplasty (CPT 27447).",
+        icon: Globe,
+      },
       {
         label: "ERISA 180-Day Rules",
         prompt: "Explain the mandatory 180-day appeal rules and de novo review standards under ERISA 29 CFR § 2560.503-1.",
@@ -269,16 +277,10 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
         prompt: "How does ClaimHero calculate the deterministic 4-pillar Overturn Probability score?",
         icon: Scales,
       },
-
       {
         label: "Search High Risk Claims",
         prompt: "Search and list any active claims in my workspace that require urgent appeal attention.",
         icon: FileMagnifyingGlass,
-      },
-      {
-        label: "No Surprises Act",
-        prompt: "Explain how No Surprises Act balance billing protections apply to out-of-network emergency claims.",
-        icon: ShieldCheck,
       },
     ];
   }, [selectedClaim]);
@@ -300,6 +302,12 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
         return "Searched Workspace Claims Roster";
       case "search_precedents":
         return "Queried 1536-d Legal Precedent Archive";
+      case "firecrawl_web_search":
+        return "Firecrawl Live Web & Policy Search";
+      case "firecrawl_scrape_url":
+        return "Firecrawl Scraped Clinical Document";
+      case "crawl_and_attach_evidence":
+        return "Firecrawl Multi-Source Evidence Ingestion";
       default:
         return toolName.replace(/_/g, " ");
     }
@@ -576,32 +584,37 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
 
           {/* Input Area */}
           <div className="p-3 border-t border-border/80 bg-muted/20 space-y-2">
-            <div className="relative flex items-center">
+            <div className="flex items-center gap-2 rounded-xl bg-background/90 border border-border/80 p-1.5 pl-3 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 shadow-inner transition-all">
               <textarea
                 ref={textareaRef}
-                rows={2}
+                rows={1}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 84)}px`;
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder={
                   selectedClaim
                     ? `Ask about ${selectedClaim.claimNumber} or ERISA statutes...`
                     : "Ask clinical, legal, or CPB questions..."
                 }
-                className="w-full resize-none rounded-lg bg-background/80 border border-border/80 px-3 py-2 pr-10 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 leading-relaxed font-sans"
+                className="flex-1 max-h-24 resize-none bg-transparent py-1 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none leading-relaxed font-sans scrollbar-none"
+                style={{ minHeight: "22px" }}
               />
               <Button
                 variant="default"
                 size="icon-xs"
                 onClick={handleSend}
                 disabled={!input.trim() || isSending}
-                className="absolute right-2 bottom-2 size-7 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 cursor-pointer"
+                className="size-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 shrink-0 transition-transform active:scale-95 cursor-pointer flex items-center justify-center"
                 title="Send message (Enter)"
               >
                 {isSending ? (
                   <CircleNotch className="size-3.5 animate-spin" />
                 ) : (
-                  <PaperPlaneRight className="size-3.5" />
+                  <PaperPlaneRight className="size-3.5" weight="fill" />
                 )}
               </Button>
             </div>

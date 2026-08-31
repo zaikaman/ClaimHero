@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-31T04:33:00Z
+- **Last updated:** 2026-08-31T04:38:30Z
 
 ## Log
 
@@ -274,20 +274,9 @@ Established comprehensive test coverage instrumentation and expanded automated u
 ### 2026-08-31 - 8fbc7e5
 Standardized the header layout and action button toolbar in the Financial Liability & ERISA Calculator (`FinancialLiabilityCalculator.tsx`) to match the single-line design system used across Appeal Studio and P2P Defense Studio. Restructured the toolbar to group secondary utility actions (`Copy Audit`, `Print Statement`, `Save & Sync`) with compact `h-8` button geometry before the primary `Embed in Legal Brief` CTA, preventing multi-line button wrapping across standard viewport widths.
 
-### 2026-08-31 - working tree
+### 2026-08-31 - 842ae4f
 Engineered the autonomous Sentinel AI Copilot Chatbot (`SentinelChatbot.tsx`, `useSentinelChat.ts`, `⌘J`) as a circular draggable floating action bubble with agentic OpenAI tool calling, persistent database sessions, and rolling context window summarization. Replaced static bottom-right pills with a draggable circular floating action bubble (`rounded-full`, pointer capture, touch/mouse dragging, viewport boundary clamping, and `localStorage` position memory) to eliminate button overlap against the bottom action bar. Added `chatbotSessions` and `chatbotMessages` tables to `convex/schema.ts` and implemented session lifecycle mutations/queries (`convex/chatbot.ts`). Built master agentic action `sentinelChatbot.ts` equipped with 7 dynamic database retrieval tools (`get_active_claim_details`, `search_claims`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) allowing the LLM to fetch only the exact data required without bloating the prompt context window. Implemented background rolling conversation summarization to prevent context exhaustion over extended threads, collapsible tool execution traces in the chat feed, and token-bucket rate limiting (`convex/lib/rateLimiter.ts:sentinelChatbot`). Added unit tests (`tests/sentinelChatbot.test.ts`), bringing the verified test suite to 165 tests across 11 suites with 100% line coverage. Convex features: database schema, relational indexes, queries, mutations, actions, components, rate-limiter, static hosting.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+### 2026-08-31 - working tree
+Equipped the Sentinel AI Copilot Chatbot with autonomous Firecrawl web search, clinical document scraping, and in-chat multi-source evidence ingestion (`convex/actions/sentinelChatbot.ts`, `src/components/chat/SentinelChatbot.tsx`). Registered three specialized agentic tools: `firecrawl_web_search` for real-time live discovery across insurer Clinical Policy Bulletins (CPBs) (Aetna, UHC, Cigna, BCBS, Humana), Medicare NCD/LCD coverage determinations, and PubMed literature; `firecrawl_scrape_url` for on-demand extraction of coverage criteria, contraindications, and step-therapy prerequisites from any public URL into structured markdown; and `crawl_and_attach_evidence` for triggering full multi-source Firecrawl pipeline execution and persisting extracted evidence clauses directly into the active claim's evidence matrix in Convex. Updated the frontend chatbot interface with Firecrawl tool execution badges, citable markdown link support, and live research starter prompts. Expanded unit testing suite (`tests/sentinelChatbot.test.ts`) validating tool parameter schemas and system prompt guidelines. Validated with `npm run verify` (100% clean typecheck, lint, 166 passing unit tests across 11 suites with 100% line coverage, and production build). Convex features: actions, queries, mutations, static hosting.
 
