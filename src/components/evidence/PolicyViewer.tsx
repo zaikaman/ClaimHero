@@ -23,7 +23,7 @@ import { stripMarkdownFormatting, cn } from "../../lib/utils";
 interface PolicyViewerProps {
   evidences: ClinicalEvidence[];
   isLoading?: boolean;
-  onDeleteEvidence?: (evidenceId: string) => Promise<any>;
+  onDeleteEvidence?: (evidenceId: string) => Promise<unknown>;
   onOpenResearchConsole?: () => void;
 }
 

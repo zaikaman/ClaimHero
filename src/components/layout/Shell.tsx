@@ -11,7 +11,7 @@ interface ShellProps {
   selectedClaim?: Claim | null;
   onSelectClaim?: (claimId: string) => void;
   onOpenIngestion: () => void;
-  onDeleteCase?: (claimId: string) => Promise<any>;
+  onDeleteCase?: (claimId: string) => Promise<unknown>;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onOpenCommandPalette?: () => void;

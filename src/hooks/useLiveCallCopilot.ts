@@ -11,6 +11,39 @@ export interface ReviewerChallenge {
   expectedObjection: string;
 }
 
+interface SpeechRecognitionResultItem {
+  readonly transcript: string;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  [index: number]: {
+    readonly isFinal: boolean;
+    readonly [index: number]: SpeechRecognitionResultItem;
+  };
+}
+
+interface SpeechRecognitionEvent {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent {
+  readonly error: string;
+}
+
+interface BrowserSpeechRecognition {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((error: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
 export function useLiveCallCopilot(claim: Claim) {
   const session = useQuery(api.p2pCallSessions.getLatestByClaim, {
     claimId: claim._id as Id<"claims">,
@@ -21,16 +54,8 @@ export function useLiveCallCopilot(claim: Claim) {
   const updateTranscriptSpeakerMutation = useMutation(api.p2pCallSessions.updateTranscriptSpeaker);
   const updateChecklistMutation = useMutation(api.p2pCallSessions.updateChecklist);
   const completeSessionMutation = useMutation(api.p2pCallSessions.completeSession);
-  const generateFastAnswerAction = useAction(
-    (api as any)["actions/p2pLiveCopilot"]?.generateLiveFastAnswer ||
-    (api as any).actions?.p2pLiveCopilot?.generateLiveFastAnswer ||
-    (api as any).p2pLiveCopilot?.generateLiveFastAnswer
-  );
-  const generateInteractiveReviewerPushbackAction = useAction(
-    (api as any)["actions/p2pLiveCopilot"]?.generateInteractiveReviewerPushback ||
-    (api as any).actions?.p2pLiveCopilot?.generateInteractiveReviewerPushback ||
-    (api as any).p2pLiveCopilot?.generateInteractiveReviewerPushback
-  );
+  const generateFastAnswerAction = useAction(api.actions.p2pLiveCopilot.generateLiveFastAnswer);
+  const generateInteractiveReviewerPushbackAction = useAction(api.actions.p2pLiveCopilot.generateInteractiveReviewerPushback);
 
   const [isCallLive, setIsCallLive] = useState<boolean>(false);
   const [activeSpeaker, setActiveSpeaker] = useState<CallSpeaker>("physician");
@@ -50,12 +75,12 @@ export function useLiveCallCopilot(claim: Claim) {
 
   const currentSessionIdRef = useRef<Id<"p2pCallSessions"> | null>(null);
   const activeSpeakerRef = useRef<CallSpeaker>(activeSpeaker);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const callTimerRef = useRef<any>(null);
+  const callTimerRef = useRef<NodeJS.Timeout | number | null>(null);
   const isReviewerSpeakingRef = useRef<boolean>(false);
   const lastReviewerSpeechRef = useRef<string>("");
 
@@ -207,7 +232,9 @@ export function useLiveCallCopilot(claim: Claim) {
   const startSpeechRecognition = useCallback(() => {
     if (typeof window === "undefined") return;
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition =
+      (window as unknown as { SpeechRecognition?: new () => BrowserSpeechRecognition; webkitSpeechRecognition?: new () => BrowserSpeechRecognition }).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: new () => BrowserSpeechRecognition }).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       console.warn("SpeechRecognition API is not supported in this browser environment.");
       return;
@@ -219,7 +246,7 @@ export function useLiveCallCopilot(claim: Claim) {
       recognition.interimResults = true;
       recognition.lang = "en-US";
 
-      recognition.onresult = async (event: any) => {
+      recognition.onresult = async (event: SpeechRecognitionEvent) => {
         // If AI Reviewer is currently speaking out loud, ignore mic input to prevent speaker acoustic echo
         if (isReviewerSpeakingRef.current) {
           setInterimText("");
@@ -259,7 +286,7 @@ export function useLiveCallCopilot(claim: Claim) {
         }
       };
 
-      recognition.onerror = (err: any) => {
+      recognition.onerror = (err: SpeechRecognitionErrorEvent) => {
         if (err.error !== "no-speech") {
           console.warn("Speech recognition error:", err.error);
         }
@@ -290,7 +317,10 @@ export function useLiveCallCopilot(claim: Claim) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
 
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
       const audioCtx = new AudioContextClass();
       audioContextRef.current = audioCtx;
 

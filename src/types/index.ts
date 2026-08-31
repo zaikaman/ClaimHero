@@ -517,7 +517,7 @@ export type CallSpeaker = "physician" | "insurer" | "system";
 
 export interface CallTranscriptItem {
   id: string;
-  speaker: CallSpeaker;
+  speaker: CallSpeaker | string;
   text: string;
   timestamp: number;
   detectedIntent?: string;
@@ -546,7 +546,7 @@ export interface LiveCallChecklistItem {
 export interface P2PCallSession {
   _id: string;
   claimId: string;
-  sessionStatus: "idle" | "live" | "paused" | "completed";
+  sessionStatus: "idle" | "live" | "paused" | "completed" | string;
   startedAt: number;
   endedAt?: number;
   durationSeconds: number;

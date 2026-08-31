@@ -68,10 +68,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
       if (onSuccess) {
         onSuccess();
       }
-    } catch (err: any) {
+    } catch (err) {
       setIsLoading(false);
       console.error("Auth error:", err);
-      const msg = err?.message || "Authentication failed. Please check your credentials.";
+      const msg = err instanceof Error ? err.message : "Authentication failed. Please check your credentials.";
       if (msg.includes("InvalidAccountId") || msg.includes("Could not find")) {
         setError("Account not found. Please check your email or click Sign Up below.");
       } else if (msg.includes("InvalidSecret") || msg.includes("password")) {
@@ -96,7 +96,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
       if (onSuccess) {
         onSuccess();
       }
-    } catch (err: any) {
+    } catch (err) {
       setIsGoogleLoading(false);
       console.warn("Google OAuth note:", err);
       setError("Google Sign-In is temporarily unavailable. Please use Email & Password below.");

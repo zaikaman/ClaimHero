@@ -2,15 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Claim, VectorPrecedentMatch } from "../types";
+import { Id } from "../../convex/_generated/dataModel";
 
-const convexApi = api as any;
 const inFlightRequests = new Map<string, Promise<VectorPrecedentMatch[]>>();
 const completedRequests = new Map<string, VectorPrecedentMatch[]>();
 
 async function retrieveOnce(
   cacheKey: string,
-  claimId: string,
-  retrieveAction: (args: { claimId: string }) => Promise<VectorPrecedentMatch[]>,
+  claimId: Id<"claims">,
+  retrieveAction: (args: { claimId: Id<"claims"> }) => Promise<VectorPrecedentMatch[]>,
   forceRefresh = false
 ): Promise<VectorPrecedentMatch[]> {
   const inFlight = inFlightRequests.get(cacheKey);
@@ -40,7 +40,7 @@ async function retrieveOnce(
 }
 
 export function usePrecedents(claim?: Claim | null) {
-  const claimId = claim?._id;
+  const claimId = claim?._id as Id<"claims"> | undefined;
   const cacheKey = claimId
     ? [
         claimId,
@@ -49,10 +49,7 @@ export function usePrecedents(claim?: Claim | null) {
         ...(claim?.icd10Codes || []),
       ].join("|")
     : "";
-  const retrieveAction = useAction(
-    convexApi["actions/precedentArchive"]?.retrieveTopPrecedents ||
-      convexApi.actions?.precedentArchive?.retrieveTopPrecedents
-  );
+  const retrieveAction = useAction(api.actions.precedentArchive.retrieveTopPrecedents);
 
   const [matches, setMatches] = useState<VectorPrecedentMatch[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -60,7 +57,7 @@ export function usePrecedents(claim?: Claim | null) {
 
   const retrievePrecedents = useCallback(
     async (targetClaimId?: string): Promise<VectorPrecedentMatch[]> => {
-      const activeClaimId = targetClaimId || claimId;
+      const activeClaimId = targetClaimId ? (targetClaimId as Id<"claims">) : claimId;
       if (!activeClaimId) {
         throw new Error("No claim selected for precedent retrieval");
       }
@@ -75,13 +72,13 @@ export function usePrecedents(claim?: Claim | null) {
         const next = await retrieveOnce(
           requestKey,
           activeClaimId,
-          retrieveAction as (args: { claimId: string }) => Promise<VectorPrecedentMatch[]>,
+          retrieveAction,
           true
         );
         setMatches(next);
         return next;
-      } catch (err: any) {
-        const message = err?.message || "Failed to retrieve precedent vectors.";
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to retrieve precedent vectors.";
         setError(message);
         throw err;
       } finally {
@@ -103,16 +100,17 @@ export function usePrecedents(claim?: Claim | null) {
     retrieveOnce(
       cacheKey,
       claimId,
-      retrieveAction as (args: { claimId: string }) => Promise<VectorPrecedentMatch[]>
+      retrieveAction
     )
       .then((result) => {
         if (!cancelled) {
           setMatches(result);
         }
       })
-      .catch((err: any) => {
+      .catch((err) => {
         if (!cancelled) {
-          setError(err?.message || "Failed to retrieve precedent vectors.");
+          const message = err instanceof Error ? err.message : "Failed to retrieve precedent vectors.";
+          setError(message);
         }
       })
       .finally(() => {

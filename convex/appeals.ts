@@ -1,4 +1,4 @@
-import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { MutationCtx, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
@@ -18,6 +18,18 @@ export const getById = query({
     if (!authorized) return null;
 
     return appeal;
+  },
+});
+
+/**
+ * Internal query for background actions to retrieve an appeal by ID without auth session checks
+ */
+export const getByIdInternal = internalQuery({
+  args: {
+    appealId: v.id("appeals"),
+  },
+  handler: async (ctx, args): Promise<Doc<"appeals"> | null> => {
+    return await ctx.db.get(args.appealId);
   },
 });
 
@@ -156,7 +168,26 @@ export function getStatutoryTierMetadata(appealLevel: string) {
   }
 }
 
-async function applyCreateOrUpdateDraft(ctx: any, args: any): Promise<Id<"appeals"> | null> {
+interface CreateOrUpdateDraftArgs {
+  claimId: Id<"claims">;
+  appealLevel: string;
+  executiveSummary: string;
+  medicalNecessityArguments: string;
+  legalCitations: string;
+  fullAppealMarkdown: string;
+  lastEditedBy?: string;
+  statutoryPosture?: string;
+  targetAuthority?: string;
+  legalAggressiveness?: string;
+  statutoryAuthorities?: string[];
+  escalationNotes?: string;
+  forceNewRevision?: boolean;
+}
+
+async function applyCreateOrUpdateDraft(
+  ctx: MutationCtx,
+  args: CreateOrUpdateDraftArgs
+): Promise<Id<"appeals"> | null> {
   const claim = await ctx.db.get(args.claimId);
   if (!claim) {
     console.warn(`Claim ${args.claimId} not found during createOrUpdateDraft; skipping.`);
@@ -166,10 +197,10 @@ async function applyCreateOrUpdateDraft(ctx: any, args: any): Promise<Id<"appeal
   const now = Date.now();
   const existing = await ctx.db
     .query("appeals")
-    .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+    .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
     .collect();
 
-  const sorted = existing.sort((a: any, b: any) => b.version - a.version);
+  const sorted = existing.sort((a, b) => b.version - a.version);
   const latest = sorted[0];
   const nextVersion = latest ? latest.version + 1 : 1;
 

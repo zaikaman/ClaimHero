@@ -2,16 +2,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Claim, P2PScript } from "../types";
-
-const convexApi = api as any;
+import { Id } from "../../convex/_generated/dataModel";
 
 export function useP2PDefense(claim?: Claim | null) {
-  const claimId = claim?._id;
+  const claimId = claim?._id as Id<"claims"> | undefined;
 
   // Real-time query to fetch latest P2P defense script from Convex
   const latestScript = useQuery(
-    convexApi.p2pScripts?.getLatestByClaim,
-    claimId ? { claimId: claimId as any } : "skip"
+    api.p2pScripts.getLatestByClaim,
+    claimId ? { claimId } : "skip"
   ) as P2PScript | null | undefined;
 
   const [markdownContent, setMarkdownContent] = useState<string>("");
@@ -24,11 +23,8 @@ export function useP2PDefense(claim?: Claim | null) {
   const [timerSeconds, setTimerSeconds] = useState<number>(0);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const saveEditsMutation = useMutation(convexApi.p2pScripts?.saveScriptEdits);
-  const generateAction = useAction(
-    convexApi["actions/p2pDefenseGenerator"]?.generateP2PScript ||
-    convexApi.actions?.p2pDefenseGenerator?.generateP2PScript
-  );
+  const saveEditsMutation = useMutation(api.p2pScripts.saveScriptEdits);
+  const generateAction = useAction(api.actions.p2pDefenseGenerator.generateP2PScript);
 
   const initializedScriptRef = useRef<string | null>(null);
 
@@ -87,7 +83,7 @@ export function useP2PDefense(claim?: Claim | null) {
           setIsSaving(true);
           try {
             await saveEditsMutation({
-              scriptId: latestScript._id as any,
+              scriptId: latestScript._id as Id<"p2pScripts">,
               fullScriptMarkdown: newContent,
               lastEditedBy: "Physician Advocate Editor",
             });
@@ -120,7 +116,7 @@ export function useP2PDefense(claim?: Claim | null) {
       setIsSynthesizing(true);
       try {
         const result = await generateAction({
-          claimId: claim._id as any,
+          claimId: claim._id as Id<"claims">,
           physicianName: options?.physicianName,
           physicianSpecialty: options?.physicianSpecialty,
           medicalDirectorRole: options?.medicalDirectorRole,

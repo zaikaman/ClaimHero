@@ -54,7 +54,7 @@ export async function createStructuredCompletion<T>(options: {
       })),
     ];
     const response = await client.responses.create({
-      model: model as any,
+      model: model as OpenAI.Responses.ResponseCreateParams["model"],
       instructions: options.systemPrompt,
       input: [{ role: "user", content }],
       text: {

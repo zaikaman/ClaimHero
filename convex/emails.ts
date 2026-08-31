@@ -1,6 +1,6 @@
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
 
 /**
@@ -10,21 +10,21 @@ export const listThreadsByClaim = query({
   args: {
     claimId: v.id("claims"),
   },
-  handler: async (ctx, args): Promise<Doc<"emailThreads">[]> => {
-    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
-    if (!authorized) return [];
+  handler: async (ctx, args) => {
+    await getClaimIfAuthorized(ctx, args.claimId);
 
     const threads = await ctx.db
       .query("emailThreads")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .order("desc")
       .collect();
 
-    return threads.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+    return threads;
   },
 });
 
 /**
- * Get a specific thread with all its chronological messages, verifying claim ownership
+ * Get a specific thread along with all its chronological messages
  */
 export const getThreadWithMessages = query({
   args: {
@@ -34,27 +34,32 @@ export const getThreadWithMessages = query({
     const thread = await ctx.db.get(args.threadId);
     if (!thread) return null;
 
-    const authorized = await getClaimIfAuthorized(ctx, thread.claimId);
-    if (!authorized) return null;
+    await getClaimIfAuthorized(ctx, thread.claimId);
 
     const messages = await ctx.db
       .query("emailMessages")
       .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+      .order("asc")
       .collect();
-
-    const sortedMessages = messages.sort((a, b) => a.receivedAt - b.receivedAt);
 
     return {
       thread,
-      messages: sortedMessages,
+      messages,
     };
   },
 });
 
-async function applyGetOrCreateThread(ctx: any, args: any): Promise<Id<"emailThreads">> {
+interface GetOrCreateThreadArgs {
+  claimId: Id<"claims">;
+  agentEmail: string;
+  payerEmail: string;
+  subject: string;
+}
+
+async function applyGetOrCreateThread(ctx: MutationCtx, args: GetOrCreateThreadArgs): Promise<Id<"emailThreads">> {
   const existing = await ctx.db
     .query("emailThreads")
-    .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+    .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
     .collect();
 
   if (existing.length > 0 && existing[0]) {
@@ -66,21 +71,20 @@ async function applyGetOrCreateThread(ctx: any, args: any): Promise<Id<"emailThr
     return existing[0]._id;
   }
 
-  const now = Date.now();
   const threadId = await ctx.db.insert("emailThreads", {
     claimId: args.claimId,
     agentEmail: args.agentEmail,
     payerEmail: args.payerEmail,
     subject: args.subject,
+    lastMessageAt: Date.now(),
     status: "active",
-    lastMessageAt: now,
   });
 
   return threadId;
 }
 
 /**
- * Get or create the dedicated AgentMail communication thread for a claim
+ * Get or create an email thread for a claim
  */
 export const getOrCreateThread = mutation({
   args: {
@@ -89,15 +93,14 @@ export const getOrCreateThread = mutation({
     payerEmail: v.string(),
     subject: v.string(),
   },
-  returns: v.id("emailThreads"),
-  handler: async (ctx, args): Promise<Id<"emailThreads">> => {
+  handler: async (ctx, args) => {
     await requireClaimOwner(ctx, args.claimId);
     return await applyGetOrCreateThread(ctx, args);
   },
 });
 
 /**
- * Internal mutation for background actions to get or create a thread
+ * Internal mutation for AgentMail actions to get or create threads
  */
 export const getOrCreateThreadInternal = internalMutation({
   args: {
@@ -106,24 +109,26 @@ export const getOrCreateThreadInternal = internalMutation({
     payerEmail: v.string(),
     subject: v.string(),
   },
-  returns: v.id("emailThreads"),
-  handler: async (ctx, args): Promise<Id<"emailThreads">> => {
+  handler: async (ctx, args) => {
     return await applyGetOrCreateThread(ctx, args);
   },
 });
 
-async function applyInsertMessage(ctx: any, args: any): Promise<Id<"emailMessages">> {
-  const now = Date.now();
+interface InsertMessageArgs {
+  threadId: Id<"emailThreads">;
+  claimId: Id<"claims">;
+  direction: "inbound" | "outbound";
+  sender: string;
+  recipient: string;
+  subject: string;
+  bodyHtml: string;
+  bodyText: string;
+  hasAttachments: boolean;
+  agentMailMessageId?: string;
+}
 
-  if (args.agentMailMessageId) {
-    const existing = await ctx.db
-      .query("emailMessages")
-      .withIndex("by_agentmail_message", (q: any) =>
-        q.eq("agentMailMessageId", args.agentMailMessageId)
-      )
-      .first();
-    if (existing) return existing._id;
-  }
+async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Promise<Id<"emailMessages">> {
+  const now = Date.now();
 
   const messageId = await ctx.db.insert("emailMessages", {
     threadId: args.threadId,
@@ -139,18 +144,24 @@ async function applyInsertMessage(ctx: any, args: any): Promise<Id<"emailMessage
     receivedAt: now,
   });
 
-  // Update parent thread
+  // Update thread's lastMessageAt
   await ctx.db.patch(args.threadId, {
     lastMessageAt: now,
     status: args.direction === "inbound" ? "response_received" : "dispatched",
   });
 
-  // Audit log
+  // Update claim's status
+  await ctx.db.patch(args.claimId, {
+    status: args.direction === "inbound" ? "under_review" : "dispatched",
+    updatedAt: now,
+  });
+
+  // Insert audit log
   await ctx.db.insert("appealAuditLogs", {
     claimId: args.claimId,
     eventType: args.direction === "inbound" ? "payer_response_received" : "appeal_dispatched",
-    actor: args.direction === "inbound" ? args.sender : "AgentMail Autonomous Gateway",
-    details: `${args.direction === "inbound" ? "Received reply from" : "Transmitted transmission to"} ${args.direction === "inbound" ? args.sender : args.recipient} (${args.subject})`,
+    actor: args.direction === "inbound" ? `Payer (${args.sender})` : `AgentMail (${args.sender})`,
+    details: `${args.direction === "inbound" ? "Received reply from" : "Transmitted appeal document to"} ${args.recipient}: "${args.subject}"`,
     timestamp: now,
   });
 
@@ -164,7 +175,7 @@ export const insertMessage = mutation({
   args: {
     threadId: v.id("emailThreads"),
     claimId: v.id("claims"),
-    direction: v.string(),
+    direction: v.union(v.literal("inbound"), v.literal("outbound")),
     sender: v.string(),
     recipient: v.string(),
     subject: v.string(),
@@ -173,8 +184,7 @@ export const insertMessage = mutation({
     hasAttachments: v.boolean(),
     agentMailMessageId: v.optional(v.string()),
   },
-  returns: v.id("emailMessages"),
-  handler: async (ctx, args): Promise<Id<"emailMessages">> => {
+  handler: async (ctx, args) => {
     await requireClaimOwner(ctx, args.claimId);
     return await applyInsertMessage(ctx, args);
   },
@@ -187,7 +197,7 @@ export const insertMessageInternal = internalMutation({
   args: {
     threadId: v.id("emailThreads"),
     claimId: v.id("claims"),
-    direction: v.string(),
+    direction: v.union(v.literal("inbound"), v.literal("outbound")),
     sender: v.string(),
     recipient: v.string(),
     subject: v.string(),

@@ -32,7 +32,7 @@ import {
 import { fastSanitizeText } from "../../lib/redactionEngine";
 import { cn } from "../../lib/utils";
 
-const convexApi = api as any;
+import { Id } from "../../../convex/_generated/dataModel";
 
 interface ExportDrawerProps {
   isOpen: boolean;
@@ -57,8 +57,8 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
 
   // Fetch indexed clinical evidences for Exhibit B & C
   const rawEvidences = useQuery(
-    convexApi.clinicalEvidences.listByClaim,
-    claim?._id ? { claimId: claim._id as any } : "skip"
+    api.clinicalEvidences.listByClaim,
+    claim?._id ? { claimId: claim._id as Id<"claims"> } : "skip"
   ) as ClinicalEvidence[] | undefined;
 
   const processedContent = useMemo(() => {

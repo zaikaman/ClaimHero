@@ -30,18 +30,18 @@ import { stripMarkdownFormatting } from "../../lib/utils";
 interface ClinicalResearchConsoleProps {
   claim: Claim;
   evidences: ClinicalEvidence[];
-  onCrawlCPB: (claimId: string, customUrl?: string) => Promise<any>;
-  onCrawlPubMed: (claimId: string, query?: string, customUrl?: string) => Promise<any>;
-  onCrawlFDA: (claimId: string, customUrl?: string, deviceName?: string) => Promise<any>;
+  onCrawlCPB: (claimId: string, customUrl?: string) => Promise<unknown>;
+  onCrawlPubMed: (claimId: string, query?: string, customUrl?: string) => Promise<unknown>;
+  onCrawlFDA: (claimId: string, customUrl?: string, deviceName?: string) => Promise<unknown>;
   onCrawlCustomUrl: (
     claimId: string,
     url: string,
     category?: string,
     notes?: string
-  ) => Promise<any>;
-  onCrawlMultiSource: (claimId: string, customUrl?: string) => Promise<any>;
-  onDeleteEvidence?: (evidenceId: string) => Promise<any>;
-  onComputeScore?: (claimId: string) => Promise<any>;
+  ) => Promise<unknown>;
+  onCrawlMultiSource: (claimId: string, customUrl?: string) => Promise<unknown>;
+  onDeleteEvidence?: (evidenceId: string) => Promise<unknown>;
+  onComputeScore?: (claimId: string) => Promise<unknown>;
   onNavigateToStudio?: () => void;
 }
 
@@ -210,25 +210,25 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
       setCurrentStageIndex(2);
       addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
 
-      let result: any = null;
+      let result: Record<string, unknown> | null = null;
       if (activeMode === "multi_source") {
-        result = await onCrawlMultiSource(claim._id, customUrl || undefined);
+        result = (await onCrawlMultiSource(claim._id, customUrl || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
-        addLog("Audit", `Synthesized multi-source dossier: ${result.cpbClauses || 0} CPB, ${result.pubMedClauses || 0} PubMed, ${result.fdaClauses || 0} FDA clauses`, "success");
+        addLog("Audit", `Synthesized multi-source dossier: ${result?.cpbClauses || 0} CPB, ${result?.pubMedClauses || 0} PubMed, ${result?.fdaClauses || 0} FDA clauses`, "success");
       } else if (activeMode === "payer_cpb") {
-        result = await onCrawlCPB(claim._id, customUrl || undefined);
+        result = (await onCrawlCPB(claim._id, customUrl || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} clinical policy clauses: "${result?.policyTitle || "Policy Bulletin"}"`, "success");
       } else if (activeMode === "pubmed_trials") {
-        result = await onCrawlPubMed(claim._id, customQuery || undefined, customUrl || undefined);
+        result = (await onCrawlPubMed(claim._id, customQuery || undefined, customUrl || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} trial clauses from study: "${result?.studyTitle || "PubMed Study"}" (${result?.identifier || "PMID"})`, "success");
       } else if (activeMode === "fda_labels") {
-        result = await onCrawlFDA(claim._id, customUrl || undefined, customQuery || undefined);
+        result = (await onCrawlFDA(claim._id, customUrl || undefined, customQuery || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} FDA label clauses for: "${result?.productName || "Approved Medical Product"}" (${result?.applicationNumber || "NDA/PMA"})`, "success");
       } else if (activeMode === "custom_url") {
-        result = await onCrawlCustomUrl(claim._id, customUrl.trim(), customCategory, customQuery || undefined);
+        result = (await onCrawlCustomUrl(claim._id, customUrl.trim(), customCategory, customQuery || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} structured criteria clauses: "${result?.documentTitle || "Custom Guideline"}"`, "success");
       }
@@ -241,13 +241,13 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
 
       const totalExtracted =
         result?.clausesExtracted ||
-        (result?.cpbClauses || 0) + (result?.pubMedClauses || 0) + (result?.fdaClauses || 0) ||
+        (Number(result?.cpbClauses || 0) + Number(result?.pubMedClauses || 0) + Number(result?.fdaClauses || 0)) ||
         "multiple";
 
       setSuccessSummary(`Successfully indexed ${totalExtracted} clinical evidence clauses in ${(Date.now() - startTime) / 1000}s.`);
       addLog("Complete", "Research session completed successfully.", "success");
-    } catch (err: any) {
-      const msg = err?.message || "Clinical research crawl failed.";
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Clinical research crawl failed.";
       setErrorMessage(msg);
       addLog("Error", msg, "error");
     } finally {

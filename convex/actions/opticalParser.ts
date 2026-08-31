@@ -80,7 +80,7 @@ export const parseDenialDocument = action({
     patientEmail: v.optional(v.string()),
     autoRunPipeline: v.optional(v.boolean()),
   },
-  handler: async (ctx, args): Promise<DenialExtractionResult & { claimId: string; pipelineResult?: any }> => {
+  handler: async (ctx, args): Promise<DenialExtractionResult & { claimId: string; pipelineResult?: Record<string, unknown> }> => {
     // Enforce rate limiting
     const limitStatus = await rateLimiter.limit(ctx, "opticalParser", {
       key: args.patientEmail || "global",
@@ -152,7 +152,7 @@ Rules:
     });
 
     // Save patient and claim into Convex database
-    const claimId: string = await ctx.runMutation((internal as any).claims.createWithPatientInternal, {
+    const claimId = await ctx.runMutation(internal.claims.createWithPatientInternal, {
       patientName: extraction.patientName?.trim() || "",
       patientEmail: args.patientEmail?.trim() || "",
       memberId: extraction.memberId?.trim() || "",
@@ -174,7 +174,7 @@ Rules:
     try {
       // 1. Resolve base gateway info (portal URL, fax, PO Box, EDI ID, etc.) from verified directory or web search
       const resolvedContact = await ctx.runAction(
-        (api as any).actions.payerContactResolver.resolvePayerGateway,
+        api.actions.payerContactResolver.resolvePayerGateway,
         {
           claimId,
           payerName: extraction.insurancePayer,
@@ -183,7 +183,7 @@ Rules:
 
       // 2. If OCR extracted an explicit appeals email or specific PO Box, overlay it with document provenance
       if (extraction.payerAppealsEmail && extraction.payerAppealsEmail.includes("@")) {
-        await ctx.runMutation((api as any).claims.updatePayerContact, {
+        await ctx.runMutation(internal.claims.updatePayerContactInternal, {
           claimId,
           payerContact: {
             ...resolvedContact,
@@ -201,15 +201,15 @@ Rules:
       console.warn("Auto payer gateway resolution note:", contactErr);
     }
 
-    let pipelineResult: any = undefined;
+    let pipelineResult: Record<string, unknown> | undefined = undefined;
     if (args.autoRunPipeline) {
       try {
-        pipelineResult = await ctx.runAction(
-          (api as any).actions.sentinelPipeline.runAutonomousPipeline,
+        pipelineResult = (await ctx.runAction(
+          api.actions.sentinelPipeline.runAutonomousPipeline,
           {
             claimId,
           }
-        );
+        )) as unknown as Record<string, unknown>;
       } catch (pipelineErr) {
         console.error("Auto-pilot pipeline error:", pipelineErr);
       }

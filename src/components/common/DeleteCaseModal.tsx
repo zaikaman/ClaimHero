@@ -28,7 +28,7 @@ interface DeleteCaseModalProps {
   isOpen: boolean;
   claim: Claim | null;
   onClose: () => void;
-  onConfirmDelete: (claimId: string) => Promise<any>;
+  onConfirmDelete: (claimId: string) => Promise<unknown>;
   onSuccess?: () => void;
 }
 
@@ -52,9 +52,9 @@ export const DeleteCaseModal: React.FC<DeleteCaseModalProps> = ({
       setIsDeleting(false);
       onClose();
       onSuccess?.();
-    } catch (err: any) {
+    } catch (err) {
       setIsDeleting(false);
-      setError(err?.message || "Failed to delete case. Please try again.");
+      setError(err instanceof Error ? err.message : "Failed to delete case. Please try again.");
     }
   };
 

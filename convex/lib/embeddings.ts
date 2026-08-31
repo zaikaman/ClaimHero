@@ -38,6 +38,8 @@ export interface RankablePrecedentHit {
   icd10Codes: string[];
   cptCodes: string[];
   carcCodes: string[];
+  title?: string;
+  citation?: string;
 }
 
 function fnv1a(input: string): number {
@@ -190,7 +192,7 @@ export function rankPrecedentHits<T extends RankablePrecedentHit>(
   const seen = new Set<string>();
   const deduplicated: Array<T & { combinedScore: number; codeOverlap: number }> = [];
   for (const item of scored) {
-    const key = ((item as any).citation || (item as any).title || String(item._id)).trim().toLowerCase();
+    const key = (item.citation || item.title || String(item._id)).trim().toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
       deduplicated.push(item);

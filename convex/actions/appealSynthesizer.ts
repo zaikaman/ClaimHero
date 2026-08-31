@@ -146,10 +146,33 @@ function formatDenialReason(code?: string, description?: string): string {
   return [code, cleanDescription].filter(Boolean).join(" - ");
 }
 
+import type { Id } from "../_generated/dataModel";
+
+export interface AppealSynthesizerClaimContext {
+  _id: Id<"claims">;
+  claimNumber: string;
+  patient?: { name?: string; memberId?: string; groupNumber?: string; state?: string; insurancePayer?: string; email?: string };
+  cptCodes?: string[];
+  icd10Codes?: string[];
+  deniedAmount: number;
+  patientOwedAmount?: number;
+  denialReasonCode?: string;
+  denialReasonDescription?: string;
+  serviceDate?: string;
+  providerName?: string;
+  daysRemaining?: number;
+  userId?: Id<"users">;
+  appealContext?: {
+    sender?: AppealSenderDetails;
+    clinicalFacts?: ClinicalFacts;
+    physicianNotes?: string;
+  };
+}
+
 const UNSUPPORTED_CLINICAL_CONCLUSION =
   /clinical documentation confirms|meets? (?:the |applicable )?criteria|does not present with|does not document (?:any )?active joint or systemic infection|does not document (?:any )?(?:active )?(?:joint|systemic) infection|no (?:absolute )?contraindications?|absence of (?:an )?(?:active )?(?:joint|systemic) infection|(?:failed|failure of|exhausted) conservative|end[- ]stage|bone[- ]on[- ]bone|necessitated the surgical intervention|supports? (?:the )?medical necessity|is medically appropriate|is medically necessary|we maintain that treatment was medically appropriate/i;
 
-function buildNeutralClinicalBasis(claim: any): string {
+function buildNeutralClinicalBasis(claim: AppealSynthesizerClaimContext): string {
   const procedureCodes = claim.cptCodes?.join(", ") || "the procedure listed on the claim";
   const diagnosisCodes = claim.icd10Codes?.join(", ") || "the diagnosis listed on the claim";
 
@@ -164,7 +187,7 @@ function quoteUserFact(value: string): string {
     .join("\n");
 }
 
-function buildDocumentedClinicalBasis(claim: any, clinicalFacts?: ClinicalFacts): string {
+function buildDocumentedClinicalBasis(claim: AppealSynthesizerClaimContext, clinicalFacts?: ClinicalFacts): string {
   const fields: Array<[string, string | undefined]> = [
     ["Symptoms and functional impact", clinicalFacts?.symptomsAndFunctionalImpact],
     ["Examination findings", clinicalFacts?.examinationFindings],
@@ -192,7 +215,7 @@ function buildDocumentedClinicalBasis(claim: any, clinicalFacts?: ClinicalFacts)
 
 function buildGroundedClinicalBasis(
   value: string | undefined,
-  claim: any,
+  claim: AppealSynthesizerClaimContext,
   clinicalFacts?: ClinicalFacts
 ): string {
   if (clinicalFacts) return buildDocumentedClinicalBasis(claim, clinicalFacts);
@@ -203,7 +226,7 @@ function buildGroundedClinicalBasis(
     : buildNeutralClinicalBasis(claim);
 }
 
-function isNegativeOrExclusionEvidence(evidence: any): boolean {
+function isNegativeOrExclusionEvidence(evidence: { title?: string; extractedEvidenceMarkdown?: string; citationClause?: string }): boolean {
   const title = (evidence.title || "").toLowerCase();
   const quote = (evidence.extractedEvidenceMarkdown || "").toLowerCase();
   const text = `${title} ${evidence.citationClause || ""} ${quote}`;
@@ -246,7 +269,12 @@ function buildSignature(providerName?: string, sender?: AppealSenderDetails): st
     : `Sincerely,\n\n${senderLines.join("\n")}`;
 }
 
-function isExternalEvidence(evidence: any): boolean {
+function isExternalEvidence(evidence: {
+  sourceType?: string;
+  title?: string;
+  citationClause?: string;
+  extractedEvidenceMarkdown?: string;
+}): boolean {
   const searchableText = [
     evidence.sourceType,
     evidence.title,
@@ -261,7 +289,12 @@ function isExternalEvidence(evidence: any): boolean {
     !/(?:vector similarity|combined score|winning brief|claimhero overturned)/i.test(searchableText);
 }
 
-function isBlockedEvidence(evidence: any): boolean {
+function isBlockedEvidence(evidence: {
+  title?: string;
+  citationClause?: string;
+  extractedEvidenceMarkdown?: string;
+  sourceUrl?: string;
+}): boolean {
   const text = [evidence.title, evidence.citationClause, evidence.extractedEvidenceMarkdown, evidence.sourceUrl]
     .filter(Boolean)
     .join(" ");
@@ -280,7 +313,10 @@ function isBlockedEvidence(evidence: any): boolean {
   return false;
 }
 
-function isPayerMismatchedEvidence(evidence: any, claim: any): boolean {
+function isPayerMismatchedEvidence(
+  evidence: { sourceUrl?: string },
+  claim: { patient?: { insurancePayer?: string }; payer?: string }
+): boolean {
   const payer: string = claim?.patient?.insurancePayer || claim?.payer || "";
   const sourceUrl: string | undefined = evidence.sourceUrl;
   if (!payer || !sourceUrl) return false;
@@ -340,7 +376,10 @@ const CPT_EXPECTED_SITES: Record<string, string[]> = {
   "29881": ["knee", "meniscectomy", "arthroscopy", "29881"],
 };
 
-function isEvidenceSiteMismatched(evidence: any, claim: any): boolean {
+function isEvidenceSiteMismatched(
+  evidence: { title?: string; citationClause?: string; extractedEvidenceMarkdown?: string; sourceUrl?: string },
+  claim: { cptCodes?: string[] }
+): boolean {
   const cptCodes: string[] = claim?.cptCodes || [];
   const hasKnown = cptCodes.some((c) => CPT_EXPECTED_SITES[c]);
   if (!hasKnown) return false;
@@ -391,14 +430,20 @@ function cleanEvidenceSummary(value?: string): string {
   return `${summary.slice(0, 217).replace(/\s+\S*$/, "")}...`;
 }
 
-function buildGroundedPolicyCitations(evidences: any[]): PolicyCitationItem[] {
+function buildGroundedPolicyCitations(evidences: Array<{
+  sourceType?: string;
+  title?: string;
+  citationClause?: string;
+  extractedEvidenceMarkdown?: string;
+  sourceUrl?: string;
+}>): PolicyCitationItem[] {
   return evidences
     .filter((e) => isExternalEvidence(e) && !isBlockedEvidence(e) && !isNegativeOrExclusionEvidence(e) && e.title && e.citationClause && e.extractedEvidenceMarkdown)
     .slice(0, 5)
     .map((e) => ({
-      source: e.title,
-      clause: e.citationClause,
-      quote: e.extractedEvidenceMarkdown,
+      source: e.title!,
+      clause: e.citationClause!,
+      quote: e.extractedEvidenceMarkdown!,
     }));
 }
 
@@ -419,10 +464,16 @@ export function formatVectorPrecedentSection(vectorPrecedents?: VectorPrecedentM
 }
 
 export function assembleProfessionalAppealEmail(
-  claim: any,
+  claim: AppealSynthesizerClaimContext,
   appealLevel: string = "level_1_internal",
   result: AppealBriefSynthesisResult,
-  evidences: any[],
+  evidences: Array<{
+    sourceType?: string;
+    title?: string;
+    citationClause?: string;
+    extractedEvidenceMarkdown?: string;
+    sourceUrl?: string;
+  }>,
   physicianNotes?: string,
   _vectorPrecedents?: VectorPrecedentMatch[],
   sender?: AppealSenderDetails,
@@ -502,7 +553,7 @@ export function assembleProfessionalAppealEmail(
   if (supportingEvidences.length > 0) {
     email += `## Supporting documentation for review\n\n`;
     email += `The following policy materials are identified as review references. They should be evaluated together with the patient-specific clinical records:\n\n`;
-    supportingEvidences.slice(0, 5).forEach((evidence: any) => {
+    supportingEvidences.slice(0, 5).forEach((evidence) => {
       const details = cleanEvidenceSummary(evidence.extractedEvidenceMarkdown);
       const sourceLink = evidence.sourceUrl ? ` ([Official source](${evidence.sourceUrl}))` : "";
       const clause = evidence.citationClause ? ` — ${evidence.citationClause}` : "";
@@ -572,7 +623,7 @@ export const generateAppealBrief = action({
     const appealLevel = args.appealLevel || "level_1_internal";
 
     // 1. Fetch claim details with joined patient data
-    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -591,7 +642,7 @@ export const generateAppealBrief = action({
     }
 
     // 2. Fetch indexed clinical evidence clauses
-    const evidences: any[] = await ctx.runQuery((internal as any).clinicalEvidences.listByClaimInternal, {
+    const evidences = await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
     });
 
@@ -617,14 +668,14 @@ export const generateAppealBrief = action({
         phone: undefined,
       };
     const evidenceText = externalEvidences.length > 0
-      ? externalEvidences.map((e: any, idx: number) => `[Source ${idx + 1}] (${e.sourceType.toUpperCase()} - ${e.title} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
+      ? externalEvidences.map((e, idx: number) => `[Source ${idx + 1}] (${e.sourceType.toUpperCase()} - ${e.title} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
       : "Standard national clinical practice guideline and ERISA disclosure rules apply.";
 
     let vectorPrecedents: VectorPrecedentMatch[] = args.vectorPrecedents || [];
     if (!args.vectorPrecedents) {
       try {
         vectorPrecedents = await ctx.runAction(
-          (api as any).actions.precedentArchive.retrieveTopPrecedents,
+          api.actions.precedentArchive.retrieveTopPrecedents,
           { claimId: args.claimId }
         );
       } catch (precedentErr) {
@@ -791,7 +842,7 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       ],
     };
 
-    const appealId: string = await ctx.runMutation((internal as any).appeals.createOrUpdateDraftInternal, {
+    const appealId = await ctx.runMutation(internal.appeals.createOrUpdateDraftInternal, {
       claimId: args.claimId,
       appealLevel,
       statutoryPosture: tierMeta.statutoryPosture,
@@ -806,7 +857,7 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
     });
 
     return {
-      appealId,
+      appealId: String(appealId),
       ...result,
     };
   },

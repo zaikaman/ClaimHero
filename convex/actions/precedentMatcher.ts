@@ -196,7 +196,7 @@ export const computeOverturnScore = action({
   },
   handler: async (ctx, args): Promise<OverturnScoringResult> => {
     // 1. Fetch claim details with joined patient data
-    const claim = await ctx.runQuery((internal as any).claims.getByIdInternal, {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -205,7 +205,7 @@ export const computeOverturnScore = action({
     }
 
     // 2. Fetch indexed clinical evidence clauses
-    const evidences = await ctx.runQuery((internal as any).clinicalEvidences.listByClaimInternal, {
+    const evidences = await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
     });
 
@@ -213,7 +213,7 @@ export const computeOverturnScore = action({
     const deterministicCalculation = calculateDeterministicRubric(claim, evidences);
 
     const evidencesSummary = evidences.length > 0
-      ? evidences.map((e: any, i: number) => `[Evidence ${i + 1}] (${e.sourceType.toUpperCase()} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
+      ? evidences.map((e, i: number) => `[Evidence ${i + 1}] (${e.sourceType.toUpperCase()} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
       : "Standard national clinical practice guideline applied.";
 
     // 4. Call OpenAI for deep qualitative legal/clinical contradictions
@@ -288,7 +288,7 @@ ${evidencesSummary}`,
     };
 
     // 5. Update claim in database with deterministic score, risk level, and criteria breakdown
-    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+    await ctx.runMutation(internal.claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "precedent_matched",
       overturnProbabilityScore: finalResult.overturnProbabilityScore,

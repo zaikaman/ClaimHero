@@ -3,6 +3,7 @@
 import { internalAction } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import {
   downloadAgentMailAttachment,
   getAgentMailMessage,
@@ -22,14 +23,14 @@ export const provisionClaimInboxes = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
     if (!claim) return null;
 
     if (!process.env.AGENTMAIL_API_KEY?.trim()) {
-      await ctx.runMutation((internal as any).claims.setAgentMailInboxes, {
+      await ctx.runMutation(internal.claims.setAgentMailInboxes, {
         claimId: args.claimId,
         status: "not_configured",
         error: "AgentMail is not configured. Set AGENTMAIL_API_KEY before sending email.",
@@ -40,7 +41,7 @@ export const provisionClaimInboxes = internalAction({
     try {
       const mailboxes = getSharedAgentMailboxes();
 
-      await ctx.runMutation((internal as any).claims.setAgentMailInboxes, {
+      await ctx.runMutation(internal.claims.setAgentMailInboxes, {
         claimId: args.claimId,
         claimInboxId: mailboxes.senderInboxId,
         claimInboxEmail: mailboxes.senderEmail,
@@ -50,7 +51,7 @@ export const provisionClaimInboxes = internalAction({
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await ctx.runMutation((internal as any).claims.setAgentMailInboxes, {
+      await ctx.runMutation(internal.claims.setAgentMailInboxes, {
         claimId: args.claimId,
         status: "failed",
         error: message.slice(0, 1000),
@@ -120,7 +121,7 @@ export const processInboundIntake = internalAction({
     const senderEmail = extractEmailAddress(sender);
     if (!senderEmail) throw new Error("Inbound AgentMail message does not contain a usable sender email address.");
 
-    const started = await ctx.runMutation((internal as any).emails.startInboundIntake, {
+    const started = await ctx.runMutation(internal.emails.startInboundIntake, {
       eventId: args.eventId,
       messageId: normalized.messageId,
       inboxId: normalized.inboxId,
@@ -135,7 +136,7 @@ export const processInboundIntake = internalAction({
       const supportedAttachment = normalized.attachments.find((attachment) =>
         isSupportedAttachment(attachment.filename, attachment.contentType)
       );
-      let storageId: string | undefined;
+      let storageId: Id<"_storage"> | undefined;
 
       if (supportedAttachment) {
         if (supportedAttachment.size && supportedAttachment.size > MAX_INTAKE_ATTACHMENT_BYTES) {
@@ -152,28 +153,30 @@ export const processInboundIntake = internalAction({
         }
 
         const contentType = attachment.contentType || supportedAttachment.contentType || "application/octet-stream";
-        storageId = await ctx.storage.store(new Blob([attachment.bytes], { type: contentType })) as string;
+        storageId = (await ctx.storage.store(new Blob([attachment.bytes], { type: contentType }))) as Id<"_storage">;
       }
 
       if (!bodyText.trim() && !storageId) {
         throw new Error("Inbound email has no readable body or supported denial-document attachment.");
       }
 
-      const extraction = await ctx.runAction((api as any)["actions/opticalParser"].parseDenialDocument, {
+      const extraction = await ctx.runAction(api.actions.opticalParser.parseDenialDocument, {
         rawDocumentText: bodyText,
         ...(storageId ? { storageId } : {}),
         patientEmail: senderEmail,
       });
 
-      const threadId = await ctx.runMutation((internal as any).emails.getOrCreateThreadInternal, {
-        claimId: extraction.claimId,
+      const extractedClaimId = extraction.claimId as Id<"claims">;
+
+      const threadId = await ctx.runMutation(internal.emails.getOrCreateThreadInternal, {
+        claimId: extractedClaimId,
         agentEmail: intakeMailbox.email,
         payerEmail: senderEmail,
         subject: normalized.subject || "Claim denial document intake",
       });
-      await ctx.runMutation((internal as any).emails.insertMessageInternal, {
+      await ctx.runMutation(internal.emails.insertMessageInternal, {
         threadId,
-        claimId: extraction.claimId,
+        claimId: extractedClaimId,
         direction: "inbound",
         sender,
         recipient: intakeMailbox.email,
@@ -183,18 +186,18 @@ export const processInboundIntake = internalAction({
         hasAttachments: normalized.attachments.length > 0,
         agentMailMessageId: normalized.messageId,
       });
-      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
-        claimId: extraction.claimId,
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
+        claimId: extractedClaimId,
         status: "ingested",
         actor: "AgentMail Intake Digest",
         details: "Inbound denial document digested from the ClaimHero intake inbox. Confirm case context before drafting.",
       });
-      await ctx.runMutation((internal as any).emails.completeInboundIntake, {
+      await ctx.runMutation(internal.emails.completeInboundIntake, {
         eventId: args.eventId,
-        claimId: extraction.claimId,
+        claimId: extractedClaimId,
       });
     } catch (error) {
-      await ctx.runMutation((internal as any).emails.failInboundIntake, {
+      await ctx.runMutation(internal.emails.failInboundIntake, {
         eventId: args.eventId,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -235,8 +238,8 @@ export const processInboundClaimReply = internalAction({
       (recipient) => extractEmailAddress(recipient) || recipient.toLowerCase()
     );
 
-    const matchingClaim: any = await ctx.runQuery(
-      (internal as any).claims.findMatchingClaimInternal,
+    const matchingClaim = await ctx.runQuery(
+      internal.claims.findMatchingClaimInternal,
       {
         subject,
         bodySnippet: bodyContent.slice(0, 1000),
@@ -249,13 +252,13 @@ export const processInboundClaimReply = internalAction({
     }
 
     const sender = normalized.from || "Insurance Payer";
-    const threadId = await ctx.runMutation((internal as any).emails.getOrCreateThreadInternal, {
+    const threadId = await ctx.runMutation(internal.emails.getOrCreateThreadInternal, {
       claimId: matchingClaim._id,
       agentEmail: normalized.recipients[0] || "",
       payerEmail: extractEmailAddress(sender) || sender,
       subject,
     });
-    await ctx.runMutation((internal as any).emails.insertMessageInternal, {
+    await ctx.runMutation(internal.emails.insertMessageInternal, {
       threadId,
       claimId: matchingClaim._id,
       direction: "inbound",
@@ -275,14 +278,14 @@ export const processInboundClaimReply = internalAction({
       lowerText.includes("payment issued") ||
       lowerText.includes("reimbursed")
     ) {
-      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: matchingClaim._id,
         status: "won",
         actor: "AgentMail Autonomous Adjudicator",
         details: `Payer approval received for claim ${matchingClaim.claimNumber}.`,
       });
     } else {
-      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: matchingClaim._id,
         status: "dispatched",
         actor: "AgentMail Webhook",

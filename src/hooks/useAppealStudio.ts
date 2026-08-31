@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Appeal, Claim, AppealLevel } from "../types";
-
-const convexApi = api as any;
+import { Id } from "../../convex/_generated/dataModel";
 
 export interface AppealSenderDetails {
   name: string;
@@ -13,18 +12,18 @@ export interface AppealSenderDetails {
 }
 
 export function useAppealStudio(claim?: Claim | null) {
-  const claimId = claim?._id;
+  const claimId = claim?._id as Id<"claims"> | undefined;
 
   // Real-time query to fetch latest appeal brief from Convex
   const latestAppeal = useQuery(
-    convexApi.appeals.getLatestByClaim,
-    claimId ? { claimId: claimId as any } : "skip"
+    api.appeals.getLatestByClaim,
+    claimId ? { claimId } : "skip"
   ) as Appeal | null | undefined;
 
   // Real-time query to fetch all historical versions/revisions across tiers
   const appealVersions = useQuery(
-    convexApi.appeals.listVersions,
-    claimId ? { claimId: claimId as any } : "skip"
+    api.appeals.listVersions,
+    claimId ? { claimId } : "skip"
   ) as Appeal[] | undefined;
 
   const [selectedAppealId, setSelectedAppealId] = useState<string | null>(null);
@@ -40,12 +39,9 @@ export function useAppealStudio(claim?: Claim | null) {
   const [senderEmail, setSenderEmail] = useState<string>(claim?.appealContext?.sender.email || "");
   const [senderPhone, setSenderPhone] = useState<string>(claim?.appealContext?.sender.phone || "");
 
-  const saveDraftMutation = useMutation(convexApi.appeals.saveDraft);
-  const escalateTierMutation = useMutation(convexApi.appeals.escalateTier);
-  const synthesizeAction = useAction(
-    convexApi["actions/appealSynthesizer"]?.generateAppealBrief ||
-    convexApi.actions?.appealSynthesizer?.generateAppealBrief
-  );
+  const saveDraftMutation = useMutation(api.appeals.saveDraft);
+  const escalateTierMutation = useMutation(api.appeals.escalateTier);
+  const synthesizeAction = useAction(api.actions.appealSynthesizer.generateAppealBrief);
 
   // Determine active displayed appeal (selected revision or latest)
   const activeAppeal = useMemo(() => {
@@ -105,7 +101,7 @@ export function useAppealStudio(claim?: Claim | null) {
           setIsSaving(true);
           try {
             await saveDraftMutation({
-              appealId: targetId as any,
+              appealId: targetId as Id<"appeals">,
               fullAppealMarkdown: newContent,
               lastEditedBy: "Collaborative Advocate Studio",
             });
@@ -138,7 +134,7 @@ export function useAppealStudio(claim?: Claim | null) {
       setIsSynthesizing(true);
       try {
         const result = await synthesizeAction({
-          claimId: claim._id as any,
+          claimId: claim._id as Id<"claims">,
           appealLevel: targetLevel,
           physicianNotes: customNotes || physicianNotes || undefined,
           senderName: customSender?.name || senderName || undefined,
@@ -170,7 +166,7 @@ export function useAppealStudio(claim?: Claim | null) {
       setIsEscalating(true);
       try {
         await escalateTierMutation({
-          claimId: claim._id as any,
+          claimId: claim._id as Id<"claims">,
           targetLevel,
           escalationReason,
           actor: senderName || "Advocate Legal Officer",

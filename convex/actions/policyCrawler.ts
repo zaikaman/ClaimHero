@@ -1,6 +1,6 @@
 "use node";
 
-import { action } from "../_generated/server";
+import { action, ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { api, components, internal } from "../_generated/api";
@@ -669,7 +669,7 @@ export function selectFirecrawlPolicySource(payload: unknown): FirecrawlPolicySo
 }
 
 async function scrapeFirecrawlPolicySource(
-  ctx: any,
+  ctx: ActionCtx,
   sourceUrl: string,
 ): Promise<FirecrawlPolicySource> {
   if (isPrivateMcgViewerUrl(sourceUrl)) {
@@ -1020,7 +1020,7 @@ export const crawlInsurerPolicy = action({
 
     // Do not leave stale, previously accepted citations visible while a new
     // source-only crawl is in progress or when the crawl fails.
-    await ctx.runMutation((internal as any).clinicalEvidences.clearByClaimInternal, {
+    await ctx.runMutation(internal.clinicalEvidences.clearByClaimInternal, {
       claimId: args.claimId,
     });
 
@@ -1071,7 +1071,7 @@ export const crawlInsurerPolicy = action({
           }));
 
           const successfulSearches = searchResults.filter(
-            (result): result is { payload: any; error: undefined } => Boolean(result.payload),
+            (result): result is { payload: Record<string, unknown>; error: undefined } => Boolean(result.payload),
           );
           const failedSearches = searchResults
             .filter((result): result is { payload: undefined; error: string } => typeof result.error === "string")
@@ -1230,13 +1230,13 @@ For each clause:
       relevanceScore: 95,
     });
 
-    await ctx.runMutation((internal as any).clinicalEvidences.insertBatchInternal, {
+    await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
       claimId: args.claimId,
       evidences: evidencesToInsert,
     });
 
     // Update claim status to analyzing
-    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+    await ctx.runMutation(internal.claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "analyzing",
       details: `Firecrawl indexed ${evidencesToInsert.length} clinical policy clauses for ${args.payer}.`,
@@ -1434,12 +1434,12 @@ Assign relevanceScore between 85 and 99.`,
     });
 
     if (evidencesToInsert.length > 0) {
-      await ctx.runMutation((internal as any).clinicalEvidences.insertBatchInternal, {
+      await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
         claimId: args.claimId,
         evidences: evidencesToInsert,
       });
 
-      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
         details: `Firecrawl indexed ${evidencesToInsert.length} PubMed study clauses (${extracted.identifier || "Clinical Trial"}).`,
@@ -1554,12 +1554,12 @@ Assign relevanceScore between 88 and 99.`,
     });
 
     if (evidencesToInsert.length > 0) {
-      await ctx.runMutation((internal as any).clinicalEvidences.insertBatchInternal, {
+      await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
         claimId: args.claimId,
         evidences: evidencesToInsert,
       });
 
-      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
         details: `Firecrawl indexed ${evidencesToInsert.length} FDA label & indication clauses (${extracted.productName}).`,
@@ -1618,12 +1618,12 @@ Assign relevanceScore between 80 and 99.`,
     }));
 
     if (evidencesToInsert.length > 0) {
-      await ctx.runMutation((internal as any).clinicalEvidences.insertBatchInternal, {
+      await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
         claimId: args.claimId,
         evidences: evidencesToInsert,
       });
 
-      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
         details: `Firecrawl extracted ${evidencesToInsert.length} clauses from custom URL: ${extracted.documentTitle}.`,
@@ -1655,15 +1655,17 @@ export const crawlMultiSourceHub = action({
     customPolicyUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Clear prior evidence to start fresh multi-source sweep
-    await ctx.runMutation((internal as any).clinicalEvidences.clearByClaimInternal, {
+    await ctx.runMutation(internal.auditLogs.logEventInternal, {
+      eventType: "multi_source_crawl_started",
+      actor: "Sentinel Multi-Source Policy Hub",
+      details: `Initiating multi-vector clinical intelligence gathering: Payer CPB (${args.payer}), PubMed / NIH Clinical Trials, and FDA Drug/Device Indications.`,
       claimId: args.claimId,
     });
 
     const results: {
-      cpbResult?: any;
-      pubMedResult?: any;
-      fdaResult?: any;
+      cpbResult?: unknown;
+      pubMedResult?: unknown;
+      fdaResult?: unknown;
       errors: string[];
     } = {
       errors: [],
@@ -1671,7 +1673,7 @@ export const crawlMultiSourceHub = action({
 
     // 1. Crawl Insurer CPB / Guideline
     try {
-      results.cpbResult = await ctx.runAction((api as any).actions?.policyCrawler?.crawlInsurerPolicy || (api as any)["actions/policyCrawler"]?.crawlInsurerPolicy, {
+      results.cpbResult = await ctx.runAction(api.actions.policyCrawler.crawlInsurerPolicy, {
         claimId: args.claimId,
         payer: args.payer,
         cptCodes: args.cptCodes,
@@ -1680,37 +1682,40 @@ export const crawlMultiSourceHub = action({
         denialReasonDescription: args.denialReasonDescription,
         customPolicyUrl: args.customPolicyUrl,
       });
-    } catch (err: any) {
-      results.errors.push(`CPB Crawl: ${err?.message || "Failed"}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed";
+      results.errors.push(`CPB Crawl: ${message}`);
     }
 
     // 2. Crawl PubMed & ClinicalTrials
     try {
-      results.pubMedResult = await ctx.runAction((api as any).actions?.policyCrawler?.crawlPubMedAndTrials || (api as any)["actions/policyCrawler"]?.crawlPubMedAndTrials, {
+      results.pubMedResult = await ctx.runAction(api.actions.policyCrawler.crawlPubMedAndTrials, {
         claimId: args.claimId,
         cptCodes: args.cptCodes,
         icd10Codes: args.icd10Codes,
         denialReasonCode: args.denialReasonCode,
         denialReasonDescription: args.denialReasonDescription,
       });
-    } catch (err: any) {
-      results.errors.push(`PubMed Scrape: ${err?.message || "Failed"}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed";
+      results.errors.push(`PubMed Scrape: ${message}`);
     }
 
     // 3. Crawl FDA Labels & Indications
     try {
-      results.fdaResult = await ctx.runAction((api as any).actions?.policyCrawler?.crawlFdaIndications || (api as any)["actions/policyCrawler"]?.crawlFdaIndications, {
+      results.fdaResult = await ctx.runAction(api.actions.policyCrawler.crawlFdaIndications, {
         claimId: args.claimId,
         cptCodes: args.cptCodes,
         icd10Codes: args.icd10Codes,
         denialReasonCode: args.denialReasonCode,
       });
-    } catch (err: any) {
-      results.errors.push(`FDA Crawler: ${err?.message || "Failed"}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed";
+      results.errors.push(`FDA Crawler: ${message}`);
     }
 
     // Ensure ERISA statutory legal precedent is always present
-    await ctx.runMutation((internal as any).clinicalEvidences.insertSingleInternal, {
+    await ctx.runMutation(internal.clinicalEvidences.insertSingleInternal, {
       claimId: args.claimId,
       sourceType: "legal_precedent",
       title: "ERISA Full & Fair Review Statutory Protocol",
@@ -1720,13 +1725,19 @@ export const crawlMultiSourceHub = action({
       relevanceScore: 95,
     });
 
+    const getClausesCount = (res: unknown): number => {
+      if (typeof res === "object" && res !== null && "clausesExtracted" in res) {
+        return Number((res as { clausesExtracted?: unknown }).clausesExtracted) || 0;
+      }
+      return 0;
+    };
+
     return {
       success: true,
-      cpbClauses: results.cpbResult?.clausesExtracted || 0,
-      pubMedClauses: results.pubMedResult?.clausesExtracted || 0,
-      fdaClauses: results.fdaResult?.clausesExtracted || 0,
+      cpbClauses: getClausesCount(results.cpbResult),
+      pubMedClauses: getClausesCount(results.pubMedResult),
+      fdaClauses: getClausesCount(results.fdaResult),
       errors: results.errors,
     };
   },
 });
-

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Claim, ClaimStatus, DashboardStats, DenialExtractionResult } from "../types";
 
-const convexApi = api as any;
+import { Id } from "../../convex/_generated/dataModel";
 
 export function useClaims(options?: {
   statusFilter?: string;
@@ -21,12 +21,12 @@ export function useClaims(options?: {
     : undefined;
 
   // Real Convex query to fetch claims
-  const rawClaims = useQuery(convexApi.claims.list, {
+  const rawClaims = useQuery(api.claims.list, {
     status: statusArg,
     payer: payerArg,
   }) as Claim[] | undefined;
 
-  const rawPortfolioStats = useQuery(convexApi.claims.getPortfolioStats, {});
+  const rawPortfolioStats = useQuery(api.claims.getPortfolioStats, {});
 
   const searchQuery = options?.searchQuery?.toLowerCase().trim() || "";
 
@@ -128,14 +128,11 @@ export function useClaims(options?: {
   }, [rawClaims, selectedClaimId]);
 
   // Real Convex mutation & action hooks
-  const generateUploadUrlMutation = useMutation(convexApi.claims.generateUploadUrl);
-  const createWithPatientMutation = useMutation(convexApi.claims.createWithPatient);
-  const updateStatusMutation = useMutation(convexApi.claims.updateStatus);
-  const deleteCaseMutation = useMutation(convexApi.claims.deleteCase);
-  const parseDenialAction = useAction(
-    convexApi["actions/opticalParser"]?.parseDenialDocument ||
-    convexApi.actions?.opticalParser?.parseDenialDocument
-  );
+  const generateUploadUrlMutation = useMutation(api.claims.generateUploadUrl);
+  const createWithPatientMutation = useMutation(api.claims.createWithPatient);
+  const updateStatusMutation = useMutation(api.claims.updateStatus);
+  const deleteCaseMutation = useMutation(api.claims.deleteCase);
+  const parseDenialAction = useAction(api.actions.opticalParser.parseDenialDocument);
 
   // Upload a real file and run optical parsing
   const uploadAndParseDocument = useCallback(
@@ -154,7 +151,7 @@ export function useClaims(options?: {
         throw new Error(`Failed to upload file: ${response.statusText}`);
       }
 
-      const { storageId } = await response.json();
+      const { storageId } = (await response.json()) as { storageId: Id<"_storage"> };
 
       // 3. Trigger optical extraction action
       const extractionResult: DenialExtractionResult & { claimId: string } = await parseDenialAction({
@@ -192,7 +189,7 @@ export function useClaims(options?: {
   const updateClaimStatus = useCallback(
     async (claimId: string, status: ClaimStatus, details?: string) => {
       await updateStatusMutation({
-        claimId: claimId as any,
+        claimId: claimId as Id<"claims">,
         status,
         details,
       });
@@ -204,7 +201,7 @@ export function useClaims(options?: {
   const deleteCase = useCallback(
     async (claimId: string) => {
       const result = await deleteCaseMutation({
-        claimId: claimId as any,
+        claimId: claimId as Id<"claims">,
       });
 
       // If currently selected claim was deleted, switch to next available claim

@@ -122,7 +122,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
           hr: () => (
             <hr className={`my-4 ${isPrintMode ? "border-slate-300" : "border-border"}`} />
           ),
-          code: ({ children, inline, className: codeClassName }: any) => {
+          code: ({ children, inline, className: codeClassName }: { children?: React.ReactNode; inline?: boolean; className?: string }) => {
             const isCodeBlock = !inline && codeClassName;
             if (isCodeBlock) {
               return (

@@ -20,7 +20,6 @@ export const hydrateByIds = internalQuery({
   args: {
     ids: v.array(v.id("precedents")),
   },
-  returns: v.array(v.any()),
   handler: async (ctx, args): Promise<Doc<"precedents">[]> => {
     const docs: Doc<"precedents">[] = [];
     for (const id of args.ids) {
@@ -67,7 +66,6 @@ export const getBySourceClaim = internalQuery({
  */
 export const listForReindex = internalQuery({
   args: {},
-  returns: v.array(v.any()),
   handler: async (ctx): Promise<Doc<"precedents">[]> => {
     return await ctx.db.query("precedents").take(1001);
   },

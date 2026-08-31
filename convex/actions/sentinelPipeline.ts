@@ -2,6 +2,7 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 
@@ -51,7 +52,7 @@ export const runAutonomousPipeline = action({
   },
   handler: async (ctx, args): Promise<PipelineResult> => {
     // 1. Fetch current claim details
-    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -95,7 +96,7 @@ export const runAutonomousPipeline = action({
       console.warn(`Pipeline sender fallback used for claim ${claim.claimNumber}: ${sender.name}`);
       // Persist fallback so subsequent steps and audit reflect it
       try {
-        await ctx.runMutation((internal as any).claims.updateAppealContextInternal, {
+        await ctx.runMutation(internal.claims.updateAppealContextInternal, {
           claimId: args.claimId,
           sender: {
             name: sender.name,
@@ -114,18 +115,23 @@ export const runAutonomousPipeline = action({
       } catch (e) {
         console.warn("Pipeline fallback sender persist note:", e);
         if (!clinicalFacts) {
-          clinicalFacts = { recordsAreIncomplete: true } as any;
+          clinicalFacts = { recordsAreIncomplete: true };
         }
       }
     }
     if (!clinicalFacts) {
-      clinicalFacts = { recordsAreIncomplete: true } as any;
+      clinicalFacts = { recordsAreIncomplete: true };
       console.warn(`Pipeline clinicalFacts fallback used for claim ${claim.claimNumber}: recordsAreIncomplete=true`);
       try {
-        await ctx.runMutation((internal as any).claims.updateAppealContextInternal, {
+        await ctx.runMutation(internal.claims.updateAppealContextInternal, {
           claimId: args.claimId,
-          sender: sender as any,
-          clinicalFacts: clinicalFacts as any,
+          sender: {
+            name: sender.name,
+            credentials: sender.credentials,
+            email: sender.email,
+            phone: sender.phone,
+          },
+          clinicalFacts,
         });
       } catch (e) {
         console.warn("Pipeline fallback clinicalFacts persist note:", e);
@@ -135,7 +141,7 @@ export const runAutonomousPipeline = action({
     // Auto-resolve payer intake gateway if not yet cached
     if (!claim.payerContact) {
       try {
-        await ctx.runAction((api as any).actions.payerContactResolver.resolvePayerGateway, {
+        await ctx.runAction(api.actions.payerContactResolver.resolvePayerGateway, {
           claimId: args.claimId,
           payerName: payer,
         });
@@ -145,17 +151,17 @@ export const runAutonomousPipeline = action({
     }
 
     // Step 1: Policy Crawling & Evidence Extraction
-    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+    await ctx.runMutation(internal.claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "analyzing",
       actor: "Autonomous Sentinel Pipeline",
       details: "Step 1/3: Crawling clinical policy bulletins & medical guidelines...",
     });
 
-    let crawlResult: any = null;
+    let crawlResult: { policyTitle?: string; clausesExtracted?: number } | null = null;
     try {
       crawlResult = await ctx.runAction(
-        (api as any).actions.policyCrawler.crawlInsurerPolicy,
+        api.actions.policyCrawler.crawlInsurerPolicy,
         {
           claimId: args.claimId,
           payer,
@@ -173,7 +179,7 @@ export const runAutonomousPipeline = action({
       // can be synthesized without citing an inaccessible or irrelevant URL.
       // The crawler already cleared prior evidences, so we insert the fallback.
       try {
-        await ctx.runMutation((internal as any).clinicalEvidences.insertBatchInternal, {
+        await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
           claimId: args.claimId,
           evidences: [
             {
@@ -190,7 +196,7 @@ export const runAutonomousPipeline = action({
       } catch (e) {
         console.warn("Fallback ERISA insertion note:", e);
       }
-      await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
         actor: "Autonomous Sentinel Pipeline",
@@ -200,31 +206,47 @@ export const runAutonomousPipeline = action({
     }
 
     // Step 2: Precedent Matching & Overturn Probability Scoring
-    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+    await ctx.runMutation(internal.claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "analyzing",
       actor: "Autonomous Sentinel Pipeline",
       details: "Step 2/3: Matching precedent vectors & evaluating 4-pillar overturn score...",
     });
 
-    const scoreResult: any = await ctx.runAction(
-      (api as any).actions.precedentMatcher.computeOverturnScore,
+    const scoreResult = await ctx.runAction(
+      api.actions.precedentMatcher.computeOverturnScore,
       {
         claimId: args.claimId,
       }
     );
 
-    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+    await ctx.runMutation(internal.claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "precedent_matched",
       actor: "Autonomous Sentinel Pipeline",
       details: "Step 2b/3: Running Convex native vector search against the Precedent Vector Archive...",
     });
 
-    let vectorPrecedents: any[] = [];
+    let vectorPrecedents: Array<{
+      _id: Id<"precedents">;
+      sourceKind: string;
+      title: string;
+      citation: string;
+      jurisdiction: string;
+      sourceUrl?: string;
+      icd10Codes: string[];
+      cptCodes: string[];
+      carcCodes: string[];
+      winningArgument: string;
+      statutoryLanguage: string;
+      outcome: string;
+      vectorScore: number;
+      combinedScore: number;
+      codeOverlap: number;
+    }> = [];
     try {
       vectorPrecedents = await ctx.runAction(
-        (api as any).actions.precedentArchive.retrieveTopPrecedents,
+        api.actions.precedentArchive.retrieveTopPrecedents,
         { claimId: args.claimId }
       );
     } catch (precedentErr) {
@@ -232,15 +254,15 @@ export const runAutonomousPipeline = action({
     }
 
     // Step 3: Formal ERISA Appeal Brief Synthesis
-    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+    await ctx.runMutation(internal.claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "drafting",
       actor: "Autonomous Sentinel Pipeline",
       details: "Step 3/3: Synthesizing cited ERISA & clinical appeal brief...",
     });
 
-    const synthesisResult: any = await ctx.runAction(
-      (api as any).actions.appealSynthesizer.generateAppealBrief,
+    const synthesisResult = await ctx.runAction(
+      api.actions.appealSynthesizer.generateAppealBrief,
       {
         claimId: args.claimId,
         appealLevel: args.appealLevel || "level_1_internal",
@@ -255,7 +277,7 @@ export const runAutonomousPipeline = action({
     );
 
     // Step 4: Final status update to ready_for_review
-    await ctx.runMutation((internal as any).claims.updateStatusInternal, {
+    await ctx.runMutation(internal.claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "ready_for_review",
       actor: "Autonomous Sentinel Pipeline",

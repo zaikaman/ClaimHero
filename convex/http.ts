@@ -85,9 +85,9 @@ http.route({
           text: event.text,
           html: event.html,
         };
-        await ctx.scheduler.runAfter(0, (internal as any)["actions/agentMail"].processInboundIntake, scheduledArgs);
+        await ctx.scheduler.runAfter(0, internal.actions.agentMail.processInboundIntake, scheduledArgs);
       } else {
-        await ctx.scheduler.runAfter(0, (internal as any)["actions/agentMail"].processInboundClaimReply, {
+        await ctx.scheduler.runAfter(0, internal.actions.agentMail.processInboundClaimReply, {
           eventId: event.eventId,
           messageId: event.messageId,
           inboxId: event.inboxId,

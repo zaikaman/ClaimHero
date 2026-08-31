@@ -1,4 +1,4 @@
-import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
@@ -83,7 +83,40 @@ export const listVersions = query({
   },
 });
 
-async function applyCreateOrUpdateScript(ctx: any, args: any): Promise<Id<"p2pScripts"> | null> {
+interface CreateOrUpdateScriptArgs {
+  claimId: Id<"claims">;
+  physicianName: string;
+  physicianSpecialty?: string;
+  medicalDirectorRole?: string;
+  estimatedCallDuration: string;
+  openingStatutoryStatement: string;
+  clinicalPolicyCitations: Array<{
+    cpbTitle: string;
+    section: string;
+    criteriaMetText: string;
+    rebuttalBullet: string;
+    sourceUrl?: string;
+  }>;
+  disqualificationCounters: Array<{
+    insurerTrapQuestion: string;
+    physicianDirectRebuttal: string;
+    clinicalRationale: string;
+    regulatoryLeverage?: string;
+  }>;
+  statutoryDemands: string;
+  condensedCheatSheet: {
+    rapidChecklist: string[];
+    keyDiagnosisCodes: string[];
+    keyProcedureCodes: string[];
+    mustSayPoints: string[];
+    doNotConcedePoints: string[];
+    closingDemandStatement: string;
+  };
+  fullScriptMarkdown: string;
+  lastEditedBy?: string;
+}
+
+async function applyCreateOrUpdateScript(ctx: MutationCtx, args: CreateOrUpdateScriptArgs): Promise<Id<"p2pScripts"> | null> {
   const claim = await ctx.db.get(args.claimId);
   if (!claim) {
     console.warn(`Claim ${args.claimId} not found during createOrUpdateScript`);
@@ -93,10 +126,10 @@ async function applyCreateOrUpdateScript(ctx: any, args: any): Promise<Id<"p2pSc
   const now = Date.now();
   const existing = await ctx.db
     .query("p2pScripts")
-    .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
+    .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
     .collect();
 
-  const latest = existing.sort((a: any, b: any) => b.version - a.version)[0];
+  const latest = existing.sort((a, b) => b.version - a.version)[0];
   const nextVersion = latest ? latest.version + 1 : 1;
 
   let scriptId: Id<"p2pScripts">;

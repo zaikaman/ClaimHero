@@ -295,7 +295,7 @@ export const PrivacyRedactionFilter: React.FC<PrivacyRedactionFilterProps> = ({
       </div>
 
       {/* View Tabs: Matrix, Side-by-Side Diff, Preview */}
-      <Tabs value={viewMode} onValueChange={(v: any) => setViewMode(v)}>
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "matrix" | "diff" | "preview")}>
         <div className="flex items-center justify-between border-b border-border/70 pb-2">
           <TabsList variant="line" className="h-8">
             <TabsTrigger value="matrix" className="gap-1.5 text-xs py-1">

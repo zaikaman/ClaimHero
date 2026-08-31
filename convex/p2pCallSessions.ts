@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
 
 export const getLatestByClaim = query({
@@ -138,7 +139,21 @@ export const appendTranscript = mutation({
   },
 });
 
-async function applyAddFastAnswer(ctx: any, args: any) {
+interface AddFastAnswerArgs {
+  sessionId: Id<"p2pCallSessions">;
+  fastAnswer: {
+    id: string;
+    trapQuestion: string;
+    suggestedQuote: string;
+    chartProof: string;
+    cpbCitation: string;
+    regulatoryLeverage?: string;
+    confidenceScore: number;
+    timestamp: number;
+  };
+}
+
+async function applyAddFastAnswer(ctx: MutationCtx, args: AddFastAnswerArgs) {
   const session = await ctx.db.get(args.sessionId);
   if (!session) return;
 

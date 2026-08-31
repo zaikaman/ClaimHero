@@ -26,8 +26,8 @@ async function seedArchiveBody(ctx: ActionCtx): Promise<{ upserted: number }> {
   let upserted = 0;
 
   for (const entry of PRECEDENT_CORPUS) {
-    const existing: string | null = await ctx.runQuery(
-      (internal as any).precedents.getByCorpusKey,
+    const existing: Id<"precedents"> | null = await ctx.runQuery(
+      internal.precedents.getByCorpusKey,
       { corpusKey: entry.corpusKey }
     );
     if (existing) {
@@ -39,7 +39,7 @@ async function seedArchiveBody(ctx: ActionCtx): Promise<{ upserted: number }> {
     extraTokens.push(`kind:${entry.sourceKind}`);
     const embedding = await createEmbedding(embedText, extraTokens);
 
-    await ctx.runMutation((internal as any).precedents.insertPrecedent, {
+    await ctx.runMutation(internal.precedents.insertPrecedent, {
       sourceKind: entry.sourceKind,
       title: entry.title,
       citation: entry.citation,
@@ -88,8 +88,8 @@ export const reindexArchive = internalAction({
     total: v.number(),
   }),
   handler: async (ctx): Promise<{ reindexed: number; total: number }> => {
-    const docs: any[] = await ctx.runQuery(
-      (internal as any).precedents.listForReindex,
+    const docs = await ctx.runQuery(
+      internal.precedents.listForReindex,
       {}
     );
     if (docs.length > 1000) {
@@ -107,7 +107,7 @@ export const reindexArchive = internalAction({
         buildPrecedentEmbedText(doc),
         extraTokens
       );
-      await ctx.runMutation((internal as any).precedents.updateEmbedding, {
+      await ctx.runMutation(internal.precedents.updateEmbedding, {
         precedentId: doc._id,
         embedding,
       });
@@ -144,7 +144,7 @@ export const retrieveTopPrecedents = action({
     combinedScore: number;
     codeOverlap: number;
   }>> => {
-    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
     });
     if (!claim) {
@@ -165,7 +165,7 @@ export const retrieveTopPrecedents = action({
     const extraTokens = weightedTokensForCodes(icd10Codes, cptCodes, [denialReasonCode]);
     const embedding = await createEmbedding(queryText, extraTokens);
 
-    const merged = new Map<string, { _id: any; _score: number }>();
+    const merged = new Map<string, { _id: Id<"precedents">; _score: number }>();
 
     const unfiltered = await ctx.vectorSearch("precedents", "by_embedding", {
       vector: embedding,
@@ -222,7 +222,7 @@ export const retrieveTopPrecedents = action({
 
     const orderedHits = [...merged.values()].sort((a, b) => b._score - a._score);
     const ids = orderedHits.map((hit) => hit._id);
-    const docs: any[] = await ctx.runQuery((internal as any).precedents.hydrateByIds, { ids });
+    const docs = await ctx.runQuery(internal.precedents.hydrateByIds, { ids });
     const docsById = new Map(docs.map((doc) => [doc._id, doc]));
 
     const rankable = orderedHits
@@ -272,7 +272,7 @@ export const retrieveTopPrecedents = action({
     }));
 
     if (matches.length > 0) {
-      await ctx.runMutation((internal as any).precedents.attachMatchesToClaim, {
+      await ctx.runMutation(internal.precedents.attachMatchesToClaim, {
         claimId: args.claimId,
         matches,
       });
@@ -292,21 +292,21 @@ export const indexWonAppeal = internalAction({
   returns: v.union(v.id("precedents"), v.null()),
   handler: async (ctx, args): Promise<Id<"precedents"> | null> => {
     const already: Id<"precedents"> | null = await ctx.runQuery(
-      (internal as any).precedents.getBySourceClaim,
+      internal.precedents.getBySourceClaim,
       { sourceClaimId: args.claimId }
     );
     if (already) {
       return already;
     }
 
-    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
     });
     if (!claim) {
       return null;
     }
 
-    const appeal: any = await ctx.runQuery((internal as any).appeals.getLatestByClaimInternal, {
+    const appeal = await ctx.runQuery(internal.appeals.getLatestByClaimInternal, {
       claimId: args.claimId,
     });
     if (!appeal?.fullAppealMarkdown) {
@@ -344,7 +344,7 @@ export const indexWonAppeal = internalAction({
       weightedTokensForCodes(icd10Codes, cptCodes, carcCodes)
     );
 
-    const insertedId: Id<"precedents"> = await ctx.runMutation((internal as any).precedents.insertPrecedent, {
+    const insertedId = await ctx.runMutation(internal.precedents.insertPrecedent, {
       sourceKind: "winning_brief",
       title: entry.title,
       citation: entry.citation,

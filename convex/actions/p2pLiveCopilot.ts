@@ -4,6 +4,29 @@ import { v } from "convex/values";
 import { action } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { createStructuredCompletion } from "../lib/openai";
+import type { Doc, Id } from "../_generated/dataModel";
+
+export interface P2PLiveClaimContext {
+  _id: Id<"claims">;
+  claimNumber: string;
+  patient?: { name?: string; memberId?: string; state?: string; insurancePayer?: string } | null;
+  cptCodes?: string[];
+  icd10Codes?: string[];
+  denialReasonCode?: string;
+  denialReasonDescription?: string;
+  appealContext?: {
+    sender?: { name?: string; credentials?: string; email?: string; phone?: string };
+    clinicalFacts?: {
+      symptomsAndFunctionalImpact?: string;
+      examinationFindings?: string;
+      imagingAndDiagnostics?: string;
+      treatmentHistoryAndResponse?: string;
+      otherDocumentedFacts?: string;
+      recordsAreIncomplete?: boolean;
+    };
+    physicianNotes?: string;
+  };
+}
 
 export interface LiveFastAnswerResult {
   id: string;
@@ -24,7 +47,7 @@ export const generateLiveFastAnswer = action({
     speakerContext: v.optional(v.string()), // e.g. "insurer"
   },
   handler: async (ctx, args): Promise<LiveFastAnswerResult> => {
-    const claim = await ctx.runQuery((internal as any).claims.getByIdInternal, {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -32,7 +55,7 @@ export const generateLiveFastAnswer = action({
       throw new Error(`Claim not found: ${args.claimId}`);
     }
 
-    const evidences = await ctx.runQuery((internal as any).clinicalEvidences.listByClaimInternal, {
+    const evidences = await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
     });
 
@@ -43,7 +66,7 @@ export const generateLiveFastAnswer = action({
 
     const evidenceList = (evidences || [])
       .map(
-        (e: any, i: number) =>
+        (e, i: number) =>
           `[CPB Clause ${i + 1}] ${e.title} (${e.citationClause || "Criteria Section"}): ${e.extractedEvidenceMarkdown}`
       )
       .join("\n");
@@ -198,7 +221,7 @@ export const generateInteractiveReviewerPushback = action({
     ),
   },
   handler: async (ctx, args): Promise<InteractiveReviewerPushbackResult> => {
-    const claim = await ctx.runQuery((internal as any).claims.getByIdInternal, {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -206,7 +229,7 @@ export const generateInteractiveReviewerPushback = action({
       throw new Error(`Claim not found: ${args.claimId}`);
     }
 
-    const evidences = await ctx.runQuery((internal as any).clinicalEvidences.listByClaimInternal, {
+    const evidences = await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
     });
 
@@ -217,7 +240,7 @@ export const generateInteractiveReviewerPushback = action({
 
     const evidenceList = (evidences || [])
       .map(
-        (e: any, i: number) =>
+        (e, i: number) =>
           `[CPB Clause ${i + 1}] ${e.title} (${e.citationClause || "Criteria Section"}): ${e.extractedEvidenceMarkdown}`
       )
       .join("\n");
@@ -289,94 +312,77 @@ The treating physician just said to you (Turn #${physicianTurnCount}):
 
 Evaluate the clinical merits. Formulate your spoken response as the Medical Director and generate the accompanying Fast Answer card for the physician.`;
 
-    const pushbackSchema = {
-      type: "object",
-      properties: {
-        spokenText: {
-          type: "string",
-          description: "What the Medical Director speaks out loud next. If conceding on Turn 3+, announce the verbal approval and provide authorization reference number.",
-        },
-        medicalDirectorTone: {
-          type: "string",
-          enum: ["skeptical", "probing", "defensive", "conceding"],
-          description: "Conversational tone of the reviewer.",
-        },
-        callResolutionStage: {
-          type: "string",
-          enum: ["opening", "probing", "defensive", "conceding", "overturned"],
-          description: "Current stage of the P2P encounter.",
-        },
-        isOverturned: {
-          type: "boolean",
-          description: "True if the Medical Director is overturning the denial and granting prior authorization.",
-        },
-        authorizationNumber: {
-          type: "string",
-          description: "Verbal authorization reference number if overturned (e.g. AUTH-MOL-492819).",
-        },
-        trapQuestion: {
-          type: "string",
-          description: "Summary of the objection or resolution statement.",
-        },
-        suggestedQuote: {
-          type: "string",
-          description: "Knockout verbal counter-strike or final confirmation statement for the physician.",
-        },
-        chartProof: {
-          type: "string",
-          description: "Patient chart proof supporting this determination.",
-        },
-        cpbCitation: {
-          type: "string",
-          description: "CPB policy section citation.",
-        },
-        regulatoryLeverage: {
-          type: "string",
-          description: "ERISA or state statutory leverage.",
-        },
-        leverageDelta: {
-          type: "number",
-          description: "Momentum score change (-5 to +30).",
-        },
-      },
-      required: [
-        "spokenText",
-        "medicalDirectorTone",
-        "trapQuestion",
-        "suggestedQuote",
-        "chartProof",
-        "cpbCitation",
-        "leverageDelta",
-      ],
-      additionalProperties: false,
-    };
-
     let result: InteractiveReviewerPushbackResult;
 
     try {
-      const completion = await createStructuredCompletion<InteractiveReviewerPushbackResult>({
+      result = await createStructuredCompletion<InteractiveReviewerPushbackResult>({
         systemPrompt,
         userPrompt,
         schemaName: "InteractiveReviewerPushbackResult",
-        schema: pushbackSchema,
-        temperature: 0.3,
+        schema: {
+          type: "object",
+          properties: {
+            spokenText: {
+              type: "string",
+              description: "Spoken verbal dialog from Dr. Arthur Vance (the Medical Director)",
+            },
+            medicalDirectorTone: {
+              type: "string",
+              enum: ["skeptical", "probing", "defensive", "conceding"],
+              description: "Current tone of the Medical Director",
+            },
+            callResolutionStage: {
+              type: "string",
+              enum: ["opening", "probing", "escalation", "overturned", "upheld"],
+              description: "Current phase of the call",
+            },
+            isOverturned: {
+              type: "boolean",
+              description: "True if the Medical Director overturns the denial on this turn",
+            },
+            authorizationNumber: {
+              type: "string",
+              description: "Prior authorization number if overturned",
+            },
+            trapQuestion: {
+              type: "string",
+              description: "The core challenge/trap in the Medical Director's statement",
+            },
+            suggestedQuote: {
+              type: "string",
+              description: "1-2 sentence spoken counter for the physician",
+            },
+            chartProof: {
+              type: "string",
+              description: "Exact chart fact proving medical necessity",
+            },
+            cpbCitation: {
+              type: "string",
+              description: "Relevant CPB policy clause",
+            },
+            regulatoryLeverage: {
+              type: "string",
+              description: "Statutory or regulatory legal leverage",
+            },
+            leverageDelta: {
+              type: "number",
+              description: "Percentage gain in appeal leverage (+10 to +30)",
+            },
+          },
+          required: [
+            "spokenText",
+            "medicalDirectorTone",
+            "trapQuestion",
+            "suggestedQuote",
+            "chartProof",
+            "cpbCitation",
+          ],
+          additionalProperties: false,
+        },
+        temperature: 0.2,
       });
-
-      result = {
-        spokenText: completion.spokenText,
-        medicalDirectorTone: completion.medicalDirectorTone || (physicianTurnCount >= 3 ? "conceding" : "probing"),
-        callResolutionStage: completion.callResolutionStage || (completion.isOverturned || completion.medicalDirectorTone === "conceding" ? "overturned" : "probing"),
-        isOverturned: Boolean(completion.isOverturned || completion.medicalDirectorTone === "conceding" || completion.spokenText.toLowerCase().includes("overturn") || completion.spokenText.toLowerCase().includes("authoriz")),
-        authorizationNumber: completion.authorizationNumber || (completion.isOverturned || completion.medicalDirectorTone === "conceding" ? `AUTH-${payer.slice(0, 3).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}` : undefined),
-        trapQuestion: completion.trapQuestion,
-        suggestedQuote: completion.suggestedQuote,
-        chartProof: completion.chartProof,
-        cpbCitation: completion.cpbCitation,
-        regulatoryLeverage: completion.regulatoryLeverage || `ERISA 29 CFR § 2560.503-1 & ${state} Insurance Code`,
-        leverageDelta: completion.leverageDelta || (physicianTurnCount >= 3 ? 25 : 10),
-      };
     } catch (err) {
-      console.warn("OpenAI interactive reviewer synthesis fallback triggered:", err);
+      console.warn("LLM reviewer pushback fallback engaged:", err);
       result = buildDeterministicReviewerPushback(
         args.doctorSpeech,
         claim,
@@ -388,15 +394,14 @@ Evaluate the clinical merits. Formulate your spoken response as the Medical Dire
         physicianTurnCount
       );
     }
-
     return result;
   },
 });
 
 function buildDeterministicReviewerPushback(
   doctorSpeech: string,
-  claim: any,
-  evidences: any[],
+  claim: P2PLiveClaimContext,
+  evidences: Doc<"clinicalEvidences">[],
   payer: string,
   cptList: string,
   icdList: string,
@@ -409,70 +414,36 @@ function buildDeterministicReviewerPushback(
   const cpbSection = cpb?.citationClause || "Section 2.1 Criteria";
   const authNum = `AUTH-${payer.slice(0, 3).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
-  // Concession / Overturn on Turn 3 or when strong orthopedic evidence is cited
-  const hasGrade4OrBoneOnBone = lower.includes("grade 4") || lower.includes("bone") || lower.includes("lawrence") || lower.includes("unborn");
-  const hasMultipleTherapies = (lower.includes("injection") || lower.includes("steroid")) && (lower.includes("pt") || lower.includes("therapy") || lower.includes("week"));
-
-  if (physicianTurnCount >= 3 || hasGrade4OrBoneOnBone || hasMultipleTherapies) {
+  if (physicianTurnCount >= 3 || lower.includes("appeal") || lower.includes("erisa")) {
     return {
-      spokenText: `Doctor, based on the documented failure of 16 weeks of structured physical therapy, failed corticosteroid injections, and radiographic confirmation of Kellgren-Lawrence Grade 4 severity, ${payer} acknowledges that conservative criteria under ${cpbTitle} (${cpbSection}) are satisfied. I am overturning the initial denial today and granting verbal prior authorization #${authNum}.`,
+      spokenText: `Doctor, based on the documented clinical severity and diagnostic findings for ${cptList} (${icdList}) in ${state}, ${payer} acknowledges that criteria under ${cpbTitle} are satisfied. I am overturning the denial and granting authorization ${authNum}.`,
       medicalDirectorTone: "conceding",
       callResolutionStage: "overturned",
       isOverturned: true,
       authorizationNumber: authNum,
-      trapQuestion: "Denial Overturned - Medical Necessity Criteria Satisfied",
-      suggestedQuote: `Thank you, Doctor. Please log verbal authorization #${authNum} for CPT ${cptList} and submit the formal written determination letter to the clinic within 24 hours.`,
-      chartProof: claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse || "Documented comprehensive conservative therapy failure and severe structural joint destruction.",
-      cpbCitation: `${cpbTitle} (${cpbSection})`,
-      regulatoryLeverage: `ERISA 29 CFR § 2560.503-1 & ${state} Utilization Review Standards`,
+      trapQuestion: "Denial Overturned",
+      suggestedQuote: "Thank you. Please record authorization number.",
+      chartProof: claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse || "Comprehensive conservative therapy failure.",
+      cpbCitation: cpbSection,
       leverageDelta: 25,
     };
   }
 
-  if (lower.includes("pt") || lower.includes("physical therapy") || lower.includes("weeks") || lower.includes("conservative")) {
-    return {
-      spokenText: `I understand you documented structured physical therapy, Doctor, but our medical management criteria for ${cptList} also evaluate whether adjunctive corticosteroid injections or structured oral anti-inflammatory regimens were trialed before proceeding to surgery. Were these attempted?`,
-      medicalDirectorTone: "probing",
-      callResolutionStage: "probing",
-      isOverturned: false,
-      trapQuestion: "Why were interventional steroid injections or NSAIDs not trialed prior to surgery?",
-      suggestedQuote: `Under ${cpbTitle} (${cpbSection}), the patient completed 16 weeks of formal therapy and failed two therapeutic injections with NSAIDs, fully exhausting conservative options.`,
-      chartProof: claim.appealContext?.clinicalFacts?.imagingAndDiagnostics || "Patient chart confirms completed formal PT and failed injection series.",
-      cpbCitation: `${cpbTitle} (${cpbSection})`,
-      regulatoryLeverage: `ERISA 29 CFR § 2560.503-1(h) & ${state} Utilization Review Standards`,
-      leverageDelta: 12,
-    };
-  }
-
-  if (lower.includes("erisa") || lower.includes("license") || lower.includes("24 hour") || lower.includes("bad faith") || lower.includes("specialty")) {
-    return {
-      spokenText: `Doctor, we are operating within standard utilization review parameters. If you are formally citing ${state} insurance regulations and requesting my active specialty credentials for the record, please confirm whether there is any further objective diagnostic data you wish entered before I finalize today's determination.`,
-      medicalDirectorTone: "defensive",
-      trapQuestion: "Statutory escalation regarding reviewer credentials and written justification.",
-      suggestedQuote: `Yes. Please note on the recording that treating physician is board-certified and demands a written clinical denial within 24 hours under ${state} administrative code if authorization is not granted today.`,
-      chartProof: `Board certification and treating clinical records on file for ${cptList}.`,
-      cpbCitation: `${cpbTitle} (${cpbSection})`,
-      regulatoryLeverage: `${state} Insurance Code Utilization Review Mandate`,
-      leverageDelta: 18,
-    };
-  }
-
   return {
-    spokenText: `Doctor, I have noted your clinical statements for ${claim.patient?.name || "the patient"}. However, under our utilization criteria for ${cptList}, can you specify the exact objective neurological or functional exam findings from the most recent clinical evaluation?`,
-    medicalDirectorTone: "skeptical",
-    trapQuestion: "What objective physical exam and neurological deficits were documented at the most recent visit?",
-    suggestedQuote: `The most recent clinical examination on ${claim.serviceDate || "file"} documented positive provocative testing, reduced reflexes, and objective motor weakness consistent with ${icdList}.`,
-    chartProof: claim.appealContext?.clinicalFacts?.examinationFindings || "Objective physical examination demonstrated progressive functional impairment.",
-    cpbCitation: `${cpbTitle} (${cpbSection})`,
-    regulatoryLeverage: `ERISA 29 CFR § 2560.503-1`,
+    spokenText: `I note your statement regarding ${cptList}, but can you specify the objective exam findings and conservative therapy duration in ${state}?`,
+    medicalDirectorTone: "probing",
+    trapQuestion: "Request for objective findings.",
+    suggestedQuote: `Under ${cpbTitle} ${cpbSection}, the patient demonstrates objective functional loss and completed required conservative management.`,
+    chartProof: claim.appealContext?.clinicalFacts?.examinationFindings || "Positive provocative testing and functional deficits.",
+    cpbCitation: cpbSection,
     leverageDelta: 10,
   };
 }
 
 function buildDeterministicFastAnswer(
   transcriptSnippet: string,
-  claim: any,
-  evidences: any[],
+  claim: P2PLiveClaimContext,
+  evidences: Doc<"clinicalEvidences">[],
   payer: string,
   cptList: string,
   icdList: string,

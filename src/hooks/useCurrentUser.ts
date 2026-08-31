@@ -8,7 +8,7 @@ export interface UserProfile {
   name?: string;
   email?: string;
   image?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 const CACHED_USER_KEY = "claimhero_cached_viewer";
@@ -87,7 +87,7 @@ export function useCurrentUser() {
 
   // 2. Real-time Convex hooks
   const { isAuthenticated: convexAuthenticated, isLoading: isConvexAuthLoading } = useConvexAuth();
-  const liveViewer = useQuery((api as any).users?.viewer);
+  const liveViewer = useQuery(api.users.viewer);
   const { signOut: convexSignOut } = useAuthActions();
 
   // 3. Keep cache in sync with live Convex query results

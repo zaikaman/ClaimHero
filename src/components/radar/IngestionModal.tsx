@@ -48,7 +48,7 @@ import { Textarea } from "../ui/textarea";
 import { Select } from "../ui/select";
 import { Input } from "../ui/input";
 
-const convexApi = api as any;
+import { Id } from "../../../convex/_generated/dataModel";
 
 const DEFAULT_CLINICAL_QUESTIONS: ClinicalIntakeQuestion[] = [
   {
@@ -119,7 +119,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [extractedResult, setExtractedResult] = useState<
-    (DenialExtractionResult & { claimId: string; pipelineResult?: any }) | null
+    (DenialExtractionResult & { claimId: string; pipelineResult?: unknown }) | null
   >(null);
   const [activePreset, setActivePreset] = useState<SampleCasePreset | null>(null);
   const [copiedEmail, setCopiedEmail] = useState(false);
@@ -184,15 +184,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     }
   }, [isOpen]);
 
-  const runPipelineAction = useAction(
-    convexApi["actions/sentinelPipeline"]?.runAutonomousPipeline ||
-    convexApi.actions?.sentinelPipeline?.runAutonomousPipeline
-  );
-  const generateIntakeQuestionsAction = useAction(
-    convexApi["actions/clinicalIntake"]?.generateClinicalIntakeQuestions ||
-    convexApi.actions?.clinicalIntake?.generateClinicalIntakeQuestions
-  );
-  const updateAppealContextMutation = useMutation(convexApi.claims.updateAppealContext);
+  const runPipelineAction = useAction(api.actions.sentinelPipeline.runAutonomousPipeline);
+  const generateIntakeQuestionsAction = useAction(api.actions.clinicalIntake.generateClinicalIntakeQuestions);
+  const updateAppealContextMutation = useMutation(api.claims.updateAppealContext);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -203,20 +197,20 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
       setErrorMessage(null);
-      setExtractedResult(null);
     }
   };
 
   const executePostExtractionPipeline = async (claimId: string) => {
-    if (!autoPilotEnabled || !runPipelineAction) return null;
+    if (!runPipelineAction) return;
 
     setProcessingMessage("Step 2/3: Indexing Insurer CPB & Evaluating Win Score...");
     try {
       const pipelineRes = await runPipelineAction({
-        claimId: claimId as any,
+        claimId: claimId as Id<"claims">,
         sender: {
           name: senderName.trim(),
           credentials: senderCredentials.trim() || undefined,
@@ -302,10 +296,11 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     try {
       const result = await onUploadFile(selectedFile, patientState);
       await prepareContextReview(result);
-    } catch (err: any) {
+    } catch (err) {
       setErrorMessage(
-        err?.message ||
-          "Failed to parse denial document. Please verify the document format or try again."
+        err instanceof Error
+          ? err.message
+          : "Failed to parse denial document. Please verify the document format or try again."
       );
     } finally {
       setIsProcessing(false);
@@ -320,10 +315,11 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     try {
       const result = await onParseText(preset.content, patientState);
       await prepareContextReview(result, preset);
-    } catch (err: any) {
+    } catch (err) {
       setErrorMessage(
-        err?.message ||
-          "Failed to extract claim information. Please check your document text."
+        err instanceof Error
+          ? err.message
+          : "Failed to extract claim information. Please check your document text."
       );
     } finally {
       setIsProcessing(false);
@@ -345,10 +341,11 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     try {
       const result = await onParseText(pastedText, patientState);
       await prepareContextReview(result);
-    } catch (err: any) {
+    } catch (err) {
       setErrorMessage(
-        err?.message ||
-          "Failed to extract claim information. Please check your document text."
+        err instanceof Error
+          ? err.message
+          : "Failed to extract claim information. Please check your document text."
       );
     } finally {
       setIsProcessing(false);
@@ -381,7 +378,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     setErrorMessage(null);
     try {
       await updateAppealContextMutation({
-        claimId: extractedResult.claimId as any,
+        claimId: extractedResult.claimId as Id<"claims">,
         sender: {
           name: senderName.trim(),
           credentials: senderCredentials.trim() || undefined,
@@ -410,8 +407,8 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       if (autoPilotEnabled) pipelineResult = await executePostExtractionPipeline(extractedResult.claimId);
       setExtractedResult((current) => current ? { ...current, pipelineResult } : current);
       setContextSubmitted(true);
-    } catch (err: any) {
-      setErrorMessage(err?.message || "Could not save the case context. Please try again.");
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Could not save the case context. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -689,7 +686,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                               mode: "HIPAA_SAFE_HARBOR",
                               count: res.stats.redactedCount,
                               categories: Object.keys(res.stats.byCategory).filter(
-                                (k) => (res.stats.byCategory as any)[k] > 0
+                                (k) => (res.stats.byCategory as Record<string, number>)[k] > 0
                               ),
                             });
                           }}
@@ -1109,12 +1106,15 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   <Shield className="size-3.5 text-primary" />
                   Triaged Defense Vectors Ready for Deployment:
                 </span>
-                {extractedResult.pipelineResult?.overturnProbabilityScore !== undefined && (
-                  <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px]">
-                    <TrendUp className="size-3 mr-1" />
-                    {extractedResult.pipelineResult.overturnProbabilityScore}% Overturn Score
-                  </Badge>
-                )}
+                {typeof extractedResult.pipelineResult === "object" &&
+                  extractedResult.pipelineResult !== null &&
+                  "overturnProbabilityScore" in extractedResult.pipelineResult &&
+                  typeof (extractedResult.pipelineResult as { overturnProbabilityScore?: unknown }).overturnProbabilityScore === "number" && (
+                    <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px]">
+                      <TrendUp className="size-3 mr-1" />
+                      {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}% Overturn Score
+                    </Badge>
+                  )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">

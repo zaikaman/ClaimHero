@@ -124,8 +124,27 @@ export interface P2PDefenseSynthesisResult {
   fullScriptMarkdown: string;
 }
 
+import type { Doc, Id } from "../_generated/dataModel";
+
+interface P2PClaimContext {
+  _id: Id<"claims">;
+  claimNumber: string;
+  patient?: { name?: string; memberId?: string; state?: string; insurancePayer?: string };
+  cptCodes?: string[];
+  icd10Codes?: string[];
+  deniedAmount: number;
+  denialReasonCode?: string;
+  denialReasonDescription?: string;
+  providerName?: string;
+  appealContext?: {
+    sender?: { name?: string; credentials?: string };
+    physicianNotes?: string;
+  };
+  userId?: Id<"users">;
+}
+
 function assembleFullP2PScriptMarkdown(
-  claim: any,
+  claim: P2PClaimContext,
   physicianName: string,
   physicianSpecialty: string,
   medicalDirectorRole: string,
@@ -187,8 +206,8 @@ function assembleFullP2PScriptMarkdown(
 }
 
 function buildDeterministicFallback(
-  claim: any,
-  evidences: any[],
+  claim: P2PClaimContext,
+  evidences: Doc<"clinicalEvidences">[],
   physicianName: string,
   physicianSpecialty: string,
   medicalDirectorRole: string
@@ -203,7 +222,7 @@ function buildDeterministicFallback(
 
   const citations: PolicyCitationScriptItem[] = [];
   if (evidences && evidences.length > 0) {
-    evidences.slice(0, 3).forEach((e: any, idx: number) => {
+    evidences.slice(0, 3).forEach((e, idx) => {
       citations.push({
         cpbTitle: e.title || `${payer} Clinical Policy Bulletin`,
         section: e.citationClause || `Section ${idx + 1}.A`,
@@ -310,7 +329,7 @@ export const generateP2PScript = action({
     args
   ): Promise<P2PDefenseSynthesisResult & { scriptId: string }> => {
     // 1. Fetch claim details
-    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -329,8 +348,8 @@ export const generateP2PScript = action({
     }
 
     // 2. Fetch clinical evidence
-    const evidences: any[] = await ctx.runQuery(
-      (internal as any).clinicalEvidences.listByClaimInternal,
+    const evidences = await ctx.runQuery(
+      internal.clinicalEvidences.listByClaimInternal,
       { claimId: args.claimId }
     );
 
@@ -357,7 +376,7 @@ export const generateP2PScript = action({
         ? evidences
             .slice(0, 4)
             .map(
-              (e: any, idx: number) =>
+              (e, idx: number) =>
                 `[CPB Policy ${idx + 1}] ${e.title} (${e.citationClause || "Criteria §"}):\n${e.extractedEvidenceMarkdown || e.title}`
             )
             .join("\n\n")
@@ -425,8 +444,8 @@ Return the structured P2P defense tele-script and condensed pocket cheat sheet.`
     }
 
     // Persist to Convex database
-    const scriptId: any = await ctx.runMutation(
-      (internal as any).p2pScripts.createOrUpdateScriptInternal,
+    const scriptId = await ctx.runMutation(
+      internal.p2pScripts.createOrUpdateScriptInternal,
       {
         claimId: args.claimId,
         physicianName,

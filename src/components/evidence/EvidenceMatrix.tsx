@@ -34,16 +34,16 @@ interface EvidenceMatrixProps {
   claim: Claim;
   evidences: ClinicalEvidence[];
   isLoadingEvidences?: boolean;
-  onCrawlPolicy: (claimId: string, customUrl?: string) => Promise<any>;
-  onCrawlPubMed?: (claimId: string, query?: string, customUrl?: string) => Promise<any>;
-  onCrawlFDA?: (claimId: string, customUrl?: string, deviceName?: string) => Promise<any>;
-  onCrawlCustomUrl?: (claimId: string, url: string, category?: string, notes?: string) => Promise<any>;
-  onCrawlMultiSource?: (claimId: string, customUrl?: string) => Promise<any>;
-  onDeleteEvidence?: (evidenceId: string) => Promise<any>;
+  onCrawlPolicy: (claimId: string, customUrl?: string) => Promise<unknown>;
+  onCrawlPubMed?: (claimId: string, query?: string, customUrl?: string) => Promise<unknown>;
+  onCrawlFDA?: (claimId: string, customUrl?: string, deviceName?: string) => Promise<unknown>;
+  onCrawlCustomUrl?: (claimId: string, url: string, category?: string, notes?: string) => Promise<unknown>;
+  onCrawlMultiSource?: (claimId: string, customUrl?: string) => Promise<unknown>;
+  onDeleteEvidence?: (evidenceId: string) => Promise<unknown>;
   onComputeScore: (claimId: string) => Promise<OverturnScoringResult>;
   onNavigateToStudio: () => void;
   onNavigateView?: (view: FlowView) => void;
-  onRunAutonomousPipeline?: (claimId?: string) => Promise<any>;
+  onRunAutonomousPipeline?: (claimId?: string) => Promise<unknown>;
 }
 
 export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
@@ -81,9 +81,9 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       await onCrawlPolicy(claim._id);
       const result = await onComputeScore(claim._id);
       setScoringResult(result);
-    } catch (err: any) {
+    } catch (err) {
       setErrorMessage(
-        err?.message || "Failed to execute complete clinical policy analysis."
+        err instanceof Error ? err.message : "Failed to execute complete clinical policy analysis."
       );
     } finally {
       setIsUnifiedAnalyzing(false);
@@ -95,9 +95,9 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
     setErrorMessage(null);
     try {
       await onCrawlPolicy(claim._id);
-    } catch (err: any) {
+    } catch (err) {
       setErrorMessage(
-        err?.message || "Failed to crawl insurer Clinical Policy Bulletin."
+        err instanceof Error ? err.message : "Failed to crawl insurer Clinical Policy Bulletin."
       );
     } finally {
       setIsCrawling(false);
@@ -110,9 +110,9 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
     try {
       const result = await onComputeScore(claim._id);
       setScoringResult(result);
-    } catch (err: any) {
+    } catch (err) {
       setErrorMessage(
-        err?.message || "Failed to calculate Overturn Probability Score."
+        err instanceof Error ? err.message : "Failed to calculate Overturn Probability Score."
       );
     } finally {
       setIsScoring(false);

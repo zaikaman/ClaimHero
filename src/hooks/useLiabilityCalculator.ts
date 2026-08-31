@@ -15,9 +15,11 @@ import {
   getDefaultErisaPenalties,
 } from "../lib/liabilityCalculator";
 
+import { Id } from "../../convex/_generated/dataModel";
+
 export function useLiabilityCalculator(claim?: Claim | null) {
-  const updateFinancialLiabilityMutation = useMutation((api as any).claims.updateFinancialLiability);
-  const updateErisaPenaltiesMutation = useMutation((api as any).claims.updateErisaPenalties);
+  const updateFinancialLiabilityMutation = useMutation(api.claims.updateFinancialLiability);
+  const updateErisaPenaltiesMutation = useMutation(api.claims.updateErisaPenalties);
 
   // Financial Liability Input State
   const [financialInputs, setFinancialInputs] = useState<Partial<FinancialLiabilityData>>(() => {
@@ -139,20 +141,21 @@ export function useLiabilityCalculator(claim?: Claim | null) {
     setErrorMessage(null);
     try {
       await updateFinancialLiabilityMutation({
-        claimId: claim._id as any,
+        claimId: claim._id as Id<"claims">,
         financialLiability: liabilityResult.data,
       });
 
       await updateErisaPenaltiesMutation({
-        claimId: claim._id as any,
+        claimId: claim._id as Id<"claims">,
         erisaPenalties: erisaResult.data,
       });
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to save liability calculations:", err);
-      setErrorMessage(err.message || "Failed to save calculation to case");
+      const message = err instanceof Error ? err.message : "Failed to save calculation to case";
+      setErrorMessage(message);
     } finally {
       setIsSaving(false);
     }

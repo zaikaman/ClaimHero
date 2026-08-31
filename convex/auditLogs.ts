@@ -19,7 +19,7 @@ export const listByClaim = query({
 
     return await ctx.db
       .query("appealAuditLogs")
-      .withIndex("by_claim_and_timestamp", (q: any) => q.eq("claimId", args.claimId))
+      .withIndex("by_claim_and_timestamp", (q) => q.eq("claimId", args.claimId))
       .order("desc")
       .take(limit);
   },
@@ -95,7 +95,7 @@ export const listRecent = query({
 
     const userClaims = await ctx.db
       .query("claims")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
     if (userClaims.length === 0) return [];
@@ -110,7 +110,7 @@ export const listRecent = query({
       activeClaims.map((claim) =>
         ctx.db
           .query("appealAuditLogs")
-          .withIndex("by_claim_and_timestamp", (q: any) => q.eq("claimId", claim._id))
+          .withIndex("by_claim_and_timestamp", (q) => q.eq("claimId", claim._id))
           .order("desc")
           .take(limit)
       )

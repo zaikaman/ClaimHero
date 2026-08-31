@@ -12,14 +12,14 @@ import {
 } from "@phosphor-icons/react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "../ui/dialog";
 import { Button } from "../ui/button";
-import { Claim, CallTranscriptItem, LiveCallChecklistItem } from "../../types";
+import { Claim, CallTranscriptItem, LiveCallChecklistItem, P2PCallSession } from "../../types";
 import { formatCurrency } from "../../lib/utils";
 
 interface P2PEncounterSummaryModalProps {
   isOpen: boolean;
   onClose: () => void;
   claim: Claim;
-  session?: any;
+  session?: P2PCallSession | null;
 }
 
 export const P2PEncounterSummaryModal: React.FC<P2PEncounterSummaryModalProps> = ({

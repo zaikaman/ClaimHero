@@ -24,7 +24,7 @@ interface AuditTimelineProps {
 
 const EVENT_CONFIGS: Record<
   string,
-  { label: string; badgeVariant: "default" | "secondary" | "destructive" | "outline"; icon: any }
+  { label: string; badgeVariant: "default" | "secondary" | "destructive" | "outline"; icon: React.ComponentType<{ className?: string }> }
 > = {
   denial_ingested: {
     label: "Denial Ingested",

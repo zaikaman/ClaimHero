@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Shell } from "./components/layout/Shell";
+import { NavigationView } from "./components/layout/Sidebar";
 
 import { CaseRadar } from "./components/radar/CaseRadar";
 import { IngestionModal } from "./components/radar/IngestionModal";
@@ -96,7 +97,7 @@ export default function App() {
 
   const handleIngestionSuccess = (claimId: string, directView?: string) => {
     setSelectedClaimId(claimId);
-    setCurrentView((directView as any) || "evidence");
+    setCurrentView((directView as NavigationView) || "evidence");
   };
 
   const { isAuthenticated, isAuthLoading } = useCurrentUser();

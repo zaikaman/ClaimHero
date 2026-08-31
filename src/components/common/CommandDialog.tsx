@@ -31,7 +31,7 @@ interface CommandDialogProps {
   onNavigateView: (view: NavigationView) => void;
   onOpenIngestion: () => void;
   onOpenOnboarding?: () => void;
-  onDeleteCase?: (claimId: string) => Promise<any>;
+  onDeleteCase?: (claimId: string) => Promise<unknown>;
 }
 
 export const CommandDialog: React.FC<CommandDialogProps> = ({

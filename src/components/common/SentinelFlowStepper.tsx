@@ -29,7 +29,7 @@ interface SentinelFlowStepperProps {
   hasDraftedBrief?: boolean;
   isProcessing?: boolean;
   processingLabel?: string;
-  onRunAutonomousPipeline?: () => Promise<any>;
+  onRunAutonomousPipeline?: () => Promise<unknown>;
 }
 
 export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({

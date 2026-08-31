@@ -365,6 +365,7 @@ ClaimHero ships with six independent anti-hallucination layers:
 ## 11. Security, Privacy & HIPAA
  
 * **Auth & Server-Side Multi-Tenant Authorization** — `@convex-dev/auth` with Google OAuth + Email/Password (`convex/auth.ts`, `convex/auth.config.ts`), deterministic RS256 JWT, and centralized authorization primitives in `convex/lib/auth.ts` / `convex/model/auth.ts` (`requireAuthUser`, `requireIdentity`, `requireClaimOwner`, `getClaimIfAuthorized`, `requireChatbotSessionOwner`, `requireOwner`). All queries and mutations strictly verify authenticated identity and document ownership (`claim.userId === userId`), ensuring zero unauthenticated PHI leakage and full compliance with `convex-authz` audits.
+* **Strict Zero-Any Type Safety & FunctionReference Integrity** — Strict `@typescript-eslint/no-explicit-any: "error"` enforced across both `convex/` and `src/`. Zero `as any`, `(api as any)`, or `(internal as any)` casts anywhere in the repository. All Convex backend queries, mutations, actions, internal endpoints, and background `crons.cron` schedulers use canonical, type-safe `FunctionReference` bindings (`internal.claims.sweepDeadlines`, `internal.actions.agentMail.*`, `api.actions.*`) and data model IDs (`Id<"claims">`, `Id<"appeals">`, `Id<"clinicalEvidences">`), ensuring zero runtime scheduling or routing failures.
 * **Redaction Engine** (`src/lib/redactionEngine.ts`) — Deterministic PII detection: SSN (hyphen/space/labeled), Member ID suffix (`MBN9823412-01 -> MBN9823412-**`), DOB, MRN, phone, email, street address, plus user-defined terms. Three presets: **HIPAA Safe Harbor** (45 CFR §164.514(b)(2)), **Balanced Appellate**, **Public Legal Exhibit**. Persisted in `claims.redactionMetadata` with `appealAuditLogs:hipaa_redaction_applied`.
 * **Transport** — AgentMail REST uses `Authorization: Bearer` with `AGENTMAIL_API_KEY`; Convex dashboard env vars are never exposed to the client.
 * **Webhook Security & Replay Prevention** — Inbound AgentMail (`POST /agentmail-webhook`, `AGENTMAIL_WEBHOOK_SECRET`) and Firecrawl (`/firecrawl/*`, `FIRECRAWL_WEBHOOK_SECRET`) endpoints enforce cryptographic HMAC-SHA256 signature verification (`svix-signature` / `svix-timestamp` / `svix-id`) with 300-second timestamp drift tolerances and timing-safe equality checks to eliminate forged intake or replay attacks.
@@ -381,9 +382,9 @@ ClaimHero ships with six independent anti-hallucination layers:
 | **Crawl** | `@firecrawl/firecrawl-convex` (official Convex component) / Firecrawl v2 API |
 | **Email** | AgentMail REST `api.agentmail.to`, inbound `POST /agentmail-webhook` |
 | **AI** | OpenAI `gpt-5.4-nano` (Structured Outputs, Vision, Embeddings 1536-d) via `openai` SDK |
-| **Frontend** | React 18 + TypeScript (strict) + Vite 6 + Tailwind CSS 3.4 |
+| **Frontend** | React 18 + TypeScript (strict mode, `@typescript-eslint/no-explicit-any: error`, zero `any` casts) + Vite 6 + Tailwind CSS 3.4 |
 | **UI** | Radix Primitives, Phosphor Icons (`@phosphor-icons/react`), `react-markdown` + `remark-gfm`/`remark-breaks`, `three`/`@react-three/fiber` Silk shader |
-| **State** | Convex reactive hooks (`useQuery`, `useMutation`, `useAction`, `useConvexAuth`) + custom hooks (`useClaims`, `useEvidence`, `useAppealStudio`, `useLiveCallCopilot`, `useLiabilityCalculator`) |
+| **State** | Convex reactive hooks (`useQuery`, `useMutation`, `useAction`, `useConvexAuth`) + custom hooks (`useClaims`, `useEvidence`, `useAppealStudio`, `useLiveCallCopilot`, `useLiabilityCalculator`, `usePrecedents`) with 100% typed `api.*` FunctionReferences |
 | **Tests** | Vitest 3 + `@vitest/coverage-v8`, 200 unit tests across 12 suites, 100% line coverage in backend libs and core utils |
 
 Theme: **Precision Medical Dark Mode** — obsidian `#0b0f17` canvas, cyan `#0ea5e9` primary, emerald/amber/crimson semantic tokens, glassmorphism (`backdrop-blur-md`, `bg-card/75`), tabular-nums for monetary values (`src/index.css:7`, `tailwind.config.js`).
@@ -534,7 +535,7 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
-npm run lint            # eslint src convex
+npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
 npm run test            # vitest run tests  (200 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run build           # tsc --noEmit && vite build
@@ -602,7 +603,7 @@ The chronological, evidence-based build log lives at **`hackathon.md`** (repo ro
 |---|---|
 | **Real-World Utility** | Solves a $1.5B/year denial crisis for providers, advocates, and patients. Every output is a *sendable* artifact (email, portal paste, certified mail PDF, P2P script) — not a demo. Preset cases mirror real EOBs with statutory intake language. |
 | **Full-Stack Integration Depth** | **Convex** (9 tables, vector search, crons, file storage, httpRouter, auth) + **Firecrawl** (live search and scrape with adaptive clearinghouse retrieval, residential stealth proxies, document windowing, payer/anatomical guards) + **AgentMail** (3-mode dispatch, 2 shared inboxes, idempotent intake + reply webhooks, REST `api.agentmail.to`) + **OpenAI** (Vision OCR, structured `DenialExtractionResult`/`PolicyExtractionResponse`/`AppealBriefSynthesisResult`, deterministic scoring, grounded synthesis). No pillar is decorative — pull any one and the product stops working. |
-| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 200 tests + 100% line coverage + production build). Strict TypeScript, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette. |
+| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 200 tests + 100% line coverage + production build). Strict zero-`any` TypeScript policy (`@typescript-eslint/no-explicit-any: "error"`), strongly typed Convex `FunctionReference` bindings across crons, actions, and UI hooks, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette. |
 | **Transparency & Process** | `hackathon.md` is the source of truth: 40+ dated entries, file-level diffs, Convex feature tags per entry, and transparent handling of private MCG portals and vector precedents. `npm run verify` is the gate before every commit. |
 
 ---

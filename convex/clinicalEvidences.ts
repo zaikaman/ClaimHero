@@ -1,4 +1,4 @@
-import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
@@ -121,7 +121,21 @@ export const listByClaimAndSource = query({
   },
 });
 
-async function applyBatchInsert(ctx: any, args: any): Promise<Id<"clinicalEvidences">[]> {
+interface ClinicalEvidenceItem {
+  sourceType: string;
+  title: string;
+  sourceUrl?: string;
+  citationClause: string;
+  extractedEvidenceMarkdown: string;
+  relevanceScore: number;
+}
+
+interface BatchInsertEvidenceArgs {
+  claimId: Id<"claims">;
+  evidences: ClinicalEvidenceItem[];
+}
+
+async function applyBatchInsert(ctx: MutationCtx, args: BatchInsertEvidenceArgs): Promise<Id<"clinicalEvidences">[]> {
   const claim = await ctx.db.get(args.claimId);
   if (!claim) {
     console.warn(`Claim ${args.claimId} not found during insertBatch; skipping.`);
@@ -202,10 +216,10 @@ export const insertBatchInternal = internalMutation({
   },
 });
 
-async function applyClearByClaim(ctx: any, claimId: Id<"claims">) {
+async function applyClearByClaim(ctx: MutationCtx, claimId: Id<"claims">) {
   const existing = await ctx.db
     .query("clinicalEvidences")
-    .withIndex("by_claim", (q: any) => q.eq("claimId", claimId))
+    .withIndex("by_claim", (q) => q.eq("claimId", claimId))
     .collect();
 
   for (const item of existing) {
@@ -265,7 +279,11 @@ export const deleteEvidence = mutation({
   },
 });
 
-async function applyInsertSingle(ctx: any, args: any): Promise<Id<"clinicalEvidences">> {
+interface InsertSingleEvidenceArgs extends ClinicalEvidenceItem {
+  claimId: Id<"claims">;
+}
+
+async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArgs): Promise<Id<"clinicalEvidences">> {
   const now = Date.now();
   const cleanClause = sanitizeCitationClause(args.citationClause);
   const id = await ctx.db.insert("clinicalEvidences", {

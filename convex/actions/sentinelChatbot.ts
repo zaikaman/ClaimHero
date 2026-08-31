@@ -225,15 +225,17 @@ export const SENTINEL_CHAT_TOOLS = [
   },
 ];
 
+import type { ActionCtx } from "../_generated/server";
+
 /**
  * Live Web Search via Firecrawl Component with Resilient Directory Fallback
  */
 async function performFirecrawlWebSearch(
-  ctx: any,
+  ctx: ActionCtx,
   query: string,
   payer?: string,
   limit = 4
-): Promise<{ query: string; totalResults: number; results: any[]; source: string }> {
+): Promise<{ query: string; totalResults: number; results: Array<{ title: string; url: string; description: string }>; source: string }> {
   const searchQuery = payer ? `${payer} ${query}` : query;
 
   try {
@@ -243,15 +245,15 @@ async function performFirecrawlWebSearch(
       scrapeOptions: { formats: ["markdown"] },
     });
 
-    const rawResults = searchData?.web || (searchData as any)?.data?.web || (searchData as any)?.data || [];
+    const rawResults = searchData?.web || [];
     const formatted = (Array.isArray(rawResults) ? rawResults : [])
       .slice(0, limit)
-      .map((item: any) => ({
+      .map((item: { title?: string; url?: string; description?: string; markdown?: string }) => ({
         title: item.title || "Clinical Policy Document",
-        url: item.url || item.link || item.sourceUrl || "",
-        description: item.description || item.snippet || item.markdown?.slice(0, 300) || "",
+        url: item.url || "",
+        description: item.description || item.markdown?.slice(0, 300) || "",
       }))
-      .filter((item: any) => Boolean(item.url));
+      .filter((item) => Boolean(item.url));
 
     if (formatted.length > 0) {
       return {
@@ -305,7 +307,7 @@ async function performFirecrawlWebSearch(
  * Scrape Clinical Policy Document or Article via Firecrawl Component
  */
 async function performFirecrawlScrapeUrl(
-  ctx: any,
+  ctx: ActionCtx,
   url: string
 ): Promise<{ sourceUrl: string; title?: string; markdownSnippet: string; success: boolean }> {
   if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) {
@@ -350,7 +352,7 @@ async function performFirecrawlScrapeUrl(
  * Trigger Multi-Source Clinical Research Pipeline for Claim
  */
 async function triggerFirecrawlEvidenceIngestion(
-  ctx: any,
+  ctx: ActionCtx,
   claimId: Id<"claims">,
   customUrl?: string
 ): Promise<{ success: boolean; message: string; claimId: string }> {
@@ -365,29 +367,19 @@ async function triggerFirecrawlEvidenceIngestion(
     }
 
     if (customUrl) {
-      const crawlerAction =
-        (api as any)["actions/policyCrawler"]?.crawlCustomResearchUrl ||
-        (api as any).actions?.policyCrawler?.crawlCustomResearchUrl;
-      if (crawlerAction) {
-        await ctx.runAction(crawlerAction, {
-          claimId,
-          customUrl,
-        });
-      }
+      await ctx.runAction(api.actions.policyCrawler.crawlCustomResearchUrl, {
+        claimId,
+        customUrl,
+      });
     } else {
-      const hubAction =
-        (api as any)["actions/policyCrawler"]?.crawlMultiSourceHub ||
-        (api as any).actions?.policyCrawler?.crawlMultiSourceHub;
-      if (hubAction) {
-        await ctx.runAction(hubAction, {
-          claimId,
-          payer: claim.insurancePayer || "Payer",
-          cptCodes: claim.cptCodes || [],
-          icd10Codes: claim.icd10Codes || [],
-          denialReasonCode: claim.denialReasonCode || "CO-50",
-          denialReasonDescription: claim.denialReasonDescription,
-        });
-      }
+      await ctx.runAction(api.actions.policyCrawler.crawlMultiSourceHub, {
+        claimId,
+        payer: claim.insurancePayer || "Payer",
+        cptCodes: claim.cptCodes || [],
+        icd10Codes: claim.icd10Codes || [],
+        denialReasonCode: claim.denialReasonCode || "CO-50",
+        denialReasonDescription: claim.denialReasonDescription,
+      });
     }
 
     return {
@@ -395,10 +387,11 @@ async function triggerFirecrawlEvidenceIngestion(
       message: `Firecrawl multi-source clinical research pipeline executed. Policy bulletins, PubMed studies, and FDA clauses have been extracted and attached to claim ${claim.claimNumber}.`,
       claimId,
     };
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     return {
       success: false,
-      message: `Research trigger note: ${err.message || String(err)}`,
+      message: `Research trigger note: ${message}`,
       claimId,
     };
   }
@@ -443,15 +436,36 @@ export function buildLeanSentinelPrompt(options: {
   return prompt;
 }
 
+interface ClaimDataChatbotResult {
+  claimNumber: string;
+  patientName?: string;
+  patientMemberId?: string;
+  insurancePayer?: string;
+  providerName?: string;
+  denialReasonCode?: string;
+  denialReasonDescription?: string;
+  deniedAmount: number;
+  patientOwedAmount: number;
+  daysRemaining?: number;
+  cptCodes: string[];
+  icd10Codes: string[];
+  overturnProbabilityScore?: number;
+  riskLevel?: string;
+  erisaPenalties?: {
+    daysInDefault: number;
+    accruedPenaltyAmount: number;
+  };
+}
+
 /**
  * Execute a single tool call against Convex database and services
  */
 async function executeToolCall(
-  ctx: any,
+  ctx: ActionCtx,
   name: string,
-  args: any,
+  args: Record<string, unknown>,
   defaultActiveClaimId?: string
-): Promise<{ toolName: string; output: string; raw: any }> {
+): Promise<{ toolName: string; output: string; raw: unknown }> {
   try {
     switch (name) {
       case "get_active_claim_details": {
@@ -488,9 +502,9 @@ async function executeToolCall(
 
       case "search_claims": {
         const data = await ctx.runQuery(internal.chatbot.searchClaimsForChatbot, {
-          searchTerm: args.searchTerm,
-          status: args.status,
-          limit: args.limit || 5,
+          searchTerm: args.searchTerm as string | undefined,
+          status: args.status as string | undefined,
+          limit: typeof args.limit === "number" ? args.limit : 5,
         });
 
         return {
@@ -575,8 +589,8 @@ async function executeToolCall(
       case "search_precedents": {
         try {
           const results = await ctx.runQuery(api.precedents.searchTextPrecedents, {
-            query: args.query,
-            primaryCpt: args.primaryCpt,
+            query: (args.query || "") as string,
+            primaryCpt: args.primaryCpt as string | undefined,
             limit: 3,
           });
           return {
@@ -642,10 +656,11 @@ async function executeToolCall(
           raw: null,
         };
     }
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     return {
       toolName: name,
-      output: `Tool execution error: ${err.message || String(err)}`,
+      output: `Tool execution error: ${message}`,
       raw: null,
     };
   }
@@ -655,7 +670,7 @@ async function executeToolCall(
  * Handle autonomous conversation summarization if message count grows
  */
 async function maybeSummarizeConversation(
-  ctx: any,
+  ctx: ActionCtx,
   sessionId: Id<"chatbotSessions">,
   messages: Array<{ role: string; content: string }>,
   existingSummary?: string
@@ -668,7 +683,7 @@ async function maybeSummarizeConversation(
 
       const summaryPrompt = `Condense the following medical appeal discussion into a 3-sentence rolling summary capturing key claims mentioned, clinical issues discussed, and agreed action items. Preserve specific claim numbers and codes. Do not use emojis.\n\nExisting Summary:\n${existingSummary || "None"}\n\nRecent Messages:\n${messages
         .slice(0, messages.length - 4)
-        .map((m: any) => `${m.role}: ${m.content}`)
+        .map((m) => `${m.role}: ${m.content}`)
         .join("\n")}`;
 
       const res = await client.chat.completions.create({
@@ -711,7 +726,7 @@ export const sendMessageWithTools = action({
       if (!ok) {
         const rateLimitReply =
           "Sentinel Copilot is currently handling peak analytical volume. Please allow a few seconds before submitting another clinical query.";
-        await ctx.runMutation((internal as any).chatbot.addMessageInternal, {
+        await ctx.runMutation(internal.chatbot.addMessageInternal, {
           sessionId: args.sessionId,
           role: "assistant",
           content: rateLimitReply,
@@ -722,19 +737,18 @@ export const sendMessageWithTools = action({
       // Continue if rate limiter is not configured
     }
 
-
     // 2. Persist user message to session
-    await ctx.runMutation((internal as any).chatbot.addMessageInternal, {
+    await ctx.runMutation(internal.chatbot.addMessageInternal, {
       sessionId: args.sessionId,
       role: "user",
       content: args.userMessage,
     });
 
     // 3. Fetch session history and existing summary
-    const session = await ctx.runQuery((internal as any).chatbot.getSessionInternal, {
+    const session = await ctx.runQuery(internal.chatbot.getSessionInternal, {
       sessionId: args.sessionId,
     });
-    const history = await ctx.runQuery((internal as any).chatbot.listMessagesInternal, {
+    const history = await ctx.runQuery(internal.chatbot.listMessagesInternal, {
       sessionId: args.sessionId,
     });
 
@@ -748,14 +762,15 @@ export const sendMessageWithTools = action({
     });
 
     // 5. Build recent message window (last 8 messages)
-    const recentMessages = history.slice(-8).map((m: any) => ({
+    const recentMessages = history.slice(-8).map((m) => ({
       role: m.role as "user" | "assistant" | "system",
       content: m.content,
     }));
 
-    const openaiMessages: any[] = [
+    type OpenAIInputMessages = Parameters<ReturnType<typeof getOpenAIClient>["chat"]["completions"]["create"]>[0]["messages"];
+    const openaiMessages: OpenAIInputMessages = [
       { role: "system", content: systemPrompt },
-      ...recentMessages,
+      ...recentMessages.map((m) => ({ role: m.role, content: m.content })),
     ];
 
     const executedToolCalls: Array<{
@@ -800,7 +815,7 @@ export const sendMessageWithTools = action({
           openaiMessages.push(message);
 
           for (const toolCall of message.tool_calls) {
-            let parsedArgs = {};
+            let parsedArgs: Record<string, unknown> = {};
             try {
               parsedArgs = JSON.parse(toolCall.function.arguments);
             } catch {
@@ -842,12 +857,12 @@ export const sendMessageWithTools = action({
         finalReply =
           "Sentinel Copilot processed your inquiry. No additional clinical actions required at this step.";
       }
-    } catch (error: any) {
+    } catch (error) {
       console.warn("Sentinel Chatbot tool calling encountered error or missing API key, executing fallback:", error);
 
       // Resilient fallback logic
       const query = args.userMessage.toLowerCase();
-      let fallbackData: any = null;
+      let fallbackData: ClaimDataChatbotResult | null = null;
 
       if (
         (query.includes("claim") ||
@@ -865,7 +880,7 @@ export const sendMessageWithTools = action({
           { claimId: args.activeClaimId },
           args.activeClaimId
         );
-        fallbackData = claimResult.raw;
+        fallbackData = claimResult.raw as ClaimDataChatbotResult | null;
         executedToolCalls.push({
           id: "call_claim_details_fallback",
           name: "get_active_claim_details",
@@ -917,7 +932,7 @@ Select an active claim or ask any clinical or legal question to begin.`;
     }
 
     // 6. Save assistant response + tool call metadata to database
-    await ctx.runMutation((internal as any).chatbot.addMessageInternal, {
+    await ctx.runMutation(internal.chatbot.addMessageInternal, {
       sessionId: args.sessionId,
       role: "assistant",
       content: finalReply,

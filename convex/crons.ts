@@ -10,7 +10,8 @@ const crons = cronJobs();
 crons.cron(
   "statutory-deadline-daily-sweep",
   "0 0 * * *",
-  (internal as any).claims.sweepDeadlines
+  internal.claims.sweepDeadlines,
+  {}
 );
 
 export default crons;

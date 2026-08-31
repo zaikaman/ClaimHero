@@ -1,16 +1,15 @@
 import React, { useState } from "react";
 import {
   Scales,
-  User,
   ArrowRight,
   ArrowLeft,
   CheckCircle,
   Lightning,
   CloudArrowUp,
-
   Check,
   CircleNotch,
   Stethoscope,
+  ShieldWarning,
 } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -27,8 +26,7 @@ import {
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
-
-const convexApi = api as any;
+import { Id } from "../../../convex/_generated/dataModel";
 
 interface OnboardingWizardProps {
   isOpen: boolean;
@@ -55,20 +53,20 @@ const ROLES = [
     icon: Scales,
   },
   {
-    id: "individual",
-    title: "Independent Patient / Healthcare Consumer",
-    description: "Self-advocates seeking to overturn surprise out-of-pocket medical bills and adverse determinations.",
-    icon: User,
+    id: "patient",
+    title: "Patient / Policyholder Individual",
+    description: "Self-insured employees, private insurance members, and surprise-billed consumers.",
+    icon: ShieldWarning,
   },
 ];
 
 const JURISDICTIONS = [
-  { code: "CA", label: "California — DMHC / CDI & Knox-Keene Standards" },
-  { code: "NY", label: "New York — DFS Independent Dispute Resolution" },
-  { code: "TX", label: "Texas — TDI Standard Review Guidelines" },
-  { code: "FL", label: "Florida — OIR External Grievance Rules" },
-  { code: "IL", label: "Illinois — DOI Consumer Protections" },
-  { code: "FED", label: "Federal ERISA 29 CFR § 2560.503-1 Universal" },
+  { code: "FL", label: "Florida (11th Circuit / AHCA Guidelines)" },
+  { code: "CA", label: "California (9th Circuit / Knox-Keene Act & DMHC)" },
+  { code: "TX", label: "Texas (5th Circuit / TDI Protections)" },
+  { code: "NY", label: "New York (2nd Circuit / DFS Independent Dispute Resolution)" },
+  { code: "IL", label: "Illinois (7th Circuit / IDOI Mandates)" },
+  { code: "FED", label: "Federal ERISA Statutory Default (29 U.S.C. § 1133)" },
 ];
 
 const TARGET_PAYERS = [
@@ -91,7 +89,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 }) => {
   const [step, setStep] = useState<number>(1);
   const [selectedRole, setSelectedRole] = useState<string>("provider");
-  const [selectedJurisdiction, setSelectedJurisdiction] = useState<string>("CA");
+  const [selectedJurisdiction, setSelectedJurisdiction] = useState<string>("FL");
   const [selectedPayers, setSelectedPayers] = useState<string[]>([
     "Molina Healthcare",
     "GeoBlue",
@@ -100,7 +98,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [selectedCaseId, setSelectedCaseId] = useState<string>("molina_knee");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  const updateAppealContextMutation = useMutation(convexApi.claims.updateAppealContext);
+  const updateAppealContextMutation = useMutation(api.claims.updateAppealContext);
 
   const togglePayer = (payer: string) => {
     setSelectedPayers((prev) =>
@@ -133,7 +131,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       if (updateAppealContextMutation && preset.sender && preset.clinicalFacts) {
         try {
           await updateAppealContextMutation({
-            claimId: result.claimId as any,
+            claimId: result.claimId as Id<"claims">,
             sender: preset.sender,
             clinicalFacts: preset.clinicalFacts,
             physicianNotes: preset.physicianNotes || undefined,

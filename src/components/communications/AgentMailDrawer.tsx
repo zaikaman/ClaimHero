@@ -35,10 +35,10 @@ interface AgentMailDrawerProps {
   threads: EmailThread[];
   messages: EmailMessage[];
   isLoading?: boolean;
-  onSendMessage: (text: string) => Promise<any>;
-  onDispatchAppeal?: (recipientEmail?: string, dispatchMode?: string) => Promise<any>;
+  onSendMessage: (text: string) => Promise<unknown>;
+  onDispatchAppeal?: (recipientEmail?: string, dispatchMode?: string) => Promise<unknown>;
   onNavigateView?: (view: FlowView) => void;
-  onRunAutonomousPipeline?: (claimId?: string) => Promise<any>;
+  onRunAutonomousPipeline?: (claimId?: string) => Promise<unknown>;
 }
 
 export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({

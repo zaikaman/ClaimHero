@@ -60,7 +60,23 @@ interface SidebarProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onOpenIngestion?: () => void;
-  onDeleteCase?: (claimId: string) => Promise<any>;
+  onDeleteCase?: (claimId: string) => Promise<unknown>;
+}
+
+interface CaseWorkspaceSubItem {
+  id: NavigationView;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+interface CaseWorkspaceItem {
+  id: NavigationView;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+  isDefenseSuite?: boolean;
+  subItems?: CaseWorkspaceSubItem[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -111,15 +127,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isDefenseSuiteView =
     currentView === "studio" || currentView === "p2p" || currentView === "calculator";
 
-  const caseWorkspaceItems = [
+  const caseWorkspaceItems: CaseWorkspaceItem[] = [
     {
-      id: "evidence" as NavigationView,
+      id: "evidence",
       label: "Evidence Matrix",
       description: "CPB Guidelines & Overturn Probability",
       icon: FileMagnifyingGlass,
     },
     {
-      id: "studio" as NavigationView,
+      id: "studio",
       label: "Defense Suite",
       badge: "3 Vectors",
       description: "Legal Brief, Doctor P2P & ERISA Penalties",
@@ -127,24 +143,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       isDefenseSuite: true,
       subItems: [
         {
-          id: "studio" as NavigationView,
+          id: "studio",
           label: "Legal Appeal Brief",
           icon: FileText,
         },
         {
-          id: "p2p" as NavigationView,
+          id: "p2p",
           label: "Doctor P2P Copilot",
           icon: PhoneCall,
         },
         {
-          id: "calculator" as NavigationView,
+          id: "calculator",
           label: "ERISA Penalties",
           icon: Scales,
         },
       ],
     },
     {
-      id: "communications" as NavigationView,
+      id: "communications",
       label: "Payer Communications",
       description: "Two-way Payer Transmissions",
       icon: Envelope,
@@ -319,9 +335,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               #{c.claimNumber} • {c.patient?.insurancePayer}
                             </div>
                           </div>
-                          <span className="font-mono text-[10px] font-bold text-destructive shrink-0">
-                            {formatCurrency(c.deniedAmount)}
-                          </span>
+                          {isCurrent && (
+                            <Badge variant="outline" className="text-[9px] font-mono h-3.5 px-1 bg-primary/10 text-primary">
+                              Active
+                            </Badge>
+                          )}
                         </DropdownMenuItem>
                       );
                     })}
@@ -366,7 +384,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <nav className="space-y-1">
             {caseWorkspaceItems.map((item) => {
               const Icon = item.icon;
-              const isSuite = (item as any).isDefenseSuite;
+              const isSuite = Boolean(item.isDefenseSuite);
               const isActive = isSuite ? isDefenseSuiteView : currentView === item.id;
 
               return (
@@ -391,9 +409,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {!isCollapsed && (
                       <div className="flex items-center justify-between flex-1 truncate">
                         <span className="truncate">{item.label}</span>
-                        {(item as any).badge && (
+                        {item.badge && (
                           <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 font-medium">
-                            {(item as any).badge}
+                            {item.badge}
                           </span>
                         )}
                       </div>
@@ -401,34 +419,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
 
                   {/* Sub-items for Defense Suite (Expanded & Active) */}
-                  {!isCollapsed && isSuite && isDefenseSuiteView && (item as any).subItems && (
+                  {!isCollapsed && isSuite && isDefenseSuiteView && item.subItems && (
                     <div className="ml-4 pl-2 border-l border-border/60 space-y-0.5 pt-0.5">
-                      {((item as any).subItems as Array<{ id: NavigationView; label: string; icon: any }>).map(
-                        (sub) => {
-                          const SubIcon = sub.icon;
-                          const isSubActive = currentView === sub.id;
-                          return (
-                            <button
-                              key={sub.id}
-                              onClick={() => onSelectView(sub.id)}
+                      {item.subItems.map((sub) => {
+                        const SubIcon = sub.icon;
+                        const isSubActive = currentView === sub.id;
+                        return (
+                          <button
+                            key={sub.id}
+                            onClick={() => onSelectView(sub.id)}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-2 py-1 rounded-md text-[11px] font-medium transition-colors text-left cursor-pointer",
+                              isSubActive
+                                ? "bg-primary/15 text-primary font-semibold border border-primary/30 shadow-2xs"
+                                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                            )}
+                          >
+                            <SubIcon
                               className={cn(
-                                "w-full flex items-center gap-2 px-2 py-1 rounded-md text-[11px] font-medium transition-colors text-left cursor-pointer",
-                                isSubActive
-                                  ? "bg-primary/15 text-primary font-semibold border border-primary/30 shadow-2xs"
-                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                "size-3 shrink-0",
+                                isSubActive ? "text-primary" : "text-muted-foreground"
                               )}
-                            >
-                              <SubIcon
-                                className={cn(
-                                  "size-3 shrink-0",
-                                  isSubActive ? "text-primary" : "text-muted-foreground"
-                                )}
-                              />
-                              <span className="truncate">{sub.label}</span>
-                            </button>
-                          );
-                        }
-                      )}
+                            />
+                            <span className="truncate">{sub.label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

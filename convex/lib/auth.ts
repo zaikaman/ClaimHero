@@ -1,6 +1,6 @@
 import { QueryCtx, MutationCtx, ActionCtx } from "../_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { Id, Doc } from "../_generated/dataModel";
+import { Id, Doc, TableNames } from "../_generated/dataModel";
 
 /**
  * Require an authenticated user identity.
@@ -9,7 +9,7 @@ import { Id, Doc } from "../_generated/dataModel";
 export async function requireAuthUser(
   ctx: QueryCtx | MutationCtx | ActionCtx
 ): Promise<Id<"users">> {
-  const userId = await getAuthUserId(ctx as any);
+  const userId = await getAuthUserId(ctx);
   if (!userId) {
     throw new Error("Unauthorized: Authentication required");
   }
@@ -52,7 +52,7 @@ export async function getClaimIfAuthorized(
   ctx: QueryCtx | MutationCtx,
   claimId: Id<"claims">
 ): Promise<{ claim: Doc<"claims">; userId: Id<"users"> } | null> {
-  const userId = await getAuthUserId(ctx as any);
+  const userId = await getAuthUserId(ctx);
   if (!userId) return null;
   const claim = await ctx.db.get(claimId);
   if (!claim) return null;
@@ -63,7 +63,7 @@ export async function getClaimIfAuthorized(
 /**
  * Generic requireOwner helper for convex-authz compatibility.
  */
-export async function requireOwner<T extends { _id: Id<any>; userId?: Id<"users"> }>(
+export async function requireOwner<T extends { _id: Id<TableNames>; userId?: Id<"users"> }>(
   ctx: QueryCtx | MutationCtx,
   doc: T | null
 ): Promise<{ doc: T; userId: Id<"users"> }> {
@@ -102,7 +102,7 @@ export async function getChatbotSessionIfAuthorized(
   ctx: QueryCtx | MutationCtx,
   sessionId: Id<"chatbotSessions">
 ): Promise<Doc<"chatbotSessions"> | null> {
-  const userId = await getAuthUserId(ctx as any);
+  const userId = await getAuthUserId(ctx);
   if (!userId) return null;
   const session = await ctx.db.get(sessionId);
   if (!session) return null;

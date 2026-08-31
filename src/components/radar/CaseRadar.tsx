@@ -62,8 +62,8 @@ interface CaseRadarProps {
   onNavigateView: (
     view: "radar" | "evidence" | "studio" | "p2p" | "communications" | "audit"
   ) => void;
-  onDeleteCase?: (claimId: string) => Promise<any>;
-  onRunAutonomousPipeline?: (claimId: string) => Promise<any>;
+  onDeleteCase?: (claimId: string) => Promise<unknown>;
+  onRunAutonomousPipeline?: (claimId: string) => Promise<unknown>;
 }
 
 const formatPayerName = (payer: string | undefined): string => {
@@ -359,7 +359,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                   <DropdownMenuLabel className="text-[11px] text-muted-foreground">Portfolio Export ({filtered.length} cases)</DropdownMenuLabel>
                   <DropdownMenuItem
                     onClick={() => {
-                      const escapeCsv = (val: any) => {
+                      const escapeCsv = (val: unknown) => {
                         if (val === undefined || val === null) return '""';
                         const str = String(val).replace(/"/g, '""');
                         return `"${str}"`;

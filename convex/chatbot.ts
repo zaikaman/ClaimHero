@@ -1,5 +1,6 @@
-import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
+import { query, mutation, internalQuery, internalMutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   getChatbotSessionIfAuthorized,
@@ -133,7 +134,19 @@ export const listMessagesInternal = internalQuery({
   },
 });
 
-async function applyAddMessage(ctx: any, args: any) {
+interface AddMessageArgs {
+  sessionId: Id<"chatbotSessions">;
+  role: "user" | "assistant" | "system" | "tool";
+  content: string;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    arguments: string;
+    output?: string;
+  }>;
+}
+
+async function applyAddMessage(ctx: MutationCtx, args: AddMessageArgs) {
   const session = await ctx.db.get(args.sessionId);
   if (!session) throw new Error("Chatbot session not found");
 
@@ -188,7 +201,7 @@ export const addMessage = mutation({
 });
 
 /**
- * Internal mutation for background chatbot action to add assistant and tool responses
+ * Internal mutation for background actions to add messages
  */
 export const addMessageInternal = internalMutation({
   args: {
@@ -223,7 +236,7 @@ export const clearSession = mutation({
 
     const messages = await ctx.db
       .query("chatbotMessages")
-      .withIndex("by_session", (q: any) => q.eq("sessionId", args.sessionId))
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
       .take(200);
 
     for (const msg of messages) {

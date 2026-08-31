@@ -103,7 +103,7 @@ export const resolvePayerGateway = action({
   },
   handler: async (ctx, args): Promise<ResolvedPayerContact> => {
     // 1. Fetch claim context
-    const claim: any = await ctx.runQuery((internal as any).claims.getByIdInternal, {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
     });
 
@@ -245,9 +245,9 @@ export const resolvePayerGateway = action({
           scrapeOptions: { formats: ["markdown"] },
         });
 
-        const results = searchData?.web || (searchData as any)?.data || [];
+        const results = searchData?.web || [];
         webSearchContext = (Array.isArray(results) ? results : [])
-          .map((r: any) => `Title: ${r.title || "Payer Portal"}\nURL: ${r.url || r.link || ""}\nContent: ${(r.markdown || r.description || "").slice(0, 1500)}`)
+          .map((r: { title?: string; url?: string; markdown?: string; description?: string }) => `Title: ${r.title || "Payer Portal"}\nURL: ${r.url || ""}\nContent: ${(r.markdown || r.description || "").slice(0, 1500)}`)
           .join("\n\n---\n\n");
       } catch (crawlErr) {
         console.warn("Firecrawl search error, continuing to AI synthesis:", crawlErr);
@@ -339,13 +339,13 @@ Extract the official appeals/grievance/claims intake gateway details for ${payer
     }
 
     // 5. Persist the discovered contact to the claim record
-    await ctx.runMutation((internal as any).claims.updatePayerContactInternal, {
+    await ctx.runMutation(internal.claims.updatePayerContactInternal, {
       claimId: args.claimId,
       payerContact: resolvedContact,
     });
 
     // 6. Record audit log
-    await ctx.runMutation((internal as any).auditLogs.logEventInternal, {
+    await ctx.runMutation(internal.auditLogs.logEventInternal, {
       claimId: args.claimId,
       eventType: "policy_crawled",
       actor: resolvedContact.source === "firecrawl_live" ? "Firecrawl Web Crawler" : "Payer Gateway Resolver",

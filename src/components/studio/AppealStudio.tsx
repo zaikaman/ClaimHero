@@ -37,7 +37,7 @@ interface AppealStudioProps {
   onNavigateToDispatch?: () => void;
   onNavigateToEvidence?: () => void;
   onNavigateView?: (view: FlowView) => void;
-  onRunAutonomousPipeline?: (claimId?: string) => Promise<any>;
+  onRunAutonomousPipeline?: (claimId?: string) => Promise<unknown>;
 }
 
 const TIER_METADATA_CONFIG = {
@@ -170,9 +170,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         email: senderEmail,
         phone: senderPhone,
       });
-    } catch (err: any) {
+    } catch (err) {
       setSynthesisError(
-        err?.message || "Failed to synthesize appeal brief. Please try again."
+        err instanceof Error ? err.message : "Failed to synthesize appeal brief. Please try again."
       );
     }
   };
@@ -184,9 +184,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       await escalateTier(currentTierConfig.nextTier, escalationReason);
       setShowEscalationModal(false);
       setEscalationReason("");
-    } catch (err: any) {
+    } catch (err) {
       setSynthesisError(
-        err?.message || "Failed to escalate appeal tier. Please try again."
+        err instanceof Error ? err.message : "Failed to escalate appeal tier. Please try again."
       );
     }
   };
@@ -423,7 +423,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onNavigateView?.("p2p" as any)}
+              onClick={() => onNavigateView?.("p2p")}
               className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
               title="Open 3-Minute Physician Peer-to-Peer Defense Tele-Script & Pocket Cheat Sheet"
             >
@@ -435,7 +435,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onNavigateView?.("calculator" as any)}
+              onClick={() => onNavigateView?.("calculator")}
               className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
               title="Open ERISA 29 U.S.C. § 1132(c) Statutory Penalty Calculator and Out-of-Pocket Liability Audit"
             >
