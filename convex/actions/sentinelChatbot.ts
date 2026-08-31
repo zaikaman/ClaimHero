@@ -3,9 +3,12 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { getOpenAIClient, getOpenAIConfig } from "../lib/openai";
-import { internal, api } from "../_generated/api";
+import { internal, api, components } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { Id } from "../_generated/dataModel";
+import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
+
+const firecrawl = new FirecrawlClient(components.firecrawl);
 
 /**
  * OpenAI Tool Definitions for Sentinel Clinical & Legal Assistant
@@ -223,55 +226,43 @@ export const SENTINEL_CHAT_TOOLS = [
 ];
 
 /**
- * Live Web Search via Firecrawl v2 API with Resilient Directory Fallback
+ * Live Web Search via Firecrawl Component with Resilient Directory Fallback
  */
 async function performFirecrawlWebSearch(
+  ctx: any,
   query: string,
   payer?: string,
   limit = 4
 ): Promise<{ query: string; totalResults: number; results: any[]; source: string }> {
-  const apiKey = process.env.FIRECRAWL_API_KEY;
   const searchQuery = payer ? `${payer} ${query}` : query;
 
-  if (apiKey && apiKey !== "firecrawl-placeholder-key") {
-    try {
-      const response = await fetch("https://api.firecrawl.dev/v2/search", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          query: searchQuery,
-          limit,
-          sources: ["web"],
-        }),
-      });
+  try {
+    const searchData = await firecrawl.search(ctx, searchQuery, {
+      limit,
+      sources: ["web"],
+      scrapeOptions: { formats: ["markdown"] },
+    });
 
-      if (response.ok) {
-        const payload = await response.json();
-        const rawResults = payload?.data?.web || payload?.data || payload?.web || [];
-        const formatted = (Array.isArray(rawResults) ? rawResults : [])
-          .slice(0, limit)
-          .map((item: any) => ({
-            title: item.title || "Clinical Policy Document",
-            url: item.url || item.link || item.sourceUrl || "",
-            description: item.description || item.snippet || item.markdown?.slice(0, 300) || "",
-          }))
-          .filter((item: any) => Boolean(item.url));
+    const rawResults = searchData?.web || (searchData as any)?.data?.web || (searchData as any)?.data || [];
+    const formatted = (Array.isArray(rawResults) ? rawResults : [])
+      .slice(0, limit)
+      .map((item: any) => ({
+        title: item.title || "Clinical Policy Document",
+        url: item.url || item.link || item.sourceUrl || "",
+        description: item.description || item.snippet || item.markdown?.slice(0, 300) || "",
+      }))
+      .filter((item: any) => Boolean(item.url));
 
-        if (formatted.length > 0) {
-          return {
-            query: searchQuery,
-            totalResults: formatted.length,
-            results: formatted,
-            source: "firecrawl_live_web",
-          };
-        }
-      }
-    } catch (err) {
-      console.warn("Firecrawl live web search error, falling back to structured directory:", err);
+    if (formatted.length > 0) {
+      return {
+        query: searchQuery,
+        totalResults: formatted.length,
+        results: formatted,
+        source: "firecrawl_live_web",
+      };
     }
+  } catch (err) {
+    console.warn("Firecrawl live web search error, falling back to structured directory:", err);
   }
 
   const payerName =
@@ -311,13 +302,12 @@ async function performFirecrawlWebSearch(
 }
 
 /**
- * Scrape Clinical Policy Document or Article via Firecrawl v2 API
+ * Scrape Clinical Policy Document or Article via Firecrawl Component
  */
 async function performFirecrawlScrapeUrl(
+  ctx: any,
   url: string
 ): Promise<{ sourceUrl: string; title?: string; markdownSnippet: string; success: boolean }> {
-  const apiKey = process.env.FIRECRAWL_API_KEY;
-
   if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) {
     return {
       sourceUrl: url,
@@ -326,38 +316,26 @@ async function performFirecrawlScrapeUrl(
     };
   }
 
-  if (apiKey && apiKey !== "firecrawl-placeholder-key") {
-    try {
-      const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          url,
-          formats: ["markdown"],
-        }),
-      });
+  try {
+    const doc = await firecrawl.scrape(ctx, url, {
+      formats: ["markdown"],
+      onlyMainContent: true,
+    });
 
-      if (response.ok) {
-        const payload = await response.json();
-        const markdown = payload?.data?.markdown || payload?.markdown || "";
-        const title = payload?.data?.metadata?.title || "Scraped Policy Document";
+    const markdown = doc.markdown || "";
+    const title = doc.metadata?.title || "Scraped Policy Document";
 
-        if (markdown) {
-          const cleanMarkdown = markdown.slice(0, 3500);
-          return {
-            sourceUrl: url,
-            title,
-            markdownSnippet: cleanMarkdown,
-            success: true,
-          };
-        }
-      }
-    } catch (err) {
-      console.warn("Firecrawl scrape error, falling back:", err);
+    if (markdown) {
+      const cleanMarkdown = markdown.slice(0, 3500);
+      return {
+        sourceUrl: url,
+        title,
+        markdownSnippet: cleanMarkdown,
+        success: true,
+      };
     }
+  } catch (err) {
+    console.warn("Firecrawl scrape error, falling back:", err);
   }
 
   return {
@@ -620,7 +598,7 @@ async function executeToolCall(
         const payer = args.payer as string | undefined;
         const limit = typeof args.limit === "number" ? Math.min(args.limit, 6) : 4;
 
-        const results = await performFirecrawlWebSearch(query, payer, limit);
+        const results = await performFirecrawlWebSearch(ctx, query, payer, limit);
         return {
           toolName: name,
           output: JSON.stringify(results, null, 2),
@@ -630,7 +608,7 @@ async function executeToolCall(
 
       case "firecrawl_scrape_url": {
         const url = (args.url || "") as string;
-        const result = await performFirecrawlScrapeUrl(url);
+        const result = await performFirecrawlScrapeUrl(ctx, url);
         return {
           toolName: name,
           output: JSON.stringify(result, null, 2),

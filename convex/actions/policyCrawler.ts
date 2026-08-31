@@ -3,8 +3,11 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
-import { api } from "../_generated/api";
+import { api, components } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
+import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
+
+const firecrawl = new FirecrawlClient(components.firecrawl);
 
 const POLICY_EXTRACTION_SCHEMA = {
   type: "object",
@@ -266,9 +269,8 @@ interface FirecrawlSearchResult {
   };
 }
 
-const MAX_POLICY_SEARCH_ROUNDS = 2;
-const MAX_POLICY_SOURCE_CANDIDATES = 6;
-const MAX_FIRECRAWL_SCRAPE_ATTEMPTS = 2;
+const MAX_POLICY_SEARCH_ROUNDS = 3;
+const MAX_POLICY_SOURCE_CANDIDATES = 8;
 
 function isAcceptableSourceUrl(value: unknown): value is string {
   if (typeof value !== "string" || !value.trim()) return false;
@@ -325,9 +327,9 @@ export function isAccessDeniedDocument(value: string): boolean {
   const blockTitlePattern = /<title[^>]*>\s*(access denied|this site can.t be reached|request unsuccessful)\s*<\/title>/i;
   if (blockTitlePattern.test(value) || /^#\s*access denied\s*$/im.test(value)) return true;
 
-  const hasIncapsulaChallenge =
-    /request unsuccessful\. incapsula incident id|_incapsula_resource|incapsula incident id/i.test(preview);
-  if (hasIncapsulaChallenge && preview.length < 2000 && !hasPolicyMarker) return true;
+  const hasWafChallenge =
+    /request unsuccessful|incident id|_incapsula_resource|access challenge|bot detection|cf-chl-bypass/i.test(preview);
+  if (hasWafChallenge && preview.length < 2000 && !hasPolicyMarker) return true;
 
   const lowerPreview = preview.toLowerCase();
   const hasBlockKeyword =
@@ -354,8 +356,8 @@ export function isHtmlErrorBody(value: string): boolean {
   if (hasPolicyMarker && preview.length > 1500) return false;
   const trimmed = value.trim().toLowerCase();
   if (trimmed.startsWith("<!doctype") || trimmed.startsWith("<html") || trimmed.startsWith("<head")) {
-    // Incapsula challenge is HTML with iframe - only treat as error if no policy content and short.
-    if (preview.length < 2500 && /request unsuccessful|incapsula incident id|access denied|forbidden|can.t be reached|timed out|dns_probe|err_connection/i.test(value)) {
+    // Challenge is HTML with iframe - only treat as error if no policy content and short.
+    if (preview.length < 2500 && /request unsuccessful|incident id|access denied|forbidden|can.t be reached|timed out|dns_probe|err_connection/i.test(value)) {
       return true;
     }
     return /<title[^>]*>\s*(access denied|this site can.t be reached)/i.test(value);
@@ -667,54 +669,22 @@ export function selectFirecrawlPolicySource(payload: unknown): FirecrawlPolicySo
 }
 
 async function scrapeFirecrawlPolicySource(
-  apiKey: string,
+  ctx: any,
   sourceUrl: string,
 ): Promise<FirecrawlPolicySource> {
   if (isPrivateMcgViewerUrl(sourceUrl)) {
     throw new Error("Source URL is a private Milliman Care Guidelines viewer and not publicly citable without authentication.");
   }
-  let response: Response | null = null;
-  for (let attempt = 0; attempt < MAX_FIRECRAWL_SCRAPE_ATTEMPTS; attempt += 1) {
-    response = await fetch("https://api.firecrawl.dev/v2/scrape", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        url: sourceUrl,
-        formats: ["markdown"],
-      }),
-    });
 
-    if (response.status !== 429 || attempt + 1 >= MAX_FIRECRAWL_SCRAPE_ATTEMPTS) {
-      break;
-    }
+  const doc = await firecrawl.scrape(ctx, sourceUrl, {
+    formats: ["markdown"],
+    onlyMainContent: true,
+    proxy: "auto",
+    blockAds: true,
+  });
 
-    const retryAfterHeader = response.headers.get("retry-after");
-    const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-    const retryDelayMs = Number.isFinite(retryAfterSeconds)
-      ? Math.min(Math.max(retryAfterSeconds * 1000, 250), 5000)
-      : 1000;
-    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-  }
-
-  if (!response || !response.ok) {
-    const status = response?.status ?? "unknown";
-    throw new Error(`Firecrawl scrape failed with HTTP ${status}.`);
-  }
-
-  const payload = await response.json();
-  const data = payload && typeof payload === "object"
-    ? (payload as { data?: unknown }).data
-    : undefined;
-  const markdown = data && typeof data === "object" && typeof (data as { markdown?: unknown }).markdown === "string"
-    ? (data as { markdown: string }).markdown.trim()
-    : "";
-
-  const statusCode = data && typeof data === "object"
-    ? (data as { metadata?: { statusCode?: unknown } }).metadata?.statusCode
-    : undefined;
+  const markdown = doc.markdown?.trim() || "";
+  const statusCode = doc.metadata?.statusCode;
   if (typeof statusCode === "number" && statusCode >= 400) {
     throw new Error(`Firecrawl could not access the source URL (HTTP ${statusCode}).`);
   }
@@ -731,12 +701,10 @@ async function scrapeFirecrawlPolicySource(
     throw new Error("Firecrawl returned a document without substantive clinical policy content.");
   }
 
-  const scrapedSourceUrl = data && typeof data === "object"
-    ? getAcceptableResultUrl({
-      url: sourceUrl,
-      metadata: (data as { metadata?: unknown }).metadata as FirecrawlSearchResult["metadata"],
-    })
-    : null;
+  const scrapedSourceUrl = getAcceptableResultUrl({
+    url: sourceUrl,
+    metadata: doc.metadata as FirecrawlSearchResult["metadata"],
+  });
 
   return {
     markdown,
@@ -1059,7 +1027,7 @@ export const crawlInsurerPolicy = action({
     let policySource: FirecrawlPolicySource | null = null;
     try {
       if (args.customPolicyUrl) {
-        const candidateSource = await scrapeFirecrawlPolicySource(firecrawlApiKey, args.customPolicyUrl);
+        const candidateSource = await scrapeFirecrawlPolicySource(ctx, args.customPolicyUrl);
         const relevance = await evaluatePolicySourceRelevance(
           candidateSource,
           args.payer,
@@ -1088,36 +1056,25 @@ export const crawlInsurerPolicy = action({
         for (let searchRound = 0; searchRound < MAX_POLICY_SEARCH_ROUNDS && !policySource; searchRound += 1) {
           const searchResults = await Promise.all(searchQueries.map(async (query) => {
             try {
-              const response = await fetch("https://api.firecrawl.dev/v2/search", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${firecrawlApiKey}`,
-                },
-                body: JSON.stringify({
-                  query,
-                  limit: 10,
-                  sources: ["web"],
-                }),
+              const payload = await firecrawl.search(ctx, query, {
+                limit: 10,
+                sources: ["web"],
               });
 
-              if (!response.ok) {
-                throw new Error(`Firecrawl policy search failed with HTTP ${response.status}.`);
-              }
-
-              return { payload: await response.json() };
+              return { payload, error: undefined };
             } catch (error) {
               return {
+                payload: undefined,
                 error: error instanceof Error ? error.message : "Unknown Firecrawl search error",
               };
             }
           }));
 
           const successfulSearches = searchResults.filter(
-            (result): result is { payload: unknown } => "payload" in result,
+            (result): result is { payload: any; error: undefined } => Boolean(result.payload),
           );
           const failedSearches = searchResults
-            .filter((result): result is { error: string } => "error" in result)
+            .filter((result): result is { payload: undefined; error: string } => typeof result.error === "string")
             .map((result) => result.error);
           searchFailures.push(...failedSearches);
 
@@ -1154,7 +1111,7 @@ export const crawlInsurerPolicy = action({
 
           for (const sourceUrl of sourceUrls) {
             try {
-              const candidateSource = await scrapeFirecrawlPolicySource(firecrawlApiKey, sourceUrl);
+              const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl);
               const relevance = await evaluatePolicySourceRelevance(
                 candidateSource,
                 args.payer,
@@ -1395,7 +1352,7 @@ export const crawlPubMedAndTrials = action({
     let sourceUrl = args.customUrl || "";
 
     if (args.customUrl) {
-      const scraped = await scrapeFirecrawlPolicySource(firecrawlApiKey, args.customUrl);
+      const scraped = await scrapeFirecrawlPolicySource(ctx, args.customUrl);
       sourceMarkdown = scraped.markdown;
       sourceUrl = scraped.sourceUrl;
     } else {
@@ -1410,26 +1367,16 @@ export const crawlPubMedAndTrials = action({
       let foundSource: FirecrawlPolicySource | null = null;
       for (const query of searchQueries) {
         try {
-          const response = await fetch("https://api.firecrawl.dev/v2/search", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${firecrawlApiKey}`,
-            },
-            body: JSON.stringify({
-              query,
-              limit: 5,
-              sources: ["web"],
-            }),
+          const payload = await firecrawl.search(ctx, query, {
+            limit: 5,
+            sources: ["web"],
           });
 
-          if (!response.ok) continue;
-          const payload = await response.json();
           const candidateUrls = selectFirecrawlPolicyUrls(payload, [...args.cptCodes, "pubmed", "trial", "study", "efficacy"], 0, 4);
 
           for (const candUrl of candidateUrls) {
             try {
-              const scraped = await scrapeFirecrawlPolicySource(firecrawlApiKey, candUrl);
+              const scraped = await scrapeFirecrawlPolicySource(ctx, candUrl);
               if (scraped.markdown && scraped.markdown.length > 300) {
                 foundSource = scraped;
                 break;
@@ -1523,16 +1470,11 @@ export const crawlFdaIndications = action({
     drugOrDeviceName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
-    if (!firecrawlApiKey?.trim()) {
-      throw new Error("FDA indication research requires FIRECRAWL_API_KEY.");
-    }
-
     let sourceMarkdown = "";
     let sourceUrl = args.customUrl || "";
 
     if (args.customUrl) {
-      const scraped = await scrapeFirecrawlPolicySource(firecrawlApiKey, args.customUrl);
+      const scraped = await scrapeFirecrawlPolicySource(ctx, args.customUrl);
       sourceMarkdown = scraped.markdown;
       sourceUrl = scraped.sourceUrl;
     } else {
@@ -1545,26 +1487,16 @@ export const crawlFdaIndications = action({
       let foundSource: FirecrawlPolicySource | null = null;
       for (const query of searchQueries) {
         try {
-          const response = await fetch("https://api.firecrawl.dev/v2/search", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${firecrawlApiKey}`,
-            },
-            body: JSON.stringify({
-              query,
-              limit: 5,
-              sources: ["web"],
-            }),
+          const payload = await firecrawl.search(ctx, query, {
+            limit: 5,
+            sources: ["web"],
           });
 
-          if (!response.ok) continue;
-          const payload = await response.json();
           const candidateUrls = selectFirecrawlPolicyUrls(payload, ["fda", "label", "indication", "package insert", "accessdata"], 0, 4);
 
           for (const candUrl of candidateUrls) {
             try {
-              const scraped = await scrapeFirecrawlPolicySource(firecrawlApiKey, candUrl);
+              const scraped = await scrapeFirecrawlPolicySource(ctx, candUrl);
               if (scraped.markdown && scraped.markdown.length > 300) {
                 foundSource = scraped;
                 break;
@@ -1656,16 +1588,11 @@ export const crawlCustomResearchUrl = action({
     clinicalNotes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
-    if (!firecrawlApiKey?.trim()) {
-      throw new Error("Custom URL research requires FIRECRAWL_API_KEY.");
-    }
-
     if (!isAcceptableSourceUrl(args.customUrl)) {
       throw new Error("Please provide a valid HTTP or HTTPS web URL.");
     }
 
-    const scraped = await scrapeFirecrawlPolicySource(firecrawlApiKey, args.customUrl);
+    const scraped = await scrapeFirecrawlPolicySource(ctx, args.customUrl);
     const windowedText = scraped.markdown.slice(0, 45000);
     const category = args.sourceCategory || "payer_cpb";
 

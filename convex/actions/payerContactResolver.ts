@@ -2,8 +2,11 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { api } from "../_generated/api";
+import { api, components } from "../_generated/api";
 import { createStructuredCompletion } from "../lib/openai";
+import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
+
+const firecrawl = new FirecrawlClient(components.firecrawl);
 
 const CONTACT_EXTRACTION_SCHEMA = {
   type: "object",
@@ -194,36 +197,22 @@ export const resolvePayerGateway = action({
     if (matchedPresetKey) {
       resolvedContact = PRESET_PAYERS[matchedPresetKey];
     } else {
-      // 3. Dynamic Discovery via Firecrawl Search API + LLM
-      const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+      // 3. Dynamic Discovery via Firecrawl Search + LLM
       let webSearchContext = "";
 
-      if (firecrawlApiKey) {
-        try {
-          const searchQuery = `"${payer}" official appeals portal or fax or claims or "khiếu nại" contact`;
-          const response = await fetch("https://api.firecrawl.dev/v1/search", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${firecrawlApiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              query: searchQuery,
-              limit: 3,
-              scrapeOptions: { formats: ["markdown"] },
-            }),
-          });
+      try {
+        const searchQuery = `"${payer}" official appeals portal or fax or claims or "khiếu nại" contact`;
+        const searchData = await firecrawl.search(ctx, searchQuery, {
+          limit: 3,
+          scrapeOptions: { formats: ["markdown"] },
+        });
 
-          if (response.ok) {
-            const searchData = await response.json();
-            const results = searchData?.data || [];
-            webSearchContext = results
-              .map((r: any) => `Title: ${r.title}\nURL: ${r.url}\nContent: ${(r.markdown || r.description || "").slice(0, 1500)}`)
-              .join("\n\n---\n\n");
-          }
-        } catch (crawlErr) {
-          console.warn("Firecrawl search error, continuing to AI synthesis:", crawlErr);
-        }
+        const results = searchData?.web || (searchData as any)?.data || [];
+        webSearchContext = (Array.isArray(results) ? results : [])
+          .map((r: any) => `Title: ${r.title || "Payer Portal"}\nURL: ${r.url || r.link || ""}\nContent: ${(r.markdown || r.description || "").slice(0, 1500)}`)
+          .join("\n\n---\n\n");
+      } catch (crawlErr) {
+        console.warn("Firecrawl search error, continuing to AI synthesis:", crawlErr);
       }
 
       // 4. Use LLM to extract or infer verified contact details
