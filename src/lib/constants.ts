@@ -456,11 +456,11 @@ export interface SampleCasePreset {
 
 export const SAMPLE_CASE_PRESETS: SampleCasePreset[] = [
   {
-    id: "geoblue_knee",
-    title: "GeoBlue Worldwide — Total Knee Arthroplasty (Carelon)",
+    id: "geoblue_meniscus",
+    title: "GeoBlue Worldwide — Knee Arthroscopy & Meniscectomy (Carelon)",
     payer: "GeoBlue",
-    amount: "$24,500",
-    cpt: "27447",
+    amount: "$6,400",
+    cpt: "29881",
     carc: "CO-50 (Not Medically Necessary)",
     badge: "Recommended",
     content: `GEOBLUE WORLDWIDE MEDICAL INSURANCE
@@ -474,16 +474,16 @@ Treating Provider: Dr. Robert Langston, MD (Advanced Orthopedic Institute)
 Facility: Metropolitan Surgical Hospital
 
 Services Rendered:
-- CPT Code 27447: Total Knee Arthroplasty (TKA), right knee
-- ICD-10 Code M17.11: Primary osteoarthritis, right knee
-- Total Billed Amount: $24,500.00
+- CPT Code 29881: Arthroscopy, knee, surgical; with meniscectomy (medial or lateral)
+- ICD-10 Code M23.22: Derangement of meniscus due to old tear or injury, right medial meniscus
+- Total Billed Amount: $6,400.00
 - Plan Allowance / Paid: $0.00
-- Denied Amount: $24,500.00
-- Patient Financial Liability: $24,500.00
+- Denied Amount: $6,400.00
+- Patient Financial Liability: $6,400.00
 
 Adjudication & Claim Denial Reason:
 Code CO-50: These are non-covered services because this is not deemed a medical necessity by the payer.
-Clinical Rationale: Under Carelon Joint Surgery Clinical Guidelines, total knee arthroplasty requires documented severe osteoarthritis with bone-on-bone joint space narrowing (Kellgren-Lawrence Grade III-IV) and documented failure of at least 12 weeks of non-surgical conservative therapy (including supervised physical therapy, intra-articular corticosteroid injections, and prescription NSAIDs). Clinical records submitted fail to establish consecutive supervised physical therapy.
+Clinical Rationale: Under Carelon Joint Surgery Clinical Guidelines (Knee Arthroscopy and Open Procedures), arthroscopic partial meniscectomy requires documented mechanical symptoms (locking, catching, or joint line tenderness) and failure of at least 6 weeks of conservative management (including physical therapy and NSAIDs) for degenerative meniscus tears. Clinical records submitted fail to establish consecutive supervised physical therapy.
 
 Statutory Notice of Appeal Rights:
 You have the right to an internal appeal pursuant to ERISA 29 CFR § 2560.503-1 and ACA 45 CFR § 147.136. You must submit your written appeal within 180 calendar days from the date of this determination notice.
@@ -500,23 +500,23 @@ Appeals Fax: 1-610-482-9623`,
     questions: [
       {
         field: "symptomsAndFunctionalImpact",
-        question: "What specific symptoms and functional limitations are documented in the clinical record regarding the patient's right knee osteoarthritis? Leave blank if not documented.",
-        whyItMatters: "Documents severe chronic pain and functional impairment requiring arthroplasty.",
+        question: "What specific symptoms and functional limitations are documented in the clinical record regarding the patient's right knee meniscus tear? Leave blank if not documented.",
+        whyItMatters: "Documents persistent pain, mechanical locking, and functional limitation requiring surgical intervention.",
       },
       {
         field: "examinationFindings",
         question: "What objective physical examination findings are documented in the clinical record for the right knee? Leave blank if not documented.",
-        whyItMatters: "Provides objective clinical data supporting severe degenerative joint disease.",
+        whyItMatters: "Establishes joint line tenderness and positive McMurray mechanical sign supporting meniscal derangement.",
       },
       {
         field: "imagingAndDiagnostics",
-        question: "What are the date and findings of the most recent weight-bearing plain radiograph of the knee documented in the record? Leave blank if not documented.",
-        whyItMatters: "Directly addresses the radiographic severity requirements cited in Carelon Joint Surgery Guidelines.",
+        question: "What are the date and findings of the MRI of the right knee documented in the record? Leave blank if not documented.",
+        whyItMatters: "Directly addresses the diagnostic imaging requirements cited in Carelon Joint Surgery Guidelines.",
       },
       {
         field: "treatmentHistoryAndResponse",
         question: "What prior conservative treatments (including physical therapy, injections, and NSAIDs) are documented in the clinical record, and what was the documented response? Leave blank if not documented.",
-        whyItMatters: "Directly addresses the 12-week conservative therapy requirement cited in the denial.",
+        whyItMatters: "Directly addresses the conservative management prerequisite cited in the denial.",
       },
       {
         field: "otherDocumentedFacts",
@@ -525,24 +525,24 @@ Appeals Fax: 1-610-482-9623`,
       },
     ],
     clinicalFacts: {
-      symptomsAndFunctionalImpact: "Patient exhibits end-stage right knee osteoarthritic pain (8/10 VAS) with severe functional limitations: ambulation distance restricted to <50 feet, inability to negotiate stairs, and progressive loss of independence in activities of daily living (ADLs).",
-      examinationFindings: "Severe medial and lateral joint line tenderness, coarse crepitus through active/passive range of motion, fixed flexion contracture of 10 degrees with maximum flexion limited to 95 degrees, and moderate persistent joint effusion.",
-      imagingAndDiagnostics: "Weight-bearing bilateral knee radiographs (05/10/2026) show severe tricompartmental osteoarthritis with bone-on-bone medial joint space obliteration (Kellgren-Lawrence Grade IV), subchondral sclerosis, and marked marginal osteophytes.",
-      treatmentHistoryAndResponse: "Completed 16 consecutive weeks of formal outpatient physical therapy (2x/weekly, Jan-Apr 2026) with documented failure to relieve symptoms; 6-month trial of prescription meloxicam 15mg daily; and two intra-articular steroid injections (02/15/2026, 05/01/2026) yielding only transient relief (<2 weeks).",
-      otherDocumentedFacts: "Dr. Robert Langston, MD certified that conservative modalities have been fully exhausted and total knee arthroplasty is medically necessary under Carelon Joint Surgery Guidelines.",
+      symptomsAndFunctionalImpact: "Patient exhibits persistent right knee medial joint line pain (7/10 VAS) with painful catching and true mechanical locking episodes during ambulation, severely impairing weight-bearing activities of daily living.",
+      examinationFindings: "Distinct right medial joint line tenderness, positive McMurray test reproducing painful medial clicking, mild reactive effusion, and painful extension block at 5 degrees.",
+      imagingAndDiagnostics: "High-resolution MRI of the right knee (05/10/2026) confirms a complex posterior horn medial meniscus tear extending to the inferior articular surface with localized parameniscal cyst formation.",
+      treatmentHistoryAndResponse: "Completed 8 consecutive weeks of formal outpatient physical therapy (2x/weekly, Feb-Apr 2026) with zero symptomatic relief, 3-month trial of oral meloxicam 15mg daily, and one image-guided intra-articular steroid injection (03/20/2026) yielding only 4 days of transient relief.",
+      otherDocumentedFacts: "Dr. Robert Langston, MD certified that non-operative modalities have failed and arthroscopic partial medial meniscectomy (CPT 29881) is medically necessary under Carelon Joint Surgery Guidelines to resolve mechanical locking and prevent chondral degradation.",
       recordsAreIncomplete: false,
     },
     physicianNotes: `PATIENT: Eleanor Vance | DOB: 04/14/1968 | DOS: 06/12/2026
 TREATING PHYSICIAN CLINICAL ATTESTATION & CONSERVATIVE THERAPY RECORD:
-Patient Eleanor Vance is a 58-year-old female presenting with severe end-stage tricompartmental right knee osteoarthritis (Kellgren-Lawrence Grade IV) with bone-on-bone medial joint space obliteration, marked marginal osteophytes, and fixed flexion contracture of 10 degrees (maximum flexion limited to 95 degrees).
+Patient Eleanor Vance is a 58-year-old female presenting with symptomatic right medial meniscus complex tear (ICD-10 M23.22) with recurrent mechanical knee locking, painful catching, and severe medial joint line tenderness.
 
 CONSERVATIVE THERAPY MODALITIES COMPLETED & FAILED:
-1. Supervised Physical Therapy: Completed 16 consecutive weeks of formal outpatient physical therapy (2 sessions/week from 01/06/2026 through 04/28/2026 at Sunstate Rehabilitation; 32 total sessions completed). Therapy discharge summary demonstrates zero functional improvement and persistent 8/10 VAS pain restricting ambulation to <50 feet.
-2. Pharmacotherapy: 6-month therapeutic course of prescription Meloxicam (15 mg PO daily) with inadequate analgesic response and secondary gastrointestinal intolerance.
-3. Intra-articular Injections: Underwent two image-guided right knee corticosteroid injections (Triamcinolone acetonide 40 mg on 02/15/2026 and 05/01/2026) providing only transient partial relief (<14 days duration).
+1. Supervised Physical Therapy: Completed 8 consecutive weeks of formal outpatient physical therapy (2 sessions/week from 02/03/2026 through 04/07/2026 at Sunstate Rehabilitation; 16 total sessions completed). Therapy discharge summary demonstrates zero improvement in mechanical catching symptoms.
+2. Pharmacotherapy: 3-month trial of prescription Meloxicam (15 mg PO daily) with inadequate analgesic relief.
+3. Intra-articular Injections: Image-guided right knee corticosteroid injection (Triamcinolone 40 mg on 03/20/2026) yielding only 4 days of transient partial relief.
 
 CLINICAL NECESSITY DETERMINATION:
-Under Carelon Clinical Guidelines for Joint Surgery, the patient has completely exhausted all non-operative conservative modalities. Right Total Knee Arthroplasty (CPT 27447) is urgently medically necessary to restore basic weight-bearing ambulation and prevent progressive functional deterioration.
+Under Carelon Clinical Guidelines for Joint Surgery (Knee Arthroscopy and Open Procedures), the patient has completed and failed all non-operative conservative management. Arthroscopic partial meniscectomy (CPT 29881) is medically necessary to resolve mechanical joint locking and prevent secondary articular cartilage damage.
 
 Attending Orthopedic Surgeon: Dr. Robert Langston, MD, FAAOS (Metropolitan Surgical Hospital)`,
   },

@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
+import { requireClaimOwnerAction } from "../lib/auth";
 
 export interface PipelineResult {
   success: boolean;
@@ -51,18 +52,12 @@ export const runAutonomousPipeline = action({
     ),
   },
   handler: async (ctx, args): Promise<PipelineResult> => {
-    // 1. Fetch current claim details
-    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
-    });
-
-    if (!claim) {
-      throw new Error(`Claim with ID ${args.claimId} not found`);
-    }
+    // 1. Fetch and authorize claim ownership
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
 
     // Enforce rate limiting per user
     const limitStatus = await rateLimiter.limit(ctx, "sentinelPipeline", {
-      key: claim.userId || "global",
+      key: userId || "global",
     });
     if (!limitStatus.ok) {
       throw new Error(

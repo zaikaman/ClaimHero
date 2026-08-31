@@ -1129,7 +1129,7 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
   it("provides 3 complete preset template denials with distinct clinical criteria", () => {
     expect(SAMPLE_CASE_PRESETS.length).toBe(3);
     const presetIds = SAMPLE_CASE_PRESETS.map((p) => p.id);
-    expect(presetIds).toContain("geoblue_knee");
+    expect(presetIds).toContain("geoblue_meniscus");
     expect(presetIds).toContain("geoblue_spine");
     expect(presetIds).toContain("bcbsglobal_mri");
   });
@@ -1211,10 +1211,10 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
       expect(preset.physicianNotes).toContain("Attending");
     }
 
-    const knee = SAMPLE_CASE_PRESETS.find((p) => p.id === "geoblue_knee");
-    expect(knee?.physicianNotes).toContain("Dr. Robert Langston");
-    expect(knee?.physicianNotes).toContain("16 consecutive weeks");
-    expect(knee?.physicianNotes).toContain("Carelon");
+    const meniscus = SAMPLE_CASE_PRESETS.find((p) => p.id === "geoblue_meniscus");
+    expect(meniscus?.physicianNotes).toContain("Dr. Robert Langston");
+    expect(meniscus?.physicianNotes).toContain("8 consecutive weeks");
+    expect(meniscus?.physicianNotes).toContain("Carelon");
 
     const geoblue = SAMPLE_CASE_PRESETS.find((p) => p.id === "geoblue_spine");
     expect(geoblue?.physicianNotes).toContain("Dr. Sarah Chen");

@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-200%2F200%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-207%2F207%20passing-0ea5e9?style=flat-square" />
   <img alt="Coverage" src="https://img.shields.io/badge/coverage-100%25%20lines-10b981?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
@@ -87,7 +87,7 @@ ClaimHero automates the entire lifecycle from denial ingestion to payer adjudica
 1. Open **[https://usable-sturgeon-376.convex.site](https://usable-sturgeon-376.convex.site)**.
 2. Click **Quick Ingest** (sidebar) or `Cmd+K` -> *Ingest Denial Notice*.
 3. Pick a preset:
-   * **GeoBlue Worldwide — Total Knee Arthroplasty (Carelon)** — $24,500 / CPT 27447 / CO-50 (`geoblue_knee`)
+   * **GeoBlue Worldwide — Knee Arthroscopy & Meniscectomy (Carelon)** — $6,400 / CPT 29881 / CO-50 (`geoblue_meniscus`)
    * **GeoBlue Worldwide — Lumbar Decompression (Carelon)** — $18,200 / CPT 63047 / CO-197 (`geoblue_spine`)
    * **BCBS Global Core — Diagnostic Knee MRI (Carelon)** — $2,850 / CPT 73721 / CO-16 (`bcbsglobal_mri`)
 4. All 5 clinical intake questions are pre-filled with grounded facts + treating physician notes (Dr. Langston / Dr. Chen / Dr. Martinez). Confirm and **Run Autonomous Pipeline**.
@@ -536,13 +536,12 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (200 tests)
+npm run test            # vitest run tests  (207 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
-npm run build           # tsc --noEmit && vite build
-npm run verify          # typecheck + lint + test + build — must be 100% clean before every commit
+npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **200/200 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
+Current: **207/207 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|

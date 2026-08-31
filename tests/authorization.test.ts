@@ -4,6 +4,7 @@ import {
   requireAuthUser,
   requireIdentity,
   requireClaimOwner,
+  requireClaimOwnerAction,
   getClaimIfAuthorized,
   requireChatbotSessionOwner,
   getChatbotSessionIfAuthorized,
@@ -300,6 +301,114 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
       const doc = { _id: "doc_1" as any, userId: "user_1" as any };
       const verified = await requireOwner(mockCtx, doc);
       expect(verified).toEqual({ doc, userId: "user_1" });
+    });
+  });
+
+  describe("requireClaimOwnerAction (ActionCtx guard)", () => {
+    it("throws Unauthorized error when caller is unauthenticated in an Action", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const mockActionCtx: any = {
+        runQuery: vi.fn(),
+      };
+
+      await expect(
+        requireClaimOwnerAction(mockActionCtx, "claim_123" as any)
+      ).rejects.toThrow(/Unauthorized/i);
+      expect(mockActionCtx.runQuery).not.toHaveBeenCalled();
+    });
+
+    it("throws not found when claim does not exist in Action", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockActionCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(null),
+      };
+
+      await expect(
+        requireClaimOwnerAction(mockActionCtx, "claim_nonexistent" as any)
+      ).rejects.toThrow("Claim claim_nonexistent not found");
+    });
+
+    it("rejects access when authenticated user does not own the claim in an Action", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_attacker_456" as any);
+      const mockActionCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          _id: "claim_secret_789",
+          userId: "user_victim_123",
+          claimNumber: "CLM-SEC-001",
+        }),
+      };
+
+      await expect(
+        requireClaimOwnerAction(mockActionCtx, "claim_secret_789" as any)
+      ).rejects.toThrow("Forbidden: You do not have permission to access this claim");
+    });
+
+    it("rejects access when claim has no userId (unassigned intake) in an Action", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockActionCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          _id: "claim_unassigned",
+          userId: undefined,
+          claimNumber: "CLM-INTAKE-002",
+        }),
+      };
+
+      await expect(
+        requireClaimOwnerAction(mockActionCtx, "claim_unassigned" as any)
+      ).rejects.toThrow("Forbidden: You do not have permission to access this claim");
+    });
+
+    it("permits access and returns claim when caller is verified claim owner in an Action", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_owner_123" as any);
+      const mockClaim = {
+        _id: "claim_789",
+        userId: "user_owner_123",
+        claimNumber: "CLM-789",
+      };
+      const mockActionCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(mockClaim),
+      };
+
+      const result = await requireClaimOwnerAction(mockActionCtx, "claim_789" as any);
+      expect(result).toEqual({ claim: mockClaim, userId: "user_owner_123" });
+    });
+  });
+
+  describe("Precedent Vector Archive Authorization & Data Isolation", () => {
+    it("attachMatchesToClaim rejects mutation if claim does not exist", async () => {
+      const { attachMatchesToClaim } = await import("../convex/precedents");
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(null),
+        },
+      };
+
+      await expect(
+        (attachMatchesToClaim as any)._handler(mockCtx, {
+          claimId: "claim_missing" as any,
+          matches: [],
+        })
+      ).rejects.toThrow("Claim claim_missing not found");
+    });
+
+    it("attachMatchesToClaim rejects mutation if caller does not own the target claim", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_attacker" as any);
+      const { attachMatchesToClaim } = await import("../convex/precedents");
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue({
+            _id: "claim_victim",
+            userId: "user_victim",
+          }),
+        },
+      };
+
+      await expect(
+        (attachMatchesToClaim as any)._handler(mockCtx, {
+          claimId: "claim_victim" as any,
+          matches: [],
+        })
+      ).rejects.toThrow("Forbidden: You do not have permission to access this claim");
     });
   });
 });

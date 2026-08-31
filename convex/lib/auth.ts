@@ -1,6 +1,7 @@
 import { QueryCtx, MutationCtx, ActionCtx } from "../_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id, Doc, TableNames } from "../_generated/dataModel";
+import { internal } from "../_generated/api";
 
 /**
  * Require an authenticated user identity.
@@ -43,6 +44,32 @@ export async function requireClaimOwner(
     throw new Error("Forbidden: You do not have permission to access this claim");
   }
   return { claim, userId };
+}
+
+export type ClaimWithDetails = Doc<"claims"> & {
+  patient?: Doc<"patients">;
+  evidenceCount?: number;
+  latestAppeal?: Doc<"appeals"> | null;
+};
+
+/**
+ * Require that the caller is authenticated and owns the specified claim in an ActionCtx.
+ * If the claim does not exist, throws "Claim not found".
+ * If the claim belongs to another user, throws "Forbidden: Access denied".
+ */
+export async function requireClaimOwnerAction(
+  ctx: ActionCtx,
+  claimId: Id<"claims">
+): Promise<{ claim: ClaimWithDetails; userId: Id<"users"> }> {
+  const userId = await requireAuthUser(ctx);
+  const claim = await ctx.runQuery(internal.claims.getByIdInternal, { claimId });
+  if (!claim) {
+    throw new Error(`Claim ${claimId} not found`);
+  }
+  if (!claim.userId || claim.userId !== userId) {
+    throw new Error("Forbidden: You do not have permission to access this claim");
+  }
+  return { claim: claim as ClaimWithDetails, userId };
 }
 
 /**

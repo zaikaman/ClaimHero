@@ -1,4 +1,5 @@
 import { internalMutation, internalQuery, query } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { precedentMatchValidator } from "./lib/precedentValidators";
@@ -151,6 +152,16 @@ export const attachMatchesToClaim = internalMutation({
   },
   returns: v.array(v.id("clinicalEvidences")),
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">[]> => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+
+    const userId = await getAuthUserId(ctx);
+    if (userId && claim.userId && claim.userId !== userId) {
+      throw new Error("Forbidden: You do not have permission to access this claim");
+    }
+
     const now = Date.now();
     const existing = await ctx.db
       .query("clinicalEvidences")

@@ -14,6 +14,7 @@ import {
   weightedTokensForCodes,
 } from "../lib/embeddings";
 import { precedentMatchValidator } from "../lib/precedentValidators";
+import { requireClaimOwnerAction } from "../lib/auth";
 
 const matchListValidator = v.array(precedentMatchValidator);
 
@@ -144,12 +145,7 @@ export const retrieveTopPrecedents = action({
     combinedScore: number;
     codeOverlap: number;
   }>> => {
-    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
-    });
-    if (!claim) {
-      throw new Error(`Claim ${args.claimId} not found`);
-    }
+    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
 
     const icd10Codes: string[] = claim.icd10Codes || [];
     const cptCodes: string[] = claim.cptCodes || [];
@@ -165,67 +161,16 @@ export const retrieveTopPrecedents = action({
     const extraTokens = weightedTokensForCodes(icd10Codes, cptCodes, [denialReasonCode]);
     const embedding = await createEmbedding(queryText, extraTokens);
 
-    const merged = new Map<string, { _id: Id<"precedents">; _score: number }>();
-
-    const unfiltered = await ctx.vectorSearch("precedents", "by_embedding", {
+    const hits = await ctx.vectorSearch("precedents", "by_embedding", {
       vector: embedding,
       limit: 16,
     });
-    for (const hit of unfiltered) {
-      merged.set(hit._id, hit);
-    }
 
-    const filterClauses: Array<{ field: "carcCode" | "primaryCpt" | "primaryIcd10"; value: string }> = [];
-    if (denialReasonCode) {
-      filterClauses.push({ field: "carcCode", value: denialReasonCode });
-    }
-    if (cptCodes[0]) {
-      filterClauses.push({ field: "primaryCpt", value: cptCodes[0] });
-    }
-    if (icd10Codes[0]) {
-      filterClauses.push({ field: "primaryIcd10", value: icd10Codes[0] });
-    }
-
-    if (filterClauses.length === 1) {
-      const clause = filterClauses[0];
-      const filtered = await ctx.vectorSearch("precedents", "by_embedding", {
-        vector: embedding,
-        limit: 12,
-        filter: (q) => q.eq(clause.field, clause.value),
-      });
-      for (const hit of filtered) {
-        const prior = merged.get(hit._id);
-        if (!prior || hit._score > prior._score) {
-          merged.set(hit._id, hit);
-        }
-      }
-    } else if (filterClauses.length > 1) {
-      const filtered = await ctx.vectorSearch("precedents", "by_embedding", {
-        vector: embedding,
-        limit: 12,
-        filter: (q) =>
-          q.or(
-            q.eq(filterClauses[0].field, filterClauses[0].value),
-            q.eq(filterClauses[1].field, filterClauses[1].value),
-            ...(filterClauses[2]
-              ? [q.eq(filterClauses[2].field, filterClauses[2].value)]
-              : [])
-          ),
-      });
-      for (const hit of filtered) {
-        const prior = merged.get(hit._id);
-        if (!prior || hit._score > prior._score) {
-          merged.set(hit._id, hit);
-        }
-      }
-    }
-
-    const orderedHits = [...merged.values()].sort((a, b) => b._score - a._score);
-    const ids = orderedHits.map((hit) => hit._id);
+    const ids = hits.map((hit) => hit._id);
     const docs = await ctx.runQuery(internal.precedents.hydrateByIds, { ids });
     const docsById = new Map(docs.map((doc) => [doc._id, doc]));
 
-    const rankable = orderedHits
+    const rankable = hits
       .map((hit) => {
         const doc = docsById.get(hit._id);
         if (!doc) return null;

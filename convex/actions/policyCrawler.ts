@@ -1142,21 +1142,21 @@ async function generatePolicySearchQueries(
 
   const result = await createStructuredCompletion<PolicySearchIntentResponse>({
     systemPrompt: `You are an expert Clinical Policy Retrieval Strategist for health insurance appeals.
-Generate 2 concise, highly targeted web search queries to locate the official clinical coverage policy or medical necessity guideline for this claim.
+Generate 2 concise, surgical web search queries to locate the official clinical coverage policy, medical necessity criteria, or specialty society guideline for this claim.
 
 Query Strategy:
-1. Payer Medical Policy Query:
-   - Combine the formal procedure name and payer name with policy terms: e.g., "${searchPayer}" "Total Knee Arthroplasty" "medical necessity" OR "coverage policy".
-2. Clinical Guideline & Specialty Standard Query:
-   - Combine the formal procedure name, numeric CPT code, and guideline terms: e.g., "Total Knee Arthroplasty" "${cptCodes[0] || ""}" "clinical guideline" OR "indications".
+1. Payer Medical Necessity Query:
+   - Combine the formal procedure name and payer name with coverage criteria terms: e.g., "${searchPayer}" "${cptDescriptions.split(",")[0]?.replace(/\(.*\)/, "").trim() || "procedure"}" "medical necessity" OR "coverage criteria".
+2. Clinical Specialty Guideline Query:
+   - Target authoritative national clinical guidelines (AAOS, NASS, ACR, CMS LCD/NCD, or major payer clinical policy bulletins) that define standard-of-care indications and conservative therapy rules for this exact procedure and CPT code: e.g., "${cptDescriptions.split(",")[0]?.replace(/\(.*\)/, "").trim() || "procedure"}" "${cptCodes[0] || ""}" "clinical guideline" criteria OR indications.
 
 Rules:
 - Always use the formal clinical procedure title (e.g. "Total Knee Arthroplasty", "Lumbar Spine Decompression", "Knee MRI").
-- Do not include third-party billing keywords or search for consumer blogs.
-- Keep each query under 80 characters for optimal search relevance.${rejectedSearchFeedback ? `
+- Do not target state Medicaid manuals or third-party billing company blogs.
+- Keep each query under 80 characters for optimal search precision.${rejectedSearchFeedback ? `
 Previous search attempts returned these rejected/stale results:
 ${rejectedSearchFeedback.slice(0, 4000)}
-Refine queries to broaden toward authoritative clinical sources (CMS, AAOS, NASS, ACR, NCCN).` : ""}`,
+Refine queries to broaden toward authoritative clinical authorities (CMS LCD, AAOS, NASS, ACR, NCCN).` : ""}`,
     userPrompt: `Build the search queries for this claim.
 
 Payer: ${searchPayer} (Original: ${payer})
