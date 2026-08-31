@@ -128,18 +128,28 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   const handleInjectErisaPenalties = () => {
     const penaltyClause = `
 
-## IV. STATUTORY REMEDIES & ERISA § 502(c) CIVIL PENALTIES DEMAND
+## Statutory remedies & ERISA § 502(c) civil penalties demand
 1. **Immediate Retroactive Coverage**: Claimant demands immediate and retroactive overturn of the adverse benefit determination for CPT codes (${claim.cptCodes?.join(", ") || "disputed clinical services"}), with prompt reimbursement issued at contractual in-network rates.
 2. **Statutory Non-Disclosure Penalties (29 U.S.C. § 1132(c)(1)(B))**: The Plan Administrator failed to disclose the internal clinical criteria, review protocols, and claim files within 30 days of written demand. Pursuant to 29 C.F.R. § 2560.503-1 and 29 C.F.R. § 2575.502c-1, claimant demands accrued statutory civil penalties at $110.00 per calendar day until full disclosure is rendered.
 3. **Fee-Shifting Notice (29 U.S.C. § 1132(g)(1))**: Notice is hereby given that claimant will petition the United States District Court for full mandatory and discretionary recovery of reasonable attorney's fees, clinical expert expenses, and taxable litigation costs upon judicial enforcement.`;
 
-    if (markdownContent.includes("ERISA § 502(c) CIVIL PENALTIES DEMAND")) {
+    if (/civil penalties demand|erisa § 502\(c\)/i.test(markdownContent)) {
       setInjectedPenaltiesSuccess(true);
       setTimeout(() => setInjectedPenaltiesSuccess(false), 2500);
       return;
     }
 
-    setMarkdownContent(markdownContent.trim() + penaltyClause);
+    const closingPattern = /\n(?=(?:Sincerely|Respectfully|Regards|Submitted by|Authorized Representative:))/i;
+    const matchIndex = markdownContent.search(closingPattern);
+
+    if (matchIndex !== -1) {
+      const before = markdownContent.slice(0, matchIndex).trimEnd();
+      const after = markdownContent.slice(matchIndex).trimStart();
+      setMarkdownContent(`${before}\n\n${penaltyClause.trim()}\n\n${after}`);
+    } else {
+      setMarkdownContent(`${markdownContent.trim()}\n\n${penaltyClause.trim()}`);
+    }
+
     setInjectedPenaltiesSuccess(true);
     setTimeout(() => setInjectedPenaltiesSuccess(false), 2500);
   };
