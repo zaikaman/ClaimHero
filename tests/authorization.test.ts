@@ -64,6 +64,23 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
       );
     });
 
+    it("rejects access when claim has no assigned owner (unassigned shared intake)", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_random_123" as any);
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue({
+            _id: "claim_unassigned",
+            userId: undefined,
+            claimNumber: "CLM-INTAKE-001",
+          }),
+        },
+      };
+
+      await expect(requireClaimOwner(mockCtx, "claim_unassigned" as any)).rejects.toThrow(
+        "Forbidden: You do not have permission to access this claim"
+      );
+    });
+
     it("permits access when caller is the verified claim owner", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_owner_123" as any);
       const mockClaim = {
@@ -111,6 +128,24 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
       };
 
       const result = await getClaimIfAuthorized(mockCtx, "claim_nonexistent" as any);
+      expect(result).toBeNull();
+    });
+
+    it("returns null when claim has no assigned owner (unassigned shared intake)", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_tenant_A" as any);
+      const mockClaim = {
+        _id: "claim_unassigned",
+        userId: undefined,
+        claimNumber: "CLM-PHI-000",
+      };
+
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+        },
+      };
+
+      const result = await getClaimIfAuthorized(mockCtx, "claim_unassigned" as any);
       expect(result).toBeNull();
     });
 
@@ -186,6 +221,19 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_bob" as any);
       await expect(requireChatbotSessionOwner(mockCtx, "session_xyz" as any)).rejects.toThrow(/Forbidden/i);
 
+      // Mutating unassigned session -> throws
+      const unassignedSession = {
+        _id: "session_unassigned",
+        userId: undefined,
+        title: "Unassigned Chat",
+      };
+      const unassignedCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(unassignedSession),
+        },
+      };
+      await expect(requireChatbotSessionOwner(unassignedCtx, "session_unassigned" as any)).rejects.toThrow(/Forbidden/i);
+
       // Alice mutating Alice's session -> succeeds
       vi.mocked(getAuthUserId).mockResolvedValue("user_alice" as any);
       const result = await requireChatbotSessionOwner(mockCtx, "session_xyz" as any);
@@ -198,10 +246,19 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
         userId: "user_alice",
         title: "Clinical Strategy",
       };
+      const mockUnassignedSession = {
+        _id: "session_unassigned",
+        userId: undefined,
+        title: "Unassigned Session",
+      };
 
       const mockCtx: any = {
         db: {
-          get: vi.fn().mockImplementation((id) => (id === "session_xyz" ? Promise.resolve(mockSession) : Promise.resolve(null))),
+          get: vi.fn().mockImplementation((id) => {
+            if (id === "session_xyz") return Promise.resolve(mockSession);
+            if (id === "session_unassigned") return Promise.resolve(mockUnassignedSession);
+            return Promise.resolve(null);
+          }),
         },
       };
 
@@ -217,7 +274,11 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_bob" as any);
       expect(await getChatbotSessionIfAuthorized(mockCtx, "session_xyz" as any)).toBeNull();
 
-      // Case 4: authorized user (Alice) -> session
+      // Case 4: unassigned session (no userId) -> null
+      vi.mocked(getAuthUserId).mockResolvedValue("user_alice" as any);
+      expect(await getChatbotSessionIfAuthorized(mockCtx, "session_unassigned" as any)).toBeNull();
+
+      // Case 5: authorized user (Alice) -> session
       vi.mocked(getAuthUserId).mockResolvedValue("user_alice" as any);
       expect(await getChatbotSessionIfAuthorized(mockCtx, "session_xyz" as any)).toEqual(mockSession);
     });
@@ -234,6 +295,7 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
 
       vi.mocked(getAuthUserId).mockResolvedValue("user_1" as any);
       await expect(requireOwner(mockCtx, { _id: "doc_1" as any, userId: "user_2" as any })).rejects.toThrow(/Forbidden/i);
+      await expect(requireOwner(mockCtx, { _id: "doc_1" as any, userId: undefined })).rejects.toThrow(/Forbidden/i);
 
       const doc = { _id: "doc_1" as any, userId: "user_1" as any };
       const verified = await requireOwner(mockCtx, doc);

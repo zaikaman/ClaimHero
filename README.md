@@ -6,7 +6,7 @@
   <a href="https://github.com/zaikaman/ClaimHero"><img alt="Convex" src="https://img.shields.io/badge/Convex-Reactive%20Backend-FF3366?style=for-the-badge&logo=convex&logoColor=white" /></a>
   <a href="https://github.com/zaikaman/ClaimHero"><img alt="Firecrawl" src="https://img.shields.io/badge/Firecrawl-Live%20CPB%20Crawl-0EA5E9?style=for-the-badge" /></a>
   <a href="https://github.com/zaikaman/ClaimHero"><img alt="AgentMail" src="https://img.shields.io/badge/AgentMail-Autonomous%20Inbox-6366F1?style=for-the-badge" /></a>
-  <a href="https://github.com/zaikaman/ClaimHero"><img alt="OpenAI" src="https://img.shields.io/badge/OpenAI-gpt--5--nano-10B981?style=for-the-badge" /></a>
+  <a href="https://github.com/zaikaman/ClaimHero"><img alt="OpenAI" src="https://img.shields.io/badge/OpenAI-gpt--5.4--nano-10B981?style=for-the-badge" /></a>
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-195%2F195%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-197%2F197%20passing-0ea5e9?style=flat-square" />
   <img alt="Coverage" src="https://img.shields.io/badge/coverage-100%25%20lines-10b981?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
@@ -534,22 +534,22 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex
-npm run test            # vitest run tests  (195 tests)
+npm run test            # vitest run tests  (197 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run build           # tsc --noEmit && vite build
 npm run verify          # typecheck + lint + test + build — must be 100% clean before every commit
 ```
 
-Current: **195/195 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
+Current: **197/197 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
 | [`tests/claimhero.test.ts`](file:///d:/ClaimHero/tests/claimhero.test.ts) | 66 | Master end-to-end integration, 4-pillar rubric scoring, ERISA rules, portfolio aggregation, bounded batch deadline sweep |
 | [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 23 | AgentMail delivery, binary attachments, webhook normalizers, Svix signature verification, key rotation |
 | [`tests/redactionEngine.test.ts`](file:///d:/ClaimHero/tests/redactionEngine.test.ts) | 17 | HIPAA Safe Harbor 18-identifier redaction, boundary masking, regex patterns |
+| [`tests/authorization.test.ts`](file:///d:/ClaimHero/tests/authorization.test.ts) | 16 | Convex multi-tenant authorization, strict document & shared intake claim ownership validation, unauthenticated rejection, session isolation |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking |
 | [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest |
-| [`tests/authorization.test.ts`](file:///d:/ClaimHero/tests/authorization.test.ts) | 14 | Convex multi-tenant authorization, claim ownership verification, unauthenticated rejection, session isolation |
 | [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting, statutory countdown math, risk badge styling |
 | [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, 3-tier appellate escalation |
 | [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, STT tolerance |

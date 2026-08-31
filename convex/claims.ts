@@ -843,18 +843,18 @@ export const getPortfolioStats = query({
 });
 
 /**
- * Assign all unassigned legacy claims created prior to auth to the currently logged in user
+ * Assign all unassigned legacy claims created prior to auth to the specified user (internal only)
  */
-export const claimLegacyCases = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await requireAuthUser(ctx);
-
+export const claimLegacyCasesInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
     const allClaims = await ctx.db.query("claims").collect();
     const unassigned = allClaims.filter((c) => !c.userId);
 
     for (const c of unassigned) {
-      await ctx.db.patch(c._id, { userId });
+      await ctx.db.patch(c._id, { userId: args.userId });
     }
 
     return unassigned.length;
@@ -862,13 +862,11 @@ export const claimLegacyCases = mutation({
 });
 
 /**
- * Delete any unassigned demo claims created prior to auth
+ * Delete any unassigned demo claims created prior to auth (internal only)
  */
-export const clearUnassignedDemoCases = mutation({
+export const clearUnassignedDemoCases = internalMutation({
   args: {},
   handler: async (ctx) => {
-    await requireAuthUser(ctx);
-
     const allClaims = await ctx.db.query("claims").collect();
     const unassigned = allClaims.filter((c) => !c.userId);
 

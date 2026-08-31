@@ -39,7 +39,7 @@ export async function requireClaimOwner(
   if (!claim) {
     throw new Error(`Claim ${claimId} not found`);
   }
-  if (claim.userId && claim.userId !== userId) {
+  if (!claim.userId || claim.userId !== userId) {
     throw new Error("Forbidden: You do not have permission to access this claim");
   }
   return { claim, userId };
@@ -56,7 +56,7 @@ export async function getClaimIfAuthorized(
   if (!userId) return null;
   const claim = await ctx.db.get(claimId);
   if (!claim) return null;
-  if (claim.userId && claim.userId !== userId) return null;
+  if (!claim.userId || claim.userId !== userId) return null;
   return { claim, userId };
 }
 
@@ -71,7 +71,7 @@ export async function requireOwner<T extends { _id: Id<any>; userId?: Id<"users"
     throw new Error("Document not found");
   }
   const userId = await requireAuthUser(ctx);
-  if (doc.userId && doc.userId !== userId) {
+  if (!doc.userId || doc.userId !== userId) {
     throw new Error("Forbidden: You do not have permission to access this resource");
   }
   return { doc, userId };
@@ -89,7 +89,7 @@ export async function requireChatbotSessionOwner(
   if (!session) {
     throw new Error("Chatbot session not found");
   }
-  if (session.userId && session.userId !== userId) {
+  if (!session.userId || session.userId !== userId) {
     throw new Error("Forbidden: You do not have permission to access this chat session");
   }
   return { session, userId };
@@ -106,6 +106,6 @@ export async function getChatbotSessionIfAuthorized(
   if (!userId) return null;
   const session = await ctx.db.get(sessionId);
   if (!session) return null;
-  if (session.userId && session.userId !== userId) return null;
+  if (!session.userId || session.userId !== userId) return null;
   return session;
 }
