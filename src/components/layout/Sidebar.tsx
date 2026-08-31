@@ -1,7 +1,5 @@
 import React, { useState } from "react";
-import { useQuery } from "convex/react";
-import { useAuthActions } from "@convex-dev/auth/react";
-import { api } from "../../../convex/_generated/api";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 import {
   Broadcast,
   FileMagnifyingGlass,
@@ -75,22 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenIngestion,
   onDeleteCase,
 }) => {
-  const viewer = useQuery((api as any).users?.viewer);
-  const { signOut } = useAuthActions();
-
-  const isAuthenticated = Boolean(viewer);
-  const userName =
-    viewer?.name ||
-    viewer?.email?.split("@")[0] ||
-    (viewer === null ? "Guest Officer" : "Sentinel Officer");
-  const userEmail =
-    viewer?.email ||
-    (viewer === null ? "Sign In to sync cases" : "sentinel@claimhero.ai");
-  const userInitial = (
-    viewer?.name?.[0] ||
-    viewer?.email?.[0] ||
-    "S"
-  ).toUpperCase();
+  const { viewer, isAuthenticated, userName, userEmail, userInitial, signOut } = useCurrentUser();
 
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);

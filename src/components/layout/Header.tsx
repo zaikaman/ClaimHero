@@ -1,6 +1,5 @@
 import React from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 import {
   Sidebar,
   MagnifyingGlass,
@@ -36,9 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   winRate = 0,
   criticalDeadlinesCount = 0,
 }) => {
-  const viewer = useQuery((api as any).users?.viewer);
-  const userName = viewer?.name || viewer?.email?.split("@")[0] || "Officer";
-  const userInitial = (viewer?.name?.[0] || viewer?.email?.[0] || "S").toUpperCase();
+  const { viewer, isAuthenticated, userName, userInitial } = useCurrentUser();
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/60 backdrop-blur-xl">
       <div className="flex h-12 items-center justify-between px-4 lg:px-6">
@@ -121,14 +118,14 @@ export const Header: React.FC<HeaderProps> = ({
             </a>
 
             {/* Profile Avatar / Sign In Link */}
-            {viewer ? (
+            {isAuthenticated ? (
               <button
                 onClick={() => onSelectView?.("radar")}
                 className="focus:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-md"
-                title={`Signed in as ${userName} (${viewer.email || ""})`}
+                title={`Signed in as ${userName} (${viewer?.email || ""})`}
               >
                 <Avatar size="sm" className="size-7 ml-1 border border-border shrink-0 bg-primary/10 text-primary rounded-md">
-                  {viewer.image && <AvatarImage src={viewer.image} alt={userName} className="rounded-md" />}
+                  {viewer?.image && <AvatarImage src={viewer.image} alt={userName} className="rounded-md" />}
                   <AvatarFallback className="text-primary text-xs font-bold rounded-md">
                     {userInitial}
                   </AvatarFallback>

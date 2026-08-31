@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useConvexAuth, useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 import {
   Star,
   Clock,
@@ -25,7 +24,7 @@ interface CinematicHeroProps {
   onEnterConsole: (view?: NavigationView) => void;
 }
 
-interface HeroSlide {
+interface ShowcaseSlide {
   badge1: { icon: React.ElementType; label: string };
   badge2: { icon: React.ElementType; label: string };
   badge3: { icon: React.ElementType; label: string };
@@ -36,32 +35,32 @@ interface HeroSlide {
   targetView: NavigationView;
 }
 
-const HERO_SLIDES: HeroSlide[] = [
+const HERO_SLIDES: ShowcaseSlide[] = [
   {
-    badge1: { icon: Star, label: "94.8% Overturn Rate" },
-    badge2: { icon: Clock, label: "24/7 Autonomous Sentinel" },
-    badge3: { icon: Buildings, label: "500+ Payers Indexed" },
-    title: "Step Through. Defend Every Claim.",
+    badge1: { icon: ShieldCheck, label: "ERISA § 502(c) Sentinel" },
+    badge2: { icon: Clock, label: "30-Day Alarms" },
+    badge3: { icon: CheckCircle, label: "94.8% Overturn Yield" },
+    title: "Overturn Denials. Defend Coverage.",
     description:
-      "AI-powered clinical intelligence citing insurer policy bulletins and medical guidelines in real time to overturn health insurance denials autonomously.",
-    primaryCtaText: "Launch Sentinel",
-    secondaryCtaText: "Explore Case Radar",
+      "Autonomous clinical intelligence cross-referencing Aetna, UHC, Cigna, and Anthem clinical bulletins with PubMed and FDA evidence to overturn wrongful medical claim denials.",
+    primaryCtaText: "Ingest Denial Notice",
+    secondaryCtaText: "Explore Evidence Matrix",
     targetView: "radar",
   },
   {
-    badge1: { icon: ShieldCheck, label: "ERISA 29 CFR § 2560.503-1" },
-    badge2: { icon: Clock, label: "< 14-Day Alarm Sweep" },
-    badge3: { icon: Buildings, label: "Molina · GeoBlue · BCBS · 500+ Payers" },
-    title: "Clinical Precedent. Zero Hallucination.",
+    badge1: { icon: Buildings, label: "Clinical Policy Engine" },
+    badge2: { icon: Star, label: "FDA & NCCN Guidelines" },
+    badge3: { icon: CheckCircle, label: "Citations Verified" },
+    title: "Bulletproof Citations. Real-time Crawls.",
     description:
-      "Autonomous clinical policy indexing scans payer bulletins, CPT codes, and LCD precedent rulings to construct unassailable, cited appeal dossiers.",
+      "Deeply crawl medical policy bulletins in seconds. Synthesize peer-reviewed clinical evidence directly cited into legal appeal briefs.",
     primaryCtaText: "Inspect Evidence Matrix",
     secondaryCtaText: "Launch Appeal Studio",
     targetView: "evidence",
   },
   {
-    badge1: { icon: Envelope, label: "Direct Payer Gateway" },
-    badge2: { icon: Clock, label: "Instant Real-Time Sync" },
+    badge1: { icon: Envelope, label: "Two-Way AgentMail Gateway" },
+    badge2: { icon: Clock, label: "Statutory SLA Clocks" },
     badge3: { icon: CheckCircle, label: "$1.4M+ Recovered" },
     title: "Autonomous Dispatch. Rapid Settlement.",
     description:
@@ -75,10 +74,7 @@ const HERO_SLIDES: HeroSlide[] = [
 export const CinematicHero: React.FC<CinematicHeroProps> = ({
   onEnterConsole,
 }) => {
-  const { isAuthenticated } = useConvexAuth();
-  const viewer = useQuery((api as any).users?.viewer);
-  const userName = viewer?.name || viewer?.email?.split("@")[0] || "Officer";
-  const userInitial = (viewer?.name?.[0] || viewer?.email?.[0] || "S").toUpperCase();
+  const { viewer, isAuthenticated, userName, userInitial } = useCurrentUser();
 
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

@@ -16,7 +16,7 @@ import { useClaims } from "./hooks/useClaims";
 import { useEvidence } from "./hooks/useEvidence";
 import { useCommunications } from "./hooks/useCommunications";
 import { useRouterView } from "./hooks/useRouterView";
-import { useConvexAuth } from "convex/react";
+import { useCurrentUser } from "./hooks/useCurrentUser";
 import { CinematicHero } from "./components/landing/CinematicHero";
 import { AuthPage } from "./components/auth/AuthPage";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
@@ -98,7 +98,7 @@ export default function App() {
     setCurrentView((directView as any) || "evidence");
   };
 
-  const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
+  const { isAuthenticated, isAuthLoading } = useCurrentUser();
 
   // Automatic redirect only if user is actively on the login page while authenticated
   useEffect(() => {

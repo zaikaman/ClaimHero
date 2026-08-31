@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { setCachedUser } from "../../hooks/useCurrentUser";
 import {
   Eye,
   EyeSlash,
@@ -58,6 +59,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
       }
 
       await signIn("password", formData);
+      setCachedUser({
+        name: name || email.split("@")[0],
+        email: email,
+      });
       setIsLoading(false);
       onNavigate("radar");
       if (onSuccess) {

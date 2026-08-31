@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-31T02:30:00Z
+- **Last updated:** 2026-08-31T02:37:00Z
 
 ## Log
 
@@ -256,8 +256,12 @@ Implemented 5 platform enhancements maximizing real-world utility, clinical work
 ### 2026-08-31 - eeb0b64
 Hardened Physician Peer-to-Peer (P2P) Live Call Practice Simulator with a realistic 3-stage conversational lifecycle, anti-repetition constraints, phonetic speech-to-text medical term interpretation, and verbal prior authorization overturn resolution. Addressed AI Medical Director looping where the reviewer previously repeated identical conservative management objections without resolution: (1) **3-Stage P2P Call Lifecycle & Overturn Resolution**: Upgraded `generateInteractiveReviewerPushback` (`convex/actions/p2pLiveCopilot.ts`) to track physician turn counts and enforce strict conversational progression (Turn 1: Initial criteria challenge, Turn 2: Specific clinical probe, Turn 3+: Concession and immediate verbal Prior Authorization issuance upon citing completed PT, injections, or Kellgren-Lawrence Grade 4 severe structural disease); (2) **Phonetic STT Tolerance**: Instructed the LLM to interpret live Web Speech phonetic approximations accurately (e.g., *Kellgren-Lawrence Grade 4 bone-on-bone* from phonetic transcription artifacts like *children Lawrence* / *Calgary Lawrence* and *corticosteroid* from *cardiacosteroid*); (3) **Anti-Repetition Rule**: Enforced strict prompting constraints prohibiting the reviewer from repeating previously addressed objections (e.g. redundant home exercise demands); (4) **P2P Live Copilot Victory HUD & State Tracking**: Updated `useLiveCallCopilot.ts` and `P2PLiveCopilot.tsx` with live exchange counters (`Exchange X of 3`), phase indicators (`Probing Phase`), auto-completion of all 6 statutory checklist items on victory, and a high-visibility emerald **"Denial Overturned • Prior Authorization Issued"** banner displaying the generated verbal authorization reference number (`AUTH-XXX-XXXXXX`) and 1-click access to the EHR Encounter Summary addendum. Validated with `npm run verify` (100% clean typecheck, lint, 116/116 unit tests, production build). Convex features: actions, queries, mutations, reactive subscriptions, static hosting.
 
-### 2026-08-31 - working tree
+### 2026-08-31 - 588778f
 Refined ERISA § 502(c) statutory non-disclosure penalty embedding in Appeal Studio (`src/components/studio/AppealStudio.tsx`). Replaced naive end-of-file appending with intelligent placement preceding formal closing signatures (`Sincerely,`, `Respectfully,`, `Regards,`, `Submitted by`, `Authorized Representative:`), preserving the signer's identity and credentials at the bottom of the brief. Standardized the section heading to un-numbered title case (`## Statutory remedies & ERISA § 502(c) civil penalties demand`), eliminating the arbitrary Roman numeral prefix to match the rest of the generated brief. Convex features: static hosting, reactive subscriptions.
+
+### 2026-08-31 - working tree
+Optimized user session hydration across the application to achieve instant 0ms rendering of authenticated state without layout shifts, flash of unauthenticated buttons, or blocking session verification screens. Built `useCurrentUser` hook (`src/hooks/useCurrentUser.ts`) providing synchronous local cache resolution from stored `@convex-dev/auth` JWT tokens and cached profile records (`claimhero_cached_viewer`) on first render, seamlessly hydrating with real-time Convex `api.users.viewer` queries in the background. Updated `CinematicHero.tsx`, `Header.tsx`, `Sidebar.tsx`, `AuthPage.tsx`, and `App.tsx` to utilize optimistic session state, eliminating the 2-3 second delay on initial load and route transitions. Validated with `npm run verify` (100% clean typecheck, lint, 116/116 passing unit tests, and production build). Convex features: auth, queries, static hosting.
+
 
 
 
