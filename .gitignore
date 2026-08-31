@@ -9,7 +9,6 @@ dist-ssr/
 build/
 coverage/
 *.tsbuildinfo
-*.local
 
 # Environment variables & secrets
 .env
@@ -17,6 +16,12 @@ coverage/
 .env.development.local
 .env.test.local
 .env.production.local
+*.local
+
+# Convex
+# Note: convex/_generated is intentionally committed to version control
+# per official Convex guidelines so that frontend builds and CI typechecking
+# succeed deterministically without requiring a live backend connection.
 
 # Logs
 npm-debug.log*
