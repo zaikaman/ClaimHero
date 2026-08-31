@@ -67,7 +67,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const assignedEmail =
     claim.agentMailInboxEmail ||
     claim.assignedAgentEmail ||
-    `appeal-claim-${claim.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
+    "claimhero-sender@agentmail.to";
 
   const payerName = claim.patient?.insurancePayer || "Health Insurer";
   const defaultPayerContact = getPayerAppellateContact(payerName);
@@ -75,7 +75,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const officialEmail = claim.payerContact?.officialAppealsEmail || payerContact.officialAppealsEmail;
   const aiAdjudicatorEmail =
     claim.agentMailAdjudicatorEmail ||
-    `${payerName.toLowerCase().replace(/[^a-z0-9]/g, "")}-adjudication@claimhero.agentmail.com`;
+    "claimhero-adjudicator@agentmail.to";
 
   const effectiveRecipient =
     dispatchMode === "ai_adjudicator"

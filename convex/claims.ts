@@ -223,7 +223,6 @@ export const create = mutation({
     const now = Date.now();
     const deadlineDays = args.appealFilingDeadlineDays || 180;
     const statutoryDeadline = now + deadlineDays * 86400000;
-    const assignedAgentEmail = `appeal-claim-${args.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
 
     const claimId = await ctx.db.insert("claims", {
       userId,
@@ -240,7 +239,7 @@ export const create = mutation({
       status: "ingested",
       statutoryDeadline,
       daysRemaining: deadlineDays,
-      assignedAgentEmail,
+      assignedAgentEmail: "",
       agentMailProvisioningStatus: "pending",
       denialLetterStorageId: args.denialLetterStorageId,
       createdAt: now,
@@ -312,12 +311,27 @@ export const createWithPatient = mutation({
     const now = Date.now();
 
     // Check if patient already exists by email for this user
-    const existingPatients = (await ctx.db
-      .query("patients")
-      .withIndex("by_email", (q: any) => q.eq("email", args.patientEmail))
-      .collect()) as Doc<"patients">[];
+    const cleanEmail = args.patientEmail?.trim() || "";
+    let matchingPatient: Doc<"patients"> | undefined;
 
-    const matchingPatient = existingPatients.find((p) => p.userId === userId || !p.userId);
+    if (cleanEmail) {
+      const existingPatients = (await ctx.db
+        .query("patients")
+        .withIndex("by_email", (q: any) => q.eq("email", cleanEmail))
+        .collect()) as Doc<"patients">[];
+      matchingPatient = existingPatients.find((p) => p.userId === userId || !p.userId);
+    } else if (args.patientName.trim()) {
+      // If no email, check if user has an existing patient record matching name and memberId/payer
+      const userPatients = (await ctx.db
+        .query("patients")
+        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .collect()) as Doc<"patients">[];
+      matchingPatient = userPatients.find(
+        (p) =>
+          p.name.toLowerCase() === args.patientName.toLowerCase() &&
+          (!args.memberId || p.memberId === args.memberId)
+      );
+    }
 
     let patientId: Id<"patients">;
 
@@ -326,6 +340,7 @@ export const createWithPatient = mutation({
       await ctx.db.patch(patientId, {
         userId,
         name: args.patientName,
+        email: cleanEmail || matchingPatient.email || "",
         memberId: args.memberId,
         groupNumber: args.groupNumber,
         insurancePayer: args.insurancePayer,
@@ -335,7 +350,7 @@ export const createWithPatient = mutation({
       patientId = await ctx.db.insert("patients", {
         userId,
         name: args.patientName,
-        email: args.patientEmail,
+        email: cleanEmail,
         memberId: args.memberId,
         groupNumber: args.groupNumber,
         insurancePayer: args.insurancePayer,
@@ -346,7 +361,6 @@ export const createWithPatient = mutation({
 
     const deadlineDays = args.appealFilingDeadlineDays || 180;
     const statutoryDeadline = now + deadlineDays * 86400000;
-    const assignedAgentEmail = `appeal-claim-${args.claimNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}@claimhero.agentmail.com`;
 
     const claimId = await ctx.db.insert("claims", {
       userId,
@@ -363,7 +377,7 @@ export const createWithPatient = mutation({
       status: "ingested",
       statutoryDeadline,
       daysRemaining: deadlineDays,
-      assignedAgentEmail,
+      assignedAgentEmail: "",
       agentMailProvisioningStatus: "pending",
       denialLetterStorageId: args.denialLetterStorageId,
       redactionMetadata: args.redactionMetadata,

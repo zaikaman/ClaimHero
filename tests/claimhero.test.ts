@@ -1241,6 +1241,75 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
     expect(email).toContain("Dr. Langston certified 16 weeks of physical therapy");
     expect(email).toContain("Jordan Lee");
   });
+
+  it("truthfully handles incomplete EOB data without fabricating claim numbers or mock emails", async () => {
+    const { assembleProfessionalAppealEmail } = await import("../convex/actions/appealSynthesizer");
+    const { formatAppealEmail } = await import("../convex/lib/appealEmail");
+
+    const incompleteClaim = {
+      claimNumber: "",
+      providerName: "",
+      serviceDate: "",
+      deniedAmount: 0,
+      denialReasonCode: "",
+      denialReasonDescription: "",
+      cptCodes: [],
+      icd10Codes: [],
+      patient: {
+        name: "",
+        memberId: "",
+        insurancePayer: "Aetna",
+      },
+    };
+
+    const mockResult = {
+      executiveSummary: "Summary",
+      statutoryRightsNotice: "Notice",
+      medicalNecessityArguments: "",
+      policyCitations: [],
+      formalDemandForPayment: "Demand",
+      fullAppealMarkdown: "",
+    };
+
+    const brief = assembleProfessionalAppealEmail(
+      incompleteClaim,
+      "level_1_internal",
+      mockResult,
+      [],
+      undefined,
+      [],
+      undefined,
+      undefined
+    );
+
+    // Verify truthful metadata rendering without fabricated data
+    expect(brief).toContain("**Claim reference:** Not specified in denial notice");
+    expect(brief).toContain("- Patient/member: Not specified in denial notice");
+    expect(brief).toContain("- Member ID: Not specified in denial notice");
+    expect(brief).toContain("- Date of service: Not specified");
+    expect(brief).toContain("- Procedure code(s): Not specified");
+    expect(brief).toContain("- Diagnosis code(s): Not specified");
+    expect(brief).toContain("- Amount at issue: Not specified in denial notice");
+    expect(brief).toContain("The available claim record does not independently document");
+    expect(brief).toContain("Sincerely,\n\nClaimHero Appeals Desk");
+
+    // Zero fake placeholders or fabricated mock emails
+    expect(brief).not.toContain("CLM-");
+    expect(brief).not.toContain("@example.com");
+    expect(brief).not.toContain("appeals@claimhero.com");
+
+    // Formatted email document check
+    const formatted = formatAppealEmail(brief, {
+      claimNumber: "",
+      payer: "Aetna",
+      patientName: "",
+    });
+
+    expect(formatted.text).toContain("Unspecified Claim Reference");
+    expect(formatted.html).toContain("Unspecified Claim Reference");
+    expect(formatted.text).not.toContain("@example.com");
+    expect(formatted.text).not.toContain("appeals@claimhero.com");
+  });
 });
 
 describe("Firecrawl Multi-Source Clinical Research Hub", () => {

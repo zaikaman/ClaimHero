@@ -223,20 +223,27 @@ function isNegativeOrExclusionEvidence(evidence: any): boolean {
   return false;
 }
 
-function buildPaymentRequest(claimNumber: string): string {
-  return `Reconsider and reprocess Claim #${claimNumber} under the applicable plan terms. If benefits are payable, please issue payment according to the plan and applicable provider agreement for the covered amount.`;
+function buildPaymentRequest(claimNumber?: string): string {
+  const hasClaimNumber = Boolean(claimNumber && claimNumber.trim() && claimNumber.trim() !== "Not specified");
+  return `Reconsider and reprocess ${hasClaimNumber ? `Claim #${claimNumber}` : "this claim"} under the applicable plan terms. If benefits are payable, please issue payment according to the plan and applicable provider agreement for the covered amount.`;
 }
 
-function buildSignature(providerName: string, sender?: AppealSenderDetails): string {
+function buildSignature(providerName?: string, sender?: AppealSenderDetails): string {
   const senderLines = [sender?.name, sender?.credentials, sender?.email, sender?.phone]
     .map((value) => value?.trim())
     .filter(Boolean) as string[];
 
+  const cleanProvider = providerName?.trim();
+
   if (senderLines.length === 0) {
-    return `Sincerely,\n\nClaimHero Appeals Desk\nTreating provider listed in the claim: ${providerName}`;
+    return cleanProvider
+      ? `Sincerely,\n\nClaimHero Appeals Desk\nTreating provider listed in the claim: ${cleanProvider}`
+      : `Sincerely,\n\nClaimHero Appeals Desk`;
   }
 
-  return `Sincerely,\n\n${senderLines.join("\n")}\nTreating provider listed in the claim: ${providerName}`;
+  return cleanProvider
+    ? `Sincerely,\n\n${senderLines.join("\n")}\nTreating provider listed in the claim: ${cleanProvider}`
+    : `Sincerely,\n\n${senderLines.join("\n")}`;
 }
 
 function isExternalEvidence(evidence: any): boolean {
@@ -421,11 +428,20 @@ export function assembleProfessionalAppealEmail(
   sender?: AppealSenderDetails,
   clinicalFacts?: ClinicalFacts
 ): string {
-  const providerName = claim.providerName;
-  const patientName = claim.patient.name;
-  const claimNumber = claim.claimNumber;
-  const cptCodes = claim.cptCodes.join(", ");
-  const icd10Codes = claim.icd10Codes.join(", ");
+  const providerName = claim.providerName?.trim() || "";
+  const patientName = claim.patient?.name?.trim() || "Not specified in denial notice";
+  const rawClaimNumber = claim.claimNumber?.trim();
+  const hasClaimNumber = Boolean(rawClaimNumber && rawClaimNumber !== "Not specified");
+  const claimNumber = hasClaimNumber ? rawClaimNumber : "";
+  const claimRefDisplay = hasClaimNumber ? `#${claimNumber}` : "Not specified in denial notice";
+  const claimRefLabel = hasClaimNumber ? `Claim #${claimNumber}` : "the referenced claim";
+  const memberId = claim.patient?.memberId?.trim() || "Not specified in denial notice";
+  const cptCodes = (claim.cptCodes || []).filter(Boolean).length
+    ? (claim.cptCodes || []).filter(Boolean).join(", ")
+    : "Not specified";
+  const icd10Codes = (claim.icd10Codes || []).filter(Boolean).length
+    ? (claim.icd10Codes || []).filter(Boolean).join(", ")
+    : "Not specified";
   const denialReason = formatDenialReason(claim.denialReasonCode, claim.denialReasonDescription);
   const clinicalBasis = buildGroundedClinicalBasis(result.medicalNecessityArguments, claim, clinicalFacts);
   const supportingEvidences = evidences.filter(
@@ -441,32 +457,34 @@ export function assembleProfessionalAppealEmail(
     ? `${claim.denialReasonCode}${claim.denialReasonDescription ? ` — ${claim.denialReasonDescription.split(/[.;\n]/)[0].trim()}` : ""}`
     : denialReason;
 
+  const serviceDateText = claim.serviceDate ? formatServiceDate(claim.serviceDate) : "Not specified";
+
   // Tier-specific titles, addressees, and salutations
   let title = `# Appeal of Adverse Benefit Determination`;
   let salutation = `Dear Appeals and Grievances Team,`;
-  let openingParagraph = `I request reconsideration of the adverse benefit determination for Claim #${claimNumber}, relating to the service provided on ${formatServiceDate(claim.serviceDate)}. The denial notice cites ${primaryDenial}. Please review the submitted clinical records and applicable plan criteria and reprocess the claim if benefits are payable under the plan.`;
+  let openingParagraph = `I request reconsideration of the adverse benefit determination for ${claimRefLabel}, relating to the service provided on ${serviceDateText}. The denial notice cites ${primaryDenial}. Please review the submitted clinical records and applicable plan criteria and reprocess the claim if benefits are payable under the plan.`;
 
   if (appealLevel === "level_2_grievance") {
     title = `# Appeal of Adverse Benefit Determination — Level 2 Formal Grievance`;
     salutation = `To the Multi-Disciplinary Peer Review Panel & Grievance Committee,`;
-    openingParagraph = `I hereby submit this Level 2 Formal Grievance escalating the adverse benefit determination for Claim #${claimNumber} (service date: ${formatServiceDate(claim.serviceDate)}). The initial adverse determination cites ${primaryDenial}. We formally challenge the clinical and procedural adequacy of the prior review and demand multi-disciplinary peer review under ERISA Section 503.`;
+    openingParagraph = `I hereby submit this Level 2 Formal Grievance escalating the adverse benefit determination for ${claimRefLabel} (service date: ${serviceDateText}). The initial adverse determination cites ${primaryDenial}. We formally challenge the clinical and procedural adequacy of the prior review and demand multi-disciplinary peer review under ERISA Section 503.`;
   } else if (appealLevel === "level_3_external_state_review") {
     title = `# Appeal of Adverse Benefit Determination — Level 3 External IRO & State Insurance Commissioner Petition`;
     salutation = `To the Independent Review Organization (IRO), State Insurance Commissioner, and Plan Administrator,`;
-    openingParagraph = `I hereby submit this Level 3 Petition for External Independent Review and formal administrative complaint regarding Claim #${claimNumber} (service date: ${formatServiceDate(claim.serviceDate)}) regarding the adverse determination citing ${primaryDenial}. Having exhausted internal administrative reviews, this petition demands independent external overturn, regulatory scrutiny, and statutory bad-faith remedies under ERISA Section 502(a)(1)(B).`;
+    openingParagraph = `I hereby submit this Level 3 Petition for External Independent Review and formal administrative complaint regarding ${claimRefLabel} (service date: ${serviceDateText}) regarding the adverse determination citing ${primaryDenial}. Having exhausted internal administrative reviews, this petition demands independent external overturn, regulatory scrutiny, and statutory bad-faith remedies under ERISA Section 502(a)(1)(B).`;
   }
 
   let email = `${title}\n\n`;
-  email += `**Claim reference:** #${claimNumber}\n\n`;
+  email += `**Claim reference:** ${claimRefDisplay}\n\n`;
   email += `**Claim details**\n`;
   email += `- Patient/member: ${patientName}\n`;
-  email += `- Member ID: ${claim.patient.memberId}\n`;
-  if (claim.patient.groupNumber) email += `- Group number: ${claim.patient.groupNumber}\n`;
-  email += `- Date of service: ${formatServiceDate(claim.serviceDate)}\n`;
+  email += `- Member ID: ${memberId}\n`;
+  if (claim.patient?.groupNumber) email += `- Group number: ${claim.patient.groupNumber}\n`;
+  email += `- Date of service: ${serviceDateText}\n`;
   email += `- Procedure code(s): ${cptCodes}\n`;
   email += `- Diagnosis code(s): ${icd10Codes}\n`;
   email += `- Denial reason: ${denialReason}\n`;
-  email += `- Amount at issue: ${formatMoney(claim.deniedAmount)}\n\n`;
+  email += `- Amount at issue: ${claim.deniedAmount ? formatMoney(claim.deniedAmount) : "Not specified in denial notice"}\n\n`;
   email += `${salutation}\n\n`;
   email += `${openingParagraph}\n\n`;
 
@@ -503,7 +521,7 @@ export function assembleProfessionalAppealEmail(
   } else if (appealLevel === "level_3_external_state_review") {
     email += `1. Conduct expedited binding external independent review pursuant to ACA 45 C.F.R. § 147.136 and applicable state external review laws.\n`;
     email += `2. State Insurance Commissioner review for unfair claims settlement practices and statutory bad-faith adjudication.\n`;
-    email += `3. Immediate full disbursement of the denied amount of ${formatMoney(claim.deniedAmount)} plus statutory prompt-pay interest penalties.\n`;
+    email += `3. Immediate full disbursement of the denied amount of ${claim.deniedAmount ? formatMoney(claim.deniedAmount) : "the disputed charges"} plus statutory prompt-pay interest penalties.\n`;
     email += `4. Notice of civil enforcement rights under ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)] and mandatory fee-shifting under ERISA Section 502(g)(1).\n\n`;
   } else {
     email += `1. ${buildPaymentRequest(claimNumber)}\n`;
@@ -513,7 +531,7 @@ export function assembleProfessionalAppealEmail(
 
   const statutoryNotice = getStatutoryRightsNotice(appealLevel);
   email += `${statutoryNotice}\n\n`;
-  email += `Thank you for your review. Please reference Claim #${claimNumber} in any response or request for additional information.\n\n`;
+  email += `Thank you for your review. Please reference ${hasClaimNumber ? `Claim #${claimNumber}` : "the attached denial notice"} in any response or request for additional information.\n\n`;
   email += buildSignature(providerName, sender);
 
   return email;
@@ -581,9 +599,11 @@ export const generateAppealBrief = action({
       (e) => isExternalEvidence(e) && !isBlockedEvidence(e) && !isPayerMismatchedEvidence(e, claim) && !isEvidenceSiteMismatched(e, claim)
     );
     const persistedContext = claim.appealContext;
-    const clinicalFacts: ClinicalFacts | undefined = args.clinicalFacts || persistedContext?.clinicalFacts;
+    const clinicalFacts: ClinicalFacts = args.clinicalFacts || persistedContext?.clinicalFacts || {
+      recordsAreIncomplete: true,
+    };
     const physicianNotes: string | undefined = args.physicianNotes || persistedContext?.physicianNotes;
-    const sender: AppealSenderDetails | undefined = args.senderName?.trim()
+    const sender: AppealSenderDetails = args.senderName?.trim()
       ? {
         name: args.senderName,
         credentials: args.senderCredentials,
@@ -591,18 +611,11 @@ export const generateAppealBrief = action({
         phone: args.senderPhone,
       }
       : persistedContext?.sender || {
-        name: args.senderName,
-        credentials: args.senderCredentials,
-        email: args.senderEmail,
-        phone: args.senderPhone,
+        name: claim.providerName?.trim() || claim.patient?.name?.trim() || "ClaimHero Appeals Desk",
+        credentials: undefined,
+        email: claim.patient?.email?.trim() || undefined,
+        phone: undefined,
       };
-
-    if (!sender?.name?.trim() || (!sender.email?.trim() && !sender.phone?.trim())) {
-      throw new Error("Complete sender details before generating an appeal");
-    }
-    if (!clinicalFacts) {
-      throw new Error("Confirm the available clinical record before generating an appeal");
-    }
     const evidenceText = externalEvidences.length > 0
       ? externalEvidences.map((e: any, idx: number) => `[Source ${idx + 1}] (${e.sourceType.toUpperCase()} - ${e.title} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
       : "Standard national clinical practice guideline and ERISA disclosure rules apply.";

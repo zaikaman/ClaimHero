@@ -86,10 +86,6 @@ export const runAutonomousPipeline = action({
         email: claim.patient?.email?.trim() || undefined,
         phone: undefined,
       };
-      // If still no contact, use a generic appeals contact to satisfy synthesizer validation
-      if (!fallbackSender.email && !fallbackSender.phone) {
-        fallbackSender.email = "appeals@claimhero.com";
-      }
       sender = {
         name: fallbackSender.name,
         credentials: fallbackSender.credentials,

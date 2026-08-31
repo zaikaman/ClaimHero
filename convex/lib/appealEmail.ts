@@ -266,11 +266,13 @@ function moneyValue(value: number | undefined): string | undefined {
 
 function buildSummaryRows(context: AppealEmailContext): Array<[string, string]> {
   const denialReason = context.denialReason;
+  const rawClaimNumber = context.claimNumber?.trim();
+  const claimRef = rawClaimNumber && rawClaimNumber !== "Not specified" ? rawClaimNumber : undefined;
   const rows: Array<[string, string | undefined]> = [
-    ["Claim reference", context.claimNumber],
+    ["Claim reference", claimRef],
     ["Patient", context.patientName],
     ["Date of service", formatServiceDate(context.serviceDate)],
-    ["Procedure codes", context.cptCodes?.join(", ")],
+    ["Procedure codes", context.cptCodes?.filter(Boolean).length ? context.cptCodes.filter(Boolean).join(", ") : undefined],
     ["Disputed amount", moneyValue(context.deniedAmount)],
     ["Denial reason", normalizeDenialReason(denialReason)],
   ];
@@ -283,14 +285,17 @@ function buildSummaryRows(context: AppealEmailContext): Array<[string, string]> 
 
 function buildHeader(context: AppealEmailContext, title: string): { html: string; text: string } {
   const payer = displayValue(context.payer);
-  const claimNumber = displayValue(context.claimNumber);
+  const rawClaimNumber = context.claimNumber?.trim();
+  const hasClaimNumber = Boolean(rawClaimNumber && rawClaimNumber !== "Not specified");
+  const claimSubtitle = hasClaimNumber ? `Claim #${displayValue(rawClaimNumber)}` : "Unspecified Claim Reference";
+  const claimSubtitleText = hasClaimNumber ? `Claim #${inlineText(rawClaimNumber)}` : "Unspecified Claim Reference";
   const summaryRows = buildSummaryRows(context);
   const htmlSummary = summaryRows.map(([label, value]) => `<tr><td style="padding:6px 12px 6px 0; color:#66788a; font-size:12px; white-space:nowrap;">${escapeHtml(label)}</td><td style="padding:6px 0; color:#253342; font-size:12px; font-weight:600;">${displayValue(value)}</td></tr>`).join("");
   const textSummary = summaryRows.map(([label, value]) => `${label}: ${value}`).join("\n");
 
   return {
-    html: `<div style="padding-bottom:18px; border-bottom:2px solid #1f486d; margin-bottom:24px;"><div style="color:#2f7ca5; font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;">ClaimHero Appeals Desk</div><h1 style="margin:8px 0 6px; color:#12263a; font-family:Arial,Helvetica,sans-serif; font-size:24px; line-height:1.25; font-weight:700;">${escapeHtml(title)}</h1><div style="color:#526273; font-size:13px;">${payer} · Claim ${claimNumber}</div></div><table role="presentation" style="width:100%; margin:0 0 26px; border-collapse:collapse;">${htmlSummary}</table>`,
-    text: `CLAIMHERO APPEALS DESK\n${title}\n${inlineText(context.payer)} · Claim ${inlineText(context.claimNumber)}\n\n${textSummary}`,
+    html: `<div style="padding-bottom:18px; border-bottom:2px solid #1f486d; margin-bottom:24px;"><div style="color:#2f7ca5; font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;">ClaimHero Appeals Desk</div><h1 style="margin:8px 0 6px; color:#12263a; font-family:Arial,Helvetica,sans-serif; font-size:24px; line-height:1.25; font-weight:700;">${escapeHtml(title)}</h1><div style="color:#526273; font-size:13px;">${payer} · ${claimSubtitle}</div></div><table role="presentation" style="width:100%; margin:0 0 26px; border-collapse:collapse;">${htmlSummary}</table>`,
+    text: `CLAIMHERO APPEALS DESK\n${title}\n${inlineText(context.payer)} · ${claimSubtitleText}\n\n${textSummary}`,
   };
 }
 

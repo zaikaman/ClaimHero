@@ -137,9 +137,11 @@ export const parseDenialDocument = action({
       systemPrompt: `You are an expert Certified Professional Medical Coder (CPC) and ERISA Insurance Claims Auditor.
 Your job is to accurately extract all financial amounts, clinical CPT procedure codes, ICD-10 diagnosis codes, denial reason codes (e.g. CO-50, CO-197, CO-16), insurer payer names, and statutory appeal filing deadlines from real denial letters and Explanation of Benefits (EOB) documents.
 Rules:
-- Extract dollar amounts as pure numbers without currency symbols (e.g. 24500 instead of "$24,500.00").
-- If the patient name or provider name is not explicitly mentioned, use the best inferred entity or "Patient Record" / "Treating Provider".
-- If the claim number is missing, generate a standard formatted identifier based on payer and date (e.g. "CLM-" + Date.now().toString().slice(-6)).
+- Extract ONLY what is explicitly stated in the document. Do NOT guess, invent, or fabricate data.
+- Extract dollar amounts as pure numbers without currency symbols (e.g. 24500 instead of "$24,500.00"). If a dollar amount is missing, return 0.
+- If the patient name, member ID, provider name, claim number, service date, or denial codes are not explicitly mentioned in the document, return an empty string "". NEVER invent, guess, or fabricate identifiers (e.g., do NOT generate fake CLM- numbers or placeholder names).
+- If CPT or ICD-10 codes are missing, return an empty array [].
+- If payer appeals email or physical appeals address is not explicitly mentioned, return an empty string "".
 - If the statutory appeal deadline is not explicitly mentioned, default appealFilingDeadlineDays to 180 (ERISA 29 CFR § 2560.503-1 standard statutory rule).`,
       userPrompt: `Extract structured medical claim metadata from the following denial document:\n\n${documentContent}`,
       schemaName: "DenialExtractionResult",
@@ -150,24 +152,22 @@ Rules:
     });
 
     // Save patient and claim into Convex database
-    const sanitizedPatient = extraction.patientName.toLowerCase().replace(/[^a-z0-9]/g, "") || "patient";
-    const sanitizedPayer = (extraction.insurancePayer || "payer").toLowerCase().replace(/[^a-z0-9]/g, "");
     const claimId: string = await ctx.runMutation((api as any).claims.createWithPatient, {
-      patientName: extraction.patientName,
-      patientEmail: args.patientEmail?.trim() || `${sanitizedPatient}-${sanitizedPayer}@example.com`,
-      memberId: extraction.memberId,
-      insurancePayer: extraction.insurancePayer,
+      patientName: extraction.patientName?.trim() || "",
+      patientEmail: args.patientEmail?.trim() || "",
+      memberId: extraction.memberId?.trim() || "",
+      insurancePayer: extraction.insurancePayer?.trim() || "Unspecified Payer",
       state: args.patientState || "California",
-      claimNumber: extraction.claimNumber,
-      serviceDate: extraction.serviceDate,
-      providerName: extraction.providerName,
-      deniedAmount: extraction.deniedAmount,
-      patientOwedAmount: extraction.patientOwedAmount,
-      cptCodes: extraction.cptCodes,
-      icd10Codes: extraction.icd10Codes,
-      denialReasonCode: extraction.denialReasonCode,
-      denialReasonDescription: extraction.denialReasonDescription,
-      appealFilingDeadlineDays: extraction.appealFilingDeadlineDays,
+      claimNumber: extraction.claimNumber?.trim() || "",
+      serviceDate: extraction.serviceDate?.trim() || "",
+      providerName: extraction.providerName?.trim() || "",
+      deniedAmount: typeof extraction.deniedAmount === "number" ? extraction.deniedAmount : 0,
+      patientOwedAmount: typeof extraction.patientOwedAmount === "number" ? extraction.patientOwedAmount : 0,
+      cptCodes: Array.isArray(extraction.cptCodes) ? extraction.cptCodes.filter(Boolean) : [],
+      icd10Codes: Array.isArray(extraction.icd10Codes) ? extraction.icd10Codes.filter(Boolean) : [],
+      denialReasonCode: extraction.denialReasonCode?.trim() || "",
+      denialReasonDescription: extraction.denialReasonDescription?.trim() || "",
+      appealFilingDeadlineDays: extraction.appealFilingDeadlineDays || 180,
     });
 
     // Autonomously resolve the payer intake gateway right from the moment of ingestion
