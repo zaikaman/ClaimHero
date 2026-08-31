@@ -286,7 +286,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
   };
 
   return (
-    <div className="space-y-3 animate-fadeIn pb-20 mb-8 min-h-[calc(100vh-6.5rem)] flex flex-col">
+    <div className="space-y-4 animate-fadeIn pb-16 flex flex-col">
       {/* 4-Step Guided Sentinel Stepper */}
       <SentinelFlowStepper
         claim={claim}

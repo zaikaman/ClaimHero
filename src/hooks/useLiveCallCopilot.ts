@@ -44,6 +44,9 @@ export function useLiveCallCopilot(claim: Claim) {
   const [simulationStepIndex, setSimulationStepIndex] = useState<number>(0);
   const [isWaitingForDoctor, setIsWaitingForDoctor] = useState<boolean>(false);
   const [activeFastAnswer, setActiveFastAnswer] = useState<LiveFastAnswer | null>(null);
+  const [isOverturned, setIsOverturned] = useState<boolean>(false);
+  const [authorizationNumber, setAuthorizationNumber] = useState<string | null>(null);
+  const [callResolutionStage, setCallResolutionStage] = useState<string>("opening");
 
   const currentSessionIdRef = useRef<Id<"p2pCallSessions"> | null>(null);
   const activeSpeakerRef = useRef<CallSpeaker>(activeSpeaker);
@@ -521,6 +524,33 @@ export function useLiveCallCopilot(claim: Claim) {
           transcriptHistory: history,
         });
 
+        if (pushback.isOverturned) {
+          setIsOverturned(true);
+          setAuthorizationNumber(pushback.authorizationNumber || `AUTH-APP-${Date.now().toString().slice(-6)}`);
+          setCallResolutionStage("overturned");
+
+          // Auto-verify all checklist items on victory
+          if (currentSessionIdRef.current) {
+            const checklistKeys = [
+              "reviewer_credentials",
+              "erisa_notice",
+              "patient_identifiers",
+              "cpb_criteria_citation",
+              "failed_conservative_proof",
+              "bad_faith_demand",
+            ];
+            for (const key of checklistKeys) {
+              await updateChecklistMutation({
+                sessionId: currentSessionIdRef.current,
+                checklistId: key,
+                isCompleted: true,
+              });
+            }
+          }
+        } else if (pushback.callResolutionStage) {
+          setCallResolutionStage(pushback.callResolutionStage);
+        }
+
         // Set tailored Fast Answer counter-strike for physician
         const newFastAnswer: LiveFastAnswer = {
           id: `fa_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -529,7 +559,7 @@ export function useLiveCallCopilot(claim: Claim) {
           chartProof: pushback.chartProof,
           cpbCitation: pushback.cpbCitation,
           regulatoryLeverage: pushback.regulatoryLeverage,
-          confidenceScore: 96,
+          confidenceScore: pushback.isOverturned ? 99 : 96,
           timestamp: Date.now(),
         };
         setActiveFastAnswer(newFastAnswer);
@@ -552,7 +582,7 @@ export function useLiveCallCopilot(claim: Claim) {
             setTimeout(() => {
               isReviewerSpeakingRef.current = false;
               setActiveSpeaker("physician");
-              setIsWaitingForDoctor(true);
+              setIsWaitingForDoctor(!pushback.isOverturned);
               setInterimText("");
             }, 400);
           };
@@ -564,7 +594,7 @@ export function useLiveCallCopilot(claim: Claim) {
         } else {
           isReviewerSpeakingRef.current = false;
           setActiveSpeaker("physician");
-          setIsWaitingForDoctor(true);
+          setIsWaitingForDoctor(!pushback.isOverturned);
         }
       } catch (err) {
         console.error("Failed to generate dynamic reviewer pushback:", err);
@@ -585,6 +615,7 @@ export function useLiveCallCopilot(claim: Claim) {
       appendTranscriptItem,
       simulationStepIndex,
       playReviewerChallenge,
+      updateChecklistMutation,
     ]
   );
 
@@ -596,6 +627,9 @@ export function useLiveCallCopilot(claim: Claim) {
   // Start Simulation from step 0
   const startSimulation = useCallback(() => {
     setSimulationStepIndex(0);
+    setIsOverturned(false);
+    setAuthorizationNumber(null);
+    setCallResolutionStage("opening");
     playReviewerChallenge(0);
   }, [playReviewerChallenge]);
 
@@ -634,6 +668,9 @@ export function useLiveCallCopilot(claim: Claim) {
     isWaitingForDoctor,
     activeFastAnswer,
     setActiveFastAnswer,
+    isOverturned,
+    authorizationNumber,
+    callResolutionStage,
     startLiveCall,
     endLiveCall,
     appendTranscriptItem,

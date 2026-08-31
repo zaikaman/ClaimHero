@@ -179,6 +179,9 @@ Generate an instant, grounded Fast Answer response card.`;
 export interface InteractiveReviewerPushbackResult {
   spokenText: string;
   medicalDirectorTone: "skeptical" | "probing" | "defensive" | "conceding";
+  callResolutionStage?: "opening" | "probing" | "defensive" | "conceding" | "overturned";
+  isOverturned?: boolean;
+  authorizationNumber?: string;
   trapQuestion: string;
   suggestedQuote: string;
   chartProof: string;
@@ -229,71 +232,106 @@ export const generateInteractiveReviewerPushback = action({
     const clinicalFacts = claim.appealContext?.clinicalFacts;
     const physicianNotes = claim.appealContext?.physicianNotes || "";
 
-    const historySnippet = (args.transcriptHistory || [])
-      .slice(-6)
+    const historyItems = args.transcriptHistory || [];
+    const physicianTurnCount = historyItems.filter((h) => h.speaker === "physician").length + 1;
+
+    const historySnippet = historyItems
+      .slice(-8)
       .map((h) => `${h.speaker === "physician" ? "Treating Physician" : "Medical Director"}: "${h.text}"`)
       .join("\n");
 
     const systemPrompt = `You are the Insurer Medical Director reviewing denied insurance claims for ${payer}.
-You are on a live interactive peer-to-peer phone call with the treating physician.
-The physician just spoke a rebuttal or answered your previous question.
+You are on a live, rapid 3-to-5 minute peer-to-peer (P2P) tele-conference with the treating physician for Claim #${claim.claimNumber} (${cptList}).
+Current Physician Speech Turn: #${physicianTurnCount}.
 
-Your task:
-1. LISTEN attentively to what the treating physician just said.
-2. Formulate a realistic, highly specific follow-up objection or question that DIRECTLY responds to what they just said.
-   - If the doctor cited conservative therapy: press on imaging, specific functional scores, or non-operative injection trials.
-   - If the doctor cited neurological deficit or acute symptoms: probe whether the exam was performed recently or whether secondary opinions were sought.
-   - If the doctor cited ERISA/state statutory licensing requirements: become defensive and demand written submission or indicate hesitation.
-   - If the doctor cited airtight clinical criteria and statutory policy: concede or shift to procedural documentation.
-3. In the same response, also generate the winning "suggestedQuote" Fast Answer rebuttal for ClaimHero's AI copilot to flash on the doctor's screen so they know how to counter your objection!
+CRITICAL GUIDELINES FOR REALISTIC P2P CALL SIMULATION:
+
+1. SPEECH-TO-TEXT (STT) PHONETIC TOLERANCE:
+   The treating physician is speaking live into their microphone. Live Web Speech transcription produces phonetic approximations of medical terms:
+   - "children Lawrence" / "Calgary Lawrence" / "Killian Lawrence" = "Kellgren-Lawrence" (Osteoarthritis radiographic grade)
+   - "bone unborn" / "bone and bone" = "bone-on-bone" (Grade 4 joint space obliteration)
+   - "cardiacosteroid" / "Carly cough steroid" / "cardiosteroid" = "corticosteroid injections"
+   - "athroplastomy" / "arthroplasty" = "arthroplasty" (e.g. CPT 27447 Total Knee / Hip Arthroplasty)
+   - "meloxicam" / "en said" / "NSAID" = oral anti-inflammatory therapy
+   Interpret these terms accurately according to clinical orthopedic/medical context.
+
+2. TURN-BASED CONVERSATION LIFECYCLE (STRICT 3-STAGE PROGRESSION):
+   - TURN 1 (Opening Challenge): Reviewer asks why standard conservative management or imaging prerequisites weren't met.
+   - TURN 2 (Probing / Verification): Reviewer probes one specific secondary nuance (e.g., injection response, provocative exam findings, or specific policy clause).
+   - TURN 3+ (CLINICAL CONCESSION & OVERTURN DETERMINATION):
+     * If the physician has articulated:
+       (a) 12-16+ weeks of physical therapy or failed trials, OR
+       (b) Kellgren-Lawrence Grade 4 / severe radiographic joint destruction / bone-on-bone status, OR
+       (c) Failed therapeutic steroid/hyaluronic injections + NSAIDs, OR
+       (d) Acute neurological loss or severe functional impairment;
+     * THEN YOU MUST CONCEDE, APPROVE THE PROCEDURE, AND OVERTURN THE DENIAL.
+     * State clearly on the call that based on the documented clinical severity and policy criteria, you are overturning the adverse determination and issuing immediate verbal authorization.
+     * Set "medicalDirectorTone" to "conceding", "callResolutionStage" to "overturned", "isOverturned" to true, and generate an authorization number (e.g. "AUTH-${payer.slice(0, 3).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}").
+
+3. STRICT ANTI-REPETITION CONSTRAINT:
+   - NEVER repeat the same objection, requirement, or phrase (e.g., do NOT repeat demands for "home exercise programs", "separate maintenance trials", or "longitudinal records" if already mentioned previously in the transcript history).
+   - Acknowledge what the physician just stated and either probe a completely new aspect or grant authorization.
 
 Case Details:
 - Patient: ${claim.patient?.name || "Patient"}
 - Payer: ${payer}
 - Jurisdiction: ${state}
-- CPT Codes: ${cptList}
-- ICD Codes: ${icdList}
+- Disputed CPT Codes: ${cptList}
+- Diagnosis Codes: ${icdList}
 - Denial Reason: ${claim.denialReasonCode || "CO-50"}: ${claim.denialReasonDescription || "Medical Necessity"}
-- Clinical Facts:
+- Clinical Facts on File:
   * Symptoms & Functional Impact: ${clinicalFacts?.symptomsAndFunctionalImpact || "Severe symptoms"}
   * Physical Exam: ${clinicalFacts?.examinationFindings || "Positive exam findings"}
-  * Imaging/Diagnostics: ${clinicalFacts?.imagingAndDiagnostics || "Diagnostic imaging confirmed pathology"}
+  * Imaging/Diagnostics: ${clinicalFacts?.imagingAndDiagnostics || "Diagnostic imaging confirmed severe pathology"}
   * Prior Conservative Therapy: ${clinicalFacts?.treatmentHistoryAndResponse || "Documented prior therapy"}
 - Treating Physician Notes: ${physicianNotes || "Intervention indicated to prevent permanent functional loss"}
-- Published CPB Criteria:
-${evidenceList || "Published policy requires documented conservative therapy failure or progressive neurologic deficit."}`;
+- Published Policy Criteria:
+${evidenceList || "Published policy requires documented conservative therapy failure or severe radiographic pathology (Grade 3/4) or progressive functional deficit."}`;
 
     const userPrompt = `Recent Call Transcript History:
 ${historySnippet || "No prior transcript."}
 
-The treating physician just said to you:
+The treating physician just said to you (Turn #${physicianTurnCount}):
 "${args.doctorSpeech}"
 
-Generate your spoken response as the Medical Director and the accompanying Fast Answer counter-strike for the physician.`;
+Evaluate the clinical merits. Formulate your spoken response as the Medical Director and generate the accompanying Fast Answer card for the physician.`;
 
     const pushbackSchema = {
       type: "object",
       properties: {
         spokenText: {
           type: "string",
-          description: "What the Medical Director speaks out loud next, directly acknowledging and responding to what the physician just said.",
+          description: "What the Medical Director speaks out loud next. If conceding on Turn 3+, announce the verbal approval and provide authorization reference number.",
         },
         medicalDirectorTone: {
           type: "string",
           enum: ["skeptical", "probing", "defensive", "conceding"],
-          description: "Emotional/conversational tone of the reviewer.",
+          description: "Conversational tone of the reviewer.",
+        },
+        callResolutionStage: {
+          type: "string",
+          enum: ["opening", "probing", "defensive", "conceding", "overturned"],
+          description: "Current stage of the P2P encounter.",
+        },
+        isOverturned: {
+          type: "boolean",
+          description: "True if the Medical Director is overturning the denial and granting prior authorization.",
+        },
+        authorizationNumber: {
+          type: "string",
+          description: "Verbal authorization reference number if overturned (e.g. AUTH-MOL-492819).",
         },
         trapQuestion: {
           type: "string",
-          description: "Summary of the objection or trap question posed in the spokenText.",
+          description: "Summary of the objection or resolution statement.",
         },
         suggestedQuote: {
           type: "string",
-          description: "1-2 sentence knockout verbal counter-strike for the doctor to read aloud.",
+          description: "Knockout verbal counter-strike or final confirmation statement for the physician.",
         },
         chartProof: {
           type: "string",
-          description: "Patient chart proof answering this objection.",
+          description: "Patient chart proof supporting this determination.",
         },
         cpbCitation: {
           type: "string",
@@ -301,11 +339,11 @@ Generate your spoken response as the Medical Director and the accompanying Fast 
         },
         regulatoryLeverage: {
           type: "string",
-          description: "ERISA or state code leverage.",
+          description: "ERISA or state statutory leverage.",
         },
         leverageDelta: {
           type: "number",
-          description: "Momentum score change (-5 to +20).",
+          description: "Momentum score change (-5 to +30).",
         },
       },
       required: [
@@ -333,13 +371,16 @@ Generate your spoken response as the Medical Director and the accompanying Fast 
 
       result = {
         spokenText: completion.spokenText,
-        medicalDirectorTone: completion.medicalDirectorTone || "probing",
+        medicalDirectorTone: completion.medicalDirectorTone || (physicianTurnCount >= 3 ? "conceding" : "probing"),
+        callResolutionStage: completion.callResolutionStage || (completion.isOverturned || completion.medicalDirectorTone === "conceding" ? "overturned" : "probing"),
+        isOverturned: Boolean(completion.isOverturned || completion.medicalDirectorTone === "conceding" || completion.spokenText.toLowerCase().includes("overturn") || completion.spokenText.toLowerCase().includes("authoriz")),
+        authorizationNumber: completion.authorizationNumber || (completion.isOverturned || completion.medicalDirectorTone === "conceding" ? `AUTH-${payer.slice(0, 3).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}` : undefined),
         trapQuestion: completion.trapQuestion,
         suggestedQuote: completion.suggestedQuote,
         chartProof: completion.chartProof,
         cpbCitation: completion.cpbCitation,
         regulatoryLeverage: completion.regulatoryLeverage || `ERISA 29 CFR § 2560.503-1 & ${state} Insurance Code`,
-        leverageDelta: completion.leverageDelta || 10,
+        leverageDelta: completion.leverageDelta || (physicianTurnCount >= 3 ? 25 : 10),
       };
     } catch (err) {
       console.warn("OpenAI interactive reviewer synthesis fallback triggered:", err);
@@ -350,7 +391,8 @@ Generate your spoken response as the Medical Director and the accompanying Fast 
         payer,
         cptList,
         icdList,
-        state
+        state,
+        physicianTurnCount
       );
     }
 
@@ -365,20 +407,44 @@ function buildDeterministicReviewerPushback(
   payer: string,
   cptList: string,
   icdList: string,
-  state: string
+  state: string,
+  physicianTurnCount: number = 1
 ): InteractiveReviewerPushbackResult {
   const lower = (doctorSpeech || "").toLowerCase();
   const cpb = evidences && evidences.length > 0 ? evidences[0] : null;
   const cpbTitle = cpb?.title || `${payer} Clinical Coverage Bulletin`;
   const cpbSection = cpb?.citationClause || "Section 2.1 Criteria";
+  const authNum = `AUTH-${payer.slice(0, 3).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  // Concession / Overturn on Turn 3 or when strong orthopedic evidence is cited
+  const hasGrade4OrBoneOnBone = lower.includes("grade 4") || lower.includes("bone") || lower.includes("lawrence") || lower.includes("unborn");
+  const hasMultipleTherapies = (lower.includes("injection") || lower.includes("steroid")) && (lower.includes("pt") || lower.includes("therapy") || lower.includes("week"));
+
+  if (physicianTurnCount >= 3 || hasGrade4OrBoneOnBone || hasMultipleTherapies) {
+    return {
+      spokenText: `Doctor, based on the documented failure of 16 weeks of structured physical therapy, failed corticosteroid injections, and radiographic confirmation of Kellgren-Lawrence Grade 4 severity, ${payer} acknowledges that conservative criteria under ${cpbTitle} (${cpbSection}) are satisfied. I am overturning the initial denial today and granting verbal prior authorization #${authNum}.`,
+      medicalDirectorTone: "conceding",
+      callResolutionStage: "overturned",
+      isOverturned: true,
+      authorizationNumber: authNum,
+      trapQuestion: "Denial Overturned - Medical Necessity Criteria Satisfied",
+      suggestedQuote: `Thank you, Doctor. Please log verbal authorization #${authNum} for CPT ${cptList} and submit the formal written determination letter to the clinic within 24 hours.`,
+      chartProof: claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse || "Documented comprehensive conservative therapy failure and severe structural joint destruction.",
+      cpbCitation: `${cpbTitle} (${cpbSection})`,
+      regulatoryLeverage: `ERISA 29 CFR § 2560.503-1 & ${state} Utilization Review Standards`,
+      leverageDelta: 25,
+    };
+  }
 
   if (lower.includes("pt") || lower.includes("physical therapy") || lower.includes("weeks") || lower.includes("conservative")) {
     return {
-      spokenText: `I understand you documented structured physical therapy, Doctor, but our medical management criteria for ${cptList} also evaluate whether adjunctive epidural steroid injections or structured oral anti-inflammatory regimens were trialed before proceeding to surgery. Were these attempted?`,
+      spokenText: `I understand you documented structured physical therapy, Doctor, but our medical management criteria for ${cptList} also evaluate whether adjunctive corticosteroid injections or structured oral anti-inflammatory regimens were trialed before proceeding to surgery. Were these attempted?`,
       medicalDirectorTone: "probing",
+      callResolutionStage: "probing",
+      isOverturned: false,
       trapQuestion: "Why were interventional steroid injections or NSAIDs not trialed prior to surgery?",
-      suggestedQuote: `Under ${cpbTitle} (${cpbSection}), persistent neurological motor deficit waives adjunctive injection requirements when progressive nerve root compression is objectively documented on imaging.`,
-      chartProof: claim.appealContext?.clinicalFacts?.imagingAndDiagnostics || "MRI confirms severe neural impingement with acute progressive motor weakness.",
+      suggestedQuote: `Under ${cpbTitle} (${cpbSection}), the patient completed 16 weeks of formal therapy and failed two therapeutic injections with NSAIDs, fully exhausting conservative options.`,
+      chartProof: claim.appealContext?.clinicalFacts?.imagingAndDiagnostics || "Patient chart confirms completed formal PT and failed injection series.",
       cpbCitation: `${cpbTitle} (${cpbSection})`,
       regulatoryLeverage: `ERISA 29 CFR § 2560.503-1(h) & ${state} Utilization Review Standards`,
       leverageDelta: 12,

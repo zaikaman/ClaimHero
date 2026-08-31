@@ -49,9 +49,13 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
     isSimulating,
     isReviewerVoiceMuted,
     setIsReviewerVoiceMuted,
+    simulationStepIndex,
     isWaitingForDoctor,
     activeFastAnswer,
     setActiveFastAnswer,
+    isOverturned,
+    authorizationNumber,
+    callResolutionStage,
     startLiveCall,
     endLiveCall,
     appendTranscriptItem,
@@ -127,7 +131,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
   const winScore = session?.winScore ?? 50;
 
   return (
-    <div className="space-y-3 font-sans animate-fadeIn pb-12 mb-6">
+    <div className="space-y-3 font-sans animate-fadeIn">
       {/* Live Call Control HUD */}
       <Card className="p-3.5 rounded-xl border-border/80 bg-card/75 backdrop-blur-xl shadow-md">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -153,12 +157,20 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   variant="outline"
                   className={cn(
                     "text-[10px] font-mono uppercase px-1.5 py-0.5",
-                    isCallLive
+                    isOverturned
+                      ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400 font-bold"
+                      : isCallLive
                       ? "border-destructive/60 bg-destructive/10 text-destructive font-bold animate-pulse"
                       : "border-border text-muted-foreground"
                   )}
                 >
-                  {isCallLive ? "LIVE TELE-CONFERENCE" : "STANDBY / READY"}
+                  {isOverturned
+                    ? "OVERTURNED • AUTH GRANTED"
+                    : isCallLive
+                    ? callResolutionStage === "probing"
+                      ? "LIVE: PROBING PHASE"
+                      : "LIVE TELE-CONFERENCE"
+                    : "STANDBY / READY"}
                 </Badge>
               </div>
 
@@ -312,7 +324,9 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
           <div
             className={cn(
               "mt-3 p-2.5 rounded-lg border text-xs font-sans flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-all",
-              isGeneratingPushback
+              isOverturned
+                ? "bg-emerald-950/60 border-emerald-500 text-emerald-100 ring-1 ring-emerald-500/40"
+                : isGeneratingPushback
                 ? "bg-primary/10 border-primary/40 text-primary"
                 : isWaitingForDoctor
                 ? "bg-emerald-950/40 border-emerald-500/50 text-emerald-200"
@@ -320,7 +334,9 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
             )}
           >
             <div className="flex items-center gap-2">
-              {isGeneratingPushback ? (
+              {isOverturned ? (
+                <ShieldCheck className="size-4 text-emerald-400 shrink-0" weight="fill" />
+              ) : isGeneratingPushback ? (
                 <CircleNotch className="size-3.5 text-primary animate-spin shrink-0" />
               ) : isWaitingForDoctor ? (
                 <div className="size-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
@@ -328,44 +344,69 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                 <CircleNotch className="size-3.5 text-primary animate-spin shrink-0" />
               )}
               <span>
-                {isGeneratingPushback ? (
+                {isOverturned ? (
                   <>
-                    <strong className="text-foreground font-semibold">Medical Director is evaluating your statement...</strong> Formulating realistic clinical pushback.
+                    <strong className="text-emerald-300 font-bold uppercase tracking-wider">
+                      Denial Overturned • Verbal Authorization Granted:
+                    </strong>{" "}
+                    <span className="font-mono font-semibold text-white">{authorizationNumber}</span>. Criteria fully satisfied under clinical policy bulletin.
+                  </>
+                ) : isGeneratingPushback ? (
+                  <>
+                    <strong className="text-foreground font-semibold">
+                      Medical Director is evaluating your statement... (Exchange {simulationStepIndex + 1})
+                    </strong>{" "}
+                    Formulating clinical evaluation.
                   </>
                 ) : isWaitingForDoctor ? (
                   <>
-                    <strong className="text-emerald-100 font-semibold">Your turn to speak!</strong> Speak your rebuttal into your mic, then click <strong className="text-emerald-300">"Hear Reviewer Pushback"</strong> to hear their response.
+                    <strong className="text-emerald-100 font-semibold">
+                      Your turn to speak! (Exchange {simulationStepIndex + 1} of 3)
+                    </strong>{" "}
+                    Speak your rebuttal into your mic, then click <strong className="text-emerald-300">&ldquo;Hear Reviewer Pushback&rdquo;</strong> to hear their response.
                   </>
                 ) : (
                   <>
-                    <strong className="text-foreground">Reviewer is speaking...</strong> Listen to the question.
+                    <strong className="text-foreground">Reviewer is speaking...</strong> Listen to the clinical challenge.
                   </>
                 )}
               </span>
             </div>
 
-            {isWaitingForDoctor && (
-              <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
+              {isOverturned ? (
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => respondToDoctorSpeech()}
-                  className="h-6 text-[11px] px-2 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20 gap-1"
+                  onClick={() => setIsSummaryModalOpen(true)}
+                  className="h-6 text-[11px] px-2.5 border-emerald-400 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 gap-1 font-semibold cursor-pointer"
                 >
-                  <span>Hear Pushback</span>
-                  <ArrowRight className="size-3" />
+                  <FileText className="size-3 text-emerald-300" />
+                  <span>View Encounter EHR Addendum</span>
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={startSimulation}
-                  className="h-6 text-[11px] px-2 text-muted-foreground hover:text-foreground gap-1"
-                >
-                  <ArrowCounterClockwise className="size-3" />
-                  <span>Restart</span>
-                </Button>
-              </div>
-            )}
+              ) : isWaitingForDoctor ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => respondToDoctorSpeech()}
+                    className="h-6 text-[11px] px-2 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20 gap-1 cursor-pointer"
+                  >
+                    <span>Hear Pushback</span>
+                    <ArrowRight className="size-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={startSimulation}
+                    className="h-6 text-[11px] px-2 text-muted-foreground hover:text-foreground gap-1 cursor-pointer"
+                  >
+                    <ArrowCounterClockwise className="size-3" />
+                    <span>Restart</span>
+                  </Button>
+                </>
+              ) : null}
+            </div>
           </div>
         )}
       </Card>
@@ -525,19 +566,36 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
           <div
             className={cn(
               "rounded-xl border p-4 space-y-3.5 transition-all shadow-md",
-              activeFastAnswer
+              isOverturned
+                ? "bg-emerald-950/40 border-emerald-500/80 ring-1 ring-emerald-500/40"
+                : activeFastAnswer
                 ? "bg-card/90 border-primary/60 ring-1 ring-primary/30"
                 : "bg-card/60 border-border/80"
             )}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="size-7 rounded-md bg-primary text-primary-foreground flex items-center justify-center font-bold text-xs shadow-xs">
-                  <Lightning className="size-4 text-primary-foreground" weight="fill" />
+                <div
+                  className={cn(
+                    "size-7 rounded-md flex items-center justify-center font-bold text-xs shadow-xs",
+                    isOverturned
+                      ? "bg-emerald-500 text-white"
+                      : "bg-primary text-primary-foreground"
+                  )}
+                >
+                  {isOverturned ? (
+                    <ShieldCheck className="size-4 text-white" weight="fill" />
+                  ) : (
+                    <Lightning className="size-4 text-primary-foreground" weight="fill" />
+                  )}
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-foreground font-sans flex items-center gap-1.5">
-                    <span>Instant Verbal Counter-Strike</span>
+                    <span>
+                      {isOverturned
+                        ? "Denial Overturned • Prior Authorization Issued"
+                        : "Instant Verbal Counter-Strike"}
+                    </span>
                     {isGeneratingAnswer && (
                       <span className="flex items-center gap-1 text-[10px] font-mono text-primary animate-pulse font-normal">
                         <CircleNotch className="size-3 animate-spin" />
@@ -546,15 +604,25 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                     )}
                   </h3>
                   <p className="text-[11px] text-muted-foreground font-sans">
-                    Read aloud into your microphone the instant the medical director asks this question
+                    {isOverturned
+                      ? "Verbal authorization granted on the record. Read aloud final closing confirmation statement."
+                      : "Read aloud into your microphone the instant the medical director asks this question"}
                   </p>
                 </div>
               </div>
 
               {activeFastAnswer && (
                 <div className="flex items-center gap-1.5">
-                  <Badge variant="outline" className="text-[10px] font-mono border-primary/40 text-primary">
-                    {activeFastAnswer.confidenceScore}% Grounded
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-[10px] font-mono",
+                      isOverturned
+                        ? "border-emerald-500/40 text-emerald-400 font-bold"
+                        : "border-primary/40 text-primary"
+                    )}
+                  >
+                    {isOverturned ? "100% Won" : `${activeFastAnswer.confidenceScore}% Grounded`}
                   </Badge>
                   <Button
                     variant="outline"
@@ -576,19 +644,52 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
             {activeFastAnswer ? (
               <div className="space-y-3">
                 {/* Detected Trap Question Header */}
-                <div className="p-2.5 rounded-md bg-destructive/10 border border-destructive/25 text-xs text-foreground/90 font-sans flex items-start gap-2">
-                  <WarningCircle className="size-4 text-destructive shrink-0 mt-0.5" />
+                <div
+                  className={cn(
+                    "p-2.5 rounded-md text-xs text-foreground/90 font-sans flex items-start gap-2 border",
+                    isOverturned
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
+                      : "bg-destructive/10 border-destructive/25"
+                  )}
+                >
+                  {isOverturned ? (
+                    <ShieldCheck className="size-4 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <WarningCircle className="size-4 text-destructive shrink-0 mt-0.5" />
+                  )}
                   <div>
-                    <span className="font-bold text-destructive">Insurer Objection: </span>
+                    <span
+                      className={cn(
+                        "font-bold",
+                        isOverturned ? "text-emerald-300" : "text-destructive"
+                      )}
+                    >
+                      {isOverturned ? "Reviewer Status: " : "Insurer Objection: "}
+                    </span>
                     <span className="italic">&ldquo;{activeFastAnswer.trapQuestion}&rdquo;</span>
                   </div>
                 </div>
 
                 {/* THE SPOKEN REBUTTAL (BIG, HIGH CONTRAST) */}
-                <div className="p-4 rounded-lg bg-secondary/70 border border-primary/30 text-foreground font-sans text-sm font-medium leading-relaxed shadow-xs selection:bg-primary/20">
-                  <div className="text-[10px] font-mono text-primary uppercase font-bold tracking-wider mb-1 flex items-center gap-1">
-                    <Play className="size-2.5 text-primary" weight="fill" />
-                    <span>SAY THIS RIGHT NOW:</span>
+                <div
+                  className={cn(
+                    "p-4 rounded-lg border text-foreground font-sans text-sm font-medium leading-relaxed shadow-xs selection:bg-primary/20",
+                    isOverturned
+                      ? "bg-emerald-950/30 border-emerald-500/40"
+                      : "bg-secondary/70 border-primary/30"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "text-[10px] font-mono uppercase font-bold tracking-wider mb-1 flex items-center gap-1",
+                      isOverturned ? "text-emerald-400" : "text-primary"
+                    )}
+                  >
+                    <Play
+                      className={cn("size-2.5", isOverturned ? "text-emerald-400" : "text-primary")}
+                      weight="fill"
+                    />
+                    <span>{isOverturned ? "SAY TO CONCLUDE CALL:" : "SAY THIS RIGHT NOW:"}</span>
                   </div>
                   <div className="text-foreground text-sm font-semibold leading-relaxed">
                     &ldquo;{activeFastAnswer.suggestedQuote}&rdquo;
@@ -620,10 +721,18 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
 
                 {/* Regulatory Leverage Tag */}
                 {activeFastAnswer.regulatoryLeverage && (
-                  <div className="text-xs font-sans text-primary/95 bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-md flex items-center gap-1.5">
+                  <div
+                    className={cn(
+                      "text-xs font-sans px-3 py-1.5 rounded-md flex items-center gap-1.5 border",
+                      isOverturned
+                        ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
+                        : "text-primary/95 bg-primary/10 border-primary/20"
+                    )}
+                  >
                     <Scales className="size-3.5 shrink-0" />
                     <span>
-                      <strong className="font-semibold">Statutory Leverage:</strong> {activeFastAnswer.regulatoryLeverage}
+                      <strong className="font-semibold">Statutory Leverage:</strong>{" "}
+                      {activeFastAnswer.regulatoryLeverage}
                     </span>
                   </div>
                 )}
