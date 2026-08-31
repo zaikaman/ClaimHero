@@ -570,42 +570,115 @@ export const generateUploadUrl = mutation({
 });
 
 /**
- * Sweep and recalculate statutory deadlines across all open claims (Invoked by cron)
+ * Helper to process a bounded page of claims during statutory deadline sweeps.
+ * Cascades asynchronously via ctx.scheduler.runAfter to prevent TransactionTooLarge
+ * and stay well within Convex documentsRead/bytesRead limits.
  */
-export const sweepDeadlines = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const now = Date.now();
-    const openClaims = await ctx.db.query("claims").collect();
-    let updatedCount = 0;
-    let criticalCount = 0;
+async function executeSweepDeadlinesBatch(
+  ctx: any,
+  args: {
+    cursor: string | null;
+    batchSize?: number;
+    totalUpdated?: number;
+    totalCritical?: number;
+  }
+) {
+  const now = Date.now();
+  const batchSize = Math.min(Math.max(1, args.batchSize ?? 100), 250);
 
-    for (const claim of openClaims) {
-      if (claim.status === "won" || claim.status === "lost") continue;
+  const pageResult = await ctx.db
+    .query("claims")
+    .paginate({ cursor: args.cursor, numItems: batchSize });
 
-      const exactRemaining = Math.max(0, Math.ceil((claim.statutoryDeadline - now) / 86400000));
+  let batchUpdated = 0;
+  let batchCritical = 0;
 
-      if (exactRemaining !== claim.daysRemaining) {
-        await ctx.db.patch(claim._id, {
-          daysRemaining: exactRemaining,
-          updatedAt: now,
+  for (const claim of pageResult.page) {
+    if (claim.status === "won" || claim.status === "lost") continue;
+
+    const exactRemaining = Math.max(
+      0,
+      Math.ceil((claim.statutoryDeadline - now) / 86400000)
+    );
+
+    if (exactRemaining !== claim.daysRemaining) {
+      await ctx.db.patch(claim._id, {
+        daysRemaining: exactRemaining,
+        updatedAt: now,
+      });
+      batchUpdated++;
+
+      if (exactRemaining <= 14 && claim.daysRemaining > 14) {
+        batchCritical++;
+        await ctx.db.insert("appealAuditLogs", {
+          claimId: claim._id,
+          eventType: "statutory_alarm_critical",
+          actor: "Statutory Deadline Sentinel",
+          details: `CRITICAL ALARM: Only ${exactRemaining} days remaining before statutory ERISA appeal clock expires for claim ${claim.claimNumber}.`,
+          timestamp: now,
         });
-        updatedCount++;
-
-        if (exactRemaining <= 14 && claim.daysRemaining > 14) {
-          criticalCount++;
-          await ctx.db.insert("appealAuditLogs", {
-            claimId: claim._id,
-            eventType: "statutory_alarm_critical",
-            actor: "Statutory Deadline Sentinel",
-            details: `CRITICAL ALARM: Only ${exactRemaining} days remaining before statutory ERISA appeal clock expires for claim ${claim.claimNumber}.`,
-            timestamp: now,
-          });
-        }
       }
     }
+  }
 
-    return { updatedCount, criticalCount };
+  const totalUpdated = (args.totalUpdated ?? 0) + batchUpdated;
+  const totalCritical = (args.totalCritical ?? 0) + batchCritical;
+
+  if (!pageResult.isDone) {
+    await ctx.scheduler.runAfter(
+      0,
+      (internal as any).claims.sweepDeadlinesBatch,
+      {
+        cursor: pageResult.continueCursor,
+        batchSize,
+        totalUpdated,
+        totalCritical,
+      }
+    );
+  }
+
+  return {
+    isDone: pageResult.isDone,
+    continueCursor: pageResult.continueCursor,
+    batchProcessed: pageResult.page.length,
+    batchUpdated,
+    batchCritical,
+    totalUpdated,
+    totalCritical,
+  };
+}
+
+/**
+ * Sweep and recalculate statutory deadlines across all open claims (Invoked by cron).
+ * Initiates bounded pagination batching to safely process any volume of claims without TransactionTooLarge.
+ */
+export const sweepDeadlines = internalMutation({
+  args: {
+    cursor: v.optional(v.union(v.string(), v.null())),
+    batchSize: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    return await executeSweepDeadlinesBatch(ctx, {
+      cursor: args.cursor ?? null,
+      batchSize: args.batchSize ?? 100,
+      totalUpdated: 0,
+      totalCritical: 0,
+    });
+  },
+});
+
+/**
+ * Internal mutation for scheduled continuation batches during statutory deadline sweep
+ */
+export const sweepDeadlinesBatch = internalMutation({
+  args: {
+    cursor: v.union(v.string(), v.null()),
+    batchSize: v.optional(v.number()),
+    totalUpdated: v.optional(v.number()),
+    totalCritical: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    return await executeSweepDeadlinesBatch(ctx, args);
   },
 });
 

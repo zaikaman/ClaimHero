@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-191%2F191%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-195%2F195%20passing-0ea5e9?style=flat-square" />
   <img alt="Coverage" src="https://img.shields.io/badge/coverage-100%25%20lines-10b981?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
@@ -210,7 +210,7 @@ Convex is not an addon; it *is* the backend. Every feature is a Convex primitive
 | **Mutations** | `convex/claims.ts:180` `create`, `251` `createWithPatient`, `411` `updateStatus`, `704` `deleteCase`, `842` `updateAppealContext`, `1010` `updateFinancialLiability`, `1059` `updateErisaPenalties` | Atomic patient+claim creation, cascading purge (5 tables + 2 storage artifacts), HIPAA metadata, ERISA penalty persistence |
 | **Actions (Node)** | `convex/actions/*` (12 actions) | All Firecrawl/OpenAI I/O lives in `"use node"` actions — never in queries/mutations |
 | **Scheduled Functions** | `ctx.scheduler.runAfter(0, ...)` in `claims.ts:269`, `sentinelPipeline.ts`, `http.ts:63` | Post-ingest inbox provisioning, post-crawl status bumps, post-win precedent reindex |
-| **Crons** | `convex/crons.ts:10` `crons.cron("statutory-deadline-daily-sweep", "0 0 * * *", api.claims.sweepDeadlines)` | Nightly recalculation of `daysRemaining`; critical alarm (<14d) audit events |
+| **Crons** | `convex/crons.ts:10` `crons.cron("statutory-deadline-daily-sweep", "0 0 * * *", internal.claims.sweepDeadlines)` | Nightly statutory deadline sweep via bounded batches (`sweepDeadlinesBatch` with `ctx.scheduler.runAfter`), recalculating `daysRemaining` and emitting `<14d` critical alarms |
 | **File Storage** | `convex/claims.ts:480` `generateUploadUrl`, `ctx.storage.getUrl/delete` | Denial PDFs, exhibit PDFs, AgentMail attachments |
 | **HTTP Router** | `convex/http.ts:19` `http.route({path:"/agentmail-webhook", method:"POST", handler: httpAction(...)})` | AgentMail `message.received` intake + claim reply intake, idempotent via `agentMailIntakeEvents` (`schema.ts:232`) |
 | **Auth** | `convex/auth.ts`, `convex/auth.config.ts`, `convex/users.ts` + `@convex-dev/auth` | Google OAuth + Password, RS256 JWT, `getAuthUserId(ctx)` ownership enforcement on every query/mutation |
@@ -278,7 +278,7 @@ This is a Convex showcase end-to-end. Selected call sites (use `file:line` to ju
 * **Cascading purge** — `convex/claims.ts:704` `deleteCase` enforces ownership, deletes across `clinicalEvidences`, `appeals` (+ `ctx.storage.delete` PDF), `emailMessages`, `emailThreads`, `appealAuditLogs`, and the denial letter storage id.
 * **Master pipeline** — `convex/actions/sentinelPipeline.ts:27` `runAutonomousPipeline` chains crawler -> scorer -> vector search -> synthesizer -> `ready_for_review`, with payer gateway auto-resolution and sender/clinicalFacts fallback.
 * **Vector retrieval** — `convex/actions/precedentArchive.ts` `retrieveTopPrecedents` does `ctx.vectorSearch("precedents", "by_embedding", {vector, limit:10, filter: q.eq(...)})`, hydrates via internal query, `rankPrecedentHits` by code overlap, and `attachMatchesToClaim` with idempotency guard.
-* **Deadline sweep** — `convex/crons.ts:10` daily `sweepDeadlines` (`claims.ts:490`) patches `daysRemaining` and emits `statutory_alarm_critical` when crossing the 14-day threshold.
+* **Deadline sweep** — `convex/crons.ts:10` daily `sweepDeadlines` and `sweepDeadlinesBatch` (`claims.ts`) patches `daysRemaining` via bounded paginated chunks with `ctx.scheduler.runAfter` and emits `statutory_alarm_critical` when crossing the 14-day threshold without hitting transaction limits.
 * **Webhook** — `convex/http.ts:19` validates payload, routes to intake vs claim-reply, and `scheduler.runAfter(0, ...)` keeps response <100ms.
 
 ---
@@ -534,17 +534,17 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex
-npm run test            # vitest run tests  (191 tests)
+npm run test            # vitest run tests  (195 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run build           # tsc --noEmit && vite build
 npm run verify          # typecheck + lint + test + build — must be 100% clean before every commit
 ```
 
-Current: **191/191 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
+Current: **195/195 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
-| [`tests/claimhero.test.ts`](file:///d:/ClaimHero/tests/claimhero.test.ts) | 62 | Master end-to-end integration, 4-pillar rubric scoring, ERISA rules, portfolio aggregation |
+| [`tests/claimhero.test.ts`](file:///d:/ClaimHero/tests/claimhero.test.ts) | 66 | Master end-to-end integration, 4-pillar rubric scoring, ERISA rules, portfolio aggregation, bounded batch deadline sweep |
 | [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 23 | AgentMail delivery, binary attachments, webhook normalizers, Svix signature verification, key rotation |
 | [`tests/redactionEngine.test.ts`](file:///d:/ClaimHero/tests/redactionEngine.test.ts) | 17 | HIPAA Safe Harbor 18-identifier redaction, boundary masking, regex patterns |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking |
@@ -601,7 +601,7 @@ The chronological, evidence-based build log lives at **`hackathon.md`** (repo ro
 |---|---|
 | **Real-World Utility** | Solves a $1.5B/year denial crisis for providers, advocates, and patients. Every output is a *sendable* artifact (email, portal paste, certified mail PDF, P2P script) — not a demo. Preset cases mirror real EOBs with statutory intake language. |
 | **Full-Stack Integration Depth** | **Convex** (9 tables, vector search, crons, file storage, httpRouter, auth) + **Firecrawl** (live search and scrape with adaptive clearinghouse retrieval, residential stealth proxies, document windowing, payer/anatomical guards) + **AgentMail** (3-mode dispatch, 2 shared inboxes, idempotent intake + reply webhooks, REST `api.agentmail.to`) + **OpenAI** (Vision OCR, structured `DenialExtractionResult`/`PolicyExtractionResponse`/`AppealBriefSynthesisResult`, deterministic scoring, grounded synthesis). No pillar is decorative — pull any one and the product stops working. |
-| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 191 tests + 100% line coverage + production build). Strict TypeScript, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette. |
+| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 195 tests + 100% line coverage + production build). Strict TypeScript, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette. |
 | **Transparency & Process** | `hackathon.md` is the source of truth: 40+ dated entries, file-level diffs, Convex feature tags per entry, and transparent handling of private MCG portals and vector precedents. `npm run verify` is the gate before every commit. |
 
 ---

@@ -1442,7 +1442,170 @@ describe("Convex Advanced Components & Infrastructure (Rate Limiter, Search Inde
     expect(evidenceModule.searchEvidence).toBeDefined();
     expect(precedentsModule.searchTextPrecedents).toBeDefined();
   });
+
+  describe("Statutory Deadline Sweep Bounded Batch Processing", () => {
+    it("exports sweepDeadlines and sweepDeadlinesBatch mutations", async () => {
+      const claimsModule = await import("../convex/claims");
+      expect(claimsModule.sweepDeadlines).toBeDefined();
+      expect(claimsModule.sweepDeadlinesBatch).toBeDefined();
+    });
+
+    it("processes deadline recalculations and triggers critical statutory alarms", async () => {
+      const claimsModule = await import("../convex/claims");
+      const handler = (claimsModule.sweepDeadlines as any)._handler;
+
+      const now = Date.now();
+      const mockPatch = vi.fn();
+      const mockInsert = vi.fn();
+      const mockRunAfter = vi.fn();
+
+      const mockClaims = [
+        // Claim 1: Needs recalculation and crosses 14-day threshold (was 16d, now 10d) -> triggers alarm
+        {
+          _id: "claim_1",
+          claimNumber: "CLM-001",
+          status: "ready_for_review",
+          statutoryDeadline: now + 10 * 86400000,
+          daysRemaining: 16,
+        },
+        // Claim 2: Terminal won case -> should be skipped
+        {
+          _id: "claim_2",
+          claimNumber: "CLM-002",
+          status: "won",
+          statutoryDeadline: now + 5 * 86400000,
+          daysRemaining: 5,
+        },
+        // Claim 3: Already accurate daysRemaining -> no patch or alarm
+        {
+          _id: "claim_3",
+          claimNumber: "CLM-003",
+          status: "dispatched",
+          statutoryDeadline: now + 50 * 86400000,
+          daysRemaining: 50,
+        },
+        // Claim 4: Needs recalculation but was already critical (was 10d, now 9d) -> patches but no new alarm
+        {
+          _id: "claim_4",
+          claimNumber: "CLM-004",
+          status: "analyzing",
+          statutoryDeadline: now + 9 * 86400000,
+          daysRemaining: 10,
+        },
+      ];
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            paginate: vi.fn().mockResolvedValue({
+              page: mockClaims,
+              isDone: false,
+              continueCursor: "cursor_page_2",
+            }),
+          }),
+          patch: mockPatch,
+          insert: mockInsert,
+        },
+        scheduler: {
+          runAfter: mockRunAfter,
+        },
+      };
+
+      const result = await handler(mockCtx, { batchSize: 50 });
+
+      // Claim 1 and Claim 4 were patched
+      expect(mockPatch).toHaveBeenCalledTimes(2);
+      expect(mockPatch).toHaveBeenCalledWith("claim_1", {
+        daysRemaining: 10,
+        updatedAt: expect.any(Number),
+      });
+      expect(mockPatch).toHaveBeenCalledWith("claim_4", {
+        daysRemaining: 9,
+        updatedAt: expect.any(Number),
+      });
+
+      // Only Claim 1 triggered the critical alarm (crossed >14 to <=14)
+      expect(mockInsert).toHaveBeenCalledTimes(1);
+      expect(mockInsert).toHaveBeenCalledWith("appealAuditLogs", {
+        claimId: "claim_1",
+        eventType: "statutory_alarm_critical",
+        actor: "Statutory Deadline Sentinel",
+        details: expect.stringContaining("CRITICAL ALARM: Only 10 days remaining"),
+        timestamp: expect.any(Number),
+      });
+
+      // Scheduled the next batch because isDone is false
+      expect(mockRunAfter).toHaveBeenCalledTimes(1);
+      expect(mockRunAfter).toHaveBeenCalledWith(
+        0,
+        expect.anything(),
+        {
+          cursor: "cursor_page_2",
+          batchSize: 50,
+          totalUpdated: 2,
+          totalCritical: 1,
+        }
+      );
+
+      expect(result).toMatchObject({
+        isDone: false,
+        continueCursor: "cursor_page_2",
+        batchProcessed: 4,
+        batchUpdated: 2,
+        batchCritical: 1,
+        totalUpdated: 2,
+        totalCritical: 1,
+      });
+    });
+
+    it("terminates gracefully when page is done without scheduling extra runs", async () => {
+      const claimsModule = await import("../convex/claims");
+      const handler = (claimsModule.sweepDeadlinesBatch as any)._handler;
+
+      const mockPatch = vi.fn();
+      const mockInsert = vi.fn();
+      const mockRunAfter = vi.fn();
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            paginate: vi.fn().mockResolvedValue({
+              page: [],
+              isDone: true,
+              continueCursor: "cursor_end",
+            }),
+          }),
+          patch: mockPatch,
+          insert: mockInsert,
+        },
+        scheduler: {
+          runAfter: mockRunAfter,
+        },
+      };
+
+      const result = await handler(mockCtx, {
+        cursor: "cursor_page_2",
+        batchSize: 100,
+        totalUpdated: 5,
+        totalCritical: 2,
+      });
+
+      expect(mockPatch).not.toHaveBeenCalled();
+      expect(mockInsert).not.toHaveBeenCalled();
+      expect(mockRunAfter).not.toHaveBeenCalled();
+
+      expect(result).toMatchObject({
+        isDone: true,
+        batchProcessed: 0,
+        batchUpdated: 0,
+        batchCritical: 0,
+        totalUpdated: 5,
+        totalCritical: 2,
+      });
+    });
+  });
 });
+
 
 
 
