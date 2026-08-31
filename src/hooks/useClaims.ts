@@ -57,8 +57,23 @@ export function useClaims(options?: {
     });
   }, [rawClaims, options?.statusFilter, searchQuery]);
 
-  // Aggregate Dashboard Statistics from real claims
+  // Aggregate Dashboard Statistics backed by server-side TableAggregate / getPortfolioStats
   const stats: DashboardStats = useMemo(() => {
+    if (
+      rawPortfolioStats &&
+      (!options?.statusFilter || options.statusFilter === "all") &&
+      (!options?.payerFilter || options.payerFilter === "all") &&
+      !searchQuery
+    ) {
+      return {
+        totalClaims: rawPortfolioStats.totalClaims,
+        activeDisputedAmount: rawPortfolioStats.activeDisputedAmount,
+        overturnedWonAmount: rawPortfolioStats.overturnedWonAmount,
+        averageWinScore: rawPortfolioStats.averageWinScore,
+        criticalDeadlinesCount: rawPortfolioStats.criticalDeadlinesCount,
+      };
+    }
+
     const list = rawClaims || [];
     const totalClaims = list.length;
     let activeDisputedAmount = 0;
@@ -91,10 +106,29 @@ export function useClaims(options?: {
       averageWinScore: scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0,
       criticalDeadlinesCount,
     };
-  }, [rawClaims]);
+  }, [rawClaims, rawPortfolioStats, options?.statusFilter, options?.payerFilter, searchQuery]);
 
-  // Status breakdown counts
+  // Status breakdown counts backed by server-side aggregations
   const claimCountsByStatus = useMemo(() => {
+    if (
+      rawPortfolioStats &&
+      (!options?.payerFilter || options.payerFilter === "all") &&
+      !searchQuery
+    ) {
+      return {
+        all: rawPortfolioStats.totalClaims,
+        ingested: rawPortfolioStats.claimsByStatus?.ingested ?? 0,
+        parsing: rawPortfolioStats.claimsByStatus?.parsing ?? 0,
+        analyzing: rawPortfolioStats.claimsByStatus?.analyzing ?? 0,
+        precedent_matched: rawPortfolioStats.claimsByStatus?.precedent_matched ?? 0,
+        drafting: rawPortfolioStats.claimsByStatus?.drafting ?? 0,
+        ready_for_review: rawPortfolioStats.claimsByStatus?.ready_for_review ?? 0,
+        dispatched: rawPortfolioStats.claimsByStatus?.dispatched ?? 0,
+        won: rawPortfolioStats.claimsByStatus?.won ?? 0,
+        critical_deadline: rawPortfolioStats.criticalDeadlinesCount,
+      };
+    }
+
     const list = rawClaims || [];
     const counts: Record<string, number> = {
       all: list.length,
@@ -119,7 +153,7 @@ export function useClaims(options?: {
     }
 
     return counts;
-  }, [rawClaims]);
+  }, [rawClaims, rawPortfolioStats, options?.payerFilter, searchQuery]);
 
   // Active selected claim
   const selectedClaim = useMemo(() => {

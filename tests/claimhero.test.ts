@@ -18,9 +18,10 @@ import { extractEmailAddress, normalizeAgentMailWebhook } from "../convex/lib/ag
 
 describe("ClaimHero Domain Utilities & Formatting", () => {
   it("formats numerical dollar amounts into standard US healthcare currency", () => {
-    expect(formatCurrency(24500)).toBe("$24,500");
-    expect(formatCurrency(18200)).toBe("$18,200");
-    expect(formatCurrency(0)).toBe("$0");
+    expect(formatCurrency(24500)).toBe("$24,500.00");
+    expect(formatCurrency(18200)).toBe("$18,200.00");
+    expect(formatCurrency(0)).toBe("$0.00");
+    expect(formatCurrency(1234.56)).toBe("$1,234.56");
   });
 
   it("evaluates statutory deadline countdown alarm states correctly", () => {

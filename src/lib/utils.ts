@@ -14,12 +14,18 @@ export function cn(...inputs: ClassValue[]) {
  * Format numerical dollar amounts into standard US healthcare currency strings
  * e.g. 24500 -> "$24,500.00"
  */
-export function formatCurrency(amount: number): string {
+export function formatCurrency(
+  amount: number,
+  options?: { hideCentsIfWhole?: boolean; minimumFractionDigits?: number; maximumFractionDigits?: number }
+): string {
+  const minDigits = options?.minimumFractionDigits ?? (options?.hideCentsIfWhole && Number.isInteger(amount) ? 0 : 2);
+  const maxDigits = options?.maximumFractionDigits ?? (options?.hideCentsIfWhole && Number.isInteger(amount) ? 0 : 2);
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: minDigits,
+    maximumFractionDigits: maxDigits,
   }).format(amount);
 }
 

@@ -28,10 +28,10 @@ describe("src/lib/utils Unit Tests", () => {
     expect(cn(["flex", "items-center"], { "justify-center": true, "hidden": false })).toBe("flex items-center justify-center");
   });
 
-  it("formatCurrency formats US healthcare monetary numbers", () => {
-    expect(formatCurrency(24500)).toBe("$24,500");
-    expect(formatCurrency(0)).toBe("$0");
-    expect(formatCurrency(1234.56)).toBe("$1,235");
+  it("formatCurrency formats US healthcare monetary numbers with full cents precision", () => {
+    expect(formatCurrency(24500)).toBe("$24,500.00");
+    expect(formatCurrency(0)).toBe("$0.00");
+    expect(formatCurrency(1234.56)).toBe("$1,234.56");
   });
 
   it("formatDate formats timestamps and date strings accurately", () => {

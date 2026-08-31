@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-207%2F207%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-213%2F213%20passing-0ea5e9?style=flat-square" />
   <img alt="Coverage" src="https://img.shields.io/badge/coverage-100%25%20lines-10b981?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
@@ -385,7 +385,7 @@ ClaimHero ships with six independent anti-hallucination layers:
 | **Frontend** | React 18 + TypeScript (strict mode, `@typescript-eslint/no-explicit-any: error`, zero `any` casts) + Vite 6 + Tailwind CSS 3.4 |
 | **UI** | Radix Primitives, Phosphor Icons (`@phosphor-icons/react`), `react-markdown` + `remark-gfm`/`remark-breaks`, `three`/`@react-three/fiber` Silk shader |
 | **State** | Convex reactive hooks (`useQuery`, `useMutation`, `useAction`, `useConvexAuth`) + custom hooks (`useClaims`, `useEvidence`, `useAppealStudio`, `useLiveCallCopilot`, `useLiabilityCalculator`, `usePrecedents`) with 100% typed `api.*` FunctionReferences |
-| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 200 unit tests across 12 suites, 100% line coverage in backend libs and core utils |
+| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 213 unit tests across 12 suites, 100% line coverage in backend libs and core utils |
 
 Theme: **Precision Medical Dark Mode** — obsidian `#0b0f17` canvas, cyan `#0ea5e9` primary, emerald/amber/crimson semantic tokens, glassmorphism (`backdrop-blur-md`, `bg-card/75`), tabular-nums for monetary values (`src/index.css:7`, `tailwind.config.js`).
 
@@ -448,7 +448,7 @@ ClaimHero/
 │   │   ├── layout/ (Shell, Sidebar, Header) + ui/* (Button, Card, Badge, Dialog, Select, Silk)
 │   │   └── onboarding/ (OnboardingWizard, OnboardingChecklist)
 │   └── types/index.ts
-├── tests/                        # 200 unit tests across 12 suites (vitest + v8 coverage)
+├── tests/                        # 213 unit tests across 12 suites (vitest + v8 coverage)
 ├── .env.example                  # all required keys documented
 ├── convex.json / vite.config.ts / tailwind.config.js / tsconfig.json
 ├── BRIEF.md / hackathon.md / README.md
@@ -536,22 +536,22 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (207 tests)
+npm run test            # vitest run tests  (213 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **207/207 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
+Current: **213/213 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
 | [`tests/claimhero.test.ts`](file:///d:/ClaimHero/tests/claimhero.test.ts) | 66 | Master end-to-end integration, 4-pillar rubric scoring, ERISA rules, portfolio aggregation, bounded batch deadline sweep, competitor payer domain rejection, and global Carelon/BCBS template verification |
 | [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 25 | AgentMail delivery, binary attachments, webhook normalizers, Svix signature verification, key rotation, free-tier intake routing |
+| [`tests/authorization.test.ts`](file:///d:/ClaimHero/tests/authorization.test.ts) | 29 | Convex multi-tenant authorization, searchIndex & vector isolation, strict document & shared intake claim ownership validation, unauthenticated rejection, session isolation, optical parser 15MB/MIME gates, idempotent thread lookups |
 | [`tests/redactionEngine.test.ts`](file:///d:/ClaimHero/tests/redactionEngine.test.ts) | 17 | HIPAA Safe Harbor 18-identifier redaction, boundary masking, regex patterns |
-| [`tests/authorization.test.ts`](file:///d:/ClaimHero/tests/authorization.test.ts) | 16 | Convex multi-tenant authorization, strict document & shared intake claim ownership validation, unauthenticated rejection, session isolation |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking |
 | [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest |
-| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting, statutory countdown math, risk badge styling, verified payer appellate contact directory lookup |
+| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting (cents precision), statutory countdown math, risk badge styling, verified payer appellate contact directory lookup |
 | [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, 3-tier appellate escalation |
 | [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, STT tolerance |
 | [`tests/p2pDefense.test.ts`](file:///d:/ClaimHero/tests/p2pDefense.test.ts) | 6 | Physician tele-script generator, statutory opening, pocket cheat sheet print |
@@ -602,7 +602,7 @@ The chronological, evidence-based build log lives at **`hackathon.md`** (repo ro
 |---|---|
 | **Real-World Utility** | Solves a $1.5B/year denial crisis for providers, advocates, and patients. Every output is a *sendable* artifact (email, portal paste, certified mail PDF, P2P script) — not a demo. Preset cases mirror real EOBs with statutory intake language. |
 | **Full-Stack Integration Depth** | **Convex** (9 tables, vector search, crons, file storage, httpRouter, auth) + **Firecrawl** (live search and scrape with adaptive clearinghouse retrieval, residential stealth proxies, document windowing, payer/anatomical guards) + **AgentMail** (3-mode dispatch, 2 shared inboxes, idempotent intake + reply webhooks, REST `api.agentmail.to`) + **OpenAI** (Vision OCR, structured `DenialExtractionResult`/`PolicyExtractionResponse`/`AppealBriefSynthesisResult`, deterministic scoring, grounded synthesis). No pillar is decorative — pull any one and the product stops working. |
-| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 200 tests + 100% line coverage + production build). Strict zero-`any` TypeScript policy (`@typescript-eslint/no-explicit-any: "error"`), strongly typed Convex `FunctionReference` bindings across crons, actions, and UI hooks, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette. |
+| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 213 tests + 100% line coverage + production build). Strict zero-`any` TypeScript policy (`@typescript-eslint/no-explicit-any: "error"`), strongly typed Convex `FunctionReference` bindings across crons, actions, and UI hooks, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette. |
 | **Transparency & Process** | `hackathon.md` is the source of truth: 40+ dated entries, file-level diffs, Convex feature tags per entry, and transparent handling of private MCG portals and vector precedents. `npm run verify` is the gate before every commit. |
 
 ---

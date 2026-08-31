@@ -32,7 +32,7 @@ export const search = query({
       })
       .take(args.limit || 20);
 
-    return results;
+    return results.filter((r) => r.userId === userId);
   },
 });
 
@@ -958,8 +958,24 @@ export const getPortfolioStats = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect()) as Doc<"claims">[];
 
-    const patients = await ctx.db.query("patients").collect();
+    // Fetch only the authenticated user's patients to prevent cross-tenant leakage
+    const patients = await ctx.db
+      .query("patients")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
     const patientMap = new Map(patients.map((p) => [p._id, p]));
+
+    // Query O(log N) claimsAggregate for portfolio-level validation where available
+    let aggregateCount: number | null = null;
+    let aggregateSum: number | null = null;
+    try {
+      [aggregateCount, aggregateSum] = await Promise.all([
+        claimsAggregate.count(ctx, { namespace: userId as string }),
+        claimsAggregate.sum(ctx, { namespace: userId as string }),
+      ]);
+    } catch {
+      // Graceful fallback to in-memory reduction if aggregate tree is synchronizing
+    }
 
     let totalDisputedAmount = 0;
     let activeDisputedAmount = 0;
@@ -1061,8 +1077,8 @@ export const getPortfolioStats = query({
     }));
 
     return {
-      totalClaims: claims.length,
-      totalDisputedAmount,
+      totalClaims: aggregateCount !== null && aggregateCount >= claims.length ? aggregateCount : claims.length,
+      totalDisputedAmount: aggregateSum !== null && aggregateSum > 0 ? aggregateSum : totalDisputedAmount,
       activeDisputedAmount,
       overturnedWonAmount,
       averageWinScore,

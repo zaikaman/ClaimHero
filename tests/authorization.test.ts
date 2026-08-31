@@ -411,4 +411,170 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
       ).rejects.toThrow("Forbidden: You do not have permission to access this claim");
     });
   });
+
+  describe("M1 & M3 & M7 Hardening Verification", () => {
+    it("M1: claims.search returns empty array and does not query search index when unauthenticated", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const { search } = await import("../convex/claims");
+      const mockCtx: any = {
+        db: {
+          query: vi.fn(),
+        },
+      };
+
+      const results = await (search as any)._handler(mockCtx, { query: "lumbar spinal surgery" });
+      expect(results).toEqual([]);
+      expect(mockCtx.db.query).not.toHaveBeenCalled();
+    });
+
+    it("M1: claims.search filters strictly by authenticated userId", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_authenticated_100" as any);
+      const { search } = await import("../convex/claims");
+      const mockTake = vi.fn().mockResolvedValue([
+        { _id: "c1", userId: "user_authenticated_100", denialReasonDescription: "lumbar spinal surgery" },
+        { _id: "c2", userId: "user_other_999", denialReasonDescription: "lumbar spinal surgery leaked" },
+      ]);
+      const mockWithSearchIndex = vi.fn().mockReturnValue({ take: mockTake });
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({ withSearchIndex: mockWithSearchIndex }),
+        },
+      };
+
+      const results = await (search as any)._handler(mockCtx, { query: "lumbar", limit: 10 });
+      // Only returns records where userId strictly matches authenticated user
+      expect(results).toEqual([
+        { _id: "c1", userId: "user_authenticated_100", denialReasonDescription: "lumbar spinal surgery" },
+      ]);
+    });
+
+    it("M3: appeals.getLatestByClaim returns latest draft even if claim status is analyzing or parsing", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_owner" as any);
+      const { getLatestByClaim } = await import("../convex/appeals");
+      const mockClaim = { _id: "claim_analyzing", userId: "user_owner", status: "analyzing" };
+      const mockAppeals = [
+        { _id: "app_1", claimId: "claim_analyzing", version: 1, executiveSummary: "Draft v1" },
+        { _id: "app_2", claimId: "claim_analyzing", version: 2, executiveSummary: "Draft v2" },
+      ];
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              collect: vi.fn().mockResolvedValue(mockAppeals),
+            }),
+          }),
+        },
+      };
+
+      const latest = await (getLatestByClaim as any)._handler(mockCtx, { claimId: "claim_analyzing" as any });
+      expect(latest?.version).toBe(2);
+      expect(latest?._id).toBe("app_2");
+    });
+
+    it("M7: emails.getOrCreateThread uses indexed first() and patches existing thread", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_owner" as any);
+      const { getOrCreateThread } = await import("../convex/emails");
+      const mockClaim = { _id: "claim_123", userId: "user_owner" };
+      const existingThread = { _id: "thread_existing", claimId: "claim_123", agentEmail: "old@agent.com" };
+
+      const mockFirst = vi.fn().mockResolvedValue(existingThread);
+      const mockWithIndex = vi.fn().mockReturnValue({ first: mockFirst });
+      const mockPatch = vi.fn().mockResolvedValue(undefined);
+
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+          query: vi.fn().mockReturnValue({ withIndex: mockWithIndex }),
+          patch: mockPatch,
+        },
+      };
+
+      const threadId = await (getOrCreateThread as any)._handler(mockCtx, {
+        claimId: "claim_123" as any,
+        agentEmail: "new@agent.com",
+        payerEmail: "appeals@payer.com",
+        subject: "Urgent ERISA Appeal",
+      });
+
+      expect(threadId).toBe("thread_existing");
+      expect(mockFirst).toHaveBeenCalled();
+      expect(mockPatch).toHaveBeenCalledWith("thread_existing", {
+        agentEmail: "new@agent.com",
+        payerEmail: "appeals@payer.com",
+        subject: "Urgent ERISA Appeal",
+      });
+    });
+
+    it("M2: opticalParser rejects oversized uploads exceeding 15MB gate", async () => {
+      const { parseDenialDocument } = await import("../convex/actions/opticalParser");
+      const mockCtx: any = {
+        runMutation: vi.fn().mockResolvedValue({ ok: true }),
+        runQuery: vi.fn().mockResolvedValue(null),
+        storage: {
+          getUrl: vi.fn().mockResolvedValue("https://convex.mock/file.pdf"),
+        },
+      };
+
+      // Mock fetch returning oversized header
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        statusText: "OK",
+        headers: {
+          get: (name: string) => {
+            if (name.toLowerCase() === "content-length") return String(20 * 1024 * 1024); // 20MB
+            if (name.toLowerCase() === "content-type") return "application/pdf";
+            return null;
+          },
+        },
+      }) as any;
+
+      try {
+        await expect(
+          (parseDenialDocument as any)._handler(mockCtx, {
+            storageId: "storage_oversized" as any,
+          })
+        ).rejects.toThrow(/exceeds the 15 MB intake limit/i);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it("M2: opticalParser rejects unsupported binary executable formats", async () => {
+      const { parseDenialDocument } = await import("../convex/actions/opticalParser");
+      const mockCtx: any = {
+        runMutation: vi.fn().mockResolvedValue({ ok: true }),
+        runQuery: vi.fn().mockResolvedValue(null),
+        storage: {
+          getUrl: vi.fn().mockResolvedValue("https://convex.mock/file.bin"),
+        },
+      };
+
+      const binaryBytes = new Uint8Array([0x00, 0x01, 0x02, 0x03, 0xff]); // binary non-text non-image
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        statusText: "OK",
+        headers: {
+          get: (name: string) => {
+            if (name.toLowerCase() === "content-length") return String(binaryBytes.length);
+            if (name.toLowerCase() === "content-type") return "application/x-executable";
+            return null;
+          },
+        },
+        arrayBuffer: vi.fn().mockResolvedValue(binaryBytes.buffer),
+      }) as any;
+
+      try {
+        await expect(
+          (parseDenialDocument as any)._handler(mockCtx, {
+            storageId: "storage_bin" as any,
+          })
+        ).rejects.toThrow(/Unsupported document format/i);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
 });

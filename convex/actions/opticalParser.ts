@@ -69,6 +69,74 @@ export interface DenialExtractionResult {
   payerAppealsAddress?: string;
 }
 
+const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024; // 15 MB
+
+function detectFileFormat(
+  contentType: string,
+  bytes: Uint8Array
+): { type: "pdf" | "image" | "text" | "unsupported"; mime: string } {
+  const normType = contentType.toLowerCase().trim();
+
+  // Check magic bytes for PDF (%PDF-)
+  if (bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+    return { type: "pdf", mime: "application/pdf" };
+  }
+
+  // Check magic bytes for PNG (\x89PNG)
+  if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return { type: "image", mime: "image/png" };
+  }
+
+  // Check magic bytes for JPEG (\xFF\xD8\xFF)
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return { type: "image", mime: "image/jpeg" };
+  }
+
+  // Check magic bytes for WebP (RIFF....WEBP)
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return { type: "image", mime: "image/webp" };
+  }
+
+  if (normType === "application/pdf") {
+    return { type: "pdf", mime: "application/pdf" };
+  }
+
+  if (normType.startsWith("image/")) {
+    return { type: "image", mime: normType };
+  }
+
+  if (normType.startsWith("text/") || normType === "application/json" || normType === "application/xml") {
+    return { type: "text", mime: normType || "text/plain" };
+  }
+
+  // If octet-stream or unknown, check if mostly printable ASCII/UTF-8
+  if (bytes.length > 0) {
+    let isPrintableText = true;
+    for (let i = 0; i < Math.min(bytes.length, 512); i++) {
+      const b = bytes[i];
+      if (b === 0 || (b < 9 && b !== 0x09) || (b > 13 && b < 32 && b !== 0x1b)) {
+        isPrintableText = false;
+        break;
+      }
+    }
+    if (isPrintableText) {
+      return { type: "text", mime: "text/plain" };
+    }
+  }
+
+  return { type: "unsupported", mime: normType };
+}
+
 /**
  * Optical Extraction Action: Parse an uploaded denial letter or user-submitted text using gpt-5.4-nano
  */
@@ -95,7 +163,7 @@ export const parseDenialDocument = action({
     const imageUrls: string[] = [];
     const fileInputs: Array<{ fileData: string; filename: string }> = [];
 
-    // If storage file was uploaded, fetch and prepare document content
+    // If storage file was uploaded, fetch and prepare document content with strict size & MIME validation
     if (args.storageId) {
       const fileUrl = await ctx.storage.getUrl(args.storageId);
       if (!fileUrl) {
@@ -104,24 +172,41 @@ export const parseDenialDocument = action({
 
       try {
         const response = await fetch(fileUrl);
-        const contentType = response.headers.get("content-type") || "";
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file from storage: ${response.statusText}`);
+        }
 
-        if (contentType.startsWith("image/")) {
-          const arrayBuffer = await response.arrayBuffer();
+        const contentLength = response.headers.get("content-length");
+        if (contentLength && parseInt(contentLength, 10) > MAX_DOCUMENT_BYTES) {
+          throw new Error(`Uploaded document exceeds the ${MAX_DOCUMENT_BYTES / (1024 * 1024)} MB intake limit.`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        if (arrayBuffer.byteLength > MAX_DOCUMENT_BYTES) {
+          throw new Error(`Uploaded document exceeds the ${MAX_DOCUMENT_BYTES / (1024 * 1024)} MB intake limit.`);
+        }
+
+        const rawContentType = response.headers.get("content-type") || "";
+        const detected = detectFileFormat(rawContentType, new Uint8Array(arrayBuffer));
+
+        if (detected.type === "image") {
           const buffer = Buffer.from(arrayBuffer);
           const base64 = buffer.toString("base64");
-          imageUrls.push(`data:${contentType};base64,${base64}`);
+          imageUrls.push(`data:${detected.mime};base64,${base64}`);
           documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached image.`.trim();
-        } else if (contentType === "application/pdf" || contentType === "application/octet-stream") {
-          const arrayBuffer = await response.arrayBuffer();
+        } else if (detected.type === "pdf") {
+          const buffer = Buffer.from(arrayBuffer);
+          const base64 = buffer.toString("base64");
           fileInputs.push({
-            fileData: `data:${contentType};base64,${Buffer.from(arrayBuffer).toString("base64")}`,
+            fileData: `data:application/pdf;base64,${base64}`,
             filename: "denial-document.pdf",
           });
           documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached document.`.trim();
-        } else {
-          const text = await response.text();
+        } else if (detected.type === "text") {
+          const text = new TextDecoder("utf-8").decode(arrayBuffer);
           documentContent = [documentContent, text].filter(Boolean).join("\n\n");
+        } else {
+          throw new Error(`Unsupported document format (${rawContentType || "binary"}). Please upload a PDF, image (PNG/JPEG/WebP), or text document.`);
         }
       } catch (err) {
         throw new Error(`Failed to read uploaded document from storage: ${String(err)}`);

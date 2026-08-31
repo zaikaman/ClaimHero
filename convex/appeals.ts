@@ -44,11 +44,6 @@ export const getLatestByClaim = query({
     const authorized = await getClaimIfAuthorized(ctx, args.claimId);
     if (!authorized) return null;
 
-    const claim = authorized.claim;
-    if (claim.status === "analyzing" || claim.status === "parsing" || claim.status === "ingested") {
-      return null;
-    }
-
     const list = await ctx.db
       .query("appeals")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))

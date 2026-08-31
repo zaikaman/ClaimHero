@@ -60,15 +60,15 @@ async function applyGetOrCreateThread(ctx: MutationCtx, args: GetOrCreateThreadA
   const existing = await ctx.db
     .query("emailThreads")
     .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-    .collect();
+    .first();
 
-  if (existing.length > 0 && existing[0]) {
-    await ctx.db.patch(existing[0]._id, {
+  if (existing) {
+    await ctx.db.patch(existing._id, {
       agentEmail: args.agentEmail,
       payerEmail: args.payerEmail,
       subject: args.subject,
     });
-    return existing[0]._id;
+    return existing._id;
   }
 
   const threadId = await ctx.db.insert("emailThreads", {

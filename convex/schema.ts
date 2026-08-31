@@ -213,6 +213,7 @@ export default defineSchema({
     lastMessageAt: v.number(),
   })
     .index("by_claim", ["claimId"])
+    .index("by_claim_agent", ["claimId", "agentEmail"])
     .index("by_agent_email", ["agentEmail"]),
 
   // Inbound & Outbound Email Messages
