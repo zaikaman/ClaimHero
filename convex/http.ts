@@ -2,7 +2,7 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
-import { normalizeAgentMailWebhook } from "./lib/agentMailWebhook";
+import { normalizeAgentMailWebhook, verifySvixWebhook } from "./lib/agentMailWebhook";
 import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { components } from "./_generated/api";
 
@@ -15,6 +15,8 @@ auth.addHttpRoutes(http);
  * AgentMail sends a lightweight event here. Both intake digestion and case
  * reply persistence run asynchronously so AgentMail receives a fast response.
  * The actions re-fetch the message from AgentMail before trusting its content.
+ * Svix cryptographic signature headers (svix-id, svix-timestamp, svix-signature)
+ * are verified against AGENTMAIL_WEBHOOK_SECRET before scheduling background tasks.
  */
 http.route({
   path: "/agentmail-webhook",
@@ -22,6 +24,26 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     try {
       const rawPayload = await request.text();
+
+      const webhookSecret = process.env.AGENTMAIL_WEBHOOK_SECRET?.trim();
+      if (webhookSecret) {
+        const verification = await verifySvixWebhook({
+          payload: rawPayload,
+          headers: request.headers,
+          secret: webhookSecret,
+        });
+
+        if (!verification.valid) {
+          return new Response(
+            JSON.stringify({ error: verification.error || "Invalid webhook signature" }),
+            {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+      }
+
       let payload: unknown;
       try {
         payload = JSON.parse(rawPayload) as unknown;
@@ -32,7 +54,10 @@ http.route({
         });
       }
 
-      const event = normalizeAgentMailWebhook(payload, request.headers.get("svix-id") || undefined);
+      const event = normalizeAgentMailWebhook(
+        payload,
+        request.headers.get("svix-id") || request.headers.get("webhook-id") || undefined
+      );
       if (!event) {
         return new Response(JSON.stringify({ error: "Missing required AgentMail event fields" }), {
           status: 400,

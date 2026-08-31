@@ -9,6 +9,11 @@ import {
 import {
   normalizeAgentMailWebhook,
   extractEmailAddress,
+  computeSvixSignature,
+  verifySvixWebhook,
+  base64ToUint8Array,
+  uint8ArrayToBase64,
+  timingSafeEqual,
 } from "../convex/lib/agentMailWebhook";
 import {
   formatAppealEmail,
@@ -370,5 +375,210 @@ Paragraph text with **bold** and *italic*.
     ]);
     expect(transcript).toContain("APPELLANT (Authorized Representative)");
     expect(transcript).toContain("PAYER MEDICAL DIRECTOR");
+  });
+
+  describe("Svix Webhook Signature Cryptographic Verification", () => {
+    const testSecret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2gAqNLm";
+    const testPayload = JSON.stringify({
+      event_type: "message.received",
+      event_id: "evt_9988",
+      message: {
+        message_id: "msg_9988",
+        inbox_id: "inbox_claimhero_intake",
+        to: ["claimhero-intake@agentmail.to"],
+      },
+    });
+
+    it("converts between base64 and Uint8Array correctly and executes timingSafeEqual", () => {
+      const original = "ClaimHero-Security-Test";
+      const bytes = new TextEncoder().encode(original);
+      const b64 = uint8ArrayToBase64(bytes);
+      const roundtripBytes = base64ToUint8Array(b64);
+      expect(new TextDecoder().decode(roundtripBytes)).toBe(original);
+
+      expect(timingSafeEqual("signature123", "signature123")).toBe(true);
+      expect(timingSafeEqual("signature123", "signature456")).toBe(false);
+      expect(timingSafeEqual("short", "longer")).toBe(false);
+    });
+
+    it("verifies a valid Svix signature with whsec_ prefixed secret", async () => {
+      const id = "msg_pld_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const signature = await computeSvixSignature(id, timestamp, testPayload, testSecret);
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,${signature}`,
+        },
+        secret: testSecret,
+      });
+
+      expect(result.valid).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it("supports Headers object format with alternative webhook-* header names", async () => {
+      const id = "msg_alt_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const signature = await computeSvixSignature(id, timestamp, testPayload, testSecret);
+
+      const headers = new Headers();
+      headers.set("webhook-id", id);
+      headers.set("webhook-timestamp", timestamp);
+      headers.set("webhook-signature", `v1,${signature}`);
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers,
+        secret: testSecret,
+      });
+
+      expect(result.valid).toBe(true);
+    });
+
+    it("verifies with raw non-prefixed secret", async () => {
+      const rawSecret = "supersecretkey123456789012345678";
+      const id = "msg_raw_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const signature = await computeSvixSignature(id, timestamp, testPayload, rawSecret);
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          id,
+          timestamp,
+          signature: `v1,${signature}`,
+        },
+        secret: rawSecret,
+      });
+
+      expect(result.valid).toBe(true);
+    });
+
+    it("supports key rotation with multiple space-delimited signatures", async () => {
+      const id = "msg_rot_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const signature = await computeSvixSignature(id, timestamp, testPayload, testSecret);
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,old_stale_signature_123 v1,${signature} v2,other_sig`,
+        },
+        secret: testSecret,
+      });
+
+      expect(result.valid).toBe(true);
+    });
+
+    it("rejects when Svix headers are missing", async () => {
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {},
+        secret: testSecret,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("Missing required Svix signature headers");
+    });
+
+    it("rejects when secret is empty or missing", async () => {
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": "id_1",
+          "svix-timestamp": "1234567",
+          "svix-signature": "v1,abc",
+        },
+        secret: "",
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("Webhook secret is not configured");
+    });
+
+    it("rejects invalid or unparseable timestamp", async () => {
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": "id_1",
+          "svix-timestamp": "not-a-number",
+          "svix-signature": "v1,abc",
+        },
+        secret: testSecret,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("Invalid timestamp header value");
+    });
+
+    it("rejects expired timestamps exceeding tolerance window", async () => {
+      const id = "msg_exp_1";
+      const oldTimestamp = (Math.floor(Date.now() / 1000) - 400).toString(); // 400s old > 300s
+      const signature = await computeSvixSignature(id, oldTimestamp, testPayload, testSecret);
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": oldTimestamp,
+          "svix-signature": `v1,${signature}`,
+        },
+        secret: testSecret,
+        toleranceInSeconds: 300,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("outside allowed tolerance");
+    });
+
+    it("rejects future timestamps exceeding tolerance window", async () => {
+      const id = "msg_fut_1";
+      const futureTimestamp = (Math.floor(Date.now() / 1000) + 500).toString();
+      const signature = await computeSvixSignature(id, futureTimestamp, testPayload, testSecret);
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": futureTimestamp,
+          "svix-signature": `v1,${signature}`,
+        },
+        secret: testSecret,
+        toleranceInSeconds: 300,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("outside allowed tolerance");
+    });
+
+    it("rejects tampered payloads and fraudulent signatures", async () => {
+      const id = "msg_tamper_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const signature = await computeSvixSignature(id, timestamp, testPayload, testSecret);
+
+      const tamperedPayload = JSON.stringify({
+        ...JSON.parse(testPayload),
+        inbox_id: "inbox_attacker_controlled",
+      });
+
+      const result = await verifySvixWebhook({
+        payload: tamperedPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,${signature}`,
+        },
+        secret: testSecret,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe("Signature verification failed");
+    });
   });
 });

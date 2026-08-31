@@ -12,7 +12,17 @@
 - **Path**: `/agentmail-webhook`
 - **Headers**:
   - `Content-Type: application/json`
-  - `svix-id`, `svix-timestamp`, and `svix-signature` (provided by AgentMail)
+  - `svix-id`: Unique event message identifier
+  - `svix-timestamp`: Unix timestamp in seconds
+  - `svix-signature`: Versioned HMAC-SHA256 signature (`v1,<base64_hmac>`)
+- **Environment Variable**: `AGENTMAIL_WEBHOOK_SECRET` (`whsec_...`)
+
+### Cryptographic Verification Algorithm
+1. Extract `svix-id`, `svix-timestamp`, and `svix-signature` headers.
+2. Check timestamp drift against maximum tolerance (300 seconds / 5 minutes) to protect against replay attacks.
+3. Construct payload to sign: `${svix_id}.${svix_timestamp}.${raw_body}`.
+4. Calculate HMAC-SHA256 over payload using decoded secret key bytes.
+5. Perform constant-time comparison against each versioned signature (`v1,...`) in `svix-signature`.
 
 ---
 
@@ -46,13 +56,32 @@
 
 ---
 
-## 3. Expected Webhook Response
+## 3. Expected Webhook Responses
 
+### Success (Accepted)
 - **Status Code**: `202 Accepted`
 - **Response Body**:
 ```json
 {
   "accepted": true,
   "eventId": "evt_123abc"
+}
+```
+
+### Unauthorized (Invalid Signature or Expired Timestamp)
+- **Status Code**: `401 Unauthorized`
+- **Response Body**:
+```json
+{
+  "error": "Signature verification failed"
+}
+```
+
+### Bad Request (Malformed JSON or Missing Fields)
+- **Status Code**: `400 Bad Request`
+- **Response Body**:
+```json
+{
+  "error": "Missing required AgentMail event fields"
 }
 ```

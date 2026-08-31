@@ -110,3 +110,142 @@ export function extractEmailAddress(value?: string): string | undefined {
   const candidate = bracketed?.[1] || value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0];
   return candidate?.trim().toLowerCase();
 }
+
+/**
+ * Decodes a base64 string to Uint8Array safely across Node and Convex runtimes.
+ */
+export function base64ToUint8Array(base64: string): Uint8Array {
+  return new Uint8Array(Buffer.from(base64, "base64"));
+}
+
+/**
+ * Encodes a Uint8Array to a base64 string safely across Node and Convex runtimes.
+ */
+export function uint8ArrayToBase64(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString("base64");
+}
+
+/**
+ * Performs timing-safe equality check to prevent timing attacks during HMAC signature validation.
+ */
+export function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+/**
+ * Computes an HMAC-SHA256 signature for Svix webhook payloads.
+ */
+export async function computeSvixSignature(
+  id: string,
+  timestamp: string | number,
+  payload: string,
+  secret: string
+): Promise<string> {
+  const cleanSecret = secret.startsWith("whsec_") ? secret.slice(6) : secret;
+  const secretKeyBytes = base64ToUint8Array(cleanSecret);
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    secretKeyBytes as unknown as BufferSource,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signedContent = `${id}.${timestamp}.${payload}`;
+  const signatureBuffer = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(signedContent)
+  );
+
+  return uint8ArrayToBase64(new Uint8Array(signatureBuffer));
+}
+
+export interface VerifySvixWebhookOptions {
+  payload: string;
+  headers:
+    | {
+        id?: string | null;
+        timestamp?: string | null;
+        signature?: string | null;
+        [key: string]: unknown;
+      }
+    | Headers;
+  secret: string;
+  toleranceInSeconds?: number;
+}
+
+export interface SvixVerificationResult {
+  valid: boolean;
+  error?: string;
+}
+
+/**
+ * Verifies standard Svix webhook signature and timestamp headers.
+ */
+export async function verifySvixWebhook(
+  options: VerifySvixWebhookOptions
+): Promise<SvixVerificationResult> {
+  const { payload, secret, toleranceInSeconds = 300 } = options;
+
+  if (!secret?.trim()) {
+    return { valid: false, error: "Webhook secret is not configured" };
+  }
+
+  let id: string | null = null;
+  let timestamp: string | null = null;
+  let signatureHeader: string | null = null;
+
+  if (options.headers && typeof (options.headers as Headers).get === "function") {
+    const h = options.headers as Headers;
+    id = h.get("svix-id") || h.get("webhook-id");
+    timestamp = h.get("svix-timestamp") || h.get("webhook-timestamp");
+    signatureHeader = h.get("svix-signature") || h.get("webhook-signature");
+  } else if (options.headers && typeof options.headers === "object") {
+    const h = options.headers as Record<string, unknown>;
+    id = (typeof h["svix-id"] === "string" ? h["svix-id"] : typeof h.id === "string" ? h.id : null);
+    timestamp = (typeof h["svix-timestamp"] === "string" ? h["svix-timestamp"] : typeof h.timestamp === "string" ? h.timestamp : null);
+    signatureHeader = (typeof h["svix-signature"] === "string" ? h["svix-signature"] : typeof h.signature === "string" ? h.signature : null);
+  }
+
+  if (!id || !timestamp || !signatureHeader) {
+    return { valid: false, error: "Missing required Svix signature headers (svix-id, svix-timestamp, svix-signature)" };
+  }
+
+  const timestampNum = parseInt(timestamp, 10);
+  if (isNaN(timestampNum)) {
+    return { valid: false, error: "Invalid timestamp header value" };
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSec - timestampNum) > toleranceInSeconds) {
+    return { valid: false, error: `Webhook timestamp outside allowed tolerance of ${toleranceInSeconds} seconds` };
+  }
+
+  const expectedSignature = await computeSvixSignature(id, timestamp, payload, secret);
+
+  const signatures = signatureHeader.trim().split(/\s+/);
+  let matched = false;
+
+  for (const sig of signatures) {
+    const [version, signatureValue] = sig.split(",", 2);
+    if (version === "v1" && signatureValue) {
+      if (timingSafeEqual(signatureValue, expectedSignature)) {
+        matched = true;
+        break;
+      }
+    }
+  }
+
+  if (!matched) {
+    return { valid: false, error: "Signature verification failed" };
+  }
+
+  return { valid: true };
+}

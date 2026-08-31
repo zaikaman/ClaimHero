@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-31T05:46:17Z
+- **Last updated:** 2026-08-31T07:22:00Z
 
 ## Log
 
@@ -292,5 +292,8 @@ Hardened `@convex-dev/aggregate` TableAggregate synchronization in case mutation
 ### 2026-08-31 - 570087c
 Redesigned the Statutory Escalation Tier controller and quick action toolbar in Appeal Studio (`src/components/studio/AppealStudio.tsx`) into a sleek segmented controller with normalized control heights (`h-9`), active tier accents (sky for Tier 1, amber for Tier 2, rose for Tier 3), and an aligned quick action toolbar (`Revisions`, `Escalate to Tier X`). Fixed the horizontal jump bar vertical scrollbar defect by introducing a `.scrollbar-none` utility in `src/index.css` supporting WebKit, Firefox, and Edge/IE, paired with explicit `overflow-y-hidden` and button sizing in `AppealStudio.tsx`. Validated with `npm run verify` (100% clean typecheck, lint, 166/166 passing unit tests across 11 suites with 100% line coverage, and production build). Convex features: static hosting, reactive subscriptions.
 
+### 2026-08-31 - 48e5ed0
+Split Dependabot npm grouping from bundled `dependencies: ["*"]` to `minor-and-patch` (`update-types: [minor, patch]`) and froze 16 high-risk majors (React 18→19, @react-three/fiber 8→9, three 0.170→0.185, openai 4→7, tailwindcss 3→4, vite 6→8, typescript 5→7, eslint 9→10 etc.) via `ignore: [version-update:semver-major]` to keep `main` stable for judging; `actions/checkout` and `actions/setup-node` 4→7 remain as low-risk individual PRs (`.github/dependabot.yml`).
+
 ### 2026-08-31 - working tree
-Split Dependabot npm grouping from bundled `dependencies: ["*"]` to `minor-and-patch` (`update-types: [minor, patch]`) and froze 16 high-risk majors (React 18→19, @react-three/fiber 8→9, three 0.170→0.185, openai 4→7, tailwindcss 3→4, vite 6→8, typescript 5→7, eslint 9→10 etc.) via `ignore: [version-update:semver-major]` to keep `main` stable for judging; `actions/checkout` and `actions/setup-node` 4→7 remain as low-risk individual PRs (` .github/dependabot.yml`).
+Hardened AgentMail inbound webhook endpoint (`POST /agentmail-webhook`, `convex/http.ts`) with cryptographic Svix signature verification (`svix-id`, `svix-timestamp`, `svix-signature`) to prevent unauthenticated attackers from triggering background appeal intake or claim reply workflows. Engineered zero-dependency Web Crypto HMAC-SHA256 verification and timing-safe equality checks (`convex/lib/agentMailWebhook.ts: verifySvixWebhook`, `computeSvixSignature`, `timingSafeEqual`) with 300-second timestamp drift tolerance protecting against replay attacks and key rotation support for space-delimited signatures (`v1,...`). Registered `AGENTMAIL_WEBHOOK_SECRET` in `convex/convex.config.ts`, documented secret template in `.env.example`, and updated the webhook contract in `specs/001-appeal-sentinel/contracts/agentmail-webhook.md`. Expanded automated testing suite (`tests/agentMail.test.ts`) with 11 new security tests covering valid/invalid signatures, `whsec_` prefixes, key rotation, and expired/future timestamps. Validated with `npm run verify`: 100% clean typecheck, ESLint, 177/177 passing unit tests across 11 suites with 100% line coverage, and production build. Convex features: httpRouter, scheduled functions, actions, components, static hosting.

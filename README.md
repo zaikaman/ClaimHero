@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-166%2F166%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-177%2F177%20passing-0ea5e9?style=flat-square" />
   <img alt="Coverage" src="https://img.shields.io/badge/coverage-100%25%20lines-10b981?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
@@ -367,6 +367,7 @@ ClaimHero ships with six independent anti-hallucination layers:
 * **Ownership** — Every `claims`/`patients` row carries `userId`; reads/writes call `getAuthUserId(ctx)` (`claims.ts:18`, `claims.ts:536`, `deleteCase:708`).
 * **Redaction Engine** (`src/lib/redactionEngine.ts`) — Deterministic PII detection: SSN (hyphen/space/labeled), Member ID suffix (`MBN9823412-01 -> MBN9823412-**`), DOB, MRN, phone, email, street address, plus user-defined terms. Three presets: **HIPAA Safe Harbor** (45 CFR §164.514(b)(2)), **Balanced Appellate**, **Public Legal Exhibit**. Persisted in `claims.redactionMetadata` with `appealAuditLogs:hipaa_redaction_applied`.
 * **Transport** — AgentMail REST uses `Authorization: Bearer` with `AGENTMAIL_API_KEY`; Convex dashboard env vars are never exposed to the client.
+* **Webhook Security & Replay Prevention** — Inbound AgentMail (`POST /agentmail-webhook`, `AGENTMAIL_WEBHOOK_SECRET`) and Firecrawl (`/firecrawl/*`, `FIRECRAWL_WEBHOOK_SECRET`) endpoints enforce cryptographic HMAC-SHA256 signature verification (`svix-signature` / `svix-timestamp` / `svix-id`) with 300-second timestamp drift tolerances and timing-safe equality checks to eliminate forged intake or replay attacks.
 * **Print hygiene** — `@media print` strips sidebars/headers/dialog chrome and forces white-paper, single-column flow with `page-break-inside: avoid` on clinical blocks.
 
 ---
@@ -383,7 +384,7 @@ ClaimHero ships with six independent anti-hallucination layers:
 | **Frontend** | React 18 + TypeScript (strict) + Vite 6 + Tailwind CSS 3.4 |
 | **UI** | Radix Primitives, Phosphor Icons (`@phosphor-icons/react`), `react-markdown` + `remark-gfm`/`remark-breaks`, `three`/`@react-three/fiber` Silk shader |
 | **State** | Convex reactive hooks (`useQuery`, `useMutation`, `useAction`, `useConvexAuth`) + custom hooks (`useClaims`, `useEvidence`, `useAppealStudio`, `useLiveCallCopilot`, `useLiabilityCalculator`) |
-| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 166 unit tests across 11 suites, 100% line coverage in backend libs and core utils |
+| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 177 unit tests across 11 suites, 100% line coverage in backend libs and core utils |
 
 Theme: **Precision Medical Dark Mode** — obsidian `#0b0f17` canvas, cyan `#0ea5e9` primary, emerald/amber/crimson semantic tokens, glassmorphism (`backdrop-blur-md`, `bg-card/75`), tabular-nums for monetary values (`src/index.css:7`, `tailwind.config.js`).
 
@@ -441,7 +442,7 @@ ClaimHero/
 │   │   ├── layout/ (Shell, Sidebar, Header) + ui/* (Button, Card, Badge, Dialog, Select, Silk)
 │   │   └── onboarding/ (OnboardingWizard, OnboardingChecklist)
 │   └── types/index.ts
-├── tests/                        # 166 unit tests across 11 suites (vitest + v8 coverage)
+├── tests/                        # 177 unit tests across 11 suites (vitest + v8 coverage)
 ├── .env.example                  # all required keys documented
 ├── convex.json / vite.config.ts / tailwind.config.js / tsconfig.json
 ├── BRIEF.md / hackathon.md / README.md
@@ -493,15 +494,31 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small # Required for Precedent Vector Ar
 
 # Firecrawl (Convex env)
 FIRECRAWL_API_KEY=fc-...
+FIRECRAWL_WEBHOOK_SECRET=whsec_...
 
 # AgentMail (Convex env)
 AGENTMAIL_API_KEY=am_...
+AGENTMAIL_WEBHOOK_SECRET=whsec_...
 AGENTMAIL_INTAKE_INBOX_ID=inb_...
 AGENTMAIL_INTAKE_EMAIL=claimhero-intake@agentmail.to
 AGENTMAIL_SENDER_INBOX_ID=inb_shared_sender
 AGENTMAIL_SENDER_EMAIL=claimhero-sender@agentmail.to
 AGENTMAIL_ADJUDICATOR_INBOX_ID=inb_shared_adjudicator
 AGENTMAIL_ADJUDICATOR_EMAIL=claimhero-adjudicator@agentmail.to
+```
+
+### Setting Convex Deployment Secrets
+
+Generate cryptographically secure Svix/webhook secrets and set them directly via the Convex CLI for both dev and production deployments:
+
+```bash
+# Generate and set secrets on dev deployment
+npx convex env set AGENTMAIL_WEBHOOK_SECRET "whsec_..."
+npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..."
+
+# Set secrets on production deployment
+npx convex env set AGENTMAIL_WEBHOOK_SECRET "whsec_..." --prod
+npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```
 
 > The intake inbox (`AGENTMAIL_INTAKE_EMAIL`) is what you forward denial emails to and what `Sidebar -> Copy Inbound Intake Address` copies (`Sidebar.tsx:82`). The sender inbox (`AGENTMAIL_SENDER_EMAIL`) transmits outbound appeals, and the adjudicator inbox (`AGENTMAIL_ADJUDICATOR_EMAIL`) processes simulated payer reviews.
@@ -513,21 +530,21 @@ AGENTMAIL_ADJUDICATOR_EMAIL=claimhero-adjudicator@agentmail.to
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex
-npm run test            # vitest run tests  (166 tests)
+npm run test            # vitest run tests  (177 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run build           # tsc --noEmit && vite build
 npm run verify          # typecheck + lint + test + build — must be 100% clean before every commit
 ```
 
-Current: **166/166 passing** across 11 suites with **100% line coverage** across backend libraries and core business utilities:
+Current: **177/177 passing** across 11 suites with **100% line coverage** across backend libraries and core business utilities:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
 | [`tests/claimhero.test.ts`](file:///d:/ClaimHero/tests/claimhero.test.ts) | 62 | Master end-to-end integration, 4-pillar rubric scoring, ERISA rules, portfolio aggregation |
+| [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 23 | AgentMail delivery, binary attachments, webhook normalizers, Svix signature verification, key rotation |
 | [`tests/redactionEngine.test.ts`](file:///d:/ClaimHero/tests/redactionEngine.test.ts) | 17 | HIPAA Safe Harbor 18-identifier redaction, boundary masking, regex patterns |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking |
 | [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest |
-| [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 12 | AgentMail delivery, inbox discovery, binary attachments, webhook normalizers |
 | [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting, statutory countdown math, risk badge styling |
 | [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, 3-tier appellate escalation |
 | [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, STT tolerance |
