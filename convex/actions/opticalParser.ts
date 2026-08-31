@@ -3,7 +3,7 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 
 const DENIAL_EXTRACTION_SCHEMA = {
@@ -152,7 +152,7 @@ Rules:
     });
 
     // Save patient and claim into Convex database
-    const claimId: string = await ctx.runMutation((api as any).claims.createWithPatient, {
+    const claimId: string = await ctx.runMutation((internal as any).claims.createWithPatientInternal, {
       patientName: extraction.patientName?.trim() || "",
       patientEmail: args.patientEmail?.trim() || "",
       memberId: extraction.memberId?.trim() || "",

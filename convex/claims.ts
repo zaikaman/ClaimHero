@@ -201,6 +201,148 @@ export const listAllInternal = internalQuery({
 });
 
 /**
+ * Internal query to lookup a claim directly by claim number using the by_claim_number index
+ */
+export const getByClaimNumberInternal = internalQuery({
+  args: {
+    claimNumber: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const trimmed = args.claimNumber.trim();
+    if (!trimmed) return null;
+    return await ctx.db
+      .query("claims")
+      .withIndex("by_claim_number", (q) => q.eq("claimNumber", trimmed))
+      .first();
+  },
+});
+
+/**
+ * Internal query to lookup a claim by any of its associated AgentMail inbox / routing emails using dedicated indexes
+ */
+export const getByInboxEmailInternal = internalQuery({
+  args: {
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const normalizedEmail = args.email.trim().toLowerCase();
+    if (!normalizedEmail) return null;
+
+    const byInbox = await ctx.db
+      .query("claims")
+      .withIndex("by_inbox_email", (q) => q.eq("agentMailInboxEmail", normalizedEmail))
+      .first();
+    if (byInbox) return byInbox;
+
+    const byAdjudicator = await ctx.db
+      .query("claims")
+      .withIndex("by_adjudicator_email", (q) => q.eq("agentMailAdjudicatorEmail", normalizedEmail))
+      .first();
+    if (byAdjudicator) return byAdjudicator;
+
+    const byAssigned = await ctx.db
+      .query("claims")
+      .withIndex("by_assigned_agent_email", (q) => q.eq("assignedAgentEmail", normalizedEmail))
+      .first();
+    if (byAssigned) return byAssigned;
+
+    return null;
+  },
+});
+
+/**
+ * Robust, production-grade internal query for matching inbound AgentMail webhook messages to claims.
+ * Uses canonical indexed lookups first (claimNumber and dedicated recipient email indexes),
+ * falling back to bounded content scanning without relying on undefined index equality.
+ */
+export const findMatchingClaimInternal = internalQuery({
+  args: {
+    subject: v.optional(v.string()),
+    bodySnippet: v.optional(v.string()),
+    recipients: v.array(v.string()),
+    claimNumber: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // 1. Direct match by explicit claim number if provided
+    if (args.claimNumber?.trim()) {
+      const direct = await ctx.db
+        .query("claims")
+        .withIndex("by_claim_number", (q) => q.eq("claimNumber", args.claimNumber!.trim()))
+        .first();
+      if (direct) return direct;
+    }
+
+    // 2. Extract potential claim numbers from subject and body using standard regex patterns
+    const textToScan = `${args.subject || ""} ${args.bodySnippet || ""}`;
+    const claimPatterns = [
+      /(?:claim|case|ref|file|tracking)[\s#:.-]*([A-Z0-9_-]{4,30})/gi,
+      /\b(CLM-[A-Z0-9-]{3,20})\b/gi,
+    ];
+    for (const pattern of claimPatterns) {
+      const matches = textToScan.matchAll(pattern);
+      for (const match of matches) {
+        const candidate = match[1]?.trim();
+        if (candidate) {
+          const found = await ctx.db
+            .query("claims")
+            .withIndex("by_claim_number", (q) => q.eq("claimNumber", candidate))
+            .first();
+          if (found) return found;
+        }
+      }
+    }
+
+    // 3. Match across recipient email addresses using dedicated email indexes
+    for (const rawRecipient of args.recipients) {
+      const normalized = rawRecipient.trim().toLowerCase();
+      if (!normalized) continue;
+
+      const byInbox = await ctx.db
+        .query("claims")
+        .withIndex("by_inbox_email", (q) => q.eq("agentMailInboxEmail", normalized))
+        .first();
+      if (byInbox) return byInbox;
+
+      const byAdjudicator = await ctx.db
+        .query("claims")
+        .withIndex("by_adjudicator_email", (q) => q.eq("agentMailAdjudicatorEmail", normalized))
+        .first();
+      if (byAdjudicator) return byAdjudicator;
+
+      const byAssigned = await ctx.db
+        .query("claims")
+        .withIndex("by_assigned_agent_email", (q) => q.eq("assignedAgentEmail", normalized))
+        .first();
+      if (byAssigned) return byAssigned;
+    }
+
+    // 4. Fallback: Scan recent claims and check if any claim's claimNumber appears in subject/body
+    const recentClaims = await ctx.db.query("claims").order("desc").take(500);
+    const subjectAndBody = textToScan.toLowerCase();
+
+    const contentMatch = recentClaims.find(
+      (c) => c.claimNumber && subjectAndBody.includes(c.claimNumber.toLowerCase())
+    );
+    if (contentMatch) return contentMatch;
+
+    // Resilient recipient fallback match in memory
+    const recipientMatch = recentClaims.find((c) =>
+      args.recipients.some((r) => {
+        const nr = r.trim().toLowerCase();
+        return (
+          c.agentMailInboxEmail?.toLowerCase() === nr ||
+          c.agentMailAdjudicatorEmail?.toLowerCase() === nr ||
+          c.assignedAgentEmail?.toLowerCase() === nr
+        );
+      })
+    );
+    if (recipientMatch) return recipientMatch;
+
+    return null;
+  },
+});
+
+/**
  * Create a new claim for an existing patient
  */
 export const create = mutation({
@@ -274,6 +416,120 @@ export const create = mutation({
   },
 });
 
+async function applyCreateWithPatient(
+  ctx: any,
+  args: any,
+  explicitUserId?: Id<"users">
+): Promise<Id<"claims">> {
+  const authUserId = await getAuthUserId(ctx);
+  let userId: Id<"users"> | undefined = explicitUserId || authUserId || undefined;
+  const now = Date.now();
+
+  // Check if patient already exists by email
+  const cleanEmail = args.patientEmail?.trim() || "";
+  let matchingPatient: Doc<"patients"> | undefined;
+
+  if (cleanEmail) {
+    const existingPatients = (await ctx.db
+      .query("patients")
+      .withIndex("by_email", (q: any) => q.eq("email", cleanEmail))
+      .collect()) as Doc<"patients">[];
+    matchingPatient = existingPatients.find((p) => (userId ? p.userId === userId : true) || !p.userId);
+    if (!userId && matchingPatient?.userId) {
+      userId = matchingPatient.userId;
+    }
+  } else if (args.patientName.trim() && userId) {
+    // If no email, check if user has an existing patient record matching name and memberId/payer
+    const userPatients = (await ctx.db
+      .query("patients")
+      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .collect()) as Doc<"patients">[];
+    matchingPatient = userPatients.find(
+      (p) =>
+        p.name.toLowerCase() === args.patientName.toLowerCase() &&
+        (!args.memberId || p.memberId === args.memberId)
+    );
+  }
+
+  let patientId: Id<"patients">;
+
+  if (matchingPatient) {
+    patientId = matchingPatient._id;
+    await ctx.db.patch(patientId, {
+      ...(userId ? { userId } : {}),
+      name: args.patientName,
+      email: cleanEmail || matchingPatient.email || "",
+      memberId: args.memberId,
+      groupNumber: args.groupNumber,
+      insurancePayer: args.insurancePayer,
+      state: args.state,
+    });
+  } else {
+    patientId = await ctx.db.insert("patients", {
+      userId,
+      name: args.patientName,
+      email: cleanEmail,
+      memberId: args.memberId,
+      groupNumber: args.groupNumber,
+      insurancePayer: args.insurancePayer,
+      state: args.state,
+      createdAt: now,
+    });
+  }
+
+  const deadlineDays = args.appealFilingDeadlineDays || 180;
+  const statutoryDeadline = now + deadlineDays * 86400000;
+
+  const claimId = await ctx.db.insert("claims", {
+    userId,
+    patientId,
+    claimNumber: args.claimNumber,
+    serviceDate: args.serviceDate,
+    providerName: args.providerName,
+    deniedAmount: args.deniedAmount,
+    patientOwedAmount: args.patientOwedAmount,
+    cptCodes: args.cptCodes,
+    icd10Codes: args.icd10Codes,
+    denialReasonCode: args.denialReasonCode,
+    denialReasonDescription: args.denialReasonDescription,
+    status: "ingested",
+    statutoryDeadline,
+    daysRemaining: deadlineDays,
+    assignedAgentEmail: "",
+    agentMailProvisioningStatus: "pending",
+    denialLetterStorageId: args.denialLetterStorageId,
+    redactionMetadata: args.redactionMetadata,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await ctx.scheduler.runAfter(
+    0,
+    (internal as any)["actions/agentMail"].provisionClaimInboxes,
+    { claimId }
+  );
+
+  // Log audit event
+  await ctx.db.insert("appealAuditLogs", {
+    claimId,
+    eventType: "denial_ingested",
+    actor: "Optical OCR Parser",
+    details: `Extracted denial document for ${args.patientName} (${args.insurancePayer} - ${args.claimNumber})`,
+    timestamp: now,
+  });
+
+  const createdClaimDoc = await ctx.db.get(claimId);
+  if (createdClaimDoc) {
+    try {
+      await claimsAggregate.insert(ctx, createdClaimDoc);
+    } catch (err) {
+      console.warn("Could not insert claim into aggregate:", err);
+    }
+  }
+
+  return claimId;
+}
+
 /**
  * Atomic creation of patient and claim from OCR extraction
  */
@@ -307,109 +563,45 @@ export const createWithPatient = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = await requireAuthUser(ctx);
-    const now = Date.now();
+    return await applyCreateWithPatient(ctx, args);
+  },
+});
 
-    // Check if patient already exists by email for this user
-    const cleanEmail = args.patientEmail?.trim() || "";
-    let matchingPatient: Doc<"patients"> | undefined;
-
-    if (cleanEmail) {
-      const existingPatients = (await ctx.db
-        .query("patients")
-        .withIndex("by_email", (q: any) => q.eq("email", cleanEmail))
-        .collect()) as Doc<"patients">[];
-      matchingPatient = existingPatients.find((p) => p.userId === userId || !p.userId);
-    } else if (args.patientName.trim()) {
-      // If no email, check if user has an existing patient record matching name and memberId/payer
-      const userPatients = (await ctx.db
-        .query("patients")
-        .withIndex("by_user", (q: any) => q.eq("userId", userId))
-        .collect()) as Doc<"patients">[];
-      matchingPatient = userPatients.find(
-        (p) =>
-          p.name.toLowerCase() === args.patientName.toLowerCase() &&
-          (!args.memberId || p.memberId === args.memberId)
-      );
-    }
-
-    let patientId: Id<"patients">;
-
-    if (matchingPatient) {
-      patientId = matchingPatient._id;
-      await ctx.db.patch(patientId, {
-        userId,
-        name: args.patientName,
-        email: cleanEmail || matchingPatient.email || "",
-        memberId: args.memberId,
-        groupNumber: args.groupNumber,
-        insurancePayer: args.insurancePayer,
-        state: args.state,
-      });
-    } else {
-      patientId = await ctx.db.insert("patients", {
-        userId,
-        name: args.patientName,
-        email: cleanEmail,
-        memberId: args.memberId,
-        groupNumber: args.groupNumber,
-        insurancePayer: args.insurancePayer,
-        state: args.state,
-        createdAt: now,
-      });
-    }
-
-    const deadlineDays = args.appealFilingDeadlineDays || 180;
-    const statutoryDeadline = now + deadlineDays * 86400000;
-
-    const claimId = await ctx.db.insert("claims", {
-      userId,
-      patientId,
-      claimNumber: args.claimNumber,
-      serviceDate: args.serviceDate,
-      providerName: args.providerName,
-      deniedAmount: args.deniedAmount,
-      patientOwedAmount: args.patientOwedAmount,
-      cptCodes: args.cptCodes,
-      icd10Codes: args.icd10Codes,
-      denialReasonCode: args.denialReasonCode,
-      denialReasonDescription: args.denialReasonDescription,
-      status: "ingested",
-      statutoryDeadline,
-      daysRemaining: deadlineDays,
-      assignedAgentEmail: "",
-      agentMailProvisioningStatus: "pending",
-      denialLetterStorageId: args.denialLetterStorageId,
-      redactionMetadata: args.redactionMetadata,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await ctx.scheduler.runAfter(
-      0,
-      (internal as any)["actions/agentMail"].provisionClaimInboxes,
-      { claimId }
-    );
-
-    // Log audit event
-    await ctx.db.insert("appealAuditLogs", {
-      claimId,
-      eventType: "denial_ingested",
-      actor: "Optical OCR Parser",
-      details: `Extracted denial document for ${args.patientName} (${args.insurancePayer} - ${args.claimNumber})`,
-      timestamp: now,
-    });
-
-    const createdClaimDoc = await ctx.db.get(claimId);
-    if (createdClaimDoc) {
-      try {
-        await claimsAggregate.insert(ctx, createdClaimDoc);
-      } catch (err) {
-        console.warn("Could not insert claim into aggregate:", err);
-      }
-    }
-
-    return claimId;
+/**
+ * Internal mutation for background actions (such as opticalParser and AgentMail intake) to create a claim
+ */
+export const createWithPatientInternal = internalMutation({
+  args: {
+    patientName: v.string(),
+    patientEmail: v.string(),
+    memberId: v.string(),
+    insurancePayer: v.string(),
+    state: v.string(),
+    groupNumber: v.optional(v.string()),
+    claimNumber: v.string(),
+    serviceDate: v.string(),
+    providerName: v.string(),
+    deniedAmount: v.number(),
+    patientOwedAmount: v.number(),
+    cptCodes: v.array(v.string()),
+    icd10Codes: v.array(v.string()),
+    denialReasonCode: v.string(),
+    denialReasonDescription: v.string(),
+    appealFilingDeadlineDays: v.optional(v.number()),
+    denialLetterStorageId: v.optional(v.id("_storage")),
+    userId: v.optional(v.id("users")),
+    redactionMetadata: v.optional(
+      v.object({
+        isRedacted: v.boolean(),
+        mode: v.string(),
+        redactedEntityCount: v.number(),
+        maskedCategories: v.array(v.string()),
+        appliedAt: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    return await applyCreateWithPatient(ctx, args, args.userId);
   },
 });
 

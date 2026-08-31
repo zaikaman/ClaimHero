@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-197%2F197%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-199%2F199%20passing-0ea5e9?style=flat-square" />
   <img alt="Coverage" src="https://img.shields.io/badge/coverage-100%25%20lines-10b981?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
@@ -200,7 +200,7 @@ Convex is not an addon; it *is* the backend. Every feature is a Convex primitive
 
 | Convex Feature | Where it lives | What it does |
 |---|---|---|
-| **Schema & Relational Indexes** | `convex/schema.ts:5` | 9 tables + 20+ secondary indexes (`by_user`, `by_user_status`, `by_claim`, `by_claimId_and_appealLevel`, etc.) |
+| **Schema & Relational Indexes** | `convex/schema.ts:5` | 9 tables + 20+ secondary indexes (`by_user`, `by_user_status`, `by_inbox_email`, `by_adjudicator_email`, `by_assigned_agent_email`, `by_claim`, `by_claimId_and_appealLevel`, etc.) |
 | **Vector Search (1536-d)** | `convex/schema.ts:279` `precedents.vectorIndex("by_embedding", { dimensions: 1536 })` | Native `ctx.vectorSearch` in `precedentArchive.ts` returns top-3 matches; re-ranked by ICD/CPT/CARC overlap (`convex/lib/embeddings.ts:rankPrecedentHits`) |
 | **Full-Text Search Index** | `convex/schema.ts:155, 174, 284` `.searchIndex()` | Native Convex `.withSearchIndex()` on `claims` (`search_claims`), `clinicalEvidences` (`search_evidence`), and `precedents` (`search_precedents`) for instant server-side lexical filtering |
 | **Rate Limiter Component** | `convex/convex.config.ts`, `convex/lib/rateLimiter.ts` | `@convex-dev/rate-limiter` token-bucket limits guarding heavy AI, OCR, Firecrawl, and AgentMail endpoints |
@@ -383,7 +383,7 @@ ClaimHero ships with six independent anti-hallucination layers:
 | **Frontend** | React 18 + TypeScript (strict) + Vite 6 + Tailwind CSS 3.4 |
 | **UI** | Radix Primitives, Phosphor Icons (`@phosphor-icons/react`), `react-markdown` + `remark-gfm`/`remark-breaks`, `three`/`@react-three/fiber` Silk shader |
 | **State** | Convex reactive hooks (`useQuery`, `useMutation`, `useAction`, `useConvexAuth`) + custom hooks (`useClaims`, `useEvidence`, `useAppealStudio`, `useLiveCallCopilot`, `useLiabilityCalculator`) |
-| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 191 unit tests across 12 suites, 100% line coverage in backend libs and core utils |
+| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 199 unit tests across 12 suites, 100% line coverage in backend libs and core utils |
 
 Theme: **Precision Medical Dark Mode** — obsidian `#0b0f17` canvas, cyan `#0ea5e9` primary, emerald/amber/crimson semantic tokens, glassmorphism (`backdrop-blur-md`, `bg-card/75`), tabular-nums for monetary values (`src/index.css:7`, `tailwind.config.js`).
 
@@ -446,7 +446,7 @@ ClaimHero/
 │   │   ├── layout/ (Shell, Sidebar, Header) + ui/* (Button, Card, Badge, Dialog, Select, Silk)
 │   │   └── onboarding/ (OnboardingWizard, OnboardingChecklist)
 │   └── types/index.ts
-├── tests/                        # 191 unit tests across 12 suites (vitest + v8 coverage)
+├── tests/                        # 199 unit tests across 12 suites (vitest + v8 coverage)
 ├── .env.example                  # all required keys documented
 ├── convex.json / vite.config.ts / tailwind.config.js / tsconfig.json
 ├── BRIEF.md / hackathon.md / README.md
@@ -534,18 +534,18 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex
-npm run test            # vitest run tests  (197 tests)
+npm run test            # vitest run tests  (199 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run build           # tsc --noEmit && vite build
 npm run verify          # typecheck + lint + test + build — must be 100% clean before every commit
 ```
 
-Current: **197/197 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
+Current: **199/199 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
 | [`tests/claimhero.test.ts`](file:///d:/ClaimHero/tests/claimhero.test.ts) | 66 | Master end-to-end integration, 4-pillar rubric scoring, ERISA rules, portfolio aggregation, bounded batch deadline sweep |
-| [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 23 | AgentMail delivery, binary attachments, webhook normalizers, Svix signature verification, key rotation |
+| [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 25 | AgentMail delivery, binary attachments, webhook normalizers, Svix signature verification, key rotation, free-tier intake routing |
 | [`tests/redactionEngine.test.ts`](file:///d:/ClaimHero/tests/redactionEngine.test.ts) | 17 | HIPAA Safe Harbor 18-identifier redaction, boundary masking, regex patterns |
 | [`tests/authorization.test.ts`](file:///d:/ClaimHero/tests/authorization.test.ts) | 16 | Convex multi-tenant authorization, strict document & shared intake claim ownership validation, unauthenticated rejection, session isolation |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking |
@@ -601,7 +601,7 @@ The chronological, evidence-based build log lives at **`hackathon.md`** (repo ro
 |---|---|
 | **Real-World Utility** | Solves a $1.5B/year denial crisis for providers, advocates, and patients. Every output is a *sendable* artifact (email, portal paste, certified mail PDF, P2P script) — not a demo. Preset cases mirror real EOBs with statutory intake language. |
 | **Full-Stack Integration Depth** | **Convex** (9 tables, vector search, crons, file storage, httpRouter, auth) + **Firecrawl** (live search and scrape with adaptive clearinghouse retrieval, residential stealth proxies, document windowing, payer/anatomical guards) + **AgentMail** (3-mode dispatch, 2 shared inboxes, idempotent intake + reply webhooks, REST `api.agentmail.to`) + **OpenAI** (Vision OCR, structured `DenialExtractionResult`/`PolicyExtractionResponse`/`AppealBriefSynthesisResult`, deterministic scoring, grounded synthesis). No pillar is decorative — pull any one and the product stops working. |
-| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 195 tests + 100% line coverage + production build). Strict TypeScript, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette. |
+| **Technical Rigor & Polish** | `npm run verify` is 100% clean (typecheck + lint + 199 tests + 100% line coverage + production build). Strict TypeScript, canonical index naming, `withIndex` everywhere, `ctx.vectorSearch` + `rankPrecedentHits` deduplication, `@media print` court pagination, Precision Medical Dark Mode with glassmorphism, Phosphor icons, responsive `2xl` toolbars, `Cmd+K` palette. |
 | **Transparency & Process** | `hackathon.md` is the source of truth: 40+ dated entries, file-level diffs, Convex feature tags per entry, and transparent handling of private MCG portals and vector precedents. `npm run verify` is the gate before every commit. |
 
 ---

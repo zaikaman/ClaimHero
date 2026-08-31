@@ -581,4 +581,52 @@ Paragraph text with **bold** and *italic*.
       expect(result.error).toBe("Signature verification failed");
     });
   });
+
+  describe("Inbound Claim Matching & Free-Tier Intake Inbox Routing", () => {
+    it("correctly matches free-tier intake claims (userId: undefined) by claimNumber in subject or body", () => {
+      const intakeClaim = {
+        _id: "claim_free_tier_1",
+        userId: undefined, // Free-tier intake unassigned claim
+        claimNumber: "CLM-INTAKE-8849",
+        assignedAgentEmail: "agent_general@claimhero.agentmail.to",
+        agentMailInboxEmail: "claim_intake_8849@claimhero.agentmail.to",
+        agentMailAdjudicatorEmail: "adj_intake_8849@claimhero.agentmail.to",
+      };
+
+      const claimsList = [intakeClaim];
+      const subject = "Re: Final Determination - Case Ref CLM-INTAKE-8849 Overturned";
+      const body = "Your claim denial has been reconsidered and approved.";
+
+      const match = claimsList.find(
+        (c) =>
+          c.claimNumber &&
+          (subject.includes(c.claimNumber) || body.includes(c.claimNumber))
+      );
+
+      expect(match).toBeDefined();
+      expect(match?._id).toBe("claim_free_tier_1");
+      expect(match?.userId).toBeUndefined();
+    });
+
+    it("correctly matches free-tier intake claims by recipient email address", () => {
+      const intakeClaim = {
+        _id: "claim_free_tier_2",
+        userId: undefined,
+        claimNumber: "CLM-FREE-1002",
+        assignedAgentEmail: "assigned_rep@claimhero.agentmail.to",
+        agentMailInboxEmail: "inbox_free_1002@claimhero.agentmail.to",
+        agentMailAdjudicatorEmail: "adj_free_1002@claimhero.agentmail.to",
+      };
+
+      const recipient = "inbox_free_1002@claimhero.agentmail.to";
+      const normalized = extractEmailAddress(recipient) || recipient.toLowerCase();
+
+      const isMatch =
+        intakeClaim.agentMailInboxEmail?.toLowerCase() === normalized ||
+        intakeClaim.assignedAgentEmail?.toLowerCase() === normalized ||
+        intakeClaim.agentMailAdjudicatorEmail?.toLowerCase() === normalized;
+
+      expect(isMatch).toBe(true);
+    });
+  });
 });

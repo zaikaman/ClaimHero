@@ -152,6 +152,9 @@ export default defineSchema({
     .index("by_patient", ["patientId"])
     .index("by_deadline", ["statutoryDeadline"])
     .index("by_claim_number", ["claimNumber"])
+    .index("by_inbox_email", ["agentMailInboxEmail"])
+    .index("by_adjudicator_email", ["agentMailAdjudicatorEmail"])
+    .index("by_assigned_agent_email", ["assignedAgentEmail"])
     .searchIndex("search_claims", {
       searchField: "denialReasonDescription",
       filterFields: ["userId", "status", "denialReasonCode"],

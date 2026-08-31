@@ -231,23 +231,18 @@ export const processInboundClaimReply = internalAction({
 
     const subject = normalized.subject || "Adjudication Update";
     const bodyContent = normalized.text || normalized.html || "";
-    const claims: any[] = await ctx.runQuery((internal as any).claims.listAllInternal, { limit: 500 });
-    const claimMatch = claims.find(
-      (claim: any) =>
-        claim.claimNumber &&
-        (subject.includes(claim.claimNumber) || bodyContent.includes(claim.claimNumber))
+    const recipientEmails = normalized.recipients.map(
+      (recipient) => extractEmailAddress(recipient) || recipient.toLowerCase()
     );
-    const recipientMatches = claims.filter((claim: any) =>
-      normalized.recipients.some((recipient) => {
-        const normalizedRecipient = extractEmailAddress(recipient) || recipient.toLowerCase();
-        return (
-          claim.agentMailInboxEmail?.toLowerCase() === normalizedRecipient ||
-          claim.assignedAgentEmail?.toLowerCase() === normalizedRecipient ||
-          claim.agentMailAdjudicatorEmail?.toLowerCase() === normalizedRecipient
-        );
-      })
+
+    const matchingClaim: any = await ctx.runQuery(
+      (internal as any).claims.findMatchingClaimInternal,
+      {
+        subject,
+        bodySnippet: bodyContent.slice(0, 1000),
+        recipients: recipientEmails,
+      }
     );
-    const matchingClaim = claimMatch || (recipientMatches.length === 1 ? recipientMatches[0] : undefined);
     if (!matchingClaim) {
       console.warn(`No ClaimHero case matched inbound AgentMail message ${args.messageId}.`);
       return null;
