@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   formatCurrency,
   formatDeadlineRemaining,
@@ -487,10 +487,38 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
   });
 
   it("accepts only scraped Firecrawl documents with direct source URLs", async () => {
-    const { isAccessDeniedDocument, selectFirecrawlPolicySource, selectFirecrawlPolicyUrl, selectFirecrawlPolicyUrls } = await import("../convex/actions/policyCrawler");
+    const { isAccessDeniedDocument, sanitizePublicPolicyUrl, selectFirecrawlPolicySource, selectFirecrawlPolicyUrl, selectFirecrawlPolicyUrls } = await import("../convex/actions/policyCrawler");
+    const { isEvidenceSiteMismatched } = await import("../convex/actions/appealSynthesizer");
 
     expect(isAccessDeniedDocument("<html><title>Access Denied</title>You don't have permission to access this resource. Reference #18.e507fab.1788066210</html>")).toBe(true);
+    expect(isAccessDeniedDocument(`Access Denied\n\nYou don't have permission to access "http://www.cms.gov/medicare-coverage-database/view/lcd.aspx?" on this server.\n\nReference #18.c6b92117.1788173787.49b7d81c\nhttps://errors.edgesuite.net/18.c6b92117.1788173787.49b7d81c`)).toBe(true);
+    expect(isAccessDeniedDocument("# Access Denied\n\nRequest blocked by administrator.")).toBe(true);
     expect(isAccessDeniedDocument("Clinical coverage policy: the requested service was denied under the following criteria.")).toBe(false);
+
+    // URL Sanitization Tests
+    expect(sanitizePublicPolicyUrl("https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=36007")).toBe(
+      "https://www.cms.gov/medicare-coverage-database/search.aspx?q=36007"
+    );
+    expect(sanitizePublicPolicyUrl("https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleid=56789")).toBe(
+      "https://www.cms.gov/medicare-coverage-database/search.aspx?q=56789"
+    );
+    expect(sanitizePublicPolicyUrl("https://provider.example.org/guideline.pdf?session=xyz123&utm_source=portal")).toBe(
+      "https://provider.example.org/guideline.pdf"
+    );
+
+    // Anatomical Site Mismatch Tests
+    expect(isEvidenceSiteMismatched(
+      { title: "Total Hip Arthroplasty Medical Necessity Criteria", citationClause: "Covered Indications - THA" },
+      { cptCodes: ["27447"] }
+    )).toBe(true);
+    expect(isEvidenceSiteMismatched(
+      { title: "Total Knee Arthroplasty Medical Necessity Criteria", citationClause: "Covered Indications - TKA" },
+      { cptCodes: ["27447"] }
+    )).toBe(false);
+    expect(isEvidenceSiteMismatched(
+      { title: "Lumbar Spinal Decompression Guidelines", citationClause: "Section 3.1" },
+      { cptCodes: ["27447"] }
+    )).toBe(true);
 
     expect(selectFirecrawlPolicySource({
       data: {
@@ -1101,7 +1129,7 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
   it("provides 3 complete preset template denials with distinct clinical criteria", () => {
     expect(SAMPLE_CASE_PRESETS.length).toBe(3);
     const presetIds = SAMPLE_CASE_PRESETS.map((p) => p.id);
-    expect(presetIds).toContain("molina_knee");
+    expect(presetIds).toContain("geoblue_knee");
     expect(presetIds).toContain("geoblue_spine");
     expect(presetIds).toContain("bcbsglobal_mri");
   });
@@ -1183,10 +1211,10 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
       expect(preset.physicianNotes).toContain("Attending");
     }
 
-    const molina = SAMPLE_CASE_PRESETS.find((p) => p.id === "molina_knee");
-    expect(molina?.physicianNotes).toContain("Dr. Robert Langston");
-    expect(molina?.physicianNotes).toContain("16 consecutive weeks");
-    expect(molina?.physicianNotes).toContain("MCP-082");
+    const knee = SAMPLE_CASE_PRESETS.find((p) => p.id === "geoblue_knee");
+    expect(knee?.physicianNotes).toContain("Dr. Robert Langston");
+    expect(knee?.physicianNotes).toContain("16 consecutive weeks");
+    expect(knee?.physicianNotes).toContain("Carelon");
 
     const geoblue = SAMPLE_CASE_PRESETS.find((p) => p.id === "geoblue_spine");
     expect(geoblue?.physicianNotes).toContain("Dr. Sarah Chen");
@@ -1349,9 +1377,12 @@ describe("Firecrawl Multi-Source Clinical Research Hub", () => {
       isPayerMismatchedSource("Cigna", "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=12345")
     ).toBe(false);
 
-    // Cross-payer mismatch (e.g. Humana source for Molina payer) is still blocked
+    // Cross-payer mismatch (e.g. Humana source for Molina payer, or Wellpoint for Cigna) is strictly blocked
     expect(
       isPayerMismatchedSource("Molina Healthcare", "https://www.humana.com/provider/medical-resources/clinical-guidance")
+    ).toBe(true);
+    expect(
+      isPayerMismatchedSource("Cigna Global", "https://www.provider.wellpoint.com/docs/gpp/IA_CARE_CarelonMedBeneMgmtClinAppGuidejointsurg.pdf")
     ).toBe(true);
   });
 

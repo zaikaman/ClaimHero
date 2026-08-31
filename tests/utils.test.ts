@@ -130,6 +130,7 @@ describe("src/lib/constants Unit Tests", () => {
     expect(getPayerAppellateContact("BCBS Global Core").id).toBe("bcbsglobal");
     expect(getPayerAppellateContact("UnitedHealthcare Optum").id).toBe("uhc");
     expect(getPayerAppellateContact("Aetna CVS Health").id).toBe("aetna");
+    expect(getPayerAppellateContact("Cigna Global").id).toBe("cignaglobal");
     expect(getPayerAppellateContact("Cigna Evernorth").id).toBe("cigna");
     expect(getPayerAppellateContact("Anthem Blue Cross").id).toBe("bcbs");
     expect(getPayerAppellateContact("Humana Health").id).toBe("humana");

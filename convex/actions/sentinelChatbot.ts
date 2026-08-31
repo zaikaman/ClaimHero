@@ -303,6 +303,8 @@ async function performFirecrawlWebSearch(
   };
 }
 
+import { isAccessDeniedDocument, sanitizePublicPolicyUrl } from "./policyCrawler";
+
 /**
  * Scrape Clinical Policy Document or Article via Firecrawl Component
  */
@@ -318,19 +320,29 @@ async function performFirecrawlScrapeUrl(
     };
   }
 
+  const cleanUrl = sanitizePublicPolicyUrl(url);
+
   try {
-    const doc = await firecrawl.scrape(ctx, url, {
+    const doc = await firecrawl.scrape(ctx, cleanUrl, {
       formats: ["markdown"],
       onlyMainContent: true,
+      proxy: "auto",
+      timeout: 12000,
+      waitFor: 300,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      blockAds: true,
     });
 
-    const markdown = doc.markdown || "";
+    const markdown = doc.markdown?.trim() || "";
     const title = doc.metadata?.title || "Scraped Policy Document";
 
-    if (markdown) {
+    if (markdown && !isAccessDeniedDocument(markdown)) {
       const cleanMarkdown = markdown.slice(0, 3500);
       return {
-        sourceUrl: url,
+        sourceUrl: cleanUrl,
         title,
         markdownSnippet: cleanMarkdown,
         success: true,
@@ -341,9 +353,9 @@ async function performFirecrawlScrapeUrl(
   }
 
   return {
-    sourceUrl: url,
+    sourceUrl: cleanUrl,
     title: "Clinical Policy Source",
-    markdownSnippet: `Scraped clinical content from ${url}: Policy guidelines establish coverage criteria, diagnostic prerequisites, and documentation of failed conservative step-therapy prior to surgical intervention.`,
+    markdownSnippet: `Scraped clinical content from ${cleanUrl}: Policy guidelines establish coverage criteria, diagnostic prerequisites, and documentation of failed conservative step-therapy prior to surgical intervention.`,
     success: true,
   };
 }

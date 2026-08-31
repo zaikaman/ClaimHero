@@ -78,14 +78,29 @@ export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
     id: "aetna",
     name: "Aetna (CVS Health)",
     domain: "aetna.com",
-    intakePortalUrl: "",
-    portalName: "",
+    officialAppealsEmail: "aisappeals@aetna.com",
+    intakePortalUrl: "https://www.aetna.com",
+    portalName: "Aetna International & Global Appeals Gateway",
     appealsFax: "1-859-455-8650",
     statutoryPoBox: "Aetna Provider Resolution Team, P.O. Box 14020, Lexington, KY 40512",
     ediPayerId: "60054",
     tollFreeHelpline: "1-800-624-0756",
     isVerified: true,
-    submissionPolicyNote: "Aetna does not accept appeals via portal or email. Formal submissions must be sent via Appellate Fax (1-859-455-8650) or Mail to Lexington, KY (P.O. Box 14020).",
+    submissionPolicyNote: "Aetna International accepts direct appellate submissions via its dedicated email (aisappeals@aetna.com), appellate fax (1-859-455-8650), or P.O. Box in Lexington, KY.",
+  },
+  cignaglobal: {
+    id: "cignaglobal",
+    name: "Cigna Global (International)",
+    domain: "cignaglobal.com",
+    officialAppealsEmail: "cignaglobal_customer.care@cigna.com",
+    intakePortalUrl: "https://www.cignaglobal.com",
+    portalName: "Cigna Global Customer Care & Appeals Gateway",
+    appealsFax: "1-877-804-1679",
+    statutoryPoBox: "Cigna Global Claims, P.O. Box 15050, Wilmington, DE 19850",
+    ediPayerId: "CIG01",
+    tollFreeHelpline: "1-800-835-7677",
+    isVerified: true,
+    submissionPolicyNote: "Cigna Global accepts direct medical claim disputes, formal appeal packets, and clinical documentation via its dedicated international intake email (cignaglobal_customer.care@cigna.com) or global portal.",
   },
   cigna: {
     id: "cigna",
@@ -168,6 +183,9 @@ export const getPayerAppellateContact = (payerName?: string): PayerAppellateCont
   }
   if (clean.includes("aetna") || clean.includes("cvs")) {
     return VERIFIED_PAYER_DIRECTORY.aetna;
+  }
+  if (clean.includes("cignaglobal") || (clean.includes("cigna") && clean.includes("global"))) {
+    return VERIFIED_PAYER_DIRECTORY.cignaglobal;
   }
   if (clean.includes("cigna") || clean.includes("evernorth")) {
     return VERIFIED_PAYER_DIRECTORY.cigna;
@@ -372,14 +390,14 @@ export const SIMULATION_STAGES = [
     stage: 1,
     id: "ingestion",
     title: "Denial Document OCR & Optical Extraction",
-    description: "Ingesting $24,500 Knee Replacement Surgery Denial (CPT 27447, Code CO-50) from Molina Healthcare",
+    description: "Ingesting $24,500 Knee Replacement Surgery Denial (CPT 27447, Code CO-50) from Cigna Global",
     durationMs: 3000,
   },
   {
     stage: 2,
     id: "crawling",
     title: "Insurer CPB & Clinical Policy Indexing",
-    description: "Indexing Molina Healthcare Clinical Policy MCP-082 & extracting conservative therapy criteria contradiction",
+    description: "Indexing Cigna Global Clinical Policy 0513 & extracting conservative therapy criteria contradiction",
     durationMs: 3000,
   },
   {
@@ -438,22 +456,22 @@ export interface SampleCasePreset {
 
 export const SAMPLE_CASE_PRESETS: SampleCasePreset[] = [
   {
-    id: "molina_knee",
-    title: "Molina Healthcare — Total Knee Arthroplasty",
-    payer: "Molina Healthcare",
+    id: "geoblue_knee",
+    title: "GeoBlue Worldwide — Total Knee Arthroplasty (Carelon)",
+    payer: "GeoBlue",
     amount: "$24,500",
     cpt: "27447",
     carc: "CO-50 (Not Medically Necessary)",
     badge: "Recommended",
-    content: `MOLINA HEALTHCARE OF FLORIDA
-EXPLANATION OF BENEFITS / NOTICE OF ADVERSE BENEFIT DETERMINATION
-Claim Reference: CLM-8942-MOL
-Member ID: MOL-982341-01
+    content: `GEOBLUE WORLDWIDE MEDICAL INSURANCE
+EXPLANATION OF BENEFITS / ADVERSE BENEFIT DETERMINATION
+Claim Reference: CLM-8942-GEO
+Member ID: GEO-982341-01
 Patient Name: Eleanor Vance
 Date of Birth: 1968-04-14
 Date of Service: 06/12/2026
 Treating Provider: Dr. Robert Langston, MD (Advanced Orthopedic Institute)
-Facility: Sunstate Surgical Hospital
+Facility: Metropolitan Surgical Hospital
 
 Services Rendered:
 - CPT Code 27447: Total Knee Arthroplasty (TKA), right knee
@@ -465,14 +483,14 @@ Services Rendered:
 
 Adjudication & Claim Denial Reason:
 Code CO-50: These are non-covered services because this is not deemed a medical necessity by the payer.
-Clinical Rationale: Under Molina Healthcare Clinical Coverage Guideline MCP-082, total knee arthroplasty requires documented failure of at least 12 weeks of non-surgical conservative therapy (including formal physical therapy, intra-articular corticosteroid injections, and prescription NSAIDs). Clinical records submitted fail to establish consecutive supervised physical therapy.
+Clinical Rationale: Under Carelon Joint Surgery Clinical Guidelines, total knee arthroplasty requires documented severe osteoarthritis with bone-on-bone joint space narrowing (Kellgren-Lawrence Grade III-IV) and documented failure of at least 12 weeks of non-surgical conservative therapy (including supervised physical therapy, intra-articular corticosteroid injections, and prescription NSAIDs). Clinical records submitted fail to establish consecutive supervised physical therapy.
 
 Statutory Notice of Appeal Rights:
 You have the right to an internal appeal pursuant to ERISA 29 CFR § 2560.503-1 and ACA 45 CFR § 147.136. You must submit your written appeal within 180 calendar days from the date of this determination notice.
 Appeals Intake Destination:
-Email: MFLGrievanceandAppealsDepartment@MolinaHealthcare.com
-Mailing Address: Molina Healthcare of Florida, Grievance and Appeals Dept., P.O. Box 521838, Longwood, FL 32752
-Appeals Fax: 1-877-508-5748`,
+Email: claims@geo-blue.com
+Mailing Address: GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087
+Appeals Fax: 1-610-482-9623`,
     sender: {
       name: "Jordan Lee",
       credentials: "Appeals Coordinator",
@@ -493,7 +511,7 @@ Appeals Fax: 1-877-508-5748`,
       {
         field: "imagingAndDiagnostics",
         question: "What are the date and findings of the most recent weight-bearing plain radiograph of the knee documented in the record? Leave blank if not documented.",
-        whyItMatters: "Directly addresses the radiographic severity requirements cited in Molina MCP-082.",
+        whyItMatters: "Directly addresses the radiographic severity requirements cited in Carelon Joint Surgery Guidelines.",
       },
       {
         field: "treatmentHistoryAndResponse",
@@ -511,7 +529,7 @@ Appeals Fax: 1-877-508-5748`,
       examinationFindings: "Severe medial and lateral joint line tenderness, coarse crepitus through active/passive range of motion, fixed flexion contracture of 10 degrees with maximum flexion limited to 95 degrees, and moderate persistent joint effusion.",
       imagingAndDiagnostics: "Weight-bearing bilateral knee radiographs (05/10/2026) show severe tricompartmental osteoarthritis with bone-on-bone medial joint space obliteration (Kellgren-Lawrence Grade IV), subchondral sclerosis, and marked marginal osteophytes.",
       treatmentHistoryAndResponse: "Completed 16 consecutive weeks of formal outpatient physical therapy (2x/weekly, Jan-Apr 2026) with documented failure to relieve symptoms; 6-month trial of prescription meloxicam 15mg daily; and two intra-articular steroid injections (02/15/2026, 05/01/2026) yielding only transient relief (<2 weeks).",
-      otherDocumentedFacts: "Dr. Robert Langston, MD certified that conservative modalities have been fully exhausted and total knee arthroplasty is medically necessary under Molina Guideline MCP-082.",
+      otherDocumentedFacts: "Dr. Robert Langston, MD certified that conservative modalities have been fully exhausted and total knee arthroplasty is medically necessary under Carelon Joint Surgery Guidelines.",
       recordsAreIncomplete: false,
     },
     physicianNotes: `PATIENT: Eleanor Vance | DOB: 04/14/1968 | DOS: 06/12/2026
@@ -524,9 +542,9 @@ CONSERVATIVE THERAPY MODALITIES COMPLETED & FAILED:
 3. Intra-articular Injections: Underwent two image-guided right knee corticosteroid injections (Triamcinolone acetonide 40 mg on 02/15/2026 and 05/01/2026) providing only transient partial relief (<14 days duration).
 
 CLINICAL NECESSITY DETERMINATION:
-Under Molina Healthcare Clinical Coverage Guideline MCP-082, the patient has completely exhausted all non-operative conservative modalities. Right Total Knee Arthroplasty (CPT 27447) is urgently medically necessary to restore basic weight-bearing ambulation and prevent progressive functional deterioration.
+Under Carelon Clinical Guidelines for Joint Surgery, the patient has completely exhausted all non-operative conservative modalities. Right Total Knee Arthroplasty (CPT 27447) is urgently medically necessary to restore basic weight-bearing ambulation and prevent progressive functional deterioration.
 
-Attending Orthopedic Surgeon: Dr. Robert Langston, MD, FAAOS (Sunstate Surgical Hospital)`,
+Attending Orthopedic Surgeon: Dr. Robert Langston, MD, FAAOS (Metropolitan Surgical Hospital)`,
   },
   {
     id: "geoblue_spine",

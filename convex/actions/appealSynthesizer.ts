@@ -149,7 +149,7 @@ function formatDenialReason(code?: string, description?: string): string {
 import type { Id } from "../_generated/dataModel";
 
 export interface AppealSynthesizerClaimContext {
-  _id: Id<"claims">;
+  _id?: Id<"claims">;
   claimNumber: string;
   patient?: { name?: string; memberId?: string; groupNumber?: string; state?: string; insurancePayer?: string; email?: string };
   cptCodes?: string[];
@@ -369,6 +369,8 @@ function isPayerMismatchedEvidence(
   }
 }
 
+import { sanitizePublicPolicyUrl } from "./policyCrawler";
+
 const CPT_EXPECTED_SITES: Record<string, string[]> = {
   "27447": ["knee", "arthroplasty", "tka", "27447"],
   "63047": ["spine", "lumbar", "laminectomy", "facetectomy", "63047"],
@@ -376,19 +378,82 @@ const CPT_EXPECTED_SITES: Record<string, string[]> = {
   "29881": ["knee", "meniscectomy", "arthroscopy", "29881"],
 };
 
-function isEvidenceSiteMismatched(
+const ANATOMICAL_CONFLICT_RULES: Array<{
+  primaryTokens: string[];
+  conflictTokens: string[];
+}> = [
+  {
+    primaryTokens: ["knee", "tka", "patella", "meniscus", "27447", "29881"],
+    conflictTokens: ["hip", "tha", "shoulder", "spine", "lumbar", "cervical", "foot", "ankle", "wrist", "elbow", "bunion", "hallux"],
+  },
+  {
+    primaryTokens: ["hip", "tha", "acetabular", "27130"],
+    conflictTokens: ["knee", "tka", "shoulder", "spine", "lumbar", "cervical", "foot", "ankle", "wrist", "elbow", "bunion", "hallux"],
+  },
+  {
+    primaryTokens: ["spine", "lumbar", "laminectomy", "facetectomy", "vertebroplasty", "63047"],
+    conflictTokens: ["knee", "tka", "hip", "tha", "shoulder", "foot", "ankle", "wrist", "elbow", "bunion", "hallux"],
+  },
+  {
+    primaryTokens: ["cervical"],
+    conflictTokens: ["lumbar", "thoracic", "knee", "hip", "foot", "ankle"],
+  },
+  {
+    primaryTokens: ["lumbar"],
+    conflictTokens: ["cervical", "thoracic", "knee", "hip", "foot", "ankle"],
+  },
+  {
+    primaryTokens: ["shoulder", "rotator", "glenoid", "29827"],
+    conflictTokens: ["knee", "tka", "hip", "tha", "spine", "lumbar", "cervical", "foot", "ankle", "wrist"],
+  },
+  {
+    primaryTokens: ["foot", "ankle", "hallux", "bunion", "bunionectomy", "metatarsal"],
+    conflictTokens: ["knee", "hip", "shoulder", "spine", "lumbar", "cervical"],
+  },
+];
+
+export function isEvidenceSiteMismatched(
   evidence: { title?: string; citationClause?: string; extractedEvidenceMarkdown?: string; sourceUrl?: string },
   claim: { cptCodes?: string[] }
 ): boolean {
   const cptCodes: string[] = claim?.cptCodes || [];
   const hasKnown = cptCodes.some((c) => CPT_EXPECTED_SITES[c]);
   if (!hasKnown) return false;
+
   const expected = new Set(cptCodes.flatMap((c) => CPT_EXPECTED_SITES[c] || [c.toLowerCase()]));
+  const titleAndClause = `${evidence.title || ""} ${evidence.citationClause || ""}`.toLowerCase();
   const haystack = [evidence.title, evidence.citationClause, evidence.extractedEvidenceMarkdown, evidence.sourceUrl]
     .join(" ")
     .toLowerCase();
+
+  // 1. Strict primary anatomical conflict check:
+  // If the target claim belongs to a primary anatomical group, check if the evidence title or clause
+  // explicitly names a conflicting anatomical site without the target site in its title/clause.
+  for (const rule of ANATOMICAL_CONFLICT_RULES) {
+    const isTargetGroup = rule.primaryTokens.some((tok) => {
+      return cptCodes.some((c) => c.toLowerCase() === tok) || [...expected].some((e) => e === tok);
+    });
+
+    if (isTargetGroup) {
+      const hasConflictInTitle = rule.conflictTokens.some((conflict) => {
+        const regex = new RegExp(`\\b${conflict}\\b`, "i");
+        return regex.test(titleAndClause);
+      });
+
+      const hasPrimaryInTitle = rule.primaryTokens.some((primary) => {
+        const regex = new RegExp(`\\b${primary}\\b`, "i");
+        return regex.test(titleAndClause);
+      });
+
+      if (hasConflictInTitle && !hasPrimaryInTitle) {
+        return true;
+      }
+    }
+  }
+
   const hasExpected = [...expected].some((kw) => haystack.includes(kw));
   if (hasExpected) return false;
+
   // If the excerpt is generic and mentions no anatomical site at all, do not treat it as mismatched;
   // the full policy document was already vetted at crawl time. Only flag when it clearly
   // mentions a different site (foot/bunion vs knee, etc.).
@@ -555,7 +620,8 @@ export function assembleProfessionalAppealEmail(
     email += `The following policy materials are identified as review references. They should be evaluated together with the patient-specific clinical records:\n\n`;
     supportingEvidences.slice(0, 5).forEach((evidence) => {
       const details = cleanEvidenceSummary(evidence.extractedEvidenceMarkdown);
-      const sourceLink = evidence.sourceUrl ? ` ([Official source](${evidence.sourceUrl}))` : "";
+      const cleanUrl = evidence.sourceUrl ? sanitizePublicPolicyUrl(evidence.sourceUrl) : "";
+      const sourceLink = cleanUrl ? ` ([Official source](${cleanUrl}))` : "";
       const clause = evidence.citationClause ? ` — ${evidence.citationClause}` : "";
       email += `- **${evidence.title}**${clause}${sourceLink}${details ? `: ${details}` : ""}\n`;
     });

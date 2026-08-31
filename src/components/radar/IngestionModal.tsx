@@ -1047,7 +1047,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 {isProcessing ? (
                   <>
                     <CircleNotch className="size-3.5 animate-spin" />
-                    <span>{autoPilotEnabled ? "Saving context & analyzing..." : "Saving context..."}</span>
+                    <span>{processingMessage || (autoPilotEnabled ? "Saving context & analyzing..." : "Saving context...")}</span>
                   </>
                 ) : (
                   <>

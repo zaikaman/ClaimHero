@@ -87,9 +87,9 @@ ClaimHero automates the entire lifecycle from denial ingestion to payer adjudica
 1. Open **[https://usable-sturgeon-376.convex.site](https://usable-sturgeon-376.convex.site)**.
 2. Click **Quick Ingest** (sidebar) or `Cmd+K` -> *Ingest Denial Notice*.
 3. Pick a preset:
-   * **Molina Healthcare — Total Knee Arthroplasty** — $24,500 / CPT 27447 / CO-50 (`molina_knee`)
-   * **GeoBlue (BCBS Global) — Lumbar Decompression** — $18,200 / CPT 63047 / CO-197 (`geoblue_spine`)
-   * **BCBS Global Core — Knee MRI** — $2,850 / CPT 73721 / CO-16 (`bcbsglobal_mri`)
+   * **GeoBlue Worldwide — Total Knee Arthroplasty (Carelon)** — $24,500 / CPT 27447 / CO-50 (`geoblue_knee`)
+   * **GeoBlue Worldwide — Lumbar Decompression (Carelon)** — $18,200 / CPT 63047 / CO-197 (`geoblue_spine`)
+   * **BCBS Global Core — Diagnostic Knee MRI (Carelon)** — $2,850 / CPT 73721 / CO-16 (`bcbsglobal_mri`)
 4. All 5 clinical intake questions are pre-filled with grounded facts + treating physician notes (Dr. Langston / Dr. Chen / Dr. Martinez). Confirm and **Run Autonomous Pipeline**.
 5. Watch the stepper: `Evidence & CPB` -> `Defense Suite` -> `Payer Dispatch`. Within ~60-90s you will have: indexed CPB clauses, a scored overturn badge, a synthesized brief, and a dispatchable packet.
 
@@ -104,7 +104,7 @@ In `Payer Communications` (`AgentMailDrawer.tsx`), select:
 
 * **AI Adjudicator** (`claimhero-adjudicator@agentmail.to`) — OpenAI reviews your brief against CPB criteria and returns a formal inbound determination that auto-updates the case to `won` and is indexed into the Precedent Vector Archive.
 * **Custom Email** — enter your own address; receive the real HTML + plain-text appeal via AgentMail REST (`api.agentmail.to/v0/inboxes/{inbox_id}/messages/send`) and reply to see two-way threading.
-* **Official Payer** — Molina / GeoBlue / BCBS Global Core routes to verified intake emails (`src/lib/constants.ts:21`), others show portal/fax/PO box with transparent source provenance badges (`Verified Gateway`, `Firecrawl Discovered`, `Extracted from Document`, `Unresolved Gateway`).
+* **Official Payer** — GeoBlue / BCBS Global Core routes to verified intake emails (`src/lib/constants.ts:21`), others show portal/fax/PO box with transparent source provenance badges (`Verified Gateway`, `Firecrawl Discovered`, `Extracted from Document`, `Unresolved Gateway`).
 
 > Tip: The floating **Sentinel Readiness Checklist** and `Cmd+K` Command Palette expose every action without hunting through navigation.
 
@@ -546,13 +546,13 @@ Current: **200/200 passing** across 12 suites with **100% line coverage** across
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
-| [`tests/claimhero.test.ts`](file:///d:/ClaimHero/tests/claimhero.test.ts) | 66 | Master end-to-end integration, 4-pillar rubric scoring, ERISA rules, portfolio aggregation, bounded batch deadline sweep |
+| [`tests/claimhero.test.ts`](file:///d:/ClaimHero/tests/claimhero.test.ts) | 66 | Master end-to-end integration, 4-pillar rubric scoring, ERISA rules, portfolio aggregation, bounded batch deadline sweep, competitor payer domain rejection, and global Carelon/BCBS template verification |
 | [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 25 | AgentMail delivery, binary attachments, webhook normalizers, Svix signature verification, key rotation, free-tier intake routing |
 | [`tests/redactionEngine.test.ts`](file:///d:/ClaimHero/tests/redactionEngine.test.ts) | 17 | HIPAA Safe Harbor 18-identifier redaction, boundary masking, regex patterns |
 | [`tests/authorization.test.ts`](file:///d:/ClaimHero/tests/authorization.test.ts) | 16 | Convex multi-tenant authorization, strict document & shared intake claim ownership validation, unauthenticated rejection, session isolation |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking |
 | [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest |
-| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting, statutory countdown math, risk badge styling |
+| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting, statutory countdown math, risk badge styling, verified payer appellate contact directory lookup |
 | [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, 3-tier appellate escalation |
 | [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, STT tolerance |
 | [`tests/p2pDefense.test.ts`](file:///d:/ClaimHero/tests/p2pDefense.test.ts) | 6 | Physician tele-script generator, statutory opening, pocket cheat sheet print |
