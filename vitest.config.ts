@@ -9,7 +9,7 @@ export default defineConfig({
     exclude: ["node_modules", "dist", "docs", "convex/_generated"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "json", "html"],
+      reporter: ["text", "json"],
       include: [
         "src/lib/**/*.ts",
         "convex/lib/**/*.ts",

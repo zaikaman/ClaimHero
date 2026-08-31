@@ -18,6 +18,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { Claim, ClinicalEvidence, AppealLevel } from "../../types";
+import { cn } from "../../lib/utils";
 import { useAppealStudio } from "../../hooks/useAppealStudio";
 import { usePrecedents } from "../../hooks/usePrecedents";
 import { CitationSidebar } from "./CitationSidebar";
@@ -48,6 +49,8 @@ const TIER_METADATA_CONFIG = {
     postureLabel: "Administrative Reconsideration",
     legalAggressiveness: "Standard",
     colorClass: "border-sky-500/40 text-sky-400 bg-sky-500/10",
+    activeClass: "border-sky-500/50 bg-sky-500/15 text-sky-300 shadow-xs ring-1 ring-sky-500/30",
+    badgeClass: "bg-sky-500/25 text-sky-300 border border-sky-500/40",
     badgeVariant: "default" as const,
     keyStatute: "ERISA 29 C.F.R. § 2560.503-1",
     description: "Initial formal challenge presenting clinical CPB contradictions, treating physician addendum, and standard ERISA disclosure demands.",
@@ -62,6 +65,8 @@ const TIER_METADATA_CONFIG = {
     postureLabel: "Elevated Adversarial Posture",
     legalAggressiveness: "Elevated Grievance",
     colorClass: "border-amber-500/40 text-amber-400 bg-amber-500/10",
+    activeClass: "border-amber-500/50 bg-amber-500/15 text-amber-300 shadow-xs ring-1 ring-amber-500/30",
+    badgeClass: "bg-amber-500/25 text-amber-300 border border-amber-500/40",
     badgeVariant: "warning" as const,
     keyStatute: "ERISA § 503 & 29 C.F.R. § 2560.503-1(h)(3)(iii)",
     description: "Elevated statutory challenge demanding independent same-specialty board-certified peer review, reviewer credentials disclosure, and bad-faith warnings.",
@@ -76,6 +81,8 @@ const TIER_METADATA_CONFIG = {
     postureLabel: "Maximum Statutory Enforcement",
     legalAggressiveness: "Maximum Statutory Enforcement",
     colorClass: "border-rose-500/40 text-rose-400 bg-rose-500/10",
+    activeClass: "border-rose-500/50 bg-rose-500/15 text-rose-300 shadow-xs ring-1 ring-rose-500/30",
+    badgeClass: "bg-rose-500/25 text-rose-300 border border-rose-500/40",
     badgeVariant: "destructive" as const,
     keyStatute: "ERISA § 502(a)(1)(B) & 45 C.F.R. § 147.136",
     description: "Maximum legal enforcement petitioning independent external review and State DOI complaint with statutory bad-faith penalties and fee-shifting.",
@@ -205,10 +212,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       />
 
       {/* Multi-Tier Statutory Escalation Stepper Bar */}
-      <Card className="p-2.5 sm:p-3 shrink-0 overflow-visible bg-gradient-to-r from-card/90 via-card to-card/90 border-border/80 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* 3 Statutory Legal Tiers */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap flex-1">
+      <Card className="p-2 sm:p-2.5 shrink-0 overflow-visible bg-card/90 border-border/80 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+          {/* 3 Statutory Legal Tiers Segmented Controller */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 p-1 rounded-lg bg-muted/40 border border-border/60 flex-1">
             {(["level_1_internal", "level_2_grievance", "level_3_external_state_review"] as AppealLevel[]).map((tierKey) => {
               const tier = TIER_METADATA_CONFIG[tierKey];
               const isActive = appealLevel === tierKey;
@@ -217,42 +224,51 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               return (
                 <button
                   key={tierKey}
+                  type="button"
                   onClick={() => setAppealLevel(tierKey)}
-                  className={`flex-1 min-w-[130px] p-2 rounded-lg border text-left transition-all relative ${
+                  className={cn(
+                    "flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border text-left transition-all",
                     isActive
-                      ? `${tier.colorClass} shadow-xs font-semibold ring-1 ring-primary/30`
-                      : "border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground"
-                  }`}
+                      ? tier.activeClass
+                      : "border-transparent bg-transparent hover:bg-muted/60 text-muted-foreground hover:text-foreground"
+                  )}
                 >
-                  <div className="flex items-center justify-between gap-1 mb-0.5">
-                    <span className="text-[10px] font-mono tracking-wider uppercase opacity-80">
-                      Tier {tier.levelNumber}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={cn(
+                        "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0",
+                        isActive ? tier.badgeClass : "bg-muted text-muted-foreground border border-border/50"
+                      )}
+                    >
+                      T{tier.levelNumber}
                     </span>
-                    {hasRevisionForTier && (
-                      <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4">
-                        Saved
-                      </Badge>
-                    )}
+                    <div className="min-w-0">
+                      <div className={cn("text-xs truncate font-medium", isActive && "font-semibold text-foreground")}>
+                        {tier.shortTitle}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground/80 truncate hidden xl:block">
+                        {tier.postureLabel}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-xs font-medium text-foreground truncate">
-                    {tier.shortTitle}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground truncate mt-0.5">
-                    {tier.postureLabel}
-                  </div>
+                  {hasRevisionForTier && (
+                    <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4 shrink-0 border-border/60">
+                      Saved
+                    </Badge>
+                  )}
                 </button>
               );
             })}
           </div>
 
           {/* Quick Actions & Escalation Trigger */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
             {/* Version History Toggle */}
             <Button
               variant={showVersionHistory ? "secondary" : "outline"}
               size="sm"
               onClick={() => setShowVersionHistory(!showVersionHistory)}
-              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
+              className="h-9 rounded-md px-3 text-xs gap-1.5 shrink-0 border-border/80"
               title="Browse historical appeal revisions across tiers"
             >
               <ClockCounterClockwise className="size-3.5 text-muted-foreground" />
@@ -265,41 +281,44 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 size="sm"
                 onClick={() => setShowEscalationModal(true)}
                 disabled={isEscalating || isSynthesizing}
-                className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0 bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-xs"
+                className="h-9 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-xs transition-all"
                 title={`Escalate dispute to ${currentTierConfig.nextTierLabel}`}
               >
                 <TrendUp className="size-3.5" />
                 <span>Escalate to Tier {TIER_METADATA_CONFIG[currentTierConfig.nextTier].levelNumber}</span>
               </Button>
             ) : (
-              <Badge variant="destructive" className="h-8 px-2.5 text-xs gap-1.5 font-sans font-medium">
+              <Badge variant="destructive" className="h-9 px-3 text-xs gap-1.5 font-sans font-medium flex items-center">
                 <Scales className="size-3.5" />
-                <span>Tier 3 Maximum Enforcement</span>
+                <span>Tier 3 Max Enforcement</span>
               </Badge>
             )}
           </div>
         </div>
 
         {/* Active Statutory Posture Pill Ribbon */}
-        <div className="mt-2.5 pt-2 border-t border-border/50 flex items-center justify-between gap-2 flex-wrap text-[11px] text-muted-foreground">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-foreground flex items-center gap-1">
+        <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between gap-2 flex-wrap text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <span className="font-semibold text-foreground flex items-center gap-1 shrink-0">
               <Gavel className="size-3 text-primary" />
               Target Authority:
             </span>
-            <span className="text-foreground">{currentTierConfig.targetAuthority}</span>
-            <span className="text-border">•</span>
-            <span className="font-mono text-primary">{currentTierConfig.keyStatute}</span>
+            <span className="text-foreground font-medium truncate">{currentTierConfig.targetAuthority}</span>
+            <span className="text-border hidden sm:inline">•</span>
+            <span className="font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20 text-[10px]">
+              {currentTierConfig.keyStatute}
+            </span>
           </div>
-          <div className="flex items-center gap-1 text-[10px] font-mono">
-            <span>Aggressiveness:</span>
-            <span className={`font-semibold ${
+          <div className="flex items-center gap-1.5 text-[10px] font-mono shrink-0">
+            <span className="text-muted-foreground">Aggressiveness:</span>
+            <span className={cn(
+              "font-semibold px-1.5 py-0.5 rounded",
               appealLevel === "level_3_external_state_review"
-                ? "text-rose-400"
+                ? "text-rose-400 bg-rose-500/10 border border-rose-500/20"
                 : appealLevel === "level_2_grievance"
-                ? "text-amber-400"
-                : "text-sky-400"
-            }`}>
+                ? "text-amber-400 bg-amber-500/10 border border-amber-500/20"
+                : "text-sky-400 bg-sky-500/10 border border-sky-500/20"
+            )}>
               {currentTierConfig.legalAggressiveness}
             </span>
           </div>
@@ -531,7 +550,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
           {/* Quick Outline Section Jump Bar */}
           {markdownContent.trim().length > 0 && (
-            <div className="h-8 shrink-0 flex items-center gap-1.5 overflow-x-auto px-4 py-1 bg-muted/20 border-b border-border/60 scrollbar-none text-[11px] font-mono">
+            <div className="h-8 shrink-0 flex items-center gap-1.5 overflow-x-auto overflow-y-hidden px-4 bg-muted/20 border-b border-border/60 scrollbar-none text-[11px] font-mono select-none">
               <span className="text-muted-foreground uppercase text-[9px] font-semibold tracking-wider shrink-0 mr-1">
                 Jump To:
               </span>
@@ -545,6 +564,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               ].map((sec) => (
                 <button
                   key={sec.id}
+                  type="button"
                   onClick={() => {
                     const editorEl = document.querySelector(".studio-editor-textarea") as HTMLTextAreaElement | null;
                     const previewEl = document.querySelector(".studio-preview-pane") as HTMLDivElement | null;
@@ -592,7 +612,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                       }
                     }
                   }}
-                  className="px-2 py-0.5 rounded border border-border/60 bg-background/60 hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 cursor-pointer transition-all text-[10px]"
+                  className="h-5.5 px-2 rounded border border-border/60 bg-background/60 hover:bg-muted/80 hover:border-border text-muted-foreground hover:text-foreground shrink-0 cursor-pointer transition-all text-[10px] inline-flex items-center justify-center leading-none"
                 >
                   {sec.label}
                 </button>

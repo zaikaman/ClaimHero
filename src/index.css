@@ -131,6 +131,18 @@
   background: hsl(var(--muted-foreground));
 }
 
+@layer utilities {
+  .scrollbar-none {
+    -ms-overflow-style: none !important; /* IE and Edge */
+    scrollbar-width: none !important; /* Firefox */
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
