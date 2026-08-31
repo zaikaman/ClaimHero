@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-31T05:32:00Z
+- **Last updated:** 2026-08-31T05:46:17Z
 
 ## Log
 
@@ -289,5 +289,8 @@ Integrated the official `@firecrawl/firecrawl-convex` Convex Component into Clai
 ### 2026-08-31 - 5e3f085
 Hardened `@convex-dev/aggregate` TableAggregate synchronization in case mutation and deletion workflows (`convex/claims.ts`). Wrapped aggregate insertion and deletion calls (`claimsAggregate.delete`, `claimsAggregate.insert`) in defensive exception handlers, preventing untracked, pre-existing legacy records or unindexed seed claims from throwing `DELETE_MISSING_KEY` errors during case deletion (`deleteCase`, `clearUnassignedDemoCases`) or intake pipelines. Validated with `npm run test` (166/166 passing unit tests across 11 suites with 100% line coverage). Convex features: components, aggregate, mutations.
 
-### 2026-08-31 - working tree
+### 2026-08-31 - 570087c
 Redesigned the Statutory Escalation Tier controller and quick action toolbar in Appeal Studio (`src/components/studio/AppealStudio.tsx`) into a sleek segmented controller with normalized control heights (`h-9`), active tier accents (sky for Tier 1, amber for Tier 2, rose for Tier 3), and an aligned quick action toolbar (`Revisions`, `Escalate to Tier X`). Fixed the horizontal jump bar vertical scrollbar defect by introducing a `.scrollbar-none` utility in `src/index.css` supporting WebKit, Firefox, and Edge/IE, paired with explicit `overflow-y-hidden` and button sizing in `AppealStudio.tsx`. Validated with `npm run verify` (100% clean typecheck, lint, 166/166 passing unit tests across 11 suites with 100% line coverage, and production build). Convex features: static hosting, reactive subscriptions.
+
+### 2026-08-31 - working tree
+Split Dependabot npm grouping from bundled `dependencies: ["*"]` to `minor-and-patch` (`update-types: [minor, patch]`) and froze 16 high-risk majors (React 18→19, @react-three/fiber 8→9, three 0.170→0.185, openai 4→7, tailwindcss 3→4, vite 6→8, typescript 5→7, eslint 9→10 etc.) via `ignore: [version-update:semver-major]` to keep `main` stable for judging; `actions/checkout` and `actions/setup-node` 4→7 remain as low-risk individual PRs (` .github/dependabot.yml`).
