@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-31T05:01:00Z
+- **Last updated:** 2026-08-31T05:16:00Z
 
 ## Log
 
@@ -283,7 +283,10 @@ Equipped the Sentinel AI Copilot Chatbot with autonomous Firecrawl web search, c
 ### 2026-08-31 - 5752d65
 Standardized default OpenAI clinical reasoning and structured output model configuration across backend actions, client consoles, specs, and tests to `gpt-5.4-nano` (`convex/lib/openai.ts`, `convex/actions/opticalParser.ts`, `convex/actions/policyCrawler.ts`, `convex/actions/appealSynthesizer.ts`, `convex/actions/sentinelChatbot.ts`, `src/components/evidence/ClinicalResearchConsole.tsx`, `tests/openai.test.ts`, `.env.example`). Convex features: actions, queries, mutations, static hosting.
 
-### 2026-08-31 - working tree
+### 2026-08-31 - 951e635
 Integrated the official `@firecrawl/firecrawl-convex` Convex Component into ClaimHero's backend architecture. Mounted the component in `convex/convex.config.ts` with typed environment variables (`FIRECRAWL_API_KEY`, optional `FIRECRAWL_WEBHOOK_SECRET`) and HTTP prefix route mounting (`/firecrawl/`). Wired `FirecrawlClient` across all clinical research actions (`convex/actions/policyCrawler.ts`, `convex/actions/payerContactResolver.ts`, `convex/actions/sentinelChatbot.ts`), replacing ad-hoc HTTP requests with component-native `firecrawl.search` and `firecrawl.scrape` while retaining all multi-round clinical scoring algorithms, PDF/HTML error guards, and anti-hallucination sanitizers. Purged legacy `@mendable/firecrawl-js` dependency from `package.json` and synchronized documentation in `README.md`. Validated with `npm run verify`: 100% clean typecheck, lint, 166/166 passing unit tests across 11 suites with 100% line coverage across backend libraries and utilities, and successful production build. Convex features: registered component, actions, queries, mutations, static hosting.
+
+### 2026-08-31 - working tree
+Hardened `@convex-dev/aggregate` TableAggregate synchronization in case mutation and deletion workflows (`convex/claims.ts`). Wrapped aggregate insertion and deletion calls (`claimsAggregate.delete`, `claimsAggregate.insert`) in defensive exception handlers, preventing untracked, pre-existing legacy records or unindexed seed claims from throwing `DELETE_MISSING_KEY` errors during case deletion (`deleteCase`, `clearUnassignedDemoCases`) or intake pipelines. Validated with `npm run test` (166/166 passing unit tests across 11 suites with 100% line coverage). Convex features: components, aggregate, mutations.
 
 

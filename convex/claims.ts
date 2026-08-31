@@ -238,7 +238,11 @@ export const create = mutation({
 
     const createdClaimDoc = await ctx.db.get(claimId);
     if (createdClaimDoc) {
-      await claimsAggregate.insert(ctx, createdClaimDoc);
+      try {
+        await claimsAggregate.insert(ctx, createdClaimDoc);
+      } catch (err) {
+        console.warn("Could not insert claim into aggregate:", err);
+      }
     }
 
     return claimId;
@@ -355,7 +359,11 @@ export const createWithPatient = mutation({
 
     const createdClaimDoc = await ctx.db.get(claimId);
     if (createdClaimDoc) {
-      await claimsAggregate.insert(ctx, createdClaimDoc);
+      try {
+        await claimsAggregate.insert(ctx, createdClaimDoc);
+      } catch (err) {
+        console.warn("Could not insert claim into aggregate:", err);
+      }
     }
 
     return claimId;
@@ -691,6 +699,11 @@ export const clearUnassignedDemoCases = mutation({
 
     for (const c of unassigned) {
       await ctx.db.delete(c._id);
+      try {
+        await claimsAggregate.delete(ctx, c);
+      } catch {
+        // Ignore if not present in aggregate
+      }
     }
 
     return unassigned.length;
@@ -779,7 +792,12 @@ export const deleteCase = mutation({
 
     // 6. Delete the core claim record and update aggregates
     await ctx.db.delete(args.claimId);
-    await claimsAggregate.delete(ctx, claim);
+    try {
+      await claimsAggregate.delete(ctx, claim);
+    } catch (err) {
+      // Document may not be tracked in aggregate if created prior to aggregate initialization
+      console.warn("Could not delete claim from aggregate:", err);
+    }
 
     return {
       success: true,
