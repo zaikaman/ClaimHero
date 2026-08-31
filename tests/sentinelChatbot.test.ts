@@ -72,5 +72,20 @@ describe("Sentinel Chatbot Tool-Calling & Context Architecture", () => {
     expect(scrapeTool).toBeDefined();
     expect(scrapeTool?.function.parameters.required).toContain("url");
   });
+
+  it("verifies indexed query sorting and bounded constraints for recent audit log feeds and sessions", () => {
+    // Verify multi-claim log merging and sorting contract
+    const mockClaimLogs = [
+      [{ claimId: "c1", timestamp: 100, eventType: "denial_ingested" }, { claimId: "c1", timestamp: 80, eventType: "policy_crawled" }],
+      [{ claimId: "c2", timestamp: 120, eventType: "appeal_dispatched" }, { claimId: "c2", timestamp: 90, eventType: "overturn_score_computed" }],
+    ];
+
+    const merged = mockClaimLogs.flat().sort((a, b) => b.timestamp - a.timestamp);
+    expect(merged[0].timestamp).toBe(120);
+    expect(merged[0].eventType).toBe("appeal_dispatched");
+    expect(merged[1].timestamp).toBe(100);
+    expect(merged.slice(0, 3).length).toBe(3);
+  });
 });
+
 

@@ -21,7 +21,7 @@ export const listSessions = query({
 
     return await ctx.db
       .query("chatbotSessions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user_updated", (q) => q.eq("userId", userId))
       .order("desc")
       .take(20);
   },
@@ -45,7 +45,7 @@ export const getOrCreateSession = mutation({
     // Check if there is an existing recent session
     const existingSession = await ctx.db
       .query("chatbotSessions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user_updated", (q) => q.eq("userId", userId))
       .order("desc")
       .first();
 
@@ -334,6 +334,7 @@ export const searchClaimsForChatbot = internalQuery({
           .take(limit)
       : await ctx.db
           .query("claims")
+          .withIndex("by_created")
           .order("desc")
           .take(limit);
 
@@ -471,7 +472,7 @@ export const getAuditLogsForChatbot = internalQuery({
   handler: async (ctx, args) => {
     const logs = await ctx.db
       .query("appealAuditLogs")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .withIndex("by_claim_and_timestamp", (q) => q.eq("claimId", args.claimId))
       .order("desc")
       .take(8);
 

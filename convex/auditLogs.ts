@@ -1,6 +1,5 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
 
@@ -10,17 +9,19 @@ import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
 export const listByClaim = query({
   args: {
     claimId: v.id("claims"),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const authorized = await getClaimIfAuthorized(ctx, args.claimId);
     if (!authorized) return [];
 
-    const logs = await ctx.db
-      .query("appealAuditLogs")
-      .withIndex("by_claim", (q: any) => q.eq("claimId", args.claimId))
-      .collect();
+    const limit = args.limit ?? 100;
 
-    return (logs as Doc<"appealAuditLogs">[]).sort((a, b) => b.timestamp - a.timestamp);
+    return await ctx.db
+      .query("appealAuditLogs")
+      .withIndex("by_claim_and_timestamp", (q: any) => q.eq("claimId", args.claimId))
+      .order("desc")
+      .take(limit);
   },
 });
 
@@ -97,13 +98,27 @@ export const listRecent = query({
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
       .collect();
 
-    const userClaimIds = new Set(userClaims.map((c) => c._id));
-    if (userClaimIds.size === 0) return [];
+    if (userClaims.length === 0) return [];
 
-    const logs = await ctx.db.query("appealAuditLogs").take(100);
+    // Focus on active/recent claims if user has many
+    const activeClaims = userClaims
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+      .slice(0, 30);
 
-    return (logs as Doc<"appealAuditLogs">[])
-      .filter((l) => userClaimIds.has(l.claimId))
+    // Fetch indexed recent logs for each claim in parallel
+    const logsPerClaim = await Promise.all(
+      activeClaims.map((claim) =>
+        ctx.db
+          .query("appealAuditLogs")
+          .withIndex("by_claim_and_timestamp", (q: any) => q.eq("claimId", claim._id))
+          .order("desc")
+          .take(limit)
+      )
+    );
+
+    const mergedLogs = logsPerClaim.flat();
+
+    return mergedLogs
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
   },

@@ -317,7 +317,11 @@ export const findMatchingClaimInternal = internalQuery({
     }
 
     // 4. Fallback: Scan recent claims and check if any claim's claimNumber appears in subject/body
-    const recentClaims = await ctx.db.query("claims").order("desc").take(500);
+    const recentClaims = await ctx.db
+      .query("claims")
+      .withIndex("by_created")
+      .order("desc")
+      .take(500);
     const subjectAndBody = textToScan.toLowerCase();
 
     const contentMatch = recentClaims.find(

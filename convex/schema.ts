@@ -155,6 +155,8 @@ export default defineSchema({
     .index("by_inbox_email", ["agentMailInboxEmail"])
     .index("by_adjudicator_email", ["agentMailAdjudicatorEmail"])
     .index("by_assigned_agent_email", ["assignedAgentEmail"])
+    .index("by_created", ["createdAt"])
+    .index("by_updated", ["updatedAt"])
     .searchIndex("search_claims", {
       searchField: "denialReasonDescription",
       filterFields: ["userId", "status", "denialReasonCode"],
@@ -298,6 +300,7 @@ export default defineSchema({
     timestamp: v.number(),
   })
     .index("by_claim", ["claimId"])
+    .index("by_claim_and_timestamp", ["claimId", "timestamp"])
     .index("by_timestamp", ["timestamp"]),
 
   // Physician Peer-to-Peer (P2P) Defense Tele-Scripts
@@ -396,6 +399,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
+    .index("by_user_updated", ["userId", "updatedAt"])
     .index("by_updated", ["updatedAt"]),
 
   // Sentinel Chatbot Messages
