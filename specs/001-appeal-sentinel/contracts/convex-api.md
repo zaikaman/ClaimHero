@@ -91,7 +91,7 @@ Saves edits and updates to an appeal brief draft with version increment.
 ## 4. Asynchronous Actions (`convex/actions/`)
 
 ### `actions.opticalParser.parseDenialDocument`
-Calls OpenAI Vision & Structured JSON (`gpt-5-nano`) to parse an uploaded denial PDF / image or raw text, and persists the patient and claim to Convex DB.
+Calls OpenAI Vision & Structured JSON (`gpt-5.4-nano`) to parse an uploaded denial PDF / image or raw text, and persists the patient and claim to Convex DB.
 - **Arguments**:
   - `storageId`: `v.optional(v.id("_storage"))`
   - `rawDocumentText`: `v.optional(v.string())`
@@ -108,13 +108,13 @@ Calls Firecrawl API to scrape relevant Clinical Policy Bulletins for the payer a
 - **Returns**: `{ clausesExtracted: number, topSources: Array<string> }`
 
 ### `actions.precedentMatcher.computeOverturnScore`
-Uses `gpt-5-nano` to cross-examine insurer CPB criteria against patient clinical records to compute win probability.
+Uses `gpt-5.4-nano` to cross-examine insurer CPB criteria against patient clinical records to compute win probability.
 - **Arguments**:
   - `claimId`: `v.id("claims")`
 - **Returns**: `{ score: number, riskLevel: string, matchedPrecedents: number }`
 
 ### `actions.appealSynthesizer.generateAppealBrief`
-Synthesizes a cited medical and ERISA appeal brief using `gpt-5-nano`.
+Synthesizes a cited medical and ERISA appeal brief using `gpt-5.4-nano`.
 - **Arguments**:
   - `claimId`: `v.id("claims")`
   - `appealLevel`: `v.string()`

@@ -9,7 +9,7 @@
 
 ### User Story 1 - Denial Document Ingestion & Optical Metadata Extraction (Priority: P1)
 
-A patient, family member, or medical practice administrator receives an insurance denial letter or Explanation of Benefits (EOB) PDF/Image. They upload the document directly through the web interface (or paste raw document text, or forward it to their dedicated claim email inbox). The system ingests the real document, extracts key case metadata (denial reason code, CPT procedure codes, ICD-10 diagnosis codes, disputed dollar amounts, dates of service, and payer identity) using OpenAI `gpt-5-nano` Vision and Structured JSON, and creates a real-time trackable appeal case in the Convex reactive database.
+A patient, family member, or medical practice administrator receives an insurance denial letter or Explanation of Benefits (EOB) PDF/Image. They upload the document directly through the web interface (or paste raw document text, or forward it to their dedicated claim email inbox). The system ingests the real document, extracts key case metadata (denial reason code, CPT procedure codes, ICD-10 diagnosis codes, disputed dollar amounts, dates of service, and payer identity) using OpenAI `gpt-5.4-nano` Vision and Structured JSON, and creates a real-time trackable appeal case in the Convex reactive database.
 
 **Why this priority**: Ingestion and structured extraction are the foundational entry points for the entire recovery workflow. Without structured case parameters, no policy analysis or appeal generation can occur.
 

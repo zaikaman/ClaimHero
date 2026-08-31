@@ -7,7 +7,7 @@
 
 ## Summary
 
-Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel that levels the healthcare reimbursement playing field for patients and providers. The system ingests medical claim denial letters and Explanation of Benefits (EOB) documents via direct file upload (PDF/Image), pasted text, or dedicated claim email inboxes (AgentMail). It parses clinical codes and disputed amounts using OpenAI Vision and Structured JSON powered by `gpt-5-nano`, crawls insurer Clinical Policy Bulletins (CPBs) live using Firecrawl, cross-matches precedents and calculates win probability via clinical reasoning, and synthesizes legally airtight, ERISA-cited appeal briefs within an interactive, real-time collaborative Appeal Studio. All data, crons, and live subscriptions are managed reactively via Convex with zero mock or fake data.
+Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel that levels the healthcare reimbursement playing field for patients and providers. The system ingests medical claim denial letters and Explanation of Benefits (EOB) documents via direct file upload (PDF/Image), pasted text, or dedicated claim email inboxes (AgentMail). It parses clinical codes and disputed amounts using OpenAI Vision and Structured JSON powered by `gpt-5.4-nano`, crawls insurer Clinical Policy Bulletins (CPBs) live using Firecrawl, cross-matches precedents and calculates win probability via clinical reasoning, and synthesizes legally airtight, ERISA-cited appeal briefs within an interactive, real-time collaborative Appeal Studio. All data, crons, and live subscriptions are managed reactively via Convex with zero mock or fake data.
 
 ---
 
@@ -16,7 +16,7 @@ Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel 
 - **Language/Version**: TypeScript 5.x, Node.js 20+
 - **Primary Dependencies**: 
   - Backend: `convex` (Reactive DB, Actions, Crons, File Storage)
-  - Intelligence: `openai` (Structured JSON outputs, Vision parsing, `gpt-5-nano` reasoning engine)
+  - Intelligence: `openai` (Structured JSON outputs, Vision parsing, `gpt-5.4-nano` reasoning engine)
   - External Data & Scraping: `@mendable/firecrawl-js` / Firecrawl REST API (Insurer CPB & clinical guidelines scraper)
   - Email Communications: AgentMail REST API (Autonomous dedicated claim inboxes and outbound transmission)
   - Frontend: `react`, `react-dom`, `vite`, `tailwindcss`, `lucide-react`, `clsx`, `tailwind-merge`, `@radix-ui/react-*`
@@ -28,7 +28,7 @@ Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel 
 - **Constraints**: 
   - Zero mock or placeholder code in production pathways; all data derived from real user inputs and live API integrations.
   - Strict HIPAA-conscious data handling and sanitization.
-  - Unified OpenAI client configured via 3 explicit environment variables (`OPENAI_API_KEY`, `OPENAI_MODEL=gpt-5-nano`, `OPENAI_BASE_URL`).
+  - Unified OpenAI client configured via 3 explicit environment variables (`OPENAI_API_KEY`, `OPENAI_MODEL=gpt-5.4-nano`, `OPENAI_BASE_URL`).
   - Resilient fallbacks for external crawling and email delivery.
 - **Scale/Scope**: 5 prioritized user journeys (Ingestion & Parsing, Evidence Crawling & Precedent Matching, Appeal Brief Synthesis in Studio, Statutory Deadline Countdown & Dispatch, Real-Time Case Analytics & Audit Timeline).
 
@@ -43,7 +43,7 @@ Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel 
 | **I. Code Quality & Strict Type Safety** | PASS | 100% TypeScript coverage with end-to-end Convex validators (`v.string()`, `v.id()`, etc.), OpenAI structured JSON schemas, and zero mock/placeholder implementations. |
 | **II. Rigorous Testing Standards** | PASS | Multi-tier testing hierarchy defined in `data-model.md` and `contracts/`, including automated Vitest unit tests and `npm run verify` CI script. |
 | **III. UX Consistency & "Precision Medical Dark-Mode"** | PASS | Design tokens codified (`#0b0f17` canvas, `#00e5ff` cyan, `#10b981` emerald, `#f43f5e` crimson, `#f59e0b` amber) with zero-latency reactive Convex subscriptions (`useQuery`). |
-| **IV. High-Throughput & Low-Latency Performance** | PASS | Decoupled non-blocking asynchronous actions for Firecrawl and `gpt-5-nano`, sub-50ms reactive mutations, and optimized relational indexing. |
+| **IV. High-Throughput & Low-Latency Performance** | PASS | Decoupled non-blocking asynchronous actions for Firecrawl and `gpt-5.4-nano`, sub-50ms reactive mutations, and optimized relational indexing. |
 | **V. Security, Data Privacy & HIPAA Guardrails** | PASS | File storage isolation, encrypted credential management via env variables, and immutable audit logging (`appealAuditLogs`). |
 | **VI. Development Workflow & Governance** | PASS | Single-branch workflow on `main`, continuous build logging in `hackathon.md`, and Vietnamese communication / English technical assets rule enforcement. |
 
@@ -72,7 +72,7 @@ specs/001-appeal-sentinel/
 convex/
 ├── schema.ts                    # 7-table Convex reactive database schema
 ├── lib/
-│   └── openai.ts                # Unified OpenAI client wrapper (gpt-5-nano, 3 env vars)
+│   └── openai.ts                # Unified OpenAI client wrapper (gpt-5.4-nano, 3 env vars)
 ├── claims.ts                    # Queries & mutations for claims intake & status management
 ├── clinicalEvidences.ts         # Queries & mutations for CPB evidence & precedent citations
 ├── appeals.ts                   # Queries & mutations for multi-section appeal brief drafts

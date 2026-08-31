@@ -8,13 +8,13 @@ import {
  * Singleton OpenAI Client Instance
  * Configured via 3 standard environment variables:
  * - OPENAI_API_KEY: Authentication key
- * - OPENAI_MODEL: Active model (defaults to gpt-5-nano)
+ * - OPENAI_MODEL: Active model (defaults to gpt-5.4-nano)
  * - OPENAI_BASE_URL: Custom endpoint/proxy (defaults to https://api.openai.com/v1)
  */
 
 export function getOpenAIConfig() {
   const apiKey = process.env.OPENAI_API_KEY || "sk-placeholder-key";
-  const model = process.env.OPENAI_MODEL || "gpt-5-nano";
+  const model = process.env.OPENAI_MODEL || "gpt-5.4-nano";
   const baseURL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
 
   return { apiKey, model, baseURL };

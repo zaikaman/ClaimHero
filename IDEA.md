@@ -82,7 +82,7 @@ flowchart TD
   * **Inbound**: Fast asynchronous webhook (`/agentmail-webhook`) processing forwarded denials and insurer determinations.
   * **Outbound**: 3-mode appellate transmission gateway (AI Adjudicator simulation, custom test email, or verified official payer address with portal/fax/PO box routing).
 * **OpenAI**:
-  * `gpt-5-nano` structured extraction for EOB parameters (claim number, provider, denied amount, patient liability, CPT, ICD-10, CARC codes, deadlines).
+  * `gpt-5.4-nano` structured extraction for EOB parameters (claim number, provider, denied amount, patient liability, CPT, ICD-10, CARC codes, deadlines).
   * Deterministic 4-pillar scoring algorithm (35% CPB + 25% Step-Therapy + 20% ERISA + 20% Precedents = 100).
   * Grounded legal brief synthesis using verified clinical facts and cited policy clauses, with automatic 3-tier escalation posture.
   * Real-time P2P Live Call Copilot generating instant Fast Answer rebuttal cards against AI Medical Director challenge traps.

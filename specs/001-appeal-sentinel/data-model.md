@@ -178,7 +178,7 @@ Clinical policy excerpts, FDA package inserts, PubMed studies, and overturned pr
 | `sourceUrl` | `v.optional(v.string())` | No | Web citation URL. |
 | `citationClause` | `v.string()` | Yes | Specific section/clause identifier (e.g., "Section 3.2.1: Conservative Therapy Exception"). |
 | `extractedEvidenceMarkdown` | `v.string()` | Yes | Relevant excerpt of clinical necessity criteria. |
-| `relevanceScore` | `v.number()` | Yes | Clinical alignment score (0.00 to 1.00) evaluated by `gpt-5-nano`. |
+| `relevanceScore` | `v.number()` | Yes | Clinical alignment score (0.00 to 1.00) evaluated by `gpt-5.4-nano`. |
 | `createdAt` | `v.number()` | Yes | Ingestion timestamp. |
 
 **Indexes**:

@@ -22,7 +22,7 @@ VITE_CONVEX_URL=https://groovy-hippopotamus-924.convex.cloud
 
 # 2. OpenAI AI Client (3 Core Variables)
 OPENAI_API_KEY=sk-proj-your-openai-api-key
-OPENAI_MODEL=gpt-5-nano
+OPENAI_MODEL=gpt-5.4-nano
 OPENAI_BASE_URL=https://api.openai.com/v1
 
 # 3. Firecrawl (Insurer Policy Crawler)
@@ -63,7 +63,7 @@ Open your browser at `http://localhost:5173`.
 
 ## 3. End-to-End Real Data Workflow
 
-1. **Ingest Denial Document**: Click **"+ Ingest Denial Document"** (use 1-Click Judge Sample Presets, upload real PDF/Image, or paste raw EOB text). `gpt-5-nano` extracts clinical codes into Convex DB.
+1. **Ingest Denial Document**: Click **"+ Ingest Denial Document"** (use 1-Click Judge Sample Presets, upload real PDF/Image, or paste raw EOB text). `gpt-5.4-nano` extracts clinical codes into Convex DB.
 2. **Inspect Clinical Policy Evidence**: Switch to the **Evidence Matrix** tab, click **"Crawl Insurer CPB"** (Firecrawl) and **"Calculate Win Score"** to cross-examine insurer policies and compute the Overturn Probability Score.
 3. **Collaborative Appeal Studio**: Open the **Appeal Studio**, click **"Synthesize Brief"** to generate a comprehensive multi-page ERISA legal brief citing 29 CFR § 2560.503-1, insert physician notes, and preview the export dossier.
 4. **Autonomous AgentMail Dispatch**: Switch to the **AgentMail Inbox** tab or click **"Proceed to Dispatch"**. The brief is sent from the shared sender inbox to the shared AI-adjudicator inbox, while each claim keeps its own Convex correspondence thread. Configure one AgentMail `message.received` webhook on the shared sender inbox at the public `/agentmail-webhook` endpoint to receive external replies. The default `agentmail.to` addresses work without a custom domain.

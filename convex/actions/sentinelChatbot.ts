@@ -279,10 +279,10 @@ async function performFirecrawlWebSearch(
     (query.toLowerCase().includes("aetna")
       ? "Aetna"
       : query.toLowerCase().includes("cigna")
-      ? "Cigna"
-      : query.toLowerCase().includes("united")
-      ? "UnitedHealthcare"
-      : "Major Payer");
+        ? "Cigna"
+        : query.toLowerCase().includes("united")
+          ? "UnitedHealthcare"
+          : "Major Payer");
 
   const fallbackResults = [
     {
@@ -694,7 +694,7 @@ async function maybeSummarizeConversation(
         .join("\n")}`;
 
       const res = await client.chat.completions.create({
-        model: model || "gpt-5-nano",
+        model: model || "gpt-5.4-nano",
         messages: [{ role: "user", content: summaryPrompt }],
         temperature: 0.1,
       });
@@ -805,7 +805,7 @@ export const sendMessageWithTools = action({
         turn++;
 
         const response = await client.chat.completions.create({
-          model: model || "gpt-5-nano",
+          model: model || "gpt-5.4-nano",
           messages: openaiMessages,
           tools: SENTINEL_CHAT_TOOLS,
           tool_choice: "auto",
@@ -903,11 +903,10 @@ export const sendMessageWithTools = action({
 - Claim Number: **${fallbackData.claimNumber}**
 - Statutory Appeal Clock: **${fallbackData.daysRemaining} days remaining** (180-day window)
 - Mandatory De Novo Review: Under 29 CFR § 2560.503-1(h)(3)(ii), review must be conducted by an independent health professional with no prior involvement.
-- Statutory $110/Day Penalties: ${
-            ep
+- Statutory $110/Day Penalties: ${ep
               ? `Plan administrator is in default for **${ep.daysInDefault} days**, accruing **$${ep.accruedPenaltyAmount.toLocaleString()}** in statutory damages.`
               : "Plan administrator must provide all internal clinical guidelines and reviewer credentials upon written request within 30 days."
-          }`;
+            }`;
         } else if (query.includes("score") || query.includes("win") || query.includes("overturn") || query.includes("probab")) {
           finalReply = `Overturn Probability Analysis for **${fallbackData.claimNumber}** (${fallbackData.patientName}):
 - Likelihood: **${fallbackData.overturnProbabilityScore ?? 88}%** (${fallbackData.riskLevel || "High Confidence"})

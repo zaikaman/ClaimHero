@@ -60,7 +60,7 @@ describe("convex/lib/openai Unit Tests", () => {
 
     const config = getOpenAIConfig();
     expect(config.apiKey).toBe("sk-placeholder-key");
-    expect(config.model).toBe("gpt-5-nano");
+    expect(config.model).toBe("gpt-5.4-nano");
     expect(config.baseURL).toBe("https://api.openai.com/v1");
 
     const client = getOpenAIClient({ timeout: 5000 });

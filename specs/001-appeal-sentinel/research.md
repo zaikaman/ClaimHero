@@ -8,14 +8,14 @@
 
 ## 1. Executive Technology Decisions
 
-### Decision 1: Single-Model AI / LLM Reasoning Architecture (OpenAI SDK with `gpt-5-nano`)
+### Decision 1: Single-Model AI / LLM Reasoning Architecture (OpenAI SDK with `gpt-5.4-nano`)
 - **Decision**: Configure a unified OpenAI SDK (`openai`) client within Convex Node.js actions powered by 3 explicit environment variables:
   - `OPENAI_API_KEY`: API authentication key.
-  - `OPENAI_MODEL`: Active reasoning model (default: `gpt-5-nano`, fully configurable to any OpenAI-compatible model).
+  - `OPENAI_MODEL`: Active reasoning model (default: `gpt-5.4-nano`, fully configurable to any OpenAI-compatible model).
   - `OPENAI_BASE_URL`: Custom base endpoint (e.g. `https://api.openai.com/v1` or custom proxy).
 - **Rationale**: 
   - **Single-Model Simplicity & 100% Proxy Compatibility**: Eliminates the need for a secondary `text-embedding-3-small` model. Custom proxies or local endpoints (vLLM, Ollama, OpenRouter, LiteLLM) often only support `/v1/chat/completions` and fail on `/v1/embeddings`.
-  - **Clinical Reasoning Over Naive Vector Search**: `gpt-5-nano` directly performs semantic matching, medical necessity evaluation, CPT/ICD-10 code cross-referencing against insurer Clinical Policy Bulletins (CPBs), and calculates the Overturn Probability Score with clinical context rather than simple cosine word similarity.
+  - **Clinical Reasoning Over Naive Vector Search**: `gpt-5.4-nano` directly performs semantic matching, medical necessity evaluation, CPT/ICD-10 code cross-referencing against insurer Clinical Policy Bulletins (CPBs), and calculates the Overturn Probability Score with clinical context rather than simple cosine word similarity.
   - **Structured Outputs**: OpenAI's JSON Schema enforcement (`response_format: { type: "json_schema", ... }`) guarantees 100% deterministic parsing of medical Explanation of Benefits (EOBs), code mappings, and multi-page appeal briefs.
 - **Alternatives Considered**:
   - *LangChain / LlamaIndex*: Rejected due to unnecessary abstraction overhead, heavy bundle size, and lower determinism compared to direct Convex actions calling OpenAI SDK.
@@ -61,6 +61,6 @@
 ### Decision 5: Frontend Experience & Precision Medical Dark-Mode (React + Tailwind CSS)
 - **Decision**: Build a high-performance single-page web application using Vite, React 18+, TypeScript, Tailwind CSS, Lucide React icons, and Radix UI primitives, styled with the "Precision Medical Dark-Mode" design system.
 - **Palette**: Deep slate-charcoal canvas (`#0b0f17`), Cyber Cyan accents (`#00e5ff`), Medical Emerald victory highlights (`#10b981`), Statutory Crimson countdowns (`#f43f5e`), and Amber badges (`#f59e0b`).
-- **Interactive UI**: Real-time **Case Ingestion Radar**, drag-and-drop PDF/image optical parser with OpenAI `gpt-5-nano`, and live ERISA deadline countdown dials.
+- **Interactive UI**: Real-time **Case Ingestion Radar**, drag-and-drop PDF/image optical parser with OpenAI `gpt-5.4-nano`, and live ERISA deadline countdown dials.
 - **Rationale**:
   - Meets hackathon judging criteria for visual excellence, cognitive clarity, and immediate responsiveness.

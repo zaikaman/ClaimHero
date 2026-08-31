@@ -59,38 +59,38 @@ const RESEARCH_MODES: Array<{
   description: string;
   badge?: string;
 }> = [
-  {
-    id: "multi_source",
-    label: "Full Multi-Source Sentinel Scan",
-    icon: Lightning,
-    description: "Concurrent sweep of Insurer CPB, PubMed clinical trials, and FDA indications",
-    badge: "Recommended",
-  },
-  {
-    id: "payer_cpb",
-    label: "Insurer Policy Bulletin (CPB)",
-    icon: BookOpen,
-    description: "Official Clinical Policy Bulletins, medical necessity rules & criteria",
-  },
-  {
-    id: "pubmed_trials",
-    label: "PubMed & ClinicalTrials.gov",
-    icon: Flask,
-    description: "Peer-reviewed RCTs, meta-analyses & standard-of-care efficacy abstracts",
-  },
-  {
-    id: "fda_labels",
-    label: "FDA Package Inserts & Labels",
-    icon: ShieldCheck,
-    description: "FDA-approved on-label indications to legally refute investigational denials",
-  },
-  {
-    id: "custom_url",
-    label: "Live Web & Guideline URL Scanner",
-    icon: Globe,
-    description: "Scrape and extract structured criteria clauses from any custom health URL",
-  },
-];
+    {
+      id: "multi_source",
+      label: "Full Multi-Source Sentinel Scan",
+      icon: Lightning,
+      description: "Concurrent sweep of Insurer CPB, PubMed clinical trials, and FDA indications",
+      badge: "Recommended",
+    },
+    {
+      id: "payer_cpb",
+      label: "Insurer Policy Bulletin (CPB)",
+      icon: BookOpen,
+      description: "Official Clinical Policy Bulletins, medical necessity rules & criteria",
+    },
+    {
+      id: "pubmed_trials",
+      label: "PubMed & ClinicalTrials.gov",
+      icon: Flask,
+      description: "Peer-reviewed RCTs, meta-analyses & standard-of-care efficacy abstracts",
+    },
+    {
+      id: "fda_labels",
+      label: "FDA Package Inserts & Labels",
+      icon: ShieldCheck,
+      description: "FDA-approved on-label indications to legally refute investigational denials",
+    },
+    {
+      id: "custom_url",
+      label: "Live Web & Guideline URL Scanner",
+      icon: Globe,
+      description: "Scrape and extract structured criteria clauses from any custom health URL",
+    },
+  ];
 
 const PRESET_RESEARCH_URLS = [
   {
@@ -208,7 +208,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
 
       // Stage 3 & 4: Clinical AI Extraction
       setCurrentStageIndex(2);
-      addLog("Extraction", "Running OpenAI gpt-5-nano clinical reasoning auditor on document payload...", "info");
+      addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
 
       let result: any = null;
       if (activeMode === "multi_source") {
@@ -352,11 +352,10 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                   key={mode.id}
                   onClick={() => setActiveMode(mode.id)}
                   disabled={isExecuting}
-                  className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    isSelected
+                  className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all cursor-pointer ${isSelected
                       ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40 text-foreground"
                       : "border-border/70 bg-card/60 hover:bg-card/90 text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between w-full mb-1">
                     <Icon className={`size-4 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
@@ -512,8 +511,8 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                     {activeMode === "multi_source"
                       ? "Launch Multi-Source Research Scan"
                       : activeMode === "custom_url"
-                      ? "Scrape & Extract Criteria Clauses"
-                      : `Crawl ${RESEARCH_MODES.find((m) => m.id === activeMode)?.label}`}
+                        ? "Scrape & Extract Criteria Clauses"
+                        : `Crawl ${RESEARCH_MODES.find((m) => m.id === activeMode)?.label}`}
                   </span>
                 </>
               )}
@@ -593,15 +592,14 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                 return (
                   <div
                     key={idx}
-                    className={`p-2.5 rounded-lg border text-xs transition-all ${
-                      isPast
+                    className={`p-2.5 rounded-lg border text-xs transition-all ${isPast
                         ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-400"
                         : isCurrent
-                        ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/40 animate-pulse"
-                        : isErrorStage
-                        ? "border-rose-500/40 bg-rose-500/10 text-rose-400"
-                        : "border-border/60 bg-muted/20 text-muted-foreground opacity-60"
-                    }`}
+                          ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/40 animate-pulse"
+                          : isErrorStage
+                            ? "border-rose-500/40 bg-rose-500/10 text-rose-400"
+                            : "border-border/60 bg-muted/20 text-muted-foreground opacity-60"
+                      }`}
                   >
                     <div className="flex items-center gap-1.5 mb-0.5">
                       {isPast ? (
@@ -625,39 +623,39 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
 
             {/* Terminal Console Activity Output */}
             <div className="rounded-xl border border-border/80 bg-black/70 p-3 font-mono text-[11px] text-foreground/90 max-h-48 overflow-y-auto space-y-1 select-text">
-            {telemetryLogs.map((log, idx) => (
-              <div key={idx} className="flex items-start gap-2 leading-relaxed">
-                <span className="text-muted-foreground shrink-0">{log.timestamp}</span>
-                <span
-                  className={`shrink-0 font-bold px-1 rounded text-[9px] uppercase ${
-                    log.type === "success"
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : log.type === "error"
-                      ? "bg-rose-500/20 text-rose-400"
-                      : log.type === "warning"
-                      ? "bg-amber-500/20 text-amber-400"
-                      : "bg-blue-500/20 text-blue-400"
-                  }`}
-                >
-                  [{log.stage}]
-                </span>
-                <span
-                  className={
-                    log.type === "error"
-                      ? "text-rose-300"
-                      : log.type === "success"
-                      ? "text-emerald-300"
-                      : "text-zinc-300"
-                  }
-                >
-                  {log.message}
-                </span>
-              </div>
-            ))}
-            <div ref={terminalBottomRef} />
-          </div>
-        </Card>
-      ); })()}
+              {telemetryLogs.map((log, idx) => (
+                <div key={idx} className="flex items-start gap-2 leading-relaxed">
+                  <span className="text-muted-foreground shrink-0">{log.timestamp}</span>
+                  <span
+                    className={`shrink-0 font-bold px-1 rounded text-[9px] uppercase ${log.type === "success"
+                        ? "bg-emerald-500/20 text-emerald-400"
+                        : log.type === "error"
+                          ? "bg-rose-500/20 text-rose-400"
+                          : log.type === "warning"
+                            ? "bg-amber-500/20 text-amber-400"
+                            : "bg-blue-500/20 text-blue-400"
+                      }`}
+                  >
+                    [{log.stage}]
+                  </span>
+                  <span
+                    className={
+                      log.type === "error"
+                        ? "text-rose-300"
+                        : log.type === "success"
+                          ? "text-emerald-300"
+                          : "text-zinc-300"
+                    }
+                  >
+                    {log.message}
+                  </span>
+                </div>
+              ))}
+              <div ref={terminalBottomRef} />
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* Indexed Clinical Evidence Dossier View */}
       <Card className="p-4 border-border/80 bg-card/80 space-y-3 shadow-sm">
@@ -681,11 +679,10 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
               <button
                 key={f.id}
                 onClick={() => setActiveEvidenceFilter(f.id)}
-                className={`text-[10px] font-sans px-2 py-0.5 rounded-md border transition-colors cursor-pointer ${
-                  activeEvidenceFilter === f.id
+                className={`text-[10px] font-sans px-2 py-0.5 rounded-md border transition-colors cursor-pointer ${activeEvidenceFilter === f.id
                     ? "bg-primary text-primary-foreground border-primary font-semibold"
                     : "border-border/70 bg-card hover:bg-muted text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 {f.label}
               </button>

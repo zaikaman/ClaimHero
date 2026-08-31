@@ -22,7 +22,7 @@
 **Purpose**: Core Convex database schema, unified OpenAI client, type definitions, and application layout shell.
 
 - [X] T006 Define complete Convex database schema with tables (`patients`, `claims`, `clinicalEvidences`, `appeals`, `emailThreads`, `emailMessages`, `appealAuditLogs`) and relational indexes in `convex/schema.ts`
-- [X] T007 Implement OpenAI client wrapper supporting `OPENAI_API_KEY`, `OPENAI_MODEL` (`gpt-5-nano`), and `OPENAI_BASE_URL` with structured output helpers in `convex/lib/openai.ts`
+- [X] T007 Implement OpenAI client wrapper supporting `OPENAI_API_KEY`, `OPENAI_MODEL` (`gpt-5.4-nano`), and `OPENAI_BASE_URL` with structured output helpers in `convex/lib/openai.ts`
 - [X] T008 [P] Implement core domain TypeScript interfaces and type definitions in `src/types/index.ts`
 - [X] T009 [P] Implement UI styling utilities, badge helpers, and currency/date formatters in `src/lib/utils.ts`
 - [X] T010 [P] Implement audit logging mutations and query helpers in `convex/auditLogs.ts`
@@ -36,12 +36,12 @@
 
 ## Phase 3: User Story 1 - Denial Document Ingestion & Optical Extraction (Priority: P1) - MVP
 
-**Goal**: Ingest real denial letters/EOBs via direct upload, text paste, or email, extract metadata using `gpt-5-nano` Vision/Structured Outputs, and create reactive claim cases.
+**Goal**: Ingest real denial letters/EOBs via direct upload, text paste, or email, extract metadata using `gpt-5.4-nano` Vision/Structured Outputs, and create reactive claim cases.
 
 **Independent Test**: Upload a real denial letter PDF or paste raw text and verify that a new claim is created in the dashboard with extracted CPT codes, denial reason codes, denied amounts, and patient liability.
 
 - [X] T014 [P] [US1] Implement patient & claim creation and query mutations in `convex/claims.ts`
-- [X] T015 [US1] Implement optical extraction action using `gpt-5-nano` with `DenialExtractionResult` schema in `convex/actions/opticalParser.ts`
+- [X] T015 [US1] Implement optical extraction action using `gpt-5.4-nano` with `DenialExtractionResult` schema in `convex/actions/opticalParser.ts`
 - [X] T016 [P] [US1] Implement real-time claim subscription hook in `src/hooks/useClaims.ts`
 - [X] T017 [P] [US1] Implement Live Case Ingestion Radar feed showing incoming claim status in `src/components/radar/CaseRadar.tsx`
 - [X] T018 [US1] Implement Drag-and-Drop Denial Upload, Text Parser, & Email Forwarding modal in `src/components/radar/IngestionModal.tsx`
@@ -53,13 +53,13 @@
 
 ## Phase 4: User Story 2 - Clinical Policy Bulletin (CPB) Evidence Crawling & Precedent Matching (Priority: P2)
 
-**Goal**: Crawl insurer CPBs live via Firecrawl (with clinical guideline fallback) and use `gpt-5-nano` to cross-examine criteria and compute Overturn Probability Score.
+**Goal**: Crawl insurer CPBs live via Firecrawl (with clinical guideline fallback) and use `gpt-5.4-nano` to cross-examine criteria and compute Overturn Probability Score.
 
 **Independent Test**: Trigger policy analysis on an ingested claim; verify that matching insurer policy clauses and clinical citations are displayed in a side-by-side policy matrix alongside an Overturn Probability Score.
 
 - [X] T020 [P] [US2] Implement evidence persistence queries and mutations in `convex/clinicalEvidences.ts`
 - [X] T021 [US2] Implement Firecrawl scraper action with resilient clinical guideline fallback in `convex/actions/policyCrawler.ts`
-- [X] T022 [US2] Implement clinical precedent evaluation and Overturn Probability scoring action using `gpt-5-nano` in `convex/actions/precedentMatcher.ts`
+- [X] T022 [US2] Implement clinical precedent evaluation and Overturn Probability scoring action using `gpt-5.4-nano` in `convex/actions/precedentMatcher.ts`
 - [X] T023 [P] [US2] Implement side-by-side Denial vs Insurer CPB inspector in `src/components/evidence/EvidenceMatrix.tsx`
 - [X] T024 [P] [US2] Implement CPB Clause & Medical Criteria Viewer with highlighted contradictions in `src/components/evidence/PolicyViewer.tsx`
 - [X] T025 [US2] Implement Precedent Feed displaying historical winning cases in `src/components/evidence/PrecedentFeed.tsx`
@@ -70,12 +70,12 @@
 
 ## Phase 5: User Story 3 - Cited Appeal Brief Synthesis & Collaborative Appeal Studio (Priority: P3)
 
-**Goal**: Synthesize multi-page medical appeal briefs citing ERISA 29 CFR § 2560.503-1 and CPB clauses using `gpt-5-nano`, and provide a real-time collaborative Appeal Studio.
+**Goal**: Synthesize multi-page medical appeal briefs citing ERISA 29 CFR § 2560.503-1 and CPB clauses using `gpt-5.4-nano`, and provide a real-time collaborative Appeal Studio.
 
 **Independent Test**: Open an assembled appeal brief in the studio, insert an additional clinical study reference or physician note, and verify that the formatted document updates in real time with intact legal citations.
 
 - [X] T026 [P] [US3] Implement appeal brief queries and draft auto-save mutations in `convex/appeals.ts`
-- [X] T027 [US3] Implement cited appeal brief generation action using `gpt-5-nano` in `convex/actions/appealSynthesizer.ts`
+- [X] T027 [US3] Implement cited appeal brief generation action using `gpt-5.4-nano` in `convex/actions/appealSynthesizer.ts`
 - [X] T028 [P] [US3] Implement live studio state management hook in `src/hooks/useAppealStudio.ts`
 - [X] T029 [US3] Implement Collaborative Live Appeal Studio document editor in `src/components/studio/AppealStudio.tsx`
 - [X] T030 [P] [US3] Implement Citation & Evidence Footnote Sidebar in `src/components/studio/CitationSidebar.tsx`

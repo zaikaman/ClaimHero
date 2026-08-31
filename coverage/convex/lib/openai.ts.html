@@ -1,65 +1,65 @@
-
 <!doctype html>
 <html lang="en">
 
 <head>
-    <title>Code coverage report for convex/lib/openai.ts</title>
-    <meta charset="utf-8" />
-    <link rel="stylesheet" href="../../prettify.css" />
-    <link rel="stylesheet" href="../../base.css" />
-    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style type='text/css'>
-        .coverage-summary .sorter {
-            background-image: url(../../sort-arrow-sprite.png);
-        }
-    </style>
+  <title>Code coverage report for convex/lib/openai.ts</title>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="../../prettify.css" />
+  <link rel="stylesheet" href="../../base.css" />
+  <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style type='text/css'>
+    .coverage-summary .sorter {
+      background-image: url(../../sort-arrow-sprite.png);
+    }
+  </style>
 </head>
-    
+
 <body>
-<div class='wrapper'>
+  <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">convex/lib</a> openai.ts</h1>
-        <div class='clearfix'>
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
-                <span class="quiet">Statements</span>
-                <span class='fraction'>141/141</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
-                <span class="quiet">Branches</span>
-                <span class='fraction'>25/25</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
-                <span class="quiet">Functions</span>
-                <span class='fraction'>5/5</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
-                <span class="quiet">Lines</span>
-                <span class='fraction'>141/141</span>
-            </div>
-        
-            
+      <h1><a href="../../index.html">All files</a> / <a href="index.html">convex/lib</a> openai.ts</h1>
+      <div class='clearfix'>
+
+        <div class='fl pad1y space-right2'>
+          <span class="strong">100% </span>
+          <span class="quiet">Statements</span>
+          <span class='fraction'>141/141</span>
         </div>
-        <p class="quiet">
-            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
-        </p>
-        <template id="filterTemplate">
-            <div class="quiet">
-                Filter:
-                <input type="search" id="fileSearch">
-            </div>
-        </template>
+
+
+        <div class='fl pad1y space-right2'>
+          <span class="strong">100% </span>
+          <span class="quiet">Branches</span>
+          <span class='fraction'>25/25</span>
+        </div>
+
+
+        <div class='fl pad1y space-right2'>
+          <span class="strong">100% </span>
+          <span class="quiet">Functions</span>
+          <span class='fraction'>5/5</span>
+        </div>
+
+
+        <div class='fl pad1y space-right2'>
+          <span class="strong">100% </span>
+          <span class="quiet">Lines</span>
+          <span class='fraction'>141/141</span>
+        </div>
+
+
+      </div>
+      <p class="quiet">
+        Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the
+        previous block.
+      </p>
+      <template id="filterTemplate">
+        <div class="quiet">
+          Filter:
+          <input type="search" id="fileSearch">
+        </div>
+      </template>
     </div>
     <div class='status-line high'></div>
     <pre><table class="coverage">
@@ -461,13 +461,13 @@ import {
  * Singleton OpenAI Client Instance
  * Configured via 3 standard environment variables:
  * - OPENAI_API_KEY: Authentication key
- * - OPENAI_MODEL: Active model (defaults to gpt-5-nano)
+ * - OPENAI_MODEL: Active model (defaults to gpt-5.4-nano)
  * - OPENAI_BASE_URL: Custom endpoint/proxy (defaults to https://api.openai.com/v1)
  */
 &nbsp;
 export function getOpenAIConfig() {
   const apiKey = process.env.OPENAI_API_KEY || "sk-placeholder-key";
-  const model = process.env.OPENAI_MODEL || "gpt-5-nano";
+  const model = process.env.OPENAI_MODEL || "gpt-5.4-nano";
   const baseURL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
 &nbsp;
   return { apiKey, model, baseURL };
@@ -645,23 +645,27 @@ export async function createEmbedding(
 &nbsp;
   return fitDimensions(embedding, EMBEDDING_DIMENSIONS);
 }
-&nbsp;</pre></td></tr></table></pre>
+&nbsp;</pre>
+    </td>
+    </tr>
+    </table>
+    </pre>
 
-                <div class='push'></div><!-- for sticky footer -->
-            </div><!-- /wrapper -->
-            <div class='footer quiet pad2 space-top1 center small'>
-                Code coverage generated by
-                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-31T04:41:32.139Z
-            </div>
-        <script src="../../prettify.js"></script>
-        <script>
-            window.onload = function () {
-                prettyPrint();
-            };
-        </script>
-        <script src="../../sorter.js"></script>
-        <script src="../../block-navigation.js"></script>
-    </body>
+    <div class='push'></div><!-- for sticky footer -->
+  </div><!-- /wrapper -->
+  <div class='footer quiet pad2 space-top1 center small'>
+    Code coverage generated by
+    <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+    at 2026-08-31T04:41:32.139Z
+  </div>
+  <script src="../../prettify.js"></script>
+  <script>
+    window.onload = function () {
+      prettyPrint();
+    };
+  </script>
+  <script src="../../sorter.js"></script>
+  <script src="../../block-navigation.js"></script>
+</body>
+
 </html>
-    

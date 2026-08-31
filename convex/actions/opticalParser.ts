@@ -70,7 +70,7 @@ export interface DenialExtractionResult {
 }
 
 /**
- * Optical Extraction Action: Parse an uploaded denial letter or user-submitted text using gpt-5-nano
+ * Optical Extraction Action: Parse an uploaded denial letter or user-submitted text using gpt-5.4-nano
  */
 export const parseDenialDocument = action({
   args: {
@@ -132,7 +132,7 @@ export const parseDenialDocument = action({
       throw new Error("No document content or file provided for optical extraction.");
     }
 
-    // Call OpenAI Structured Outputs with gpt-5-nano
+    // Call OpenAI Structured Outputs with gpt-5.4-nano
     const extraction = await createStructuredCompletion<DenialExtractionResult>({
       systemPrompt: `You are an expert Certified Professional Medical Coder (CPC) and ERISA Insurance Claims Auditor.
 Your job is to accurately extract all financial amounts, clinical CPT procedure codes, ICD-10 diagnosis codes, denial reason codes (e.g. CO-50, CO-197, CO-16), insurer payer names, and statutory appeal filing deadlines from real denial letters and Explanation of Benefits (EOB) documents.
@@ -154,7 +154,7 @@ Rules:
     const sanitizedPayer = (extraction.insurancePayer || "payer").toLowerCase().replace(/[^a-z0-9]/g, "");
     const claimId: string = await ctx.runMutation((api as any).claims.createWithPatient, {
       patientName: extraction.patientName,
-       patientEmail: args.patientEmail?.trim() || `${sanitizedPatient}-${sanitizedPayer}@example.com`,
+      patientEmail: args.patientEmail?.trim() || `${sanitizedPatient}-${sanitizedPayer}@example.com`,
       memberId: extraction.memberId,
       insurancePayer: extraction.insurancePayer,
       state: args.patientState || "California",

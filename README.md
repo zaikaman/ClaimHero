@@ -225,7 +225,7 @@ No curated `CURATED_POLICY_REPOSITORY`. Every citation is scraped live.
 * **Payer Matching** — `isPayerMismatchedSource:486` against `NEUTRAL_PUBLIC_HOSTS:404` (CMS, FDA, NIH, NCCN, NASS `spine.org`, AAOS `aaos.org`, ACR `acr.org`, Carelon/EviCore) — GeoBlue/BCBS network affiliations are explicitly allowed.
 * **Windowing** — `extractRelevantDocumentWindow:845` finds the procedure section (e.g., Lumbar vs Cervical in a 150KB Carelon master guideline) while preserving headers, preventing false anatomical rejections.
 * **CPT Keyword Prefilter** — `getCptKeywords:819` maps 27447->knee/tka, 63047->spine/lumbar/laminectomy; feeds relevance scoring and post-extraction `isPolicyAlignedWithClaim:885` safety net.
-* **Extraction** — `gpt-5-nano` structured `PolicyExtractionResponse` (`policyCrawler.ts:1021`) strips `**` and enforces `relevanceScore 80-99`; always appends one ERISA `legal_precedent` clause.
+* **Extraction** — `gpt-5.4-nano` structured `PolicyExtractionResponse` (`policyCrawler.ts:1021`) strips `**` and enforces `relevanceScore 80-99`; always appends one ERISA `legal_precedent` clause.
 
 Secondary crawlers share the same hardening:
 
@@ -256,7 +256,7 @@ Follow-up addenda to adjudication addresses reload full thread history and re-ru
 
 ### 6.4 OpenAI — Clinical Reason Extraction & Grounded Synthesis
 
-* **Model** — `gpt-5-nano` via unified wrapper `convex/lib/openai.ts:23` (`getOpenAIClient`, `createStructuredCompletion`, `createEmbedding`) with `OPENAI_MODEL` / `OPENAI_API_KEY` / `OPENAI_BASE_URL` support.
+* **Model** — `gpt-5.4-nano` via unified wrapper `convex/lib/openai.ts:23` (`getOpenAIClient`, `createStructuredCompletion`, `createEmbedding`) with `OPENAI_MODEL` / `OPENAI_API_KEY` / `OPENAI_BASE_URL` support.
 * **Optical Parser** (`opticalParser.ts`) — Vision + Structured JSON `DenialExtractionResult`: CPT, CARC, amounts, deadlines, payer contacts (including international insurers). Multilingual detection.
 * **Precedent Matcher** (`precedentMatcher.ts`) — Deterministic 4-pillar rubric: CPB Indication Alignment 35% + Clinical Documentation & Step-Therapy 25% + ERISA §2560.503-1 Procedural 20% + External Precedent Benchmark 20% = 100 (`tests/claimhero.test.ts:114`). `temperature: 0.0`, mathematical summation, persisted in `claims.scoringBreakdown`.
 * **Appeal Synthesizer** (`appealSynthesizer.ts:528` `generateAppealBrief`) — Produces *concise payer correspondence*, not a litigation memo. Structured `AppealBriefSynthesisResult`, then `assembleProfessionalAppealEmail:414` enforces grounded assembly: only human-confirmed `clinicalFacts`, `isBlockedEvidence:257`/`isPayerMismatchedEvidence`/`isEvidenceSiteMismatched:336` filtering, conditional ERISA language, HTML+text via `lib/appealEmail.ts`, and tier-specific posture (`STATUTORY_RIGHTS_NOTICES:84`).
@@ -377,7 +377,7 @@ ClaimHero ships with six independent anti-hallucination layers:
 | **Auth** | `@convex-dev/auth` (Google OAuth + Password), `convex/auth.config.ts` |
 | **Crawl** | Firecrawl JS SDK `v2/search` + `v2/scrape`, `@mendable/firecrawl-js` |
 | **Email** | AgentMail REST `api.agentmail.to`, inbound `POST /agentmail-webhook` |
-| **AI** | OpenAI `gpt-5-nano` (Structured Outputs, Vision, Embeddings 1536-d) via `openai` SDK |
+| **AI** | OpenAI `gpt-5.4-nano` (Structured Outputs, Vision, Embeddings 1536-d) via `openai` SDK |
 | **Frontend** | React 18 + TypeScript (strict) + Vite 6 + Tailwind CSS 3.4 |
 | **UI** | Radix Primitives, Phosphor Icons (`@phosphor-icons/react`), `react-markdown` + `remark-gfm`/`remark-breaks`, `three`/`@react-three/fiber` Silk shader |
 | **State** | Convex reactive hooks (`useQuery`, `useMutation`, `useAction`, `useConvexAuth`) + custom hooks (`useClaims`, `useEvidence`, `useAppealStudio`, `useLiveCallCopilot`, `useLiabilityCalculator`) |
@@ -485,7 +485,7 @@ JWT_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----
 
 # OpenAI (Convex env)
 OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-5-nano
+OPENAI_MODEL=gpt-5.4-nano
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small # Required for Precedent Vector Archive embeddings
 

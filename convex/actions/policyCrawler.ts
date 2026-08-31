@@ -733,9 +733,9 @@ async function scrapeFirecrawlPolicySource(
 
   const scrapedSourceUrl = data && typeof data === "object"
     ? getAcceptableResultUrl({
-        url: sourceUrl,
-        metadata: (data as { metadata?: unknown }).metadata as FirecrawlSearchResult["metadata"],
-      })
+      url: sourceUrl,
+      metadata: (data as { metadata?: unknown }).metadata as FirecrawlSearchResult["metadata"],
+    })
     : null;
 
   return {
@@ -1215,7 +1215,7 @@ export const crawlInsurerPolicy = action({
 
     const windowedPolicyText = extractRelevantDocumentWindow(policyText, args.cptCodes, 50000);
 
-    // Use gpt-5-nano to extract precise medical criteria and contradiction clauses.
+    // Use gpt-5.4-nano to extract precise medical criteria and contradiction clauses.
     const extractedData = await createStructuredCompletion<PolicyExtractionResponse>({
       systemPrompt: `You are an expert Medical Legal Analyst and Clinical Auditor.
 Analyze the provided insurer Clinical Policy Bulletin (CPB) or clinical guideline.

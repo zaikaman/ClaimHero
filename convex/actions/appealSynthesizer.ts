@@ -585,17 +585,17 @@ export const generateAppealBrief = action({
     const physicianNotes: string | undefined = args.physicianNotes || persistedContext?.physicianNotes;
     const sender: AppealSenderDetails | undefined = args.senderName?.trim()
       ? {
-          name: args.senderName,
-          credentials: args.senderCredentials,
-          email: args.senderEmail,
-          phone: args.senderPhone,
-        }
+        name: args.senderName,
+        credentials: args.senderCredentials,
+        email: args.senderEmail,
+        phone: args.senderPhone,
+      }
       : persistedContext?.sender || {
-      name: args.senderName,
-      credentials: args.senderCredentials,
-      email: args.senderEmail,
-      phone: args.senderPhone,
-    };
+        name: args.senderName,
+        credentials: args.senderCredentials,
+        email: args.senderEmail,
+        phone: args.senderPhone,
+      };
 
     if (!sender?.name?.trim() || (!sender.email?.trim() && !sender.phone?.trim())) {
       throw new Error("Complete sender details before generating an appeal");
@@ -622,12 +622,12 @@ export const generateAppealBrief = action({
     const precedentText =
       vectorPrecedents.length > 0
         ? vectorPrecedents
-            .map((match, idx) => {
-              const similarity =
-                Math.round(Math.max(0, Math.min(1, (match.vectorScore + 1) / 2)) * 1000) / 10;
-              return `[Vector Precedent ${idx + 1}] ${match.title} (${match.citation}, similarity ${similarity}%):\nStatutory language: ${match.statutoryLanguage}\nWinning argument: ${match.winningArgument}`;
-            })
-            .join("\n\n")
+          .map((match, idx) => {
+            const similarity =
+              Math.round(Math.max(0, Math.min(1, (match.vectorScore + 1) / 2)) * 1000) / 10;
+            return `[Vector Precedent ${idx + 1}] ${match.title} (${match.citation}, similarity ${similarity}%):\nStatutory language: ${match.statutoryLanguage}\nWinning argument: ${match.winningArgument}`;
+          })
+          .join("\n\n")
         : "No vector-archive matches were available; rely on ERISA 29 CFR § 2560.503-1 and published CPB criteria.";
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
@@ -789,7 +789,7 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       medicalNecessityArguments: result.medicalNecessityArguments,
       legalCitations: citationsSummary,
       fullAppealMarkdown: result.fullAppealMarkdown,
-      lastEditedBy: "OpenAI gpt-5-nano Appeal Synthesizer",
+      lastEditedBy: "OpenAI gpt-5.4-nano Appeal Synthesizer",
     });
 
     return {
