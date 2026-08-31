@@ -4,9 +4,10 @@ import {
   TrendUp,
   Warning,
   CheckCircle,
-  Sparkle,
+  Lightning,
   CircleNotch,
   ArrowsClockwise,
+
   Shield,
   ArrowRight,
   Stethoscope,
@@ -183,7 +184,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       case "precedent_strength":
         return <Medal className="size-3.5 text-amber-500 shrink-0 mt-0.5" />;
       default:
-        return <Sparkle className="size-3.5 text-primary shrink-0 mt-0.5" />;
+        return <Shield className="size-3.5 text-primary shrink-0 mt-0.5" />;
     }
   };
 
@@ -256,7 +257,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 </>
               ) : (
                 <>
-                  <Sparkle className="size-3.5" />
+                  <Lightning className="size-3.5" weight="fill" />
                   <span>1-Click Complete Analysis</span>
                 </>
               )}
@@ -437,9 +438,10 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           {keyContradictions.length > 0 && (
             <div className="space-y-2 pt-1">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <Sparkle className="size-3.5 text-primary" />
+                <FileMagnifyingGlass className="size-3.5 text-primary" />
                 Key Insurer Contradictions Identified:
               </span>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {keyContradictions.map((contra, idx) => (
                   <div

@@ -126,6 +126,8 @@ In `Payer Communications` (`AgentMailDrawer.tsx`), select:
 | **Audit Timeline** (`AuditTimeline.tsx`) | Immutable `appealAuditLogs` ledger per claim | Every state transition is cryptographically ordered |
 | **Portfolio Analytics** (`AnalyticsMetrics.tsx`) | Total disputed, recovered, win rate, payer breakdown, confidence distribution (`convex/claims.ts:530`), and `ExecutiveReportModal.tsx` for practice audit statements & CSV/print exports | Proves ROI; executive accountability per payer |
 | **HIPAA Privacy Filter** (`PrivacyRedactionFilter.tsx`) | Deterministic PII detection (SSN, MRN, DOB, phone, address, custom terms) with 3 presets: Safe Harbor, Balanced Appellate, Public Legal Exhibit | Redact before you dispatch or publish precedent |
+| **Sentinel AI Copilot Widget** (`SentinelChatbot.tsx`, `⌘J`) | Autonomous clinical & legal chatbot with agentic OpenAI tool calling (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`), persistent `chatbotSessions`/`chatbotMessages` tables, rolling context window summarization, and collapsible tool execution traces | On-demand conversational intelligence across all cases, CPB criteria, and statutory ERISA mandates |
+
 
 ---
 
@@ -259,7 +261,9 @@ Follow-up addenda to adjudication addresses reload full thread history and re-ru
 * **Precedent Matcher** (`precedentMatcher.ts`) — Deterministic 4-pillar rubric: CPB Indication Alignment 35% + Clinical Documentation & Step-Therapy 25% + ERISA §2560.503-1 Procedural 20% + External Precedent Benchmark 20% = 100 (`tests/claimhero.test.ts:114`). `temperature: 0.0`, mathematical summation, persisted in `claims.scoringBreakdown`.
 * **Appeal Synthesizer** (`appealSynthesizer.ts:528` `generateAppealBrief`) — Produces *concise payer correspondence*, not a litigation memo. Structured `AppealBriefSynthesisResult`, then `assembleProfessionalAppealEmail:414` enforces grounded assembly: only human-confirmed `clinicalFacts`, `isBlockedEvidence:257`/`isPayerMismatchedEvidence`/`isEvidenceSiteMismatched:336` filtering, conditional ERISA language, HTML+text via `lib/appealEmail.ts`, and tier-specific posture (`STATUTORY_RIGHTS_NOTICES:84`).
 * **P2P Defense Generator** (`p2pDefenseGenerator.ts`) + **Live Copilot** (`p2pLiveCopilot.ts`) — Structured outputs for trap-question counters, statutory demands, and real-time rebuttal cards.
+* **Sentinel AI Copilot Chatbot** (`sentinelChatbot.ts`, `convex/chatbot.ts`) — Agentic tool-calling conversational assistant with dynamic database lookups (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`), persistent session/message tables (`chatbotSessions`, `chatbotMessages`), rolling context window summarization, and collapsible tool execution traces.
 * **Embeddings** (`lib/embeddings.ts`, `lib/openai.ts:167`) — 1536-d, L2-normalized via OpenAI `OPENAI_EMBEDDING_MODEL` (e.g. `text-embedding-3-small`). Fails hard without fallback when unset to guarantee authentic vector embeddings in the Precedent Vector Archive.
+
 
 ---
 

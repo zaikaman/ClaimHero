@@ -19,10 +19,12 @@ import type * as actions_payerContactResolver from "../actions/payerContactResol
 import type * as actions_policyCrawler from "../actions/policyCrawler.js";
 import type * as actions_precedentArchive from "../actions/precedentArchive.js";
 import type * as actions_precedentMatcher from "../actions/precedentMatcher.js";
+import type * as actions_sentinelChatbot from "../actions/sentinelChatbot.js";
 import type * as actions_sentinelPipeline from "../actions/sentinelPipeline.js";
 import type * as appeals from "../appeals.js";
 import type * as auditLogs from "../auditLogs.js";
 import type * as auth from "../auth.js";
+import type * as chatbot from "../chatbot.js";
 import type * as claims from "../claims.js";
 import type * as clinicalEvidences from "../clinicalEvidences.js";
 import type * as crons from "../crons.js";
@@ -61,10 +63,12 @@ declare const fullApi: ApiFromModules<{
   "actions/policyCrawler": typeof actions_policyCrawler;
   "actions/precedentArchive": typeof actions_precedentArchive;
   "actions/precedentMatcher": typeof actions_precedentMatcher;
+  "actions/sentinelChatbot": typeof actions_sentinelChatbot;
   "actions/sentinelPipeline": typeof actions_sentinelPipeline;
   appeals: typeof appeals;
   auditLogs: typeof auditLogs;
   auth: typeof auth;
+  chatbot: typeof chatbot;
   claims: typeof claims;
   clinicalEvidences: typeof clinicalEvidences;
   crons: typeof crons;

@@ -11,14 +11,16 @@ import {
   FileText,
   Clock,
   ArrowUpRight,
+  Lightning,
   PlusCircle,
   Funnel,
+
   ArrowCounterClockwise,
   Trash,
   DotsThreeVertical,
   Envelope,
-  Sparkle,
   CircleNotch,
+
   PhoneCall,
   FileCode,
   CaretDown,
@@ -732,7 +734,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                               title="Synthesize Appeal Brief"
                               className="h-7 px-2.5 text-xs gap-1"
                             >
-                              <Sparkle className="size-3" />
+                              <FileText className="size-3" />
                               <span>Draft Brief</span>
                             </Button>
                           ) : (
@@ -765,12 +767,13 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 </>
                               ) : (
                                 <>
-                                  <Sparkle className="size-3" />
+                                  <Lightning className="size-3" weight="fill" />
                                   <span>Auto-Solve</span>
                                 </>
                               )}
                             </Button>
                           )}
+
 
                           {/* Row Context Menu */}
                           <DropdownMenu>

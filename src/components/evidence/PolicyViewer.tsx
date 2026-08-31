@@ -5,9 +5,9 @@ import {
   Copy,
   Check,
   BookOpen,
-  Sparkle,
   MagnifyingGlass,
   Trash,
+
   Globe,
   Flask,
   ShieldCheck,
@@ -268,9 +268,10 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
 
                 <div className="rounded-lg bg-muted/40 border border-border p-3 text-xs text-muted-foreground leading-relaxed font-sans">
                   <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground mb-1">
-                    <Sparkle className="size-3 text-primary" />
+                    <ShieldCheck className="size-3 text-primary" />
                     <span>Medical Necessity Criteria & Policy Rule:</span>
                   </div>
+
                   <p className="whitespace-pre-line text-xs text-foreground/90">
                     {stripMarkdownFormatting(item.extractedEvidenceMarkdown)}
                   </p>

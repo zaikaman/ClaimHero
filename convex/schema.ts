@@ -381,5 +381,39 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_claim", ["claimId"]),
+
+  // Sentinel Chatbot Persistent Conversation Sessions
+  chatbotSessions: defineTable({
+    userId: v.optional(v.id("users")),
+    title: v.string(),
+    activeClaimId: v.optional(v.id("claims")),
+    summary: v.optional(v.string()), // Compressed summary of older conversation turns
+    messageCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_updated", ["updatedAt"]),
+
+  // Sentinel Chatbot Messages
+  chatbotMessages: defineTable({
+    sessionId: v.id("chatbotSessions"),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system"), v.literal("tool")),
+    content: v.string(),
+    toolCalls: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          name: v.string(),
+          arguments: v.string(),
+          output: v.optional(v.string()),
+        })
+      )
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_and_time", ["sessionId", "createdAt"]),
 });
+
 

@@ -5,9 +5,9 @@ import {
   ArrowRight,
   ArrowLeft,
   CheckCircle,
-  Sparkle,
   Lightning,
   CloudArrowUp,
+
   Check,
   CircleNotch,
   Stethoscope,
@@ -484,11 +484,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   </>
                 ) : (
                   <>
-                    <Sparkle className="size-3.5" />
+                    <Lightning className="size-3.5" weight="fill" />
                     <span>Complete Setup & Launch Sentinel</span>
                   </>
                 )}
               </Button>
+
             )}
           </div>
         </div>

@@ -6,9 +6,9 @@ import {
   PhoneDisconnect,
   Microphone,
   Lightning,
-  Sparkle,
   Copy,
   Check,
+
   ShieldCheck,
   Scales,
   Clock,
@@ -267,10 +267,11 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                 className="h-8 rounded-md px-2.5 text-xs gap-1.5 border-emerald-500/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 cursor-pointer animate-pulse"
                 title="Medical Director will listen to your spoken argument and counter"
               >
-                <Sparkle className="size-3.5" />
+                <Lightning className="size-3.5" weight="fill" />
                 <span>Hear Reviewer Pushback</span>
                 <ArrowRight className="size-3.5" />
               </Button>
+
             ) : (
               <Button
                 variant="outline"
@@ -739,7 +740,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               </div>
             ) : (
               <div className="p-8 text-center space-y-2 border border-dashed border-border/80 rounded-lg text-muted-foreground">
-                <Sparkle className="size-8 mx-auto text-primary opacity-50" />
+                <Stethoscope className="size-8 mx-auto text-primary opacity-50" />
                 <p className="text-xs font-sans text-foreground">
                   Awaiting insurer objection or question on the live call.
                 </p>
@@ -818,11 +819,12 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
             <div className="rounded-xl border border-border/80 bg-card/60 backdrop-blur-xl p-3.5 space-y-2 flex flex-col justify-between shadow-xs">
               <div className="flex items-center justify-between border-b border-border/60 pb-2">
                 <div className="flex items-center gap-1.5">
-                  <Sparkle className="size-4 text-primary" />
+                  <Lightning className="size-4 text-primary" weight="fill" />
                   <h4 className="text-xs font-bold text-foreground font-sans">
                     Fast Answers Generated
                   </h4>
                 </div>
+
                 <span className="text-[10px] font-mono text-muted-foreground">
                   {fastAnswers.length} Total
                 </span>

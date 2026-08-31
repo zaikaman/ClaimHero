@@ -4,9 +4,9 @@ import {
   BookOpen,
   Flask,
   FileText,
-  Sparkle,
   CircleNotch,
   CheckCircle,
+  TrendUp,
   Warning,
   ArrowRight,
   Copy,
@@ -320,7 +320,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                 disabled={isExecuting}
                 className="h-7.5 text-xs px-2.5 gap-1.5 font-sans"
               >
-                <Sparkle className="size-3.5 text-primary" />
+                <TrendUp className="size-3.5 text-primary" />
                 <span>Re-score Rubric</span>
               </Button>
             )}
@@ -507,7 +507,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                 </>
               ) : (
                 <>
-                  <Sparkle className="size-3.5" />
+                  <Globe className="size-3.5" />
                   <span>
                     {activeMode === "multi_source"
                       ? "Launch Multi-Source Research Scan"
@@ -518,6 +518,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                 </>
               )}
             </Button>
+
           </div>
         </div>
 

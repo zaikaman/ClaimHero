@@ -5,9 +5,9 @@ import {
   Circle,
   CaretDown,
   CaretUp,
-  Sparkle,
   ArrowRight,
   X,
+
   FileMagnifyingGlass,
   FileText,
   Envelope,
@@ -128,14 +128,14 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
   // Minimized Floating Button
   if (isMinimized) {
     return (
-      <div className="fixed bottom-5 right-5 z-40 animate-fadeIn">
+      <div className="fixed bottom-16 right-5 z-40 animate-fadeIn">
         <Button
           variant="outline"
           size="sm"
           onClick={() => setIsMinimized(false)}
           className="shadow-xl bg-card/95 border-border backdrop-blur-md gap-2 h-9 px-3 text-xs"
         >
-          <Sparkle className="size-3.5 text-primary" />
+          <Shield className="size-3.5 text-primary" />
           <span className="font-medium text-foreground">
             Sentinel Checklist
           </span>
@@ -149,7 +149,8 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
   }
 
   return (
-    <Card className="fixed bottom-5 right-5 z-40 w-[340px] sm:w-[370px] bg-card/95 border-border shadow-2xl backdrop-blur-md overflow-hidden text-left p-0 animate-blur-fade-up">
+    <Card className="fixed bottom-16 right-5 z-40 w-[340px] sm:w-[370px] bg-card/95 border-border shadow-2xl backdrop-blur-md overflow-hidden text-left p-0 animate-blur-fade-up">
+
       
       {/* Header Bar */}
       <div className="p-3.5 pb-2.5 border-b border-border/70 flex items-center justify-between bg-muted/20">
@@ -259,9 +260,10 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
       {isAllDone && (
         <div className="p-3 bg-emerald-500/10 border-t border-emerald-500/20 text-center space-y-1">
           <div className="text-xs font-semibold text-emerald-500 flex items-center justify-center gap-1.5">
-            <Sparkle className="size-3.5 text-amber-500" />
+            <Medal className="size-3.5 text-amber-500" />
             <span>Sentinel Readiness: 100% Certified</span>
           </div>
+
           <p className="text-[10px] text-muted-foreground">
             You are ready to autonomously defend claims and overturn health insurance denials.
           </p>

@@ -44,4 +44,12 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 10,
   },
+  // Sentinel Chatbot conversational assistant (burst: 20, rate: 20/min)
+  sentinelChatbot: {
+    kind: "token bucket",
+    rate: 20,
+    period: MINUTE,
+    capacity: 20,
+  },
 });
+

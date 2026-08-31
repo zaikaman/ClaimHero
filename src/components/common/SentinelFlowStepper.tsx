@@ -2,9 +2,10 @@ import React from "react";
 import {
   CheckCircle,
   CircleNotch,
-  Sparkle,
+  Lightning,
   FileMagnifyingGlass,
   FileText,
+
   Envelope,
   PaperPlaneTilt,
   ArrowLeft,
@@ -183,11 +184,12 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
                 </>
               ) : (
                 <>
-                  <Sparkle className="size-3" />
+                  <Lightning className="size-3" weight="fill" />
                   <span>{hasAppealContext ? "1-Click Auto-Pilot" : "Complete case context"}</span>
                 </>
               )}
             </Button>
+
           )}
         </div>
       </div>

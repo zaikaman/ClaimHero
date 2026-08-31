@@ -13,9 +13,9 @@ import {
   Printer,
   Copy,
   Check,
-  Sparkle,
   ShieldWarning,
   ShieldCheck,
+
   Scales,
   WarningCircle,
   FileText,
@@ -397,10 +397,11 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
               {isSynthesizing ? (
                 <CircleNotch className="size-3.5 animate-spin" />
               ) : (
-                <Sparkle className="size-3.5" />
+                <FileText className="size-3.5" />
               )}
               <span>{isSynthesizing ? "Synthesizing Defense..." : "Re-Synthesize"}</span>
             </Button>
+
           </div>
         </div>
 

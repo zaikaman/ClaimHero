@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import {
   FileText,
-  Sparkle,
   CircleNotch,
   Check,
+
   Eye,
   PencilSimpleLine,
   PhoneCall,
@@ -451,7 +451,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 </>
               ) : (
                 <>
-                  <Sparkle className="size-3.5" />
+                  <FileText className="size-3.5" />
                   <span>Synthesize Brief</span>
                 </>
               )}
@@ -630,7 +630,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-3 text-muted-foreground my-auto">
                     <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                      <Sparkle className="size-6" />
+                      <FileText className="size-6" />
                     </div>
                     <div className="space-y-1 max-w-sm">
                       <div className="text-sm font-semibold text-foreground">
@@ -653,7 +653,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                         </>
                       ) : (
                         <>
-                          <Sparkle className="size-3.5" />
+                          <FileText className="size-3.5" />
                           <span>1-Click Synthesize Appeal Brief</span>
                         </>
                       )}
@@ -663,6 +663,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               </div>
             )}
           </div>
+
         </Card>
 
         {/* Panel 3: Right 4 Cols Citation Sidebar (Fixed height matched with left card) */}

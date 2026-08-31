@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-31T04:03:30Z
+- **Last updated:** 2026-08-31T04:33:00Z
 
 ## Log
 
@@ -271,8 +271,13 @@ Configured production-grade GitHub Actions CI/CD automation and automated securi
 ### 2026-08-31 - 97f369a
 Established comprehensive test coverage instrumentation and expanded automated unit testing suite across backend infrastructure and domain libraries to achieve 100% line coverage (`package.json`, `vitest.config.ts`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`). Configured `@vitest/coverage-v8` with text, JSON, and HTML reporting and hard thresholds (100% lines, 100% statements). Created and expanded dedicated test suites for AgentMail and webhook normalizers (`tests/agentMail.test.ts`), OpenAI structured outputs, chat completions, and 1536-d vector embeddings (`tests/openai.test.ts`), healthcare utility formatters and statutory constants (`tests/utils.test.ts`), HIPAA redaction engine with address masking and custom overrides (`tests/redactionEngine.test.ts`), financial liability calculator with out-of-network balance billing and severity tiers (`tests/financialErisaCalculator.test.ts`), and court-ready dossier binders with EDI resolution and statutory postures (`tests/appealDossierBinder.test.ts`). Achieved **100% line coverage** across all files in backend libraries (`convex/lib/`) and core utilities (`src/lib/`) with **161 passing unit tests across 10 suites**. Upgraded CI/CD pipelines to enforce the 100% coverage gate on pull requests, generate markdown summary tables in `$GITHUB_STEP_SUMMARY`, and upload test coverage artifacts. Synchronized line-by-line citation references across `README.md`. Validated with `npm run verify` (100% clean typecheck, lint, 161/161 unit tests, and production build). Convex features: vector search, rate-limiter, aggregate, static hosting.
 
-### 2026-08-31 - working tree
+### 2026-08-31 - 8fbc7e5
 Standardized the header layout and action button toolbar in the Financial Liability & ERISA Calculator (`FinancialLiabilityCalculator.tsx`) to match the single-line design system used across Appeal Studio and P2P Defense Studio. Restructured the toolbar to group secondary utility actions (`Copy Audit`, `Print Statement`, `Save & Sync`) with compact `h-8` button geometry before the primary `Embed in Legal Brief` CTA, preventing multi-line button wrapping across standard viewport widths.
+
+### 2026-08-31 - working tree
+Engineered the autonomous Sentinel AI Copilot Chatbot (`SentinelChatbot.tsx`, `useSentinelChat.ts`, `⌘J`) as a circular draggable floating action bubble with agentic OpenAI tool calling, persistent database sessions, and rolling context window summarization. Replaced static bottom-right pills with a draggable circular floating action bubble (`rounded-full`, pointer capture, touch/mouse dragging, viewport boundary clamping, and `localStorage` position memory) to eliminate button overlap against the bottom action bar. Added `chatbotSessions` and `chatbotMessages` tables to `convex/schema.ts` and implemented session lifecycle mutations/queries (`convex/chatbot.ts`). Built master agentic action `sentinelChatbot.ts` equipped with 7 dynamic database retrieval tools (`get_active_claim_details`, `search_claims`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) allowing the LLM to fetch only the exact data required without bloating the prompt context window. Implemented background rolling conversation summarization to prevent context exhaustion over extended threads, collapsible tool execution traces in the chat feed, and token-bucket rate limiting (`convex/lib/rateLimiter.ts:sentinelChatbot`). Added unit tests (`tests/sentinelChatbot.test.ts`), bringing the verified test suite to 165 tests across 11 suites with 100% line coverage. Convex features: database schema, relational indexes, queries, mutations, actions, components, rate-limiter, static hosting.
+
+
 
 
 

@@ -10,9 +10,10 @@ import {
   CircleNotch,
   FileDoc,
   WarningCircle,
-  Sparkle,
+  Lightning,
   FileMagnifyingGlass,
   ArrowRight,
+
   ArrowLeft,
   ShieldCheck,
   Lock,
@@ -468,7 +469,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
             )}
           >
             <div className="flex items-center gap-1.5 min-w-0">
-              <Sparkle className="size-3.5 shrink-0 text-primary" />
+              <Lightning className="size-3.5 shrink-0 text-primary" weight="fill" />
               <span className="truncate">Auto-Pilot Pipeline</span>
             </div>
             <Badge
@@ -492,9 +493,10 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList variant="line" className="w-full">
               <TabsTrigger value="presets" className="gap-1.5">
-                <Sparkle className="size-3.5" />
+                <FileDoc className="size-3.5" />
                 <span>1-Click Presets</span>
               </TabsTrigger>
+
               <TabsTrigger value="upload" className="gap-1.5">
                 <CloudArrowUp className="size-3.5" />
                 <span>File Upload</span>

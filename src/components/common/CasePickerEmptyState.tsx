@@ -6,8 +6,8 @@ import {
   ArrowRight,
   PlusCircle,
   Shield,
-  Sparkle,
 } from "@phosphor-icons/react";
+
 import { Claim } from "../../types";
 import { formatCurrency, formatDate } from "../../lib/utils";
 import { Card } from "../ui/card";
@@ -125,9 +125,10 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
               </p>
             </div>
             <Button onClick={onOpenIngestion} className="gap-2 text-xs shadow-xs">
-              <Sparkle className="size-3.5" />
+              <PlusCircle className="size-3.5" />
               <span>Ingest First Denial Notice</span>
             </Button>
+
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

@@ -21,6 +21,7 @@ import { CinematicHero } from "./components/landing/CinematicHero";
 import { AuthPage } from "./components/auth/AuthPage";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
 import { OnboardingChecklist } from "./components/onboarding/OnboardingChecklist";
+import { SentinelChatbot } from "./components/chat/SentinelChatbot";
 import { BrandIcon, BrandWordmark } from "./components/common/BrandLogo";
 import { CircleNotch } from "@phosphor-icons/react";
 
@@ -370,6 +371,13 @@ export default function App() {
         claims={claims}
         onOpenIngestion={handleOpenIngestion}
       />
+
+      {/* Floating Autonomous Sentinel Copilot AI Chatbot (⌘J / Ctrl+J) */}
+      <SentinelChatbot
+        selectedClaim={selectedClaim}
+        currentView={currentView}
+      />
     </Shell>
   );
 }
+

@@ -3,7 +3,7 @@ import {
   Clock,
   Shield,
   FileMagnifyingGlass,
-  Sparkle,
+  Globe,
   PaperPlaneTilt,
   Envelope,
   Warning,
@@ -34,8 +34,9 @@ const EVENT_CONFIGS: Record<
   policy_crawled: {
     label: "Policy Crawled",
     badgeVariant: "secondary",
-    icon: Sparkle,
+    icon: Globe,
   },
+
   status_changed_to_precedent_matched: {
     label: "Win Score Computed",
     badgeVariant: "default",
