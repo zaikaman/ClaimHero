@@ -146,15 +146,9 @@ export const getPayerAppellateContact = (payerName?: string): PayerAppellateCont
     return {
       id: "unknown",
       name: "Health Insurer",
-      domain: "insurance-payer.com",
-      intakePortalUrl: "https://www.insurance-payer.com/appeals",
-      portalName: "Insurer Grievance & Appeals Gateway",
-      appealsFax: "1-800-555-0198",
-      statutoryPoBox: "Grievance & Appeals Department",
-      ediPayerId: "EDI-UNKNOWN",
-      tollFreeHelpline: "1-800-555-0199",
+      domain: "",
       isVerified: false,
-      submissionPolicyNote: "Standard submission via Provider Portal, Certified Mail, or Appellate Fax.",
+      submissionPolicyNote: "Payer contact details not yet resolved.",
     };
   }
 
@@ -191,15 +185,9 @@ export const getPayerAppellateContact = (payerName?: string): PayerAppellateCont
   return {
     id: clean,
     name: payerName,
-    domain: `${clean}.com`,
-    intakePortalUrl: `https://www.${clean}.com/appeals`,
-    portalName: `${payerName} Official Appeals Portal`,
-    appealsFax: "1-800-555-0198",
-    statutoryPoBox: `${payerName} Appeals & Grievances Unit`,
-    ediPayerId: "EDI-AUTO",
-    tollFreeHelpline: "1-800-555-0199",
+    domain: "",
     isVerified: false,
-    submissionPolicyNote: "Official submission accepted via Online Portal, Certified Mail, or Appellate Fax.",
+    submissionPolicyNote: "Payer contact details not in preset directory. Awaiting Firecrawl discovery or denial letter OCR.",
   };
 };
 

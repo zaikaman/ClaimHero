@@ -490,9 +490,24 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               </div>
               <Badge
                 variant="outline"
-                className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                className={cn(
+                  "text-[9px] font-mono",
+                  payerContact.isVerified
+                    ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                    : claim.payerContact?.source === "document_ocr"
+                    ? "text-cyan-600 dark:text-cyan-400 border-cyan-500/30"
+                    : claim.payerContact?.source === "firecrawl_live"
+                    ? "text-indigo-600 dark:text-indigo-400 border-indigo-500/30"
+                    : "text-amber-600 dark:text-amber-400 border-amber-500/30"
+                )}
               >
-                {payerContact.isVerified ? "Verified Payer Gateway" : "Intake Gateway"}
+                {payerContact.isVerified
+                  ? "Verified Gateway"
+                  : claim.payerContact?.source === "document_ocr"
+                  ? "Extracted from Document"
+                  : claim.payerContact?.source === "firecrawl_live"
+                  ? "Firecrawl Discovered"
+                  : "Unresolved Gateway"}
               </Badge>
             </div>
 
@@ -520,13 +535,15 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <div>
                   <span className="text-[10px] font-mono text-muted-foreground block">Online Portal Status</span>
                   <span className="text-[11px] text-muted-foreground italic block mt-0.5">
-                    Not supported by payer (Appellate Fax or Mail required)
+                    {payerContact.isVerified
+                      ? "Not supported by payer (Appellate Fax or Mail required)"
+                      : "No public submission portal verified"}
                   </span>
                 </div>
               )}
 
               {/* Official Appellate Fax Line */}
-              {payerContact.appealsFax && (
+              {payerContact.appealsFax ? (
                 <div>
                   <span className="text-[10px] font-mono text-muted-foreground block">Appellate Fax Line</span>
                   <div className="flex items-center justify-between gap-1 mt-0.5">
@@ -547,6 +564,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                       )}
                     </Button>
                   </div>
+                </div>
+              ) : (
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Appellate Fax Line</span>
+                  <span className="text-[11px] text-muted-foreground italic block mt-0.5">
+                    Not specified on record
+                  </span>
                 </div>
               )}
 
@@ -580,47 +604,60 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <div>
                   <span className="text-[10px] font-mono text-muted-foreground block">Appeals Intake Channel</span>
                   <span className="text-[11px] text-foreground font-medium block mt-0.5">
-                    {payerContact.intakePortalUrl ? "Official Online Portal & Appellate Fax" : "Appellate Fax & Certified Mail"}
+                    {payerContact.intakePortalUrl
+                      ? "Official Online Portal & Appellate Fax"
+                      : payerContact.appealsFax
+                      ? "Appellate Fax & Certified Mail"
+                      : "Certified Mail / Check Denial Notice"}
                   </span>
                   <span className="text-[10px] text-muted-foreground block mt-0.5">
-                    Email submission prohibited by insurer (HIPAA protected)
+                    Direct email submission not supported or HIPAA restricted by insurer
                   </span>
                 </div>
               )}
 
-              <div>
-                <span className="text-[10px] font-mono text-muted-foreground block">Statutory Appeals P.O. Box</span>
-                <div className="flex items-start justify-between gap-1 mt-0.5">
-                  <span className="text-foreground text-[11px] font-mono leading-tight">
-                    {payerContact.statutoryPoBox}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={handleCopyPoBox}
-                    title="Copy P.O. Box address"
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
-                  >
-                    {copiedPoBox ? (
-                      <Check className="size-3 text-emerald-500" />
-                    ) : (
-                      <Copy className="size-3" />
-                    )}
-                  </Button>
+              {payerContact.statutoryPoBox ? (
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Statutory Appeals P.O. Box</span>
+                  <div className="flex items-start justify-between gap-1 mt-0.5">
+                    <span className="text-foreground text-[11px] font-mono leading-tight">
+                      {payerContact.statutoryPoBox}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={handleCopyPoBox}
+                      title="Copy P.O. Box address"
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                    >
+                      {copiedPoBox ? (
+                        <Check className="size-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="size-3" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Statutory Appeals P.O. Box</span>
+                  <span className="text-[11px] text-muted-foreground italic block mt-0.5">
+                    Address not specified on record
+                  </span>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
                 <div>
                   <span className="text-[10px] font-mono text-muted-foreground block">Electronic Payer ID</span>
                   <span className="font-mono text-[11px] text-foreground font-semibold">
-                    {payerContact.ediPayerId}
+                    {payerContact.ediPayerId || "Not Registered"}
                   </span>
                 </div>
                 <div>
                   <span className="text-[10px] font-mono text-muted-foreground block">Appeals Helpline</span>
                   <span className="font-mono text-[11px] text-foreground">
-                    {payerContact.tollFreeHelpline}
+                    {payerContact.tollFreeHelpline || "Not Available"}
                   </span>
                 </div>
               </div>
@@ -653,12 +690,12 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <span>Gateway Source:</span>
                   <span className="text-foreground font-medium">
                     {claim.payerContact?.source === "firecrawl_live"
-                      ? "Automated Policy & Directory Discovery"
+                      ? "Firecrawl Web Discovery"
                       : claim.payerContact?.source === "document_ocr"
                       ? "Extracted from Document"
                       : payerContact.isVerified
                       ? "Verified Statutory Directory"
-                      : "Inferred Gateway"}
+                      : "Unresolved / Manual Verification"}
                   </span>
                 </div>
               </div>

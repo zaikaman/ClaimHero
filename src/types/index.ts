@@ -227,7 +227,7 @@ export interface PayerContact {
   tollFreeHelpline?: string;
   isVerified: boolean;
   submissionPolicyNote?: string;
-  source?: "preset" | "firecrawl_live" | "document_ocr";
+  source?: "preset" | "firecrawl_live" | "document_ocr" | "ai_knowledge" | "unresolved" | string;
 }
 
 export interface ScoringCriterion {

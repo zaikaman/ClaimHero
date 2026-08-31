@@ -14,19 +14,57 @@ const CONTACT_EXTRACTION_SCHEMA = {
     officialAppealsEmail: {
       type: "string",
       description:
-        "Official public email exclusively dedicated to receiving formal claim appeals or grievance submissions. LEAVE NULL OR EMPTY if the insurer does not accept appeals via email (which is the case for most major US health plans).",
+        "Official public email exclusively dedicated to receiving formal claim appeals or grievance submissions. Return empty string if not found or if payer rejects email appeals.",
     },
-    intakePortalUrl: { type: "string" },
-    portalName: { type: "string" },
-    appealsFax: { type: "string" },
-    statutoryPoBox: { type: "string" },
-    ediPayerId: { type: "string" },
-    tollFreeHelpline: { type: "string" },
-    isVerified: { type: "boolean" },
-    submissionPolicyNote: { type: "string" },
-    source: { type: "string" },
+    intakePortalUrl: {
+      type: "string",
+      description:
+        "Official URL of the payer's online appeals/grievance/claims portal. Return empty string if not found.",
+    },
+    portalName: {
+      type: "string",
+      description:
+        "Human-readable name of the portal. Return empty string if not found.",
+    },
+    appealsFax: {
+      type: "string",
+      description:
+        "Official fax number dedicated to receiving appeals. Return empty string if not found.",
+    },
+    statutoryPoBox: {
+      type: "string",
+      description:
+        "Physical mailing address or P.O. Box for formal written appeals. Return empty string if not found.",
+    },
+    ediPayerId: {
+      type: "string",
+      description:
+        "Electronic Data Interchange (EDI) Payer ID if known. Return empty string if not found.",
+    },
+    tollFreeHelpline: {
+      type: "string",
+      description:
+        "Customer service or appeals department telephone helpline. Return empty string if not found.",
+    },
+    isVerified: {
+      type: "boolean",
+      description:
+        "True ONLY if authentic, verified contact information was identified from authoritative search results.",
+    },
+    submissionPolicyNote: {
+      type: "string",
+      description:
+        "Brief note explaining the payer's official submission requirements based on search results.",
+    },
+    source: {
+      type: "string",
+      description:
+        "'firecrawl_live' if discovered from web search, 'preset' if preset directory, or 'unresolved' if not found.",
+    },
   },
   required: [
+    "officialAppealsEmail",
+    "intakePortalUrl",
     "portalName",
     "appealsFax",
     "statutoryPoBox",
@@ -215,22 +253,23 @@ export const resolvePayerGateway = action({
         console.warn("Firecrawl search error, continuing to AI synthesis:", crawlErr);
       }
 
-      // 4. Use LLM to extract or infer verified contact details
+      // 4. Use LLM to extract verified contact details
       const systemPrompt = `You are ClaimHero's Payer Intake Intelligence Agent.
-Your task is to identify the accurate, official appellate, grievance, claims, or customer care intake gateway details for the specified health insurer or insurance company.
+Your task is to extract authentic, official appellate, grievance, claims, or customer care intake gateway details for the specified health insurer or insurance company.
 
-CRITICAL RULES ON EMAIL ADDRESSES:
-1. NEVER guess, synthesize, or hallucinate an email address (such as appeals@domain.com or claims@domain.com).
-2. Most major health insurers (especially US commercial plans like UHC, Aetna, Cigna, Anthem, Humana, Kaiser) STRICTLY REJECT appeal submissions via unencrypted public email due to HIPAA compliance and mandate online portals, appellate faxes, or certified postal mail.
-3. ONLY return an officialAppealsEmail if a genuine, publicly documented email address explicitly intended for claim appeals/disputes or customer grievances was found in the search results (for instance, certain international insurers like Bảo Việt, or specific state Medicaid dispute inboxes).
-4. If no legitimate public appeals email exists for this insurer, omit or return null/empty for officialAppealsEmail. Prioritize accurate portal URLs and appellate fax numbers instead.`;
+CRITICAL INTEGRITY RULES:
+1. NEVER guess, synthesize, or hallucinate contact information (e.g. do NOT invent fake domains, fake 555 numbers, fake EDI IDs like EDI-AUTO, or fake emails).
+2. Most major health insurers strictly reject appeal submissions via unencrypted public email due to HIPAA compliance and mandate online provider portals, appellate faxes, or certified postal mail.
+3. ONLY return an officialAppealsEmail if a genuine, publicly documented email address explicitly intended for claim appeals/disputes or customer grievances was found in the search results.
+4. If any field (email, portal URL, portal name, fax, PO Box, EDI ID, helpline) is not found in the search evidence, return an empty string "".
+5. Set isVerified to true ONLY if authentic, verified contact information was identified in the evidence.`;
 
       const userPrompt = `Insurer Name: ${payer}
 Patient State / Jurisdiction: ${claim.patient?.state || "National"}
 Web Search Evidence from Firecrawl:
-${webSearchContext || "No live search results available. Use authoritative institutional knowledge."}
+${webSearchContext || "No live search results available."}
 
-Extract or resolve the official appeals/grievance/claims intake gateway details for ${payer}.`;
+Extract the official appeals/grievance/claims intake gateway details for ${payer}.`;
 
       try {
         const aiExtraction = await createStructuredCompletion<ResolvedPayerContact>({
@@ -241,32 +280,60 @@ Extract or resolve the official appeals/grievance/claims intake gateway details 
           temperature: 0.1,
         });
 
-        const extractedEmail = aiExtraction.officialAppealsEmail?.trim();
+        const cleanField = (val?: string) => {
+          const trimmed = val?.trim();
+          if (!trimmed) return undefined;
+          if (trimmed.includes("555-01") || trimmed.includes("EDI-AUTO") || trimmed.includes("EDI-UNKNOWN")) {
+            return undefined;
+          }
+          return trimmed;
+        };
+
+        const extractedEmail = cleanField(aiExtraction.officialAppealsEmail);
+        const intakePortalUrl = cleanField(aiExtraction.intakePortalUrl);
+        const portalName = cleanField(aiExtraction.portalName);
+        const appealsFax = cleanField(aiExtraction.appealsFax);
+        const statutoryPoBox = cleanField(aiExtraction.statutoryPoBox);
+        const ediPayerId = cleanField(aiExtraction.ediPayerId);
+        const tollFreeHelpline = cleanField(aiExtraction.tollFreeHelpline);
+        const submissionPolicyNote = cleanField(aiExtraction.submissionPolicyNote);
+
+        const hasAnyContact = Boolean(
+          extractedEmail || intakePortalUrl || appealsFax || statutoryPoBox
+        );
 
         resolvedContact = {
           officialAppealsEmail: extractedEmail && extractedEmail.includes("@") ? extractedEmail : undefined,
-          intakePortalUrl: aiExtraction.intakePortalUrl || `https://www.${cleanName}.com`,
-          portalName: aiExtraction.portalName || `${payer} Online Grievance Gateway`,
-          appealsFax: aiExtraction.appealsFax || "1-800-555-0198",
-          statutoryPoBox: aiExtraction.statutoryPoBox || `${payer} Appeals Department`,
-          ediPayerId: aiExtraction.ediPayerId || "EDI-AUTO",
-          tollFreeHelpline: aiExtraction.tollFreeHelpline || "1-800-555-0199",
-          isVerified: aiExtraction.isVerified ?? Boolean(webSearchContext),
-          submissionPolicyNote: aiExtraction.submissionPolicyNote || "Official submissions accepted via Portal, Fax, or Certified Mail.",
-          source: webSearchContext ? "firecrawl_live" : "ai_knowledge",
+          intakePortalUrl:
+            intakePortalUrl && (intakePortalUrl.startsWith("http://") || intakePortalUrl.startsWith("https://"))
+              ? intakePortalUrl
+              : undefined,
+          portalName: portalName || (intakePortalUrl ? `${payer} Appeals Portal` : undefined),
+          appealsFax,
+          statutoryPoBox,
+          ediPayerId,
+          tollFreeHelpline,
+          isVerified: Boolean(aiExtraction.isVerified && hasAnyContact),
+          submissionPolicyNote:
+            submissionPolicyNote ||
+            (hasAnyContact
+              ? "Submissions accepted via official payer channels."
+              : "No verified electronic gateway found in public index. Submit via address on denial notice."),
+          source: hasAnyContact ? (webSearchContext ? "firecrawl_live" : "ai_knowledge") : "unresolved",
         };
       } catch {
         resolvedContact = {
           officialAppealsEmail: undefined,
-          intakePortalUrl: `https://www.${cleanName}.com`,
-          portalName: `${payer} Appeals Portal`,
-          appealsFax: "1-800-555-0198",
-          statutoryPoBox: `${payer} Grievance & Appeals Unit`,
-          ediPayerId: "EDI-AUTO",
-          tollFreeHelpline: "1-800-555-0199",
+          intakePortalUrl: undefined,
+          portalName: undefined,
+          appealsFax: undefined,
+          statutoryPoBox: undefined,
+          ediPayerId: undefined,
+          tollFreeHelpline: undefined,
           isVerified: false,
-          submissionPolicyNote: "Official submissions accepted via Portal, Fax, or Certified Mail.",
-          source: "inferred",
+          submissionPolicyNote:
+            "Payer gateway could not be verified automatically. Consult the denial notice for appellate filing instructions.",
+          source: "unresolved",
         };
       }
     }
@@ -282,7 +349,9 @@ Extract or resolve the official appeals/grievance/claims intake gateway details 
       claimId: args.claimId,
       eventType: "policy_crawled",
       actor: resolvedContact.source === "firecrawl_live" ? "Firecrawl Web Crawler" : "Payer Gateway Resolver",
-      details: `Resolved official appeals gateway for ${payer}: ${resolvedContact.officialAppealsEmail || resolvedContact.portalName || resolvedContact.appealsFax || "Appellate Gateway"} (Source: ${resolvedContact.source}).`,
+      details: resolvedContact.isVerified
+        ? `Resolved official appeals gateway for ${payer}: ${resolvedContact.officialAppealsEmail || resolvedContact.portalName || resolvedContact.appealsFax || "Appellate Gateway"} (Source: ${resolvedContact.source}).`
+        : `No verified public appeals gateway found for ${payer}; manual filing verification required.`,
     });
 
     return resolvedContact;

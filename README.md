@@ -104,7 +104,7 @@ In `Payer Communications` (`AgentMailDrawer.tsx`), select:
 
 * **AI Adjudicator** (`claimhero-adjudicator@agentmail.to`) — OpenAI reviews your brief against CPB criteria and returns a formal inbound determination that auto-updates the case to `won` and is indexed into the Precedent Vector Archive.
 * **Custom Email** — enter your own address; receive the real HTML + plain-text appeal via AgentMail REST (`api.agentmail.to/v0/inboxes/{inbox_id}/messages/send`) and reply to see two-way threading.
-* **Official Payer** — Molina / GeoBlue / BCBS Global Core routes to verified intake emails (`src/lib/constants.ts:21`), others show portal/fax/PO box with source provenance badges.
+* **Official Payer** — Molina / GeoBlue / BCBS Global Core routes to verified intake emails (`src/lib/constants.ts:21`), others show portal/fax/PO box with transparent source provenance badges (`Verified Gateway`, `Firecrawl Discovered`, `Extracted from Document`, `Unresolved Gateway`).
 
 > Tip: The floating **Sentinel Readiness Checklist** and `Cmd+K` Command Palette expose every action without hunting through navigation.
 
@@ -231,6 +231,7 @@ No curated `CURATED_POLICY_REPOSITORY`. Every citation is scraped live through t
 
 Secondary crawlers share the same hardening:
 
+* **Payer Gateway Discovery** (`convex/actions/payerContactResolver.ts`) — `firecrawl.search` discovers authentic online grievance portals, appellate fax lines, statutory P.O. boxes, and verified email endpoints for unlisted domestic and international insurers, eliminating synthetic fallback URLs and dummy 555 numbers.
 * **PubMed/ClinicalTrials** (`crawlPubMedAndTrials:1378`) — `site:pubmed.ncbi.nlm.nih.gov`, `site:clinicaltrials.gov` queries via `generatePubMedSearchQueries:1300`.
 * **FDA Labels** (`crawlFdaIndications:1516`) — `accessdata.fda.gov`, `dailymed.nlm.nih.gov` via `generateFdaSearchQueries:1344`.
 * **Custom Research Hub** (`crawlCustomResearchUrl:1651`, `crawlMultiSourceHub:1720`) — any payer or guideline URL, with the same relevance and MCG guards.
@@ -246,7 +247,7 @@ ClaimHero configures dedicated AgentMail inboxes (`convex/actions/agentMail.ts`,
 |---|---|---|---|
 | **AI Adjudicator** (`ai_adjudicator`) | `claimhero-adjudicator@agentmail.to` | AgentMail REST `api.agentmail.to/v0/inboxes/{inbox_id}/messages/send` from `claimhero-sender@agentmail.to` -> `claimhero-adjudicator@agentmail.to` -> OpenAI structured review -> inbound determination insert | Claim flips to `won` live in docket; transcript available |
 | **Custom Email** (`custom_email`) | Any address you type (e.g., `judge@hackathon.com`) | Same REST path from `claimhero-sender@agentmail.to`; thread `agentEmail`/`payerEmail` tracking | Real email in your inbox; reply and watch `/agentmail-webhook` append it to the thread |
-| **Official Payer** (`official_payer`) | Verified `payerContact.officialAppealsEmail` (Molina, GeoBlue, BCBS Global Core) or portal/fax/PO box badge if `undefined` (`src/lib/constants.ts:21`) | Guarded `dispatchAppealPacket` (`mailDispatcher.ts`) refuses to email `unknown@` and switches CTA to *Copy Brief for Portal / Print Docket* | Truthful *Email Prohibited by Payer under HIPAA* state when appropriate (`AgentMailDrawer.tsx`) |
+| **Official Payer** (`official_payer`) | Verified `payerContact.officialAppealsEmail` (Molina, GeoBlue, BCBS Global Core) or portal/fax/PO box with provenance badges (`Verified Gateway`, `Firecrawl Discovered`, `Extracted from Document`, `Unresolved Gateway`) | Guarded `dispatchAppealPacket` (`mailDispatcher.ts`) refuses to email `unknown@` and switches CTA to *Copy Brief for Portal / Print Docket* | Truthful *Email Prohibited by Payer under HIPAA* or *Unresolved Gateway* state when appropriate (`AgentMailDrawer.tsx`) |
 
 **Inbound:**
 

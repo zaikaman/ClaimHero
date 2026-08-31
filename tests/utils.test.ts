@@ -138,7 +138,9 @@ describe("src/lib/constants Unit Tests", () => {
     const customPayer = getPayerAppellateContact("Custom Regional Mutual");
     expect(customPayer.isVerified).toBe(false);
     expect(customPayer.name).toBe("Custom Regional Mutual");
-    expect(customPayer.intakePortalUrl).toContain("customregionalmutual");
+    expect(customPayer.intakePortalUrl).toBeUndefined();
+    expect(customPayer.appealsFax).toBeUndefined();
+    expect(customPayer.ediPayerId).toBeUndefined();
   });
 
   it("exports valid CARC denial codes, CPT dictionary, statutory constants, and presets", () => {
