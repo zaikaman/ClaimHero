@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-31T02:41:30Z
+- **Last updated:** 2026-08-31T02:47:45Z
 
 ## Log
 
@@ -262,8 +262,11 @@ Refined ERISA § 502(c) statutory non-disclosure penalty embedding in Appeal Stu
 ### 2026-08-31 - c6a75e8
 Optimized user session hydration across the application to achieve instant 0ms rendering of authenticated state without layout shifts, flash of unauthenticated buttons, or blocking session verification screens. Built `useCurrentUser` hook (`src/hooks/useCurrentUser.ts`) providing synchronous local cache resolution from stored `@convex-dev/auth` JWT tokens and cached profile records (`claimhero_cached_viewer`) on first render, seamlessly hydrating with real-time Convex `api.users.viewer` queries in the background. Updated `CinematicHero.tsx`, `Header.tsx`, `Sidebar.tsx`, `AuthPage.tsx`, and `App.tsx` to utilize optimistic session state, eliminating the 2-3 second delay on initial load and route transitions. Validated with `npm run verify` (100% clean typecheck, lint, 116/116 passing unit tests, and production build). Convex features: auth, queries, static hosting.
 
-### 2026-08-31 - working tree
+### 2026-08-31 - ec02bf4
 Streamlined top navigation and profile accessibility by removing redundant top-right avatar buttons that redirected to Case Radar (`src/components/layout/Header.tsx`, `src/components/landing/CinematicHero.tsx`). User profile status, account details, and session controls remain centrally managed via the interactive sidebar footer dropdown and authenticated console navigation. Validated with `npm run verify` (100% clean typecheck, lint, 116/116 passing unit tests, and production build). Convex features: static hosting, auth.
+
+### 2026-08-31 - working tree
+Configured production-grade GitHub Actions CI/CD automation and automated security monitoring (`.github/workflows/ci.yml`, `.github/workflows/deploy.yml`, `.github/dependabot.yml`). Implemented a multi-stage pull request CI quality gate running strict TypeScript typechecking, ESLint analysis, Vitest automated test suite (116 tests), and production bundle builds in parallel. Created continuous deployment pipeline targeting Convex Static Hosting with concurrency locking, automated pre-flight `verify` checks, `CONVEX_DEPLOY_KEY` authentication, synthetic post-deploy health probes, and structured GitHub Step Summaries. Convex features: static hosting.
 
 
 

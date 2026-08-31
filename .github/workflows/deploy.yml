@@ -1,0 +1,77 @@
+name: CD - Production Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Pre-Flight Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Full Quality Verification
+        run: npm run verify
+
+  deploy:
+    name: Deploy Backend & Static Hosting
+    runs-on: ubuntu-latest
+    needs: [verify]
+    environment: production
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Deploy to Convex Static Hosting
+        id: convex_deploy
+        run: npm run deploy
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
+      - name: Post-Deploy Smoke Test
+        run: |
+          echo "Running synthetic health check against live deployment..."
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://usable-sturgeon-376.convex.site" || echo "000")
+          echo "Received HTTP status code: $STATUS_CODE"
+          if [ "$STATUS_CODE" -ne 200 ]; then
+            echo "Smoke test failed: expected HTTP 200 from https://usable-sturgeon-376.convex.site, got $STATUS_CODE"
+            exit 1
+          fi
+          echo "Smoke test passed successfully."
+
+      - name: Generate Deployment Summary
+        if: always()
+        run: |
+          echo "### Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Live Application**: [https://usable-sturgeon-376.convex.site](https://usable-sturgeon-376.convex.site)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Convex Cloud Backend**: [https://usable-sturgeon-376.convex.cloud](https://usable-sturgeon-376.convex.cloud)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment Timestamp**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_STEP_SUMMARY
