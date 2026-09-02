@@ -531,7 +531,7 @@ Hardened User Notification Dispatch & Resolved Erroneous Clinical Preset Email R
 - **Verification**:
   - Ran `npm test`: 368/368 passing tests across 27 suites with zero errors. Convex features: actions, internalAction, internalQuery, database schema, relational indexes.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - f813e4a
 Optimized Inbound Reply Delivery for Instant Real-Time UI Rendering (<300ms) (`convex/actions/agentMail.ts`, `src/hooks/useCommunications.ts`):
 - **Sub-Second Real-Time Message Insertion**:
   - Restructured `handleInboundClaimReply` in `convex/actions/agentMail.ts` to compute an instant heuristic classification and execute `insertMessageInternal` *immediately* upon message intake, before kicking off the LLM call.
@@ -542,6 +542,19 @@ Optimized Inbound Reply Delivery for Instant Real-Time UI Rendering (<300ms) (`c
   - Reduced active polling interval while on the communications page to 4 seconds for immediate responsiveness.
 - **Verification**:
   - Verified 100% clean with `npm run verify`: 368/368 passing tests across 27 suites, 0 TypeScript/ESLint errors, and successful production build. Convex features: actions, internalAction, internalMutation, reactive subscriptions, crons.
+
+### 2026-09-02 - working tree
+Fixed Won / Overturned Claims Visual Presentation & Adjudication States (`src/components/radar/CaseRadar.tsx`, `src/components/radar/DeadlineCountdown.tsx`, `src/components/common/SentinelFlowStepper.tsx`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/studio/AppealStudio.tsx`, `src/components/common/CasePickerEmptyState.tsx`):
+- **Root Cause & Visual Ambiguity**:
+  - Won claims previously rendered identical to active denied claims in the Case Radar table: disputed amounts appeared in red text (`text-destructive`) labeled with full patient liability (`Owes: $18,200.00`), the statutory ERISA clock continued displaying a pending countdown (`180d left`), the denial code badge displayed as a red destructive error, and win likelihood showed pre-appeal probability estimates (`81% High`).
+- **Comprehensive Overturned / Won UX Redesign**:
+  - **Case Radar Row & Badges**: Added dedicated "WON" badge in claim header, strikethrough overturned denial badge styling, green currency formatting (`Saved 100% • Owes $0`), and an explicit `100% Won` adjudication status badge.
+  - **Statutory Clock Resolution**: Extended `DeadlineCountdown` with `isWon` support, transforming the ticking deadline into an emerald `Case Resolved / Claim Overturned & Won` status with completed 100% progress.
+  - **Macro Stepper & Communications**: Updated `SentinelFlowStepper` and `AgentMailDrawer` to display `Overturned & Won — Reversal Confirmed by Insurer` and `Won` amount badges.
+  - **Quick Contextual Actions**: Replaced standard actions with direct `[Reversal Notice]` and `[View Victorious Brief]` entrypoints.
+- **Verification**:
+  - Verified 100% clean with `npm run typecheck` and `npm run test`: 368/368 passing tests across 27 suites with zero errors.
+
 
 
 

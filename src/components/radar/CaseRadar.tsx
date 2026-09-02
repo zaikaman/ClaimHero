@@ -20,7 +20,7 @@ import {
   DotsThreeVertical,
   Envelope,
   CircleNotch,
-
+  CheckCircle,
   PhoneCall,
   FileCode,
   CaretDown,
@@ -574,6 +574,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
               ) : (
                 filtered.map((claim) => {
                   const isSelected = claim._id === selectedClaimId;
+                  const isWon = claim.status === "won";
                   const denialReason = DENIAL_REASON_CODES[claim.denialReasonCode];
                   const primaryCpt = claim.cptCodes[0] || "27447";
                   const cptInfo = CPT_CODES[primaryCpt];
@@ -584,20 +585,41 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                       key={claim._id}
                       onClick={() => onSelectClaim(claim._id)}
                       data-state={isSelected ? "selected" : undefined}
-                      className="cursor-pointer hover:bg-muted/40 transition-colors"
+                      className={cn(
+                        "cursor-pointer hover:bg-muted/40 transition-colors",
+                        isWon && "bg-emerald-500/[0.02]"
+                      )}
                     >
                       {/* 1. Claim & Patient (Avatar + Name + Claim Number) */}
                       <TableCell className="py-2.5">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Avatar size="sm" className="bg-muted text-foreground font-semibold shrink-0">
+                          <Avatar
+                            size="sm"
+                            className={cn(
+                              "font-semibold shrink-0",
+                              isWon
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                                : "bg-muted text-foreground"
+                            )}
+                          >
                             <AvatarFallback className="text-[10px]">
                               {claim.patient?.name ? claim.patient.name.slice(0, 2).toUpperCase() : "PT"}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex flex-col min-w-0">
-                            <span className="font-semibold text-foreground text-xs truncate max-w-[120px]" title={claim.patient?.name}>
-                              {claim.patient?.name || "Patient Record"}
-                            </span>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="font-semibold text-foreground text-xs truncate max-w-[110px]" title={claim.patient?.name}>
+                                {claim.patient?.name || "Patient Record"}
+                              </span>
+                              {isWon && (
+                                <Badge
+                                  variant="default"
+                                  className="bg-emerald-500/20 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 text-[9px] px-1 py-0 font-bold shrink-0 leading-none h-4"
+                                >
+                                  WON
+                                </Badge>
+                              )}
+                            </div>
                             <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[120px]">
                               {claim.claimNumber}
                             </span>
@@ -609,7 +631,10 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                       <TableCell className="py-2.5">
                         <Badge
                           variant="outline"
-                          className="font-medium max-w-[100px] truncate block text-center"
+                          className={cn(
+                            "font-medium max-w-[100px] truncate block text-center",
+                            isWon && "border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5"
+                          )}
                           title={claim.patient?.insurancePayer || "Insurer"}
                         >
                           {payerLabel}
@@ -633,12 +658,25 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                       {/* 4. Denial Code */}
                       <TableCell className="py-2.5">
                         <div className="flex flex-col min-w-0">
-                          <Badge variant="destructive" className="font-mono text-[9px] w-fit px-1.5 py-0">
-                            {claim.denialReasonCode}
-                          </Badge>
+                          {isWon ? (
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-[9px] w-fit px-1.5 py-0 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 line-through decoration-emerald-500/60 font-semibold"
+                              title="Original Denial Reason Code (Overturned)"
+                            >
+                              {claim.denialReasonCode}
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive" className="font-mono text-[9px] w-fit px-1.5 py-0">
+                              {claim.denialReasonCode}
+                            </Badge>
+                          )}
                           {denialReason && (
-                            <span className="text-[10px] text-muted-foreground truncate max-w-[110px] mt-0.5" title={denialReason.title}>
-                              {denialReason.title}
+                            <span
+                              className="text-[10px] text-muted-foreground truncate max-w-[110px] mt-0.5"
+                              title={isWon ? "Overturned Adverse Determination" : denialReason.title}
+                            >
+                              {isWon ? "Overturned" : denialReason.title}
                             </span>
                           )}
                         </div>
@@ -647,18 +685,41 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                       {/* 5. Disputed Amount */}
                       <TableCell className="py-2.5">
                         <div className="flex flex-col">
-                          <span className="font-mono font-bold text-destructive text-xs">
-                            {formatCurrency(claim.deniedAmount)}
-                          </span>
-                          <span className="font-mono text-[10px] text-muted-foreground">
-                            Owes: {formatCurrency(claim.patientOwedAmount)}
-                          </span>
+                          {isWon ? (
+                            <>
+                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                                {formatCurrency(claim.deniedAmount)}
+                              </span>
+                              <span className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                                Saved 100% (Owes $0)
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-mono font-bold text-destructive text-xs">
+                                {formatCurrency(claim.deniedAmount)}
+                              </span>
+                              <span className="font-mono text-[10px] text-muted-foreground">
+                                Owes: {formatCurrency(claim.patientOwedAmount)}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </TableCell>
 
                       {/* 6. Win Likelihood */}
                       <TableCell className="py-2.5">
-                        {claim.overturnProbabilityScore !== undefined ? (
+                        {isWon ? (
+                          <div className="flex items-center gap-1 font-mono">
+                            <Badge
+                              variant="secondary"
+                              className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-[10px] font-semibold gap-1 px-1.5 py-0.5"
+                            >
+                              <CheckCircle className="size-3 text-emerald-500" />
+                              <span>100% Won</span>
+                            </Badge>
+                          </div>
+                        ) : claim.overturnProbabilityScore !== undefined ? (
                           <div className="flex items-center gap-1 font-mono">
                             <span className="font-bold text-xs text-foreground">
                               {claim.overturnProbabilityScore}%
@@ -686,6 +747,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                         <DeadlineCountdown
                           daysRemaining={claim.daysRemaining}
                           statutoryDeadline={claim.statutoryDeadline}
+                          isWon={isWon}
                           size="sm"
                         />
                       </TableCell>
@@ -694,7 +756,21 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                       <TableCell className="py-2.5 text-right">
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                           {/* Smart Contextual Primary Action */}
-                          {claim.status === "dispatched" || claim.status === "won" ? (
+                          {claim.status === "won" ? (
+                            <Button
+                              variant="secondary"
+                              size="xs"
+                              onClick={() => {
+                                onSelectClaim(claim._id);
+                                onNavigateView("communications");
+                              }}
+                              title="Open Insurer Reversal Notice & Communications"
+                              className="h-7 px-2.5 text-xs gap-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+                            >
+                              <CheckCircle className="size-3 text-emerald-500" />
+                              <span>Reversal</span>
+                            </Button>
+                          ) : claim.status === "dispatched" ? (
                             <Button
                               variant="secondary"
                               size="xs"
@@ -789,28 +865,55 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
                               <DropdownMenuLabel className="text-[10px] font-mono text-muted-foreground uppercase">
-                                Case #{claim.claimNumber}
+                                Case #{claim.claimNumber} {isWon && "• WON"}
                               </DropdownMenuLabel>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  onSelectClaim(claim._id);
-                                  onNavigateView("studio");
-                                }}
-                                className="gap-2 text-xs cursor-pointer"
-                              >
-                                <FileText className="size-3.5" />
-                                <span>Open Appeal Studio</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  onSelectClaim(claim._id);
-                                  onNavigateView("p2p");
-                                }}
-                                className="gap-2 text-xs cursor-pointer text-primary font-medium"
-                              >
-                                <PhoneCall className="size-3.5" />
-                                <span>P2P Defense Tele-Script</span>
-                              </DropdownMenuItem>
+                              {isWon ? (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      onSelectClaim(claim._id);
+                                      onNavigateView("communications");
+                                    }}
+                                    className="gap-2 text-xs cursor-pointer text-emerald-600 dark:text-emerald-400 font-medium"
+                                  >
+                                    <CheckCircle className="size-3.5 text-emerald-500" />
+                                    <span>View Reversal Notice</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      onSelectClaim(claim._id);
+                                      onNavigateView("studio");
+                                    }}
+                                    className="gap-2 text-xs cursor-pointer"
+                                  >
+                                    <FileText className="size-3.5 text-primary" />
+                                    <span>View Victorious Brief</span>
+                                  </DropdownMenuItem>
+                                </>
+                              ) : (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      onSelectClaim(claim._id);
+                                      onNavigateView("studio");
+                                    }}
+                                    className="gap-2 text-xs cursor-pointer"
+                                  >
+                                    <FileText className="size-3.5" />
+                                    <span>Open Appeal Studio</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      onSelectClaim(claim._id);
+                                      onNavigateView("p2p");
+                                    }}
+                                    className="gap-2 text-xs cursor-pointer text-primary font-medium"
+                                  >
+                                    <PhoneCall className="size-3.5" />
+                                    <span>P2P Defense Tele-Script</span>
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                               <DropdownMenuItem
                                 onClick={() => {
                                   onSelectClaim(claim._id);

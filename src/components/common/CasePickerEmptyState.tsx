@@ -9,7 +9,7 @@ import {
 } from "@phosphor-icons/react";
 
 import { Claim } from "../../types";
-import { formatCurrency, formatDate } from "../../lib/utils";
+import { formatCurrency, formatDate, cn } from "../../lib/utils";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -171,11 +171,14 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
                       </div>
 
                       <Badge
-                        variant={isWon ? "secondary" : isUrgent ? "destructive" : "outline"}
-                        className="text-[9px] font-mono shrink-0"
+                        variant={isWon ? "default" : isUrgent ? "destructive" : "outline"}
+                        className={cn(
+                          "text-[9px] font-mono shrink-0",
+                          isWon && "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/40"
+                        )}
                       >
                         {isWon
-                          ? "Won"
+                          ? "Won / Overturned"
                           : isUrgent
                           ? `${claim.daysRemaining}d Left`
                           : claim.status.replace(/_/g, " ")}
@@ -197,8 +200,13 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between text-muted-foreground">
-                        <span className="text-[11px]">Disputed Amount:</span>
-                        <span className="font-mono font-bold text-destructive text-xs">
+                        <span className="text-[11px]">{isWon ? "Recovered Amount:" : "Disputed Amount:"}</span>
+                        <span
+                          className={cn(
+                            "font-mono font-bold text-xs",
+                            isWon ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
+                          )}
+                        >
                           {formatCurrency(claim.deniedAmount)}
                         </span>
                       </div>

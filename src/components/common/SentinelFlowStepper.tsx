@@ -120,10 +120,14 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     {
       id: "communications",
       number: 3,
-      title: "Payer Dispatch",
-      subtitle: isDispatched ? "Transmitted to Payer" : "Ready to send",
+      title: isWon ? "Case Won" : "Payer Dispatch",
+      subtitle: isWon
+        ? "100% Payer Reversal"
+        : isDispatched
+        ? "Transmitted to Payer"
+        : "Ready to send",
       view: "communications" as FlowView,
-      icon: isDispatched ? PaperPlaneTilt : Envelope,
+      icon: isWon ? CheckCircle : isDispatched ? PaperPlaneTilt : Envelope,
       isCompleted: isDispatched,
       isActive: currentView === "communications",
     },
@@ -153,22 +157,35 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
             <Badge variant="outline" className="font-mono text-[10px] shrink-0">
               {claim.patient?.insurancePayer || "Insurer"}
             </Badge>
-            <Badge variant="secondary" className="font-mono font-bold text-destructive text-[10px] shrink-0">
-              {formatCurrency(claim.deniedAmount)}
-            </Badge>
+            {isWon ? (
+              <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 text-[10px] shrink-0">
+                {formatCurrency(claim.deniedAmount)} Won
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="font-mono font-bold text-destructive text-[10px] shrink-0">
+                {formatCurrency(claim.deniedAmount)}
+              </Badge>
+            )}
           </div>
         </div>
 
         {/* Status Indicators & Fast Pipeline Action */}
         <div className="flex items-center gap-2 self-end sm:self-auto">
-          {claim.overturnProbabilityScore !== undefined && (
+          {isWon ? (
+            <div className="flex items-center gap-1 text-xs font-mono">
+              <CheckCircle className="size-3.5 text-emerald-500" />
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                Overturned & Won
+              </span>
+            </div>
+          ) : claim.overturnProbabilityScore !== undefined ? (
             <div className="flex items-center gap-1 text-xs font-mono">
               <TrendUp className="size-3 text-emerald-500" />
               <span className="font-bold text-emerald-600 dark:text-emerald-400">
                 {claim.overturnProbabilityScore}% Win Likelihood
               </span>
             </div>
-          )}
+          ) : null}
 
           {(!hasEvidence || !hasBrief) && onRunAutonomousPipeline && (
             <Button

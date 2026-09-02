@@ -398,6 +398,12 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 <Badge variant="outline" className="font-mono text-[10px]">
                   Claim #{claim.claimNumber}
                 </Badge>
+                {claim.status === "won" && (
+                  <Badge variant="default" className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 text-[10px] font-semibold gap-1">
+                    <Check className="size-3 text-emerald-500" />
+                    <span>Overturned & Won</span>
+                  </Badge>
+                )}
                 {saveStatus === "saving" && (
                   <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground animate-pulse">
                     <CircleNotch className="size-3 animate-spin" />

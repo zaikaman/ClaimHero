@@ -584,7 +584,12 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               </button>
             )}
 
-            {claim.status === "dispatched" || claim.status === "won" ? (
+            {claim.status === "won" ? (
+              <Badge variant="secondary" className="gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1">
+                <CheckCircle className="size-3.5 text-emerald-500" />
+                <span>Overturned & Won — Reversal Confirmed by Insurer</span>
+              </Badge>
+            ) : claim.status === "dispatched" ? (
               <Badge variant="secondary" className="gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 px-2.5 py-1">
                 <CheckCircle className="size-3.5" />
                 <span>Packet Transmitted to Insurer</span>
