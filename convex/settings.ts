@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id } from "./_generated/dataModel";
@@ -167,6 +168,15 @@ export const triggerManualSweepAndSync = mutation({
       await ctx.db.patch(userSetting._id, {
         lastSyncTimestamp: now,
       });
+    }
+
+    // Trigger AgentMail inbox sync in background
+    if (ctx.scheduler?.runAfter) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.agentMail.syncInboundMessagesInternal,
+        {}
+      );
     }
 
     return {

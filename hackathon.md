@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T12:32:00Z
+- **Last updated:** 2026-09-02T12:44:00Z
 
 ## Log
 
@@ -484,7 +484,7 @@ Full-Stack Settings Dashboard, Advocate Signatory Profile, Onboarding Wizard Int
   - Added unit tests in `tests/utils.test.ts` verifying resilient date formatting.
   - Verified 100% clean with `npm run verify`: 372/372 passing tests across 27 test suites, 0 TypeScript/ESLint errors, and successful production build. Convex features: database schema, relational indexes, queries, internalQuery, mutations, internalMutation, actions, internalAction, reactive subscriptions, auth, static hosting.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 1044571
 Purged Electronic Intake Email Infrastructure & Streamlined to 2-Mailbox Architecture (`convex/schema.ts`, `convex/http.ts`, `convex/lib/agentMail.ts`, `convex/actions/agentMail.ts`, `convex/emails.ts`, `src/components/radar/IngestionModal.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/common/CommandDialog.tsx`, `src/components/settings/SettingsPage.tsx`, `.env.example`, `README.md`, `specs/001-appeal-sentinel/contracts/agentmail-webhook.md`, `IDEA.md`, `docs/THREAT_MODEL.md`):
 - **Complete Elimination of Electronic Intake Email**:
   - Purged all electronic intake address references, UI tabs, and copy buttons from `IngestionModal.tsx`, `CommandDialog.tsx`, and `Sidebar.tsx`. Ingestion Modal now focuses exclusively on the 3 core high-signal channels: 1-Click Presets, Direct File Upload (PDF/Image OCR), and Raw Denial Text.
@@ -500,6 +500,23 @@ Purged Electronic Intake Email Infrastructure & Streamlined to 2-Mailbox Archite
   - Updated `README.md`, `specs/`, `IDEA.md`, `docs/THREAT_MODEL.md`, and `.env.example` to document the 2-inbox communications architecture.
   - Updated and pruned test suites in `tests/convexHttp.test.ts`, `tests/agentMail.test.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`, `tests/convexEmails.test.ts`, `tests/redactionEngine.test.ts`, and `tests/claimhero.test.ts`.
   - Verified 100% clean with `npm run verify`: 367/367 passing tests across 27 suites, zero TypeScript or ESLint errors, and successful production build. Convex features: database schema, relational indexes, httpRouter, actions, mutations, internalMutation, static hosting.
+
+### 2026-09-02 - working tree
+Implemented Autonomous Inbound Email Synchronization & Real-Time Polling Engine (`convex/schema.ts`, `convex/lib/agentMail.ts`, `convex/actions/agentMail.ts`, `convex/emails.ts`, `convex/crons.ts`, `convex/settings.ts`, `src/hooks/useCommunications.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/App.tsx`):
+- **Root Cause Resolution**:
+  - Identified that external email replies (sent from Gmail or standard client inboxes to `claimhero-sender@agentmail.to`) arrived inside AgentMail inboxes, but were not imported into Convex in local development or fallback environments because Svix webhooks were exclusively targeted to the production hostname without a secondary synchronization mechanism.
+- **AgentMail Inbox Synchronizer Action**:
+  - Created `listAgentMailMessages` in `convex/lib/agentMail.ts` querying AgentMail's REST endpoint (`GET /inboxes/{inboxId}/messages`).
+  - Added `performInboxSync`, `syncInboundMessagesInternal` (internalAction), and `syncInboxes` (action) in `convex/actions/agentMail.ts` to actively inspect both shared inboxes (`senderInboxId` and `adjudicatorInboxId`), detect unrecorded incoming correspondence, and process them through the clinical adjudication & LLM classification pipeline.
+  - Added `by_agent_mail_message_id` index on `emailMessages` and `hasMessageByAgentMailId` internal query in `convex/emails.ts` for O(1) duplicate prevention and guaranteed idempotency.
+- **Automated Crons & Multi-Layered Triggers**:
+  - Configured 5-minute recurring cron job (`sync-agentmail-inboxes`) in `convex/crons.ts` to continuously sync inbound messages.
+  - Wired Settings manual sweep (`triggerManualSweepAndSync` in `convex/settings.ts`) to immediately trigger background inbox synchronization.
+  - Added automatic mounting sync and gentle 30s background polling in `src/hooks/useCommunications.ts`.
+  - Added interactive "Sync Inbox" button with spinning state in `AgentMailDrawer.tsx` header card.
+- **Verification**:
+  - Successfully imported and processed the live Gmail test reply for claim `#BV-2026-8849201-VN`, generating clinical rationale, escalating status to `response_received`/`escalated`, and persisting in Convex.
+  - Verified 100% clean with `npm run verify`: 367/367 passing unit tests across 27 suites, 0 TypeScript/ESLint errors, and successful production build. Convex features: database schema, relational indexes, crons, actions, internalAction, internalQuery, mutations, static hosting.
 
 
 

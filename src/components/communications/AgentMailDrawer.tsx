@@ -47,6 +47,8 @@ interface AgentMailDrawerProps {
   onDispatchAppeal?: (recipientEmail?: string, dispatchMode?: string) => Promise<unknown>;
   onNavigateView?: (view: FlowView) => void;
   onRunAutonomousPipeline?: (claimId?: string) => Promise<unknown>;
+  onSyncInboxes?: () => Promise<unknown>;
+  isSyncingInboxes?: boolean;
 }
 
 export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
@@ -58,6 +60,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   onDispatchAppeal,
   onNavigateView,
   onRunAutonomousPipeline,
+  onSyncInboxes,
+  isSyncingInboxes,
 }) => {
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -560,6 +564,25 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+
+            {/* Manual Sync Inboxes Button */}
+            {onSyncInboxes && (
+              <button
+                type="button"
+                onClick={() => onSyncInboxes()}
+                disabled={isSyncingInboxes}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all cursor-pointer select-none",
+                  isSyncingInboxes
+                    ? "bg-primary/20 text-primary border-primary/40 animate-pulse"
+                    : "bg-muted/40 text-muted-foreground border-border hover:bg-muted/70 hover:text-foreground"
+                )}
+                title="Force refresh inbound replies from AgentMail inboxes"
+              >
+                <ArrowsClockwise className={cn("size-3", isSyncingInboxes && "animate-spin")} />
+                <span>{isSyncingInboxes ? "Syncing..." : "Sync Inbox"}</span>
+              </button>
+            )}
 
             {claim.status === "dispatched" || claim.status === "won" ? (
               <Badge variant="secondary" className="gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 px-2.5 py-1">

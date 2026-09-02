@@ -1,4 +1,4 @@
-import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
@@ -252,6 +252,24 @@ export const updateMessageAnalysisInternal = internalMutation({
   handler: async (ctx, args) => {
     const { messageId, ...fields } = args;
     await ctx.db.patch(messageId, fields);
+  },
+});
+
+/**
+ * Check if a message with the given agentMailMessageId has already been recorded
+ */
+export const hasMessageByAgentMailId = internalQuery({
+  args: {
+    agentMailMessageId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const trimmed = args.agentMailMessageId.trim();
+    if (!trimmed) return false;
+    const existing = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmed))
+      .first();
+    return existing !== null;
   },
 });
 

@@ -69,6 +69,8 @@ export default function App() {
     isLoadingAudit,
     sendMessage,
     dispatchAppeal,
+    syncInboxes,
+    isSyncingInboxes,
   } = useCommunications(selectedClaim);
 
   const handleToggleSidebar = useCallback(() => {
@@ -302,6 +304,8 @@ export default function App() {
                 onDispatchAppeal={dispatchAppeal}
                 onNavigateView={setCurrentView}
                 onRunAutonomousPipeline={runFullPipeline}
+                onSyncInboxes={syncInboxes}
+                isSyncingInboxes={isSyncingInboxes}
               />
             ) : (
               <CasePickerEmptyState

@@ -105,6 +105,27 @@ export async function sendAgentMailMessage(options: {
   };
 }
 
+export async function listAgentMailMessages(
+  inboxId: string,
+  limit = 20
+): Promise<Array<Record<string, unknown>>> {
+  const response = await fetch(
+    `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(inboxId)}/messages?limit=${limit}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${configuredApiKey()}` },
+    }
+  );
+  const body = await parseResponse(response);
+  if (!response.ok) {
+    const detail = typeof body === "string" ? body : JSON.stringify(body);
+    throw new Error(`AgentMail messages list failed (${response.status}): ${detail}`);
+  }
+  if (Array.isArray(body)) return body as Array<Record<string, unknown>>;
+  if (isRecord(body) && Array.isArray(body.messages)) return body.messages as Array<Record<string, unknown>>;
+  return [];
+}
+
 export async function getAgentMailMessage(inboxId: string, messageId: string): Promise<Record<string, unknown>> {
   const response = await fetch(
     `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}`,

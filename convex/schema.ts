@@ -244,7 +244,8 @@ export default defineSchema({
     receivedAt: v.number(),
   })
     .index("by_thread", ["threadId"])
-    .index("by_claim", ["claimId"]),
+    .index("by_claim", ["claimId"])
+    .index("by_agent_mail_message_id", ["agentMailMessageId"]),
 
   // Precedent Vector Archive — winning briefs, commissioner rulings, court overturns
   precedents: defineTable({

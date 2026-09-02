@@ -1,12 +1,13 @@
 "use node";
 
-import { internalAction } from "../_generated/server";
+import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import {
   getAgentMailMessage,
   getSharedAgentMailboxes,
+  listAgentMailMessages,
   sendAgentMailMessage,
 } from "../lib/agentMail";
 import { extractEmailAddress, normalizeAgentMailWebhook } from "../lib/agentMailWebhook";
@@ -112,16 +113,23 @@ interface InboundAnalysisResult {
   suggestedAutoReplyAddendum: string;
 }
 
-/** Persist replies received on the shared case correspondence inbox. */
-export const processInboundClaimReply = internalAction({
+async function handleInboundClaimReply(
+  ctx: ActionCtx,
   args: {
-    eventId: v.string(),
-    messageId: v.string(),
-    inboxId: v.string(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const message = await getAgentMailMessage(args.inboxId, args.messageId);
+    eventId: string;
+    messageId: string;
+    inboxId: string;
+  }
+): Promise<null> {
+  // Idempotency check: if message already processed, skip
+  const alreadyRecorded = await ctx.runQuery(internal.emails.hasMessageByAgentMailId, {
+    agentMailMessageId: args.messageId,
+  });
+  if (alreadyRecorded === true) {
+    return null;
+  }
+
+  const message = await getAgentMailMessage(args.inboxId, args.messageId);
     const normalized = normalizeAgentMailWebhook({
       event_type: "message.received",
       event_id: args.eventId,
@@ -389,5 +397,127 @@ Evaluate the inbound correspondence text rigorously:
     }
 
     return null;
+}
+
+/** Persist replies received on the shared case correspondence inbox. */
+export const processInboundClaimReply = internalAction({
+  args: {
+    eventId: v.string(),
+    messageId: v.string(),
+    inboxId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    return await handleInboundClaimReply(ctx, args);
   },
 });
+
+async function performInboxSync(
+  ctx: ActionCtx,
+  limit = 30
+): Promise<{ syncedCount: number; totalChecked: number }> {
+  if (!process.env.AGENTMAIL_API_KEY?.trim()) {
+    return { syncedCount: 0, totalChecked: 0 };
+  }
+
+  let mailboxes;
+  try {
+    mailboxes = getSharedAgentMailboxes();
+  } catch {
+    return { syncedCount: 0, totalChecked: 0 };
+  }
+
+  const inboxesToCheck = Array.from(
+    new Set([mailboxes.senderInboxId, mailboxes.adjudicatorInboxId].filter(Boolean))
+  );
+
+  let syncedCount = 0;
+  let totalChecked = 0;
+
+  for (const inboxId of inboxesToCheck) {
+    try {
+      const messages = await listAgentMailMessages(inboxId, limit);
+      for (const msg of messages) {
+        totalChecked++;
+        const rawMessageId =
+          (typeof msg.message_id === "string" ? msg.message_id : undefined) ||
+          (typeof msg.messageId === "string" ? msg.messageId : undefined) ||
+          (typeof msg.id === "string" ? msg.id : undefined);
+
+        if (!rawMessageId) continue;
+
+        const labels = Array.isArray(msg.labels) ? (msg.labels as string[]) : [];
+        const fromStr = typeof msg.from === "string" ? msg.from.toLowerCase() : "";
+        const isOwnInboxSender = fromStr.includes(inboxId.toLowerCase());
+
+        // Process if marked as received or if sender is not this inbox itself
+        const isReceived = labels.includes("received") || !isOwnInboxSender;
+        if (!isReceived) continue;
+
+        // Check if already in DB
+        const alreadyExists = await ctx.runQuery(
+          internal.emails.hasMessageByAgentMailId,
+          { agentMailMessageId: rawMessageId }
+        );
+        if (alreadyExists) continue;
+
+        // Process the inbound claim reply
+        try {
+          const sanitizedId = rawMessageId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
+          await handleInboundClaimReply(ctx, {
+            eventId: `sync_${Date.now()}_${sanitizedId}`,
+            messageId: rawMessageId,
+            inboxId,
+          });
+          syncedCount++;
+        } catch (processErr) {
+          console.warn(`Failed to process synced message ${rawMessageId}:`, processErr);
+        }
+      }
+    } catch (inboxErr) {
+      console.warn(`Failed to list messages for inbox ${inboxId}:`, inboxErr);
+    }
+  }
+
+  return { syncedCount, totalChecked };
+}
+
+/**
+ * Internal action to poll and synchronize inbound messages from AgentMail inboxes.
+ * Processes unrecorded messages that arrived while webhooks were offline or delayed.
+ */
+export const syncInboundMessagesInternal = internalAction({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  returns: v.object({
+    syncedCount: v.number(),
+    totalChecked: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    return await performInboxSync(ctx, args.limit);
+  },
+});
+
+/**
+ * Public action callable from UI to trigger an immediate inbox sync
+ */
+export const syncInboxes = action({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    syncedCount: v.number(),
+    totalChecked: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const result = await performInboxSync(ctx, args.limit);
+    return {
+      success: true,
+      syncedCount: result.syncedCount,
+      totalChecked: result.totalChecked,
+    };
+  },
+});
+

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Claim, EmailThread, EmailMessage, AuditLog } from "../types";
@@ -6,6 +6,7 @@ import { Id } from "../../convex/_generated/dataModel";
 
 export function useCommunications(claim?: Claim | null) {
   const claimId = claim?._id as Id<"claims"> | undefined;
+  const [isSyncingInboxes, setIsSyncingInboxes] = useState(false);
 
   // Query threads for this claim
   const threads = useQuery(
@@ -37,6 +38,28 @@ export function useCommunications(claim?: Claim | null) {
   const dispatchAction = useAction(api.actions.mailDispatcher.dispatchAppealPacket);
   const sendOutboundAction = useAction(api.actions.mailDispatcher.sendOutboundMessage);
   const resolvePayerGatewayAction = useAction(api.actions.payerContactResolver.resolvePayerGateway);
+  const syncInboxesAction = useAction(api.actions.agentMail.syncInboxes);
+
+  const syncInboxes = useCallback(async () => {
+    if (isSyncingInboxes || !syncInboxesAction) return;
+    setIsSyncingInboxes(true);
+    try {
+      await syncInboxesAction({ limit: 30 });
+    } catch (err) {
+      console.warn("Failed to sync AgentMail inboxes:", err);
+    } finally {
+      setIsSyncingInboxes(false);
+    }
+  }, [syncInboxesAction, isSyncingInboxes]);
+
+  // Automatically poll/sync inboxes when mounted or claim changes, and on a gentle 30s interval
+  useEffect(() => {
+    syncInboxes();
+    const interval = setInterval(() => {
+      syncInboxes();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [claimId]);
 
   // Send an outbound reply/addendum message via live AgentMail
   const sendMessage = useCallback(
@@ -119,5 +142,7 @@ export function useCommunications(claim?: Claim | null) {
     sendMessage,
     dispatchAppeal,
     resolvePayerGateway,
+    syncInboxes,
+    isSyncingInboxes,
   };
 }

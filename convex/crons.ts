@@ -14,4 +14,15 @@ crons.cron(
   {}
 );
 
+/**
+ * AgentMail Inbound Sync Cron:
+ * Synchronizes recent messages from AgentMail inboxes every 5 minutes to ingest payer replies.
+ */
+crons.interval(
+  "sync-agentmail-inboxes",
+  { minutes: 5 },
+  internal.actions.agentMail.syncInboundMessagesInternal,
+  {}
+);
+
 export default crons;
