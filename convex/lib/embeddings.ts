@@ -42,15 +42,6 @@ export interface RankablePrecedentHit {
   citation?: string;
 }
 
-function fnv1a(input: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
 export function l2Normalize(vector: number[]): number[] {
   let sumSquares = 0;
   for (const value of vector) {
@@ -74,40 +65,6 @@ export function fitDimensions(vector: number[], dimensions: number = EMBEDDING_D
   }
   const padded = vector.concat(new Array(dimensions - vector.length).fill(0));
   return l2Normalize(padded);
-}
-
-export function hashEmbed(text: string, extraWeightedTokens: string[] = []): number[] {
-  const vector = new Array<number>(EMBEDDING_DIMENSIONS).fill(0);
-  const normalized = text
-    .toLowerCase()
-    .replace(/[^a-z0-9§.\s-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const tokens = normalized.split(" ").filter((token) => token.length > 1);
-
-  const addToken = (token: string, weight: number) => {
-    const h1 = fnv1a(token);
-    const h2 = fnv1a(`${token}#sign`);
-    const h3 = fnv1a(`${token}#alt`);
-    const sign = (h2 & 1) === 0 ? 1 : -1;
-    vector[h1 % EMBEDDING_DIMENSIONS] += sign * weight;
-    vector[h3 % EMBEDDING_DIMENSIONS] += sign * weight * 0.45;
-  };
-
-  for (const token of tokens) {
-    addToken(token, 1);
-  }
-  for (let i = 0; i < tokens.length - 1; i++) {
-    addToken(`${tokens[i]}_${tokens[i + 1]}`, 0.65);
-  }
-  for (const extra of extraWeightedTokens) {
-    const cleaned = extra.toLowerCase().trim();
-    if (cleaned.length > 0) {
-      addToken(cleaned, 3.2);
-    }
-  }
-
-  return l2Normalize(vector);
 }
 
 export function weightedTokensForCodes(

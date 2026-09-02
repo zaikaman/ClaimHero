@@ -35,7 +35,6 @@ import {
   formatPrecedentInsertion,
   rankPrecedentHits,
   weightedTokensForCodes,
-  hashEmbed,
   fitDimensions,
   l2Normalize,
   EMBEDDING_DIMENSIONS,
@@ -45,7 +44,7 @@ describe("convex/lib/openai Unit Tests", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    process.env = { ...originalEnv };
+    process.env = { ...originalEnv, OPENAI_API_KEY: "test-openai-key" };
     vi.clearAllMocks();
   });
 
@@ -53,18 +52,26 @@ describe("convex/lib/openai Unit Tests", () => {
     process.env = originalEnv;
   });
 
-  it("reads configuration with defaults", () => {
-    delete process.env.OPENAI_API_KEY;
+  it("reads configuration with defaults when API key is present", () => {
+    process.env.OPENAI_API_KEY = "custom-key";
     delete process.env.OPENAI_MODEL;
     delete process.env.OPENAI_BASE_URL;
 
     const config = getOpenAIConfig();
-    expect(config.apiKey).toBe("sk-placeholder-key");
+    expect(config.apiKey).toBe("custom-key");
     expect(config.model).toBe("gpt-5.4-nano");
     expect(config.baseURL).toBe("https://api.openai.com/v1");
 
     const client = getOpenAIClient({ timeout: 5000 });
     expect(client).toBeDefined();
+  });
+
+  it("throws error when OPENAI_API_KEY is missing or empty", () => {
+    delete process.env.OPENAI_API_KEY;
+    expect(() => getOpenAIConfig()).toThrow("OPENAI_API_KEY is not configured");
+
+    process.env.OPENAI_API_KEY = "   ";
+    expect(() => getOpenAIConfig()).toThrow("OPENAI_API_KEY is not configured");
   });
 
   it("creates structured completions with JSON schema parsing", async () => {
@@ -287,11 +294,6 @@ describe("convex/lib/embeddings Unit Tests", () => {
     expect(emptyCarcRanked).toHaveLength(0);
   });
 
-  it("computes hashEmbed vector with deterministic dimensions", () => {
-    const vector = hashEmbed("Total Knee Arthroplasty for severe degenerative osteoarthritis", ["cpt:27447"]);
-    expect(vector).toHaveLength(EMBEDDING_DIMENSIONS);
-    expect(vector[0]).toBeDefined();
-  });
 
   it("ranks and deduplicates precedent hits with combined scoring", () => {
     const claimQuery = {

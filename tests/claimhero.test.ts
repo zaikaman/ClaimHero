@@ -639,26 +639,27 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
 });
 
 describe("Precedent Vector Archive", () => {
-  it("produces L2-normalized 1536-d hash embeddings that are deterministic", async () => {
-    const { hashEmbed, EMBEDDING_DIMENSIONS, l2Normalize } = await import("../convex/lib/embeddings");
+  it("normalizes and fits 1536-d vectors deterministically", async () => {
+    const { fitDimensions, EMBEDDING_DIMENSIONS, l2Normalize } = await import("../convex/lib/embeddings");
 
-    const a = hashEmbed("total knee arthroplasty medical necessity CO-50", ["cpt:27447", "icd:m17.11", "carc:co-50"]);
-    const b = hashEmbed("total knee arthroplasty medical necessity CO-50", ["cpt:27447", "icd:m17.11", "carc:co-50"]);
+    const rawVector = new Array(100).fill(1);
+    const fitted = fitDimensions(rawVector, EMBEDDING_DIMENSIONS);
 
-    expect(a).toHaveLength(EMBEDDING_DIMENSIONS);
-    expect(b).toEqual(a);
+    expect(fitted).toHaveLength(EMBEDDING_DIMENSIONS);
 
-    const magnitude = Math.sqrt(a.reduce((sum, value) => sum + value * value, 0));
+    const magnitude = Math.sqrt(fitted.reduce((sum, value) => sum + value * value, 0));
     expect(magnitude).toBeCloseTo(1, 5);
 
-    const padded = l2Normalize([3, 4]);
-    expect(padded[0]).toBeCloseTo(0.6, 5);
-    expect(padded[1]).toBeCloseTo(0.8, 5);
+    const normalized = l2Normalize([3, 4]);
+    expect(normalized[0]).toBeCloseTo(0.6, 5);
+    expect(normalized[1]).toBeCloseTo(0.8, 5);
   });
 
   it("fails hard with an explicit error when OPENAI_EMBEDDING_MODEL is unset", async () => {
     const { createEmbedding } = await import("../convex/lib/openai");
     const originalModel = process.env.OPENAI_EMBEDDING_MODEL;
+    const originalKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "test-key";
     delete process.env.OPENAI_EMBEDDING_MODEL;
 
     try {
@@ -668,6 +669,33 @@ describe("Precedent Vector Archive", () => {
     } finally {
       if (originalModel !== undefined) {
         process.env.OPENAI_EMBEDDING_MODEL = originalModel;
+      }
+      if (originalKey !== undefined) {
+        process.env.OPENAI_API_KEY = originalKey;
+      } else {
+        delete process.env.OPENAI_API_KEY;
+      }
+    }
+  });
+
+  it("fails hard with an explicit error when OPENAI_API_KEY is unset", async () => {
+    const { getOpenAIConfig, createEmbedding } = await import("../convex/lib/openai");
+    const originalKey = process.env.OPENAI_API_KEY;
+    const originalModel = process.env.OPENAI_EMBEDDING_MODEL;
+    delete process.env.OPENAI_API_KEY;
+    process.env.OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
+
+    try {
+      expect(() => getOpenAIConfig()).toThrow("OPENAI_API_KEY is not configured");
+      await expect(createEmbedding("sample query")).rejects.toThrow("OPENAI_API_KEY is not configured");
+    } finally {
+      if (originalKey !== undefined) {
+        process.env.OPENAI_API_KEY = originalKey;
+      }
+      if (originalModel !== undefined) {
+        process.env.OPENAI_EMBEDDING_MODEL = originalModel;
+      } else {
+        delete process.env.OPENAI_EMBEDDING_MODEL;
       }
     }
   });

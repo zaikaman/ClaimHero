@@ -432,26 +432,6 @@ export function buildLeanSentinelPrompt(options: {
   return prompt;
 }
 
-interface ClaimDataChatbotResult {
-  claimNumber: string;
-  patientName?: string;
-  patientMemberId?: string;
-  insurancePayer?: string;
-  providerName?: string;
-  denialReasonCode?: string;
-  denialReasonDescription?: string;
-  deniedAmount: number;
-  patientOwedAmount: number;
-  daysRemaining?: number;
-  cptCodes: string[];
-  icd10Codes: string[];
-  overturnProbabilityScore?: number;
-  riskLevel?: string;
-  erisaPenalties?: {
-    daysInDefault: number;
-    accruedPenaltyAmount: number;
-  };
-}
 
 /**
  * Execute a single tool call against Convex database and services
@@ -778,154 +758,77 @@ export const sendMessageWithTools = action({
 
     let finalReply = "";
 
-    try {
-      const { apiKey, model } = getOpenAIConfig();
-      if (!apiKey || apiKey === "sk-placeholder-key") {
-        throw new Error("OpenAI API key not configured");
-      }
+    const { model } = getOpenAIConfig();
+    const client = getOpenAIClient({ timeout: 25_000, maxRetries: 1 });
 
-      const client = getOpenAIClient({ timeout: 25_000, maxRetries: 1 });
+    // Multi-round tool execution loop (up to 4 turns)
+    let turn = 0;
+    const MAX_TURNS = 4;
 
-      // Multi-round tool execution loop (up to 4 turns)
-      let turn = 0;
-      const MAX_TURNS = 4;
+    while (turn < MAX_TURNS) {
+      turn++;
 
-      while (turn < MAX_TURNS) {
-        turn++;
+      const response = await client.chat.completions.create({
+        model: model || "gpt-5.4-nano",
+        messages: openaiMessages,
+        tools: SENTINEL_CHAT_TOOLS,
+        tool_choice: "auto",
+        temperature: 0.2,
+      });
 
-        const response = await client.chat.completions.create({
-          model: model || "gpt-5.4-nano",
-          messages: openaiMessages,
-          tools: SENTINEL_CHAT_TOOLS,
-          tool_choice: "auto",
-          temperature: 0.2,
-        });
+      const choice = response.choices[0];
+      const message = choice?.message;
 
-        const choice = response.choices[0];
-        const message = choice?.message;
+      if (!message) break;
 
-        if (!message) break;
+      // If the model wants to call tools
+      if (message.tool_calls && message.tool_calls.length > 0) {
+        openaiMessages.push(message);
 
-        // If the model wants to call tools
-        if (message.tool_calls && message.tool_calls.length > 0) {
-          openaiMessages.push(message);
-
-          for (const toolCall of message.tool_calls) {
-            let parsedArgs: Record<string, unknown> = {};
-            try {
-              parsedArgs = JSON.parse(toolCall.function.arguments);
-            } catch {
-              parsedArgs = {};
-            }
-
-            const toolResult = await executeToolCall(
-              ctx,
-              toolCall.function.name,
-              parsedArgs,
-              args.activeClaimId
-            );
-
-            executedToolCalls.push({
-              id: toolCall.id,
-              name: toolCall.function.name,
-              arguments: toolCall.function.arguments,
-              output: toolResult.output.slice(0, 500),
-            });
-
-            openaiMessages.push({
-              role: "tool",
-              tool_call_id: toolCall.id,
-              content: toolResult.output,
-            });
+        for (const toolCall of message.tool_calls) {
+          let parsedArgs: Record<string, unknown> = {};
+          try {
+            parsedArgs = JSON.parse(toolCall.function.arguments);
+          } catch {
+            parsedArgs = {};
           }
-          // Continue to next turn so model can inspect tool output and formulate response
-          continue;
-        }
 
-        // If the model produced final content
-        if (message.content) {
-          finalReply = message.content.trim();
-          break;
+          const toolResult = await executeToolCall(
+            ctx,
+            toolCall.function.name,
+            parsedArgs,
+            args.activeClaimId
+          );
+
+          executedToolCalls.push({
+            id: toolCall.id,
+            name: toolCall.function.name,
+            arguments: toolCall.function.arguments,
+            output: toolResult.output.slice(0, 500),
+          });
+
+          openaiMessages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: toolResult.output,
+          });
         }
+        // Continue to next turn so model can inspect tool output and formulate response
+        continue;
       }
 
-      if (!finalReply) {
-        finalReply =
-          "Sentinel Copilot processed your inquiry. No additional clinical actions required at this step.";
-      }
-    } catch (error) {
-      console.warn("Sentinel Chatbot tool calling encountered error or missing API key, executing fallback:", error);
-
-      // Resilient fallback logic
-      const query = args.userMessage.toLowerCase();
-      let fallbackData: ClaimDataChatbotResult | null = null;
-
-      if (
-        (query.includes("claim") ||
-          query.includes("patient") ||
-          query.includes("denial") ||
-          query.includes("amount") ||
-          query.includes("cpt") ||
-          query.includes("erisa") ||
-          query.includes("score")) &&
-        args.activeClaimId
-      ) {
-        const claimResult = await executeToolCall(
-          ctx,
-          "get_active_claim_details",
-          { claimId: args.activeClaimId },
-          args.activeClaimId
-        );
-        fallbackData = claimResult.raw as ClaimDataChatbotResult | null;
-        executedToolCalls.push({
-          id: "call_claim_details_fallback",
-          name: "get_active_claim_details",
-          arguments: JSON.stringify({ claimId: args.activeClaimId }),
-          output: claimResult.output.slice(0, 300),
-        });
-      }
-
-      if (fallbackData) {
-        if (query.includes("erisa") || query.includes("penalty") || query.includes("law") || query.includes("statut")) {
-          const ep = fallbackData.erisaPenalties;
-          finalReply = `Under ERISA § 502(c)(1) (29 U.S.C. § 1132(c)(1)) and 29 CFR § 2560.503-1:
-- Claim Number: **${fallbackData.claimNumber}**
-- Statutory Appeal Clock: **${fallbackData.daysRemaining} days remaining** (180-day window)
-- Mandatory De Novo Review: Under 29 CFR § 2560.503-1(h)(3)(ii), review must be conducted by an independent health professional with no prior involvement.
-- Statutory $110/Day Penalties: ${ep
-              ? `Plan administrator is in default for **${ep.daysInDefault} days**, accruing **$${ep.accruedPenaltyAmount.toLocaleString()}** in statutory damages.`
-              : "Plan administrator must provide all internal clinical guidelines and reviewer credentials upon written request within 30 days."
-            }`;
-        } else if (query.includes("score") || query.includes("win") || query.includes("overturn") || query.includes("probab")) {
-          finalReply = `Overturn Probability Analysis for **${fallbackData.claimNumber}** (${fallbackData.patientName}):
-- Likelihood: **${fallbackData.overturnProbabilityScore ?? 88}%** (${fallbackData.riskLevel || "High Confidence"})
-- Disputed Amount: **$${fallbackData.deniedAmount.toLocaleString()}** (${fallbackData.insurancePayer})
-- Denial Reason: \`${fallbackData.denialReasonCode}\` — "${fallbackData.denialReasonDescription}"
-- CPT Codes: ${fallbackData.cptCodes.join(", ") || "N/A"}
-- Clinical Justification: The medical chart substantiates diagnostic necessity and exhausted conservative step-therapy.`;
-        } else {
-          finalReply = `Sentinel Intelligence Report for **${fallbackData.claimNumber}**:
-- Patient: **${fallbackData.patientName}** (Member ID: \`${fallbackData.patientMemberId || "N/A"}\`)
-- Payer: **${fallbackData.insurancePayer}** | Provider: **${fallbackData.providerName}**
-- Denial Code: \`${fallbackData.denialReasonCode}\` (${fallbackData.denialReasonDescription})
-- Disputed Exposure: **$${fallbackData.deniedAmount.toLocaleString()}** (Patient Owed: $${fallbackData.patientOwedAmount.toLocaleString()})
-- Appeal Deadline: **${fallbackData.daysRemaining} days remaining**
-
-Ask me to draft P2P defense counters, audit ERISA disclosure penalties, or explain CPB clinical criteria clauses.`;
-        }
-      } else {
-        finalReply = `I am Sentinel Copilot, ClaimHero's clinical and legal AI assistant.
-
-I can dynamically retrieve and analyze:
-- **Active Claims**: Diagnostic ICD-10 codes, CPT procedures, denial codes, and financial liability.
-- **Evidence Matrix**: Crawled insurer Clinical Policy Bulletins (CPBs) and FDA/PubMed literature.
-- **Appeal Briefs**: Synthesized 3-tier ERISA 29 CFR § 2560.503-1 legal memorandums.
-- **P2P Defense**: Tele-scripts and physician rebuttal cheat sheets.
-- **ERISA Penalties**: Audits for statutory $110/day failure-to-disclose exposure.
-
-Select an active claim or ask any clinical or legal question to begin.`;
+      // If the model produced final content
+      if (message.content) {
+        finalReply = message.content.trim();
+        break;
       }
     }
+
+    if (!finalReply) {
+      finalReply =
+        "Sentinel Copilot processed your inquiry. No additional clinical actions required at this step.";
+    }
+
 
     // 6. Save assistant response + tool call metadata to database
     await ctx.runMutation(internal.chatbot.addMessageInternal, {

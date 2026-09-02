@@ -409,8 +409,8 @@ ClaimHero/
 │   │   └── auth.ts               # canonical authorization re-exports for convex-authz
 │   ├── lib/
 │   │   ├── auth.ts               # requireAuthUser, requireClaimOwner, getClaimIfAuthorized
-│   │   ├── openai.ts             # unified client + structured completions + embeddings
-│   │   ├── embeddings.ts         # hashEmbed, l2Normalize, rankPrecedentHits
+│   │   ├── openai.ts             # unified client + structured completions + embeddings (strict config)
+│   │   ├── embeddings.ts         # fitDimensions, l2Normalize, rankPrecedentHits
 │   │   ├── appealEmail.ts        # HTML+text rendering with safe link validation
 │   │   ├── aiAdjudicator.ts      # adjudicator addressing + transcript formatting
 │   │   ├── agentMail.ts / agentMailWebhook.ts

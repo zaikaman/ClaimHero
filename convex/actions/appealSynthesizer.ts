@@ -764,11 +764,9 @@ export const generateAppealBrief = action({
     const cptList = (claim.cptCodes || []).join(", ");
     const icdList = (claim.icd10Codes || []).join(", ");
 
-    // 3. Call OpenAI with structured JSON schema and robust fallback
-    let rawResult: AppealBriefSynthesisResult;
-    try {
-      rawResult = await createStructuredCompletion<AppealBriefSynthesisResult>({
-        systemPrompt: `You draft professional healthcare payer correspondence. Produce content that can be sent as the body of a normal appeal email, not a litigation memorandum and not legal advice.
+    // 3. Call OpenAI with structured JSON schema
+    const rawResult = await createStructuredCompletion<AppealBriefSynthesisResult>({
+      systemPrompt: `You draft professional healthcare payer correspondence. Produce content that can be sent as the body of a normal appeal email, not a litigation memorandum and not legal advice.
 
 Evidence and safety rules:
 1. Use only facts explicitly present in the case details, indexed evidence, and treating-provider notes. Never invent symptoms, severity grades, measurements, treatment dates, medication names or doses, outcome scores, functional limitations, clearance, authorization, representation authority, plan type, jurisdiction, deadlines, or eligibility.
@@ -780,7 +778,7 @@ Evidence and safety rules:
 7. The application assembles the final email from your structured fields. Return an empty string for fullAppealMarkdown; do not write a second full document there.
 
 Write the structured fields in English unless the denial materials clearly establish another language.`,
-        userPrompt: `Draft the content for a ${appealLevel.replace(/_/g, " ")} medical appeal email for:
+      userPrompt: `Draft the content for a ${appealLevel.replace(/_/g, " ")} medical appeal email for:
 
 Case Details:
 - Claim Number: ${claim.claimNumber}
@@ -810,21 +808,10 @@ ${sender?.name ? `Sender details for the closing (use only as provided):\n- Name
 ${args.customInstructions ? `Advocate Custom Instructions:\n${args.customInstructions}\n` : ""}
 
 Return a short, evidence-grounded email draft in the structured fields. If a clinical detail is not present, say that the current record does not provide it rather than filling the gap.`,
-        schemaName: "AppealBriefSynthesisResult",
-        schema: APPEAL_SYNTHESIS_SCHEMA,
-        temperature: 0.15,
-      });
-    } catch (llmErr) {
-      console.warn("LLM appeal synthesis fallback engaged:", llmErr);
-      rawResult = {
-        executiveSummary: `This appeal requests reconsideration of the adverse benefit determination for Claim #${claim.claimNumber}, based on the claim details and supporting sources currently available.`,
-        medicalNecessityArguments: buildNeutralClinicalBasis(claim),
-        statutoryRightsNotice: SAFE_STATUTORY_RIGHTS_NOTICE,
-        policyCitations: buildGroundedPolicyCitations(evidences),
-        formalDemandForPayment: buildPaymentRequest(claim.claimNumber),
-        fullAppealMarkdown: "",
-      };
-    }
+      schemaName: "AppealBriefSynthesisResult",
+      schema: APPEAL_SYNTHESIS_SCHEMA,
+      temperature: 0.15,
+    });
 
     const groundedPolicyCitations = buildGroundedPolicyCitations(evidences);
     const groundedMedicalNecessityArguments = buildGroundedClinicalBasis(
