@@ -320,7 +320,7 @@ export function formatAppealEmail(markdown: string, context: AppealEmailContext)
     context,
     "Appeal of Adverse Benefit Determination",
     markdown,
-    "Please reference the claim number above in any reply or request for additional information."
+    `[ClaimHero #${context.claimNumber}] Please reference the claim number above in any reply or request for additional information.`
   );
 }
 
@@ -333,6 +333,6 @@ export function formatCorrespondenceEmail(
     context,
     title,
     markdown,
-    "Please reference the claim number above in any reply or additional submission."
+    `[ClaimHero #${context.claimNumber}] Please reference the claim number above in any reply or additional submission.`
   );
 }

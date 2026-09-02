@@ -322,11 +322,25 @@ describe("Convex Claims CRUD, Financials & Analytics Engine", () => {
         claimId: "c1",
         claimInboxId: "in_1",
         claimInboxEmail: "c1@agentmail.com",
+        agentMailThreadId: "thread_custom_1",
         status: "shared",
       });
       expect(mockDb.patch).toHaveBeenCalledWith("c1", expect.objectContaining({
         assignedAgentEmail: "c1@agentmail.com",
+        agentMailThreadId: "thread_custom_1",
       }));
+
+      await (claims.setAgentMailThreadIdInternal as any)._handler(mockCtx, {
+        claimId: "c1",
+        agentMailThreadId: "thread_custom_2",
+      });
+      expect(mockDb.patch).toHaveBeenCalledWith("c1", {
+        agentMailThreadId: "thread_custom_2",
+      });
+
+      mockDb.query().withIndex().first.mockResolvedValue({ _id: "c1", agentMailThreadId: "thread_custom_2" });
+      const byThread = await (claims.getByThreadIdInternal as any)._handler(mockCtx, { threadId: "thread_custom_2" });
+      expect(byThread?.agentMailThreadId).toBe("thread_custom_2");
     });
 
     it("sweepDeadlines: paginates claims, updates daysRemaining, and logs critical alarm", async () => {

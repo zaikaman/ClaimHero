@@ -57,6 +57,7 @@ export default defineSchema({
     agentMailInboxEmail: v.optional(v.string()),
     agentMailAdjudicatorInboxId: v.optional(v.string()),
     agentMailAdjudicatorEmail: v.optional(v.string()),
+    agentMailThreadId: v.optional(v.string()),
     agentMailProvisioningStatus: v.optional(v.string()), // pending, shared, provisioned, not_configured, failed
     agentMailProvisioningError: v.optional(v.string()),
     denialLetterStorageId: v.optional(v.id("_storage")),
@@ -161,6 +162,7 @@ export default defineSchema({
     .index("by_assigned_agent_email", ["assignedAgentEmail"])
     .index("by_created", ["createdAt"])
     .index("by_updated", ["updatedAt"])
+    .index("by_threadId", ["agentMailThreadId"])
     .searchIndex("search_claims", {
       searchField: "denialReasonDescription",
       filterFields: ["userId", "status", "denialReasonCode"],

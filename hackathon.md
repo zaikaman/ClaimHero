@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T07:27:00Z
+- **Last updated:** 2026-09-02T08:08:00Z
 
 ## Log
 
@@ -414,7 +414,7 @@ Evidence-Proportional Dynamic Scoring for ERISA & Precedent Pillars (`convex/act
 - **Comprehensive Unit Testing**: Added unit tests in `tests/actionsPrecedentsAndPipeline.test.ts` asserting strict scale-down on zero evidence (21 pts, `complex_litigation`), moderate scoring on single evidence (55-79 pts, `moderate`), and robust scoring on CPB + legal precedents (>=80 pts, `high_confidence`).
 - **Full Verification**: Passed `npm run verify` (100% clean TypeScript typecheck, ESLint, 360/360 passing tests across 26 test suites, and Vite production bundle build). Convex features: actions, queries, mutations, internalMutation, static hosting.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 79a51ea
 Multi-Tier Clinical Policy Search & Candidate Retrieval Architecture (`convex/actions/policyCrawler.ts`, `tests/actionsPolicyAndSynthesizer.test.ts`):
 - **Root Cause Resolution for Clinical Policy Search**: Identified and fixed the root cause where specialized plans, BCBS licensees (such as GeoBlue), and regional health plans failed policy discovery due to over-constraining quoted search queries that returned university travel-abroad marketing pages instead of clinical coverage bulletins.
 - **Multi-Tier Search Strategy Prompt Engineering**: Upgraded `generatePolicySearchQueries` to generate 3 diverse, high-yield queries spanning Tier 1 (Payer & UM Guidelines e.g. Carelon, Anthem/BCBS, EviCore), Tier 2 (National Specialty Society Standard-of-Care Guidelines e.g. NASS for spine, AAOS for joint/knee, ACR for imaging), and Tier 3 (National Statutory & CMS Local Coverage Determinations [LCD]).
@@ -423,6 +423,17 @@ Multi-Tier Clinical Policy Search & Candidate Retrieval Architecture (`convex/ac
 - **Adaptive Multi-Round Search with Negative Feedback**: Enabled `MAX_POLICY_SEARCH_ROUNDS = 2` with sequential candidate scraping (up to 3 per round) and LLM-guided rejection feedback refinement.
 - **Active Guideline Targeting Prompt Engineering**: Enhanced `generatePolicySearchQueries` to explicitly target currently active, in-force standard-of-care guidelines and avoid past year/archive keywords, while candidate ranking (`archivePenalty`) heavily scores against historical editions.
 - **Validation**: Added unit tests in `tests/actionsPolicyAndSynthesizer.test.ts` verifying exclusion of student safety pages and prioritization of Carelon / NASS clinical guidelines. Verified 100% clean with `npm run verify` (361 passing unit tests across 26 suites, typecheck, lint, and production build). Convex features: actions, queries, mutations, rateLimiter, components.
+
+### 2026-09-02 - working tree
+Hardened Free-Tier Two-Way Routing & Bidirectional Thread Tracking (`convex/schema.ts`, `convex/claims.ts`, `convex/actions/agentMail.ts`, `convex/actions/mailDispatcher.ts`, `convex/lib/agentMail.ts`, `convex/lib/appealEmail.ts`):
+- **Deterministic Claim Tag Injection in Subject & Footer**: Enforced universal injection of `[ClaimHero #${claimNumber}]` in `convex/actions/mailDispatcher.ts` (`dispatchAppealPacket`, `sendOutboundMessage`, `deliverAiAdjudication`) and `convex/lib/appealEmail.ts` (`formatAppealEmail`, `formatCorrespondenceEmail`) across email headers, subjects, and footers to guarantee unambiguous claim correlation across external payer replies.
+- **Bidirectional AgentMail Thread ID Persistence**: Updated `sendAgentMailMessage` in `convex/lib/agentMail.ts` to return both `messageId` and `threadId`, and automatically persisted outbound transmission thread IDs to `claims.agentMailThreadId` via `internal.claims.setAgentMailThreadIdInternal` in `convex/claims.ts` and `setAgentMailInboxes`.
+- **Relational `by_threadId` Indexing**: Added `agentMailThreadId: v.optional(v.string())` field and `.index("by_threadId", ["agentMailThreadId"])` to the `claims` table schema in `convex/schema.ts`, alongside dedicated `getByThreadIdInternal` query in `convex/claims.ts`.
+- **Hierarchical Inbound Claim Matching & Routing**: Overhauled `processInboundClaimReply` in `convex/actions/agentMail.ts` to implement a strict 4-step routing hierarchy: 1) direct `threadId` match via indexed `getByThreadIdInternal`, 2) fallback subject regex matching `/#(CH-\d+)/i` and `[ClaimHero #...]` via `getByClaimNumberInternal`, 3) fallback recipient exact match via `getByInboxEmailInternal`, and 4) bounded recent claims fallback.
+- **Intake vs Case Inbox Boundary Isolation**: Retained strict check in `processInboundIntake` ensuring messages destined for non-intake mailboxes are filtered out and cleanly routed to reply handling without inbox duplication.
+- **Unit Test Coverage for Missing Claim Numbers**: Added unit tests in `tests/actionsAgentMailAndDispatcher.test.ts` and `tests/convexClaimsFull.test.ts` verifying correct inbound routing when `claimNumber` is missing from subject lines (both via `threadId` and recipient fallback).
+- **Reactive Appeal Brief Resolution in AgentMail Dispatch UI**: Fixed client-side disabled state on the "Transmit to AI Payer Reviewer" and "Print Docket" buttons in `src/components/communications/AgentMailDrawer.tsx` and `src/hooks/useClaims.ts`. Resolved `selectedClaimDetail` through `api.claims.getById` and integrated direct reactive `api.appeals.getLatestByClaim` subscription in `AgentMailDrawer.tsx`, ensuring `effectiveAppeal` is immediately populated even when navigating from list queries that do not join deep appeal objects.
+- **Full Verification**: 100% PASS with `npm run verify` (typecheck, ESLint, 363/363 passing unit tests across 26 test suites, and Vite production bundle build). Convex features: database schema, relational indexes, queries, internalQuery, mutations, internalMutation, actions, internalAction, reactive subscriptions, static hosting.
 
 
 

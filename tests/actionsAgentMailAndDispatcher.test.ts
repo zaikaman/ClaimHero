@@ -160,6 +160,110 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         status: "won",
       }));
     });
+
+    it("processInboundClaimReply: routes correctly via threadId match when claimNumber is missing from subject", async () => {
+      process.env.AGENTMAIL_INTAKE_INBOX_ID = "inbox_intake";
+      process.env.AGENTMAIL_INTAKE_EMAIL = "intake@claimhero.com";
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_reply_2",
+        thread_id: "thread_agentmail_99",
+        inbox_id: "inbox_case_1",
+        from: "payer_appeals@united.com",
+        recipients: ["claims-desk@claimhero.com"],
+        to: ["claims-desk@claimhero.com"],
+        subject: "General Inquiry regarding medical documents",
+        text: "Please find attached our update.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_reply_2",
+        messageId: "msg_reply_2",
+        threadId: "thread_agentmail_99",
+        inboxId: "inbox_case_1",
+        from: "payer_appeals@united.com",
+        recipients: ["claims-desk@claimhero.com"],
+        subject: "General Inquiry regarding medical documents",
+        text: "Please find attached our update.",
+        attachments: [],
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args.threadId === "thread_agentmail_99") {
+            return Promise.resolve({ _id: "claim_thread_match", claimNumber: "CH-88899" });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue("id_2"),
+      };
+
+      const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_reply_2",
+        messageId: "msg_reply_2",
+        inboxId: "inbox_case_1",
+      });
+
+      expect(res).toBeNull();
+      expect(mockCtx.runQuery).toHaveBeenCalledWith(expect.anything(), { threadId: "thread_agentmail_99" });
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        claimId: "claim_thread_match",
+        status: "dispatched",
+      }));
+    });
+
+    it("processInboundClaimReply: routes correctly via recipient exact match fallback when claimNumber is missing and threadId unmatched", async () => {
+      process.env.AGENTMAIL_INTAKE_INBOX_ID = "inbox_intake";
+      process.env.AGENTMAIL_INTAKE_EMAIL = "intake@claimhero.com";
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_reply_3",
+        inbox_id: "inbox_case_1",
+        from: "payer_appeals@united.com",
+        recipients: ["special-assigned-case@claimhero.com"],
+        to: ["special-assigned-case@claimhero.com"],
+        subject: "Medical Record Follow-up with no claim id",
+        text: "We received the documents.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_reply_3",
+        messageId: "msg_reply_3",
+        inboxId: "inbox_case_1",
+        from: "payer_appeals@united.com",
+        recipients: ["special-assigned-case@claimhero.com"],
+        subject: "Medical Record Follow-up with no claim id",
+        text: "We received the documents.",
+        attachments: [],
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args.email === "special-assigned-case@claimhero.com") {
+            return Promise.resolve({ _id: "claim_recipient_match", claimNumber: "CH-77766" });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue("id_3"),
+      };
+
+      const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_reply_3",
+        messageId: "msg_reply_3",
+        inboxId: "inbox_case_1",
+      });
+
+      expect(res).toBeNull();
+      expect(mockCtx.runQuery).toHaveBeenCalledWith(expect.anything(), { email: "special-assigned-case@claimhero.com" });
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        claimId: "claim_recipient_match",
+        status: "dispatched",
+      }));
+    });
   });
 
   describe("convex/actions/mailDispatcher", () => {
@@ -218,6 +322,15 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
 
       expect(receipt.status).toBe("delivered");
       expect(receipt.adjudicationDetermination).toBe("OVERTURNED_APPROVED");
+      expect(receipt.subject).toContain("[ClaimHero #CLM-100]");
+      expect(libAgentMail.sendAgentMailMessage).toHaveBeenCalledWith(expect.objectContaining({
+        subject: expect.stringContaining("[ClaimHero #CLM-100]"),
+        text: expect.stringContaining("[ClaimHero #CLM-100]"),
+      }));
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        claimId: "c1",
+        agentMailThreadId: "live_msg_1",
+      }));
       expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: "won" }));
     });
 
@@ -274,6 +387,14 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
 
       expect(res.success).toBe(true);
       expect(res.adjudicationDetermination).toBe("OVERTURNED_APPROVED");
+      expect(libAgentMail.sendAgentMailMessage).toHaveBeenCalledWith(expect.objectContaining({
+        subject: expect.stringContaining("[ClaimHero #CLM-100]"),
+        text: expect.stringContaining("[ClaimHero #CLM-100]"),
+      }));
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        claimId: "c1",
+        agentMailThreadId: "live_msg_2",
+      }));
     });
   });
 });

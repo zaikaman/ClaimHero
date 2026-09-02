@@ -1,4 +1,7 @@
 import React, { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
 import {
   Envelope,
   PaperPlaneTilt,
@@ -17,7 +20,7 @@ import {
   Info,
   Robot,
 } from "@phosphor-icons/react";
-import { Claim, EmailMessage, EmailThread } from "../../types";
+import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
 import { getPayerAppellateContact } from "../../lib/constants";
 import { isAiAdjudicatorAddress } from "../../../convex/lib/aiAdjudicator";
@@ -70,6 +73,12 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL ||
     "";
 
+  const appealFromDb = useQuery(
+    api.appeals.getLatestByClaim,
+    claim?._id ? { claimId: claim._id as Id<"claims"> } : "skip"
+  ) as Appeal | null | undefined;
+  const effectiveAppeal: Appeal | null = (claim.latestAppeal || appealFromDb || null) as Appeal | null;
+
   const payerName = claim.patient?.insurancePayer || "Health Insurer";
   const defaultPayerContact = getPayerAppellateContact(payerName);
   const payerContact = claim.payerContact || defaultPayerContact;
@@ -106,7 +115,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   };
 
   const handleCopyBrief = () => {
-    const briefText = claim.latestAppeal?.fullAppealMarkdown;
+    const briefText = effectiveAppeal?.fullAppealMarkdown;
     if (!briefText) return;
     navigator.clipboard.writeText(briefText);
     setCopiedBrief(true);
@@ -220,7 +229,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 size="sm"
                 variant="outline"
                 onClick={handleCopyBrief}
-                disabled={!claim.latestAppeal}
+                disabled={!effectiveAppeal}
                 className="h-8 rounded-md text-xs px-2.5 gap-1.5 shrink-0"
               >
                 {copiedBrief ? (
@@ -235,8 +244,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 size="sm"
                 variant="outline"
                 onClick={() => setIsExportDrawerOpen(true)}
-                disabled={!claim.latestAppeal}
-                title={claim.latestAppeal ? "Open formal court-ready appeal dossier & print docket" : "Synthesize appeal brief in studio first"}
+                disabled={!effectiveAppeal}
+                title={effectiveAppeal ? "Open formal court-ready appeal dossier & print docket" : "Synthesize appeal brief in studio first"}
                 className="h-8 rounded-md text-xs px-2.5 gap-1.5 shrink-0"
               >
                 <Printer className="size-3.5" />
@@ -386,7 +395,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             <Button
               size="sm"
               onClick={handleRunDispatch}
-              disabled={isDispatching || !canDispatch || !claim.latestAppeal}
+              disabled={isDispatching || !canDispatch || !effectiveAppeal}
               className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9 px-4"
             >
               {isDispatching ? (
@@ -839,8 +848,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         isOpen={isExportDrawerOpen}
         onClose={() => setIsExportDrawerOpen(false)}
         claim={claim}
-        appeal={claim.latestAppeal || null}
-        markdownContent={claim.latestAppeal?.fullAppealMarkdown || ""}
+        appeal={effectiveAppeal}
+        markdownContent={effectiveAppeal?.fullAppealMarkdown || ""}
         onProceedToDispatch={() => {
           setIsExportDrawerOpen(false);
         }}

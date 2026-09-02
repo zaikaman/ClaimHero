@@ -244,6 +244,23 @@ export const listAllInternal = internalQuery({
 });
 
 /**
+ * Internal query to lookup a claim directly by AgentMail thread / message ID using the by_threadId index
+ */
+export const getByThreadIdInternal = internalQuery({
+  args: {
+    threadId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const trimmed = args.threadId.trim();
+    if (!trimmed) return null;
+    return await ctx.db
+      .query("claims")
+      .withIndex("by_threadId", (q) => q.eq("agentMailThreadId", trimmed))
+      .first();
+  },
+});
+
+/**
  * Internal query to lookup a claim directly by claim number using the by_claim_number index
  */
 export const getByClaimNumberInternal = internalQuery({
@@ -295,18 +312,30 @@ export const getByInboxEmailInternal = internalQuery({
 
 /**
  * Robust, production-grade internal query for matching inbound AgentMail webhook messages to claims.
- * Uses canonical indexed lookups first (claimNumber and dedicated recipient email indexes),
- * falling back to bounded content scanning without relying on undefined index equality.
+ * 1) Tries threadId match first via by_threadId index.
+ * 2) Falls back to explicit claim number or subject regex (#CH-\d+, [ClaimHero #...], CLM-...).
+ * 3) Falls back to dedicated recipient indexed lookups.
+ * 4) Bounded content scan.
  */
 export const findMatchingClaimInternal = internalQuery({
   args: {
+    threadId: v.optional(v.string()),
     subject: v.optional(v.string()),
     bodySnippet: v.optional(v.string()),
     recipients: v.array(v.string()),
     claimNumber: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // 1. Direct match by explicit claim number if provided
+    // 1. Thread ID lookup first
+    if (args.threadId?.trim()) {
+      const byThread = await ctx.db
+        .query("claims")
+        .withIndex("by_threadId", (q) => q.eq("agentMailThreadId", args.threadId!.trim()))
+        .first();
+      if (byThread) return byThread;
+    }
+
+    // 2. Direct match by explicit claim number if provided
     if (args.claimNumber?.trim()) {
       const direct = await ctx.db
         .query("claims")
@@ -315,9 +344,11 @@ export const findMatchingClaimInternal = internalQuery({
       if (direct) return direct;
     }
 
-    // 2. Extract potential claim numbers from subject and body using standard regex patterns
+    // 3. Extract potential claim numbers from subject and body using standard regex patterns
     const textToScan = `${args.subject || ""} ${args.bodySnippet || ""}`;
     const claimPatterns = [
+      /#(CH-\d+)/gi,
+      /\[ClaimHero\s*#([^\]]+)\]/gi,
       /(?:claim|case|ref|file|tracking)[\s#:.-]*([A-Z0-9_-]{4,30})/gi,
       /\b(CLM-[A-Z0-9-]{3,20})\b/gi,
     ];
@@ -335,7 +366,7 @@ export const findMatchingClaimInternal = internalQuery({
       }
     }
 
-    // 3. Match across recipient email addresses using dedicated email indexes
+    // 4. Match across recipient email addresses using dedicated email indexes
     for (const rawRecipient of args.recipients) {
       const normalized = rawRecipient.trim().toLowerCase();
       if (!normalized) continue;
@@ -359,7 +390,7 @@ export const findMatchingClaimInternal = internalQuery({
       if (byAssigned) return byAssigned;
     }
 
-    // 4. Fallback: Scan recent claims and check if any claim's claimNumber appears in subject/body
+    // 5. Fallback: Scan recent claims and check if any claim's claimNumber appears in subject/body
     const recentClaims = await ctx.db
       .query("claims")
       .withIndex("by_created")
@@ -696,6 +727,7 @@ export const setAgentMailInboxes = internalMutation({
     claimInboxEmail: v.optional(v.string()),
     adjudicatorInboxId: v.optional(v.string()),
     adjudicatorEmail: v.optional(v.string()),
+    agentMailThreadId: v.optional(v.string()),
     status: v.string(),
     error: v.optional(v.string()),
   },
@@ -722,7 +754,27 @@ export const setAgentMailInboxes = internalMutation({
     if (args.adjudicatorEmail !== undefined) {
       patchData.agentMailAdjudicatorEmail = args.adjudicatorEmail;
     }
+    if (args.agentMailThreadId !== undefined) {
+      patchData.agentMailThreadId = args.agentMailThreadId;
+    }
     await ctx.db.patch(args.claimId, patchData);
+    return null;
+  },
+});
+
+/**
+ * Internal mutation to save AgentMail messageId / threadId to a claim for bidirectional thread routing
+ */
+export const setAgentMailThreadIdInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    agentMailThreadId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.claimId, {
+      agentMailThreadId: args.agentMailThreadId,
+    });
     return null;
   },
 });

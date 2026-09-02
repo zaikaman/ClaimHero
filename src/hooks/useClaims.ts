@@ -155,11 +155,30 @@ export function useClaims(options?: {
     return counts;
   }, [rawClaims, rawPortfolioStats, options?.payerFilter, searchQuery]);
 
-  // Active selected claim
-  const selectedClaim = useMemo(() => {
+  // Active selected claim with deep resolution of latestAppeal and evidenceCount
+  const rawSelectedClaim = useMemo(() => {
     if (!rawClaims || rawClaims.length === 0) return null;
     return rawClaims.find((c) => c._id === selectedClaimId) || rawClaims[0] || null;
   }, [rawClaims, selectedClaimId]);
+
+  const selectedClaimDetail = useQuery(
+    api.claims.getById,
+    rawSelectedClaim?._id ? { claimId: rawSelectedClaim._id as Id<"claims"> } : "skip"
+  ) as Claim | null | undefined;
+
+  const selectedClaim: Claim | null = useMemo(() => {
+    if (!rawSelectedClaim) return null;
+    if (selectedClaimDetail) {
+      return {
+        ...rawSelectedClaim,
+        ...selectedClaimDetail,
+        patient: selectedClaimDetail.patient || rawSelectedClaim.patient,
+        latestAppeal: selectedClaimDetail.latestAppeal || rawSelectedClaim.latestAppeal,
+        evidenceCount: selectedClaimDetail.evidenceCount ?? rawSelectedClaim.evidenceCount,
+      } as Claim;
+    }
+    return rawSelectedClaim;
+  }, [rawSelectedClaim, selectedClaimDetail]);
 
   // Real Convex mutation & action hooks
   const generateUploadUrlMutation = useMutation(api.claims.generateUploadUrl);

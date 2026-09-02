@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-360%2F360%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-363%2F363%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -199,7 +199,7 @@ Convex is not an addon; it *is* the backend. Every feature is a Convex primitive
 
 | Convex Feature | Where it lives | What it does |
 |---|---|---|
-| **Schema & Relational Indexes** | `convex/schema.ts:5` | 9 tables + 20+ secondary indexes (`by_user`, `by_user_status`, `by_user_updated`, `by_inbox_email`, `by_adjudicator_email`, `by_assigned_agent_email`, `by_claim`, `by_claim_and_timestamp`, `by_claimId_and_appealLevel`, `by_created`, `by_updated`, etc.) ensuring zero unindexed table scans |
+| **Schema & Relational Indexes** | `convex/schema.ts:5` | 9 tables + 20+ secondary indexes (`by_user`, `by_user_status`, `by_user_updated`, `by_inbox_email`, `by_adjudicator_email`, `by_assigned_agent_email`, `by_threadId`, `by_claim`, `by_claim_and_timestamp`, `by_claimId_and_appealLevel`, `by_created`, `by_updated`, etc.) ensuring zero unindexed table scans |
 | **Vector Search (1536-d)** | `convex/schema.ts:279` `precedents.vectorIndex("by_embedding", { dimensions: 1536 })` | Native `ctx.vectorSearch` in `precedentArchive.ts` returns top-3 matches; re-ranked by ICD/CPT/CARC overlap (`convex/lib/embeddings.ts:rankPrecedentHits`) |
 | **Full-Text Search Index** | `convex/schema.ts:155, 174, 284` `.searchIndex()` | Native Convex `.withSearchIndex()` on `claims` (`search_claims`), `clinicalEvidences` (`search_evidence`), and `precedents` (`search_precedents`) for instant server-side lexical filtering |
 | **Rate Limiter Component** | `convex/convex.config.ts`, `convex/lib/rateLimiter.ts` | `@convex-dev/rate-limiter` token-bucket limits guarding heavy AI, OCR, Firecrawl, and AgentMail endpoints |
@@ -253,11 +253,19 @@ ClaimHero configures dedicated AgentMail inboxes (`convex/actions/agentMail.ts`,
 | **Custom Email** (`custom_email`) | Any address you type (e.g., `judge@hackathon.com`) | Same REST path from `claimhero-sender@agentmail.to`; thread `agentEmail`/`payerEmail` tracking | Real email in your inbox; reply and watch `/agentmail-webhook` append it to the thread |
 | **Official Payer** (`official_payer`) | Verified `payerContact.officialAppealsEmail` (Molina, GeoBlue, BCBS Global Core) or portal/fax/PO box with provenance badges (`Verified Gateway`, `Firecrawl Discovered`, `Extracted from Document`, `Unresolved Gateway`) | Guarded `dispatchAppealPacket` (`mailDispatcher.ts`) refuses to email `unknown@` and switches CTA to *Copy Brief for Portal / Print Docket* | Truthful *Email Prohibited by Payer under HIPAA* or *Unresolved Gateway* state when appropriate (`AgentMailDrawer.tsx`) |
 
-**Inbound:**
+**Outbound Hardening & Bidirectional Correlation:**
+* Universal Claim Tagging — Every outbound message automatically injects `[ClaimHero #${claimNumber}]` into the email subject and footer (`convex/actions/mailDispatcher.ts`, `convex/lib/appealEmail.ts`), guaranteeing reliable case correlation across third-party payer systems.
+* Thread ID Persistence — Outbound transmissions automatically record AgentMail `messageId` and `threadId` to `claims.agentMailThreadId` (`schema.ts:58`), enabling indexed reverse lookups on inbound responses.
 
-* Intake path — `processInboundIntake` (`convex/actions/agentMail.ts`) handles denial email bodies + PDF/image/text attachments, re-fetches from AgentMail, stores in `_storage`, runs `opticalParser`, creates case, idempotent via `agentMailIntakeEvents` (`schema.ts:232`).
-* Reply path — `processInboundClaimReply` matches by claim number in subject+body, recognizes adjudicator mailbox, inserts `emailMessages` with `direction: inbound`, flips `claims.status` on victory keywords, and reindexes into `precedents`.
-* Webhook — `POST /agentmail-webhook` (`http.ts:19`) normalizes via `normalizeAgentMailWebhook` (`agentMailWebhook.ts`), fast `202 Accepted`, then `scheduler.runAfter(0, ...)` so AgentMail never waits.
+**Inbound Routing & Hierarchy:**
+* Intake path — `processInboundIntake` (`convex/actions/agentMail.ts`) handles denial email bodies + PDF/image/text attachments, validates intake inbox recipient (`inboxId === intakeMailbox.inboxId`), re-fetches from AgentMail, stores in `_storage`, runs `opticalParser`, creates case, and ensures idempotency via `agentMailIntakeEvents` (`schema.ts:232`).
+* Reply path — `processInboundClaimReply` implements a strict 4-step routing hierarchy:
+  1. *Thread ID Index Lookup* — Resolves claim instantly via `getByThreadIdInternal` matching `claims.agentMailThreadId`.
+  2. *Subject Regex Extraction* — Matches `/#(CH-\d+)/i` and `[ClaimHero #...]` via `getByClaimNumberInternal`.
+  3. *Recipient Exact Match* — Matches dedicated assigned and routing addresses via `getByInboxEmailInternal`.
+  4. *Bounded Content Fallback* — Scans recent cases for claim numbers in email text without full-table scans.
+  Upon recognition, it inserts `emailMessages` (`direction: inbound`), updates `claims.status` on victory keywords, and automatically reindexes won cases into the `precedents` archive.
+* Webhook — `POST /agentmail-webhook` (`http.ts:19`) verifies Svix HMAC signatures, normalizes payloads via `normalizeAgentMailWebhook` (`agentMailWebhook.ts`), returns fast `202 Accepted`, and dispatches work via `scheduler.runAfter(0, ...)`.
 
 Follow-up addenda to adjudication addresses reload full thread history and re-run structured OpenAI adjudication (`mailDispatcher.ts:deliverAiAdjudication`, `lib/aiAdjudicator.ts`).
 
@@ -298,7 +306,7 @@ claims: { userId?, patientId, claimNumber, serviceDate, providerName,
           deniedAmount, patientOwedAmount, cptCodes[], icd10Codes[],
           denialReasonCode, denialReasonDescription, status, statutoryDeadline, daysRemaining,
           overturnProbabilityScore?, riskLevel?, scoringBreakdown?[],
-          assignedAgentEmail, agentMailInboxId?, agentMailInboxEmail?, agentMailAdjudicator*?,
+          assignedAgentEmail, agentMailInboxId?, agentMailInboxEmail?, agentMailAdjudicator*?, agentMailThreadId?,
           denialLetterStorageId?, appealContext?{sender, clinicalFacts, physicianNotes},
           payerContact?{officialAppealsEmail?, intakePortalUrl?, appealsFax?, statutoryPoBox?, ediPayerId?},
           redactionMetadata?, financialLiability?, erisaPenalties? }
@@ -452,7 +460,7 @@ ClaimHero/
 │   │   ├── layout/ (Shell, Sidebar, Header) + ui/* (Button, Card, Badge, Dialog, Select, Silk)
 │   │   └── onboarding/ (OnboardingWizard, OnboardingChecklist)
 │   └── types/index.ts
-├── tests/                        # 356 unit tests across 26 suites (vitest)
+├── tests/                        # 363 unit tests across 26 suites (vitest)
 ├── .env.example                  # all required keys documented
 ├── convex.json / vite.config.ts / tailwind.config.js / tsconfig.json
 ├── BRIEF.md / hackathon.md / README.md
@@ -540,12 +548,12 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (360 tests)
+npm run test            # vitest run tests  (363 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **360/360 passing** across 26 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
+Current: **363/363 passing** across 26 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
@@ -558,7 +566,7 @@ Current: **360/360 passing** across 26 comprehensive test suites covering end-to
 | [`tests/convexClinicalEvidences.test.ts`](file:///d:/ClaimHero/tests/convexClinicalEvidences.test.ts) | 16 | Clinical evidence clause sanitization, batch insertions, search indexes, deletion, and source counting |
 | [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest, out-of-pocket maximum offsets, and No Surprises Act protections |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking, and API key validation |
-| [`tests/convexClaimsFull.test.ts`](file:///d:/ClaimHero/tests/convexClaimsFull.test.ts) | 13 | Claims CRUD, financial liability calculations, ERISA penalty tracking, bounded pagination, and deadline sweeps |
+| [`tests/convexClaimsFull.test.ts`](file:///d:/ClaimHero/tests/convexClaimsFull.test.ts) | 13 | Claims CRUD, financial liability calculations, ERISA penalty tracking, `by_threadId` index queries, `setAgentMailThreadIdInternal` mutations, bounded pagination, and deadline sweeps |
 | [`tests/convexAuditLogsAndUsers.test.ts`](file:///d:/ClaimHero/tests/convexAuditLogsAndUsers.test.ts) | 12 | Immutable audit trail logging, user profile management, crons registration, and auth methods |
 | [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, and 3-tier appellate escalation |
 | [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting (cents precision), statutory countdown math, risk badge styling, and payer appellate contact directory lookup |
@@ -566,13 +574,13 @@ Current: **360/360 passing** across 26 comprehensive test suites covering end-to
 | [`tests/convexHttp.test.ts`](file:///d:/ClaimHero/tests/convexHttp.test.ts) | 9 | Svix HMAC-SHA256 signature verification, AgentMail intake webhooks, claim replies, and error handling |
 | [`tests/convexP2P.test.ts`](file:///d:/ClaimHero/tests/convexP2P.test.ts) | 9 | Live call sessions, real-time transcripts, fast answers, checklist scoring, and tele-scripts |
 | [`tests/convexPrecedents.test.ts`](file:///d:/ClaimHero/tests/convexPrecedents.test.ts) | 9 | Vector matching attachments, corpus key lookup, hydration, and search index |
-| [`tests/actionsAgentMailAndDispatcher.test.ts`](file:///d:/ClaimHero/tests/actionsAgentMailAndDispatcher.test.ts) | 7 | AgentMail actions, attachment download, transmission dispatching, and thread resolution |
+| [`tests/actionsAgentMailAndDispatcher.test.ts`](file:///d:/ClaimHero/tests/actionsAgentMailAndDispatcher.test.ts) | 9 | AgentMail actions, attachment download, transmission dispatching, bidirectional threadId routing, missing claimNumber fallback matching, and universal `[ClaimHero #${claimNumber}]` subject/footer injection |
 | [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, and STT tolerance |
 | [`tests/p2pDefense.test.ts`](file:///d:/ClaimHero/tests/p2pDefense.test.ts) | 6 | Physician tele-script generator, statutory opening, and pocket cheat sheet print |
 | [`tests/sentinelChatbot.test.ts`](file:///d:/ClaimHero/tests/sentinelChatbot.test.ts) | 6 | Agentic OpenAI tool calling (10 tools), Firecrawl live search/scrape schemas, and lean prompt builder |
 | [`tests/actionsClinicalAndParser.test.ts`](file:///d:/ClaimHero/tests/actionsClinicalAndParser.test.ts) | 5 | Clinical intake question generation, optical parser vision extraction, and payer contact resolver |
 | [`tests/statutoryEscalation.test.ts`](file:///d:/ClaimHero/tests/statutoryEscalation.test.ts) | 5 | 180-day internal appeal to Level 3 DOI escalation state machine |
-| [`tests/actionsPolicyAndSynthesizer.test.ts`](file:///d:/ClaimHero/tests/actionsPolicyAndSynthesizer.test.ts) | 4 | Policy crawler scraping, PubMed research, FDA package insert extraction, and appeal brief synthesis |
+| [`tests/actionsPolicyAndSynthesizer.test.ts`](file:///d:/ClaimHero/tests/actionsPolicyAndSynthesizer.test.ts) | 5 | Policy crawler multi-tier search query generation, Carelon/NASS clinical candidate selection, student safety filtering, PubMed research, and appeal brief synthesis |
 | [`tests/actionsPrecedentsAndPipeline.test.ts`](file:///d:/ClaimHero/tests/actionsPrecedentsAndPipeline.test.ts) | 8 | Precedent vector indexing, 4-pillar evidence-proportional rubric matching, zero/weak/strong evidence testing, and autonomous pipeline orchestration |
 | [`tests/actionsP2PAndChatbot.test.ts`](file:///d:/ClaimHero/tests/actionsP2PAndChatbot.test.ts) | 4 | Physician P2P defense generation, live copilot fast answers, interactive pushback, and multi-turn agentic chatbot |
 
@@ -603,19 +611,19 @@ The chronological, evidence-based build log lives at **`hackathon.md`** (repo ro
 
 ---
 
-## 18. Submission Checklist (BRIEF.md §5)
+## 18. Submission Checklist 
 
 | Requirement | Status | Evidence |
 |---|---|---|
 | **Public GitHub repo** | Done | https://github.com/zaikaman/ClaimHero — clean code, zero fake fallbacks, all 4 pillars performing production work |
 | **`hackathon.md` at root** | Done | 280+ lines, UTC timestamps, per-commit hashes, `hackathon.md:1` |
-| **Live `convex.site` URL** | Ready to Deploy | `convex.json` + `vite.config.ts` + Convex static hosting |
+| **Live `convex.site` URL** | Done | `convex.json` + `vite.config.ts` + Convex static hosting |
 | **3-minute demo video** | Prepared | Walkthrough under 3 minutes clicking through live denial intake, crawl, synthesis, and dispatch |
 | **Social proof (X/LinkedIn)** | Prepared | Public build and launch thread showcasing architecture and live app |
 
 ---
 
-## 19. How ClaimHero Maps to Judging Criteria (BRIEF.md §6)
+## 19. How ClaimHero Maps to Judging Criteria 
 
 | Official Criterion | How ClaimHero Over-Delivers |
 |---|---|

@@ -1,5 +1,6 @@
 export interface AgentMailSendResult {
   messageId?: string;
+  threadId?: string;
 }
 
 export interface SharedAgentMailboxes {
@@ -116,6 +117,7 @@ export async function sendAgentMailMessage(options: {
 
   return {
     messageId: responseField(body, "message_id", "messageId", "id"),
+    threadId: responseField(body, "thread_id", "threadId", "conversation_id", "conversationId"),
   };
 }
 

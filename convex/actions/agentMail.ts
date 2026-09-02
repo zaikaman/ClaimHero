@@ -3,7 +3,7 @@
 import { internalAction } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { v } from "convex/values";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import {
   downloadAgentMailAttachment,
   getAgentMailMessage,
@@ -238,14 +238,57 @@ export const processInboundClaimReply = internalAction({
       (recipient) => extractEmailAddress(recipient) || recipient.toLowerCase()
     );
 
-    const matchingClaim = await ctx.runQuery(
-      internal.claims.findMatchingClaimInternal,
-      {
-        subject,
-        bodySnippet: bodyContent.slice(0, 1000),
-        recipients: recipientEmails,
+    let matchingClaim: Doc<"claims"> | null = null;
+    const inboundThreadId =
+      normalized.threadId ||
+      (typeof message.thread_id === "string" ? message.thread_id : undefined) ||
+      (typeof message.threadId === "string" ? message.threadId : undefined) ||
+      (typeof message.in_reply_to === "string" ? message.in_reply_to : undefined);
+
+    // 1. Try threadId match first
+    if (inboundThreadId) {
+      matchingClaim = await ctx.runQuery(internal.claims.getByThreadIdInternal, {
+        threadId: inboundThreadId,
+      });
+    }
+
+    // 2. Fallback to subject regex /#CH-\d+/ (and [ClaimHero #...])
+    if (!matchingClaim && subject) {
+      const chMatch =
+        subject.match(/#(CH-\d+)/i) ||
+        subject.match(/\[ClaimHero\s*#([^\]]+)\]/i) ||
+        subject.match(/#(CLM-[A-Za-z0-9-]+)/i) ||
+        subject.match(/(CH-\d+)/i);
+      if (chMatch && chMatch[1]) {
+        matchingClaim = await ctx.runQuery(internal.claims.getByClaimNumberInternal, {
+          claimNumber: chMatch[1].trim(),
+        });
       }
-    );
+    }
+
+    // 3. Fallback to recipient exact match
+    if (!matchingClaim) {
+      for (const recipient of recipientEmails) {
+        matchingClaim = await ctx.runQuery(internal.claims.getByInboxEmailInternal, {
+          email: recipient,
+        });
+        if (matchingClaim) break;
+      }
+    }
+
+    // 4. Fallback to findMatchingClaimInternal
+    if (!matchingClaim) {
+      matchingClaim = await ctx.runQuery(
+        internal.claims.findMatchingClaimInternal,
+        {
+          threadId: inboundThreadId,
+          subject,
+          bodySnippet: bodyContent.slice(0, 1000),
+          recipients: recipientEmails,
+        }
+      );
+    }
+
     if (!matchingClaim) {
       console.warn(`No ClaimHero case matched inbound AgentMail message ${args.messageId}.`);
       return null;

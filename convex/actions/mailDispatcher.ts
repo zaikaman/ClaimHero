@@ -178,11 +178,15 @@ async function deliverAiAdjudication(
     temperature: 0.1,
   });
 
-  const determinationSubject = `RE: Formal Medical Appeal | Claim #${claim.claimNumber} | ${
+  const claimTag = `[ClaimHero #${claim.claimNumber}]`;
+  const rawDeterminationSubject = `RE: Formal Medical Appeal | Claim #${claim.claimNumber} | ${
     adjudicationResult.determination === "OVERTURNED_APPROVED"
       ? "Appeal Overturned"
       : "Additional Records Requested"
   }`;
+  const determinationSubject = rawDeterminationSubject.includes(claimTag)
+    ? rawDeterminationSubject
+    : `${claimTag} ${rawDeterminationSubject}`;
 
   const determinationEmail = formatCorrespondenceEmail(
     adjudicationResult.formalDeterminationLetter,
@@ -208,6 +212,14 @@ async function deliverAiAdjudication(
     text: determinationEmail.text,
     html: determinationEmail.html,
   });
+
+  const replyThreadId = liveReply.threadId || liveReply.messageId;
+  if (replyThreadId) {
+    await ctx.runMutation(internal.claims.setAgentMailThreadIdInternal, {
+      claimId: claim._id,
+      agentMailThreadId: replyThreadId,
+    });
+  }
 
   await ctx.runMutation(internal.emails.insertMessageInternal, withAgentMailMessageId({
     threadId,
@@ -316,9 +328,11 @@ export const dispatchAppealPacket = action({
       throw new Error(`No email recipient is configured for claim ${claim.claimNumber}.`);
     }
     const finalRecipient = recipient;
-    const subject =
+    const claimTag = `[ClaimHero #${claim.claimNumber}]`;
+    const rawSubject =
       args.customSubject ||
       `Appeal request | Claim #${claim.claimNumber} | ${payer}`;
+    const subject = rawSubject.includes(claimTag) ? rawSubject : `${claimTag} ${rawSubject}`;
     const transmissionId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const appealEmail = formatAppealEmail(appeal.fullAppealMarkdown, {
       claimNumber: claim.claimNumber,
@@ -338,6 +352,14 @@ export const dispatchAppealPacket = action({
       text: appealEmail.text,
       html: appealEmail.html,
     });
+
+    const recordedThreadId = liveTransmission.threadId || liveTransmission.messageId;
+    if (recordedThreadId) {
+      await ctx.runMutation(internal.claims.setAgentMailThreadIdInternal, {
+        claimId: args.claimId,
+        agentMailThreadId: recordedThreadId,
+      });
+    }
 
     // 3. Ensure email thread exists
     const threadId = await ctx.runMutation(internal.emails.getOrCreateThreadInternal, {
@@ -440,7 +462,9 @@ export const sendOutboundMessage = action({
       args.customRecipient ||
       threadData?.thread?.payerEmail ||
       claim.payerContact?.officialAppealsEmail;
-    const subject = args.customSubject || `Re: Formal Medical Appeal | Claim #${claim.claimNumber} | Addendum`;
+    const claimTag = `[ClaimHero #${claim.claimNumber}]`;
+    const rawSubject = args.customSubject || `Re: Formal Medical Appeal | Claim #${claim.claimNumber} | Addendum`;
+    const subject = rawSubject.includes(claimTag) ? rawSubject : `${claimTag} ${rawSubject}`;
     const payer = claim.patient?.insurancePayer || "Health Insurer";
     const correspondenceEmail = formatCorrespondenceEmail(args.text, {
       claimNumber: claim.claimNumber,
@@ -473,6 +497,14 @@ export const sendOutboundMessage = action({
       text: correspondenceEmail.text,
       html: correspondenceEmail.html,
     });
+
+    const recordedThreadId = liveTransmission.threadId || liveTransmission.messageId;
+    if (recordedThreadId) {
+      await ctx.runMutation(internal.claims.setAgentMailThreadIdInternal, {
+        claimId: args.claimId,
+        agentMailThreadId: recordedThreadId,
+      });
+    }
 
     const threadId = await ctx.runMutation(internal.emails.getOrCreateThreadInternal, {
       claimId: args.claimId,
