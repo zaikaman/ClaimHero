@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T04:40:00Z
+- **Last updated:** 2026-09-02T05:01:00Z
 
 ## Log
 
@@ -352,12 +352,25 @@ Resolved F1 defect by decoupling AgentMail sender and adjudicator fallbacks from
 - **CI/CD Pipeline Environment Wiring**: Configured `.github/workflows/deploy.yml` and `.github/workflows/ci.yml` with `VITE_AGENTMAIL_*` and `VITE_CONVEX_*` variable bindings and fallback defaults for deterministic builds on GitHub Actions runners.
 - **Firecrawl Real-Time Failure Propagation in Sentinel Chatbot**: Eliminated synthetic directory fallbacks (`firecrawl_citable_directory` with hardcoded `aetna.com/cpb`) in `performFirecrawlWebSearch` and synthetic success responses (`markdownSnippet: "Scraped clinical content..."`, `success: true`) in `performFirecrawlScrapeUrl` within `convex/actions/sentinelChatbot.ts`. Both functions now fail transparently on errors or empty crawls with descriptive error details rather than fabricating data or masking outages. Verified with `npm run verify` (100% typecheck, ESLint, 213/213 passing unit tests, and production build). Convex features: actions, components, static hosting.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 853576f
 Eliminated duplicate ERISA statutory fallbacks and error masking across Clinical Policy Bulletin (CPB) crawling and the autonomous Sentinel pipeline (`convex/actions/policyCrawler.ts`, `convex/actions/sentinelPipeline.ts`):
 - **Transparent CPB Crawler Error Propagation**: Removed the broad `try/catch` block in `crawlInsurerPolicy` (`convex/actions/policyCrawler.ts`) that previously intercepted all search errors, 429 rate limits, and missing document results, inserted an ERISA legal precedent, and faked a successful CPB crawl (`policyTitle: "ERISA Statutory..."`). The action now throws descriptive, authentic errors (e.g. rate limit, search failure, or inaccessible document) directly to callers.
 - **Centralized ERISA Statutory Evidence Constant**: Exported `ERISA_STATUTORY_EVIDENCE` from `policyCrawler.ts` to provide a single, type-safe source of truth for the baseline ERISA 29 CFR § 2560.503-1 statutory protocol across successful CPB crawls, multi-source hub crawls, and pipeline fallback handlers.
 - **Architectural Fallback Layering in Sentinel Pipeline**: Structured fallback orchestration cleanly at the pipeline level (`sentinelPipeline.ts`). When `crawlInsurerPolicy` encounters an outage or inaccessible CPB, the pipeline catches the error, transparently updates the claim status audit trail (`Policy crawl unavailable: ... Proceeding with statutory precedent only`), indexes `ERISA_STATUTORY_EVIDENCE`, and proceeds with legal brief synthesis without masking the Firecrawl outage.
 - **Validation**: Verified end-to-end with `npm run verify` (100% clean typecheck, ESLint, 213/213 passing unit tests, and Vite production bundle). Convex features: actions, queries, mutations, internalMutation, components, static hosting.
+
+### 2026-09-02 - 8aaa656
+Enhanced OpenAI API configuration handling and embeddings resilience:
+- **Strict API Key Sanitization & Validation**: Ensured OpenAI API keys and custom endpoints are trimmed and validated before invocation across client wrappers.
+- **Embeddings Processing**: Enhanced vector embeddings generation and fallback error signaling for clinical precedent search.
+- **Validation**: Verified with test suite (`tests/openai.test.ts`).
+
+### 2026-09-02 - working tree
+Hardened AgentMail inbound webhook endpoint and published comprehensive threat model (`convex/http.ts`, `convex/convex.config.ts`, `docs/THREAT_MODEL.md`):
+- **Mandatory Webhook Secret Schema**: Updated `convex/convex.config.ts` to enforce `AGENTMAIL_WEBHOOK_SECRET: v.string()` as a required environment variable rather than optional, preventing unverified deployment configurations.
+- **Fail-Closed 401 Webhook Authentication**: Hardened `/agentmail-webhook` in `convex/http.ts` to return `401 Unauthorized` immediately if `AGENTMAIL_WEBHOOK_SECRET` is unset or empty, and unconditionally verify Svix v1 HMAC-SHA256 signatures with 300-second timestamp drift tolerance and constant-time string comparison (`timingSafeEqual`).
+- **Comprehensive Threat Modeling**: Documented complete asset inventory, attack vectors (STRIDE: spoofing, replay, side-channel timing, payload tampering, DoS), cryptographic controls, and zero-trust re-fetch architecture in `docs/THREAT_MODEL.md`.
+- **Validation**: Verified with full test suite (`tests/agentMail.test.ts`) and `npm run verify` (100% typecheck, ESLint, 214/214 passing unit tests, and production build). Convex features: httpRouter, actions, components, static hosting.
 
 
 

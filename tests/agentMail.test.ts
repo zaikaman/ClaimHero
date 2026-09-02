@@ -487,8 +487,8 @@ Paragraph text with **bold** and *italic*.
       expect(result.error).toContain("Missing required Svix signature headers");
     });
 
-    it("rejects when secret is empty or missing", async () => {
-      const result = await verifySvixWebhook({
+    it("rejects when secret is empty, undefined, or whitespace-only", async () => {
+      const resultEmpty = await verifySvixWebhook({
         payload: testPayload,
         headers: {
           "svix-id": "id_1",
@@ -498,8 +498,21 @@ Paragraph text with **bold** and *italic*.
         secret: "",
       });
 
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain("Webhook secret is not configured");
+      expect(resultEmpty.valid).toBe(false);
+      expect(resultEmpty.error).toContain("Webhook secret is not configured");
+
+      const resultWhitespace = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": "id_1",
+          "svix-timestamp": "1234567",
+          "svix-signature": "v1,abc",
+        },
+        secret: "   ",
+      });
+
+      expect(resultWhitespace.valid).toBe(false);
+      expect(resultWhitespace.error).toContain("Webhook secret is not configured");
     });
 
     it("rejects invalid or unparseable timestamp", async () => {

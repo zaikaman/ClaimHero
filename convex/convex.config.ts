@@ -9,7 +9,7 @@ const app = defineApp({
   env: {
     FIRECRAWL_API_KEY: v.string(),
     FIRECRAWL_WEBHOOK_SECRET: v.optional(v.string()),
-    AGENTMAIL_WEBHOOK_SECRET: v.optional(v.string()),
+    AGENTMAIL_WEBHOOK_SECRET: v.string(),
   },
 });
 

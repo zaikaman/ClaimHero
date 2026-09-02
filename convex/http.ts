@@ -26,22 +26,30 @@ http.route({
       const rawPayload = await request.text();
 
       const webhookSecret = process.env.AGENTMAIL_WEBHOOK_SECRET?.trim();
-      if (webhookSecret) {
-        const verification = await verifySvixWebhook({
-          payload: rawPayload,
-          headers: request.headers,
-          secret: webhookSecret,
-        });
+      if (!webhookSecret) {
+        return new Response(
+          JSON.stringify({ error: "Webhook secret is not configured" }),
+          {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
 
-        if (!verification.valid) {
-          return new Response(
-            JSON.stringify({ error: verification.error || "Invalid webhook signature" }),
-            {
-              status: 401,
-              headers: { "Content-Type": "application/json" },
-            }
-          );
-        }
+      const verification = await verifySvixWebhook({
+        payload: rawPayload,
+        headers: request.headers,
+        secret: webhookSecret,
+      });
+
+      if (!verification.valid) {
+        return new Response(
+          JSON.stringify({ error: verification.error || "Invalid webhook signature" }),
+          {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
       }
 
       let payload: unknown;
