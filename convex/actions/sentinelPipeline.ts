@@ -68,70 +68,12 @@ export const runAutonomousPipeline = action({
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
     const context = claim.appealContext;
-    let sender = args.sender || context?.sender;
-    let clinicalFacts = args.clinicalFacts || context?.clinicalFacts;
+    const sender = args.sender || context?.sender;
+    const clinicalFacts = args.clinicalFacts || context?.clinicalFacts;
     const physicianNotes = args.physicianNotes || context?.physicianNotes;
 
-    // Graceful fallback for legacy claims or automated retriggers that lack explicit intake.
-    // Prior strict throws caused `Uncaught Error: Complete the sender details...` and blocked the pipeline.
-    // Use provider/patient-derived defaults so the pipeline can still produce a compliant, non-hallucinated brief
-    // that states the record does not independently document findings and requests plan criteria review.
     if (!sender?.name?.trim() || (!sender.email?.trim() && !sender.phone?.trim())) {
-      const fallbackSender = {
-        name: claim.providerName?.trim() || claim.patient?.name?.trim() || "ClaimHero Appeals Desk",
-        credentials: undefined,
-        email: claim.patient?.email?.trim() || undefined,
-        phone: undefined,
-      };
-      sender = {
-        name: fallbackSender.name,
-        credentials: fallbackSender.credentials,
-        email: fallbackSender.email,
-        phone: fallbackSender.phone,
-      };
-      console.warn(`Pipeline sender fallback used for claim ${claim.claimNumber}: ${sender.name}`);
-      // Persist fallback so subsequent steps and audit reflect it
-      try {
-        await ctx.runMutation(internal.claims.updateAppealContextInternal, {
-          claimId: args.claimId,
-          sender: {
-            name: sender.name,
-            credentials: sender.credentials,
-            email: sender.email,
-            phone: sender.phone,
-          },
-          clinicalFacts: clinicalFacts || {
-            recordsAreIncomplete: true,
-          },
-        });
-        // Refresh local clinicalFacts if it was missing
-        if (!clinicalFacts) {
-          clinicalFacts = { recordsAreIncomplete: true };
-        }
-      } catch (e) {
-        console.warn("Pipeline fallback sender persist note:", e);
-        if (!clinicalFacts) {
-          clinicalFacts = { recordsAreIncomplete: true };
-        }
-      }
-    }
-    if (!clinicalFacts) {
-      clinicalFacts = { recordsAreIncomplete: true };
-      console.warn(`Pipeline clinicalFacts fallback used for claim ${claim.claimNumber}: recordsAreIncomplete=true`);
-      try {
-        await ctx.runMutation(internal.claims.updateAppealContextInternal, {
-          claimId: args.claimId,
-          sender: {
-            name: sender.name,
-            credentials: sender.credentials,
-            email: sender.email,
-            phone: sender.phone,
-          },
-          clinicalFacts,
-        });
-      } catch (e) {
-        console.warn("Pipeline fallback clinicalFacts persist note:", e);
-      }
+      throw new Error("Complete sender details before drafting");
     }
 
     // Auto-resolve payer intake gateway if not yet cached

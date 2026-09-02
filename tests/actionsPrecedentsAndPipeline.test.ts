@@ -128,6 +128,30 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
   });
 
   describe("convex/actions/sentinelPipeline", () => {
+    it("runAutonomousPipeline: throws error if sender details are missing", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+
+      const mockClaim = {
+        _id: "c1",
+        userId: "user_123",
+        claimNumber: "CLM-AUTO-1",
+        patient: { name: "Marcus Holloway", insurancePayer: "UnitedHealthcare", state: "CA" },
+      };
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(mockClaim),
+        runAction: vi.fn(),
+        runMutation: vi.fn(),
+      };
+
+      await expect(
+        (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
+          claimId: "c1",
+        })
+      ).rejects.toThrow("Complete sender details before drafting");
+    });
+
     it("runAutonomousPipeline: orchestrates the entire autonomous claim workflow", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
@@ -142,6 +166,13 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
         denialReasonCode: "CO-50",
         denialReasonDescription: "Medical necessity criteria not satisfied",
         deniedAmount: 18450,
+        appealContext: {
+          sender: {
+            name: "Dr. Gregory House, MD",
+            credentials: "MD, Board Certified Neurologist",
+            email: "ghouse@princetonplainsboro.edu",
+          },
+        },
       };
 
       const mockCtx: any = {
