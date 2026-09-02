@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T06:31:30Z
+- **Last updated:** 2026-09-02T07:27:00Z
 
 ## Log
 
@@ -397,12 +397,23 @@ Live-First Autonomous Firecrawl Payer Discovery Architecture (`convex/actions/pa
 - **Client Baseline Documentation**: Annotated `VERIFIED_PAYER_DIRECTORY` in `src/lib/constants.ts` to clearly document its role as an initial optimistic client seed cache while async live crawling executes.
 - **Validation**: Added unit tests for live Firecrawl extraction and statutory fallback. Verified with `npm run verify` (100% typecheck, ESLint, 357/357 passing unit tests across 26 suites, and Vite production bundle). Convex features: actions, queries, mutations, internalMutation, components, static hosting.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 678d3d1
 Deterministic 4-Pillar Appeal Rubric Formula Documentation & User-Centric Scoring Explanation (`convex/actions/precedentMatcher.ts`, `src/components/ui/tooltip.tsx`, `src/components/evidence/EvidenceMatrix.tsx`):
 - **Deterministic 4-Pillar Statutory Rubric Documentation**: Enriched `calculateDeterministicRubric` in `convex/actions/precedentMatcher.ts` with comprehensive documentation and mathematical formulas linking each statutory subscore (Policy Alignment: max 35 pts; Clinical Records: max 25 pts; ERISA 29 CFR § 2560.503-1: max 20 pts; Precedents: max 20 pts) directly to the rubric weights validated in `tests/claimhero.test.ts:114`.
 - **Radix UI Tooltip Component**: Created `src/components/ui/tooltip.tsx` wrapping `@radix-ui/react-tooltip` with smooth enter/exit animations and dark-mode precision styling.
 - **User-Centric Win Score Calculation Tooltip**: Integrated an accessible, professional breakdown tooltip in `src/components/evidence/EvidenceMatrix.tsx` that explains the 100-point win probability model in clear healthcare and legal terminology for non-technical patients and providers without exposed raw code formulas or internal test names.
 - **Validation**: Verified with `npm run verify` (100% clean typecheck, ESLint, 357/357 passing unit tests across 26 test suites, and production bundle build). Convex features: actions, queries, mutations, static hosting.
+
+### 2026-09-02 - working tree
+Evidence-Proportional Dynamic Scoring for ERISA & Precedent Pillars (`convex/actions/precedentMatcher.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`):
+- **Eliminated Unconditional Baseline Grants**: Refactored `calculateDeterministicRubric` in `convex/actions/precedentMatcher.ts` so that Pillar 3 (ERISA 29 CFR § 2560.503-1 Statutory Protections) and Pillar 4 (External Review Precedents & Overturn Benchmark) dynamically scale down to low baseline points (4 pts each, categorized as `"weak"`) when zero supporting evidence is present, eliminating falsely inflated scores (e.g. 78% on empty cases) on unsubstantiated claims.
+- **Graduated Multi-Tier Evidence Proportionality**:
+  - *Zero Evidence*: Evaluates Policy (8 pts), Clinical (5 pts), ERISA (4 pts), and Precedent (4 pts) yielding a 21% composite win score classified accurately under `"complex_litigation"`.
+  - *Single / Preliminary Evidence*: Awards moderate points (ERISA: 12 pts, Precedents: 10-12 pts) indicating preliminary statutory standing requiring corroborating diagnostic disclosures.
+  - *Substantiated Multi-Evidence / CPB / Precedent*: Awards full strength (ERISA: 19 pts, Precedents: 16-19 pts, Policy: 29-34 pts, Clinical: 22-24 pts) with strong status.
+- **Comprehensive Unit Testing**: Added unit tests in `tests/actionsPrecedentsAndPipeline.test.ts` asserting strict scale-down on zero evidence (21 pts, `complex_litigation`), moderate scoring on single evidence (55-79 pts, `moderate`), and robust scoring on CPB + legal precedents (>=80 pts, `high_confidence`).
+- **Full Verification**: Passed `npm run verify` (100% clean TypeScript typecheck, ESLint, 360/360 passing tests across 26 test suites, and Vite production bundle build). Convex features: actions, queries, mutations, internalMutation, static hosting.
+
 
 
 

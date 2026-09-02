@@ -74,11 +74,11 @@ interface RawLLMAnalysisOutput {
  *   - Pillar 4: External Review Precedents & Overturn Benchmark (Max: 20 pts)
  *   - Total Score = min(99, max(5, round(∑ Pillar Scores)))
  * 
- * Score Formula:
- *   score = (hasCpb ? (isClinicalDenial ? 34 : isAuthOrAdminDenial ? 31 : 29) : (isClinicalDenial ? 24 : 20))
- *         + (evidences.length >= 3 ? (isClinicalDenial ? 24 : 22) : evidences.length >= 1 ? (isClinicalDenial ? 22 : 20) : 16)
- *         + 19 [ERISA procedural review criteria violation baseline]
- *         + (denialReasonCode === "CO-50" ? 19 : denialReasonCode === "CO-197" ? 18 : ("CO-16"|"CO-4") ? 17 : 16)
+ * Evidence-Proportional Formula:
+ *   - Pillar 1 (Policy): hasCpb (29-34) | hasClinicalStudies/evidence>=2 (20-24) | evidence=1 (16-18) | 0 evidence (8)
+ *   - Pillar 2 (Clinical): evidence>=3 (22-24) | evidence>=1 (20-22) | 0 evidence (5)
+ *   - Pillar 3 (ERISA): hasLegalPrecedent/hasCpb/evidence>=2 (19) | evidence=1 (12) | 0 evidence (4)
+ *   - Pillar 4 (Precedent): hasLegalPrecedent/hasCpb/evidence>=2 (16-19 by denial code) | evidence=1 (10-12) | 0 evidence (4)
  */
 export function calculateDeterministicRubric(
   claim: {
@@ -89,14 +89,18 @@ export function calculateDeterministicRubric(
   },
   evidences: Array<{ sourceType: string; citationClause?: string; extractedEvidenceMarkdown?: string }>
 ) {
+  const evidencesCount = evidences.length;
   const hasCpb = evidences.some((e) => e.sourceType === "payer_cpb");
+  const hasLegalPrecedent = evidences.some((e) => e.sourceType === "legal_precedent");
+  const hasClinicalStudies = evidences.some((e) =>
+    ["pubmed_study", "nccn_guideline", "fda_package_insert"].includes(e.sourceType)
+  );
   const isClinicalDenial = ["CO-50", "CO-57", "CO-119", "CO-151"].includes(claim.denialReasonCode);
   const isAuthOrAdminDenial = ["CO-197", "CO-16", "CO-4", "CO-96", "CO-252"].includes(claim.denialReasonCode);
 
   // Pillar 1. CPB & Indication Alignment (Max: 35 points; rubric weight tested in tests/claimhero.test.ts:114)
-  // Formula: hasCpb ? (isClinicalDenial ? 34 : isAuthOrAdminDenial ? 31 : 29) : (isClinicalDenial ? 24 : 20)
-  let policyScore = 20;
-  let policyRationale = `National standard clinical practice guidelines support medical necessity for CPT ${claim.cptCodes[0] || "procedure"}.`;
+  let policyScore = 8;
+  let policyRationale = "No published CPB or clinical policy guidelines retrieved yet. Ingest insurer clinical policy to substantiate indication alignment.";
   if (hasCpb) {
     if (isClinicalDenial) {
       policyScore = 34;
@@ -108,47 +112,64 @@ export function calculateDeterministicRubric(
       policyScore = 29;
       policyRationale = `Published clinical policy guidelines substantiate medical necessity for CPT ${claim.cptCodes[0] || "procedure"}.`;
     }
-  } else {
-    policyScore = isClinicalDenial ? 24 : 20;
+  } else if (hasClinicalStudies || evidencesCount >= 2) {
+    policyScore = isClinicalDenial ? 24 : isAuthOrAdminDenial ? 22 : 20;
     policyRationale = `Clinical indications align with national standards; crawl insurer CPB to unlock full coverage criteria verification.`;
+  } else if (evidencesCount === 1) {
+    policyScore = isClinicalDenial ? 18 : 16;
+    policyRationale = `Preliminary clinical indication alignment identified; ingesting insurer CPB is recommended to verify procedural coverage criteria.`;
   }
 
   // Pillar 2. Objective Clinical Documentation & Step-Therapy (Max: 25 points; rubric weight tested in tests/claimhero.test.ts:114)
-  // Formula: evidences.length >= 3 ? (isClinicalDenial ? 24 : 22) : evidences.length >= 1 ? (isClinicalDenial ? 22 : 20) : 16
-  let clinicalScore = 16;
-  let clinicalRationale = "Standard clinical documentation available.";
-  if (evidences.length >= 3) {
+  let clinicalScore = 5;
+  let clinicalRationale = "No objective clinical documentation or diagnostic records attached to substantiate medical necessity.";
+  if (evidencesCount >= 3) {
     clinicalScore = isClinicalDenial ? 24 : 22;
     clinicalRationale = `Documented step-therapy trial, diagnostic imaging, and treating physician clinical narrative substantiate medical necessity.`;
-  } else if (evidences.length >= 1) {
+  } else if (evidencesCount >= 1) {
     clinicalScore = isClinicalDenial ? 22 : 20;
     clinicalRationale = `Treating provider records confirm clinical diagnosis and failed conservative management prior to procedure.`;
-  } else {
-    clinicalScore = 16;
-    clinicalRationale = `Standard clinical notes available; attaching supplementary diagnostic records will reinforce conservative therapy timeline.`;
   }
 
   // Pillar 3. ERISA 29 CFR § 2560.503-1 & Statutory Protections (Max: 20 points; rubric weight tested in tests/claimhero.test.ts:114)
-  // Formula: Baseline 19/20 points for adverse determinations failing ERISA statutory clinical specification mandates
-  const erisaScore = 19;
-  const erisaRationale = `Adverse determination violates ERISA 29 CFR § 2560.503-1 disclosure mandates by failing to articulate specific internal clinical review criteria.`;
+  // Scaled by substantiated case evidence rather than granted unconditionally
+  let erisaScore = 4;
+  let erisaRationale = "Unsubstantiated statutory standing: attaching denial letter disclosures and clinical records is required to substantiate ERISA § 2560.503-1 non-compliance.";
+  if (hasLegalPrecedent || hasCpb || evidencesCount >= 2) {
+    erisaScore = 19;
+    erisaRationale = `Adverse determination violates ERISA 29 CFR § 2560.503-1 disclosure mandates by failing to articulate specific internal clinical review criteria contradicted by documented record.`;
+  } else if (evidencesCount === 1) {
+    erisaScore = 12;
+    erisaRationale = `Preliminary statutory grounds identified under ERISA 29 CFR § 2560.503-1; supplementary disclosure request recommended to substantiate complete denial rationale omissions.`;
+  }
 
   // Pillar 4. External Review Precedents & Overturn Benchmark (Max: 20 points; rubric weight tested in tests/claimhero.test.ts:114)
-  // Formula: CO-50 -> 19 | CO-197 -> 18 | CO-16/CO-4 -> 17 | other -> 16
-  let precedentScore = 17;
-  let precedentRationale = "";
-  if (claim.denialReasonCode === "CO-50") {
-    precedentScore = 19;
-    precedentRationale = `Independent Medical Review (IMR) decisions show an 88% historical overturn rate for CO-50 denials when objective diagnostic criteria are demonstrated.`;
-  } else if (claim.denialReasonCode === "CO-197") {
-    precedentScore = 18;
-    precedentRationale = `State Insurance Commissioner rulings mandate retroactive claim authorization for CO-197 when urgency or specialist referral is documented.`;
-  } else if (claim.denialReasonCode === "CO-16" || claim.denialReasonCode === "CO-4") {
-    precedentScore = 17;
-    precedentRationale = `External review precedents consistently overturn CO-16 administrative denials upon supplemental clinical submission.`;
-  } else {
-    precedentScore = 16;
-    precedentRationale = `State appellate benchmarks indicate strong likelihood of favorable adjudication under independent external review.`;
+  // Scaled by corroborating evidence and indexed precedents rather than static assignment
+  let precedentScore = 4;
+  let precedentRationale = "No clinical evidence or indexed precedents available to establish external review parity.";
+  if (hasLegalPrecedent || hasCpb || evidencesCount >= 2) {
+    if (claim.denialReasonCode === "CO-50") {
+      precedentScore = 19;
+      precedentRationale = `Independent Medical Review (IMR) decisions show an 88% historical overturn rate for CO-50 denials when objective diagnostic criteria are demonstrated.`;
+    } else if (claim.denialReasonCode === "CO-197") {
+      precedentScore = 18;
+      precedentRationale = `State Insurance Commissioner rulings mandate retroactive claim authorization for CO-197 when urgency or specialist referral is documented.`;
+    } else if (claim.denialReasonCode === "CO-16" || claim.denialReasonCode === "CO-4") {
+      precedentScore = 17;
+      precedentRationale = `External review precedents consistently overturn CO-16 administrative denials upon supplemental clinical submission.`;
+    } else {
+      precedentScore = 16;
+      precedentRationale = `State appellate benchmarks indicate strong likelihood of favorable adjudication under independent external review.`;
+    }
+  } else if (evidencesCount === 1) {
+    if (claim.denialReasonCode === "CO-50") {
+      precedentScore = 12;
+    } else if (claim.denialReasonCode === "CO-197") {
+      precedentScore = 11;
+    } else {
+      precedentScore = 10;
+    }
+    precedentRationale = `Preliminary appellate benchmark for denial code ${claim.denialReasonCode || "denial"}; corroborated clinical records required to establish binding precedent parity.`;
   }
 
   const scoringBreakdown: ScoringCriterionResult[] = [

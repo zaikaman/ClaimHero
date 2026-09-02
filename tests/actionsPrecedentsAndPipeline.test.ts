@@ -125,6 +125,100 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
         status: "precedent_matched",
       }));
     });
+
+    it("calculateDeterministicRubric: scales ERISA and precedent scores down on zero evidence", () => {
+      const claim = {
+        cptCodes: ["99214"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+      };
+      const zeroEvidences: any[] = [];
+
+      const result = actionPrecedentMatcher.calculateDeterministicRubric(claim, zeroEvidences);
+
+      expect(result.riskLevel).toBe("complex_litigation");
+      expect(result.overturnProbabilityScore).toBeLessThan(55);
+
+      const erisaCriterion = result.scoringBreakdown.find((c) => c.category === "statutory_erisa");
+      const precedentCriterion = result.scoringBreakdown.find((c) => c.category === "precedent_strength");
+      const policyCriterion = result.scoringBreakdown.find((c) => c.category === "policy_alignment");
+      const clinicalCriterion = result.scoringBreakdown.find((c) => c.category === "clinical_documentation");
+
+      expect(erisaCriterion?.score).toBe(4);
+      expect(erisaCriterion?.status).toBe("weak");
+      expect(precedentCriterion?.score).toBe(4);
+      expect(precedentCriterion?.status).toBe("weak");
+      expect(policyCriterion?.score).toBe(8);
+      expect(clinicalCriterion?.score).toBe(5);
+      expect(result.overturnProbabilityScore).toBe(21);
+    });
+
+    it("calculateDeterministicRubric: yields moderate score on single non-CPB evidence", () => {
+      const claim = {
+        cptCodes: ["99214"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+      };
+      const singleEvidence = [
+        {
+          sourceType: "pubmed_study",
+          citationClause: "PMID 3829102",
+          extractedEvidenceMarkdown: "Clinical trial demonstrates efficacy",
+        },
+      ];
+
+      const result = actionPrecedentMatcher.calculateDeterministicRubric(claim, singleEvidence);
+
+      expect(result.riskLevel).toBe("moderate");
+      expect(result.overturnProbabilityScore).toBeGreaterThanOrEqual(55);
+      expect(result.overturnProbabilityScore).toBeLessThan(80);
+
+      const erisaCriterion = result.scoringBreakdown.find((c) => c.category === "statutory_erisa");
+      const precedentCriterion = result.scoringBreakdown.find((c) => c.category === "precedent_strength");
+
+      expect(erisaCriterion?.score).toBe(12);
+      expect(erisaCriterion?.status).toBe("moderate");
+      expect(precedentCriterion?.score).toBe(12);
+      expect(precedentCriterion?.status).toBe("moderate");
+    });
+
+    it("calculateDeterministicRubric: awards high confidence when CPB and precedents are robustly indexed", () => {
+      const claim = {
+        cptCodes: ["63047"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+      };
+      const robustEvidences = [
+        {
+          sourceType: "payer_cpb",
+          citationClause: "Section 3.A",
+          extractedEvidenceMarkdown: "Laminectomy indication satisfied",
+        },
+        {
+          sourceType: "legal_precedent",
+          citationClause: "IMR 2024-11",
+          extractedEvidenceMarkdown: "Overturned upon objective imaging submission",
+        },
+        {
+          sourceType: "pubmed_study",
+          citationClause: "Spine J. 2023",
+          extractedEvidenceMarkdown: "Decompression efficacy confirmed",
+        },
+      ];
+
+      const result = actionPrecedentMatcher.calculateDeterministicRubric(claim, robustEvidences);
+
+      expect(result.riskLevel).toBe("high_confidence");
+      expect(result.overturnProbabilityScore).toBeGreaterThanOrEqual(80);
+
+      const erisaCriterion = result.scoringBreakdown.find((c) => c.category === "statutory_erisa");
+      const precedentCriterion = result.scoringBreakdown.find((c) => c.category === "precedent_strength");
+
+      expect(erisaCriterion?.score).toBe(19);
+      expect(erisaCriterion?.status).toBe("strong");
+      expect(precedentCriterion?.score).toBe(19);
+      expect(precedentCriterion?.status).toBe("strong");
+    });
   });
 
   describe("convex/actions/sentinelPipeline", () => {
