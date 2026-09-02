@@ -36,9 +36,9 @@
   "message": {
     "message_id": "<msg_9841029384@agentmail.to>",
     "thread_id": "thread_123",
-    "inbox_id": "inbox_claimhero_intake",
+    "inbox_id": "inbox_claimhero_sender",
     "from_": ["billing@clinic.example"],
-    "to": ["claimhero-intake@agentmail.to"],
+    "to": ["claimhero-sender@agentmail.to"],
     "subject": "Denial notice for review",
     "text": "Please review the attached denial notice.",
     "html": "<p>Please review the attached denial notice.</p>",

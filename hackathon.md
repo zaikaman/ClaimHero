@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T12:05:00Z
+- **Last updated:** 2026-09-02T12:32:00Z
 
 ## Log
 
@@ -449,7 +449,7 @@ LLM-Driven Inbound Reply Adjudication, User Email Alert Notifications & 1-Hour A
 - **Schema & Type Extensions**: Added `autoPilotEnabled` to `claims` table, and `detectedDetermination`, `clinicalRationale`, `missingRecordsRequested`, `settlementAmount`, `autoReplyDraft`, and `autoReplyStatus` to `emailMessages` table (`convex/schema.ts`, `convex/emails.ts`, `src/types/index.ts`).
 - **Validation**: 100% clean execution with `npm run verify` (typecheck, lint, 363/363 passing unit tests across 26 test suites, and Vite production bundle build). Convex features: schema, indexes, queries, internalQuery, mutations, internalMutation, actions, internalAction, reactive subscriptions, static hosting.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 49dbd00
 Full-Stack Settings Dashboard, Advocate Signatory Profile, Onboarding Wizard Integration, Non-Claim Rejection Safeguards & 3-Tier Sidebar Architecture (`convex/schema.ts`, `convex/settings.ts`, `convex/actions/opticalParser.ts`, `src/components/settings/SettingsPage.tsx`, `src/components/onboarding/OnboardingWizard.tsx`, `src/components/layout/Sidebar.tsx`, `src/hooks/useSettings.ts`, `src/hooks/useClaims.ts`, `src/hooks/useRouterView.ts`, `src/components/ui/switch.tsx`, `src/lib/utils.ts`, `src/App.tsx`, `tests/convexSettings.test.ts`, `tests/actionsClinicalAndParser.test.ts`, `tests/utils.test.ts`):
 - **Convex Settings Schema & Backend Mutations (`convex/schema.ts`, `convex/settings.ts`)**:
   - Created `userSettings` table schema with indexes (`by_user`) tracking `approvalMode` (`manual_review` vs `autonomous_high_confidence`), `followUpCadenceDays`, `defaultLegalPosture`, `autoReplyInbound`, `autoRescanPolicies`, `criticalDeadlineAlerts`, `advocateProfile` (`{ name, credentials, organization, phone, state }`), and `lastSyncTimestamp`.
@@ -483,6 +483,24 @@ Full-Stack Settings Dashboard, Advocate Signatory Profile, Onboarding Wizard Int
   - Added unit tests in `tests/actionsClinicalAndParser.test.ts` verifying document classification and rejection safeguards.
   - Added unit tests in `tests/utils.test.ts` verifying resilient date formatting.
   - Verified 100% clean with `npm run verify`: 372/372 passing tests across 27 test suites, 0 TypeScript/ESLint errors, and successful production build. Convex features: database schema, relational indexes, queries, internalQuery, mutations, internalMutation, actions, internalAction, reactive subscriptions, auth, static hosting.
+
+### 2026-09-02 - working tree
+Purged Electronic Intake Email Infrastructure & Streamlined to 2-Mailbox Architecture (`convex/schema.ts`, `convex/http.ts`, `convex/lib/agentMail.ts`, `convex/actions/agentMail.ts`, `convex/emails.ts`, `src/components/radar/IngestionModal.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/common/CommandDialog.tsx`, `src/components/settings/SettingsPage.tsx`, `.env.example`, `README.md`, `specs/001-appeal-sentinel/contracts/agentmail-webhook.md`, `IDEA.md`, `docs/THREAT_MODEL.md`):
+- **Complete Elimination of Electronic Intake Email**:
+  - Purged all electronic intake address references, UI tabs, and copy buttons from `IngestionModal.tsx`, `CommandDialog.tsx`, and `Sidebar.tsx`. Ingestion Modal now focuses exclusively on the 3 core high-signal channels: 1-Click Presets, Direct File Upload (PDF/Image OCR), and Raw Denial Text.
+  - Removed `VITE_AGENTMAIL_INTAKE_EMAIL` from `src/vite-env.d.ts`, `.env.example`, and frontend configurations.
+  - Upgraded Settings (`SettingsPage.tsx`) AgentMail Communications Gateway to clearly present the 2 active shared identities (Outbound Appeal Dispatcher `claimhero-sender@agentmail.to` and Simulated Payer Review Inbox `claimhero-adjudicator@agentmail.to`).
+- **Convex Backend & Webhook Streamlining**:
+  - Removed `agentMailIntakeEvents` table and secondary indexes from `convex/schema.ts`.
+  - Removed `IntakeAgentMailbox` interface and `getIntakeAgentMailbox` helper from `convex/lib/agentMail.ts`.
+  - Removed `processInboundIntake` internal action from `convex/actions/agentMail.ts`.
+  - Removed `startInboundIntake`, `completeInboundIntake`, and `failInboundIntake` mutations from `convex/emails.ts`.
+  - Streamlined `/agentmail-webhook` endpoint (`convex/http.ts`) to immediately dispatch verified incoming `message.received` events directly to `processInboundClaimReply` without branching or intake mailbox overhead.
+- **Documentation & Test Suite Hardening**:
+  - Updated `README.md`, `specs/`, `IDEA.md`, `docs/THREAT_MODEL.md`, and `.env.example` to document the 2-inbox communications architecture.
+  - Updated and pruned test suites in `tests/convexHttp.test.ts`, `tests/agentMail.test.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`, `tests/convexEmails.test.ts`, `tests/redactionEngine.test.ts`, and `tests/claimhero.test.ts`.
+  - Verified 100% clean with `npm run verify`: 367/367 passing tests across 27 suites, zero TypeScript or ESLint errors, and successful production build. Convex features: database schema, relational indexes, httpRouter, actions, mutations, internalMutation, static hosting.
+
 
 
 

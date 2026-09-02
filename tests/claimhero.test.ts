@@ -776,11 +776,11 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
       event_type: "message.received",
       event_id: "evt_123",
       message: {
-        inbox_id: "inb_intake",
+        inbox_id: "inb_sender",
         message_id: "<msg_123@agentmail.to>",
         thread_id: "thd_123",
         from_: ["billing@clinic.example"],
-        to: ["ClaimHero Intake <claimhero-intake@agentmail.to>"],
+        to: ["ClaimHero Sender <claimhero-sender@agentmail.to>"],
         subject: "Denial notice",
         text: "Attached is the denial notice.",
         attachments: [{
@@ -796,9 +796,9 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
       eventType: "message.received",
       eventId: "evt_123",
       messageId: "<msg_123@agentmail.to>",
-      inboxId: "inb_intake",
+      inboxId: "inb_sender",
       from: "billing@clinic.example",
-      recipients: ["ClaimHero Intake <claimhero-intake@agentmail.to>"],
+      recipients: ["ClaimHero Sender <claimhero-sender@agentmail.to>"],
       text: "Attached is the denial notice.",
     });
     expect(event?.attachments[0]).toMatchObject({
@@ -806,7 +806,7 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
       filename: "denial.pdf",
       contentType: "application/pdf",
     });
-    expect(extractEmailAddress(event?.recipients[0])).toBe("claimhero-intake@agentmail.to");
+    expect(extractEmailAddress(event?.recipients[0])).toBe("claimhero-sender@agentmail.to");
   });
 
   it("rejects webhook payloads without a message identity or recipient", () => {

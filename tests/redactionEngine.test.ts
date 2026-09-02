@@ -96,15 +96,15 @@ describe("HIPAA-Compliant Automated Redaction Engine", () => {
       expect(mrnEntities[0]?.originalText).toBe("MRN-9847291");
     });
 
-    it("detects phone numbers and personal emails while preserving official intake routing", () => {
-      const sample = "Contact patient at (555) 019-2834 or jordan.taylor@example.com. Forward disputes to claimhero-intake@agentmail.to.";
+    it("detects phone numbers and personal emails while preserving official sender routing", () => {
+      const sample = "Contact patient at (555) 019-2834 or jordan.taylor@example.com. Forward disputes to claimhero-sender@agentmail.to.";
       const entities = detectPiiEntities(sample);
 
       const contactEntities = entities.filter((e) => e.category === "contact");
       expect(contactEntities.some((e) => e.originalText === "(555) 019-2834")).toBe(true);
       expect(contactEntities.some((e) => e.originalText === "jordan.taylor@example.com")).toBe(true);
-      // Official intake email should NOT be redacted
-      expect(contactEntities.some((e) => e.originalText.includes("claimhero-intake"))).toBe(false);
+      // Official sender email should NOT be redacted
+      expect(contactEntities.some((e) => e.originalText.includes("claimhero-sender"))).toBe(false);
     });
 
     it("detects explicit patient name when patientName option is provided", () => {

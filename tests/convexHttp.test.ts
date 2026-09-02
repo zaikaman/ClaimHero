@@ -145,41 +145,8 @@ describe("Convex HTTP Router & Webhook Endpoints", () => {
     expect(response.status).toBe(204);
   });
 
-  it("schedules processInboundIntake for intake inbox events", async () => {
+  it("schedules processInboundClaimReply for message.received events", async () => {
     process.env.AGENTMAIL_WEBHOOK_SECRET = "whsec_test123";
-    process.env.AGENTMAIL_INTAKE_INBOX_ID = "inbox_intake_123";
-    vi.spyOn(agentMailWebhook, "verifySvixWebhook").mockResolvedValue({ valid: true });
-    vi.spyOn(agentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
-      eventType: "message.received",
-      eventId: "evt_intake",
-      messageId: "msg_intake",
-      inboxId: "inbox_intake_123",
-      from: "patient@example.com",
-      recipients: ["intake@claimhero.com"],
-      subject: "New Appeal Denial",
-      text: "Denial text",
-      attachments: [],
-    });
-
-    const handler = getHandler();
-    const mockReq = new Request("http://localhost/agentmail-webhook", {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-    const mockCtx: any = { scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) } };
-
-    const response = await handler(mockCtx, mockReq);
-    expect(response.status).toBe(202);
-    expect(mockCtx.scheduler.runAfter).toHaveBeenCalledWith(0, expect.anything(), expect.objectContaining({
-      eventId: "evt_intake",
-      messageId: "msg_intake",
-      inboxId: "inbox_intake_123",
-    }));
-  });
-
-  it("schedules processInboundClaimReply for claim reply events", async () => {
-    process.env.AGENTMAIL_WEBHOOK_SECRET = "whsec_test123";
-    process.env.AGENTMAIL_INTAKE_INBOX_ID = "inbox_intake_123";
     vi.spyOn(agentMailWebhook, "verifySvixWebhook").mockResolvedValue({ valid: true });
     vi.spyOn(agentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
       eventType: "message.received",

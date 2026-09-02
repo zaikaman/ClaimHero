@@ -94,7 +94,7 @@ ClaimHero automates the entire lifecycle from denial ingestion to payer adjudica
 
 ### Option B — Your Own Denial
 
-* **Drag & drop** a PDF/image, **paste** raw EOB text, or **forward** the denial email to the dedicated intake address (`claimhero-intake@agentmail.to` — copied from `Sidebar.tsx:82`). The `/agentmail-webhook` (`convex/http.ts:19`) ingests it asynchronously, stores attachments in Convex Storage, parses via Vision Structured Outputs, and creates a new case.
+* **Drag & drop** a PDF/image, **paste** raw EOB text, or select one of the **1-Click Presets**. The ingestion modal parses clinical details via Optical Structured Extraction, maps CARC/RARC codes, and creates a new case.
 * Answer the 5 neutral clinical questions (symptoms, exam, imaging, treatment history, other facts) and pick a HIPAA redaction preset if needed.
 
 ### Option C — Live Dispatch Test (the adjudicator)
@@ -213,10 +213,10 @@ Convex is not an addon; it *is* the backend. Every feature is a Convex primitive
 | **Scheduled Functions** | `ctx.scheduler.runAfter(0, ...)` in `claims.ts:269`, `sentinelPipeline.ts`, `http.ts:63` | Post-ingest inbox provisioning, post-crawl status bumps, post-win precedent reindex |
 | **Crons** | `convex/crons.ts:10` `crons.cron("statutory-deadline-daily-sweep", "0 0 * * *", internal.claims.sweepDeadlines)` | Nightly statutory deadline sweep via bounded batches (`sweepDeadlinesBatch` with `ctx.scheduler.runAfter`), recalculating `daysRemaining` and emitting `<14d` critical alarms |
 | **File Storage** | `convex/claims.ts:480` `generateUploadUrl`, `ctx.storage.getUrl/delete` | Denial PDFs, exhibit PDFs, AgentMail attachments |
-| **HTTP Router** | `convex/http.ts:19` `http.route({path:"/agentmail-webhook", method:"POST", handler: httpAction(...)})` | AgentMail `message.received` intake + claim reply intake, idempotent via `agentMailIntakeEvents` (`schema.ts:232`) |
+| **HTTP Router** | `convex/http.ts:19` `http.route({path:"/agentmail-webhook", method:"POST", handler: httpAction(...)})` | AgentMail `message.received` claim reply & adjudication ingestion |
 | **Auth** | `convex/auth.ts`, `convex/auth.config.ts`, `convex/users.ts` + `@convex-dev/auth` | Google OAuth + Password, RS256 JWT, `getAuthUserId(ctx)` ownership enforcement on every query/mutation |
 
-**Multi-tenant isolation** is enforced at the data layer: `claims.userId` (`convex/schema.ts:25`) + `by_user`/`by_user_status` indexes + `getAuthUserId(ctx)` scoping in `claims.ts:18` and `claims.ts:536`. Shared intake claims (`userId: undefined`) are visible for the free-tier two-inbox model without leaking private cases.
+**Multi-tenant isolation** is enforced at the data layer: `claims.userId` (`convex/schema.ts:25`) + `by_user`/`by_user_status` indexes + `getAuthUserId(ctx)` scoping in `claims.ts:18` and `claims.ts:536`. Pre-authenticated starter demo cases are visible for the two-inbox model without leaking private user cases.
 
 ### 6.2 Firecrawl — Live Clinical Intelligence via `@firecrawl/firecrawl-convex`
 
@@ -244,8 +244,7 @@ Secondary crawlers share the same hardening:
 
 ### 6.3 AgentMail — Autonomous Communications
 
-ClaimHero configures dedicated AgentMail inboxes (`convex/actions/agentMail.ts`, `convex/lib/agentMail.ts`) across 3 endpoints:
-* `AGENTMAIL_INTAKE_EMAIL=claimhero-intake@agentmail.to` — Inbound denial ingestion & webhook processing
+ClaimHero configures dedicated AgentMail inboxes (`convex/actions/agentMail.ts`, `convex/lib/agentMail.ts`) across 2 endpoints:
 * `AGENTMAIL_SENDER_EMAIL=claimhero-sender@agentmail.to` — Outbound appellate packet & addendum dispatch
 * `AGENTMAIL_ADJUDICATOR_EMAIL=claimhero-adjudicator@agentmail.to` — Autonomous AI Payer Adjudicator mailbox
 
@@ -260,7 +259,6 @@ ClaimHero configures dedicated AgentMail inboxes (`convex/actions/agentMail.ts`,
 * Thread ID Persistence — Outbound transmissions automatically record AgentMail `messageId` and `threadId` to `claims.agentMailThreadId` (`schema.ts:58`), enabling indexed reverse lookups on inbound responses.
 
 **Inbound Routing & Hierarchy:**
-* Intake path — `processInboundIntake` (`convex/actions/agentMail.ts`) handles denial email bodies + PDF/image/text attachments, validates intake inbox recipient (`inboxId === intakeMailbox.inboxId`), re-fetches from AgentMail, stores in `_storage`, runs `opticalParser`, creates case, and ensures idempotency via `agentMailIntakeEvents` (`schema.ts:232`).
 * Reply path — `processInboundClaimReply` implements a strict 4-step routing hierarchy:
   1. *Thread ID Index Lookup* — Resolves claim instantly via `getByThreadIdInternal` matching `claims.agentMailThreadId`.
   2. *Subject Regex Extraction* — Matches `/#(CH-\d+)/i` and `[ClaimHero #...]` via `getByClaimNumberInternal`.
@@ -323,7 +321,6 @@ appeals: { claimId, version, appealLevel, statutoryPosture?, targetAuthority?, l
            legalCitations, fullAppealMarkdown, pdfExportStorageId? }
 emailThreads: { claimId, agentEmail, payerEmail, subject, status }
 emailMessages: { threadId, claimId, direction, sender, recipient, subject, bodyHtml, bodyText }
-agentMailIntakeEvents: { eventId, messageId, inboxId, sender, recipient, subject, status, claimId? }
 precedents: { sourceKind, title, citation, jurisdiction, icd10Codes[], cptCodes[], carcCodes[],
               winningArgument, statutoryLanguage, embedding[1536], corpusKey } // vectorIndex by_embedding
 appealAuditLogs: { claimId, eventType, actor, details, timestamp } // immutable
@@ -525,8 +522,6 @@ FIRECRAWL_WEBHOOK_SECRET=whsec_...
 # AgentMail (Convex env)
 AGENTMAIL_API_KEY=am_...
 AGENTMAIL_WEBHOOK_SECRET=whsec_...
-AGENTMAIL_INTAKE_INBOX_ID=inb_...
-AGENTMAIL_INTAKE_EMAIL=claimhero-intake@agentmail.to
 AGENTMAIL_SENDER_INBOX_ID=inb_shared_sender
 AGENTMAIL_SENDER_EMAIL=claimhero-sender@agentmail.to
 AGENTMAIL_ADJUDICATOR_INBOX_ID=inb_shared_adjudicator
@@ -547,7 +542,7 @@ npx convex env set AGENTMAIL_WEBHOOK_SECRET "whsec_..." --prod
 npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```
 
-> The intake inbox (`AGENTMAIL_INTAKE_EMAIL`) is what you forward denial emails to and what `Sidebar -> Copy Inbound Intake Address` copies (`Sidebar.tsx:82`). The sender inbox (`AGENTMAIL_SENDER_EMAIL`) transmits outbound appeals, and the adjudicator inbox (`AGENTMAIL_ADJUDICATOR_EMAIL`) processes simulated payer reviews.
+> The sender inbox (`AGENTMAIL_SENDER_EMAIL`) transmits outbound appeals, and the adjudicator inbox (`AGENTMAIL_ADJUDICATOR_EMAIL`) processes simulated payer reviews.
 
 ---
 

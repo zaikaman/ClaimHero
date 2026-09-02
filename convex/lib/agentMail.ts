@@ -10,11 +10,6 @@ export interface SharedAgentMailboxes {
   adjudicatorEmail: string;
 }
 
-export interface IntakeAgentMailbox {
-  inboxId: string;
-  email: string;
-}
-
 const AGENTMAIL_API_BASE_URL = "https://api.agentmail.to/v0";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -62,17 +57,6 @@ export function getSharedAgentMailboxes(): SharedAgentMailboxes {
   }
 
   return { senderInboxId, senderEmail, adjudicatorInboxId, adjudicatorEmail };
-}
-
-export function getIntakeAgentMailbox(): IntakeAgentMailbox {
-  const inboxId = configuredValue("AGENTMAIL_INTAKE_INBOX_ID");
-  const email = configuredValue("AGENTMAIL_INTAKE_EMAIL");
-
-  if (!inboxId || !email) {
-    throw new Error("AgentMail intake is not configured. Set AGENTMAIL_INTAKE_INBOX_ID and AGENTMAIL_INTAKE_EMAIL.");
-  }
-
-  return { inboxId, email: email.toLowerCase() };
 }
 
 async function parseResponse(response: Response): Promise<unknown> {

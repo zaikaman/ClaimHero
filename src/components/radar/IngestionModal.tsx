@@ -2,10 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   CloudArrowUp,
   FileText,
-  Envelope,
   CheckCircle,
-  Copy,
-  Check,
   Shield,
   CircleNotch,
   FileDoc,
@@ -13,7 +10,6 @@ import {
   Lightning,
   FileMagnifyingGlass,
   ArrowRight,
-
   ArrowLeft,
   ShieldCheck,
   Lock,
@@ -122,7 +118,6 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     (DenialExtractionResult & { claimId: string; pipelineResult?: unknown }) | null
   >(null);
   const [activePreset, setActivePreset] = useState<SampleCasePreset | null>(null);
-  const [copiedEmail, setCopiedEmail] = useState(false);
   const [contextSubmitted, setContextSubmitted] = useState(false);
   const [isPreparingContext, setIsPreparingContext] = useState(false);
   const [intakeQuestions, setIntakeQuestions] = useState<ClinicalIntakeQuestion[]>(DEFAULT_CLINICAL_QUESTIONS);
@@ -163,7 +158,6 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       setErrorMessage(null);
       setExtractedResult(null);
       setActivePreset(null);
-      setCopiedEmail(false);
       setContextSubmitted(false);
       setIsPreparingContext(false);
       setIntakeQuestions(DEFAULT_CLINICAL_QUESTIONS);
@@ -189,14 +183,6 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const updateAppealContextMutation = useMutation(api.claims.updateAppealContext);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const intakeEmail = import.meta.env.VITE_AGENTMAIL_INTAKE_EMAIL || "claimhero-intake@agentmail.to";
-
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText(intakeEmail);
-    setCopiedEmail(true);
-    setTimeout(() => setCopiedEmail(false), 2000);
-  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -504,10 +490,6 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 <FileText className="size-3.5" />
                 <span>Paste Text</span>
               </TabsTrigger>
-              <TabsTrigger value="email" className="gap-1.5">
-                <Envelope className="size-3.5" />
-                <span>Electronic Intake</span>
-              </TabsTrigger>
             </TabsList>
 
             {/* Tab 1: 1-Click Presets */}
@@ -723,59 +705,6 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   </div>
                 </>
               )}
-            </TabsContent>
-
-            {/* Tab 4: Electronic Intake */}
-            <TabsContent value="email" className="space-y-3 pt-2">
-              <Card className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground">
-                    ClaimHero Electronic Intake
-                  </span>
-                  <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-500/30">
-                    <span className="size-1.5 rounded-full bg-emerald-500"></span>
-                    Live inbound digestion
-                  </Badge>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={intakeEmail}
-                    className="flex-1 rounded-lg border border-input bg-muted/40 px-3 py-1.5 text-xs font-mono text-foreground select-all"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopyEmail}
-                    className="gap-1"
-                  >
-                    {copiedEmail ? (
-                      <>
-                        <Check className="size-3.5 text-emerald-500" />
-                        <span>Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="size-3.5" />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                <ul className="list-disc list-inside space-y-1 text-xs text-muted-foreground leading-relaxed pt-1">
-                  <li>Forward a denial letter or EOB here from an authorized patient or clinic mailbox.</li>
-                  <li>ClaimHero reads the email body and supported PDF, image, or text attachments.</li>
-                  <li>The denial is extracted into a new case and appears in Case Radar for context confirmation.</li>
-                </ul>
-              </Card>
-
-              <div className="rounded-lg border border-border bg-muted/20 p-2.5 flex items-center gap-2 text-xs text-muted-foreground">
-                <Shield className="size-4 shrink-0 text-foreground" />
-                <span>AgentMail transport and Convex storage handle the inbound document securely. Send only records you are authorized to share.</span>
-              </div>
             </TabsContent>
           </Tabs>
         ) : !contextSubmitted ? (

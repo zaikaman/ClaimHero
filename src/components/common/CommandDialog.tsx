@@ -8,8 +8,6 @@ import {
   ChartPieSlice,
   Clock,
   CloudArrowUp,
-  Copy,
-  Check,
   User,
   Trash,
   PhoneCall,
@@ -46,7 +44,6 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   onDeleteCase,
 }) => {
   const [query, setQuery] = useState("");
-  const [copiedEmail, setCopiedEmail] = useState(false);
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
 
   useEffect(() => {
@@ -76,17 +73,6 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   const handleNavigate = (view: NavigationView) => {
     onNavigateView(view);
     onClose();
-  };
-
-  const intakeEmail = import.meta.env.VITE_AGENTMAIL_INTAKE_EMAIL || "claimhero-intake@agentmail.to";
-
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText(intakeEmail);
-    setCopiedEmail(true);
-    setTimeout(() => {
-      setCopiedEmail(false);
-      onClose();
-    }, 1500);
   };
 
   const platformViews = [
@@ -276,21 +262,6 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                 <Badge variant="outline" size="sm" className="font-mono text-[9px]">
                   1-Click
                 </Badge>
-              </button>
-
-              <button
-                onClick={handleCopyEmail}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-muted/70 text-foreground text-left transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Envelope className="size-3.5 text-emerald-500" />
-                  <span>Copy Electronic Intake Address ({intakeEmail})</span>
-                </div>
-                {copiedEmail ? (
-                  <Check className="size-3 text-emerald-500" />
-                ) : (
-                  <Copy className="size-3 text-muted-foreground" />
-                )}
               </button>
 
               {onOpenOnboarding && (

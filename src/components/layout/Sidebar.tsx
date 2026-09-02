@@ -10,8 +10,6 @@ import {
   PlusCircle,
   DotsThreeVertical,
   CloudArrowUp,
-  Copy,
-  Check,
   BookOpen,
   SignOut,
   SignIn,
@@ -93,16 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { viewer, isAuthenticated, userName, userEmail, userInitial, signOut } = useCurrentUser();
 
-  const [copiedEmail, setCopiedEmail] = useState(false);
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
-
-  const intakeEmail = import.meta.env.VITE_AGENTMAIL_INTAKE_EMAIL || "claimhero-intake@agentmail.to";
-
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText(intakeEmail);
-    setCopiedEmail(true);
-    setTimeout(() => setCopiedEmail(false), 2000);
-  };
 
   // Group 1: Platform Command & Macro Intelligence
   const platformNavItems = [
@@ -591,10 +580,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <DropdownMenuItem onClick={() => onOpenIngestion?.()} className="gap-2 cursor-pointer">
               <CloudArrowUp className="size-3.5" />
               <span>Ingest Denial Notice</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleCopyEmail} className="gap-2 cursor-pointer">
-              {copiedEmail ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
-              <span>{copiedEmail ? "Address Copied!" : "Copy Inbound Intake Address"}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

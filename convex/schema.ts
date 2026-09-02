@@ -244,25 +244,7 @@ export default defineSchema({
     receivedAt: v.number(),
   })
     .index("by_thread", ["threadId"])
-    .index("by_claim", ["claimId"])
-    .index("by_agentmail_message", ["agentMailMessageId"]),
-
-  // Idempotency and operational state for the shared electronic intake inbox.
-  agentMailIntakeEvents: defineTable({
-    eventId: v.string(),
-    messageId: v.string(),
-    inboxId: v.string(),
-    sender: v.string(),
-    recipient: v.string(),
-    subject: v.string(),
-    status: v.string(), // processing, completed, failed
-    claimId: v.optional(v.id("claims")),
-    error: v.optional(v.string()),
-    receivedAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_event_id", ["eventId"])
-    .index("by_message_id", ["messageId"]),
+    .index("by_claim", ["claimId"]),
 
   // Precedent Vector Archive — winning briefs, commissioner rulings, court overturns
   precedents: defineTable({

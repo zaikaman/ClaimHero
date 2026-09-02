@@ -679,7 +679,7 @@ export const createWithPatient = mutation({
 });
 
 /**
- * Internal mutation for background actions (such as opticalParser and AgentMail intake) to create a claim
+ * Internal mutation for background actions (such as opticalParser) to create a claim
  */
 export const createWithPatientInternal = internalMutation({
   args: {

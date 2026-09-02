@@ -451,8 +451,8 @@ export function detectPiiEntities(
   const emailRegex = /\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/g;
   while ((match = emailRegex.exec(text)) !== null) {
     const rawEmail = match[1];
-    // Skip official agentmail intake address to avoid breaking instructions
-    if (rawEmail.toLowerCase().includes("claimhero-intake@agentmail.to") || rawEmail.toLowerCase().includes("payer-review@claimhero.agentmail.com")) {
+    // Skip official agentmail sender address to avoid breaking instructions
+    if (rawEmail.toLowerCase().includes("claimhero-sender@agentmail.to") || rawEmail.toLowerCase().includes("payer-review@claimhero.agentmail.com")) {
       continue;
     }
     addEntity(

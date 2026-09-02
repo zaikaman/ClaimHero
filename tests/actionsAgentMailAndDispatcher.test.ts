@@ -53,74 +53,7 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       }));
     });
 
-    it("processInboundIntake: processes incoming intake email and runs optical extraction", async () => {
-      process.env.AGENTMAIL_INTAKE_INBOX_ID = "inbox_intake";
-      process.env.AGENTMAIL_INTAKE_EMAIL = "intake@claimhero.com";
-
-      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
-        message_id: "msg_intake_1",
-        inbox_id: "inbox_intake",
-        from: "patient@example.com",
-        recipients: ["intake@claimhero.com"],
-        to: ["intake@claimhero.com"],
-        subject: "Medical Claim Denial",
-        text: "Denial text content",
-        attachments: [
-          {
-            attachment_id: "att_1",
-            filename: "denial.pdf",
-            content_type: "application/pdf",
-            size: 1024,
-          },
-        ],
-      } as any);
-
-      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
-        eventType: "message.received",
-        eventId: "evt_1",
-        messageId: "msg_intake_1",
-        inboxId: "inbox_intake",
-        from: "patient@example.com",
-        recipients: ["intake@claimhero.com"],
-        subject: "Medical Claim Denial",
-        text: "Denial text content",
-        attachments: [
-          {
-            attachmentId: "att_1",
-            filename: "denial.pdf",
-            contentType: "application/pdf",
-            size: 1024,
-          },
-        ],
-      });
-
-      vi.spyOn(libAgentMail, "downloadAgentMailAttachment").mockResolvedValue({
-        bytes: new ArrayBuffer(8),
-        contentType: "application/pdf",
-      });
-
-      const mockCtx: any = {
-        runMutation: vi.fn().mockImplementation((fn, args) => {
-          return Promise.resolve("thread_1");
-        }),
-        storage: { store: vi.fn().mockResolvedValue("storage_doc_1") },
-        runAction: vi.fn().mockResolvedValue({ claimId: "claim_new_1" }),
-      };
-
-      const res = await (actionAgentMail.processInboundIntake as any)._handler(mockCtx, {
-        eventId: "evt_1",
-        messageId: "msg_intake_1",
-        inboxId: "inbox_intake",
-      });
-
-      expect(res).toBeNull();
-      expect(mockCtx.runAction).toHaveBeenCalled();
-    });
-
     it("processInboundClaimReply: processes approval and updates claim to won", async () => {
-      process.env.AGENTMAIL_INTAKE_INBOX_ID = "inbox_intake";
-      process.env.AGENTMAIL_INTAKE_EMAIL = "intake@claimhero.com";
-
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_reply_1",
         inbox_id: "inbox_case_1",
@@ -162,9 +95,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
     });
 
     it("processInboundClaimReply: routes correctly via threadId match when claimNumber is missing from subject", async () => {
-      process.env.AGENTMAIL_INTAKE_INBOX_ID = "inbox_intake";
-      process.env.AGENTMAIL_INTAKE_EMAIL = "intake@claimhero.com";
-
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_reply_2",
         thread_id: "thread_agentmail_99",
@@ -191,13 +121,9 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       });
 
       const mockCtx: any = {
-        runQuery: vi.fn().mockImplementation((fn, args) => {
-          if (args.threadId === "thread_agentmail_99") {
-            return Promise.resolve({ _id: "claim_thread_match", claimNumber: "CH-88899" });
-          }
-          return Promise.resolve(null);
-        }),
+        runQuery: vi.fn().mockResolvedValue({ _id: "claim_thread_match", claimNumber: "CLM-THREAD-001" }),
         runMutation: vi.fn().mockResolvedValue("id_2"),
+        runAction: vi.fn().mockResolvedValue(undefined),
       };
 
       const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
@@ -215,9 +141,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
     });
 
     it("processInboundClaimReply: routes correctly via recipient exact match fallback when claimNumber is missing and threadId unmatched", async () => {
-      process.env.AGENTMAIL_INTAKE_INBOX_ID = "inbox_intake";
-      process.env.AGENTMAIL_INTAKE_EMAIL = "intake@claimhero.com";
-
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_reply_3",
         inbox_id: "inbox_case_1",

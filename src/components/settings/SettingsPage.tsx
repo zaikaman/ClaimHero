@@ -36,13 +36,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
   const [formState, setFormState] = useState<UserSettings | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
-  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedSender, setCopiedSender] = useState(false);
+  const [copiedAdjudicator, setCopiedAdjudicator] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [resetConfirmInput, setResetConfirmInput] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
-  const intakeEmail = import.meta.env.VITE_AGENTMAIL_INTAKE_EMAIL || "claimhero-intake@agentmail.to";
+  const senderEmail = import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL || "claimhero-sender@agentmail.to";
+  const adjudicatorEmail = import.meta.env.VITE_AGENTMAIL_ADJUDICATOR_EMAIL || "claimhero-adjudicator@agentmail.to";
 
   // Initialize local form state once settings are loaded
   useEffect(() => {
@@ -84,10 +86,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
     setTimeout(() => setSaveSuccessMessage(null), 3000);
   };
 
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText(intakeEmail);
-    setCopiedEmail(true);
-    setTimeout(() => setCopiedEmail(false), 2000);
+  const handleCopySender = () => {
+    navigator.clipboard.writeText(senderEmail);
+    setCopiedSender(true);
+    setTimeout(() => setCopiedSender(false), 2000);
+  };
+
+  const handleCopyAdjudicator = () => {
+    navigator.clipboard.writeText(adjudicatorEmail);
+    setCopiedAdjudicator(true);
+    setTimeout(() => setCopiedAdjudicator(false), 2000);
   };
 
   const handleSync = async () => {
@@ -421,39 +429,73 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
           </CardContent>
         </Card>
 
-        {/* Card 4: AgentMail Inbound Gateway */}
+        {/* Card 4: AgentMail Communications Gateway */}
         <Card className="border-border/60 bg-card/60 backdrop-blur-md">
           <CardHeader className="pb-3 border-b border-border/40">
             <div className="flex items-center gap-2">
               <EnvelopeSimple className="size-4 text-primary" />
-              <CardTitle className="text-sm font-semibold">AgentMail Inbound Gateway</CardTitle>
+              <CardTitle className="text-sm font-semibold">AgentMail Communications Gateway</CardTitle>
             </div>
             <CardDescription className="text-xs">
-              Dedicated electronic communications address for automated denial notice routing and two-way adjudicator correspondence.
+              Configured shared mailboxes for outbound appeal dispatch and two-way simulated payer correspondence.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="pt-4 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/30">
               <div className="space-y-0.5">
-                <div className="text-xs font-semibold text-foreground">Dedicated intake address</div>
+                <div className="text-xs font-semibold text-foreground">Appeals Transmission Outbox</div>
                 <div className="text-[11px] text-muted-foreground">
-                  Forward insurer denial letters or configure payer electronic appeals to this address.
+                  Outbound appeal briefs and case correspondence transmission address.
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/70 bg-background/80 font-mono text-xs text-foreground shadow-2xs">
                   <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>{intakeEmail}</span>
+                  <span>{senderEmail}</span>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCopyEmail}
+                  onClick={handleCopySender}
                   className="h-8 gap-1 text-xs cursor-pointer"
-                  title="Copy Inbound Address"
+                  title="Copy Sender Address"
                 >
-                  {copiedEmail ? (
+                  {copiedSender ? (
+                    <>
+                      <Check className="size-3.5 text-emerald-500" />
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="size-3.5" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/30">
+              <div className="space-y-0.5">
+                <div className="text-xs font-semibold text-foreground">Simulated Payer Review Inbox</div>
+                <div className="text-[11px] text-muted-foreground">
+                  AI adjudicator mailbox receiving simulated payer review requests.
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/70 bg-background/80 font-mono text-xs text-foreground shadow-2xs">
+                  <span className="size-2 rounded-full bg-sky-500" />
+                  <span>{adjudicatorEmail}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyAdjudicator}
+                  className="h-8 gap-1 text-xs cursor-pointer"
+                  title="Copy Adjudicator Address"
+                >
+                  {copiedAdjudicator ? (
                     <>
                       <Check className="size-3.5 text-emerald-500" />
                       <span>Copied</span>

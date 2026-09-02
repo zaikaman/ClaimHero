@@ -23,7 +23,7 @@ In the U.S. healthcare system, health insurers improperly deny approximately **1
 ```mermaid
 flowchart TD
     subgraph Intake ["1. Ingestion & Communication (AgentMail + Vision)"]
-        A1["Forward Denial PDF to claimhero-intake@agentmail.to / Ingestion Modal"] --> A2["Vision Optical Parser (CPT / ICD-10 / CARC / Amounts)"]
+        A1["Ingestion Modal (Presets / PDF Upload / Paste Text)"] --> A2["Vision Optical Parser (CPT / ICD-10 / CARC / Amounts)"]
         A3["Outbound 3-Mode Dispatch (AI Adjudicator / Custom / Official Payer)"]
         A4["Inbound Payer Determination / Addendum Webhook (/agentmail-webhook)"]
     end
@@ -78,8 +78,8 @@ flowchart TD
   * Multi-layer hardening: document windowing for 150KB+ clinical manuals, private MCG viewer rejection, payer domain verification, and Incapsula/CAPTCHA access-denied filtering.
   * Specialized secondary crawlers for PubMed/ClinicalTrials.gov literature and FDA package inserts (`accessdata.fda.gov`).
 * **AgentMail**:
-  * Dedicated autonomous mailboxes: Intake (`claimhero-intake@agentmail.to`), Outbound Sender (`claimhero-sender@agentmail.to`), and AI Adjudicator (`claimhero-adjudicator@agentmail.to`).
-  * **Inbound**: Fast asynchronous webhook (`/agentmail-webhook`) processing forwarded denials and insurer determinations.
+  * Dedicated autonomous mailboxes: Outbound Sender (`claimhero-sender@agentmail.to`) and AI Adjudicator (`claimhero-adjudicator@agentmail.to`).
+  * **Inbound**: Fast asynchronous webhook (`/agentmail-webhook`) processing insurer determinations and correspondence replies.
   * **Outbound**: 3-mode appellate transmission gateway (AI Adjudicator simulation, custom test email, or verified official payer address with portal/fax/PO box routing).
 * **OpenAI**:
   * `gpt-5.4-nano` structured extraction for EOB parameters (claim number, provider, denied amount, patient liability, CPT, ICD-10, CARC codes, deadlines).
@@ -91,7 +91,7 @@ flowchart TD
 
 ## 3. Data Schema Design (Convex)
 
-`convex/schema.ts` defines 9 core domain tables with secondary indexes, full-text search indexes, and vector indexes:
+`convex/schema.ts` defines 8 core domain tables with secondary indexes, full-text search indexes, and vector indexes:
 
 1. **`patients`**:
    * `userId`, `name`, `email`, `memberId`, `groupNumber`, `insurancePayer`, `state`, `createdAt`.
@@ -114,13 +114,10 @@ flowchart TD
    * `claimId`, `agentEmail`, `payerEmail`, `subject`, `status`.
    * `threadId`, `direction` (`inbound`, `outbound`), `sender`, `recipient`, `bodyHtml`, `bodyText`, `sentAt`.
    * Indexes: `by_claim`, `by_thread`.
-6. **`agentMailIntakeEvents`**:
-   * `eventId`, `messageId`, `inboxId`, `sender`, `recipient`, `subject`, `status`, `claimId`.
-   * Indexes: `by_event_id`, `by_message_id`.
-7. **`precedents`** (Vector Archive):
+6. **`precedents`** (Vector Archive):
    * `sourceKind`, `title`, `citation`, `jurisdiction`, `icd10Codes`, `cptCodes`, `carcCodes`, `outcome`, `winningArgument`, `statutoryLanguage`, `embedding` (1536 dimensions), `corpusKey`.
    * Indexes: `by_corpus_key`, `by_primary_cpt`, `by_primary_carc`, searchIndex `search_precedents`, vectorIndex `by_embedding` (1536-d, cosine).
-8. **`appealAuditLogs`**:
+7. **`appealAuditLogs`**:
    * `claimId`, `eventType`, `actor`, `details`, `timestamp`.
    * Indexes: `by_claim`, `by_event_type`.
 9. **`p2pScripts` & `p2pCallSessions`**:

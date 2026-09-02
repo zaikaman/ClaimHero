@@ -3,11 +3,9 @@
 import { internalAction } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { v } from "convex/values";
-import type { Doc, Id } from "../_generated/dataModel";
+import type { Doc } from "../_generated/dataModel";
 import {
-  downloadAgentMailAttachment,
   getAgentMailMessage,
-  getIntakeAgentMailbox,
   getSharedAgentMailboxes,
   sendAgentMailMessage,
 } from "../lib/agentMail";
@@ -56,151 +54,6 @@ export const provisionClaimInboxes = internalAction({
         claimId: args.claimId,
         status: "failed",
         error: message.slice(0, 1000),
-      });
-      throw error;
-    }
-
-    return null;
-  },
-});
-
-const MAX_INTAKE_ATTACHMENT_BYTES = 15 * 1024 * 1024;
-
-function isSupportedAttachment(filename?: string, contentType?: string): boolean {
-  const normalizedType = contentType?.toLowerCase() || "";
-  const normalizedName = filename?.toLowerCase() || "";
-  return (
-    normalizedType === "application/pdf" ||
-    normalizedType.startsWith("image/") ||
-    normalizedType === "text/plain" ||
-    /\.(pdf|png|jpe?g|webp|txt)$/.test(normalizedName)
-  );
-}
-
-/**
- * Digests a message sent to the application-level AgentMail intake inbox.
- * The webhook is only a trigger: the message is re-fetched from AgentMail and
- * checked against the configured inbox before any claim data is created.
- */
-export const processInboundIntake = internalAction({
-  args: {
-    eventId: v.string(),
-    messageId: v.string(),
-    inboxId: v.string(),
-    sender: v.optional(v.string()),
-    recipient: v.optional(v.string()),
-    subject: v.optional(v.string()),
-    text: v.optional(v.string()),
-    html: v.optional(v.string()),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const intakeMailbox = getIntakeAgentMailbox();
-    if (args.inboxId !== intakeMailbox.inboxId) {
-      return null;
-    }
-
-    const message = await getAgentMailMessage(args.inboxId, args.messageId);
-    const normalized = normalizeAgentMailWebhook({
-      event_type: "message.received",
-      event_id: args.eventId,
-      message,
-    });
-    if (!normalized || normalized.inboxId !== intakeMailbox.inboxId) {
-      throw new Error("AgentMail message payload could not be validated against the intake inbox.");
-    }
-
-    const hasIntakeRecipient = normalized.recipients.some(
-      (recipient) => extractEmailAddress(recipient) === intakeMailbox.email
-    );
-    if (!hasIntakeRecipient) {
-      console.warn(`Ignoring AgentMail message ${args.messageId} without the configured intake recipient.`);
-      return null;
-    }
-
-    const sender = normalized.from || args.sender || "";
-    const senderEmail = extractEmailAddress(sender);
-    if (!senderEmail) throw new Error("Inbound AgentMail message does not contain a usable sender email address.");
-
-    const started = await ctx.runMutation(internal.emails.startInboundIntake, {
-      eventId: args.eventId,
-      messageId: normalized.messageId,
-      inboxId: normalized.inboxId,
-      sender,
-      recipient: intakeMailbox.email,
-      subject: normalized.subject || args.subject || "Claim denial document intake",
-    });
-    if (!started) return null;
-
-    try {
-      const bodyText = normalized.text || args.text || normalized.html || args.html || "";
-      const supportedAttachment = normalized.attachments.find((attachment) =>
-        isSupportedAttachment(attachment.filename, attachment.contentType)
-      );
-      let storageId: Id<"_storage"> | undefined;
-
-      if (supportedAttachment) {
-        if (supportedAttachment.size && supportedAttachment.size > MAX_INTAKE_ATTACHMENT_BYTES) {
-          throw new Error(`Inbound attachment exceeds the ${MAX_INTAKE_ATTACHMENT_BYTES / 1024 / 1024} MB intake limit.`);
-        }
-
-        const attachment = await downloadAgentMailAttachment({
-          inboxId: normalized.inboxId,
-          messageId: normalized.messageId,
-          attachmentId: supportedAttachment.attachmentId,
-        });
-        if (attachment.bytes.byteLength > MAX_INTAKE_ATTACHMENT_BYTES) {
-          throw new Error(`Inbound attachment exceeds the ${MAX_INTAKE_ATTACHMENT_BYTES / 1024 / 1024} MB intake limit.`);
-        }
-
-        const contentType = attachment.contentType || supportedAttachment.contentType || "application/octet-stream";
-        storageId = (await ctx.storage.store(new Blob([attachment.bytes], { type: contentType }))) as Id<"_storage">;
-      }
-
-      if (!bodyText.trim() && !storageId) {
-        throw new Error("Inbound email has no readable body or supported denial-document attachment.");
-      }
-
-      const extraction = await ctx.runAction(api.actions.opticalParser.parseDenialDocument, {
-        rawDocumentText: bodyText,
-        ...(storageId ? { storageId } : {}),
-        patientEmail: senderEmail,
-      });
-
-      const extractedClaimId = extraction.claimId as Id<"claims">;
-
-      const threadId = await ctx.runMutation(internal.emails.getOrCreateThreadInternal, {
-        claimId: extractedClaimId,
-        agentEmail: intakeMailbox.email,
-        payerEmail: senderEmail,
-        subject: normalized.subject || "Claim denial document intake",
-      });
-      await ctx.runMutation(internal.emails.insertMessageInternal, {
-        threadId,
-        claimId: extractedClaimId,
-        direction: "inbound",
-        sender,
-        recipient: intakeMailbox.email,
-        subject: normalized.subject || "Claim denial document intake",
-        bodyHtml: normalized.html || (bodyText ? `<p>${bodyText}</p>` : "<p>Attachment-only intake message.</p>"),
-        bodyText: bodyText || "Attachment-only intake message.",
-        hasAttachments: normalized.attachments.length > 0,
-        agentMailMessageId: normalized.messageId,
-      });
-      await ctx.runMutation(internal.claims.updateStatusInternal, {
-        claimId: extractedClaimId,
-        status: "ingested",
-        actor: "AgentMail Intake Digest",
-        details: "Inbound denial document digested from the ClaimHero intake inbox. Confirm case context before drafting.",
-      });
-      await ctx.runMutation(internal.emails.completeInboundIntake, {
-        eventId: args.eventId,
-        claimId: extractedClaimId,
-      });
-    } catch (error) {
-      await ctx.runMutation(internal.emails.failInboundIntake, {
-        eventId: args.eventId,
-        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -275,13 +128,6 @@ export const processInboundClaimReply = internalAction({
       message,
     });
     if (!normalized) throw new Error("AgentMail reply payload could not be validated.");
-
-    const intakeMailbox = getIntakeAgentMailbox();
-    if (normalized.inboxId === intakeMailbox.inboxId || normalized.recipients.some(
-      (recipient) => extractEmailAddress(recipient) === intakeMailbox.email
-    )) {
-      return null;
-    }
 
     const subject = normalized.subject || "Adjudication Update";
     const bodyContent = normalized.text || normalized.html || "";

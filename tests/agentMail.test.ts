@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   getSharedAgentMailboxes,
-  getIntakeAgentMailbox,
   sendAgentMailMessage,
   getAgentMailMessage,
   downloadAgentMailAttachment,
@@ -42,26 +41,19 @@ describe("convex/lib/agentMail Unit Tests", () => {
     delete process.env.AGENTMAIL_SENDER_INBOX_ID;
 
     expect(() => getSharedAgentMailboxes()).toThrow("Shared AgentMail is not configured");
-    expect(() => getIntakeAgentMailbox()).toThrow("AgentMail intake is not configured");
   });
 
-  it("returns shared and intake agent mailboxes when properly configured", () => {
+  it("returns shared agent mailboxes when properly configured", () => {
     process.env.AGENTMAIL_SENDER_INBOX_ID = "inbox_sender_1";
     process.env.AGENTMAIL_SENDER_EMAIL = "sender@claimhero.agentmail.to";
     process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "inbox_adj_1";
     process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adjudicator@claimhero.agentmail.to";
-    process.env.AGENTMAIL_INTAKE_INBOX_ID = "inbox_intake_1";
-    process.env.AGENTMAIL_INTAKE_EMAIL = "Intake@ClaimHero.AgentMail.to";
 
     const shared = getSharedAgentMailboxes();
     expect(shared.senderInboxId).toBe("inbox_sender_1");
     expect(shared.senderEmail).toBe("sender@claimhero.agentmail.to");
     expect(shared.adjudicatorInboxId).toBe("inbox_adj_1");
     expect(shared.adjudicatorEmail).toBe("adjudicator@claimhero.agentmail.to");
-
-    const intake = getIntakeAgentMailbox();
-    expect(intake.inboxId).toBe("inbox_intake_1");
-    expect(intake.email).toBe("intake@claimhero.agentmail.to");
   });
 
   it("sends AgentMail message and returns messageId", async () => {
@@ -384,8 +376,8 @@ Paragraph text with **bold** and *italic*.
       event_id: "evt_9988",
       message: {
         message_id: "msg_9988",
-        inbox_id: "inbox_claimhero_intake",
-        to: ["claimhero-intake@agentmail.to"],
+        inbox_id: "inbox_claimhero_sender",
+        to: ["claimhero-sender@agentmail.to"],
       },
     });
 
