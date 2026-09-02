@@ -404,7 +404,7 @@ Deterministic 4-Pillar Appeal Rubric Formula Documentation & User-Centric Scorin
 - **User-Centric Win Score Calculation Tooltip**: Integrated an accessible, professional breakdown tooltip in `src/components/evidence/EvidenceMatrix.tsx` that explains the 100-point win probability model in clear healthcare and legal terminology for non-technical patients and providers without exposed raw code formulas or internal test names.
 - **Validation**: Verified with `npm run verify` (100% clean typecheck, ESLint, 357/357 passing unit tests across 26 test suites, and production bundle build). Convex features: actions, queries, mutations, static hosting.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 9284b10
 Evidence-Proportional Dynamic Scoring for ERISA & Precedent Pillars (`convex/actions/precedentMatcher.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`):
 - **Eliminated Unconditional Baseline Grants**: Refactored `calculateDeterministicRubric` in `convex/actions/precedentMatcher.ts` so that Pillar 3 (ERISA 29 CFR § 2560.503-1 Statutory Protections) and Pillar 4 (External Review Precedents & Overturn Benchmark) dynamically scale down to low baseline points (4 pts each, categorized as `"weak"`) when zero supporting evidence is present, eliminating falsely inflated scores (e.g. 78% on empty cases) on unsubstantiated claims.
 - **Graduated Multi-Tier Evidence Proportionality**:
@@ -413,6 +413,16 @@ Evidence-Proportional Dynamic Scoring for ERISA & Precedent Pillars (`convex/act
   - *Substantiated Multi-Evidence / CPB / Precedent*: Awards full strength (ERISA: 19 pts, Precedents: 16-19 pts, Policy: 29-34 pts, Clinical: 22-24 pts) with strong status.
 - **Comprehensive Unit Testing**: Added unit tests in `tests/actionsPrecedentsAndPipeline.test.ts` asserting strict scale-down on zero evidence (21 pts, `complex_litigation`), moderate scoring on single evidence (55-79 pts, `moderate`), and robust scoring on CPB + legal precedents (>=80 pts, `high_confidence`).
 - **Full Verification**: Passed `npm run verify` (100% clean TypeScript typecheck, ESLint, 360/360 passing tests across 26 test suites, and Vite production bundle build). Convex features: actions, queries, mutations, internalMutation, static hosting.
+
+### 2026-09-02 - working tree
+Multi-Tier Clinical Policy Search & Candidate Retrieval Architecture (`convex/actions/policyCrawler.ts`, `tests/actionsPolicyAndSynthesizer.test.ts`):
+- **Root Cause Resolution for Clinical Policy Search**: Identified and fixed the root cause where specialized plans, BCBS licensees (such as GeoBlue), and regional health plans failed policy discovery due to over-constraining quoted search queries that returned university travel-abroad marketing pages instead of clinical coverage bulletins.
+- **Multi-Tier Search Strategy Prompt Engineering**: Upgraded `generatePolicySearchQueries` to generate 3 diverse, high-yield queries spanning Tier 1 (Payer & UM Guidelines e.g. Carelon, Anthem/BCBS, EviCore), Tier 2 (National Specialty Society Standard-of-Care Guidelines e.g. NASS for spine, AAOS for joint/knee, ACR for imaging), and Tier 3 (National Statutory & CMS Local Coverage Determinations [LCD]).
+- **Hostname-Scoped Payer Match & Non-Clinical Path Filtering**: Corrected `selectFirecrawlPolicyUrls` to evaluate `payerBonus` against parsed URL hostnames instead of arbitrary path substrings, preventing university student/travel safety paths (e.g. `/global-safety-security/`, `/study-abroad/`, `/travel-health/`) from receiving spurious payer score boosts.
+- **Expanded Medical Authority Domains**: Added authoritative clinical repositories (`thespinejournalonline.com`, `jbjs.org`, `sciencedirect.com`) to `NEUTRAL_PUBLIC_HOSTS` and increased authority score weighting.
+- **Adaptive Multi-Round Search with Negative Feedback**: Enabled `MAX_POLICY_SEARCH_ROUNDS = 2` with sequential candidate scraping (up to 3 per round) and LLM-guided rejection feedback refinement.
+- **Active Guideline Targeting Prompt Engineering**: Enhanced `generatePolicySearchQueries` to explicitly target currently active, in-force standard-of-care guidelines and avoid past year/archive keywords, while candidate ranking (`archivePenalty`) heavily scores against historical editions.
+- **Validation**: Added unit tests in `tests/actionsPolicyAndSynthesizer.test.ts` verifying exclusion of student safety pages and prioritization of Carelon / NASS clinical guidelines. Verified 100% clean with `npm run verify` (361 passing unit tests across 26 suites, typecheck, lint, and production build). Convex features: actions, queries, mutations, rateLimiter, components.
 
 
 

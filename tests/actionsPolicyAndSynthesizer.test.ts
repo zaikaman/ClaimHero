@@ -150,6 +150,43 @@ describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
       expect(res.clausesExtracted).toBe(1);
       expect(mockCtx.runMutation).toHaveBeenCalled();
     });
+
+    it("selectFirecrawlPolicyUrls: rejects university student/travel safety paths and prioritizes clinical authorities", async () => {
+      const payload = {
+        data: {
+          web: [
+            {
+              url: "https://www.northwestern.edu/global-safety-security/health-safety/travel-health/international-health-insurance/geoblue-for-students.html",
+              title: "GeoBlue for Students | Global Safety and Security",
+              description: "International student health insurance coverage details and registration.",
+            },
+            {
+              url: "https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-lumbar-decompression.pdf",
+              title: "Carelon Medical Benefits Management Clinical Guideline: Lumbar Spine Decompression",
+              description: "Clinical coverage policy and medical necessity criteria for CPT 63047 lumbar laminectomy.",
+            },
+            {
+              url: "https://www.spine.org/guidelines/lumbar-decompression-criteria.pdf",
+              title: "North American Spine Society (NASS) Coverage Recommendations: Lumbar Decompression",
+              description: "Evidence-based clinical guidelines and conservative management criteria for 63047.",
+            },
+          ],
+        },
+      };
+
+      const urls = actionPolicyCrawler.selectFirecrawlPolicyUrls(
+        payload,
+        ["63047", "lumbar", "spine", "laminectomy", "medical policy"],
+        0,
+        3,
+        "GeoBlue",
+      );
+
+      // Student safety URL is filtered out; Carelon and NASS clinical authorities are selected and ranked first
+      expect(urls).not.toContain("https://www.northwestern.edu/global-safety-security/health-safety/travel-health/international-health-insurance/geoblue-for-students.html");
+      expect(urls).toContain("https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-lumbar-decompression.pdf");
+      expect(urls).toContain("https://www.spine.org/guidelines/lumbar-decompression-criteria.pdf");
+    });
   });
 
   describe("convex/actions/appealSynthesizer", () => {

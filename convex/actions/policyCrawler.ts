@@ -269,8 +269,8 @@ interface FirecrawlSearchResult {
   };
 }
 
-const MAX_POLICY_SEARCH_ROUNDS = 1;
-const MAX_POLICY_SOURCE_CANDIDATES = 3;
+const MAX_POLICY_SEARCH_ROUNDS = 2;
+const MAX_POLICY_SOURCE_CANDIDATES = 4;
 
 const DISALLOWED_MARKETING_DOMAINS = new Set([
   "allzonems.com",
@@ -339,6 +339,11 @@ function isAcceptableSourceUrl(value: unknown): value is string {
     }
 
     if (isPrivateMcgViewerUrl(value.trim())) return false;
+
+    // Exclude student travel / study-abroad / exchange insurance / non-clinical educational pages
+    if (/\/(?:global-safety-security|study-abroad|travel-health|student-insurance|for-students|student-health|international-travel|academic-programs|admissions)\//i.test(url.pathname)) {
+      return false;
+    }
 
     return !/(?:^|\/)(?:login|signin|sign-in|oauth|sso|authenticate)(?:\/|$)/i.test(url.pathname);
   } catch {
@@ -593,6 +598,12 @@ export const NEUTRAL_PUBLIC_HOSTS = new Set([
   "www.guidelinecentral.com",
   "orthobullets.com",
   "www.orthobullets.com",
+  "thespinejournalonline.com",
+  "www.thespinejournalonline.com",
+  "jbjs.org",
+  "www.jbjs.org",
+  "sciencedirect.com",
+  "www.sciencedirect.com",
 ]);
 
 export function getPayerHostKeyword(payer: string): string | null {
@@ -765,13 +776,29 @@ export function selectFirecrawlPolicyUrls(
         "nccn.org",
         "nih.gov",
         "ncbi.nlm.nih.gov",
+        "thespinejournalonline.com",
+        "jbjs.org",
+        "sciencedirect.com",
       ].reduce(
-        (total, term) => total + (sourceUrl.toLowerCase().includes(term) ? 3 : 0),
+        (total, term) => total + (sourceUrl.toLowerCase().includes(term) ? 4 : 0),
         0,
       );
 
-      // Huge score bonus if the URL host matches the claim's actual payer
-      const payerBonus = payer && getPayerHostKeyword(payer) && sourceUrl.toLowerCase().includes(getPayerHostKeyword(payer)!) ? 8 : 0;
+      // Huge score bonus ONLY if the URL host matches the claim's actual payer
+      let payerBonus = 0;
+      if (payer) {
+        const payerKw = getPayerHostKeyword(payer);
+        if (payerKw) {
+          try {
+            const parsedHost = new URL(sourceUrl).hostname.toLowerCase();
+            if (parsedHost.includes(payerKw)) {
+              payerBonus = 8;
+            }
+          } catch {
+            // ignore malformed URLs
+          }
+        }
+      }
 
       // Conflicting anatomical term penalty in search snippet/URL (e.g. foot/bunion on a knee claim)
       const isKnee = relevanceTerms.some((t) => t === "knee" || t === "27447" || t === "29881");
@@ -795,12 +822,29 @@ export function selectFirecrawlPolicyUrls(
         "edi",
         "billing",
         "provider enrollment",
+        "for-students",
+        "student",
+        "study-abroad",
+        "travel-health",
+        "travel-insurance",
+        "rebranding",
+        "international-coverage",
+        "products-programs",
+        "brochure",
+        "handbook",
       ].reduce(
-        (total, term) => total + (searchableText.includes(term) ? 3 : 0),
+        (total, term) => total + (searchableText.includes(term) ? 4 : 0),
         0,
       );
       const privateViewerPenalty = isPrivateMcgViewerUrl(sourceUrl) ? 10 : 0;
-      const archivePenalty = (sourceUrl.toLowerCase().includes("/archive") || sourceUrl.toLowerCase().includes("archived-") || searchableText.includes("archived")) ? 6 : 0;
+      const archivePenalty = (
+        sourceUrl.toLowerCase().includes("/archive") ||
+        sourceUrl.toLowerCase().includes("archived-") ||
+        searchableText.includes("archived") ||
+        searchableText.includes("archive date:") ||
+        searchableText.includes("historical information only") ||
+        /-\d{4}-\d{2}-\d{2}/.test(sourceUrl)
+      ) ? 12 : 0;
       const score = termScore + specificDocumentScore + authorityHostScore + payerBonus + documentFormatScore - landingPagePenalty - privateViewerPenalty - anatomicalPenalty - archivePenalty;
 
       if (minimumRelevanceScore <= 0 || score >= minimumRelevanceScore) {
@@ -1139,24 +1183,36 @@ async function generatePolicySearchQueries(
       return name ? `${code} (${name})` : code;
     })
     .join(", ");
+  const primaryProcedureName = cptCodes[0] && CPT_CLINICAL_NAMES[cptCodes[0]]
+    ? CPT_CLINICAL_NAMES[cptCodes[0]].replace(/\(.*?\)/g, "").trim()
+    : "Medical Procedure";
+  const primaryCpt = cptCodes[0] || "";
 
   const result = await createStructuredCompletion<PolicySearchIntentResponse>({
     systemPrompt: `You are an expert Clinical Policy Retrieval Strategist for health insurance appeals.
-Generate 2 concise, surgical web search queries to locate the official clinical coverage policy, medical necessity criteria, or specialty society guideline for this claim.
+Generate 3 distinct, high-precision web search queries to locate official, currently active clinical coverage policies, medical necessity guidelines, or national specialty society standards for this claim.
 
 Query Strategy:
-1. Payer Medical Necessity Query:
-   - Combine the formal procedure name and payer name with coverage criteria terms: e.g., "${searchPayer}" "${cptDescriptions.split(",")[0]?.replace(/\(.*\)/, "").trim() || "procedure"}" "medical necessity" OR "coverage criteria".
-2. Clinical Specialty Guideline Query:
-   - Target authoritative national clinical guidelines (AAOS, NASS, ACR, CMS LCD/NCD, or major payer clinical policy bulletins) that define standard-of-care indications and conservative therapy rules for this exact procedure and CPT code: e.g., "${cptDescriptions.split(",")[0]?.replace(/\(.*\)/, "").trim() || "procedure"}" "${cptCodes[0] || ""}" "clinical guideline" criteria OR indications.
+1. Payer & Utilization Management Guideline Query:
+   - Target currently effective payer medical policies and clinical guidelines managers (e.g. Carelon, EviCore, Anthem/BCBS, Aetna, Cigna, UHC, Molina).
+   - Example: ${primaryProcedureName} ${primaryCpt} Carelon current clinical guideline OR coverage criteria ${searchPayer}
+2. Clinical Specialty Society Standard-of-Care Guideline Query:
+   - Target authoritative national medical specialty guidelines (NASS for spine, AAOS for orthopedics/joint, ACR for imaging/radiology, NCCN for oncology) that establish active clinical necessity and conservative therapy criteria.
+   - Example: ${primaryProcedureName} ${primaryCpt} NASS OR AAOS OR ACR clinical practice guideline indications
+3. National Statutory & CMS Coverage Query:
+   - Target CMS Local Coverage Determinations (LCD) or standard medical necessity criteria.
+   - Example: ${primaryProcedureName} ${primaryCpt} CMS LCD medical necessity criteria indications
 
 Rules:
-- Always use the formal clinical procedure title (e.g. "Total Knee Arthroplasty", "Lumbar Spine Decompression", "Knee MRI").
-- Do not target state Medicaid manuals or third-party billing company blogs.
-- Keep each query under 80 characters for optimal search precision.${rejectedSearchFeedback ? `
+- Always include the clinical procedure title (e.g. "lumbar laminectomy decompression", "knee arthroscopy meniscectomy", "total knee arthroplasty", "knee MRI").
+- Combine procedure names with primary CPT codes and authoritative keywords (Carelon, NASS, AAOS, ACR, CMS LCD, coverage criteria).
+- Do NOT use rigid exact-match double quotes around every word; use natural search engine keyword combinations.
+- Do NOT include 'archive' or past years in queries; target active and currently effective guidelines.
+- Do NOT target university student health portals, travel insurance marketing brochures, state Medicaid forms, or billing blogs.
+- Keep each query concise (under 90 characters) and focused.${rejectedSearchFeedback ? `
 Previous search attempts returned these rejected/stale results:
 ${rejectedSearchFeedback.slice(0, 4000)}
-Refine queries to broaden toward authoritative clinical authorities (CMS LCD, AAOS, NASS, ACR, NCCN).` : ""}`,
+Refine queries to avoid archived/student/marketing domains and target active Carelon, NASS, AAOS, ACR, or CMS LCD guidelines directly.` : ""}`,
     userPrompt: `Build the search queries for this claim.
 
 Payer: ${searchPayer} (Original: ${payer})
@@ -1173,7 +1229,7 @@ Denial: ${denialReasonCode} - ${denialReasonDescription || "Medical necessity"}`
       .filter((query): query is string => typeof query === "string")
       .map((query) => query.trim())
       .filter(Boolean),
-  )].slice(0, 2);
+  )].slice(0, 3);
 
   if (!queries.length) {
     throw new Error("Policy search planning returned no usable search queries.");
@@ -1268,7 +1324,7 @@ export const crawlInsurerPolicy = action({
         const failedSearches: string[] = [];
 
         // Run search queries sequentially (not in parallel) to prevent rate-limit bursts
-        for (const query of searchQueries.slice(0, 2)) {
+        for (const query of searchQueries.slice(0, 3)) {
           try {
             const payload = await firecrawl.search(ctx, query, {
               limit: 5,
@@ -1340,7 +1396,7 @@ export const crawlInsurerPolicy = action({
         discoveredSourceCount += sourceUrls.length;
 
         // Evaluate candidate URLs sequentially (concurrency 1) to honor Firecrawl concurrency limits
-        for (const sourceUrl of sourceUrls.slice(0, 2)) {
+        for (const sourceUrl of sourceUrls.slice(0, 3)) {
           try {
             const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl);
             const relevance = await evaluatePolicySourceRelevance(

@@ -99,21 +99,30 @@ Every valid project submission on [vibeapps.dev](https://vibeapps.dev) must incl
 
 ---
 
-## 6. Evaluation & Judging Criteria
+## 6. Qualification & Judging Criteria
 
-Judges evaluate submissions across the following core dimensions:
+The hackathon evaluation is scored across 7 official criteria:
 
-1. **Real-World Utility:**
-   - Focus on practical applications that solve tangible problems for human end-users or businesses, rather than purely meta developer utilities.
+1. **Everyday apps, not developer tools:**
+   - We score what you ship on Convex, OpenAI, Firecrawl, and AgentMail. Your hackathon build log is what judges read, so include what you built, the stack, the live URL, and your demo link.
 
-2. **Full-Stack Integration Depth:**
-   - Meaningful, tight integration of the four pillars: Convex reactivity, Firecrawl data ingestion, AgentMail communications, and AI reasoning.
+2. **Creativity and usefulness:**
+   - Build something a real person would use this week: law, hospitality, health, construction, whatever you know. Copycats and developer-only tools score low.
 
-3. **Technical Rigor & Polish:**
-   - End-to-end functionality, high reliability, robust schema design, zero fake fallbacks, and polished UI/UX interaction.
+3. **Convex depth:**
+   - Real use of queries, mutations, live updates, auth, and components. A thin frontend on a hosted page does not count.
 
-4. **Transparency & Process (`hackathon.md`):**
-   - Quality of documentation, architectural clarity, and truthful representation of what was built and verified during the build window.
+4. **Sponsor stack:**
+   - OpenAI, Firecrawl, and AgentMail do real work in your product. They generate, crawl, or send, not just sit in the README.
+
+5. **Live URL:**
+   - Judges can open what you built. Publish on `convex.site` or `chatgpt.site`. No localhost demos.
+
+6. **Social proof:**
+   - You posted your build on X or LinkedIn. Engagement counts.
+
+7. **Video demo:**
+   - Under 3 minutes. Talk less, click through the real product.
 
 ---
 
