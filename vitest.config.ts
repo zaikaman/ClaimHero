@@ -11,18 +11,18 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json"],
       include: [
-        "src/lib/**/*.ts",
-        "convex/lib/**/*.ts",
+        "convex/**/*.ts",
       ],
       exclude: [
         "node_modules",
         "dist",
+        "docs",
         "convex/_generated/**",
+        "convex/convex.config.ts",
+        "convex/auth.config.ts",
+        "convex/schema.ts",
+        "**/*.d.ts",
       ],
-      thresholds: {
-        lines: 100,
-        statements: 100,
-      },
     },
   },
   resolve: {

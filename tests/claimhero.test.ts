@@ -1,5 +1,7 @@
 import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it, expect, vi } from "vitest";
+import { AppealBriefRenderer } from "../src/components/studio/AppealBriefRenderer";
 import {
   formatCurrency,
   formatDeadlineRemaining,
@@ -852,10 +854,7 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
     expect(addendum.text).not.toContain("*");
   });
 
-  it("renders official sources as clickable links in the PDF preview", async () => {
-    const { renderToStaticMarkup } = await import("react-dom/server");
-    const { AppealBriefRenderer } = await import("../src/components/studio/AppealBriefRenderer");
-
+  it("renders official sources as clickable links in the PDF preview", () => {
     const html = renderToStaticMarkup(
       React.createElement(AppealBriefRenderer, {
         content: "Supporting [official policy source](https://example.com/policy).",
@@ -873,7 +872,7 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
     expect(html).toContain("underline");
     expect(unsafeHtml).not.toContain("href=");
     expect(unsafeHtml).not.toContain("javascript:");
-  }, 30000);
+  });
 
   it("formats dedicated agentmail inbox address correctly", () => {
     const claimNumber = "CLM-2026-88192";

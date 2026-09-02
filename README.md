@@ -18,8 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-217%2F217%20passing-0ea5e9?style=flat-square" />
-  <img alt="Coverage" src="https://img.shields.io/badge/coverage-100%25%20lines-10b981?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-356%2F356%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -448,7 +447,7 @@ ClaimHero/
 │   │   ├── layout/ (Shell, Sidebar, Header) + ui/* (Button, Card, Badge, Dialog, Select, Silk)
 │   │   └── onboarding/ (OnboardingWizard, OnboardingChecklist)
 │   └── types/index.ts
-├── tests/                        # 217 unit tests across 12 suites (vitest + v8 coverage)
+├── tests/                        # 356 unit tests across 26 suites (vitest)
 ├── .env.example                  # all required keys documented
 ├── convex.json / vite.config.ts / tailwind.config.js / tsconfig.json
 ├── BRIEF.md / hackathon.md / README.md
@@ -536,27 +535,41 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (217 tests)
+npm run test            # vitest run tests  (356 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **217/217 passing** across 12 suites with **100% line coverage** across backend libraries and core business utilities:
+Current: **356/356 passing** across 26 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
 | [`tests/claimhero.test.ts`](file:///d:/ClaimHero/tests/claimhero.test.ts) | 70 | Master end-to-end integration, 4-pillar rubric scoring, ERISA rules, portfolio aggregation, bounded batch deadline sweep, bounded indexed claim listing & pagination, N+1 query elimination, competitor payer domain rejection, and global Carelon/BCBS template verification |
-| [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 25 | AgentMail delivery, binary attachments, webhook normalizers, Svix signature verification, key rotation, free-tier intake routing |
 | [`tests/authorization.test.ts`](file:///d:/ClaimHero/tests/authorization.test.ts) | 29 | Convex multi-tenant authorization, searchIndex & vector isolation, strict document & shared intake claim ownership validation, unauthenticated rejection, session isolation, optical parser 15MB/MIME gates, idempotent thread lookups |
-| [`tests/redactionEngine.test.ts`](file:///d:/ClaimHero/tests/redactionEngine.test.ts) | 17 | HIPAA Safe Harbor 18-identifier redaction, boundary masking, regex patterns |
-| [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking |
-| [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest |
-| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting (cents precision), statutory countdown math, risk badge styling, verified payer appellate contact directory lookup |
-| [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, 3-tier appellate escalation |
-| [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, STT tolerance |
-| [`tests/p2pDefense.test.ts`](file:///d:/ClaimHero/tests/p2pDefense.test.ts) | 6 | Physician tele-script generator, statutory opening, pocket cheat sheet print |
-| [`tests/sentinelChatbot.test.ts`](file:///d:/ClaimHero/tests/sentinelChatbot.test.ts) | 6 | Agentic OpenAI tool calling (10 tools), Firecrawl live search/scrape schemas, lean prompt builder, indexed query sorting and bounded constraints |
+| [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 25 | AgentMail delivery, binary attachments, webhook normalizers, Svix signature verification, key rotation, free-tier intake routing |
+| [`tests/convexAppeals.test.ts`](file:///d:/ClaimHero/tests/convexAppeals.test.ts) | 21 | Versioned appeal drafts, Level 1-3 statutory escalation, draft auto-saving, PDF storage ID mutations, and ownership access controls |
+| [`tests/redactionEngine.test.ts`](file:///d:/ClaimHero/tests/redactionEngine.test.ts) | 17 | HIPAA Safe Harbor 18-identifier redaction, boundary masking, regex patterns, and deterministic tokenization |
+| [`tests/convexChatbot.test.ts`](file:///d:/ClaimHero/tests/convexChatbot.test.ts) | 17 | Chatbot sessions, message history, auto-titling, conversation summaries, and internal lookup tool queries for claims, evidence, and briefs |
+| [`tests/convexClinicalEvidences.test.ts`](file:///d:/ClaimHero/tests/convexClinicalEvidences.test.ts) | 16 | Clinical evidence clause sanitization, batch insertions, search indexes, deletion, and source counting |
+| [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest, out-of-pocket maximum offsets, and No Surprises Act protections |
+| [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking, and API key validation |
+| [`tests/convexClaimsFull.test.ts`](file:///d:/ClaimHero/tests/convexClaimsFull.test.ts) | 13 | Claims CRUD, financial liability calculations, ERISA penalty tracking, bounded pagination, and deadline sweeps |
+| [`tests/convexAuditLogsAndUsers.test.ts`](file:///d:/ClaimHero/tests/convexAuditLogsAndUsers.test.ts) | 12 | Immutable audit trail logging, user profile management, crons registration, and auth methods |
+| [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, and 3-tier appellate escalation |
+| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting (cents precision), statutory countdown math, risk badge styling, and payer appellate contact directory lookup |
+| [`tests/convexEmails.test.ts`](file:///d:/ClaimHero/tests/convexEmails.test.ts) | 9 | Email threads, messages, inbound intake states, and multi-tenant access boundaries |
+| [`tests/convexHttp.test.ts`](file:///d:/ClaimHero/tests/convexHttp.test.ts) | 9 | Svix HMAC-SHA256 signature verification, AgentMail intake webhooks, claim replies, and error handling |
+| [`tests/convexP2P.test.ts`](file:///d:/ClaimHero/tests/convexP2P.test.ts) | 9 | Live call sessions, real-time transcripts, fast answers, checklist scoring, and tele-scripts |
+| [`tests/convexPrecedents.test.ts`](file:///d:/ClaimHero/tests/convexPrecedents.test.ts) | 9 | Vector matching attachments, corpus key lookup, hydration, and search index |
+| [`tests/actionsAgentMailAndDispatcher.test.ts`](file:///d:/ClaimHero/tests/actionsAgentMailAndDispatcher.test.ts) | 7 | AgentMail actions, attachment download, transmission dispatching, and thread resolution |
+| [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, and STT tolerance |
+| [`tests/p2pDefense.test.ts`](file:///d:/ClaimHero/tests/p2pDefense.test.ts) | 6 | Physician tele-script generator, statutory opening, and pocket cheat sheet print |
+| [`tests/sentinelChatbot.test.ts`](file:///d:/ClaimHero/tests/sentinelChatbot.test.ts) | 6 | Agentic OpenAI tool calling (10 tools), Firecrawl live search/scrape schemas, and lean prompt builder |
+| [`tests/actionsClinicalAndParser.test.ts`](file:///d:/ClaimHero/tests/actionsClinicalAndParser.test.ts) | 5 | Clinical intake question generation, optical parser vision extraction, and payer contact resolver |
 | [`tests/statutoryEscalation.test.ts`](file:///d:/ClaimHero/tests/statutoryEscalation.test.ts) | 5 | 180-day internal appeal to Level 3 DOI escalation state machine |
+| [`tests/actionsPolicyAndSynthesizer.test.ts`](file:///d:/ClaimHero/tests/actionsPolicyAndSynthesizer.test.ts) | 4 | Policy crawler scraping, PubMed research, FDA package insert extraction, and appeal brief synthesis |
+| [`tests/actionsPrecedentsAndPipeline.test.ts`](file:///d:/ClaimHero/tests/actionsPrecedentsAndPipeline.test.ts) | 4 | Precedent vector indexing, 4-pillar rubric matching, and autonomous pipeline orchestration |
+| [`tests/actionsP2PAndChatbot.test.ts`](file:///d:/ClaimHero/tests/actionsP2PAndChatbot.test.ts) | 4 | Physician P2P defense generation, live copilot fast answers, interactive pushback, and multi-turn agentic chatbot |
 
 ---
 

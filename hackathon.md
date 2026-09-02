@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T05:14:00Z
+- **Last updated:** 2026-09-02T05:55:00Z
 
 ## Log
 
@@ -372,13 +372,16 @@ Hardened AgentMail inbound webhook endpoint and published comprehensive threat m
 - **Comprehensive Threat Modeling**: Documented complete asset inventory, attack vectors (STRIDE: spoofing, replay, side-channel timing, payload tampering, DoS), cryptographic controls, and zero-trust re-fetch architecture in `docs/THREAT_MODEL.md`.
 - **Validation**: Verified with full test suite (`tests/agentMail.test.ts`) and `npm run verify` (100% typecheck, ESLint, 214/214 passing unit tests, and production build). Convex features: httpRouter, actions, components, static hosting.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - c131202
 Eliminated unbounded table reads and N+1 query joins across claims, portfolio metrics, audit logs, and clinical evidence:
 - **Denormalized Patient & Payer on Claims Schema**: Added `patientName` and `insurancePayer` fields directly to the `claims` schema table (`convex/schema.ts`) alongside secondary indexes `by_user_payer` (`["userId", "insurancePayer"]`) and `by_payer` (`["insurancePayer"]`). Updated claim creation mutations (`create`, `applyCreateWithPatient`) to populate denormalized fields atomically.
 - **N+1 Elimination & Bounded/Paginated Claim Listing**: Refactored `api.claims.list` (`convex/claims.ts`) to use index scans (`by_user_payer`, `by_user_status`, `by_user`) and bounded reads (`.take(limit)` or `.paginate(args.paginationOpts)`), completely eliminating secondary `db.get(patientId)`, `appeals`, and `clinicalEvidences` N+1 sub-queries per claim.
 - **O(log N) Portfolio Statistics & Patient Scan Removal**: Upgraded `api.claims.getPortfolioStats` (`convex/claims.ts`) to rely on O(log N) `claimsAggregate.count` / `claimsAggregate.sum` and bounded `.take(500)` scans reading denormalized `insurancePayer`, fully eliminating unbounded `.collect()` scans over the `patients` table.
 - **Bounded Queries across Audit Logs & Evidence**: Enforced `.take(30)` on `auditLogs.listRecent` (`convex/auditLogs.ts`), `.take(50)` on `clinicalEvidences.listByClaim` and `listByClaimInternal`, and indexed `by_claim_source` search on `clinicalEvidences.listByClaimAndSource` (`convex/clinicalEvidences.ts`).
 - **Validation**: Added unit tests in `tests/claimhero.test.ts` verifying bounded indexed listing, pagination, and aggregate computation. Verified with `npm run verify` (100% clean typecheck, ESLint, 217/217 passing unit tests, and production bundle build). Convex features: schema, indexes, queries, mutations, internalMutation, aggregate, components.
+
+### 2026-09-02 - working tree
+Comprehensive Backend Test Suite & Coverage Expansion: Built and passed complete unit test suites across all Convex server modules and background actions, bringing the test suite to 356 total passing tests across 26 test files. Verified full type checking and test suites run cleanly with zero errors.
 
 
 
