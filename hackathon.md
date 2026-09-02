@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T06:17:00Z
+- **Last updated:** 2026-09-02T06:25:30Z
 
 ## Log
 
@@ -383,11 +383,20 @@ Eliminated unbounded table reads and N+1 query joins across claims, portfolio me
 ### 2026-09-02 - f46aa64
 Comprehensive Backend Test Suite & Coverage Expansion: Built and passed complete unit test suites across all Convex server modules and background actions, bringing the test suite to 356 total passing tests across 26 test files. Verified full type checking and test suites run cleanly with zero errors.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 75c9fee
 Strict Attestation & Sender Validation in Autonomous Sentinel Pipeline (`convex/actions/sentinelPipeline.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`):
 - **Eliminated Synthetic Fallbacks**: Removed silent fallback logic in `runAutonomousPipeline` that fabricated a synthetic `"ClaimHero Appeals Desk"` sender and auto-persisted `recordsAreIncomplete: true` to the database, which bypassed the attestation gate in `IngestionModal.tsx` and violated zero-mock principles.
 - **Strict Sender Requirement**: Enforced strict validation checking that `sender.name` and at least one contact channel (`sender.email` or `sender.phone`) are provided in `args.sender` or `claim.appealContext`, throwing `Error("Complete sender details before drafting")` when absent.
 - **Unit & Integration Test Verification**: Added tests verifying error rejection on missing sender details and successful pipeline orchestration when sender information is supplied. Verified all 357 unit tests across 26 suites with `npm run verify` (100% clean typecheck, build, and tests). Convex features: actions, queries, mutations, rateLimiter.
+
+### 2026-09-02 - working tree
+Live-First Autonomous Firecrawl Payer Discovery Architecture (`convex/actions/payerContactResolver.ts`, `src/lib/constants.ts`, `tests/actionsClinicalAndParser.test.ts`):
+- **Live Search First Integration**: Restructured `resolvePayerGateway` to execute live Firecrawl web searches (`firecrawl.search`) unconditionally across all health insurers and payers during claim intake, discovering real-time appeals/grievance gateways, appellate fax numbers, statutory mailing addresses, and filing instructions.
+- **AI Extraction & Statutory Registry Grounding**: Extracted structured contact endpoints via OpenAI (`createStructuredCompletion`), using `STATUTORY_PAYER_REGISTRY` as a validation and metadata enrichment anchor. Discovered gateways receive `source: "firecrawl_live"`, while inconclusive searches gracefully fall back to statutory gateways (`source: "registry_fallback"`).
+- **Audit Trail Attribution**: Updated audit logging to dynamically attribute discoveries to `"Firecrawl Web Crawler"` or `"Statutory Payer Registry"`.
+- **Client Baseline Documentation**: Annotated `VERIFIED_PAYER_DIRECTORY` in `src/lib/constants.ts` to clearly document its role as an initial optimistic client seed cache while async live crawling executes.
+- **Validation**: Added unit tests for live Firecrawl extraction and statutory fallback. Verified with `npm run verify` (100% typecheck, ESLint, 357/357 passing unit tests across 26 suites, and Vite production bundle). Convex features: actions, queries, mutations, internalMutation, components, static hosting.
+
 
 
 

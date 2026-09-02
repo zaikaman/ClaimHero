@@ -18,6 +18,13 @@ export interface PayerAppellateContact {
   submissionPolicyNote?: string;
 }
 
+/**
+ * STATUTORY PAYER REGISTRY (Baseline Seeds & Optimistic Fallback)
+ * 
+ * Serves as an initial optimistic baseline and offline resilience anchor for the UI
+ * before the autonomous Live-First Firecrawl Payer Discovery action (`resolvePayerGateway`)
+ * executes live web crawling and AI extraction.
+ */
 export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
   molina: {
     id: "molina",

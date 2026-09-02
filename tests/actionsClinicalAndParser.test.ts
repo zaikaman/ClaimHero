@@ -111,7 +111,7 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
   });
 
   describe("convex/actions/payerContactResolver", () => {
-    it("resolvePayerGateway: matches preset payer directory", async () => {
+    it("resolvePayerGateway: falls back to statutory registry when web crawl returns inconclusive results", async () => {
       const mockClaim = {
         _id: "c1",
         claimNumber: "CLM-100",
@@ -120,7 +120,21 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
       const mockCtx: any = {
         runQuery: vi.fn().mockResolvedValue(mockClaim),
         runMutation: vi.fn().mockResolvedValue(undefined),
+        runAction: vi.fn().mockResolvedValue({ web: [] }),
       };
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        officialAppealsEmail: "",
+        intakePortalUrl: "",
+        portalName: "",
+        appealsFax: "",
+        statutoryPoBox: "",
+        ediPayerId: "",
+        tollFreeHelpline: "",
+        isVerified: false,
+        submissionPolicyNote: "",
+        source: "unresolved",
+      } as any);
 
       const res = await (actionPayerContactResolver.resolvePayerGateway as any)._handler(mockCtx, {
         claimId: "c1",
@@ -129,16 +143,17 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
 
       expect(res.portalName).toContain("UHC");
       expect(res.isVerified).toBe(true);
-      expect(res.source).toBe("preset");
+      expect(res.source).toBe("registry_fallback");
       expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
         claimId: "c1",
         payerContact: expect.objectContaining({
           isVerified: true,
+          source: "registry_fallback",
         }),
       }));
     });
 
-    it("resolvePayerGateway: performs web search fallback when payer is unfamiliar", async () => {
+    it("resolvePayerGateway: performs live Firecrawl discovery and AI extraction", async () => {
       const mockClaim = {
         _id: "c2",
         claimNumber: "CLM-200",
@@ -160,16 +175,17 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
         tollFreeHelpline: "1-800-555-0100",
         isVerified: true,
         submissionPolicyNote: "Submit via portal or fax",
+        source: "firecrawl_live",
       } as any);
 
       const res = await (actionPayerContactResolver.resolvePayerGateway as any)._handler(mockCtx, {
         claimId: "c2",
         payerName: "Obscure Regional Health Plan",
-        forceWebSearch: true,
       });
 
       expect(res.officialAppealsEmail).toBe("appeals@custompayer.org");
       expect(res.source).toBe("firecrawl_live");
+      expect(res.isVerified).toBe(true);
     });
   });
 });
