@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T06:25:30Z
+- **Last updated:** 2026-09-02T06:31:30Z
 
 ## Log
 
@@ -389,13 +389,20 @@ Strict Attestation & Sender Validation in Autonomous Sentinel Pipeline (`convex/
 - **Strict Sender Requirement**: Enforced strict validation checking that `sender.name` and at least one contact channel (`sender.email` or `sender.phone`) are provided in `args.sender` or `claim.appealContext`, throwing `Error("Complete sender details before drafting")` when absent.
 - **Unit & Integration Test Verification**: Added tests verifying error rejection on missing sender details and successful pipeline orchestration when sender information is supplied. Verified all 357 unit tests across 26 suites with `npm run verify` (100% clean typecheck, build, and tests). Convex features: actions, queries, mutations, rateLimiter.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 3fb099e
 Live-First Autonomous Firecrawl Payer Discovery Architecture (`convex/actions/payerContactResolver.ts`, `src/lib/constants.ts`, `tests/actionsClinicalAndParser.test.ts`):
 - **Live Search First Integration**: Restructured `resolvePayerGateway` to execute live Firecrawl web searches (`firecrawl.search`) unconditionally across all health insurers and payers during claim intake, discovering real-time appeals/grievance gateways, appellate fax numbers, statutory mailing addresses, and filing instructions.
 - **AI Extraction & Statutory Registry Grounding**: Extracted structured contact endpoints via OpenAI (`createStructuredCompletion`), using `STATUTORY_PAYER_REGISTRY` as a validation and metadata enrichment anchor. Discovered gateways receive `source: "firecrawl_live"`, while inconclusive searches gracefully fall back to statutory gateways (`source: "registry_fallback"`).
 - **Audit Trail Attribution**: Updated audit logging to dynamically attribute discoveries to `"Firecrawl Web Crawler"` or `"Statutory Payer Registry"`.
 - **Client Baseline Documentation**: Annotated `VERIFIED_PAYER_DIRECTORY` in `src/lib/constants.ts` to clearly document its role as an initial optimistic client seed cache while async live crawling executes.
 - **Validation**: Added unit tests for live Firecrawl extraction and statutory fallback. Verified with `npm run verify` (100% typecheck, ESLint, 357/357 passing unit tests across 26 suites, and Vite production bundle). Convex features: actions, queries, mutations, internalMutation, components, static hosting.
+
+### 2026-09-02 - working tree
+Deterministic 4-Pillar Appeal Rubric Formula Documentation & User-Centric Scoring Explanation (`convex/actions/precedentMatcher.ts`, `src/components/ui/tooltip.tsx`, `src/components/evidence/EvidenceMatrix.tsx`):
+- **Deterministic 4-Pillar Statutory Rubric Documentation**: Enriched `calculateDeterministicRubric` in `convex/actions/precedentMatcher.ts` with comprehensive documentation and mathematical formulas linking each statutory subscore (Policy Alignment: max 35 pts; Clinical Records: max 25 pts; ERISA 29 CFR § 2560.503-1: max 20 pts; Precedents: max 20 pts) directly to the rubric weights validated in `tests/claimhero.test.ts:114`.
+- **Radix UI Tooltip Component**: Created `src/components/ui/tooltip.tsx` wrapping `@radix-ui/react-tooltip` with smooth enter/exit animations and dark-mode precision styling.
+- **User-Centric Win Score Calculation Tooltip**: Integrated an accessible, professional breakdown tooltip in `src/components/evidence/EvidenceMatrix.tsx` that explains the 100-point win probability model in clear healthcare and legal terminology for non-technical patients and providers without exposed raw code formulas or internal test names.
+- **Validation**: Verified with `npm run verify` (100% clean typecheck, ESLint, 357/357 passing unit tests across 26 test suites, and production bundle build). Convex features: actions, queries, mutations, static hosting.
 
 
 

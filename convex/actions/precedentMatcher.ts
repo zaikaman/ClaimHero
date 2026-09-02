@@ -64,7 +64,21 @@ interface RawLLMAnalysisOutput {
 
 /**
  * Deterministic Clinical Appeal Criteria Calculator
- * Evaluates the 4 pillars with mathematical precision based on objective case evidence.
+ * 
+ * Evaluates the 4 statutory appeal pillars with mathematical precision based on objective case evidence.
+ * Corresponds to the deterministic 4-pillar appeal scoring rubric weighting tested in tests/claimhero.test.ts:114
+ * ("Phase 4: Clinical Evidence & Precedent Structure Validation"):
+ *   - Pillar 1: CPB & Indication Alignment (Max: 35 pts)
+ *   - Pillar 2: Objective Clinical Documentation & Step-Therapy (Max: 25 pts)
+ *   - Pillar 3: ERISA 29 CFR § 2560.503-1 Statutory Protections (Max: 20 pts)
+ *   - Pillar 4: External Review Precedents & Overturn Benchmark (Max: 20 pts)
+ *   - Total Score = min(99, max(5, round(∑ Pillar Scores)))
+ * 
+ * Score Formula:
+ *   score = (hasCpb ? (isClinicalDenial ? 34 : isAuthOrAdminDenial ? 31 : 29) : (isClinicalDenial ? 24 : 20))
+ *         + (evidences.length >= 3 ? (isClinicalDenial ? 24 : 22) : evidences.length >= 1 ? (isClinicalDenial ? 22 : 20) : 16)
+ *         + 19 [ERISA procedural review criteria violation baseline]
+ *         + (denialReasonCode === "CO-50" ? 19 : denialReasonCode === "CO-197" ? 18 : ("CO-16"|"CO-4") ? 17 : 16)
  */
 export function calculateDeterministicRubric(
   claim: {
@@ -79,7 +93,8 @@ export function calculateDeterministicRubric(
   const isClinicalDenial = ["CO-50", "CO-57", "CO-119", "CO-151"].includes(claim.denialReasonCode);
   const isAuthOrAdminDenial = ["CO-197", "CO-16", "CO-4", "CO-96", "CO-252"].includes(claim.denialReasonCode);
 
-  // 1. CPB & Indication Alignment (Max: 35 points)
+  // Pillar 1. CPB & Indication Alignment (Max: 35 points; rubric weight tested in tests/claimhero.test.ts:114)
+  // Formula: hasCpb ? (isClinicalDenial ? 34 : isAuthOrAdminDenial ? 31 : 29) : (isClinicalDenial ? 24 : 20)
   let policyScore = 20;
   let policyRationale = `National standard clinical practice guidelines support medical necessity for CPT ${claim.cptCodes[0] || "procedure"}.`;
   if (hasCpb) {
@@ -98,7 +113,8 @@ export function calculateDeterministicRubric(
     policyRationale = `Clinical indications align with national standards; crawl insurer CPB to unlock full coverage criteria verification.`;
   }
 
-  // 2. Objective Clinical Documentation & Step-Therapy (Max: 25 points)
+  // Pillar 2. Objective Clinical Documentation & Step-Therapy (Max: 25 points; rubric weight tested in tests/claimhero.test.ts:114)
+  // Formula: evidences.length >= 3 ? (isClinicalDenial ? 24 : 22) : evidences.length >= 1 ? (isClinicalDenial ? 22 : 20) : 16
   let clinicalScore = 16;
   let clinicalRationale = "Standard clinical documentation available.";
   if (evidences.length >= 3) {
@@ -112,11 +128,13 @@ export function calculateDeterministicRubric(
     clinicalRationale = `Standard clinical notes available; attaching supplementary diagnostic records will reinforce conservative therapy timeline.`;
   }
 
-  // 3. ERISA 29 CFR § 2560.503-1 & Statutory Protections (Max: 20 points)
+  // Pillar 3. ERISA 29 CFR § 2560.503-1 & Statutory Protections (Max: 20 points; rubric weight tested in tests/claimhero.test.ts:114)
+  // Formula: Baseline 19/20 points for adverse determinations failing ERISA statutory clinical specification mandates
   const erisaScore = 19;
   const erisaRationale = `Adverse determination violates ERISA 29 CFR § 2560.503-1 disclosure mandates by failing to articulate specific internal clinical review criteria.`;
 
-  // 4. External Review Precedents & Overturn Benchmark (Max: 20 points)
+  // Pillar 4. External Review Precedents & Overturn Benchmark (Max: 20 points; rubric weight tested in tests/claimhero.test.ts:114)
+  // Formula: CO-50 -> 19 | CO-197 -> 18 | CO-16/CO-4 -> 17 | other -> 16
   let precedentScore = 17;
   let precedentRationale = "";
   if (claim.denialReasonCode === "CO-50") {

@@ -7,7 +7,6 @@ import {
   Lightning,
   CircleNotch,
   ArrowsClockwise,
-
   Shield,
   ArrowRight,
   Stethoscope,
@@ -16,6 +15,7 @@ import {
   Medal,
   Scales,
   Globe,
+  Info,
 } from "@phosphor-icons/react";
 import { Claim, ClinicalEvidence, OverturnScoringResult, ScoringCriterion } from "../../types";
 import { PolicyViewer } from "./PolicyViewer";
@@ -29,6 +29,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 
 interface EvidenceMatrixProps {
   claim: Claim;
@@ -377,9 +378,92 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                   <Scales className="size-3.5 text-primary" />
                   Deterministic Scoring Criteria (100-Point Appeal Rubric):
                 </span>
-                <span className="text-[11px] font-mono text-muted-foreground">
-                  Score = ∑ Criteria ({breakdown.reduce((acc, c) => acc + c.score, 0)} / 100 pts)
-                </span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors border border-dashed border-border/80 hover:border-primary/50 cursor-help"
+                      >
+                        <Info className="size-3.5 text-primary shrink-0" />
+                        <span>How is this score calculated? ({breakdown.reduce((acc, c) => acc + c.score, 0)} / 100 pts)</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="end" className="w-88 max-w-md space-y-3 p-3.5 font-sans shadow-xl border-border/80 bg-popover text-foreground">
+                      <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                        <div>
+                          <h4 className="text-xs font-semibold text-foreground">
+                            How We Calculate Your Win Score
+                          </h4>
+                          <p className="text-[11px] text-muted-foreground">
+                            Evidence-based evaluation across 4 legal & clinical pillars
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30 shrink-0">
+                          100 Pts Model
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-2 text-[11px] leading-snug">
+                        <div className="rounded-md bg-muted/40 border border-border/50 p-2 space-y-1">
+                          <div className="flex items-center justify-between font-semibold text-foreground text-[11px]">
+                            <span className="flex items-center gap-1.5">
+                              <BookOpen className="size-3 text-primary" />
+                              1. Insurer Policy Criteria
+                            </span>
+                            <span className="font-mono text-[10px] text-primary">Max 35 pts</span>
+                          </div>
+                          <p className="text-muted-foreground text-[10.5px]">
+                            Verified against published insurer Clinical Policy Bulletins (CPBs) and national coverage guidelines.
+                          </p>
+                        </div>
+
+                        <div className="rounded-md bg-muted/40 border border-border/50 p-2 space-y-1">
+                          <div className="flex items-center justify-between font-semibold text-foreground text-[11px]">
+                            <span className="flex items-center gap-1.5">
+                              <Stethoscope className="size-3 text-primary" />
+                              2. Clinical Records & Step-Therapy
+                            </span>
+                            <span className="font-mono text-[10px] text-primary">Max 25 pts</span>
+                          </div>
+                          <p className="text-muted-foreground text-[10.5px]">
+                            Diagnostic imaging reports, conservative care history, and treating physician clinical necessity letters.
+                          </p>
+                        </div>
+
+                        <div className="rounded-md bg-muted/40 border border-border/50 p-2 space-y-1">
+                          <div className="flex items-center justify-between font-semibold text-foreground text-[11px]">
+                            <span className="flex items-center gap-1.5">
+                              <Shield className="size-3 text-primary" />
+                              3. Federal ERISA Protections
+                            </span>
+                            <span className="font-mono text-[10px] text-primary">Max 20 pts</span>
+                          </div>
+                          <p className="text-muted-foreground text-[10.5px]">
+                            Procedural rights under 29 CFR § 2560.503-1 requiring insurers to disclose internal clinical review standards.
+                          </p>
+                        </div>
+
+                        <div className="rounded-md bg-muted/40 border border-border/50 p-2 space-y-1">
+                          <div className="flex items-center justify-between font-semibold text-foreground text-[11px]">
+                            <span className="flex items-center gap-1.5">
+                              <Scales className="size-3 text-primary" />
+                              4. Independent Precedent Rulings
+                            </span>
+                            <span className="font-mono text-[10px] text-primary">Max 20 pts</span>
+                          </div>
+                          <p className="text-muted-foreground text-[10.5px]">
+                            Historical overturn benchmarks from state insurance commissions and Independent Medical Reviews (IMR).
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-[10px] text-muted-foreground border-t border-border/50 pt-2 flex items-center justify-between">
+                        <span>Confidence Bands: 80+ High &bull; 55–79 Moderate &bull; &lt;55 Complex</span>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -398,7 +482,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                               {crit.criterion}
                             </span>
                             <span className="text-[10px] text-muted-foreground font-mono uppercase">
-                              {crit.category.replace(/_/g, " ")}
+                              {crit.category.replace(/_/g, " ")} (Max {crit.maxScore} pts)
                             </span>
                           </div>
                         </div>
