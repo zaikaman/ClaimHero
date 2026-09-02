@@ -248,7 +248,8 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
    - Extract dollar amounts as pure numbers without currency symbols (e.g. 24500 instead of "$24,500.00"). If missing, return 0.
    - If identifiers (patient name, member ID, provider, claim number, service date) are not explicitly mentioned, return "". NEVER invent or fabricate identifiers.
    - If CPT or ICD-10 codes are missing, return [].
-   - If statutory appeal deadline is not explicitly mentioned, default appealFilingDeadlineDays to 180.`,
+   - If statutory appeal deadline is not explicitly mentioned, default appealFilingDeadlineDays to 180.
+4. Always extract and output all textual metadata, denial reasons, descriptions, and classification reasons exclusively in English.`,
       userPrompt: `Extract structured medical claim metadata from the following denial document:\n\n${documentContent}`,
       schemaName: "DenialExtractionResult",
       schema: DENIAL_EXTRACTION_SCHEMA,

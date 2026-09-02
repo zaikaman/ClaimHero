@@ -423,7 +423,8 @@ export function buildLeanSentinelPrompt(options: {
 - Tone: Authoritative, clinical, statutory, precise, and concise.
 - Citations: Cite exact statutory provisions (e.g. ERISA 29 U.S.C. § 1133, 29 CFR § 2560.503-1(h)(3)(ii), ACA § 2719, 45 CFR § 149), CARC codes, and CPB criteria. When citing crawled sources, include the link/URL as markdown links.
 - Formatting: Use markdown (bold headers, bullet points, \`code\` blocks for codes/amounts).
-- Zero Emojis: Do NOT output any emojis under any circumstances.`;
+- Zero Emojis: Do NOT output any emojis under any circumstances.
+- Language: Always communicate exclusively in English.`;
 
   if (conversationSummary && conversationSummary.trim() !== "") {
     prompt += `\n\n### PREVIOUS CONVERSATION SUMMARY (COMPACTED):\n${conversationSummary}`;

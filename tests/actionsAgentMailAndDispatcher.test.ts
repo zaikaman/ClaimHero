@@ -187,6 +187,83 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         status: "dispatched",
       }));
     });
+
+    it("processInboundClaimReply: notifies registered user account and ignores fake appealContext sender email", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_user_notify_1",
+        inbox_id: "in_send",
+        from: "payer_adjudicator@aetna.com",
+        recipients: ["send@claimhero.com"],
+        to: ["send@claimhero.com"],
+        subject: "Re: [ClaimHero #CLM-ALERT-1] Denial Maintained",
+        text: "The denial is upheld.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_notify_1",
+        messageId: "msg_user_notify_1",
+        inboxId: "in_send",
+        from: "payer_adjudicator@aetna.com",
+        recipients: ["send@claimhero.com"],
+        subject: "Re: [ClaimHero #CLM-ALERT-1] Denial Maintained",
+        text: "The denial is upheld.",
+        attachments: [],
+      });
+
+      const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+        messageId: "msg_alert_sent_1",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimNumber === "CLM-ALERT-1") {
+            return Promise.resolve({
+              _id: "claim_alert_1",
+              claimNumber: "CLM-ALERT-1",
+              userId: "user_real_99",
+              insurancePayer: "Aetna",
+              appealContext: {
+                sender: {
+                  name: "Alex Morgan",
+                  email: "alex.morgan@spineinstitute.org", // dummy clinical preset email
+                },
+              },
+            });
+          }
+          if (args?.userId === "user_real_99") {
+            return Promise.resolve({
+              _id: "user_real_99",
+              email: "real_user@myclinic.com",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue("id_mut_1"),
+      };
+
+      const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_notify_1",
+        messageId: "msg_user_notify_1",
+        inboxId: "in_send",
+      });
+
+      expect(res).toBeNull();
+      expect(sendMailSpy).toHaveBeenCalledWith(expect.objectContaining({
+        to: "real_user@myclinic.com",
+        subject: expect.stringContaining("[ClaimHero Alert]"),
+      }));
+      expect(sendMailSpy).not.toHaveBeenCalledWith(expect.objectContaining({
+        to: "alex.morgan@spineinstitute.org",
+      }));
+    });
   });
 
   describe("convex/actions/mailDispatcher", () => {

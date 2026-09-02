@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T12:44:00Z
+- **Last updated:** 2026-09-02T12:52:00Z
 
 ## Log
 
@@ -501,7 +501,7 @@ Purged Electronic Intake Email Infrastructure & Streamlined to 2-Mailbox Archite
   - Updated and pruned test suites in `tests/convexHttp.test.ts`, `tests/agentMail.test.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`, `tests/convexEmails.test.ts`, `tests/redactionEngine.test.ts`, and `tests/claimhero.test.ts`.
   - Verified 100% clean with `npm run verify`: 367/367 passing tests across 27 suites, zero TypeScript or ESLint errors, and successful production build. Convex features: database schema, relational indexes, httpRouter, actions, mutations, internalMutation, static hosting.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - f844594
 Implemented Autonomous Inbound Email Synchronization & Real-Time Polling Engine (`convex/schema.ts`, `convex/lib/agentMail.ts`, `convex/actions/agentMail.ts`, `convex/emails.ts`, `convex/crons.ts`, `convex/settings.ts`, `src/hooks/useCommunications.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/App.tsx`):
 - **Root Cause Resolution**:
   - Identified that external email replies (sent from Gmail or standard client inboxes to `claimhero-sender@agentmail.to`) arrived inside AgentMail inboxes, but were not imported into Convex in local development or fallback environments because Svix webhooks were exclusively targeted to the production hostname without a secondary synchronization mechanism.
@@ -517,6 +517,19 @@ Implemented Autonomous Inbound Email Synchronization & Real-Time Polling Engine 
 - **Verification**:
   - Successfully imported and processed the live Gmail test reply for claim `#BV-2026-8849201-VN`, generating clinical rationale, escalating status to `response_received`/`escalated`, and persisting in Convex.
   - Verified 100% clean with `npm run verify`: 367/367 passing unit tests across 27 suites, 0 TypeScript/ESLint errors, and successful production build. Convex features: database schema, relational indexes, crons, actions, internalAction, internalQuery, mutations, static hosting.
+
+### 2026-09-02 - working tree
+Hardened User Notification Dispatch & Resolved Erroneous Clinical Preset Email Routing (`convex/actions/agentMail.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`):
+- **Root Cause Analysis**:
+  - In `handleInboundClaimReply` (`convex/actions/agentMail.ts`), when inbound correspondence arrived, the user notification routine previously prioritized `matchingClaim.appealContext?.sender?.email` as the recipient `userEmail`.
+  - In demo/uploaded claims, `appealContext.sender.email` contained fictitious clinical coordinator / provider credentials (e.g. `alex.morgan@spineinstitute.org`, `taylor.reed@diagnosticimaging.org`).
+  - When real users sent test emails to the system, AgentMail attempted to dispatch the inbound alert email to `alex.morgan@spineinstitute.org`, causing a 403 `MessageRejectedError` (recipient blocked/suppressed due to prior bounce).
+- **Resolution & Safeguards**:
+  - Refactored `handleInboundClaimReply` to resolve `userEmail` strictly from the registered account owner (`matchingClaim.userId -> userRecord.email`), completely decoupling it from clinical brief attestation metadata.
+  - Added loopback prevention: automatically suppresses email notifications if the inbound sender address matches the user's account email address.
+  - Added unit test in `tests/actionsAgentMailAndDispatcher.test.ts` verifying that alert notifications target the real user account owner and strictly ignore demo `appealContext` clinical sender emails.
+- **Verification**:
+  - Ran `npm test`: 368/368 passing tests across 27 suites with zero errors. Convex features: actions, internalAction, internalQuery, database schema, relational indexes.
 
 
 

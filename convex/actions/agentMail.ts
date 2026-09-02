@@ -344,9 +344,9 @@ Evaluate the inbound correspondence text rigorously:
       });
     }
 
-    // User Email Notification: Notify user whenever an inbound reply arrives
-    let userEmail: string | undefined = matchingClaim.appealContext?.sender?.email;
-    if (!userEmail && matchingClaim.userId) {
+    // User Email Notification: Notify user account owner whenever an inbound reply arrives
+    let userEmail: string | undefined;
+    if (matchingClaim.userId) {
       try {
         const userRecord = await ctx.runQuery(internal.users.getUserByIdInternal, {
           userId: matchingClaim.userId,
@@ -357,6 +357,12 @@ Evaluate the inbound correspondence text rigorously:
       } catch (userErr) {
         console.warn("Failed to retrieve user record for inbound email alert:", userErr);
       }
+    }
+
+    // Skip notification if the inbound message originated from the user themselves
+    const senderEmail = extractEmailAddress(sender) || sender.toLowerCase();
+    if (userEmail && senderEmail.toLowerCase() === userEmail.toLowerCase()) {
+      userEmail = undefined;
     }
 
     if (userEmail) {

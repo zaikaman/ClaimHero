@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-372%2F372%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-368%2F368%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -276,7 +276,7 @@ Follow-up addenda to adjudication addresses reload full thread history and re-ru
 ### 6.4 OpenAI — Clinical Reason Extraction & Grounded Synthesis
 
 * **Model** — `gpt-5.4-nano` via unified wrapper `convex/lib/openai.ts:23` (`getOpenAIClient`, `createStructuredCompletion`, `createEmbedding`) with `OPENAI_MODEL` / `OPENAI_API_KEY` / `OPENAI_BASE_URL` support.
-* **Optical Parser** (`opticalParser.ts`) — Vision + Structured JSON `DenialExtractionResult`: CPT, CARC, amounts, deadlines, payer contacts (including international insurers). Multilingual detection.
+* **Optical Parser** (`opticalParser.ts`) — Vision + Structured JSON `DenialExtractionResult`: CPT, CARC, amounts, deadlines, and payer contacts.
 * **Precedent Matcher** (`precedentMatcher.ts`) — Deterministic 4-pillar rubric: CPB Indication Alignment 35% + Clinical Documentation & Step-Therapy 25% + ERISA §2560.503-1 Procedural 20% + External Precedent Benchmark 20% = 100 (`tests/claimhero.test.ts:114`). `temperature: 0.0`, mathematical summation, persisted in `claims.scoringBreakdown`.
 * **Inbound Adjudication & Auto-Rebuttal Engine** (`agentMail.ts`, `mailDispatcher.ts`) — Structured LLM analysis of incoming payer letters, extracting decision codes, demanded records, settlement figures, and synthesizing on-demand cited clinical rebuttal addenda.
 * **Appeal Synthesizer** (`appealSynthesizer.ts:528` `generateAppealBrief`) — Produces *concise payer correspondence*, not a litigation memo. Structured `AppealBriefSynthesisResult`, then `assembleProfessionalAppealEmail:414` enforces grounded assembly: only human-confirmed `clinicalFacts`, `isBlockedEvidence:257`/`isPayerMismatchedEvidence`/`isEvidenceSiteMismatched:336` filtering, conditional ERISA language, HTML+text via `lib/appealEmail.ts`, and tier-specific posture (`STATUTORY_RIGHTS_NOTICES:84`).
@@ -402,7 +402,7 @@ ClaimHero ships with six independent anti-hallucination layers:
 | **Frontend** | React 18 + TypeScript (strict mode, `@typescript-eslint/no-explicit-any: error`, zero `any` casts) + Vite 6 + Tailwind CSS 3.4 |
 | **UI** | Radix Primitives, Phosphor Icons (`@phosphor-icons/react`), `react-markdown` + `remark-gfm`/`remark-breaks`, `three`/`@react-three/fiber` Silk shader |
 | **State** | Convex reactive hooks (`useQuery`, `useMutation`, `useAction`, `useConvexAuth`) + custom hooks (`useClaims`, `useEvidence`, `useAppealStudio`, `useLiveCallCopilot`, `useLiabilityCalculator`, `usePrecedents`) with 100% typed `api.*` FunctionReferences |
-| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 363 unit tests across 26 suites, 100% line coverage in backend libs and core utils |
+| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 368 unit tests across 27 suites, 100% line coverage in backend libs and core utils |
 
 Theme: **Precision Medical Dark Mode** — obsidian `#0b0f17` canvas, cyan `#0ea5e9` primary, emerald/amber/crimson semantic tokens, glassmorphism (`backdrop-blur-md`, `bg-card/75`), tabular-nums for monetary values (`src/index.css:7`, `tailwind.config.js`).
 
@@ -465,7 +465,7 @@ ClaimHero/
 │   │   ├── layout/ (Shell, Sidebar, Header) + ui/* (Button, Card, Badge, Dialog, Select, Silk)
 │   │   └── onboarding/ (OnboardingWizard, OnboardingChecklist)
 │   └── types/index.ts
-├── tests/                        # 363 unit tests across 26 suites (vitest)
+├── tests/                        # 368 unit tests across 27 suites (vitest)
 ├── .env.example                  # all required keys documented
 ├── convex.json / vite.config.ts / tailwind.config.js / tsconfig.json
 ├── BRIEF.md / hackathon.md / README.md
@@ -551,12 +551,12 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (372 tests)
+npm run test            # vitest run tests  (368 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **372/372 passing** across 27 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
+Current: **368/368 passing** across 27 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
@@ -570,14 +570,14 @@ Current: **372/372 passing** across 27 comprehensive test suites covering end-to
 | [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest, out-of-pocket maximum offsets, and No Surprises Act protections |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking, and API key validation |
 | [`tests/convexClaimsFull.test.ts`](file:///d:/ClaimHero/tests/convexClaimsFull.test.ts) | 13 | Claims CRUD, financial liability calculations, ERISA penalty tracking, `by_threadId` index queries, `setAgentMailThreadIdInternal` mutations, bounded pagination, and deadline sweeps |
-| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 13 | Healthcare currency formatting (cents precision), resilient date/datetime formatting against invalid values, statutory countdown math, risk badge styling, and payer appellate contact directory lookup |
+| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting (cents precision), resilient date/datetime formatting against invalid values, statutory countdown math, risk badge styling, and payer appellate contact directory lookup |
 | [`tests/convexAuditLogsAndUsers.test.ts`](file:///d:/ClaimHero/tests/convexAuditLogsAndUsers.test.ts) | 12 | Immutable audit trail logging, user profile management, crons registration, and auth methods |
 | [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, and 3-tier appellate escalation |
-| [`tests/convexEmails.test.ts`](file:///d:/ClaimHero/tests/convexEmails.test.ts) | 9 | Email threads, messages, inbound intake states, and multi-tenant access boundaries |
-| [`tests/convexHttp.test.ts`](file:///d:/ClaimHero/tests/convexHttp.test.ts) | 9 | Svix HMAC-SHA256 signature verification, AgentMail intake webhooks, claim replies, and error handling |
+| [`tests/convexEmails.test.ts`](file:///d:/ClaimHero/tests/convexEmails.test.ts) | 6 | Email threads, messages, inbound intake states, and multi-tenant access boundaries |
+| [`tests/convexHttp.test.ts`](file:///d:/ClaimHero/tests/convexHttp.test.ts) | 8 | Svix HMAC-SHA256 signature verification, AgentMail intake webhooks, claim replies, and error handling |
 | [`tests/convexP2P.test.ts`](file:///d:/ClaimHero/tests/convexP2P.test.ts) | 9 | Live call sessions, real-time transcripts, fast answers, checklist scoring, and tele-scripts |
 | [`tests/convexPrecedents.test.ts`](file:///d:/ClaimHero/tests/convexPrecedents.test.ts) | 9 | Vector matching attachments, corpus key lookup, hydration, and search index |
-| [`tests/actionsAgentMailAndDispatcher.test.ts`](file:///d:/ClaimHero/tests/actionsAgentMailAndDispatcher.test.ts) | 9 | AgentMail actions, attachment download, transmission dispatching, bidirectional threadId routing, missing claimNumber fallback matching, and universal `[ClaimHero #${claimNumber}]` subject/footer injection |
+| [`tests/actionsAgentMailAndDispatcher.test.ts`](file:///d:/ClaimHero/tests/actionsAgentMailAndDispatcher.test.ts) | 9 | AgentMail actions, attachment download, transmission dispatching, bidirectional threadId routing, missing claimNumber fallback matching, user account notification routing & fake clinical sender suppression, and universal `[ClaimHero #${claimNumber}]` subject/footer injection |
 | [`tests/actionsPrecedentsAndPipeline.test.ts`](file:///d:/ClaimHero/tests/actionsPrecedentsAndPipeline.test.ts) | 8 | Precedent vector indexing, 4-pillar evidence-proportional rubric matching, zero/weak/strong evidence testing, and autonomous pipeline orchestration |
 | [`tests/convexSettings.test.ts`](file:///d:/ClaimHero/tests/convexSettings.test.ts) | 7 | User settings defaults, profile updates, manual sync sweep triggers, and safe portfolio reset cascading |
 | [`tests/actionsClinicalAndParser.test.ts`](file:///d:/ClaimHero/tests/actionsClinicalAndParser.test.ts) | 7 | Clinical intake question generation, optical parser vision extraction, non-claim document classification & rejection, and payer contact resolver |

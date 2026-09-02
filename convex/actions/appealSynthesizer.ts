@@ -777,7 +777,7 @@ Evidence and safety rules:
 6. Be concise and practical: a salutation, short paragraphs, a clinical rationale grounded in the record, a specific request, and a professional closing. The application supplies the email subject separately. Do not use all-caps filler, exhibit indexes, markdown tables, horizontal rules, threats, or ceremonial language.
 7. The application assembles the final email from your structured fields. Return an empty string for fullAppealMarkdown; do not write a second full document there.
 
-Write the structured fields in English unless the denial materials clearly establish another language.`,
+Always write all structured fields exclusively in English.`,
       userPrompt: `Draft the content for a ${appealLevel.replace(/_/g, " ")} medical appeal email for:
 
 Case Details:
