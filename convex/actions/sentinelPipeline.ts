@@ -6,6 +6,7 @@ import type { Id } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
+import { ERISA_STATUTORY_EVIDENCE } from "./policyCrawler";
 
 export interface PipelineResult {
   success: boolean;
@@ -176,17 +177,7 @@ export const runAutonomousPipeline = action({
       try {
         await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
           claimId: args.claimId,
-          evidences: [
-            {
-              sourceType: "legal_precedent",
-              title: "ERISA Full & Fair Review Statutory Protocol",
-              sourceUrl: "https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XXV/subchapter-L/part-2560/section-2560.503-1",
-              citationClause: "29 CFR § 2560.503-1(h)(2)(iii)",
-              extractedEvidenceMarkdown:
-                "Statutory Requirement: Plan administrators must provide claimants upon request with all documents, records, and internal clinical criteria utilized in making the adverse determination. Adverse benefit determinations lacking specific clinical justification violate the claimant's right to a full and fair review.",
-              relevanceScore: 95,
-            },
-          ],
+          evidences: [{ ...ERISA_STATUTORY_EVIDENCE }],
         });
       } catch (e) {
         console.warn("Fallback ERISA insertion note:", e);
@@ -195,9 +186,9 @@ export const runAutonomousPipeline = action({
         claimId: args.claimId,
         status: "analyzing",
         actor: "Autonomous Sentinel Pipeline",
-        details: `Policy crawl yielded no publicly accessible document: ${crawlMessage}. Proceeding with statutory precedent only.`,
+        details: `Policy crawl unavailable: ${crawlMessage}. Proceeding with statutory precedent only.`,
       });
-      crawlResult = { policyTitle: "No publicly accessible policy source", clausesExtracted: 1 };
+      crawlResult = { policyTitle: "No publicly accessible policy source (ERISA statutory protocol applied)", clausesExtracted: 1 };
     }
 
     // Step 2: Precedent Matching & Overturn Probability Scoring

@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T04:30:00Z
+- **Last updated:** 2026-09-02T04:40:00Z
 
 ## Log
 
@@ -344,14 +344,21 @@ Hardened client environment configuration and documented repository build conven
 - **Convex Generated Types Documentation**: Clarified `.gitignore` with an explicit note documenting that `convex/_generated` is intentionally committed to version control per Convex official best practices, ensuring CI typechecking and static bundle builds succeed deterministically without requiring a live backend connection.
 - **Validation**: Verified with `npm run typecheck` and `npm test` (100% PASS, 213/213 unit tests across 12 suites).
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 33b89a8
 Resolved F1 defect by decoupling AgentMail sender and adjudicator fallbacks from hardcoded strings and eliminating artificial inbox provisioning UI artifacts:
 - **Environment Variable Fallback Resolution**: Updated `src/components/communications/AgentMailDrawer.tsx` to source fallback sender and adjudicator addresses dynamically from Vite client environment variables (`import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL`, `import.meta.env.VITE_AGENTMAIL_ADJUDICATOR_EMAIL`, and `import.meta.env.VITE_AGENTMAIL_INTAKE_EMAIL`) via typed declarations in `src/vite-env.d.ts`, instead of static hardcoded values.
 - **Elimination of Synthetic Provisioning UI**: Completely removed misleading "Provisioning" / "Provisioning failed" status badges from the shared case inbox banner in `AgentMailDrawer.tsx`, accurately reflecting ClaimHero's 3-inbox shared infrastructure model (Intake, Sender, AI Adjudicator) without synthetic per-claim provisioning overhead.
 - **Graceful Dispatch Guards**: Updated appellate dispatch capability guards and address renderers to evaluate live email availability dynamically across all three transmission modes.
-- **Validation**: Verified with `npm run typecheck`, `npm run lint`, and Vitest unit tests.
 - **CI/CD Pipeline Environment Wiring**: Configured `.github/workflows/deploy.yml` and `.github/workflows/ci.yml` with `VITE_AGENTMAIL_*` and `VITE_CONVEX_*` variable bindings and fallback defaults for deterministic builds on GitHub Actions runners.
 - **Firecrawl Real-Time Failure Propagation in Sentinel Chatbot**: Eliminated synthetic directory fallbacks (`firecrawl_citable_directory` with hardcoded `aetna.com/cpb`) in `performFirecrawlWebSearch` and synthetic success responses (`markdownSnippet: "Scraped clinical content..."`, `success: true`) in `performFirecrawlScrapeUrl` within `convex/actions/sentinelChatbot.ts`. Both functions now fail transparently on errors or empty crawls with descriptive error details rather than fabricating data or masking outages. Verified with `npm run verify` (100% typecheck, ESLint, 213/213 passing unit tests, and production build). Convex features: actions, components, static hosting.
+
+### 2026-09-02 - working tree
+Eliminated duplicate ERISA statutory fallbacks and error masking across Clinical Policy Bulletin (CPB) crawling and the autonomous Sentinel pipeline (`convex/actions/policyCrawler.ts`, `convex/actions/sentinelPipeline.ts`):
+- **Transparent CPB Crawler Error Propagation**: Removed the broad `try/catch` block in `crawlInsurerPolicy` (`convex/actions/policyCrawler.ts`) that previously intercepted all search errors, 429 rate limits, and missing document results, inserted an ERISA legal precedent, and faked a successful CPB crawl (`policyTitle: "ERISA Statutory..."`). The action now throws descriptive, authentic errors (e.g. rate limit, search failure, or inaccessible document) directly to callers.
+- **Centralized ERISA Statutory Evidence Constant**: Exported `ERISA_STATUTORY_EVIDENCE` from `policyCrawler.ts` to provide a single, type-safe source of truth for the baseline ERISA 29 CFR § 2560.503-1 statutory protocol across successful CPB crawls, multi-source hub crawls, and pipeline fallback handlers.
+- **Architectural Fallback Layering in Sentinel Pipeline**: Structured fallback orchestration cleanly at the pipeline level (`sentinelPipeline.ts`). When `crawlInsurerPolicy` encounters an outage or inaccessible CPB, the pipeline catches the error, transparently updates the claim status audit trail (`Policy crawl unavailable: ... Proceeding with statutory precedent only`), indexes `ERISA_STATUTORY_EVIDENCE`, and proceeds with legal brief synthesis without masking the Firecrawl outage.
+- **Validation**: Verified end-to-end with `npm run verify` (100% clean typecheck, ESLint, 213/213 passing unit tests, and Vite production bundle). Convex features: actions, queries, mutations, internalMutation, components, static hosting.
+
 
 
 

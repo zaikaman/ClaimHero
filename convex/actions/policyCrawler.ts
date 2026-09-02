@@ -1182,8 +1182,20 @@ Denial: ${denialReasonCode} - ${denialReasonDescription || "Medical necessity"}`
   return queries;
 }
 
+export const ERISA_STATUTORY_EVIDENCE = {
+  sourceType: "legal_precedent",
+  title: "ERISA Full & Fair Review Statutory Protocol",
+  sourceUrl:
+    "https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XXV/subchapter-L/part-2560/section-2560.503-1",
+  citationClause: "29 CFR § 2560.503-1(h)(2)(iii)",
+  extractedEvidenceMarkdown:
+    "Statutory Requirement: Plan administrators must provide claimants upon request with all documents, records, and internal clinical criteria utilized in making the adverse determination. Adverse benefit determinations lacking specific clinical justification violate the claimant's right to a full and fair review.",
+  relevanceScore: 95,
+} as const;
+
 /**
- * Policy Crawler Action: Search and scrape an insurer policy through Firecrawl.
+ * Insurer CPB & Clinical Policy Bulletin Crawler Action
+ * Dynamically queries Firecrawl to retrieve, parse, and extract clinical coverage criteria for any US insurer.
  */
 export const crawlInsurerPolicy = action({
   args: {
@@ -1224,190 +1236,155 @@ export const crawlInsurerPolicy = action({
     });
 
     let policySource: FirecrawlPolicySource | null = null;
-    try {
-      if (args.customPolicyUrl) {
-        const candidateSource = await scrapeFirecrawlPolicySource(ctx, args.customPolicyUrl);
-        const relevance = await evaluatePolicySourceRelevance(
-          candidateSource,
-          args.payer,
-          args.cptCodes,
-          args.icd10Codes,
-          args.denialReasonCode,
-          args.denialReasonDescription || "",
-        );
-        if (!relevance.relevant) {
-          throw new Error(`The supplied policy URL was rejected as irrelevant: ${relevance.rationale}`);
+    if (args.customPolicyUrl) {
+      const candidateSource = await scrapeFirecrawlPolicySource(ctx, args.customPolicyUrl);
+      const relevance = await evaluatePolicySourceRelevance(
+        candidateSource,
+        args.payer,
+        args.cptCodes,
+        args.icd10Codes,
+        args.denialReasonCode,
+        args.denialReasonDescription || "",
+      );
+      if (!relevance.relevant) {
+        throw new Error(`The supplied policy URL was rejected as irrelevant: ${relevance.rationale}`);
+      }
+      policySource = candidateSource;
+    } else {
+      let searchQueries = await generatePolicySearchQueries(
+        args.payer,
+        args.cptCodes,
+        args.icd10Codes,
+        args.denialReasonCode,
+        args.denialReasonDescription || "",
+      );
+      const failedSources: string[] = [];
+      const searchFailures: string[] = [];
+      const seenSourceUrls = new Set<string>();
+      let discoveredSourceCount = 0;
+
+      for (let searchRound = 0; searchRound < MAX_POLICY_SEARCH_ROUNDS && !policySource; searchRound += 1) {
+        const successfulSearches: Array<{ payload: Record<string, unknown> }> = [];
+        const failedSearches: string[] = [];
+
+        // Run search queries sequentially (not in parallel) to prevent rate-limit bursts
+        for (const query of searchQueries.slice(0, 2)) {
+          try {
+            const payload = await firecrawl.search(ctx, query, {
+              limit: 5,
+              sources: ["web"],
+            });
+            if (payload) successfulSearches.push({ payload: payload as Record<string, unknown> });
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : "Unknown Firecrawl search error";
+            failedSearches.push(msg);
+            // If rate limited, break early to avoid worsening the 429
+            if (msg.includes("429") || msg.includes("Rate limit")) break;
+          }
         }
-        policySource = candidateSource;
-      } else {
-        let searchQueries = await generatePolicySearchQueries(
-          args.payer,
-          args.cptCodes,
-          args.icd10Codes,
-          args.denialReasonCode,
-          args.denialReasonDescription || "",
+
+        searchFailures.push(...failedSearches);
+
+        const searchQueryTerms = searchQueries.flatMap(
+          (query) => query.toLowerCase().match(/[a-z0-9][a-z0-9.-]{2,}/g) ?? [],
         );
-        const failedSources: string[] = [];
-        const searchFailures: string[] = [];
-        const seenSourceUrls = new Set<string>();
-        let discoveredSourceCount = 0;
+        const combinedSearchPayload = {
+          data: {
+            web: successfulSearches.flatMap(({ payload }) => getFirecrawlSearchResults(payload)),
+          },
+        };
 
-        for (let searchRound = 0; searchRound < MAX_POLICY_SEARCH_ROUNDS && !policySource; searchRound += 1) {
-          const successfulSearches: Array<{ payload: Record<string, unknown> }> = [];
-          const failedSearches: string[] = [];
-
-          // Run search queries sequentially (not in parallel) to prevent rate-limit bursts
-          for (const query of searchQueries.slice(0, 2)) {
-            try {
-              const payload = await firecrawl.search(ctx, query, {
-                limit: 5,
-                sources: ["web"],
-              });
-              if (payload) successfulSearches.push({ payload: payload as Record<string, unknown> });
-            } catch (error) {
-              const msg = error instanceof Error ? error.message : "Unknown Firecrawl search error";
-              failedSearches.push(msg);
-              // If rate limited, break early to avoid worsening the 429
-              if (msg.includes("429") || msg.includes("Rate limit")) break;
-            }
-          }
-
-          searchFailures.push(...failedSearches);
-
-          const searchQueryTerms = searchQueries.flatMap(
-            (query) => query.toLowerCase().match(/[a-z0-9][a-z0-9.-]{2,}/g) ?? [],
-          );
-          const combinedSearchPayload = {
-            data: {
-              web: successfulSearches.flatMap(({ payload }) => getFirecrawlSearchResults(payload)),
-            },
-          };
-
-          // Fast path: check if search payload already included substantive markdown
-          const directSource = selectFirecrawlPolicySource(combinedSearchPayload);
-          if (directSource && isPolicyMarkdownSubstantive(directSource.markdown)) {
-            try {
-              const relevance = await evaluatePolicySourceRelevance(
-                directSource,
-                args.payer,
-                args.cptCodes,
-                args.icd10Codes,
-                args.denialReasonCode,
-                args.denialReasonDescription || "",
-              );
-              if (relevance.relevant) {
-                policySource = directSource;
-                break;
-              }
-            } catch {
-              // Defer to URL scraping
-            }
-          }
-
-          const cptKeywordTerms = getCptKeywords(args.cptCodes);
-          const sourceRelevanceTerms = [
-            ...args.cptCodes,
-            ...args.icd10Codes,
-            ...cptKeywordTerms,
-            ...searchQueryTerms,
-            "medical policy",
-            "medical necessity",
-            "coverage criteria",
-            "clinical policy",
-          ];
-          const sourceUrls = selectFirecrawlPolicyUrls(
-            combinedSearchPayload,
-            sourceRelevanceTerms,
-            0,
-            MAX_POLICY_SOURCE_CANDIDATES,
-            args.payer,
-          ).filter((sourceUrl) => {
-            if (seenSourceUrls.has(sourceUrl)) return false;
-            seenSourceUrls.add(sourceUrl);
-            return true;
-          });
-          discoveredSourceCount += sourceUrls.length;
-
-          // Evaluate candidate URLs sequentially (concurrency 1) to honor Firecrawl concurrency limits
-          for (const sourceUrl of sourceUrls.slice(0, 2)) {
-            try {
-              const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl);
-              const relevance = await evaluatePolicySourceRelevance(
-                candidateSource,
-                args.payer,
-                args.cptCodes,
-                args.icd10Codes,
-                args.denialReasonCode,
-                args.denialReasonDescription || "",
-              );
-              if (relevance.relevant) {
-                policySource = candidateSource;
-                break;
-              }
-
-              failedSources.push(`${sourceUrl}: document rejected as irrelevant (${relevance.rationale})`);
-            } catch (error) {
-              const message = error instanceof Error ? error.message : "Unknown source error";
-              failedSources.push(`${sourceUrl}: ${message}`);
-              if (message.includes("429") || message.includes("Rate limit")) break;
-            }
-          }
-
-          if (!policySource && searchRound + 1 < MAX_POLICY_SEARCH_ROUNDS && !failedSearches.some((s) => s.includes("429"))) {
-            const feedback = [...searchFailures, ...failedSources.slice(-10)].join(" | ");
-            searchQueries = await generatePolicySearchQueries(
+        // Fast path: check if search payload already included substantive markdown
+        const directSource = selectFirecrawlPolicySource(combinedSearchPayload);
+        if (directSource && isPolicyMarkdownSubstantive(directSource.markdown)) {
+          try {
+            const relevance = await evaluatePolicySourceRelevance(
+              directSource,
               args.payer,
               args.cptCodes,
               args.icd10Codes,
               args.denialReasonCode,
               args.denialReasonDescription || "",
-              feedback,
             );
+            if (relevance.relevant) {
+              policySource = directSource;
+              break;
+            }
+          } catch {
+            // Defer to URL scraping
           }
         }
 
-        if (!policySource) {
-          if (!discoveredSourceCount) {
-            const detail = searchFailures.length ? ` ${searchFailures.join(" | ")}` : "";
-            throw new Error(`Firecrawl search returned no direct HTTP(S) policy source URL.${detail}`);
-          }
+        const cptKeywordTerms = getCptKeywords(args.cptCodes);
+        const sourceRelevanceTerms = [
+          ...args.cptCodes,
+          ...args.icd10Codes,
+          ...cptKeywordTerms,
+          ...searchQueryTerms,
+          "medical policy",
+          "medical necessity",
+          "coverage criteria",
+          "clinical policy",
+        ];
+        const sourceUrls = selectFirecrawlPolicyUrls(
+          combinedSearchPayload,
+          sourceRelevanceTerms,
+          0,
+          MAX_POLICY_SOURCE_CANDIDATES,
+          args.payer,
+        ).filter((sourceUrl) => {
+          if (seenSourceUrls.has(sourceUrl)) return false;
+          seenSourceUrls.add(sourceUrl);
+          return true;
+        });
+        discoveredSourceCount += sourceUrls.length;
 
-          throw new Error(`Firecrawl returned no publicly accessible policy document from ${discoveredSourceCount} direct result(s). ${failedSources.join(" | ")}`);
+        // Evaluate candidate URLs sequentially (concurrency 1) to honor Firecrawl concurrency limits
+        for (const sourceUrl of sourceUrls.slice(0, 2)) {
+          try {
+            const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl);
+            const relevance = await evaluatePolicySourceRelevance(
+              candidateSource,
+              args.payer,
+              args.cptCodes,
+              args.icd10Codes,
+              args.denialReasonCode,
+              args.denialReasonDescription || "",
+            );
+            if (relevance.relevant) {
+              policySource = candidateSource;
+              break;
+            }
+
+            failedSources.push(`${sourceUrl}: document rejected as irrelevant (${relevance.rationale})`);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Unknown source error";
+            failedSources.push(`${sourceUrl}: ${message}`);
+            if (message.includes("429") || message.includes("Rate limit")) break;
+          }
+        }
+
+        if (!policySource && searchRound + 1 < MAX_POLICY_SEARCH_ROUNDS && !failedSearches.some((s) => s.includes("429"))) {
+          const feedback = [...searchFailures, ...failedSources.slice(-10)].join(" | ");
+          searchQueries = await generatePolicySearchQueries(
+            args.payer,
+            args.cptCodes,
+            args.icd10Codes,
+            args.denialReasonCode,
+            args.denialReasonDescription || "",
+            feedback,
+          );
         }
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown Firecrawl error";
-      console.warn(`Firecrawl policy crawl fallback activated: ${message}`);
 
-      // Graceful fallback for rate limits (429) or timeouts: insert statutory ERISA protocol so appeal brief synthesis completes cleanly
-      const fallbackEvidences = [
-        {
-          sourceType: "legal_precedent",
-          title: "ERISA Full & Fair Review Statutory Protocol",
-          sourceUrl: "https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XXV/subchapter-L/part-2560/section-2560.503-1",
-          citationClause: "29 CFR § 2560.503-1(h)(2)(iii)",
-          extractedEvidenceMarkdown: "Statutory Requirement: Plan administrators must provide claimants upon request with all documents, records, and internal clinical criteria utilized in making the adverse determination. Adverse benefit determinations lacking specific clinical justification violate the claimant's right to a full and fair review.",
-          relevanceScore: 95,
-        },
-      ];
+      if (!policySource) {
+        if (!discoveredSourceCount) {
+          const detail = searchFailures.length ? ` ${searchFailures.join(" | ")}` : "";
+          throw new Error(`Firecrawl search returned no direct HTTP(S) policy source URL.${detail}`);
+        }
 
-      await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
-        claimId: args.claimId,
-        evidences: fallbackEvidences,
-      });
-
-      await ctx.runMutation(internal.claims.updateStatusInternal, {
-        claimId: args.claimId,
-        status: "analyzing",
-        details: `Statutory ERISA precedent indexed for ${args.payer}.`,
-      });
-
-      return {
-        policyTitle: "ERISA Statutory Full & Fair Review Protocol",
-        policyNumber: "29 CFR § 2560.503-1",
-        clausesExtracted: 1,
-        evidences: fallbackEvidences,
-      };
+        throw new Error(`Firecrawl returned no publicly accessible policy document from ${discoveredSourceCount} direct result(s). ${failedSources.join(" | ")}`);
+      }
     }
 
     if (!policySource) {
@@ -1476,12 +1453,7 @@ For each clause:
 
     // Add at least 1 legal precedent clause citing ERISA
     evidencesToInsert.push({
-      sourceType: "legal_precedent",
-      title: "ERISA Full & Fair Review Statutory Protocol",
-      sourceUrl: "https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XXV/subchapter-L/part-2560/section-2560.503-1",
-      citationClause: "29 CFR § 2560.503-1(h)(2)(iii)",
-      extractedEvidenceMarkdown: "Statutory Requirement: Plan administrators must provide claimants upon request with all documents, records, and internal clinical criteria utilized in making the adverse determination. Adverse benefit determinations lacking specific clinical justification violate the claimant's right to a full and fair review.",
-      relevanceScore: 95,
+      ...ERISA_STATUTORY_EVIDENCE,
     });
 
     await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
@@ -1971,12 +1943,7 @@ export const crawlMultiSourceHub = action({
     // Ensure ERISA statutory legal precedent is always present
     await ctx.runMutation(internal.clinicalEvidences.insertSingleInternal, {
       claimId: args.claimId,
-      sourceType: "legal_precedent",
-      title: "ERISA Full & Fair Review Statutory Protocol",
-      sourceUrl: "https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XXV/subchapter-L/part-2560/section-2560.503-1",
-      citationClause: "29 CFR § 2560.503-1(h)(2)(iii)",
-      extractedEvidenceMarkdown: "Statutory Requirement: Plan administrators must provide claimants upon request with all documents, records, and internal clinical criteria utilized in making the adverse determination. Adverse benefit determinations lacking specific clinical justification violate the claimant's right to a full and fair review.",
-      relevanceScore: 95,
+      ...ERISA_STATUTORY_EVIDENCE,
     });
 
     const getClausesCount = (res: unknown): number => {
