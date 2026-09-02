@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-363%2F363%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-372%2F372%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -114,6 +114,7 @@ In `Payer Communications` (`AgentMailDrawer.tsx`), select:
 | Surface | What it does | Why it matters |
 |---|---|---|
 | **Cinematic Landing Hero** (`src/components/landing/CinematicHero.tsx`) | Full-viewport ambient video, liquid-glass CTAs, 3-slide showcase, `CinematicHero.tsx:134` | First-impression polish for judges; routes to `/` vs `/app/*` via `useRouterView.ts` |
+| **Sentinel Onboarding Wizard** (`OnboardingWizard.tsx`) | 3-step interactive setup: role selection with live-editable Advocate & Signatory Profile inputs (Name, Credentials, Organization, Phone) synced to Convex `userSettings`, state jurisdiction, payer targeting, optional starter cases, and native PDF/image file picker with drag-and-drop | Tailors brief arguments, attestation signatures, and EOB parsing from the first second |
 | **Case Radar** (`src/components/radar/CaseRadar.tsx`) | Reactive table of all claims, status tabs, payer filter, search, `DeadlineCountdown.tsx` circular gauge, RFC 4180 CSV & JSON multi-field portfolio export dropdown | Portfolio at a glance; ERISA urgency is visually unmissable |
 | **Evidence Matrix** (`src/components/evidence/EvidenceMatrix.tsx`) | Side-by-side denial vs insurer CPB inspector, overturn score with breakdown bars, `PolicyViewer.tsx` clause viewer with multi-source category filter pills (CPB / PubMed / FDA / ERISA), `PrecedentFeed.tsx` live vector hits | Turns a 150KB policy into 5 citable clauses with instant category slicing |
 | **Defense Suite** (3 vectors under one stepper) | **Legal Appeal Brief** (`AppealStudio.tsx` with Section Outline Jump Bar) + **Doctor P2P Script** (`P2PDefenseStudio.tsx`) + **ERISA Penalties** (`FinancialLiabilityCalculator.tsx`) via `SentinelFlowStepper.tsx` | One pipeline arms three enforcement vectors; cross-embeds $110/day damages into Section IV with one click |
@@ -126,6 +127,7 @@ In `Payer Communications` (`AgentMailDrawer.tsx`), select:
 | **Portfolio Analytics** (`AnalyticsMetrics.tsx`) | Total disputed, recovered, win rate, payer breakdown, confidence distribution (`convex/claims.ts:530`), and `ExecutiveReportModal.tsx` for practice audit statements & CSV/print exports | Proves ROI; executive accountability per payer |
 | **HIPAA Privacy Filter** (`PrivacyRedactionFilter.tsx`) | Deterministic PII detection (SSN, MRN, DOB, phone, address, custom terms) with 3 presets: Safe Harbor, Balanced Appellate, Public Legal Exhibit | Redact before you dispatch or publish precedent |
 | **Sentinel AI Copilot Widget** (`SentinelChatbot.tsx`, `⌘J`) | Autonomous clinical & legal chatbot with 10 agentic OpenAI tool calling capabilities across Convex database records (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) and live Firecrawl web intelligence (`firecrawl_web_search`, `firecrawl_scrape_url`, `crawl_and_attach_evidence`), persistent `chatbotSessions`/`chatbotMessages` tables, rolling context window summarization, and collapsible tool execution traces | On-demand conversational intelligence across all cases, live insurer CPB criteria, and statutory ERISA mandates |
+| **Sentinel Settings Dashboard** (`SettingsPage.tsx`) | 100% Convex-persisted controls for autonomous approval mode, ERISA follow-up cadence (1-90 days), default statutory legal posture, inbound determination auto-replies, background CPB guideline rescans, advocate signatory profile defaults, live AgentMail intake gateway synchronization, and portfolio reset controls | Full control over autonomous dispatch thresholds, clinical profile pre-population, and gateway operational parameters |
 
 
 ---
@@ -303,7 +305,7 @@ This is a Convex showcase end-to-end. Selected call sites (use `file:line` to ju
 
 ## 8. Data Model
 
-`convex/schema.ts:5` — 9 domain tables + auth tables. All monetary values are `v.number()`, all code arrays are `v.array(v.string())`.
+`convex/schema.ts:5` — 10 domain tables + auth tables. All monetary values are `v.number()`, all code arrays are `v.array(v.string())`.
 
 ```ts
 patients: { userId?, name, email, memberId, groupNumber?, insurancePayer, state }
@@ -327,6 +329,7 @@ precedents: { sourceKind, title, citation, jurisdiction, icd10Codes[], cptCodes[
 appealAuditLogs: { claimId, eventType, actor, details, timestamp } // immutable
 p2pScripts: { claimId, version, openingStatutoryStatement, clinicalPolicyCitations[], disqualificationCounters[], ... }
 p2pCallSessions: { claimId, sessionStatus, transcripts[], fastAnswers[], checklistProgress[], winScore }
+userSettings: { userId?, approvalMode, followUpCadenceDays, defaultLegalPosture, autoReplyInbound, autoRescanPolicies, criticalDeadlineAlerts, advocateProfile{name, credentials, organization, phone, state}, lastSyncTimestamp } // indexed by_user
 ```
 
 Indexes are named canonically (`by_user_status`, `by_claimId_and_appealLevel`, `by_corpus_key`, `by_primary_cpt`, etc.) and queries use `withIndex`.
@@ -553,12 +556,12 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (363 tests)
+npm run test            # vitest run tests  (372 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **363/363 passing** across 26 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
+Current: **372/372 passing** across 27 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
@@ -572,21 +575,22 @@ Current: **363/363 passing** across 26 comprehensive test suites covering end-to
 | [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest, out-of-pocket maximum offsets, and No Surprises Act protections |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking, and API key validation |
 | [`tests/convexClaimsFull.test.ts`](file:///d:/ClaimHero/tests/convexClaimsFull.test.ts) | 13 | Claims CRUD, financial liability calculations, ERISA penalty tracking, `by_threadId` index queries, `setAgentMailThreadIdInternal` mutations, bounded pagination, and deadline sweeps |
+| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 13 | Healthcare currency formatting (cents precision), resilient date/datetime formatting against invalid values, statutory countdown math, risk badge styling, and payer appellate contact directory lookup |
 | [`tests/convexAuditLogsAndUsers.test.ts`](file:///d:/ClaimHero/tests/convexAuditLogsAndUsers.test.ts) | 12 | Immutable audit trail logging, user profile management, crons registration, and auth methods |
 | [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, and 3-tier appellate escalation |
-| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting (cents precision), statutory countdown math, risk badge styling, and payer appellate contact directory lookup |
 | [`tests/convexEmails.test.ts`](file:///d:/ClaimHero/tests/convexEmails.test.ts) | 9 | Email threads, messages, inbound intake states, and multi-tenant access boundaries |
 | [`tests/convexHttp.test.ts`](file:///d:/ClaimHero/tests/convexHttp.test.ts) | 9 | Svix HMAC-SHA256 signature verification, AgentMail intake webhooks, claim replies, and error handling |
 | [`tests/convexP2P.test.ts`](file:///d:/ClaimHero/tests/convexP2P.test.ts) | 9 | Live call sessions, real-time transcripts, fast answers, checklist scoring, and tele-scripts |
 | [`tests/convexPrecedents.test.ts`](file:///d:/ClaimHero/tests/convexPrecedents.test.ts) | 9 | Vector matching attachments, corpus key lookup, hydration, and search index |
 | [`tests/actionsAgentMailAndDispatcher.test.ts`](file:///d:/ClaimHero/tests/actionsAgentMailAndDispatcher.test.ts) | 9 | AgentMail actions, attachment download, transmission dispatching, bidirectional threadId routing, missing claimNumber fallback matching, and universal `[ClaimHero #${claimNumber}]` subject/footer injection |
+| [`tests/actionsPrecedentsAndPipeline.test.ts`](file:///d:/ClaimHero/tests/actionsPrecedentsAndPipeline.test.ts) | 8 | Precedent vector indexing, 4-pillar evidence-proportional rubric matching, zero/weak/strong evidence testing, and autonomous pipeline orchestration |
+| [`tests/convexSettings.test.ts`](file:///d:/ClaimHero/tests/convexSettings.test.ts) | 7 | User settings defaults, profile updates, manual sync sweep triggers, and safe portfolio reset cascading |
+| [`tests/actionsClinicalAndParser.test.ts`](file:///d:/ClaimHero/tests/actionsClinicalAndParser.test.ts) | 7 | Clinical intake question generation, optical parser vision extraction, non-claim document classification & rejection, and payer contact resolver |
 | [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, and STT tolerance |
 | [`tests/p2pDefense.test.ts`](file:///d:/ClaimHero/tests/p2pDefense.test.ts) | 6 | Physician tele-script generator, statutory opening, and pocket cheat sheet print |
 | [`tests/sentinelChatbot.test.ts`](file:///d:/ClaimHero/tests/sentinelChatbot.test.ts) | 6 | Agentic OpenAI tool calling (10 tools), Firecrawl live search/scrape schemas, and lean prompt builder |
-| [`tests/actionsClinicalAndParser.test.ts`](file:///d:/ClaimHero/tests/actionsClinicalAndParser.test.ts) | 5 | Clinical intake question generation, optical parser vision extraction, and payer contact resolver |
 | [`tests/statutoryEscalation.test.ts`](file:///d:/ClaimHero/tests/statutoryEscalation.test.ts) | 5 | 180-day internal appeal to Level 3 DOI escalation state machine |
 | [`tests/actionsPolicyAndSynthesizer.test.ts`](file:///d:/ClaimHero/tests/actionsPolicyAndSynthesizer.test.ts) | 5 | Policy crawler multi-tier search query generation, Carelon/NASS clinical candidate selection, student safety filtering, PubMed research, and appeal brief synthesis |
-| [`tests/actionsPrecedentsAndPipeline.test.ts`](file:///d:/ClaimHero/tests/actionsPrecedentsAndPipeline.test.ts) | 8 | Precedent vector indexing, 4-pillar evidence-proportional rubric matching, zero/weak/strong evidence testing, and autonomous pipeline orchestration |
 | [`tests/actionsP2PAndChatbot.test.ts`](file:///d:/ClaimHero/tests/actionsP2PAndChatbot.test.ts) | 4 | Physician P2P defense generation, live copilot fast answers, interactive pushback, and multi-turn agentic chatbot |
 
 ---

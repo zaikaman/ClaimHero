@@ -14,6 +14,7 @@ import {
   Trash,
   PhoneCall,
   Calculator,
+  GearSix,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -92,6 +93,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
     { id: "radar" as NavigationView, label: "Case Radar Feed", icon: Broadcast, desc: "Intake & Alarms" },
     { id: "analytics" as NavigationView, label: "Portfolio Analytics", icon: ChartPieSlice, desc: "Recovery Yield" },
     { id: "audit" as NavigationView, label: "Audit Timeline", icon: Clock, desc: "ERISA 29 CFR Ledger" },
+    { id: "settings" as NavigationView, label: "Sentinel Settings", icon: GearSix, desc: "Autonomy & Gateway" },
   ];
 
   const caseTools = [

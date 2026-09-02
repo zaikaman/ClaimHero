@@ -21,6 +21,7 @@ import {
   PhoneCall,
   Shield,
   Scales,
+  GearSix,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -49,6 +50,7 @@ export type NavigationView =
   | "communications"
   | "audit"
   | "analytics"
+  | "settings"
   | "login";
 
 interface SidebarProps {
@@ -166,6 +168,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: "Payer Communications",
       description: "Two-way Payer Transmissions",
       icon: Envelope,
+    },
+  ];
+
+  // Group 3: Sentinel Agent & System
+  const agentNavItems = [
+    {
+      id: "settings" as NavigationView,
+      label: "Settings",
+      description: "Dispatch Autonomy & Gateway",
+      icon: GearSix,
     },
   ];
 
@@ -454,6 +466,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
             })}
           </nav>
         </div>
+
+        {/* Group 3: Sentinel Agent & System Config */}
+        <div className="space-y-1 pt-1">
+          {!isCollapsed && (
+            <div className="px-2 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+              Sentinel Agent
+            </div>
+          )}
+          <nav className="space-y-0.5">
+            {agentNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentView === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectView(item.id)}
+                  title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
+                  className={cn(
+                    "w-full flex items-center rounded-md text-xs font-medium transition-colors text-left group cursor-pointer",
+                    isCollapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-1.5",
+                    isActive
+                      ? "bg-secondary text-foreground font-semibold shadow-xs"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "size-4 shrink-0",
+                      isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )}
+                  />
+                  {!isCollapsed && (
+                    <div className="flex items-center justify-between flex-1 truncate">
+                      <span className="truncate">{item.label}</span>
+                      <span className="text-[9px] font-mono text-muted-foreground group-hover:text-foreground/70">
+                        Config
+                      </span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
       </div>
 
       {/* Footer Support Card & User Profile Dropdown */}
@@ -514,6 +570,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="font-semibold text-xs text-foreground">{userName}</span>
               <span className="text-[10px] text-muted-foreground font-normal truncate">{userEmail}</span>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onSelectView("settings")} className="gap-2 cursor-pointer font-medium">
+              <GearSix className="size-3.5 text-primary" />
+              <span>Sentinel Settings</span>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             {isAuthenticated ? (
               <DropdownMenuItem onClick={() => signOut()} className="gap-2 text-destructive focus:text-destructive cursor-pointer">

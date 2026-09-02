@@ -1,7 +1,7 @@
 "use node";
 
 import { action } from "../_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
@@ -9,6 +9,16 @@ import { rateLimiter } from "../lib/rateLimiter";
 const DENIAL_EXTRACTION_SCHEMA = {
   type: "object",
   properties: {
+    isMedicalClaimDenial: {
+      type: "boolean",
+      description:
+        "Set to true ONLY IF this document or image is an actual healthcare insurance claim denial letter, Explanation of Benefits (EOB), adverse benefit determination, medical necessity denial, or medical bill denial. Set to false if the document or image is NOT a healthcare denial notice (e.g. photos of animals, pets, scenery, food, receipts, memes, general letters, non-medical invoices, or unrelated graphics).",
+    },
+    documentClassificationReason: {
+      type: "string",
+      description:
+        "Brief explanation describing what the document is and why it is or is not a genuine healthcare insurance claim denial document.",
+    },
     claimNumber: { type: "string" },
     patientName: { type: "string" },
     memberId: { type: "string" },
@@ -32,6 +42,8 @@ const DENIAL_EXTRACTION_SCHEMA = {
     payerAppealsAddress: { type: "string" },
   },
   required: [
+    "isMedicalClaimDenial",
+    "documentClassificationReason",
     "claimNumber",
     "patientName",
     "memberId",
@@ -52,6 +64,8 @@ const DENIAL_EXTRACTION_SCHEMA = {
 };
 
 export interface DenialExtractionResult {
+  isMedicalClaimDenial?: boolean;
+  documentClassificationReason?: string;
   claimNumber: string;
   patientName: string;
   memberId: string;
@@ -220,14 +234,21 @@ export const parseDenialDocument = action({
     // Call OpenAI Structured Outputs with gpt-5.4-nano
     const extraction = await createStructuredCompletion<DenialExtractionResult>({
       systemPrompt: `You are an expert Certified Professional Medical Coder (CPC) and ERISA Insurance Claims Auditor.
-Your job is to accurately extract all financial amounts, clinical CPT procedure codes, ICD-10 diagnosis codes, denial reason codes (e.g. CO-50, CO-197, CO-16), insurer payer names, and statutory appeal filing deadlines from real denial letters and Explanation of Benefits (EOB) documents.
-Rules:
-- Extract ONLY what is explicitly stated in the document. Do NOT guess, invent, or fabricate data.
-- Extract dollar amounts as pure numbers without currency symbols (e.g. 24500 instead of "$24,500.00"). If a dollar amount is missing, return 0.
-- If the patient name, member ID, provider name, claim number, service date, or denial codes are not explicitly mentioned in the document, return an empty string "". NEVER invent, guess, or fabricate identifiers (e.g., do NOT generate fake CLM- numbers or placeholder names).
-- If CPT or ICD-10 codes are missing, return an empty array [].
-- If payer appeals email or physical appeals address is not explicitly mentioned, return an empty string "".
-- If the statutory appeal deadline is not explicitly mentioned, default appealFilingDeadlineDays to 180 (ERISA 29 CFR § 2560.503-1 standard statutory rule).`,
+Your job is to rigorously classify uploaded documents/images and extract structured medical claim denial data.
+
+CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
+1. First, determine whether the input document or image is an actual healthcare insurance claim denial, Explanation of Benefits (EOB), adverse benefit determination, or medical necessity denial letter.
+2. If the document or image is NOT a medical claim denial (for example: photographs of animals, pets, scenery, food, receipts, general letters, memes, non-medical invoices, or unreadable graphics):
+   - Set "isMedicalClaimDenial" to FALSE.
+   - Provide a clear, polite 1-sentence reason in "documentClassificationReason" (e.g. "The uploaded file is an image of an animal/non-medical subject, not a healthcare insurance claim denial or EOB.").
+   - Set all string fields to "", numbers to 0, and arrays to [].
+3. If the document IS a valid medical claim denial:
+   - Set "isMedicalClaimDenial" to TRUE.
+   - Extract all financial amounts, clinical CPT procedure codes, ICD-10 diagnosis codes, denial reason codes (e.g. CO-50, CO-197, CO-16), insurer payer names, and statutory appeal filing deadlines.
+   - Extract dollar amounts as pure numbers without currency symbols (e.g. 24500 instead of "$24,500.00"). If missing, return 0.
+   - If identifiers (patient name, member ID, provider, claim number, service date) are not explicitly mentioned, return "". NEVER invent or fabricate identifiers.
+   - If CPT or ICD-10 codes are missing, return [].
+   - If statutory appeal deadline is not explicitly mentioned, default appealFilingDeadlineDays to 180.`,
       userPrompt: `Extract structured medical claim metadata from the following denial document:\n\n${documentContent}`,
       schemaName: "DenialExtractionResult",
       schema: DENIAL_EXTRACTION_SCHEMA,
@@ -235,6 +256,33 @@ Rules:
       fileInputs: fileInputs.length > 0 ? fileInputs : undefined,
       temperature: 0.1,
     });
+
+    // Enforce claim validation safeguards - reject non-claim documents
+    if (extraction.isMedicalClaimDenial === false) {
+      const reason =
+        extraction.documentClassificationReason?.trim() ||
+        "The uploaded file is not a valid healthcare insurance claim denial letter or Explanation of Benefits (EOB).";
+      throw new ConvexError(
+        `Non-claim document detected: ${reason} Please upload a genuine adverse determination letter, medical denial notice, or EOB document.`
+      );
+    }
+
+    // Additional sanity check: ensure at least one core claim signal exists
+    const hasFinancials = (extraction.deniedAmount || 0) > 0 || (extraction.patientOwedAmount || 0) > 0;
+    const hasCodes =
+      (extraction.cptCodes && extraction.cptCodes.length > 0) ||
+      (extraction.icd10Codes && extraction.icd10Codes.length > 0) ||
+      Boolean(extraction.denialReasonCode?.trim());
+    const hasClaimIdentifiers =
+      Boolean(extraction.claimNumber?.trim()) ||
+      Boolean(extraction.memberId?.trim()) ||
+      Boolean(extraction.denialReasonDescription?.trim());
+
+    if (!hasFinancials && !hasCodes && !hasClaimIdentifiers) {
+      throw new ConvexError(
+        "The uploaded document does not contain recognizable medical claim denial details (missing denial reason, CPT codes, claim identifiers, and denied amount). Please upload a complete Explanation of Benefits or adverse determination letter."
+      );
+    }
 
     // Save patient and claim into Convex database
     const claimId = await ctx.runMutation(internal.claims.createWithPatientInternal, {

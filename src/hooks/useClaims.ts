@@ -207,16 +207,26 @@ export function useClaims(options?: {
       const { storageId } = (await response.json()) as { storageId: Id<"_storage"> };
 
       // 3. Trigger optical extraction action
-      const extractionResult: DenialExtractionResult & { claimId: string } = await parseDenialAction({
-        storageId,
-        patientState,
-      });
+      try {
+        const extractionResult: DenialExtractionResult & { claimId: string } = await parseDenialAction({
+          storageId,
+          patientState,
+        });
 
-      if (extractionResult?.claimId) {
-        setSelectedClaimId(extractionResult.claimId);
+        if (extractionResult?.claimId) {
+          setSelectedClaimId(extractionResult.claimId);
+        }
+
+        return extractionResult;
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === "object" && "data" in err && typeof (err as { data: unknown }).data === "string"
+            ? (err as { data: string }).data
+            : err instanceof Error
+              ? err.message.replace(/^Uncaught (?:Error|ConvexError):\s*/i, "").replace(/^Server Error\s*/i, "")
+              : String(err);
+        throw new Error(msg);
       }
-
-      return extractionResult;
     },
     [generateUploadUrlMutation, parseDenialAction]
   );
@@ -224,16 +234,26 @@ export function useClaims(options?: {
   // Parse raw text pasted by user
   const parseDocumentText = useCallback(
     async (text: string, patientState?: string) => {
-      const extractionResult: DenialExtractionResult & { claimId: string } = await parseDenialAction({
-        rawDocumentText: text,
-        patientState,
-      });
+      try {
+        const extractionResult: DenialExtractionResult & { claimId: string } = await parseDenialAction({
+          rawDocumentText: text,
+          patientState,
+        });
 
-      if (extractionResult?.claimId) {
-        setSelectedClaimId(extractionResult.claimId);
+        if (extractionResult?.claimId) {
+          setSelectedClaimId(extractionResult.claimId);
+        }
+
+        return extractionResult;
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === "object" && "data" in err && typeof (err as { data: unknown }).data === "string"
+            ? (err as { data: string }).data
+            : err instanceof Error
+              ? err.message.replace(/^Uncaught (?:Error|ConvexError):\s*/i, "").replace(/^Server Error\s*/i, "")
+              : String(err);
+        throw new Error(msg);
       }
-
-      return extractionResult;
     },
     [parseDenialAction]
   );

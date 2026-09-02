@@ -23,6 +23,7 @@ import { AuthPage } from "./components/auth/AuthPage";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
 import { OnboardingChecklist } from "./components/onboarding/OnboardingChecklist";
 import { SentinelChatbot } from "./components/chat/SentinelChatbot";
+import { SettingsPage } from "./components/settings/SettingsPage";
 import { BrandIcon, BrandWordmark } from "./components/common/BrandLogo";
 import { CircleNotch } from "@phosphor-icons/react";
 
@@ -332,6 +333,13 @@ export default function App() {
               isLoading={isLoadingAudit}
             />
           )}
+
+          {/* 7. Sentinel Operational & Advocate Settings */}
+          {currentView === "settings" && (
+            <SettingsPage
+              onNavigateToRadar={() => setCurrentView("radar")}
+            />
+          )}
         </>
       )}
 
@@ -360,6 +368,7 @@ export default function App() {
       <OnboardingWizard
         isOpen={isOnboardingOpen}
         onClose={() => setIsOnboardingOpen(false)}
+        onUploadFile={uploadAndParseDocument}
         onParseText={parseDocumentText}
         onOpenIngestionModal={handleOpenIngestion}
         onSuccess={handleIngestionSuccess}

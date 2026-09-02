@@ -38,6 +38,11 @@ describe("src/lib/utils Unit Tests", () => {
     const timestamp = new Date("2026-06-12T12:00:00Z").getTime();
     expect(formatDate(timestamp)).toContain("2026");
     expect(formatDate("2026-06-12")).toContain("2026");
+    expect(formatDate(undefined)).toBe("N/A");
+    expect(formatDate(null)).toBe("N/A");
+    expect(formatDate("")).toBe("N/A");
+    expect(formatDate("invalid-date-string")).toBe("invalid-date-string");
+    expect(formatDate("Unknown")).toBe("Unknown");
   });
 
   it("formatDateTime formats timestamp with time", () => {
@@ -45,6 +50,10 @@ describe("src/lib/utils Unit Tests", () => {
     const formatted = formatDateTime(timestamp);
     expect(formatted).toContain("2026");
     expect(formatted).toMatch(/\d+:\d{2}/);
+    expect(formatDateTime(undefined)).toBe("N/A");
+    expect(formatDateTime(null)).toBe("N/A");
+    expect(formatDateTime("")).toBe("N/A");
+    expect(formatDateTime("invalid-datetime")).toBe("invalid-datetime");
   });
 
   it("formatDeadlineRemaining calculates critical, urgent, and standard statuses", () => {

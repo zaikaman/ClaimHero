@@ -435,6 +435,34 @@ export default defineSchema({
   })
     .index("by_session", ["sessionId"])
     .index("by_session_and_time", ["sessionId", "createdAt"]),
+
+  // Global & Per-User Sentinel Operational Settings
+  userSettings: defineTable({
+    userId: v.optional(v.id("users")),
+    approvalMode: v.union(
+      v.literal("manual_review"),
+      v.literal("autonomous_high_confidence")
+    ),
+    followUpCadenceDays: v.number(),
+    defaultLegalPosture: v.union(
+      v.literal("administrative_reconsideration"),
+      v.literal("procedural_grievance_bad_faith"),
+      v.literal("external_iro_erisa_502_petition")
+    ),
+    autoReplyInbound: v.boolean(),
+    autoRescanPolicies: v.boolean(),
+    criticalDeadlineAlerts: v.boolean(),
+    advocateProfile: v.object({
+      name: v.string(),
+      credentials: v.string(),
+      organization: v.string(),
+      phone: v.string(),
+      state: v.string(),
+    }),
+    lastSyncTimestamp: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
 });
 
 

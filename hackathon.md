@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T10:35:00Z
+- **Last updated:** 2026-09-02T12:05:00Z
 
 ## Log
 
@@ -435,7 +435,7 @@ Hardened Free-Tier Two-Way Routing & Bidirectional Thread Tracking (`convex/sche
 - **Reactive Appeal Brief Resolution in AgentMail Dispatch UI**: Fixed client-side disabled state on the "Transmit to AI Payer Reviewer" and "Print Docket" buttons in `src/components/communications/AgentMailDrawer.tsx` and `src/hooks/useClaims.ts`. Resolved `selectedClaimDetail` through `api.claims.getById` and integrated direct reactive `api.appeals.getLatestByClaim` subscription in `AgentMailDrawer.tsx`, ensuring `effectiveAppeal` is immediately populated even when navigating from list queries that do not join deep appeal objects.
 - **Full Verification**: 100% PASS with `npm run verify` (typecheck, ESLint, 363/363 passing unit tests across 26 test suites, and Vite production bundle build). Convex features: database schema, relational indexes, queries, internalQuery, mutations, internalMutation, actions, internalAction, reactive subscriptions, static hosting.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 3032aaf
 LLM-Driven Inbound Reply Adjudication, User Email Alert Notifications & 1-Hour Auto-Pilot SLA (`convex/schema.ts`, `convex/users.ts`, `convex/emails.ts`, `convex/actions/agentMail.ts`, `convex/actions/mailDispatcher.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/types/index.ts`):
 - **Replaced Naive Keyword Matching with OpenAI Structured Review**: Upgraded `processInboundClaimReply` in `convex/actions/agentMail.ts` to execute structured LLM clinical analysis (`createStructuredCompletion`) on all incoming payer emails, accurately classifying determinations (`OVERTURNED_APPROVED`, `ADDITIONAL_RECORDS_REQUIRED`, `DENIAL_UPHELD`, `ACKNOWLEDGMENT_ONLY`, `GENERAL_INQUIRY`), extracting specific clinical records demanded, and determining authorized settlement dollar amounts.
 - **Instant User Email Alert Notifications**: Added real-time user notification dispatch in `processInboundClaimReply` (`convex/actions/agentMail.ts`, `convex/users.ts: getUserByIdInternal`). Whenever an insurer responds, ClaimHero automatically emails the adjudicator/patient with determination headlines, clinical summaries, and docket direct links.
@@ -448,6 +448,41 @@ LLM-Driven Inbound Reply Adjudication, User Email Alert Notifications & 1-Hour A
   - *Streamlined Interface*: Purged redundant manual template chips in favor of autonomous model selection.
 - **Schema & Type Extensions**: Added `autoPilotEnabled` to `claims` table, and `detectedDetermination`, `clinicalRationale`, `missingRecordsRequested`, `settlementAmount`, `autoReplyDraft`, and `autoReplyStatus` to `emailMessages` table (`convex/schema.ts`, `convex/emails.ts`, `src/types/index.ts`).
 - **Validation**: 100% clean execution with `npm run verify` (typecheck, lint, 363/363 passing unit tests across 26 test suites, and Vite production bundle build). Convex features: schema, indexes, queries, internalQuery, mutations, internalMutation, actions, internalAction, reactive subscriptions, static hosting.
+
+### 2026-09-02 - working tree
+Full-Stack Settings Dashboard, Advocate Signatory Profile, Onboarding Wizard Integration, Non-Claim Rejection Safeguards & 3-Tier Sidebar Architecture (`convex/schema.ts`, `convex/settings.ts`, `convex/actions/opticalParser.ts`, `src/components/settings/SettingsPage.tsx`, `src/components/onboarding/OnboardingWizard.tsx`, `src/components/layout/Sidebar.tsx`, `src/hooks/useSettings.ts`, `src/hooks/useClaims.ts`, `src/hooks/useRouterView.ts`, `src/components/ui/switch.tsx`, `src/lib/utils.ts`, `src/App.tsx`, `tests/convexSettings.test.ts`, `tests/actionsClinicalAndParser.test.ts`, `tests/utils.test.ts`):
+- **Convex Settings Schema & Backend Mutations (`convex/schema.ts`, `convex/settings.ts`)**:
+  - Created `userSettings` table schema with indexes (`by_user`) tracking `approvalMode` (`manual_review` vs `autonomous_high_confidence`), `followUpCadenceDays`, `defaultLegalPosture`, `autoReplyInbound`, `autoRescanPolicies`, `criticalDeadlineAlerts`, `advocateProfile` (`{ name, credentials, organization, phone, state }`), and `lastSyncTimestamp`.
+  - Implemented `getSettings` query returning user-specific settings or standard medical advocate defaults.
+  - Implemented `updateSettings` mutation with strict validation, clamping statutory follow-up cadence (1-90 days), and database persistence.
+  - Implemented `triggerManualSweepAndSync` mutation recalculating remaining days across active claims and updating real-time sync timestamps.
+  - Implemented `resetPortfolio` danger zone mutation with cascade cleanup across claims, evidences, briefs, threads, and logs requiring strict confirmation phrase matching (`RESET_PORTFOLIO`).
+- **Precision Dark-Mode Settings Page (`src/components/settings/SettingsPage.tsx`)**:
+  - *Outreach & Appeal Dispatch*: Approval mode dropdown, statutory follow-up cadence slider/input, and default legal posture selector.
+  - *Autonomy & Intelligence*: Accessible toggle switches (`src/components/ui/switch.tsx`) for inbound determination auto-replies, background clinical policy bulletin rescanning, and 14-day critical deadline alarms.
+  - *Advocate & Clinical Profile*: Default physician/advocate signatory details (Name, Credentials, Organization, Phone, State) pre-populating newly synthesized appeal briefs and doctor P2P tele-scripts.
+  - *AgentMail Inbound Gateway*: Live active intake address card with 1-click clipboard copy and real-time manual sweep trigger with spinner.
+  - *Danger Zone*: Safe portfolio reset modal with confirmation phrase validation.
+- **3-Tier Sidebar Navigation Reorganization (`src/components/layout/Sidebar.tsx`)**:
+  - Structured sidebar navigation into 3 clean groups: **Sentinel Platform** (Case Radar, Portfolio Analytics, Audit Timeline), **Case Workspace** (Evidence Matrix, Defense Suite, Payer Communications), and **Sentinel Agent** (Settings with `GearSix` icon).
+  - Added Settings direct jump in the user profile dropdown, SPA routing (`/settings`, `/app/settings`), and global Command Palette (`⌘K`).
+- **Enhanced Onboarding Wizard with Live Profile & File Intake (`src/components/onboarding/OnboardingWizard.tsx`)**:
+  - *Step 1 (Role & Signatory Profile)*: Live editable Advocate & Clinical Signatory inputs (Name, Credentials, Organization, Phone) tailored to selected role, automatically synced to Convex `userSettings`.
+  - *Step 3 (Starter Appeal Case & Custom Intake)*: Case selection is purely optional with dynamic "Complete Setup" vs "Complete Setup & Launch Sentinel" action buttons.
+  - *Native File Picker & HTML5 Drag & Drop*: Added native file browser trigger and drag-and-drop file upload with real-time file preview chips and clear controls.
+  - *Visual Error Banners*: In-dialog error alert banner with dismissal controls when invalid or non-claim documents are uploaded.
+- **Intelligent Non-Claim Document Classification & Safeguards (`convex/actions/opticalParser.ts`, `src/hooks/useClaims.ts`)**:
+  - Upgraded `DENIAL_EXTRACTION_SCHEMA` and system prompt with `isMedicalClaimDenial` boolean and `documentClassificationReason` string properties.
+  - Vision model evaluates whether an uploaded file is an authentic healthcare insurance claim denial, EOB, or adverse determination.
+  - Rigorously rejects non-claim files (e.g. photos of pets/animals, scenery, food, receipts, unrelated invoices, or blank files) using typed `ConvexError` without creating empty dummy claims in the database.
+  - Hardened client-side error unwrapping in `useClaims.ts` to surface clean, user-friendly rejection alerts.
+- **Resilient Healthcare Date Utilities (`src/lib/utils.ts`)**:
+  - Hardened `formatDate` and `formatDateTime` against invalid dates, `null`, `undefined`, and unparseable strings, ensuring components (like `EvidenceMatrix.tsx`) never crash with `RangeError: Invalid time value`.
+- **Testing & Verification**:
+  - Added 7 unit tests in `tests/convexSettings.test.ts` validating settings queries, mutations, sweeps, and reset cascade.
+  - Added unit tests in `tests/actionsClinicalAndParser.test.ts` verifying document classification and rejection safeguards.
+  - Added unit tests in `tests/utils.test.ts` verifying resilient date formatting.
+  - Verified 100% clean with `npm run verify`: 372/372 passing tests across 27 test suites, 0 TypeScript/ESLint errors, and successful production build. Convex features: database schema, relational indexes, queries, internalQuery, mutations, internalMutation, actions, internalAction, reactive subscriptions, auth, static hosting.
 
 
 

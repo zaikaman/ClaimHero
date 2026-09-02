@@ -26,6 +26,8 @@ export const PATH_TO_VIEW_MAP: Record<string, NavigationView> = {
   "/app/analytics": "analytics",
   "/audit": "audit",
   "/app/audit": "audit",
+  "/settings": "settings",
+  "/app/settings": "settings",
   "/login": "login",
   "/auth": "login",
   "/signin": "login",
@@ -42,6 +44,7 @@ export const VIEW_TO_PATH_MAP: Record<NavigationView, string> = {
   communications: "/app/inbox",
   analytics: "/app/analytics",
   audit: "/app/audit",
+  settings: "/app/settings",
   login: "/login",
 };
 

@@ -45,6 +45,7 @@ import type * as model_auth from "../model/auth.js";
 import type * as p2pCallSessions from "../p2pCallSessions.js";
 import type * as p2pScripts from "../p2pScripts.js";
 import type * as precedents from "../precedents.js";
+import type * as settings from "../settings.js";
 import type * as users from "../users.js";
 
 import type {
@@ -91,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   p2pCallSessions: typeof p2pCallSessions;
   p2pScripts: typeof p2pScripts;
   precedents: typeof precedents;
+  settings: typeof settings;
   users: typeof users;
 }>;
 

@@ -72,6 +72,8 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
     it("parseDenialDocument: parses raw document text and creates claim", async () => {
       vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
       vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        isMedicalClaimDenial: true,
+        documentClassificationReason: "Valid health insurance denial notice for lumbar decompression surgery.",
         claimNumber: "CLM-CA-888",
         patientName: "Alice Walker",
         memberId: "MEM-999",
@@ -107,6 +109,80 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
         claimNumber: "CLM-CA-888",
         deniedAmount: 12500,
       }));
+    });
+
+    it("parseDenialDocument: rejects non-claim documents with informative classification error", async () => {
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        isMedicalClaimDenial: false,
+        documentClassificationReason: "The uploaded file is a photo of a domestic cat, not a medical claim denial letter or Explanation of Benefits.",
+        claimNumber: "",
+        patientName: "",
+        memberId: "",
+        insurancePayer: "",
+        serviceDate: "",
+        providerName: "",
+        deniedAmount: 0,
+        patientOwedAmount: 0,
+        cptCodes: [],
+        icd10Codes: [],
+        denialReasonCode: "",
+        denialReasonDescription: "",
+        appealFilingDeadlineDays: 180,
+        payerAppealsEmail: "",
+        payerAppealsAddress: "",
+      } as any);
+
+      const mockCtx: any = {
+        runMutation: vi.fn(),
+        runAction: vi.fn(),
+      };
+
+      await expect(
+        (actionOpticalParser.parseDenialDocument as any)._handler(mockCtx, {
+          rawDocumentText: "Random photo or text",
+          patientState: "CA",
+        })
+      ).rejects.toThrow(/Non-claim document detected/);
+
+      expect(mockCtx.runMutation).not.toHaveBeenCalled();
+    });
+
+    it("parseDenialDocument: rejects document when all core claim signals are empty", async () => {
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        isMedicalClaimDenial: true,
+        documentClassificationReason: "Unclear document",
+        claimNumber: "",
+        patientName: "",
+        memberId: "",
+        insurancePayer: "",
+        serviceDate: "",
+        providerName: "",
+        deniedAmount: 0,
+        patientOwedAmount: 0,
+        cptCodes: [],
+        icd10Codes: [],
+        denialReasonCode: "",
+        denialReasonDescription: "",
+        appealFilingDeadlineDays: 180,
+        payerAppealsEmail: "",
+        payerAppealsAddress: "",
+      } as any);
+
+      const mockCtx: any = {
+        runMutation: vi.fn(),
+        runAction: vi.fn(),
+      };
+
+      await expect(
+        (actionOpticalParser.parseDenialDocument as any)._handler(mockCtx, {
+          rawDocumentText: "Blank or unreadable document",
+          patientState: "CA",
+        })
+      ).rejects.toThrow(/does not contain recognizable medical claim denial details/);
+
+      expect(mockCtx.runMutation).not.toHaveBeenCalled();
     });
   });
 

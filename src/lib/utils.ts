@@ -30,13 +30,21 @@ export function formatCurrency(
 }
 
 /**
- * Format timestamps into human-readable medical record dates
+ * Format timestamps into human-readable medical record dates with safe fallback
  */
-export function formatDate(timestampOrDateString: number | string): string {
+export function formatDate(timestampOrDateString: number | string | undefined | null): string {
+  if (timestampOrDateString === undefined || timestampOrDateString === null || timestampOrDateString === "") {
+    return "N/A";
+  }
+
   const date =
     typeof timestampOrDateString === "number"
       ? new Date(timestampOrDateString)
       : new Date(timestampOrDateString);
+
+  if (isNaN(date.getTime())) {
+    return typeof timestampOrDateString === "string" ? timestampOrDateString : "N/A";
+  }
 
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -46,9 +54,18 @@ export function formatDate(timestampOrDateString: number | string): string {
 }
 
 /**
- * Format datetime with hours and minutes
+ * Format datetime with hours and minutes with safe fallback
  */
-export function formatDateTime(timestamp: number): string {
+export function formatDateTime(timestamp: number | string | undefined | null): string {
+  if (timestamp === undefined || timestamp === null || timestamp === "") {
+    return "N/A";
+  }
+
+  const date = typeof timestamp === "number" ? new Date(timestamp) : new Date(timestamp);
+  if (isNaN(date.getTime())) {
+    return typeof timestamp === "string" ? timestamp : "N/A";
+  }
+
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -56,7 +73,7 @@ export function formatDateTime(timestamp: number): string {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-  }).format(new Date(timestamp));
+  }).format(date);
 }
 
 /**
