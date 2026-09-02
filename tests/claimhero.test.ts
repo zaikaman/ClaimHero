@@ -1664,7 +1664,162 @@ describe("Convex Advanced Components & Infrastructure (Rate Limiter, Search Inde
       });
     });
   });
+
+  describe("Bounded Reads, Pagination & N+1 Query Elimination", () => {
+    it("claims.list performs bounded indexed queries and formats denormalized patient data without N+1 joins", async () => {
+      const claimsModule = await import("../convex/claims");
+      const listHandler = (claimsModule.list as any)._handler;
+
+      const mockClaims = [
+        {
+          _id: "claim_1",
+          userId: "user_test",
+          patientId: "patient_1",
+          patientName: "Jane Doe",
+          insurancePayer: "Aetna",
+          claimNumber: "CLM-001",
+          createdAt: 1000,
+        },
+        {
+          _id: "claim_2",
+          userId: "user_test",
+          patientId: "patient_2",
+          patientName: "John Smith",
+          insurancePayer: "UnitedHealthcare",
+          claimNumber: "CLM-002",
+          createdAt: 2000,
+        },
+      ];
+
+      const mockTake = vi.fn().mockResolvedValue(mockClaims);
+      const mockOrder = vi.fn().mockReturnValue({ take: mockTake });
+      const mockWithIndex = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockQuery = vi.fn().mockReturnValue({ withIndex: mockWithIndex });
+      const mockGet = vi.fn();
+
+      const mockCtx: any = {
+        auth: {
+          getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_test" }),
+        },
+        db: {
+          query: mockQuery,
+          get: mockGet,
+        },
+      };
+
+      const result = await listHandler(mockCtx, { limit: 25 });
+
+      expect(mockQuery).toHaveBeenCalledWith("claims");
+      expect(mockWithIndex).toHaveBeenCalled();
+      expect(mockTake).toHaveBeenCalledWith(25);
+      // Zero N+1 joins because patientName and insurancePayer are denormalized
+      expect(mockGet).not.toHaveBeenCalled();
+      expect(result).toHaveLength(2);
+      expect(result[0].patient?.name).toBe("Jane Doe");
+      expect(result[0].patient?.insurancePayer).toBe("Aetna");
+    });
+
+    it("claims.list supports reactive pagination via paginationOpts", async () => {
+      const claimsModule = await import("../convex/claims");
+      const listHandler = (claimsModule.list as any)._handler;
+
+      const mockClaims = [
+        {
+          _id: "claim_1",
+          userId: "user_test",
+          patientId: "patient_1",
+          patientName: "Jane Doe",
+          insurancePayer: "Aetna",
+          claimNumber: "CLM-001",
+          createdAt: 1000,
+        },
+      ];
+
+      const mockPaginate = vi.fn().mockResolvedValue({
+        page: mockClaims,
+        isDone: true,
+        continueCursor: "cursor_next",
+      });
+      const mockOrder = vi.fn().mockReturnValue({ paginate: mockPaginate });
+      const mockWithIndex = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockQuery = vi.fn().mockReturnValue({ withIndex: mockWithIndex });
+
+      const mockCtx: any = {
+        auth: {
+          getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_test" }),
+        },
+        db: {
+          query: mockQuery,
+        },
+      };
+
+      const paginationOpts = { cursor: null, numItems: 25 };
+      const result = await listHandler(mockCtx, { paginationOpts });
+
+      expect(mockPaginate).toHaveBeenCalledWith(paginationOpts);
+      expect(result.page).toHaveLength(1);
+      expect(result.page[0].patient?.name).toBe("Jane Doe");
+      expect(result.isDone).toBe(true);
+    });
+
+    it("claims.getPortfolioStats uses bounded take(500) and computes metrics without patient joins", async () => {
+      const claimsModule = await import("../convex/claims");
+      const statsHandler = (claimsModule.getPortfolioStats as any)._handler;
+
+      const mockClaims = [
+        {
+          _id: "claim_1",
+          userId: "user_test",
+          patientId: "patient_1",
+          insurancePayer: "Blue Cross",
+          deniedAmount: 15000,
+          status: "won",
+          overturnProbabilityScore: 92,
+          daysRemaining: 10,
+          createdAt: 1000,
+        },
+        {
+          _id: "claim_2",
+          userId: "user_test",
+          patientId: "patient_2",
+          insurancePayer: "Blue Cross",
+          deniedAmount: 5000,
+          status: "drafting",
+          overturnProbabilityScore: 80,
+          daysRemaining: 8,
+          createdAt: 2000,
+        },
+      ];
+
+      const mockTake = vi.fn().mockResolvedValue(mockClaims);
+      const mockOrder = vi.fn().mockReturnValue({ take: mockTake });
+      const mockWithIndex = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockQuery = vi.fn().mockReturnValue({ withIndex: mockWithIndex });
+
+      const mockCtx: any = {
+        auth: {
+          getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_test" }),
+        },
+        db: {
+          query: mockQuery,
+        },
+      };
+
+      const result = await statsHandler(mockCtx, {});
+
+      expect(mockTake).toHaveBeenCalledWith(500);
+      expect(result.totalClaims).toBe(2);
+      expect(result.totalDisputedAmount).toBe(20000);
+      expect(result.overturnedWonAmount).toBe(15000);
+      expect(result.activeDisputedAmount).toBe(5000);
+      expect(result.criticalDeadlinesCount).toBe(1); // Only active non-won claim counts
+      expect(result.payerBreakdown).toHaveLength(1);
+      expect(result.payerBreakdown[0].payer).toBe("Blue Cross");
+      expect(result.payerBreakdown[0].wonCount).toBe(1);
+    });
+  });
 });
+
 
 
 

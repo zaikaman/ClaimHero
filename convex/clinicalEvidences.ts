@@ -52,7 +52,7 @@ export const listByClaim = query({
     const evidences = await ctx.db
       .query("clinicalEvidences")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
+      .take(50);
 
     // Sort by relevance score descending and sanitize raw formatting
     return evidences
@@ -78,7 +78,7 @@ export const listByClaimInternal = internalQuery({
     const evidences = await ctx.db
       .query("clinicalEvidences")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
+      .take(50);
 
     return evidences
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
@@ -106,18 +106,18 @@ export const listByClaimAndSource = query({
 
     const evidences = await ctx.db
       .query("clinicalEvidences")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
+      .withIndex("by_claim_source", (q) =>
+        q.eq("claimId", args.claimId).eq("sourceType", args.sourceType)
+      )
+      .take(50);
 
-    return evidences
-      .filter((item) => item.sourceType === args.sourceType)
-      .map((item) => ({
-        ...item,
-        title: item.title?.replace(/\*\*/g, "") || "",
-        citationClause: sanitizeCitationClause(item.citationClause),
-        extractedEvidenceMarkdown:
-          item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
-      }));
+    return evidences.map((item) => ({
+      ...item,
+      title: item.title?.replace(/\*\*/g, "") || "",
+      citationClause: sanitizeCitationClause(item.citationClause),
+      extractedEvidenceMarkdown:
+        item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
+    }));
   },
 });
 
@@ -370,7 +370,7 @@ export const listSourcesSummary = query({
     const evidences = await ctx.db
       .query("clinicalEvidences")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
+      .take(100);
 
     const summary: Record<string, number> = {
       payer_cpb: 0,

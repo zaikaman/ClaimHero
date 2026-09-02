@@ -24,6 +24,8 @@ export default defineSchema({
   claims: defineTable({
     userId: v.optional(v.id("users")),
     patientId: v.id("patients"),
+    patientName: v.optional(v.string()),
+    insurancePayer: v.optional(v.string()),
     claimNumber: v.string(),
     serviceDate: v.string(),
     providerName: v.string(),
@@ -55,7 +57,7 @@ export default defineSchema({
     agentMailInboxEmail: v.optional(v.string()),
     agentMailAdjudicatorInboxId: v.optional(v.string()),
     agentMailAdjudicatorEmail: v.optional(v.string()),
-      agentMailProvisioningStatus: v.optional(v.string()), // pending, shared, provisioned, not_configured, failed
+    agentMailProvisioningStatus: v.optional(v.string()), // pending, shared, provisioned, not_configured, failed
     agentMailProvisioningError: v.optional(v.string()),
     denialLetterStorageId: v.optional(v.id("_storage")),
     appealContext: v.optional(
@@ -148,6 +150,8 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_status", ["userId", "status"])
+    .index("by_user_payer", ["userId", "insurancePayer"])
+    .index("by_payer", ["insurancePayer"])
     .index("by_status", ["status"])
     .index("by_patient", ["patientId"])
     .index("by_deadline", ["statutoryDeadline"])

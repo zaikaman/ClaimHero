@@ -96,7 +96,8 @@ export const listRecent = query({
     const userClaims = await ctx.db
       .query("claims")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
+      .order("desc")
+      .take(30);
 
     if (userClaims.length === 0) return [];
 

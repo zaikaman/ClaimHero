@@ -1,4 +1,5 @@
 import { MutationCtx, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -37,77 +38,127 @@ export const search = query({
 });
 
 /**
- * List all claims for the authenticated user with optional status and payer filtering
+ * List all claims for the authenticated user with optional status and payer filtering.
+ * Uses bounded reads and indexed queries (by_user_payer, by_user_status, by_user)
+ * with denormalized patient data to eliminate N+1 overhead and unbounded document scans.
  */
 export const list = query({
   args: {
     status: v.optional(v.string()),
     payer: v.optional(v.string()),
     limit: v.optional(v.number()),
+    cursor: v.optional(v.union(v.string(), v.null())),
+    paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
+      if (args.paginationOpts) {
+        return { page: [], isDone: true, continueCursor: "" };
+      }
       return [];
     }
 
-    let claims: Doc<"claims">[];
+    const hasStatus = Boolean(args.status && args.status !== "all");
+    const hasPayer = Boolean(args.payer && args.payer !== "all");
 
-    if (args.status && args.status !== "all") {
-      claims = await ctx.db
+    let queryBuilder;
+    if (hasPayer) {
+      queryBuilder = ctx.db
+        .query("claims")
+        .withIndex("by_user_payer", (q) =>
+          q.eq("userId", userId).eq("insurancePayer", args.payer!)
+        );
+      if (hasStatus) {
+        queryBuilder = queryBuilder.filter((q) => q.eq(q.field("status"), args.status!));
+      }
+    } else if (hasStatus) {
+      queryBuilder = ctx.db
         .query("claims")
         .withIndex("by_user_status", (q) =>
           q.eq("userId", userId).eq("status", args.status!)
-        )
-        .collect();
+        );
     } else {
-      claims = await ctx.db
+      queryBuilder = ctx.db
         .query("claims")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect();
+        .withIndex("by_user", (q) => q.eq("userId", userId));
     }
 
-    // Join with patient details, latest appeal draft, and evidence count
-    const joinedClaims = await Promise.all(
-      claims.map(async (claim) => {
-        const patient = (await ctx.db.get(claim.patientId)) as Doc<"patients"> | null;
-        const appeals = await ctx.db
-          .query("appeals")
-          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-          .collect();
-        const latestAppeal = appeals.sort((a, b) => b.version - a.version)[0] || null;
+    queryBuilder = queryBuilder.order("desc");
 
-        const evidences = await ctx.db
-          .query("clinicalEvidences")
-          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-          .collect();
+    // Support reactive pagination if paginationOpts is provided
+    if (args.paginationOpts) {
+      const paginatedResult = await queryBuilder.paginate(args.paginationOpts);
+      const page = await Promise.all(
+        paginatedResult.page.map(async (claim) => {
+          let patientName = claim.patientName;
+          let insurancePayer = claim.insurancePayer;
+
+          if (!patientName || !insurancePayer) {
+            const patient = (await ctx.db.get(claim.patientId)) as Doc<"patients"> | null;
+            if (patient) {
+              patientName = patientName || patient.name;
+              insurancePayer = insurancePayer || patient.insurancePayer;
+            }
+          }
+
+          return {
+            ...claim,
+            patientName,
+            insurancePayer,
+            patient: {
+              _id: claim.patientId,
+              name: patientName || "Patient",
+              email: "",
+              memberId: "PENDING",
+              insurancePayer: insurancePayer || "Health Insurer",
+              state: "FL",
+              createdAt: claim.createdAt,
+            },
+          };
+        })
+      );
+
+      return {
+        ...paginatedResult,
+        page,
+      };
+    }
+
+    const effectiveLimit = Math.min(args.limit ?? 50, 100);
+    const claims = await queryBuilder.take(effectiveLimit);
+
+    // Map denormalized patient data into the expected Claim shape without N+1 joins
+    return await Promise.all(
+      claims.map(async (claim) => {
+        let patientName = claim.patientName;
+        let insurancePayer = claim.insurancePayer;
+
+        // Graceful fallback for legacy documents
+        if (!patientName || !insurancePayer) {
+          const patient = (await ctx.db.get(claim.patientId)) as Doc<"patients"> | null;
+          if (patient) {
+            patientName = patientName || patient.name;
+            insurancePayer = insurancePayer || patient.insurancePayer;
+          }
+        }
 
         return {
           ...claim,
-          patient: patient || undefined,
-          latestAppeal,
-          evidenceCount: evidences.length,
+          patientName,
+          insurancePayer,
+          patient: {
+            _id: claim.patientId,
+            name: patientName || "Patient",
+            email: "",
+            memberId: "PENDING",
+            insurancePayer: insurancePayer || "Health Insurer",
+            state: "FL",
+            createdAt: claim.createdAt,
+          },
         };
       })
     );
-
-    // Apply payer filter if specified
-    let filtered = joinedClaims;
-    if (args.payer && args.payer !== "all") {
-      filtered = filtered.filter(
-        (c) =>
-          c.patient?.insurancePayer.toLowerCase() === args.payer?.toLowerCase()
-      );
-    }
-
-    // Sort by createdAt descending
-    filtered.sort((a, b) => b.createdAt - a.createdAt);
-
-    if (args.limit) {
-      return filtered.slice(0, args.limit);
-    }
-
-    return filtered;
   },
 });
 
@@ -128,12 +179,12 @@ export const getById = query({
     const evidences = await ctx.db
       .query("clinicalEvidences")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
+      .take(50);
 
     const appeals = await ctx.db
       .query("appeals")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
+      .take(20);
 
     const latestAppeal = appeals.sort((a, b) => b.version - a.version)[0] || null;
 
@@ -162,12 +213,12 @@ export const getByIdInternal = internalQuery({
     const evidences = await ctx.db
       .query("clinicalEvidences")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
+      .take(50);
 
     const appeals = await ctx.db
       .query("appeals")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
+      .take(20);
 
     const latestAppeal = appeals.sort((a, b) => b.version - a.version)[0] || null;
 
@@ -362,9 +413,13 @@ export const create = mutation({
     const deadlineDays = args.appealFilingDeadlineDays || 180;
     const statutoryDeadline = now + deadlineDays * 86400000;
 
+    const patient = (await ctx.db.get(args.patientId)) as Doc<"patients"> | null;
+
     const claimId = await ctx.db.insert("claims", {
       userId,
       patientId: args.patientId,
+      patientName: patient?.name || "Patient",
+      insurancePayer: patient?.insurancePayer || "Health Insurer",
       claimNumber: args.claimNumber,
       serviceDate: args.serviceDate,
       providerName: args.providerName,
@@ -448,7 +503,7 @@ async function applyCreateWithPatient(
   let userId: Id<"users"> | undefined = explicitUserId || authUserId || undefined;
   const now = Date.now();
 
-  // Check if patient already exists by email
+  // Check if patient already exists by email (bounded scan)
   const cleanEmail = args.patientEmail?.trim() || "";
   let matchingPatient: Doc<"patients"> | undefined;
 
@@ -456,7 +511,7 @@ async function applyCreateWithPatient(
     const existingPatients = await ctx.db
       .query("patients")
       .withIndex("by_email", (q) => q.eq("email", cleanEmail))
-      .collect();
+      .take(10);
     matchingPatient = existingPatients.find((p) => (userId ? p.userId === userId : true) || !p.userId);
     if (!userId && matchingPatient?.userId) {
       userId = matchingPatient.userId;
@@ -466,7 +521,7 @@ async function applyCreateWithPatient(
     const userPatients = await ctx.db
       .query("patients")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
+      .take(50);
     matchingPatient = userPatients.find(
       (p) =>
         p.name.toLowerCase() === args.patientName.toLowerCase() &&
@@ -506,6 +561,8 @@ async function applyCreateWithPatient(
   const claimId = await ctx.db.insert("claims", {
     userId,
     patientId,
+    patientName: args.patientName,
+    insurancePayer: args.insurancePayer || "Molina Healthcare",
     claimNumber: args.claimNumber,
     serviceDate: args.serviceDate,
     providerName: args.providerName,
@@ -917,7 +974,9 @@ export const sweepDeadlinesBatch = internalMutation({
 });
 
 /**
- * Retrieve comprehensive portfolio analytics and financial metrics strictly computed across the authenticated user's claims
+ * Retrieve comprehensive portfolio analytics and financial metrics strictly computed across the authenticated user's claims.
+ * Leverages O(log N) claimsAggregate for portfolio count and sum, combined with a bounded scan
+ * using denormalized payer fields to eliminate cross-table patient joins.
  */
 export const getPortfolioStats = query({
   args: {},
@@ -953,18 +1012,6 @@ export const getPortfolioStats = query({
       };
     }
 
-    const claims = (await ctx.db
-      .query("claims")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect()) as Doc<"claims">[];
-
-    // Fetch only the authenticated user's patients to prevent cross-tenant leakage
-    const patients = await ctx.db
-      .query("patients")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-    const patientMap = new Map(patients.map((p) => [p._id, p]));
-
     // Query O(log N) claimsAggregate for portfolio-level validation where available
     let aggregateCount: number | null = null;
     let aggregateSum: number | null = null;
@@ -976,6 +1023,13 @@ export const getPortfolioStats = query({
     } catch {
       // Graceful fallback to in-memory reduction if aggregate tree is synchronizing
     }
+
+    // Bounded fetch of recent claims for status, risk, and payer breakdown (max 500)
+    const claims = (await ctx.db
+      .query("claims")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(500)) as Doc<"claims">[];
 
     let totalDisputedAmount = 0;
     let activeDisputedAmount = 0;
@@ -1009,8 +1063,7 @@ export const getPortfolioStats = query({
     > = {};
 
     for (const claim of claims) {
-      const patient = patientMap.get(claim.patientId);
-      const payer = patient?.insurancePayer || "Health Insurer";
+      const payer = claim.insurancePayer || "Health Insurer";
 
       totalDisputedAmount += claim.deniedAmount;
 
@@ -1100,7 +1153,7 @@ export const claimLegacyCasesInternal = internalMutation({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const allClaims = await ctx.db.query("claims").collect();
+    const allClaims = await ctx.db.query("claims").take(200);
     const unassigned = allClaims.filter((c) => !c.userId);
 
     for (const c of unassigned) {
@@ -1117,7 +1170,7 @@ export const claimLegacyCasesInternal = internalMutation({
 export const clearUnassignedDemoCases = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const allClaims = await ctx.db.query("claims").collect();
+    const allClaims = await ctx.db.query("claims").take(200);
     const unassigned = allClaims.filter((c) => !c.userId);
 
     for (const c of unassigned) {
