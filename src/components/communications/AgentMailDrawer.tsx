@@ -67,7 +67,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const assignedEmail =
     claim.agentMailInboxEmail ||
     claim.assignedAgentEmail ||
-    "claimhero-sender@agentmail.to";
+    import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL ||
+    "";
 
   const payerName = claim.patient?.insurancePayer || "Health Insurer";
   const defaultPayerContact = getPayerAppellateContact(payerName);
@@ -75,7 +76,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const officialEmail = claim.payerContact?.officialAppealsEmail || payerContact.officialAppealsEmail;
   const aiAdjudicatorEmail =
     claim.agentMailAdjudicatorEmail ||
-    "claimhero-adjudicator@agentmail.to";
+    import.meta.env.VITE_AGENTMAIL_ADJUDICATOR_EMAIL ||
+    "";
 
   const effectiveRecipient =
     dispatchMode === "ai_adjudicator"
@@ -91,12 +93,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
   const canDispatch =
     dispatchMode === "ai_adjudicator"
-      ? true
+      ? Boolean(aiAdjudicatorEmail)
       : dispatchMode === "custom_email"
       ? Boolean(customEmail.trim() && customEmail.includes("@"))
       : Boolean(officialEmail);
 
   const handleCopyEmail = () => {
+    if (!assignedEmail) return;
     navigator.clipboard.writeText(assignedEmail);
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
@@ -279,7 +282,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   </p>
                 </div>
                 <div className="mt-2.5 pt-2 border-t border-border/50 text-[10px] font-mono text-primary/90 truncate">
-                  {aiAdjudicatorEmail}
+                  {aiAdjudicatorEmail || "AI Adjudicator mailbox"}
                 </div>
               </div>
 
@@ -458,23 +461,22 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2.5 rounded-lg border border-border bg-muted/40 p-2.5 text-xs">
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground">Shared Case Inbox:</span>
-            <span className="font-mono font-semibold text-foreground">{assignedEmail}</span>
-            {claim.agentMailProvisioningStatus !== "shared" && claim.agentMailProvisioningStatus !== "provisioned" ? (
-              <Badge variant="outline" className="text-[9px] text-amber-600 dark:text-amber-400 border-amber-500/30">
-                {claim.agentMailProvisioningStatus === "failed" ? "Provisioning failed" : "Provisioning"}
-              </Badge>
-            ) : null}
+            <span className="font-mono font-semibold text-foreground">
+              {assignedEmail || "Shared Sender Inbox"}
+            </span>
           </div>
 
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={handleCopyEmail}
-            className="gap-1"
-          >
-            {copiedEmail ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
-            <span>{copiedEmail ? "Copied" : "Copy Address"}</span>
-          </Button>
+          {assignedEmail ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={handleCopyEmail}
+              className="gap-1"
+            >
+              {copiedEmail ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+              <span>{copiedEmail ? "Copied" : "Copy Address"}</span>
+            </Button>
+          ) : null}
         </div>
       </Card>
 

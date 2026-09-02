@@ -94,8 +94,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
 
+  const intakeEmail = import.meta.env.VITE_AGENTMAIL_INTAKE_EMAIL || "claimhero-intake@agentmail.to";
+
   const handleCopyEmail = () => {
-    navigator.clipboard.writeText("claimhero-intake@agentmail.to");
+    navigator.clipboard.writeText(intakeEmail);
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
   };

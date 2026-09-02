@@ -107,4 +107,10 @@ jobs:
 
       - name: Build Frontend & Backend Types
         run: npm run build
+        env:
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL || 'https://usable-sturgeon-376.convex.cloud' }}
+          VITE_CONVEX_SITE_URL: ${{ vars.VITE_CONVEX_SITE_URL || 'https://usable-sturgeon-376.convex.site' }}
+          VITE_AGENTMAIL_SENDER_EMAIL: ${{ vars.VITE_AGENTMAIL_SENDER_EMAIL || 'claimhero-sender@agentmail.to' }}
+          VITE_AGENTMAIL_ADJUDICATOR_EMAIL: ${{ vars.VITE_AGENTMAIL_ADJUDICATOR_EMAIL || 'claimhero-adjudicator@agentmail.to' }}
+          VITE_AGENTMAIL_INTAKE_EMAIL: ${{ vars.VITE_AGENTMAIL_INTAKE_EMAIL || 'claimhero-intake@agentmail.to' }}
 

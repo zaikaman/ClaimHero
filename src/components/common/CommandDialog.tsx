@@ -77,8 +77,10 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
     onClose();
   };
 
+  const intakeEmail = import.meta.env.VITE_AGENTMAIL_INTAKE_EMAIL || "claimhero-intake@agentmail.to";
+
   const handleCopyEmail = () => {
-    navigator.clipboard.writeText("claimhero-intake@agentmail.to");
+    navigator.clipboard.writeText(intakeEmail);
     setCopiedEmail(true);
     setTimeout(() => {
       setCopiedEmail(false);
@@ -280,7 +282,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
               >
                 <div className="flex items-center gap-2">
                   <Envelope className="size-3.5 text-emerald-500" />
-                  <span>Copy Electronic Intake Address (claimhero-intake@agentmail.to)</span>
+                  <span>Copy Electronic Intake Address ({intakeEmail})</span>
                 </div>
                 {copiedEmail ? (
                   <Check className="size-3 text-emerald-500" />

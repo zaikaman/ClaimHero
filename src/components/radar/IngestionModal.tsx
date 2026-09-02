@@ -190,8 +190,10 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const intakeEmail = import.meta.env.VITE_AGENTMAIL_INTAKE_EMAIL || "claimhero-intake@agentmail.to";
+
   const handleCopyEmail = () => {
-    navigator.clipboard.writeText("claimhero-intake@agentmail.to");
+    navigator.clipboard.writeText(intakeEmail);
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
   };
@@ -740,7 +742,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   <input
                     type="text"
                     readOnly
-                    value="claimhero-intake@agentmail.to"
+                    value={intakeEmail}
                     className="flex-1 rounded-lg border border-input bg-muted/40 px-3 py-1.5 text-xs font-mono text-foreground select-all"
                   />
                   <Button

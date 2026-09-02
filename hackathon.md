@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-08-31T13:36:00Z
+- **Last updated:** 2026-09-02T04:18:00Z
 
 ## Log
 
@@ -338,11 +338,20 @@ Resolved M1, M2, M3, M4, M5, and M7 core architecture and data security issues:
 - **M7 (Idempotent Inbox Threading & Compound Indexing)**: Replaced full array collections in `emails.getOrCreateThread` (`convex/emails.ts`) with direct `.first()` indexed lookups on `by_claim`, and added compound index `by_claim_agent` (`["claimId", "agentEmail"]`) in `convex/schema.ts` to prevent race conditions and duplicate thread creation under concurrent dispatches.
 - **Validation**: Added comprehensive test cases in `tests/authorization.test.ts`, raising the verified test suite to 213 unit tests across 12 suites with 100% statement and line coverage. Verified end-to-end with `npm run verify` (typecheck, ESLint, vitest coverage, and production build). Convex features: database schema, searchIndex, relational compound indexes, aggregate component, queries, mutations, actions, auth.
 
-### 2026-08-31 - working tree
+### 2026-08-31 - a65026c
 Hardened client environment configuration and documented repository build conventions:
 - **Fail-Fast Client Boot**: Replaced the silent `https://placeholder.convex.cloud` fallback in `src/main.tsx` with a fail-fast runtime check that throws a clear error if `VITE_CONVEX_URL` is missing, preventing silent initialization hangs and empty radar states without diagnostic feedback.
 - **Convex Generated Types Documentation**: Clarified `.gitignore` with an explicit note documenting that `convex/_generated` is intentionally committed to version control per Convex official best practices, ensuring CI typechecking and static bundle builds succeed deterministically without requiring a live backend connection.
 - **Validation**: Verified with `npm run typecheck` and `npm test` (100% PASS, 213/213 unit tests across 12 suites).
+
+### 2026-09-02 - working tree
+Resolved F1 defect by decoupling AgentMail sender and adjudicator fallbacks from hardcoded strings and eliminating artificial inbox provisioning UI artifacts:
+- **Environment Variable Fallback Resolution**: Updated `src/components/communications/AgentMailDrawer.tsx` to source fallback sender and adjudicator addresses dynamically from Vite client environment variables (`import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL`, `import.meta.env.VITE_AGENTMAIL_ADJUDICATOR_EMAIL`, and `import.meta.env.VITE_AGENTMAIL_INTAKE_EMAIL`) via typed declarations in `src/vite-env.d.ts`, instead of static hardcoded values.
+- **Elimination of Synthetic Provisioning UI**: Completely removed misleading "Provisioning" / "Provisioning failed" status badges from the shared case inbox banner in `AgentMailDrawer.tsx`, accurately reflecting ClaimHero's 3-inbox shared infrastructure model (Intake, Sender, AI Adjudicator) without synthetic per-claim provisioning overhead.
+- **Graceful Dispatch Guards**: Updated appellate dispatch capability guards and address renderers to evaluate live email availability dynamically across all three transmission modes.
+- **Validation**: Verified with `npm run typecheck`, `npm run lint`, and Vitest unit tests.
+- **CI/CD Pipeline Environment Wiring**: Configured `.github/workflows/deploy.yml` and `.github/workflows/ci.yml` with `VITE_AGENTMAIL_*` and `VITE_CONVEX_*` variable bindings and fallback defaults for deterministic builds on GitHub Actions runners.
+
 
 
 
