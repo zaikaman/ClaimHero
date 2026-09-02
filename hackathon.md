@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T04:18:00Z
+- **Last updated:** 2026-09-02T04:30:00Z
 
 ## Log
 
@@ -351,6 +351,7 @@ Resolved F1 defect by decoupling AgentMail sender and adjudicator fallbacks from
 - **Graceful Dispatch Guards**: Updated appellate dispatch capability guards and address renderers to evaluate live email availability dynamically across all three transmission modes.
 - **Validation**: Verified with `npm run typecheck`, `npm run lint`, and Vitest unit tests.
 - **CI/CD Pipeline Environment Wiring**: Configured `.github/workflows/deploy.yml` and `.github/workflows/ci.yml` with `VITE_AGENTMAIL_*` and `VITE_CONVEX_*` variable bindings and fallback defaults for deterministic builds on GitHub Actions runners.
+- **Firecrawl Real-Time Failure Propagation in Sentinel Chatbot**: Eliminated synthetic directory fallbacks (`firecrawl_citable_directory` with hardcoded `aetna.com/cpb`) in `performFirecrawlWebSearch` and synthetic success responses (`markdownSnippet: "Scraped clinical content..."`, `success: true`) in `performFirecrawlScrapeUrl` within `convex/actions/sentinelChatbot.ts`. Both functions now fail transparently on errors or empty crawls with descriptive error details rather than fabricating data or masking outages. Verified with `npm run verify` (100% typecheck, ESLint, 213/213 passing unit tests, and production build). Convex features: actions, components, static hosting.
 
 
 

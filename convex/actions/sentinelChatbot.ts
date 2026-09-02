@@ -228,14 +228,20 @@ export const SENTINEL_CHAT_TOOLS = [
 import type { ActionCtx } from "../_generated/server";
 
 /**
- * Live Web Search via Firecrawl Component with Resilient Directory Fallback
+ * Live Web Search via Firecrawl Component
  */
 async function performFirecrawlWebSearch(
   ctx: ActionCtx,
   query: string,
   payer?: string,
   limit = 4
-): Promise<{ query: string; totalResults: number; results: Array<{ title: string; url: string; description: string }>; source: string }> {
+): Promise<{
+  query: string;
+  totalResults: number;
+  results: Array<{ title: string; url: string; description: string }>;
+  source: string;
+  error?: string;
+}> {
   const searchQuery = payer ? `${payer} ${query}` : query;
 
   try {
@@ -255,52 +261,22 @@ async function performFirecrawlWebSearch(
       }))
       .filter((item) => Boolean(item.url));
 
-    if (formatted.length > 0) {
-      return {
-        query: searchQuery,
-        totalResults: formatted.length,
-        results: formatted,
-        source: "firecrawl_live_web",
-      };
-    }
+    return {
+      query: searchQuery,
+      totalResults: formatted.length,
+      results: formatted,
+      source: "firecrawl_live_web",
+    };
   } catch (err) {
-    console.warn("Firecrawl live web search error, falling back to structured directory:", err);
+    console.error("Firecrawl live web search error:", err);
+    return {
+      query: searchQuery,
+      totalResults: 0,
+      results: [],
+      source: "firecrawl_live_web",
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
-
-  const payerName =
-    payer ||
-    (query.toLowerCase().includes("aetna")
-      ? "Aetna"
-      : query.toLowerCase().includes("cigna")
-        ? "Cigna"
-        : query.toLowerCase().includes("united")
-          ? "UnitedHealthcare"
-          : "Major Payer");
-
-  const fallbackResults = [
-    {
-      title: `${payerName} Clinical Policy Bulletins & Coverage Determinations`,
-      url: `https://www.aetna.com/cpb/medical/data/`,
-      description: `Official insurer policy criteria, experimental/investigational exclusions, and medical necessity guidelines for ${query}.`,
-    },
-    {
-      title: "CMS Medicare Coverage Database (NCD & LCD Guidelines)",
-      url: "https://www.cms.gov/medicare-coverage-database/search.aspx",
-      description: `National Coverage Determinations (NCD) and Local Coverage Determinations (LCD) establishing standard-of-care criteria.`,
-    },
-    {
-      title: "PubMed / National Library of Medicine Clinical Database",
-      url: "https://pubmed.ncbi.nlm.nih.gov/",
-      description: `Peer-reviewed randomized controlled trials and clinical standard-of-care evidence for ${query}.`,
-    },
-  ];
-
-  return {
-    query: searchQuery,
-    totalResults: fallbackResults.length,
-    results: fallbackResults,
-    source: "firecrawl_citable_directory",
-  };
 }
 
 import { isAccessDeniedDocument, sanitizePublicPolicyUrl } from "./policyCrawler";
@@ -311,12 +287,13 @@ import { isAccessDeniedDocument, sanitizePublicPolicyUrl } from "./policyCrawler
 async function performFirecrawlScrapeUrl(
   ctx: ActionCtx,
   url: string
-): Promise<{ sourceUrl: string; title?: string; markdownSnippet: string; success: boolean }> {
+): Promise<{ sourceUrl: string; title?: string; markdownSnippet: string; success: boolean; error?: string }> {
   if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) {
     return {
       sourceUrl: url,
       markdownSnippet: "Invalid URL provided. Please supply a valid HTTP or HTTPS address.",
       success: false,
+      error: "Invalid URL protocol",
     };
   }
 
@@ -348,16 +325,23 @@ async function performFirecrawlScrapeUrl(
         success: true,
       };
     }
-  } catch (err) {
-    console.warn("Firecrawl scrape error, falling back:", err);
-  }
 
-  return {
-    sourceUrl: cleanUrl,
-    title: "Clinical Policy Source",
-    markdownSnippet: `Scraped clinical content from ${cleanUrl}: Policy guidelines establish coverage criteria, diagnostic prerequisites, and documentation of failed conservative step-therapy prior to surgical intervention.`,
-    success: true,
-  };
+    return {
+      sourceUrl: cleanUrl,
+      title,
+      markdownSnippet: "Policy document content was empty or access was restricted / denied.",
+      success: false,
+      error: "Empty or restricted content",
+    };
+  } catch (err) {
+    console.error("Firecrawl scrape error:", err);
+    return {
+      sourceUrl: cleanUrl,
+      markdownSnippet: `Failed to scrape document from ${cleanUrl}: ${err instanceof Error ? err.message : String(err)}`,
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 /**
