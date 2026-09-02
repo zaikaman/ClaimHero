@@ -52,14 +52,30 @@ export function useCommunications(claim?: Claim | null) {
     }
   }, [syncInboxesAction, isSyncingInboxes]);
 
-  // Automatically poll/sync inboxes when mounted or claim changes, and on a gentle 30s interval
+  // Automatically poll/sync inboxes when mounted or claim changes, and on window focus/tab switch
   useEffect(() => {
     syncInboxes();
+
+    // Fast active polling (every 4 seconds) so inbound emails appear in near-real-time
     const interval = setInterval(() => {
       syncInboxes();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [claimId]);
+    }, 4000);
+
+    const handleFocusOrVisibility = () => {
+      if (document.visibilityState === "visible") {
+        syncInboxes();
+      }
+    };
+
+    window.addEventListener("focus", handleFocusOrVisibility);
+    document.addEventListener("visibilitychange", handleFocusOrVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocusOrVisibility);
+      document.removeEventListener("visibilitychange", handleFocusOrVisibility);
+    };
+  }, [claimId, syncInboxes]);
 
   // Send an outbound reply/addendum message via live AgentMail
   const sendMessage = useCallback(

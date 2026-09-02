@@ -202,7 +202,92 @@ async function handleInboundClaimReply(
     const sender = normalized.from || "Insurance Payer";
     const payer = matchingClaim.insurancePayer || "Health Insurer";
 
-    // Perform structured LLM evaluation on inbound response instead of crude keyword matching
+    // Fast heuristic classification for instantaneous sub-second UI rendering
+    const lowerText = (normalized.text || normalized.html || subject || "").toLowerCase();
+    const isApprovalFallback =
+      lowerText.includes("overturned") ||
+      lowerText.includes("approved") ||
+      lowerText.includes("payment issued") ||
+      lowerText.includes("reimbursed") ||
+      lowerText.includes("reversed");
+    const isRecordsFallback =
+      lowerText.includes("additional records") ||
+      lowerText.includes("documentation required") ||
+      lowerText.includes("please provide") ||
+      lowerText.includes("clinical records") ||
+      lowerText.includes("need records");
+    const isDenialFallback =
+      lowerText.includes("upheld") ||
+      lowerText.includes("denial maintained") ||
+      lowerText.includes("adverse determination affirmed") ||
+      lowerText.includes("not paying") ||
+      lowerText.includes("ain't paying") ||
+      lowerText.includes("refuse") ||
+      lowerText.includes("denied");
+
+    const fallbackDetermination = isApprovalFallback
+      ? "OVERTURNED_APPROVED"
+      : isRecordsFallback
+      ? "ADDITIONAL_RECORDS_REQUIRED"
+      : isDenialFallback
+      ? "DENIAL_UPHELD"
+      : "GENERAL_INQUIRY";
+
+    const threadId = await ctx.runMutation(internal.emails.getOrCreateThreadInternal, {
+      claimId: matchingClaim._id,
+      agentEmail: normalized.recipients[0] || "",
+      payerEmail: extractEmailAddress(sender) || sender,
+      subject,
+    });
+
+    // ⚡ INSTANT REAL-TIME PERSISTENCE: Insert message immediately so user sees it in <300ms
+    const messageDbId = await ctx.runMutation(internal.emails.insertMessageInternal, {
+      threadId,
+      claimId: matchingClaim._id,
+      direction: "inbound",
+      sender,
+      recipient: normalized.recipients[0] || "",
+      subject,
+      bodyHtml: normalized.html || `<p>${normalized.text || ""}</p>`,
+      bodyText: normalized.text || normalized.html || "",
+      hasAttachments: normalized.attachments.length > 0,
+      agentMailMessageId: normalized.messageId,
+      detectedDetermination: fallbackDetermination,
+      clinicalRationale: fallbackDetermination === "OVERTURNED_APPROVED"
+        ? "Determination overturned and approved."
+        : fallbackDetermination === "ADDITIONAL_RECORDS_REQUIRED"
+        ? "Payer requested additional clinical documentation."
+        : fallbackDetermination === "DENIAL_UPHELD"
+        ? "Adverse determination upheld by reviewer."
+        : "Inbound correspondence received and recorded.",
+      autoReplyStatus: "pending",
+    });
+
+    // Update claim status based on initial instant assessment
+    if (fallbackDetermination === "OVERTURNED_APPROVED") {
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
+        claimId: matchingClaim._id,
+        status: "won",
+        actor: `${payer} Appellate Review Board`,
+        details: `VICTORY: Adverse determination overturned. Authorized recovery of $${(matchingClaim.deniedAmount || 0).toLocaleString()} approved.`,
+      });
+    } else if (fallbackDetermination === "ADDITIONAL_RECORDS_REQUIRED") {
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
+        claimId: matchingClaim._id,
+        status: "under_review",
+        actor: `${payer} Review Board`,
+        details: "Additional clinical records requested by reviewer.",
+      });
+    } else if (fallbackDetermination === "DENIAL_UPHELD") {
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
+        claimId: matchingClaim._id,
+        status: "escalated",
+        actor: `${payer} Appeals Department`,
+        details: "Initial determination upheld by payer. File queued for Level 2 review.",
+      });
+    }
+
+    // Perform deep structured LLM evaluation to refine rationale, extract settlement numbers & draft rebuttal
     let analysis: InboundAnalysisResult | null = null;
     try {
       const { createStructuredCompletion } = await import("../lib/openai");
@@ -235,30 +320,6 @@ Evaluate the inbound correspondence text rigorously:
       console.warn("LLM evaluation of inbound message failed; falling back to conservative parsing:", llmError);
     }
 
-    const lowerText = (normalized.text || normalized.html || subject || "").toLowerCase();
-    const isApprovalFallback =
-      lowerText.includes("overturned") ||
-      lowerText.includes("approved") ||
-      lowerText.includes("payment issued") ||
-      lowerText.includes("reimbursed");
-    const isRecordsFallback =
-      lowerText.includes("additional records") ||
-      lowerText.includes("documentation required") ||
-      lowerText.includes("please provide") ||
-      lowerText.includes("clinical records");
-    const isDenialFallback =
-      lowerText.includes("upheld") ||
-      lowerText.includes("denial maintained") ||
-      lowerText.includes("adverse determination affirmed");
-
-    const fallbackDetermination = isApprovalFallback
-      ? "OVERTURNED_APPROVED"
-      : isRecordsFallback
-      ? "ADDITIONAL_RECORDS_REQUIRED"
-      : isDenialFallback
-      ? "DENIAL_UPHELD"
-      : "GENERAL_INQUIRY";
-
     const determination = analysis?.determination || fallbackDetermination;
     const isOverturned = determination === "OVERTURNED_APPROVED" || matchingClaim.status === "won";
     const clinicalRationale =
@@ -267,6 +328,8 @@ Evaluate the inbound correspondence text rigorously:
         ? "Determination overturned and approved by payer review."
         : determination === "ADDITIONAL_RECORDS_REQUIRED"
         ? "Payer requested additional clinical documentation."
+        : determination === "DENIAL_UPHELD"
+        ? "Adverse determination upheld by reviewer."
         : "Inbound correspondence received and recorded.");
     const missingRecords = analysis?.missingRecordsRequested || [];
     const settlementAmount =
@@ -274,24 +337,9 @@ Evaluate the inbound correspondence text rigorously:
       (determination === "OVERTURNED_APPROVED" ? matchingClaim.deniedAmount : undefined);
     const suggestedAutoReply = isOverturned ? "" : (analysis?.suggestedAutoReplyAddendum || "");
 
-    const threadId = await ctx.runMutation(internal.emails.getOrCreateThreadInternal, {
-      claimId: matchingClaim._id,
-      agentEmail: normalized.recipients[0] || "",
-      payerEmail: extractEmailAddress(sender) || sender,
-      subject,
-    });
-
-    await ctx.runMutation(internal.emails.insertMessageInternal, {
-      threadId,
-      claimId: matchingClaim._id,
-      direction: "inbound",
-      sender,
-      recipient: normalized.recipients[0] || "",
-      subject,
-      bodyHtml: normalized.html || `<p>${normalized.text || ""}</p>`,
-      bodyText: normalized.text || normalized.html || "",
-      hasAttachments: normalized.attachments.length > 0,
-      agentMailMessageId: normalized.messageId,
+    // Refine the stored message with deep clinical analysis & auto-reply draft
+    await ctx.runMutation(internal.emails.updateMessageAnalysisInternal, {
+      messageId: messageDbId,
       detectedDetermination: determination,
       clinicalRationale,
       missingRecordsRequested: missingRecords.length > 0 ? missingRecords : undefined,

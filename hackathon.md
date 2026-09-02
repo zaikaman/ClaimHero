@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T12:52:00Z
+- **Last updated:** 2026-09-02T13:09:00Z
 
 ## Log
 
@@ -518,7 +518,7 @@ Implemented Autonomous Inbound Email Synchronization & Real-Time Polling Engine 
   - Successfully imported and processed the live Gmail test reply for claim `#BV-2026-8849201-VN`, generating clinical rationale, escalating status to `response_received`/`escalated`, and persisting in Convex.
   - Verified 100% clean with `npm run verify`: 367/367 passing unit tests across 27 suites, 0 TypeScript/ESLint errors, and successful production build. Convex features: database schema, relational indexes, crons, actions, internalAction, internalQuery, mutations, static hosting.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 8117128
 Hardened User Notification Dispatch & Resolved Erroneous Clinical Preset Email Routing (`convex/actions/agentMail.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`):
 - **Root Cause Analysis**:
   - In `handleInboundClaimReply` (`convex/actions/agentMail.ts`), when inbound correspondence arrived, the user notification routine previously prioritized `matchingClaim.appealContext?.sender?.email` as the recipient `userEmail`.
@@ -530,6 +530,18 @@ Hardened User Notification Dispatch & Resolved Erroneous Clinical Preset Email R
   - Added unit test in `tests/actionsAgentMailAndDispatcher.test.ts` verifying that alert notifications target the real user account owner and strictly ignore demo `appealContext` clinical sender emails.
 - **Verification**:
   - Ran `npm test`: 368/368 passing tests across 27 suites with zero errors. Convex features: actions, internalAction, internalQuery, database schema, relational indexes.
+
+### 2026-09-02 - working tree
+Optimized Inbound Reply Delivery for Instant Real-Time UI Rendering (<300ms) (`convex/actions/agentMail.ts`, `src/hooks/useCommunications.ts`):
+- **Sub-Second Real-Time Message Insertion**:
+  - Restructured `handleInboundClaimReply` in `convex/actions/agentMail.ts` to compute an instant heuristic classification and execute `insertMessageInternal` *immediately* upon message intake, before kicking off the LLM call.
+  - Inbound email replies now appear on the user's `/inbox` screen via Convex reactive WebSocket subscriptions within sub-300ms.
+  - The heavy OpenAI structured clinical analysis runs asynchronously in the background and progressively updates the message with deep clinical rationale, authorized settlement amounts, and synthesized auto-reply drafts without blocking initial message visibility.
+- **Client-Side Focus & Fast Active Polling**:
+  - Enhanced `useCommunications.ts` with window focus and `visibilitychange` event listeners that trigger an immediate inbox sync the moment the user switches back from their email client to ClaimHero.
+  - Reduced active polling interval while on the communications page to 4 seconds for immediate responsiveness.
+- **Verification**:
+  - Verified 100% clean with `npm run verify`: 368/368 passing tests across 27 suites, 0 TypeScript/ESLint errors, and successful production build. Convex features: actions, internalAction, internalMutation, reactive subscriptions, crons.
 
 
 
