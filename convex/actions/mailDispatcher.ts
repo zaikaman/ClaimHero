@@ -4,7 +4,7 @@ import { action, type ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
-import { createStructuredCompletion } from "../lib/openai";
+import { createChatCompletion, createStructuredCompletion } from "../lib/openai";
 import {
   formatCorrespondenceTranscript,
   isAiAdjudicatorAddress,
@@ -567,5 +567,81 @@ Issue an updated formal determination letter that responds specifically to this 
     }
 
     return { success: true, adjudicationDetermination };
+  },
+});
+
+/**
+ * Synthesizes an on-demand AI Smart Auto-Reply clinical rebuttal to an inbound message
+ */
+export const generateAutoReplyDraft = action({
+  args: {
+    claimId: v.id("claims"),
+    inboundMessageId: v.optional(v.id("emailMessages")),
+    customPayerInquiry: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ success: boolean; draftText: string; suggestedSubject: string }> => {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
+      claimId: args.claimId,
+    });
+
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+
+    if (claim.status === "won") {
+      return {
+        success: true,
+        draftText: "",
+        suggestedSubject: `Re: Claim #${claim.claimNumber} - Overturned and Approved (No Reply Required)`,
+      };
+    }
+
+    const appeal = await ctx.runQuery(internal.appeals.getLatestByClaimInternal, {
+      claimId: args.claimId,
+    });
+
+    const evidences = await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
+      claimId: args.claimId,
+    });
+
+    const payer = claim.insurancePayer || "Health Insurer";
+    const patientName = claim.patientName || "Patient";
+
+    const systemPrompt = `You are a Board-Certified Physician Appeal Specialist & ERISA Appellate Counsel for ClaimHero.
+You are drafting an immediate Clinical Rebuttal Addendum in response to an insurance payer's (${payer}) request for additional documentation or clarifying review for Claim #${claim.claimNumber} (Patient: ${patientName}).
+Prior Appeal Summary: ${appeal?.executiveSummary || "Initial Level 1 ERISA Appeal Brief on file."}
+Clinical Context:
+- CPT Codes: [${(claim.cptCodes || []).join(", ")}]
+- ICD-10 Diagnoses: [${(claim.icd10Codes || []).join(", ")}]
+- Denied Amount: $${claim.deniedAmount}
+- Denial Reason: ${claim.denialReasonCode} - ${claim.denialReasonDescription}
+- Provider: ${claim.providerName}
+- Documented Clinical Facts: ${JSON.stringify(claim.appealContext?.clinicalFacts || {})}
+- Clinical Evidence & CPB Quotes: ${evidences.map((e: { title: string; citationClause: string }) => `${e.title}: ${e.citationClause}`).join("\n")}
+
+Guidelines:
+1. Provide a direct, authoritative, and respectful clinical response that directly supplies the demanded records/explanations.
+2. Formally assert statutory ERISA compliance (29 C.F.R. § 2560.503-1) requiring full and fair review within mandated timelines.
+3. Reiterate that the clinical record conclusively demonstrates medical necessity under published clinical criteria.
+4. Keep the letter structured with a clear salutation, 2-3 focused clinical paragraphs, and a formal closing. Do not use Markdown headings or AI meta-language.`;
+
+    const userPrompt = args.customPayerInquiry
+      ? `The payer sent the following specific inquiry or request:\n"${args.customPayerInquiry}"\n\nGenerate the complete Clinical Addendum response.`
+      : `Generate a formal Clinical Addendum response providing conservative therapy verification, radiographic diagnostics, and peer-reviewed necessity proof to secure immediate claim overturn.`;
+
+    const draft = await createChatCompletion({
+      systemPrompt,
+      userPrompt,
+      temperature: 0.2,
+    });
+
+    return {
+      success: true,
+      draftText: draft.trim(),
+      suggestedSubject: `Re: Formal Medical Appeal | Claim #${claim.claimNumber} | Clinical Reconsideration Addendum`,
+    };
   },
 });

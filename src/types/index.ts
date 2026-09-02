@@ -62,7 +62,8 @@ export interface Claim {
   agentMailInboxEmail?: string;
   agentMailAdjudicatorInboxId?: string;
   agentMailAdjudicatorEmail?: string;
-    agentMailProvisioningStatus?: "pending" | "shared" | "provisioned" | "not_configured" | "failed" | string;
+  autoPilotEnabled?: boolean;
+  agentMailProvisioningStatus?: "pending" | "shared" | "provisioned" | "not_configured" | "failed" | string;
   agentMailProvisioningError?: string;
   denialLetterStorageId?: string;
   appealContext?: AppealContext;
@@ -327,6 +328,13 @@ export interface EmailMessage {
   bodyHtml: string;
   bodyText: string;
   hasAttachments: boolean;
+  agentMailMessageId?: string;
+  detectedDetermination?: "OVERTURNED_APPROVED" | "ADDITIONAL_RECORDS_REQUIRED" | "DENIAL_UPHELD" | "ACKNOWLEDGMENT_ONLY" | "GENERAL_INQUIRY" | string;
+  clinicalRationale?: string;
+  missingRecordsRequested?: string[];
+  settlementAmount?: number;
+  autoReplyDraft?: string;
+  autoReplyStatus?: "pending" | "dispatched" | "dismissed" | string;
   receivedAt: number;
 }
 

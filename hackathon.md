@@ -12,7 +12,7 @@
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T08:08:00Z
+- **Last updated:** 2026-09-02T10:35:00Z
 
 ## Log
 
@@ -424,7 +424,7 @@ Multi-Tier Clinical Policy Search & Candidate Retrieval Architecture (`convex/ac
 - **Active Guideline Targeting Prompt Engineering**: Enhanced `generatePolicySearchQueries` to explicitly target currently active, in-force standard-of-care guidelines and avoid past year/archive keywords, while candidate ranking (`archivePenalty`) heavily scores against historical editions.
 - **Validation**: Added unit tests in `tests/actionsPolicyAndSynthesizer.test.ts` verifying exclusion of student safety pages and prioritization of Carelon / NASS clinical guidelines. Verified 100% clean with `npm run verify` (361 passing unit tests across 26 suites, typecheck, lint, and production build). Convex features: actions, queries, mutations, rateLimiter, components.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 6a22c7a
 Hardened Free-Tier Two-Way Routing & Bidirectional Thread Tracking (`convex/schema.ts`, `convex/claims.ts`, `convex/actions/agentMail.ts`, `convex/actions/mailDispatcher.ts`, `convex/lib/agentMail.ts`, `convex/lib/appealEmail.ts`):
 - **Deterministic Claim Tag Injection in Subject & Footer**: Enforced universal injection of `[ClaimHero #${claimNumber}]` in `convex/actions/mailDispatcher.ts` (`dispatchAppealPacket`, `sendOutboundMessage`, `deliverAiAdjudication`) and `convex/lib/appealEmail.ts` (`formatAppealEmail`, `formatCorrespondenceEmail`) across email headers, subjects, and footers to guarantee unambiguous claim correlation across external payer replies.
 - **Bidirectional AgentMail Thread ID Persistence**: Updated `sendAgentMailMessage` in `convex/lib/agentMail.ts` to return both `messageId` and `threadId`, and automatically persisted outbound transmission thread IDs to `claims.agentMailThreadId` via `internal.claims.setAgentMailThreadIdInternal` in `convex/claims.ts` and `setAgentMailInboxes`.
@@ -434,6 +434,20 @@ Hardened Free-Tier Two-Way Routing & Bidirectional Thread Tracking (`convex/sche
 - **Unit Test Coverage for Missing Claim Numbers**: Added unit tests in `tests/actionsAgentMailAndDispatcher.test.ts` and `tests/convexClaimsFull.test.ts` verifying correct inbound routing when `claimNumber` is missing from subject lines (both via `threadId` and recipient fallback).
 - **Reactive Appeal Brief Resolution in AgentMail Dispatch UI**: Fixed client-side disabled state on the "Transmit to AI Payer Reviewer" and "Print Docket" buttons in `src/components/communications/AgentMailDrawer.tsx` and `src/hooks/useClaims.ts`. Resolved `selectedClaimDetail` through `api.claims.getById` and integrated direct reactive `api.appeals.getLatestByClaim` subscription in `AgentMailDrawer.tsx`, ensuring `effectiveAppeal` is immediately populated even when navigating from list queries that do not join deep appeal objects.
 - **Full Verification**: 100% PASS with `npm run verify` (typecheck, ESLint, 363/363 passing unit tests across 26 test suites, and Vite production bundle build). Convex features: database schema, relational indexes, queries, internalQuery, mutations, internalMutation, actions, internalAction, reactive subscriptions, static hosting.
+
+### 2026-09-02 - working tree
+LLM-Driven Inbound Reply Adjudication, User Email Alert Notifications & 1-Hour Auto-Pilot SLA (`convex/schema.ts`, `convex/users.ts`, `convex/emails.ts`, `convex/actions/agentMail.ts`, `convex/actions/mailDispatcher.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/types/index.ts`):
+- **Replaced Naive Keyword Matching with OpenAI Structured Review**: Upgraded `processInboundClaimReply` in `convex/actions/agentMail.ts` to execute structured LLM clinical analysis (`createStructuredCompletion`) on all incoming payer emails, accurately classifying determinations (`OVERTURNED_APPROVED`, `ADDITIONAL_RECORDS_REQUIRED`, `DENIAL_UPHELD`, `ACKNOWLEDGMENT_ONLY`, `GENERAL_INQUIRY`), extracting specific clinical records demanded, and determining authorized settlement dollar amounts.
+- **Instant User Email Alert Notifications**: Added real-time user notification dispatch in `processInboundClaimReply` (`convex/actions/agentMail.ts`, `convex/users.ts: getUserByIdInternal`). Whenever an insurer responds, ClaimHero automatically emails the adjudicator/patient with determination headlines, clinical summaries, and docket direct links.
+- **1-Hour Autonomous SLA & Auto-Pilot Engine**: Auto-Pilot autonomously synthesizes and prepares cited clinical rebuttal addenda when payers demand additional documentation; if the adjudicator does not take manual action within 1 hour, Auto-Pilot transmits the rebuttal automatically.
+- **On-Demand Smart Rebuttal Synthesis (`mailDispatcher.ts`)**: Implemented `generateAutoReplyDraft` action synthesizing court-ready clinical rebuttal addenda referencing claim diagnostic facts, CPT/ICD-10 codes, and statutory ERISA 29 C.F.R. § 2560.503-1 review timelines.
+- **Enhanced Inbox UI (`AgentMailDrawer.tsx`)**:
+  - *Auto-Pilot Sentinel Toggle*: Interactive status badge button with 1-Hour SLA Radix UI tooltip.
+  - *LLM Determination Badges & Insights*: Inbound messages render visual decision badges, clinical rationale analysis blocks, and demanded records tags.
+  - *Autonomous Clinical Addendum Card*: Clean scrollable legal preview with live 1-hour auto-dispatch indicator and 1-click transmission controls.
+  - *Streamlined Interface*: Purged redundant manual template chips in favor of autonomous model selection.
+- **Schema & Type Extensions**: Added `autoPilotEnabled` to `claims` table, and `detectedDetermination`, `clinicalRationale`, `missingRecordsRequested`, `settlementAmount`, `autoReplyDraft`, and `autoReplyStatus` to `emailMessages` table (`convex/schema.ts`, `convex/emails.ts`, `src/types/index.ts`).
+- **Validation**: 100% clean execution with `npm run verify` (typecheck, lint, 363/363 passing unit tests across 26 test suites, and Vite production bundle build). Convex features: schema, indexes, queries, internalQuery, mutations, internalMutation, actions, internalAction, reactive subscriptions, static hosting.
 
 
 

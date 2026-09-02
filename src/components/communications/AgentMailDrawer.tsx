@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useQuery } from "convex/react";
+import React, { useState, useEffect } from "react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import {
@@ -19,6 +19,10 @@ import {
   Printer,
   Info,
   Robot,
+  ArrowsClockwise,
+  ShieldCheck,
+  FileText,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
@@ -30,6 +34,7 @@ import { Badge } from "../ui/badge";
 import { Button, buttonVariants } from "../ui/button";
 import { Input } from "../ui/input";
 import { ExportDrawer } from "../studio/ExportDrawer";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 
 type DispatchMode = "ai_adjudicator" | "custom_email" | "official_payer";
 
@@ -66,6 +71,69 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const [copiedFax, setCopiedFax] = useState(false);
   const [copiedPoBox, setCopiedPoBox] = useState(false);
   const [isExportDrawerOpen, setIsExportDrawerOpen] = useState(false);
+
+  // Auto-Pilot & Smart Rebuttal State
+  const setAutoPilotMutation = useMutation(api.emails.setClaimAutoPilot);
+  const generateDraftAction = useAction(api.actions.mailDispatcher.generateAutoReplyDraft);
+  const [autoPilotEnabled, setAutoPilotEnabled] = useState<boolean>(
+    claim.autoPilotEnabled !== false
+  );
+  const [isTogglingAutoPilot, setIsTogglingAutoPilot] = useState(false);
+  const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+  const [activeAutoDraft, setActiveAutoDraft] = useState<string>("");
+
+  // Find latest inbound message with autoReplyDraft or need for reply
+  const latestInbound = [...messages].reverse().find((m) => m.direction === "inbound");
+
+  useEffect(() => {
+    if (latestInbound?.autoReplyDraft && !activeAutoDraft) {
+      setActiveAutoDraft(latestInbound.autoReplyDraft);
+    }
+  }, [latestInbound?.autoReplyDraft, activeAutoDraft]);
+
+  const handleToggleAutoPilot = async () => {
+    if (isTogglingAutoPilot || !claim._id) return;
+    setIsTogglingAutoPilot(true);
+    try {
+      const nextState = !autoPilotEnabled;
+      await setAutoPilotMutation({
+        claimId: claim._id as Id<"claims">,
+        enabled: nextState,
+      });
+      setAutoPilotEnabled(nextState);
+    } finally {
+      setIsTogglingAutoPilot(false);
+    }
+  };
+
+  const handleGenerateSmartDraft = async (customPrompt?: string) => {
+    if (isGeneratingDraft || !claim._id) return;
+    setIsGeneratingDraft(true);
+    try {
+      const res = await generateDraftAction({
+        claimId: claim._id as Id<"claims">,
+        inboundMessageId: latestInbound?._id as Id<"emailMessages"> | undefined,
+        customPayerInquiry: customPrompt || latestInbound?.bodyText,
+      });
+      if (res?.draftText) {
+        setActiveAutoDraft(res.draftText);
+      }
+    } finally {
+      setIsGeneratingDraft(false);
+    }
+  };
+
+  const handleApproveAndSendDraft = async () => {
+    if (!activeAutoDraft.trim() || isSending) return;
+    setIsSending(true);
+    try {
+      await onSendMessage(activeAutoDraft);
+      setActiveAutoDraft("");
+      setReplyText("");
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   const assignedEmail =
     claim.agentMailInboxEmail ||
@@ -456,7 +524,43 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Auto-Pilot Sentinel Interactive Badge Button with 1-Hour SLA Tooltip */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleToggleAutoPilot}
+                    disabled={isTogglingAutoPilot}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all cursor-pointer select-none",
+                      autoPilotEnabled
+                        ? "bg-primary/15 text-primary border-primary/30 hover:bg-primary/25"
+                        : "bg-muted/40 text-muted-foreground border-border hover:bg-muted/70 hover:text-foreground"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full shrink-0",
+                        autoPilotEnabled
+                          ? "bg-primary shadow-[0_0_6px_rgba(14,165,233,0.8)] animate-pulse"
+                          : "bg-muted-foreground/40"
+                      )}
+                    />
+                    <span>Auto-Pilot: {autoPilotEnabled ? "ON" : "OFF"}</span>
+                    <Info className="size-3 opacity-60 hover:opacity-100 transition-opacity ml-0.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="end" className="max-w-xs space-y-1">
+                  <div className="font-semibold text-foreground">Sentinel Auto-Pilot (1-Hour SLA)</div>
+                  <div className="text-[11px] text-muted-foreground leading-relaxed">
+                    Monitors inbound payer replies. If you don't manually review or reply within 1 hour, Auto-Pilot autonomously synthesizes and transmits the cited clinical rebuttal.
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             {claim.status === "dispatched" || claim.status === "won" ? (
               <Badge variant="secondary" className="gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 px-2.5 py-1">
                 <CheckCircle className="size-3.5" />
@@ -677,7 +781,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <span className="text-[10px] font-mono text-muted-foreground block">Delivery Channel</span>
                 <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium text-[11px]">
                   <CheckCircle className="size-3.5" />
-                  {claim.status === "dispatched" || claim.status === "won"
+                  {claim.status === "won"
+                    ? "Overturned / Settlement Authorized"
+                    : claim.status === "dispatched"
                     ? "Packet Transmitted & Logged"
                     : recipientEmail
                     ? "Ready for Electronic Dispatch"
@@ -721,9 +827,11 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               <Tray className="size-4 text-muted-foreground" />
               <span>Transmission History ({messages.length})</span>
             </div>
-            <Badge variant="outline" size="sm" className="text-[10px]">
-              Intake Active
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" size="sm" className="text-[10px] font-mono">
+                {autoPilotEnabled ? "Auto-Pilot Active" : "Manual Review Mode"}
+              </Badge>
+            </div>
           </div>
 
           {/* Messages Container */}
@@ -745,6 +853,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             ) : (
               messages.map((msg) => {
                 const isOutbound = msg.direction === "outbound";
+                const isOverturned = msg.detectedDetermination === "OVERTURNED_APPROVED";
+                const isRecordsReq = msg.detectedDetermination === "ADDITIONAL_RECORDS_REQUIRED";
+                const isDenialUpheld = msg.detectedDetermination === "DENIAL_UPHELD";
 
                 return (
                   <div
@@ -753,10 +864,16 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                       "rounded-xl border p-3.5 space-y-2 transition-all",
                       isOutbound
                         ? "border-border bg-muted/30 ml-4"
-                        : "border-emerald-500/20 bg-emerald-500/5 mr-4"
+                        : isOverturned
+                        ? "border-emerald-500/40 bg-emerald-500/10 mr-4 shadow-xs"
+                        : isRecordsReq
+                        ? "border-amber-500/40 bg-amber-500/5 mr-4"
+                        : isDenialUpheld
+                        ? "border-rose-500/40 bg-rose-500/5 mr-4"
+                        : "border-primary/20 bg-primary/5 mr-4"
                     )}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Badge
                           variant={isOutbound ? "secondary" : "default"}
@@ -774,15 +891,84 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
-                        <Clock className="size-3" />
-                        <span>{formatDate(msg.receivedAt)}</span>
+                      <div className="flex items-center gap-2">
+                        {/* LLM Determination Badge */}
+                        {!isOutbound && msg.detectedDetermination && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] font-mono gap-1",
+                              isOverturned
+                                ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/40 bg-emerald-500/10"
+                                : isRecordsReq
+                                ? "text-amber-600 dark:text-amber-400 border-amber-500/40 bg-amber-500/10"
+                                : isDenialUpheld
+                                ? "text-rose-600 dark:text-rose-400 border-rose-500/40 bg-rose-500/10"
+                                : "text-muted-foreground border-border"
+                            )}
+                          >
+                            {isOverturned ? (
+                              <CheckCircle className="size-3" />
+                            ) : isRecordsReq ? (
+                              <WarningCircle className="size-3" />
+                            ) : (
+                              <ShieldCheck className="size-3" />
+                            )}
+                            <span>
+                              {isOverturned
+                                ? "Determination: Overturned / Approved"
+                                : isRecordsReq
+                                ? "Additional Records Requested"
+                                : isDenialUpheld
+                                ? "Level 1 Denial Upheld"
+                                : "General Response"}
+                            </span>
+                          </Badge>
+                        )}
+
+                        <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
+                          <Clock className="size-3" />
+                          <span>{formatDate(msg.receivedAt)}</span>
+                        </div>
                       </div>
                     </div>
 
                     <div className="text-xs font-semibold text-foreground">
                       Subject: {msg.subject}
                     </div>
+
+                    {/* LLM Clinical Rationale Insight */}
+                    {!isOutbound && msg.clinicalRationale && (
+                      <div className="p-2 rounded bg-background/80 border border-border/60 text-[11px] text-muted-foreground flex items-start gap-2">
+                        <Info className="size-3.5 text-primary shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <span className="font-semibold text-foreground text-[10px] font-mono block uppercase tracking-wider">
+                            LLM Clinical Analysis:
+                          </span>
+                          <p className="leading-snug text-foreground/80">{msg.clinicalRationale}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Demanded Records Pills */}
+                    {!isOutbound && msg.missingRecordsRequested && msg.missingRecordsRequested.length > 0 && (
+                      <div className="space-y-1 pt-1">
+                        <span className="text-[10px] font-mono text-muted-foreground block">
+                          Demanded Clinical Records:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {msg.missingRecordsRequested.map((rec, i) => (
+                            <Badge
+                              key={i}
+                              variant="secondary"
+                              className="text-[10px] font-mono border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10"
+                            >
+                              {rec}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="rounded-lg bg-background border border-border p-3 text-xs text-foreground/90 font-mono whitespace-pre-line leading-relaxed">
                       {msg.bodyText}
@@ -799,6 +985,70 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               })
             )}
           </div>
+
+          {/* Autonomous Clinical Addendum Draft Card */}
+          {activeAutoDraft && claim.status !== "won" && (
+            <div className="p-3 bg-muted/20 border-t border-border space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <ShieldCheck className="size-4 text-primary shrink-0" />
+                  <span>Autonomous Clinical Addendum</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {autoPilotEnabled && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
+                      <Clock className="size-3 text-primary animate-pulse" />
+                      <span>Auto-dispatch in 1h if unreviewed</span>
+                    </span>
+                  )}
+                  <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
+                    Cited Evidence
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="max-h-28 overflow-y-auto rounded-md bg-background/90 p-2.5 border border-border text-[11px] font-mono text-foreground/90 leading-relaxed whitespace-pre-wrap select-text">
+                {activeAutoDraft}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="xs"
+                  onClick={handleApproveAndSendDraft}
+                  disabled={isSending}
+                  className="gap-1.5 h-7 px-3 text-xs font-medium"
+                >
+                  {isSending ? (
+                    <CircleNotch className="size-3.5 animate-spin" />
+                  ) : (
+                    <PaperPlaneTilt className="size-3.5" />
+                  )}
+                  <span>Transmit Addendum</span>
+                </Button>
+
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => setReplyText(activeAutoDraft)}
+                  className="gap-1.5 h-7 px-2.5 text-xs font-medium"
+                >
+                  <FileText className="size-3.5" />
+                  <span>Open in Composer</span>
+                </Button>
+
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => handleGenerateSmartDraft()}
+                  disabled={isGeneratingDraft}
+                  className="gap-1 text-muted-foreground hover:text-foreground h-7 px-2 text-xs"
+                >
+                  <ArrowsClockwise className={cn("size-3.5", isGeneratingDraft && "animate-spin")} />
+                  <span>Regenerate</span>
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Reply Composer */}
           <form

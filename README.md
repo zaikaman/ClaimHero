@@ -73,7 +73,7 @@ ClaimHero automates the entire lifecycle from denial ingestion to payer adjudica
 * **Synthesize** — Grounded, sendable payer appeal correspondence that uses only human-confirmed clinical facts and cites real policy clauses. Vector precedents are internal retrieval context, never quoted verbatim.
 * **Escalate** — 3 statutory tiers (Level 1 Internal -> Level 2 Grievance -> Level 3 External IRO/DOI) with tier-specific posture, authority, and rights notices (`convex/actions/appealSynthesizer.ts:84`).
 * **Defend** — Doctor P2P tele-script + live call copilot + ERISA $110/day penalty calculator + court-ready exhibit binder.
-* **Dispatch** — 3-mode transmission gateway: AI Adjudicator, custom test inbox, or official payer email/portal/fax/PO box. Two-way AgentMail threads with inbound determination that flips claim state to `won` in real time.
+* **Dispatch & Auto-Reply Sentinel** — 3-mode transmission gateway (AI Adjudicator, custom test inbox, official payer) + two-way AgentMail threads. When payers reply, OpenAI structured review extracts determinations (`OVERTURNED_APPROVED`, `ADDITIONAL_RECORDS_REQUIRED`, `DENIAL_UPHELD`), notifies the claimant by email, and autonomously synthesizes/dispatches cited rebuttal addenda within 1 hour if not manually reviewed. Overturned victories flip case status to `won` in real time with auto-reply suppressed.
 
 **Live integrations only.** If Firecrawl cannot retrieve a publicly accessible policy, the pipeline inserts a single statutory ERISA precedent and proceeds transparently — never a guessed CPB paragraph.
 
@@ -264,7 +264,11 @@ ClaimHero configures dedicated AgentMail inboxes (`convex/actions/agentMail.ts`,
   2. *Subject Regex Extraction* — Matches `/#(CH-\d+)/i` and `[ClaimHero #...]` via `getByClaimNumberInternal`.
   3. *Recipient Exact Match* — Matches dedicated assigned and routing addresses via `getByInboxEmailInternal`.
   4. *Bounded Content Fallback* — Scans recent cases for claim numbers in email text without full-table scans.
-  Upon recognition, it inserts `emailMessages` (`direction: inbound`), updates `claims.status` on victory keywords, and automatically reindexes won cases into the `precedents` archive.
+* **Structured Inbound LLM Adjudication & Autonomous Sentinel Auto-Pilot:**
+  - *Clinical Comprehension* — Incoming payer correspondence is evaluated via OpenAI structured outputs (`INBOUND_ANALYSIS_SCHEMA`), categorizing determinations (`OVERTURNED_APPROVED`, `ADDITIONAL_RECORDS_REQUIRED`, `DENIAL_UPHELD`, `ACKNOWLEDGMENT_ONLY`, `GENERAL_INQUIRY`), extracting demanded clinical documentation, and parsing approved dollar amounts.
+  - *Instant User Email Alerts* — Whenever a payer responds, ClaimHero automatically emails the claimant/adjudicator via AgentMail with determination summaries and direct links to the claim docket.
+  - *1-Hour Autonomous Auto-Pilot SLA* — When additional documentation is requested and Auto-Pilot is active, ClaimHero autonomously synthesizes the cited rebuttal addendum; if unreviewed after 1 hour, Auto-Pilot transmits the rebuttal automatically to keep the ERISA clock moving.
+  - *Overturn Protection* — When a determination is overturned and won, auto-replies are strictly suppressed, and the case is automatically reindexed into the Precedent Vector Archive.
 * Webhook — `POST /agentmail-webhook` (`http.ts:19`) verifies Svix HMAC signatures, normalizes payloads via `normalizeAgentMailWebhook` (`agentMailWebhook.ts`), returns fast `202 Accepted`, and dispatches work via `scheduler.runAfter(0, ...)`.
 
 Follow-up addenda to adjudication addresses reload full thread history and re-run structured OpenAI adjudication (`mailDispatcher.ts:deliverAiAdjudication`, `lib/aiAdjudicator.ts`).
@@ -274,6 +278,7 @@ Follow-up addenda to adjudication addresses reload full thread history and re-ru
 * **Model** — `gpt-5.4-nano` via unified wrapper `convex/lib/openai.ts:23` (`getOpenAIClient`, `createStructuredCompletion`, `createEmbedding`) with `OPENAI_MODEL` / `OPENAI_API_KEY` / `OPENAI_BASE_URL` support.
 * **Optical Parser** (`opticalParser.ts`) — Vision + Structured JSON `DenialExtractionResult`: CPT, CARC, amounts, deadlines, payer contacts (including international insurers). Multilingual detection.
 * **Precedent Matcher** (`precedentMatcher.ts`) — Deterministic 4-pillar rubric: CPB Indication Alignment 35% + Clinical Documentation & Step-Therapy 25% + ERISA §2560.503-1 Procedural 20% + External Precedent Benchmark 20% = 100 (`tests/claimhero.test.ts:114`). `temperature: 0.0`, mathematical summation, persisted in `claims.scoringBreakdown`.
+* **Inbound Adjudication & Auto-Rebuttal Engine** (`agentMail.ts`, `mailDispatcher.ts`) — Structured LLM analysis of incoming payer letters, extracting decision codes, demanded records, settlement figures, and synthesizing on-demand cited clinical rebuttal addenda.
 * **Appeal Synthesizer** (`appealSynthesizer.ts:528` `generateAppealBrief`) — Produces *concise payer correspondence*, not a litigation memo. Structured `AppealBriefSynthesisResult`, then `assembleProfessionalAppealEmail:414` enforces grounded assembly: only human-confirmed `clinicalFacts`, `isBlockedEvidence:257`/`isPayerMismatchedEvidence`/`isEvidenceSiteMismatched:336` filtering, conditional ERISA language, HTML+text via `lib/appealEmail.ts`, and tier-specific posture (`STATUTORY_RIGHTS_NOTICES:84`).
 * **P2P Defense Generator** (`p2pDefenseGenerator.ts`) + **Live Copilot** (`p2pLiveCopilot.ts`) — Structured outputs for trap-question counters, statutory demands, and real-time rebuttal cards.
 * **Sentinel AI Copilot Chatbot** (`sentinelChatbot.ts`, `convex/chatbot.ts`) — Agentic tool-calling conversational assistant with dynamic database lookups (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`), persistent session/message tables (`chatbotSessions`, `chatbotMessages`), rolling context window summarization, and collapsible tool execution traces.
@@ -397,7 +402,7 @@ ClaimHero ships with six independent anti-hallucination layers:
 | **Frontend** | React 18 + TypeScript (strict mode, `@typescript-eslint/no-explicit-any: error`, zero `any` casts) + Vite 6 + Tailwind CSS 3.4 |
 | **UI** | Radix Primitives, Phosphor Icons (`@phosphor-icons/react`), `react-markdown` + `remark-gfm`/`remark-breaks`, `three`/`@react-three/fiber` Silk shader |
 | **State** | Convex reactive hooks (`useQuery`, `useMutation`, `useAction`, `useConvexAuth`) + custom hooks (`useClaims`, `useEvidence`, `useAppealStudio`, `useLiveCallCopilot`, `useLiabilityCalculator`, `usePrecedents`) with 100% typed `api.*` FunctionReferences |
-| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 356 unit tests across 26 suites, 100% line coverage in backend libs and core utils |
+| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 363 unit tests across 26 suites, 100% line coverage in backend libs and core utils |
 
 Theme: **Precision Medical Dark Mode** — obsidian `#0b0f17` canvas, cyan `#0ea5e9` primary, emerald/amber/crimson semantic tokens, glassmorphism (`backdrop-blur-md`, `bg-card/75`), tabular-nums for monetary values (`src/index.css:7`, `tailwind.config.js`).
 

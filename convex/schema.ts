@@ -58,6 +58,7 @@ export default defineSchema({
     agentMailAdjudicatorInboxId: v.optional(v.string()),
     agentMailAdjudicatorEmail: v.optional(v.string()),
     agentMailThreadId: v.optional(v.string()),
+    autoPilotEnabled: v.optional(v.boolean()),
     agentMailProvisioningStatus: v.optional(v.string()), // pending, shared, provisioned, not_configured, failed
     agentMailProvisioningError: v.optional(v.string()),
     denialLetterStorageId: v.optional(v.id("_storage")),
@@ -234,6 +235,12 @@ export default defineSchema({
     bodyText: v.string(),
     hasAttachments: v.boolean(),
     agentMailMessageId: v.optional(v.string()),
+    detectedDetermination: v.optional(v.string()), // OVERTURNED_APPROVED, ADDITIONAL_RECORDS_REQUIRED, DENIAL_UPHELD, ACKNOWLEDGMENT_ONLY, GENERAL_INQUIRY
+    clinicalRationale: v.optional(v.string()),
+    missingRecordsRequested: v.optional(v.array(v.string())),
+    settlementAmount: v.optional(v.number()),
+    autoReplyDraft: v.optional(v.string()),
+    autoReplyStatus: v.optional(v.string()), // pending, dispatched, dismissed
     receivedAt: v.number(),
   })
     .index("by_thread", ["threadId"])

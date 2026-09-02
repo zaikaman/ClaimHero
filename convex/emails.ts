@@ -125,6 +125,12 @@ interface InsertMessageArgs {
   bodyText: string;
   hasAttachments: boolean;
   agentMailMessageId?: string;
+  detectedDetermination?: string;
+  clinicalRationale?: string;
+  missingRecordsRequested?: string[];
+  settlementAmount?: number;
+  autoReplyDraft?: string;
+  autoReplyStatus?: string;
 }
 
 async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Promise<Id<"emailMessages">> {
@@ -141,6 +147,12 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
     bodyText: args.bodyText,
     hasAttachments: args.hasAttachments,
     agentMailMessageId: args.agentMailMessageId,
+    detectedDetermination: args.detectedDetermination,
+    clinicalRationale: args.clinicalRationale,
+    missingRecordsRequested: args.missingRecordsRequested,
+    settlementAmount: args.settlementAmount,
+    autoReplyDraft: args.autoReplyDraft,
+    autoReplyStatus: args.autoReplyStatus,
     receivedAt: now,
   });
 
@@ -183,6 +195,12 @@ export const insertMessage = mutation({
     bodyText: v.string(),
     hasAttachments: v.boolean(),
     agentMailMessageId: v.optional(v.string()),
+    detectedDetermination: v.optional(v.string()),
+    clinicalRationale: v.optional(v.string()),
+    missingRecordsRequested: v.optional(v.array(v.string())),
+    settlementAmount: v.optional(v.number()),
+    autoReplyDraft: v.optional(v.string()),
+    autoReplyStatus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await requireClaimOwner(ctx, args.claimId);
@@ -205,10 +223,53 @@ export const insertMessageInternal = internalMutation({
     bodyText: v.string(),
     hasAttachments: v.boolean(),
     agentMailMessageId: v.optional(v.string()),
+    detectedDetermination: v.optional(v.string()),
+    clinicalRationale: v.optional(v.string()),
+    missingRecordsRequested: v.optional(v.array(v.string())),
+    settlementAmount: v.optional(v.number()),
+    autoReplyDraft: v.optional(v.string()),
+    autoReplyStatus: v.optional(v.string()),
   },
   returns: v.id("emailMessages"),
   handler: async (ctx, args): Promise<Id<"emailMessages">> => {
     return await applyInsertMessage(ctx, args);
+  },
+});
+
+/**
+ * Update analysis details on an existing email message
+ */
+export const updateMessageAnalysisInternal = internalMutation({
+  args: {
+    messageId: v.id("emailMessages"),
+    detectedDetermination: v.optional(v.string()),
+    clinicalRationale: v.optional(v.string()),
+    missingRecordsRequested: v.optional(v.array(v.string())),
+    settlementAmount: v.optional(v.number()),
+    autoReplyDraft: v.optional(v.string()),
+    autoReplyStatus: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { messageId, ...fields } = args;
+    await ctx.db.patch(messageId, fields);
+  },
+});
+
+/**
+ * Toggle or update Auto-Pilot status on a claim
+ */
+export const setClaimAutoPilot = mutation({
+  args: {
+    claimId: v.id("claims"),
+    enabled: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    await requireClaimOwner(ctx, args.claimId);
+    await ctx.db.patch(args.claimId, {
+      autoPilotEnabled: args.enabled,
+      updatedAt: Date.now(),
+    });
+    return { success: true, enabled: args.enabled };
   },
 });
 
