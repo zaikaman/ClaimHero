@@ -476,13 +476,21 @@ export const create = mutation({
     const patient = (await ctx.db.get(args.patientId)) as Doc<"patients"> | null;
 
     let claimNumber = args.claimNumber.trim();
-    const existingWithSameNumber = await ctx.db
+    if (!claimNumber) {
+      const initialSuffix = Math.floor(1000 + Math.random() * 9000);
+      claimNumber = `CLM-${initialSuffix}`;
+    }
+    let existingWithSameNumber = await ctx.db
       .query("claims")
       .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
       .first();
-    if (existingWithSameNumber) {
+    while (existingWithSameNumber) {
       const suffix = Math.floor(1000 + Math.random() * 9000);
       claimNumber = `${claimNumber}-${suffix}`;
+      existingWithSameNumber = await ctx.db
+        .query("claims")
+        .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
+        .first();
     }
 
     const claimId = await ctx.db.insert("claims", {
@@ -629,13 +637,21 @@ async function applyCreateWithPatient(
   const statutoryDeadline = now + deadlineDays * 86400000;
 
   let claimNumber = args.claimNumber.trim();
-  const existingWithSameNumber = await ctx.db
+  if (!claimNumber) {
+    const initialSuffix = Math.floor(1000 + Math.random() * 9000);
+    claimNumber = `CLM-${initialSuffix}`;
+  }
+  let existingWithSameNumber = await ctx.db
     .query("claims")
     .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
     .first();
-  if (existingWithSameNumber) {
+  while (existingWithSameNumber) {
     const suffix = Math.floor(1000 + Math.random() * 9000);
     claimNumber = `${claimNumber}-${suffix}`;
+    existingWithSameNumber = await ctx.db
+      .query("claims")
+      .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
+      .first();
   }
 
   const claimId = await ctx.db.insert("claims", {
