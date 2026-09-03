@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-03T12:09:00Z
+- **Last updated:** 2026-09-03T12:30:00Z
 
 ## Log
 
@@ -664,8 +664,12 @@ Resolved Firecrawl policy crawler retrieval failure on the Lumbar Spine Decompre
 ### 2026-09-03 - 272bd70
 Hardened inbound AgentMail routing by strictly disallowing shared inboxes (`claimhero-sender@agentmail.to`, `claimhero-adjudicator@agentmail.to`) from matching claims solely by recipient email address in `getByInboxEmailInternal`, `findMatchingClaimInternal`, and `handleInboundClaimReply`, ensuring inbound messages match by active thread or explicit claim reference. Convex features: internalQuery, internalAction, indexes (`by_inbox_email`).
 
-### 2026-09-03 - working tree
+### 2026-09-03 - fe6bee6
 Aligned the starter case intake experience in `OnboardingWizard.tsx` with Case Radar (`IngestionModal.tsx`) by adding unique randomized claim number suffixing on intake, interactive clinical context review with HIPAA Safe Harbor de-identification, autonomous Sentinel pipeline execution (`runAutonomousPipeline`), and the multi-vector defense completion HUD. Hardened database collision detection in `create` and `applyCreateWithPatient` (`convex/claims.ts`) using collision retry loops. Convex features: actions, queries, mutations, indexes (`by_claim_number`).
+
+### 2026-09-03 - working tree
+Eliminated duplicate execution and answer flashing during autonomous clinical addendum synthesis by adding module-scoped in-flight deduplication and synchronous tracking guards in `AgentMailDrawer.tsx`, setting `autoReplyStatus: "generating"` on initial inbound intake in `handleInboundClaimReply` (`convex/actions/agentMail.ts`), and adding message draft caching in `generateAutoReplyDraft` (`convex/actions/mailDispatcher.ts`, `convex/emails.ts`) so existing drafts are reused without redundant LLM invocations. Convex features: actions, internalQuery, internalMutation, reactive WebSocket subscriptions.
+
 
 
 

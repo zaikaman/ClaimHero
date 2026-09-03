@@ -581,6 +581,7 @@ export const generateAutoReplyDraft = action({
     claimId: v.id("claims"),
     inboundMessageId: v.optional(v.id("emailMessages")),
     customPayerInquiry: v.optional(v.string()),
+    forceRegenerate: v.optional(v.boolean()),
   },
   handler: async (
     ctx,
@@ -600,6 +601,20 @@ export const generateAutoReplyDraft = action({
         draftText: "",
         suggestedSubject: `Re: Claim #${claim.claimNumber} - Overturned and Approved (No Reply Required)`,
       };
+    }
+
+    // Backend Deduplication: If inbound message already contains a generated draft and caller didn't explicitly force regenerate, reuse existing draft
+    if (args.inboundMessageId && !args.forceRegenerate) {
+      const existingMsg = await ctx.runQuery(internal.emails.getMessageByIdInternal, {
+        messageId: args.inboundMessageId,
+      });
+      if (existingMsg?.autoReplyDraft && existingMsg.autoReplyDraft.trim()) {
+        return {
+          success: true,
+          draftText: existingMsg.autoReplyDraft.trim(),
+          suggestedSubject: `Re: Claim #${claim.claimNumber} - Clinical Addendum Response`,
+        };
+      }
     }
 
     const appeal = await ctx.runQuery(internal.appeals.getLatestByClaimInternal, {
@@ -623,7 +638,7 @@ Clinical Context:
 - Denial Reason: ${claim.denialReasonCode} - ${claim.denialReasonDescription}
 - Provider: ${claim.providerName}
 - Documented Clinical Facts: ${JSON.stringify(claim.appealContext?.clinicalFacts || {})}
-- Clinical Evidence & CPB Quotes: ${evidences.map((e: { title: string; citationClause: string }) => `${e.title}: ${e.citationClause}`).join("\n")}
+- Clinical Evidence & CPB Quotes: ${(evidences || []).map((e: { title: string; citationClause: string }) => `${e.title}: ${e.citationClause}`).join("\n")}
 
 Guidelines:
 1. Provide a direct, authoritative, and respectful clinical response that directly supplies the demanded records/explanations.

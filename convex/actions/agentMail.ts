@@ -358,7 +358,7 @@ async function handleInboundClaimReply(
         : fallbackDetermination === "DENIAL_UPHELD"
         ? "Adverse determination upheld by reviewer."
         : "Inbound correspondence received and recorded.",
-      autoReplyStatus: "pending",
+      autoReplyStatus: fallbackDetermination === "OVERTURNED_APPROVED" ? undefined : "generating",
     });
 
     if (insertResult && typeof insertResult === "object" && "isNew" in insertResult && !insertResult.isNew) {

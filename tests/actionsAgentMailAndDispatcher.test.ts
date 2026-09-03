@@ -590,5 +590,82 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         agentMailThreadId: "live_msg_2",
       }));
     });
+
+    it("generateAutoReplyDraft: deduplicates and returns existing draft without re-synthesizing", async () => {
+      const mockClaim = {
+        _id: "c1",
+        claimNumber: "CLM-100",
+        status: "under_review",
+        deniedAmount: 5000,
+        patientName: "John Doe",
+        insurancePayer: "Aetna",
+      };
+      const mockExistingMessage = {
+        _id: "m1",
+        autoReplyDraft: "Existing cached clinical addendum draft text",
+      };
+
+      const chatSpy = vi.spyOn(libOpenAI, "createChatCompletion").mockResolvedValue("Newly synthesized draft");
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args.claimId) return Promise.resolve(mockClaim);
+          if (args.messageId) return Promise.resolve(mockExistingMessage);
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue(null),
+      };
+
+      const res = await (actionMailDispatcher.generateAutoReplyDraft as any)._handler(mockCtx, {
+        claimId: "c1",
+        inboundMessageId: "m1",
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.draftText).toBe("Existing cached clinical addendum draft text");
+      // Must NOT invoke createChatCompletion when existing draft is present
+      expect(chatSpy).not.toHaveBeenCalled();
+      chatSpy.mockRestore();
+    });
+
+    it("generateAutoReplyDraft: synthesizes new draft when forceRegenerate is true", async () => {
+      const mockClaim = {
+        _id: "c1",
+        claimNumber: "CLM-100",
+        status: "under_review",
+        deniedAmount: 5000,
+        patientName: "John Doe",
+        insurancePayer: "Aetna",
+      };
+      const mockExistingMessage = {
+        _id: "m1",
+        autoReplyDraft: "Old draft text",
+      };
+
+      const chatSpy = vi.spyOn(libOpenAI, "createChatCompletion").mockResolvedValue("Newly regenerated draft text");
+
+        let queryCount = 0;
+        const mockCtx: any = {
+          runQuery: vi.fn().mockImplementation((fn, args) => {
+            if (args.messageId) return Promise.resolve(mockExistingMessage);
+            queryCount++;
+            if (queryCount === 1) return Promise.resolve(mockClaim);
+            if (queryCount === 2) return Promise.resolve(null);
+            return Promise.resolve([]);
+          }),
+          runMutation: vi.fn().mockResolvedValue(null),
+        };
+
+      const res = await (actionMailDispatcher.generateAutoReplyDraft as any)._handler(mockCtx, {
+        claimId: "c1",
+        inboundMessageId: "m1",
+        forceRegenerate: true,
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.draftText).toBe("Newly regenerated draft text");
+      expect(chatSpy).toHaveBeenCalled();
+      chatSpy.mockRestore();
+    });
   });
 });

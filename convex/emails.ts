@@ -305,6 +305,18 @@ export const insertInboundMessageInternal = internalMutation({
 });
 
 /**
+ * Internal query to retrieve an email message by its ID
+ */
+export const getMessageByIdInternal = internalQuery({
+  args: {
+    messageId: v.id("emailMessages"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.messageId);
+  },
+});
+
+/**
  * Check if a message with the given agentMailMessageId has already been recorded
  */
 export const hasMessageByAgentMailId = internalQuery({
