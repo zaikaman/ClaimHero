@@ -270,7 +270,7 @@ interface FirecrawlSearchResult {
 }
 
 const MAX_POLICY_SEARCH_ROUNDS = 2;
-const MAX_POLICY_SOURCE_CANDIDATES = 4;
+const MAX_POLICY_SOURCE_CANDIDATES = 6;
 
 const DISALLOWED_MARKETING_DOMAINS = new Set([
   "allzonems.com",
@@ -298,6 +298,8 @@ const DISALLOWED_MARKETING_DOMAINS = new Set([
   "sitecorecontenthub.cloud",
   "medium.com",
   "wordpress.com",
+  "worldebhcday.org",
+  "www.worldebhcday.org",
 ]);
 
 function isAcceptableSourceUrl(value: unknown): value is string {
@@ -810,7 +812,8 @@ export function selectFirecrawlPolicyUrls(
         anatomicalPenalty = 15;
       }
 
-      const documentFormatScore = /\.(?:pdf|ashx?)(?:$|[?#])/i.test(sourceUrl) ? 1 : 0;
+      const isPdfFormat = /\.(?:pdf|ashx?)(?:$|[?#])/i.test(sourceUrl);
+      const documentFormatScore = isPdfFormat ? (termScore > 0 || specificDocumentScore > 0 ? 5 : 1) : 0;
       const landingPagePenalty = [
         "directory",
         "index",
@@ -832,10 +835,28 @@ export function selectFirecrawlPolicyUrls(
         "products-programs",
         "brochure",
         "handbook",
+        "blog",
+        "blogs",
+        "opinion",
+        "commentary",
+        "news",
+        "press-release",
+        "forum",
+        "podcast",
+        "webinar",
+        "awareness",
       ].reduce(
         (total, term) => total + (searchableText.includes(term) ? 4 : 0),
         0,
       );
+      const blogPenalty = /\/(?:blog|blogs|news|press-releases|commentary|opinion)\//i.test(sourceUrl) ? 15 : 0;
+      const directoryIndexPenalty = (
+        sourceUrl.toLowerCase().includes("/research/clinical-guidelines") ||
+        sourceUrl.toLowerCase().endsWith("/clinical-guidelines") ||
+        sourceUrl.toLowerCase().endsWith("/clinical-guidelines/") ||
+        sourceUrl.toLowerCase().endsWith("/guidelines") ||
+        sourceUrl.toLowerCase().endsWith("/guidelines/")
+      ) && !/\.(?:pdf|ashx?)(?:$|[?#])/i.test(sourceUrl) ? 10 : 0;
       const privateViewerPenalty = isPrivateMcgViewerUrl(sourceUrl) ? 10 : 0;
       const archivePenalty = (
         sourceUrl.toLowerCase().includes("/archive") ||
@@ -845,7 +866,18 @@ export function selectFirecrawlPolicyUrls(
         searchableText.includes("historical information only") ||
         /-\d{4}-\d{2}-\d{2}/.test(sourceUrl)
       ) ? 12 : 0;
-      const score = termScore + specificDocumentScore + authorityHostScore + payerBonus + documentFormatScore - landingPagePenalty - privateViewerPenalty - anatomicalPenalty - archivePenalty;
+      const score =
+        termScore +
+        specificDocumentScore +
+        authorityHostScore +
+        payerBonus +
+        documentFormatScore -
+        landingPagePenalty -
+        blogPenalty -
+        directoryIndexPenalty -
+        privateViewerPenalty -
+        anatomicalPenalty -
+        archivePenalty;
 
       if (minimumRelevanceScore <= 0 || score >= minimumRelevanceScore) {
         candidates.push({ sourceUrl, score, position });
@@ -1092,6 +1124,62 @@ export function isPolicyAlignedWithClaim(
   };
 }
 
+export function extractGuidelineLinksFromMarkdown(
+  markdown: string,
+  baseUrl: string,
+  cptCodes: string[],
+): string[] {
+  if (!markdown) return [];
+  const cptKeywords = getCptKeywords(cptCodes);
+  const relevantKeywords = [
+    ...cptCodes,
+    ...cptKeywords,
+    "clinical guideline",
+    "coverage policy",
+    "medical necessity",
+    "lumbar",
+    "spinal",
+    "stenosis",
+    "decompression",
+    "laminectomy",
+    "knee",
+    "meniscus",
+    "arthroplasty",
+  ].map((k) => k.toLowerCase());
+
+  const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)/g;
+  const matches: Array<{ url: string; score: number }> = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = linkRegex.exec(markdown)) !== null) {
+    const text = match[1].toLowerCase();
+    const href = match[2].trim();
+
+    const textScore = relevantKeywords.reduce((sum, kw) => sum + (text.includes(kw) ? 2 : 0), 0);
+    const hrefScore = relevantKeywords.reduce((sum, kw) => sum + (href.toLowerCase().includes(kw) ? 1 : 0), 0);
+    const isPdf = /\.(?:pdf|ashx)(?:$|[?#])/i.test(href);
+
+    if (textScore > 0 || hrefScore > 0 || (isPdf && (textScore > 0 || hrefScore > 0))) {
+      let resolvedUrl = href;
+      try {
+        resolvedUrl = new URL(href, baseUrl).toString();
+      } catch {
+        continue;
+      }
+      if (isAcceptableSourceUrl(resolvedUrl) && !isPrivateMcgViewerUrl(resolvedUrl)) {
+        matches.push({
+          url: resolvedUrl,
+          score: textScore + hrefScore + (isPdf ? 4 : 0),
+        });
+      }
+    }
+  }
+
+  return matches
+    .sort((a, b) => b.score - a.score)
+    .map((m) => m.url);
+}
+
 async function evaluatePolicySourceRelevance(
   policySource: FirecrawlPolicySource,
   payer: string,
@@ -1131,6 +1219,8 @@ Evaluation Directives:
 2. Clinical Specificity: The document must establish substantive medical necessity criteria, diagnostic standards, conservative therapy rules, or coverage indications for the procedure and anatomical site involved in the claim (e.g. Spine Surgery / Decompression for CPT 63047, Total Knee Arthroplasty for CPT 27447, Knee MRI for CPT 73721).
 3. Content Type: Reject commercial billing coding blogs, consumer marketing materials, provider enrollment forms, and private password-protected viewers.
 4. Historical & Archive Rule: Major clinical guideline repositories (such as Carelon, EviCore, CMS, Aetna CPBs) index past editions with banners stating 'ARCHIVED' or 'for historical information only'. In insurance claim appeals, prior and historical guideline versions are fully valid and citable evidence. You MUST NOT reject an authoritative guideline merely because of an 'ARCHIVED', 'Superseded', 'Historical', or 'Past Review Date' disclaimer if it contains substantive clinical criteria for the procedure.
+5. Administrative & Prior-Authorization Denials (e.g. CO-197, CO-16, Precertification Absent): When a claim is denied for lack of prior authorization or precertification, the universal legal and clinical appeal mechanism under ERISA and health plan rules is demonstrating emergency medical necessity, acute progressive deficit, or clinical indication for retroactive authorization. You MUST NEVER reject an authoritative clinical guideline, coverage policy, or peer-reviewed study simply because the denial code was administrative or 'lack of prior authorization'. Clinical criteria and surgical indications ARE the exact substantive evidence required to overturn prior-authorization denials.
+6. Peer-Reviewed Clinical Evidence & PubMed: Peer-reviewed clinical studies, systematic reviews, and meta-analyses indexed on PubMed/NCBI establish clinical efficacy, standard-of-care, and medical necessity indications under ERISA full-and-fair review regulations. You MUST accept a PubMed study or systematic review if it evaluates the surgical indications, clinical outcomes, or medical necessity for the procedure and diagnosis in the claim. Do not reject PubMed documents merely because they are formatted as journal articles or abstracts rather than an insurer CPB bulletin.
 
 Return relevant=true if the document satisfies all directives, or relevant=false with a concise explanation.`,
     userPrompt: `Evaluate this Firecrawl document before it is used as appeal evidence.
@@ -1194,11 +1284,16 @@ Generate 3 distinct, high-precision web search queries to locate official, curre
 
 Query Strategy:
 1. Payer & Utilization Management Guideline Query:
-   - Target currently effective payer medical policies and clinical guidelines managers (e.g. Carelon, EviCore, Anthem/BCBS, Aetna, Cigna, UHC, Molina).
-   - Example: ${primaryProcedureName} ${primaryCpt} Carelon current clinical guideline OR coverage criteria ${searchPayer}
+   - Target currently effective payer medical policies and recognized clinical guidelines managers:
+     * GeoBlue / Blue Cross Blue Shield / Anthem / Elevance utilize Carelon (formerly AIM Specialty Health) clinical appropriateness guidelines or Anthem clinical guidelines.
+     * Cigna, Molina, and regional plans utilize EviCore or Carelon clinical policies.
+     * Aetna and UnitedHealthcare utilize direct Clinical Policy Bulletins (CPBs).
+   - Target substantive policy documents and PDFs (e.g. Carelon spine surgery clinical appropriateness guideline pdf, Carelon musculoskeletal guideline).
+   - Example: ${primaryProcedureName} ${primaryCpt} Carelon current clinical guideline pdf OR coverage criteria ${searchPayer}
 2. Clinical Specialty Society Standard-of-Care Guideline Query:
-   - Target authoritative national medical specialty guidelines (NASS for spine, AAOS for orthopedics/joint, ACR for imaging/radiology, NCCN for oncology) that establish active clinical necessity and conservative therapy criteria.
-   - Example: ${primaryProcedureName} ${primaryCpt} NASS OR AAOS OR ACR clinical practice guideline indications
+   - Target authoritative national medical specialty guidelines (NASS for spine/lumbar, AAOS for orthopedics/joint, ACR for imaging/radiology, NCCN for oncology) that establish active clinical necessity and conservative therapy criteria.
+   - Include direct document keywords like "clinical guideline pdf" or "coverage recommendations criteria" to target substantive clinical guidelines rather than directory index pages or blog posts.
+   - Example: ${primaryProcedureName} ${primaryCpt} NASS clinical practice guideline pdf OR indications
 3. National Statutory & CMS Coverage Query:
    - Target CMS Local Coverage Determinations (LCD) or standard medical necessity criteria.
    - Example: ${primaryProcedureName} ${primaryCpt} CMS LCD medical necessity criteria indications
@@ -1396,7 +1491,7 @@ export const crawlInsurerPolicy = action({
         discoveredSourceCount += sourceUrls.length;
 
         // Evaluate candidate URLs sequentially (concurrency 1) to honor Firecrawl concurrency limits
-        for (const sourceUrl of sourceUrls.slice(0, 3)) {
+        for (const sourceUrl of sourceUrls.slice(0, 5)) {
           try {
             const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl);
             const relevance = await evaluatePolicySourceRelevance(
@@ -1413,6 +1508,46 @@ export const crawlInsurerPolicy = action({
             }
 
             failedSources.push(`${sourceUrl}: document rejected as irrelevant (${relevance.rationale})`);
+
+            // If the document is an index/directory page, inspect child guideline links matching the procedure
+            const isDirectoryLike =
+              /landing page|directory|index of/i.test(relevance.rationale) ||
+              sourceUrl.toLowerCase().includes("/research/clinical-guidelines") ||
+              sourceUrl.toLowerCase().endsWith("/clinical-guidelines") ||
+              sourceUrl.toLowerCase().endsWith("/guidelines");
+
+            if (isDirectoryLike) {
+              const childLinks = extractGuidelineLinksFromMarkdown(
+                candidateSource.markdown,
+                candidateSource.sourceUrl,
+                args.cptCodes,
+              );
+              for (const childUrl of childLinks.slice(0, 2)) {
+                if (seenSourceUrls.has(childUrl)) continue;
+                seenSourceUrls.add(childUrl);
+                discoveredSourceCount += 1;
+                try {
+                  const childSource = await scrapeFirecrawlPolicySource(ctx, childUrl);
+                  const childRelevance = await evaluatePolicySourceRelevance(
+                    childSource,
+                    args.payer,
+                    args.cptCodes,
+                    args.icd10Codes,
+                    args.denialReasonCode,
+                    args.denialReasonDescription || "",
+                  );
+                  if (childRelevance.relevant) {
+                    policySource = childSource;
+                    break;
+                  }
+                  failedSources.push(`${childUrl}: document rejected as irrelevant (${childRelevance.rationale})`);
+                } catch (childErr) {
+                  const msg = childErr instanceof Error ? childErr.message : "Child source error";
+                  failedSources.push(`${childUrl}: ${msg}`);
+                }
+              }
+              if (policySource) break;
+            }
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown source error";
             failedSources.push(`${sourceUrl}: ${message}`);

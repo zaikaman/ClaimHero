@@ -555,7 +555,7 @@ Attending Orthopedic Surgeon: Dr. Robert Langston, MD, FAAOS (Metropolitan Surgi
   },
   {
     id: "geoblue_spine",
-    title: "GeoBlue (BCBS Global) — Lumbar Decompression",
+    title: "GeoBlue Worldwide — Lumbar Spine Decompression (Carelon)",
     payer: "GeoBlue",
     amount: "$18,200",
     cpt: "63047",
@@ -579,10 +579,10 @@ Procedure & Clinical Codes:
 
 Denial Adjudication Reason:
 Code CO-197: Precertification / prior authorization / notification absent or lacking.
-Description: Surgical treatment for lumbar spinal stenosis was performed without securing prior authorization from GeoBlue Medical Review Department prior to the date of service.
+Description: Surgical treatment for lumbar spinal stenosis was performed without securing prior authorization from GeoBlue Medical Review Department prior to the date of service. Under Carelon Musculoskeletal Clinical Appropriateness Guidelines for Spine Surgery (Lumbar Decompression / Laminectomy), non-emergent surgical intervention requires prospective authorization or clinical documentation of acute progressive neurological motor deficit establishing emergency medical necessity.
 
 Appeals Procedure & Filing Instructions:
-In accordance with federal regulations under 29 CFR § 2560.503-1, you or your authorized representative have 180 days from receipt of this notice to file a Level 1 appeal demonstrating emergency medical necessity or retroactive pre-authorization criteria under Policy SURG.00011.
+In accordance with federal regulations under 29 CFR § 2560.503-1, you or your authorized representative have 180 days from receipt of this notice to file a Level 1 appeal demonstrating emergency medical necessity or retroactive pre-authorization criteria under Carelon Clinical Appropriateness Guidelines for Spine Surgery (Lumbar Decompression / Laminectomy) / Policy SURG.00011.
 Submit complete appeal dossier and clinical records to:
 Official Claims & Appeals Email: claims@geo-blue.com
 Mailing Address: GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087
@@ -607,7 +607,7 @@ Appeals Fax: 1-610-482-9623`,
       {
         field: "imagingAndDiagnostics",
         question: "What are the date and findings of the most recent diagnostic imaging (MRI/CT) of the lumbar spine in the record? Leave blank if not documented.",
-        whyItMatters: "Directly addresses anatomical compression and surgical necessity criteria under Policy SURG.00011.",
+        whyItMatters: "Directly addresses anatomical compression and surgical necessity criteria under Carelon Spine Surgery Guidelines / Policy SURG.00011.",
       },
       {
         field: "treatmentHistoryAndResponse",
@@ -617,7 +617,7 @@ Appeals Fax: 1-610-482-9623`,
       {
         field: "otherDocumentedFacts",
         question: "Are there any other relevant clinical facts documented regarding the emergency nature of the procedure? Leave blank if not documented.",
-        whyItMatters: "Provides attending surgeon emergency attestation explaining lack of prior authorization.",
+        whyItMatters: "Provides attending surgeon emergency attestation explaining lack of prior authorization under Carelon emergency criteria.",
       },
     ],
     clinicalFacts: {
@@ -625,7 +625,7 @@ Appeals Fax: 1-610-482-9623`,
       examinationFindings: "Neurological examination demonstrates right foot drop with extensor hallucis longus and tibialis anterior weakness (grade 3/5), positive straight leg raise test on right at 30 degrees, absent right Achilles reflex (0/2), and L5-S1 hypoesthesia.",
       imagingAndDiagnostics: "Emergency lumbar spine MRI (06/28/2026) demonstrated acute extruded L5-S1 right paracentral disc herniation causing high-grade central canal stenosis and acute impingement of the traversing right S1 nerve root.",
       treatmentHistoryAndResponse: "Patient was undergoing conservative outpatient physical therapy and oral analgesics, but suffered sudden neurological deterioration requiring emergency surgical decompression to prevent irreversible nerve root damage.",
-      otherDocumentedFacts: "Attending neurosurgeon Dr. Sarah Chen, MD documented that emergency decompression was immediately necessary within 24 hours to prevent permanent foot drop, satisfying retroactive authorization criteria under GeoBlue Policy SURG.00011.",
+      otherDocumentedFacts: "Attending neurosurgeon Dr. Sarah Chen, MD documented that emergency decompression was immediately necessary within 24 hours to prevent permanent foot drop, satisfying retroactive authorization criteria under Carelon Clinical Guidelines for Spine Surgery (Lumbar Decompression) / GeoBlue Policy SURG.00011.",
       recordsAreIncomplete: false,
     },
     physicianNotes: `PATIENT: Marcus Sterling | DOB: 11/22/1974 | DOS: 07/04/2026
@@ -638,7 +638,7 @@ CLINICAL EXAMINATION & NEUROLOGICAL DEFICITS:
 3. Diagnostic MRI: Emergency lumbar MRI (06/28/2026) revealed acute large extruded L5-S1 right paracentral disc herniation resulting in severe central canal stenosis and acute severe impingement of the traversing right S1 nerve root.
 
 EMERGENCY SURGICAL INDICATION & RETROACTIVE PRE-AUTHORIZATION:
-In accordance with GeoBlue Policy SURG.00011 and prudent layperson emergency standards, emergency lumbar laminectomy, facetectomy, and foraminotomy (CPT 63047) was immediately indicated within 24 hours to prevent permanent motor paralysis and irreversible nerve root ischemia. Awaiting prospective commercial prior authorization was medically contraindicated and posed immediate threat of permanent disability.
+In accordance with Carelon Clinical Appropriateness Guidelines for Spine Surgery (Lumbar Decompression / Laminectomy), GeoBlue Policy SURG.00011, and prudent layperson emergency standards, emergency lumbar laminectomy, facetectomy, and foraminotomy (CPT 63047) was immediately indicated within 24 hours to prevent permanent motor paralysis and irreversible nerve root ischemia. Awaiting prospective commercial prior authorization was medically contraindicated and posed immediate threat of permanent disability.
 
 Attending Neurosurgeon: Dr. Sarah Chen, MD, FAANS (Spine & Neurosurgery Associates)`,
   },

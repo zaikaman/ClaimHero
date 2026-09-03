@@ -187,6 +187,60 @@ describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
       expect(urls).toContain("https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-lumbar-decompression.pdf");
       expect(urls).toContain("https://www.spine.org/guidelines/lumbar-decompression-criteria.pdf");
     });
+
+    it("selectFirecrawlPolicyUrls: penalizes blog posts and directories while prioritizing direct guideline PDFs", async () => {
+      const payload = {
+        data: {
+          web: [
+            {
+              url: "https://worldebhcday.org/blog/2024/advancing-spine-evidence-synthesis-north-american-spine-society-nass-guidelines",
+              title: "Advancing Spine Evidence Synthesis | Blog",
+              description: "Blog post commentary on healthcare awareness and spine guidelines.",
+            },
+            {
+              url: "https://www.spine.org/Research/Clinical-Guidelines",
+              title: "NASS Clinical Guidelines Directory",
+              description: "Landing page index of all NASS clinical practice guidelines.",
+            },
+            {
+              url: "https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-lumbar.pdf",
+              title: "Carelon Spine Surgery Decompression Guideline",
+              description: "Clinical coverage policy and medical necessity criteria for lumbar spine decompression.",
+            },
+          ],
+        },
+      };
+
+      const urls = actionPolicyCrawler.selectFirecrawlPolicyUrls(
+        payload,
+        ["63047", "lumbar", "spine", "laminectomy", "medical policy"],
+        0,
+        3,
+        "GeoBlue",
+      );
+
+      // Direct PDF ranks first, blog is excluded or ranked lowest
+      expect(urls[0]).toBe("https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-lumbar.pdf");
+      expect(urls).not.toContain("https://worldebhcday.org/blog/2024/advancing-spine-evidence-synthesis-north-american-spine-society-nass-guidelines");
+    });
+
+    it("extractGuidelineLinksFromMarkdown: extracts matching clinical guideline PDFs from directory pages", () => {
+      const directoryMarkdown = `# North American Spine Society Clinical Guidelines
+Welcome to the NASS guidelines directory. Below are the published clinical practice guidelines:
+- [Lumbar Spinal Stenosis Guidelines (PDF)](https://www.spine.org/Portals/0/assets/downloads/ResearchClinicalCare/Guidelines/LumbarStenosis.pdf)
+- [Cervical Radiculopathy Guidelines](https://www.spine.org/Portals/0/assets/downloads/ResearchClinicalCare/Guidelines/CervicalRadiculopathy.pdf)
+- [Unrelated Member Benefits Form](https://www.spine.org/benefits/form.pdf)
+`;
+
+      const links = actionPolicyCrawler.extractGuidelineLinksFromMarkdown(
+        directoryMarkdown,
+        "https://www.spine.org/Research/Clinical-Guidelines",
+        ["63047"],
+      );
+
+      expect(links.length).toBeGreaterThanOrEqual(1);
+      expect(links[0]).toBe("https://www.spine.org/Portals/0/assets/downloads/ResearchClinicalCare/Guidelines/LumbarStenosis.pdf");
+    });
   });
 
   describe("convex/actions/appealSynthesizer", () => {

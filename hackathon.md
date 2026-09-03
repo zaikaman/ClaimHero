@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-03T11:08:00Z
+- **Last updated:** 2026-09-03T11:28:00Z
 
 ## Log
 
@@ -655,7 +655,11 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
        - Updated `deliverAiAdjudication` to record `detectedDetermination` and `clinicalRationale` when inserting inbound adjudicator messages.
   - **Verification**: Verified cleanly with `npm run verify` (100% typecheck pass, 0 ESLint errors, 372/372 passing tests across 27 suites, and successful Vite production build in 7.04s).
 
-### 2026-09-03 - working tree
+### 2026-09-03 - 82b638d
 Prevented cross-account routing collisions on shared AgentMail inboxes by appending a randomized suffix to sample preset claim numbers upon intake (`src/components/radar/IngestionModal.tsx`) and enforcing claim number uniqueness during database creation (`convex/claims.ts`). Convex features: mutations, indexes (`by_claim_number`).
+
+### 2026-09-03 - working tree
+Resolved Firecrawl policy crawler retrieval failure on the Lumbar Spine Decompression template (CPT 63047, denial CO-197) where peer-reviewed PubMed evidence and clinical guidelines were falsely rejected as irrelevant due to administrative prior-authorization denial codes. Strengthened prompt engineering in `evaluatePolicySourceRelevance` (`convex/actions/policyCrawler.ts`) with explicit directives instructing the LLM classifier that clinical medical necessity, acute progressive motor deficit criteria, and PubMed outcomes studies are the universal substantive legal basis under ERISA to overturn administrative prior-authorization denials and obtain retroactive coverage. Aligned the Lumbar preset in `SAMPLE_CASE_PRESETS` (`src/lib/constants.ts`) to cite Carelon Musculoskeletal Guidelines for Spine Surgery (Lumbar Decompression / Laminectomy) and Policy SURG.00011, providing clinical grounding consistent with the Carelon Knee preset. Added guideline manager awareness (GeoBlue / BCBS / Anthem -> Carelon; Cigna / Molina -> EviCore / Carelon) and direct document/PDF targeting to `generatePolicySearchQueries` (`convex/actions/policyCrawler.ts`). Implemented `extractGuidelineLinksFromMarkdown` (`convex/actions/policyCrawler.ts`) to automatically detect and crawl procedure-specific child guideline PDFs (e.g. Lumbar Stenosis PDF) when Firecrawl returns index/directory landing pages. Hardened candidate scoring in `selectFirecrawlPolicyUrls` (`convex/actions/policyCrawler.ts`) by prioritizing direct PDFs, penalizing non-clinical blogs and directory pages, and expanding candidate evaluation headroom to 5 URLs. Verified with `npm run verify`: 100% clean typecheck, 0 ESLint errors/warnings, 374/374 passing unit tests across 27 suites, and production build in 7.42s. Convex features: actions, queries, mutations, components (`@firecrawl/firecrawl-convex`).
+
 
 
