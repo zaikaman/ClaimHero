@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-371%2F371%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-378%2F378%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -557,12 +557,12 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (371 tests)
+npm run test            # vitest run tests  (378 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **371/371 passing** across 27 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
+Current: **378/378 passing** across 27 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
@@ -573,6 +573,7 @@ Current: **371/371 passing** across 27 comprehensive test suites covering end-to
 | [`tests/redactionEngine.test.ts`](file:///d:/ClaimHero/tests/redactionEngine.test.ts) | 17 | HIPAA Safe Harbor 18-identifier redaction, boundary masking, regex patterns, and deterministic tokenization |
 | [`tests/convexChatbot.test.ts`](file:///d:/ClaimHero/tests/convexChatbot.test.ts) | 17 | Chatbot sessions, message history, auto-titling, conversation summaries, and internal lookup tool queries for claims, evidence, and briefs |
 | [`tests/convexClinicalEvidences.test.ts`](file:///d:/ClaimHero/tests/convexClinicalEvidences.test.ts) | 16 | Clinical evidence clause sanitization, batch insertions, search indexes, deletion, and source counting |
+| [`tests/actionsAgentMailAndDispatcher.test.ts`](file:///d:/ClaimHero/tests/actionsAgentMailAndDispatcher.test.ts) | 16 | AgentMail actions, attachment download, transmission dispatching, bidirectional threadId routing, RFC in-reply-to threading, base claim prefix matching, registered user notification for test & real accounts, and universal `[ClaimHero #${claimNumber}]` injection |
 | [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest, out-of-pocket maximum offsets, and No Surprises Act protections |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking, and API key validation |
 | [`tests/convexClaimsFull.test.ts`](file:///d:/ClaimHero/tests/convexClaimsFull.test.ts) | 13 | Claims CRUD, financial liability calculations, ERISA penalty tracking, `by_threadId` index queries, `setAgentMailThreadIdInternal` mutations, bounded pagination, and deadline sweeps |

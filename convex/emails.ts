@@ -335,6 +335,25 @@ export const hasMessageByAgentMailId = internalQuery({
 });
 
 /**
+ * Internal query to look up a claim by prior AgentMail / SES message ID referenced in In-Reply-To or References
+ */
+export const getClaimByAgentMailMessageIdInternal = internalQuery({
+  args: {
+    agentMailMessageId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const trimmed = args.agentMailMessageId.trim();
+    if (!trimmed) return null;
+    const msg = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmed))
+      .first();
+    if (!msg) return null;
+    return await ctx.db.get(msg.claimId);
+  },
+});
+
+/**
  * Batch check which AgentMail message IDs are already recorded in emailMessages.
  * Eliminates running dozens of single queries across the network.
  */

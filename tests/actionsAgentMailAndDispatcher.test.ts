@@ -265,6 +265,143 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       }));
     });
 
+    it("processInboundClaimReply: notifies registered user account even when user sent reply from their own email during testing", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_user_self_test_1",
+        inbox_id: "in_send",
+        from: "zaikaman123@gmail.com",
+        recipients: ["send@claimhero.com"],
+        to: ["send@claimhero.com"],
+        subject: "Re: [ClaimHero #CLM-6104-GEO-4092] Appeal request | GeoBlue",
+        text: "I am not paying this claim.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_self_test_1",
+        messageId: "msg_user_self_test_1",
+        inboxId: "in_send",
+        from: "zaikaman123@gmail.com",
+        recipients: ["send@claimhero.com"],
+        subject: "Re: [ClaimHero #CLM-6104-GEO-4092] Appeal request | GeoBlue",
+        text: "I am not paying this claim.",
+        attachments: [],
+      });
+
+      const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+        messageId: "msg_alert_sent_user_1",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimNumber === "CLM-6104-GEO-4092") {
+            return Promise.resolve({
+              _id: "claim_self_test_1",
+              claimNumber: "CLM-6104-GEO-4092",
+              userId: "user_zaikaman",
+              insurancePayer: "GeoBlue",
+            });
+          }
+          if (args?.userId === "user_zaikaman") {
+            return Promise.resolve({
+              _id: "user_zaikaman",
+              email: "zaikaman123@gmail.com",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue("id_mut_self"),
+      };
+
+      const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_self_test_1",
+        messageId: "msg_user_self_test_1",
+        inboxId: "in_send",
+      });
+
+      expect(res).toBeNull();
+      expect(sendMailSpy).toHaveBeenCalledWith(expect.objectContaining({
+        to: "zaikaman123@gmail.com",
+        subject: expect.stringContaining("[ClaimHero Alert]"),
+      }));
+    });
+
+    it("processInboundClaimReply: resolves claim via in_reply_to referencing earlier outbound message", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_reply_header_1",
+        inbox_id: "in_send",
+        from: "payer@insurance.com",
+        recipients: ["send@claimhero.com"],
+        to: ["send@claimhero.com"],
+        subject: "Re: Your appeal", // No claim number in subject
+        text: "Please provide clinical notes.",
+        in_reply_to: "<010001a0-prior-ses-msg-id@email.amazonses.com>",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_reply_header_1",
+        messageId: "msg_reply_header_1",
+        inboxId: "in_send",
+        from: "payer@insurance.com",
+        recipients: ["send@claimhero.com"],
+        subject: "Re: Your appeal",
+        text: "Please provide clinical notes.",
+        attachments: [],
+      });
+
+      const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+        messageId: "msg_alert_reply_to",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.agentMailMessageId === "<010001a0-prior-ses-msg-id@email.amazonses.com>") {
+            return Promise.resolve({
+              _id: "claim_from_in_reply_to",
+              claimNumber: "CLM-IN-REPLY-1",
+              userId: "user_in_reply",
+              insurancePayer: "Aetna",
+            });
+          }
+          if (args?.userId === "user_in_reply") {
+            return Promise.resolve({
+              _id: "user_in_reply",
+              email: "doctor@hospital.org",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue("id_mut_reply_to"),
+      };
+
+      const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_reply_header_1",
+        messageId: "msg_reply_header_1",
+        inboxId: "in_send",
+      });
+
+      expect(res).toBeNull();
+      expect(sendMailSpy).toHaveBeenCalledWith(expect.objectContaining({
+        to: "doctor@hospital.org",
+        subject: expect.stringContaining("[ClaimHero Alert]"),
+      }));
+    });
+
     it("processInboundClaimReply: suppresses bounce / delivery status notifications without emailing user or updating claim status", async () => {
       const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
         messageId: "msg_sent_out",

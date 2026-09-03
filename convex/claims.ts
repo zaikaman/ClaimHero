@@ -269,11 +269,25 @@ export const getByClaimNumberInternal = internalQuery({
   handler: async (ctx, args) => {
     const trimmed = args.claimNumber.trim();
     if (!trimmed) return null;
-    return await ctx.db
+    const direct = await ctx.db
       .query("claims")
       .withIndex("by_claim_number", (q) => q.eq("claimNumber", trimmed))
       .order("desc")
       .first();
+    if (direct) return direct;
+
+    const recent = await ctx.db.query("claims").withIndex("by_created").order("desc").take(100);
+    const candidateLower = trimmed.toLowerCase();
+    return (
+      recent.find((c) => {
+        const numLower = c.claimNumber.toLowerCase();
+        return (
+          numLower === candidateLower ||
+          numLower.startsWith(`${candidateLower}-`) ||
+          candidateLower.startsWith(`${numLower}-`)
+        );
+      }) || null
+    );
   },
 });
 
@@ -419,9 +433,18 @@ export const findMatchingClaimInternal = internalQuery({
       .take(500);
     const subjectAndBody = textToScan.toLowerCase();
 
-    const contentMatch = recentClaims.find(
-      (c) => c.claimNumber && subjectAndBody.includes(c.claimNumber.toLowerCase())
-    );
+    const contentMatch = recentClaims.find((c) => {
+      if (!c.claimNumber) return false;
+      const cNum = c.claimNumber.toLowerCase();
+      if (subjectAndBody.includes(cNum)) return true;
+      // If claim number in DB has a random suffix like "-4092", check if base appears in subject/body
+      const dashIdx = cNum.lastIndexOf("-");
+      if (dashIdx > 3) {
+        const base = cNum.slice(0, dashIdx);
+        if (subjectAndBody.includes(base)) return true;
+      }
+      return false;
+    });
     if (contentMatch) return contentMatch;
 
     // Resilient recipient fallback match in memory (excluding shared mailboxes)

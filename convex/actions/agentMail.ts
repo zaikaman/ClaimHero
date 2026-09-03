@@ -150,8 +150,31 @@ async function handleInboundClaimReply(
       (typeof message.threadId === "string" ? message.threadId : undefined) ||
       (typeof message.in_reply_to === "string" ? message.in_reply_to : undefined);
 
+    // 0. Try standard in_reply_to or references against prior outbound emailMessages
+    const candidateMessageIds: string[] = [];
+    if (typeof message.in_reply_to === "string" && message.in_reply_to.trim()) {
+      candidateMessageIds.push(message.in_reply_to.trim());
+    }
+    if (typeof message.inReplyTo === "string" && message.inReplyTo.trim()) {
+      candidateMessageIds.push(message.inReplyTo.trim());
+    }
+    if (Array.isArray(message.references)) {
+      for (const ref of message.references) {
+        if (typeof ref === "string" && ref.trim()) {
+          candidateMessageIds.push(ref.trim());
+        }
+      }
+    }
+    for (const refId of candidateMessageIds) {
+      matchingClaim = await ctx.runQuery(
+        internal.emails.getClaimByAgentMailMessageIdInternal,
+        { agentMailMessageId: refId }
+      );
+      if (matchingClaim) break;
+    }
+
     // 1. Try threadId match first
-    if (inboundThreadId) {
+    if (!matchingClaim && inboundThreadId) {
       matchingClaim = await ctx.runQuery(internal.claims.getByThreadIdInternal, {
         threadId: inboundThreadId,
       });
@@ -517,9 +540,8 @@ Evaluate the inbound correspondence text rigorously:
       }
     }
 
-    // Skip notification if the inbound message originated from the user themselves or is a daemon
-    const senderEmail = extractEmailAddress(sender) || sender.toLowerCase();
-    if (userEmail && (senderEmail.toLowerCase() === userEmail.toLowerCase() || isBounceSender)) {
+    // Skip notification if the inbound message is from a mailer daemon or bounce address
+    if (userEmail && isBounceSender) {
       userEmail = undefined;
     }
 
