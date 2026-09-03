@@ -37,6 +37,7 @@ export interface LiveFastAnswerResult {
   regulatoryLeverage?: string;
   confidenceScore: number;
   timestamp: number;
+  generatedBy?: "openai" | "fallback";
 }
 
 export const generateLiveFastAnswer = action({
@@ -166,18 +167,22 @@ Generate an instant, grounded Fast Answer response card.`;
         regulatoryLeverage: completion.regulatoryLeverage || `ERISA 29 CFR § 2560.503-1 & ${state} Utilization Review Standards`,
         confidenceScore: completion.confidenceScore || 95,
         timestamp: Date.now(),
+        generatedBy: "openai" as const,
       };
     } catch (err) {
       console.warn("OpenAI live fast answer synthesis fallback triggered:", err);
-      result = buildDeterministicFastAnswer(
-        args.recentTranscript,
-        claim,
-        evidences,
-        payer,
-        cptList,
-        icdList,
-        state
-      );
+      result = {
+        ...buildDeterministicFastAnswer(
+          args.recentTranscript,
+          claim,
+          evidences,
+          payer,
+          cptList,
+          icdList,
+          state
+        ),
+        generatedBy: "fallback" as const,
+      };
     }
 
     // If sessionId provided, persist directly to session
@@ -203,7 +208,8 @@ export interface InteractiveReviewerPushbackResult {
   chartProof: string;
   cpbCitation: string;
   regulatoryLeverage?: string;
-  leverageDelta: number;
+  leverageDelta?: number;
+  generatedBy?: "openai" | "fallback";
 }
 
 export const generateInteractiveReviewerPushback = action({
@@ -324,7 +330,7 @@ Evaluate the clinical merits. Formulate your spoken response as the Medical Dire
           properties: {
             spokenText: {
               type: "string",
-              description: "Spoken verbal dialog from Dr. Arthur Vance (the Medical Director)",
+              description: "Spoken verbal dialog from Demo AI Reviewer (simulated Medical Director for evaluation only)",
             },
             medicalDirectorTone: {
               type: "string",
@@ -381,18 +387,22 @@ Evaluate the clinical merits. Formulate your spoken response as the Medical Dire
         },
         temperature: 0.2,
       });
+      result.generatedBy = "openai";
     } catch (err) {
       console.warn("LLM reviewer pushback fallback engaged:", err);
-      result = buildDeterministicReviewerPushback(
-        args.doctorSpeech,
-        claim,
-        evidences,
-        payer,
-        cptList,
-        icdList,
-        state,
-        physicianTurnCount
-      );
+      result = {
+        ...buildDeterministicReviewerPushback(
+          args.doctorSpeech,
+          claim,
+          evidences,
+          payer,
+          cptList,
+          icdList,
+          state,
+          physicianTurnCount
+        ),
+        generatedBy: "fallback",
+      };
     }
     return result;
   },

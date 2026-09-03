@@ -81,29 +81,30 @@ ClaimHero automates the entire lifecycle from denial ingestion to payer adjudica
 
 ## 3. 60-Second Judge Quickstart
 
-### Option A — 1-Click Preset Flow (Recommended)
+### Option A — Try Demo Case (Synthetic Evaluation Fixtures)
 
 1. Open **[https://kindhearted-elephant-992.convex.site](https://kindhearted-elephant-992.convex.site)**.
-2. Click **Quick Ingest** (sidebar) or `Cmd+K` -> *Ingest Denial Notice*.
-3. Pick a preset:
+2. Click **Quick Ingest** (sidebar) or `Cmd+K` -> *Ingest Denial Notice* -> **Try demo case (synthetic)** tab.
+3. Pick a synthetic evaluation fixture:
    * **GeoBlue Worldwide — Knee Arthroscopy & Meniscectomy (Carelon)** — $6,400 / CPT 29881 / CO-50 (`geoblue_meniscus`)
    * **GeoBlue Worldwide — Lumbar Decompression (Carelon)** — $18,200 / CPT 63047 / CO-197 (`geoblue_spine`)
    * **BCBS Global Core — Diagnostic Knee MRI (Carelon)** — $2,850 / CPT 73721 / CO-16 (`bcbsglobal_mri`)
-4. All 5 clinical intake questions are pre-filled with grounded facts + treating physician notes (Dr. Langston / Dr. Chen / Dr. Martinez). Confirm and **Run Autonomous Pipeline**.
+4. Confirm and **Run Autonomous Pipeline**. The fixture is synthetic input (HIPAA Safe Harbor) that exercises the **100% live pipeline**: live optical extraction, real Firecrawl policy search/scraping, deterministic 4-pillar rubric calculation, LLM brief synthesis, and real AgentMail dispatch. Zero mocked outputs or fabricated policy text.
 5. Watch the stepper: `Evidence & CPB` -> `Defense Suite` -> `Payer Dispatch`. Within ~60-90s you will have: indexed CPB clauses, a scored overturn badge, a synthesized brief, and a dispatchable packet.
+6. **Scoped Demo Isolation & Purge:** Demo fixtures are tagged with `isDemo: true`, `dataOrigin: 'demo-fixture'`, and excluded from portfolio statistics by default. Use the **Include demo cases** toggle on Case Radar, or click **Clear demo data** (in Ingestion Modal, Case Radar, or Settings Danger Zone) to purge all synthetic records at any time.
 
 ### Option B — Your Own Denial
 
-* **Drag & drop** a PDF/image, **paste** raw EOB text, or select one of the **1-Click Presets**. The ingestion modal parses clinical details via Optical Structured Extraction, maps CARC/RARC codes, and creates a new case.
+* **Drag & drop** a PDF/image, **paste** raw EOB text, or select one of the **Synthetic Demo Cases**. The ingestion modal parses clinical details via Optical Structured Extraction, maps CARC/RARC codes, and creates a new case.
 * Answer the 5 neutral clinical questions (symptoms, exam, imaging, treatment history, other facts) and pick a HIPAA redaction preset if needed.
 
-### Option C — Live Dispatch Test (the adjudicator)
+### Option C — Live Dispatch Test (Verification of Live Send)
 
 In `Payer Communications` (`AgentMailDrawer.tsx`), select:
 
-* **AI Adjudicator** (`claimhero-adjudicator@agentmail.to`) — OpenAI reviews your brief against CPB criteria and returns a formal inbound determination that auto-updates the case to `won` and is indexed into the Precedent Vector Archive.
-* **Custom Email** — enter your own address; receive the real HTML + plain-text appeal via AgentMail REST (`api.agentmail.to/v0/inboxes/{inbox_id}/messages/send`) and reply to see two-way threading.
-* **Official Payer** — GeoBlue / BCBS Global Core routes to verified intake emails (`src/lib/constants.ts:21`), others show portal/fax/PO box with transparent source provenance badges (`Verified Gateway`, `Firecrawl Discovered`, `Extracted from Document`, `Unresolved Gateway`).
+* **Demo AI Reviewer (Simulated — Evaluation Only)** (`claimhero-adjudicator@agentmail.to`) — Simulated clinical reviewer evaluates your brief against CPB criteria for safe, self-contained demonstration. Evaluates objectively and can approve, request additional records, or uphold denials.
+* **Custom Email (Interactive Test — Proof of Send)** — enter your own address; receive the real HTML + plain-text appeal via AgentMail REST (`api.agentmail.to/v0/inboxes/{inbox_id}/messages/send`) and reply from your own email to prove two-way inbound webhook routing and thread resolution.
+* **Official Payer Gateway** — GeoBlue / BCBS Global Core routes to verified intake emails (`src/lib/constants.ts:21`), others show portal/fax/PO box with transparent source provenance badges (`Verified Gateway`, `Firecrawl Discovered`, `Extracted from Document`, `Unresolved Gateway`).
 
 > Tip: The floating **Sentinel Readiness Checklist** and `Cmd+K` Command Palette expose every action without hunting through navigation.
 
@@ -593,6 +594,7 @@ Current: **378/378 passing** across 27 comprehensive test suites covering end-to
 | [`tests/sentinelChatbot.test.ts`](file:///d:/ClaimHero/tests/sentinelChatbot.test.ts) | 6 | Agentic OpenAI tool calling (10 tools), Firecrawl live search/scrape schemas, and lean prompt builder |
 | [`tests/statutoryEscalation.test.ts`](file:///d:/ClaimHero/tests/statutoryEscalation.test.ts) | 5 | 180-day internal appeal to Level 3 DOI escalation state machine |
 | [`tests/actionsPolicyAndSynthesizer.test.ts`](file:///d:/ClaimHero/tests/actionsPolicyAndSynthesizer.test.ts) | 5 | Policy crawler multi-tier search query generation, Carelon/NASS clinical candidate selection, student safety filtering, PubMed research, and appeal brief synthesis |
+| [`tests/demoIsolationAndHonestPipelines.test.ts`](file:///d:/ClaimHero/tests/demoIsolationAndHonestPipelines.test.ts) | 8 | Demo fixture provenance tagging, HIPAA Safe Harbor metadata, scoped demo cascade purge, purged hardcoded fake NPIs, honest LLM fallbacks, and generation attribution |
 | [`tests/actionsP2PAndChatbot.test.ts`](file:///d:/ClaimHero/tests/actionsP2PAndChatbot.test.ts) | 4 | Physician P2P defense generation, live copilot fast answers, interactive pushback, and multi-turn agentic chatbot |
 
 ---

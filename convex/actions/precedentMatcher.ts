@@ -50,6 +50,8 @@ export interface OverturnScoringResult {
   keyPolicyContradictions: string[];
   winningPrecedentSummary: string;
   suggestedAppealLevel: "level_1_internal" | "level_2_grievance" | "level_3_external_state_review";
+  llmAvailable?: boolean;
+  generatedBy?: "openai" | "fallback";
 }
 
 interface RawLLMAnalysisOutput {
@@ -257,6 +259,8 @@ export const computeOverturnScore = action({
 
     // 4. Call OpenAI for deep qualitative legal/clinical contradictions
     let llmAnalysis: RawLLMAnalysisOutput;
+    let generatedBy: "openai" | "fallback" = "openai";
+    let llmAvailable = true;
     try {
       llmAnalysis = await createStructuredCompletion<RawLLMAnalysisOutput>({
         systemPrompt: `You are a Senior Medical Director, ERISA Claim Adjudication Expert, and Clinical Appeals Evaluator.
@@ -288,14 +292,14 @@ ${evidencesSummary}`,
         schema: OVERTURN_ANALYSIS_SCHEMA,
         temperature: 0.0,
       });
-    } catch {
+    } catch (err) {
+      console.warn("LLM precedent analysis failed, falling back to deterministic calculation without fabricated citations:", err);
+      generatedBy = "fallback";
+      llmAvailable = false;
       llmAnalysis = {
-        keyPolicyContradictions: [
-          `Payer CPB criteria fully satisfied by documented conservative care for CPT ${claim.cptCodes[0] || "27447"}.`,
-          `Adverse determination under ${claim.denialReasonCode} violates ERISA 29 CFR § 2560.503-1 disclosure requirements.`,
-        ],
-        winningPrecedentSummary: `Binding precedent supports reversal of ${claim.denialReasonCode} when objective diagnostic evidence and specialist certification are documented.`,
-        suggestedAppealLevel: "level_1_internal",
+        keyPolicyContradictions: [],
+        winningPrecedentSummary: "Deterministic rubric baseline evaluated against statutory procedural requirements and indexed policy evidence.",
+        suggestedAppealLevel: deterministicCalculation.riskLevel === "complex_litigation" ? "level_2_grievance" : "level_1_internal",
       };
     }
 
@@ -324,6 +328,8 @@ ${evidencesSummary}`,
       keyPolicyContradictions: (llmAnalysis.keyPolicyContradictions || []).map((c) => c.replace(/\*\*/g, "")),
       winningPrecedentSummary: llmAnalysis.winningPrecedentSummary?.replace(/\*\*/g, "") || "",
       suggestedAppealLevel: llmAnalysis.suggestedAppealLevel,
+      llmAvailable,
+      generatedBy,
     };
 
     // 5. Update claim in database with deterministic score, risk level, and criteria breakdown

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-03T13:00:00Z
+- **Last updated:** 2026-09-03T15:05:00Z
 
 ## Log
 
@@ -670,5 +670,8 @@ Aligned the starter case intake experience in `OnboardingWizard.tsx` with Case R
 ### 2026-09-03 - 31804d2
 Eliminated duplicate execution and answer flashing during autonomous clinical addendum synthesis by adding module-scoped in-flight deduplication and synchronous tracking guards in `AgentMailDrawer.tsx`, setting `autoReplyStatus: "generating"` on initial inbound intake in `handleInboundClaimReply` (`convex/actions/agentMail.ts`), and adding message draft caching in `generateAutoReplyDraft` (`convex/actions/mailDispatcher.ts`, `convex/emails.ts`) so existing drafts are reused without redundant LLM invocations. Convex features: actions, internalQuery, internalMutation, reactive WebSocket subscriptions.
 
-### 2026-09-03 - working tree
+### 2026-09-03 - 71df48b
 Resolved payer response user notification suppression and hardened inbound email thread correlation by removing the erroneous self-sender email check in `handleInboundClaimReply` (`convex/actions/agentMail.ts`) so test replies dispatch user alerts, implementing RFC-compliant `In-Reply-To` and `References` threading via `getClaimByAgentMailMessageIdInternal` (`convex/emails.ts`), and adding resilient prefix/base claim number fallback matching in `getByClaimNumberInternal` and `findMatchingClaimInternal` (`convex/claims.ts`). Convex features: internalQuery, internalMutation, actions, relational indexes (`by_agent_mail_message_id`, `by_claim_number`).
+
+### 2026-09-03 - working tree
+Hardened evaluation pipeline integrity, demo case isolation, and inbound email routing: tagged demo fixtures with HIPAA Safe Harbor provenance metadata (`convex/schema.ts`, `src/lib/constants.ts`), enabled demo case inclusion by default across reactive queries and radar filters with an atomic cascading purge mutation (`convex/claims.ts: clearDemoData`), purged hardcoded 555 numbers and fake NPIs from production dossier and onboarding paths (`src/lib/dossierBuilder.ts`, `convex/settings.ts`), eliminated fabricated mathematical scoring breakdowns and fake policy citations in favor of grounded deterministic baselines with generation attribution (`convex/actions/precedentMatcher.ts`, `p2pDefenseGenerator.ts`, `src/components/evidence/EvidenceMatrix.tsx`), enforced exact claim number matching in `convex/claims.ts:findMatchingClaimInternal` to eliminate cross-claim email pollution, and added `ignoredAgentMailMessages` deduplication in `convex/emails.ts` and `convex/actions/agentMail.ts` to prevent repeated sync warning loops. Convex features: schema, queries, mutations, actions, relational indexes (`by_user_demo`, `by_agent_mail_message_id`).

@@ -122,6 +122,7 @@ export interface P2PDefenseSynthesisResult {
   statutoryDemands: string;
   condensedCheatSheet: CondensedCheatSheet;
   fullScriptMarkdown: string;
+  generatedBy?: "openai" | "fallback";
 }
 
 import type { Doc, Id } from "../_generated/dataModel";
@@ -383,6 +384,7 @@ export const generateP2PScript = action({
         : "Standard published clinical coverage guidelines and ERISA disclosure mandates apply.";
 
     let rawResult: P2PDefenseSynthesisResult;
+    let generatedBy: "openai" | "fallback" = "openai";
 
     try {
       rawResult = await createStructuredCompletion<P2PDefenseSynthesisResult>({
@@ -434,6 +436,7 @@ Return the structured P2P defense tele-script and condensed pocket cheat sheet.`
       );
     } catch (err) {
       console.warn("LLM P2P defense synthesis fallback engaged:", err);
+      generatedBy = "fallback";
       rawResult = buildDeterministicFallback(
         claim,
         evidences,
@@ -443,28 +446,30 @@ Return the structured P2P defense tele-script and condensed pocket cheat sheet.`
       );
     }
 
-    // Persist to Convex database
-    const scriptId = await ctx.runMutation(
-      internal.p2pScripts.createOrUpdateScriptInternal,
-      {
-        claimId: args.claimId,
-        physicianName,
-        physicianSpecialty,
-        medicalDirectorRole,
-        estimatedCallDuration: "3 Minutes",
-        openingStatutoryStatement: rawResult.openingStatutoryStatement,
-        clinicalPolicyCitations: rawResult.clinicalPolicyCitations,
-        disqualificationCounters: rawResult.disqualificationCounters,
-        statutoryDemands: rawResult.statutoryDemands,
-        condensedCheatSheet: rawResult.condensedCheatSheet,
-        fullScriptMarkdown: rawResult.fullScriptMarkdown,
-        lastEditedBy: "P2P Defense Tele-Script Generator",
-      }
-    );
+    rawResult.generatedBy = generatedBy;
 
-    return {
-      scriptId: scriptId || "",
-      ...rawResult,
-    };
+      // Persist to Convex database
+      const scriptId = await ctx.runMutation(
+        internal.p2pScripts.createOrUpdateScriptInternal,
+        {
+          claimId: args.claimId,
+          physicianName,
+          physicianSpecialty,
+          medicalDirectorRole,
+          estimatedCallDuration: "3 Minutes",
+          openingStatutoryStatement: rawResult.openingStatutoryStatement,
+          clinicalPolicyCitations: rawResult.clinicalPolicyCitations,
+          disqualificationCounters: rawResult.disqualificationCounters,
+          statutoryDemands: rawResult.statutoryDemands,
+          condensedCheatSheet: rawResult.condensedCheatSheet,
+          fullScriptMarkdown: rawResult.fullScriptMarkdown,
+          lastEditedBy: "P2P Defense Tele-Script Generator",
+        }
+      );
+
+      return {
+        scriptId: scriptId || "",
+        ...rawResult,
+      };
   },
 });

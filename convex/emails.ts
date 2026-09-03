@@ -372,9 +372,92 @@ export const getExistingAgentMailMessageIds = internalQuery({
         .first();
       if (existing !== null) {
         existingIds.push(trimmed);
+        continue;
+      }
+      const ignored = await ctx.db
+        .query("ignoredAgentMailMessages")
+        .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmed))
+        .first();
+      if (ignored !== null) {
+        existingIds.push(trimmed);
       }
     }
     return existingIds;
+  },
+});
+
+/**
+ * Record an AgentMail message ID that does not match any claim to avoid re-processing loops
+ */
+export const recordIgnoredAgentMailMessageInternal = internalMutation({
+  args: {
+    agentMailMessageId: v.string(),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const trimmed = args.agentMailMessageId.trim();
+    if (!trimmed) return null;
+    const existing = await ctx.db
+      .query("ignoredAgentMailMessages")
+      .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmed))
+      .first();
+    if (!existing) {
+      await ctx.db.insert("ignoredAgentMailMessages", {
+        agentMailMessageId: trimmed,
+        reason: args.reason,
+        ignoredAt: Date.now(),
+      });
+    }
+    return null;
+  },
+});
+
+/**
+ * Clean up messages that were falsely associated with a claim due to partial prefix matching
+ */
+export const cleanupMismatchedMessagesForClaim = mutation({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) return { deletedCount: 0 };
+
+    const cNum = (claim.claimNumber || "").toLowerCase();
+    const messages = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .collect();
+
+    let deletedCount = 0;
+    for (const msg of messages) {
+      const text = `${msg.subject || ""} ${msg.bodyText || ""}`.toLowerCase();
+      // If the message does not contain the exact claim number of this claim, it was falsely matched
+      if (!text.includes(cNum)) {
+        await ctx.db.delete(msg._id);
+        deletedCount++;
+      }
+    }
+
+    const remaining = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .collect();
+
+    if (remaining.length === 0) {
+      const threads = await ctx.db
+        .query("emailThreads")
+        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+        .collect();
+      for (const th of threads) {
+        await ctx.db.delete(th._id);
+      }
+      if (claim.status === "escalated" || claim.status === "dispatched" || claim.status === "under_review") {
+        await ctx.db.patch(args.claimId, { status: "ready_for_review" });
+      }
+    }
+
+    return { deletedCount };
   },
 });
 

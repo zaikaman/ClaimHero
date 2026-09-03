@@ -17,12 +17,13 @@ import {
   PhoneCall,
   Scales,
   TrendUp,
+  Trash,
 } from "@phosphor-icons/react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { ClinicalFacts, ClinicalIntakeQuestion, DenialExtractionResult } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
-import { SAMPLE_CASE_PRESETS, SampleCasePreset } from "../../lib/constants";
+import { DEMO_CASE_FIXTURES, DemoCaseFixture, SampleCasePreset } from "../../lib/constants";
 import {
   ComplianceStandard,
   detectPiiEntities,
@@ -117,7 +118,24 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const [extractedResult, setExtractedResult] = useState<
     (DenialExtractionResult & { claimId: string; pipelineResult?: unknown }) | null
   >(null);
-  const [activePreset, setActivePreset] = useState<SampleCasePreset | null>(null);
+  const [activePreset, setActivePreset] = useState<DemoCaseFixture | null>(null);
+  const clearDemoDataMutation = useMutation(api.claims.clearDemoData);
+  const [isClearingDemo, setIsClearingDemo] = useState<boolean>(false);
+  const [demoFeedback, setDemoFeedback] = useState<string | null>(null);
+
+  const handleClearDemoData = async () => {
+    try {
+      setIsClearingDemo(true);
+      setDemoFeedback(null);
+      const res = await clearDemoDataMutation({});
+      setDemoFeedback(`Cleared ${res.deletedClaimsCount} demo cases.`);
+      setTimeout(() => setDemoFeedback(null), 4000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Failed to clear demo cases");
+    } finally {
+      setIsClearingDemo(false);
+    }
+  };
   const [contextSubmitted, setContextSubmitted] = useState(false);
   const [isPreparingContext, setIsPreparingContext] = useState(false);
   const [intakeQuestions, setIntakeQuestions] = useState<ClinicalIntakeQuestion[]>(DEFAULT_CLINICAL_QUESTIONS);
@@ -501,7 +519,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
             <TabsList variant="line" className="w-full">
               <TabsTrigger value="presets" className="gap-1.5">
                 <FileDoc className="size-3.5" />
-                <span>1-Click Presets</span>
+                <span>Try demo case (synthetic)</span>
               </TabsTrigger>
 
               <TabsTrigger value="upload" className="gap-1.5">
@@ -514,14 +532,33 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               </TabsTrigger>
             </TabsList>
 
-            {/* Tab 1: 1-Click Presets */}
+            {/* Tab 1: Demo Fixtures */}
             <TabsContent value="presets" className="space-y-3 pt-2">
-              <p className="text-xs text-muted-foreground">
-                Select a sample medical denial case. Clicking a preset immediately analyzes the clinical criteria and creates the claim record:
-              </p>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-xs text-muted-foreground">
+                  Fictional EOB for evaluation. Runs live extraction/crawl/scoring, no mocked results.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={handleClearDemoData}
+                  disabled={isClearingDemo}
+                  className="h-7 text-[11px] gap-1 text-destructive hover:bg-destructive/10 border-destructive/30 shrink-0 cursor-pointer"
+                >
+                  <Trash className="size-3" />
+                  <span>{isClearingDemo ? "Clearing..." : "Clear demo data"}</span>
+                </Button>
+              </div>
+
+              {demoFeedback && (
+                <div className="text-[11px] text-emerald-500 font-medium bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-1">
+                  {demoFeedback}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-2.5">
-                {SAMPLE_CASE_PRESETS.map((preset) => (
+                {DEMO_CASE_FIXTURES.map((preset) => (
                   <Card
                     key={preset.id}
                     onClick={() => !isProcessing && handleProcessPreset(preset)}
@@ -537,6 +574,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+                      <Badge variant="secondary" className="font-mono text-[9px] text-amber-500 bg-amber-500/10 border-amber-500/20">
+                        Synthetic demo — not real PHI
+                      </Badge>
                       <Badge variant="secondary">CPT {preset.cpt}</Badge>
                       <Badge variant="outline" className="text-muted-foreground">
                         {preset.carc}

@@ -23,7 +23,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { BrandIcon } from "../common/BrandLogo";
 import { ClinicalFacts, ClinicalIntakeQuestion, DenialExtractionResult } from "../../types";
-import { SAMPLE_CASE_PRESETS, SampleCasePreset } from "../../lib/constants";
+import { DEMO_CASE_FIXTURES, DemoCaseFixture } from "../../lib/constants";
 import {
   Dialog,
   DialogContent,
@@ -103,7 +103,7 @@ const ROLES = [
     defaultName: "Dr. Sarah Chen, MD, FACP",
     defaultCredentials: "Board Certified Internal Medicine / Clinical Advocate",
     defaultOrg: "ClaimHero Health Advocacy Group",
-    defaultPhone: "+1 (800) 555-0199",
+    defaultPhone: "",
   },
   {
     id: "advocate",
@@ -113,7 +113,7 @@ const ROLES = [
     defaultName: "Alex Vance, Esq. / ERISA Counsel",
     defaultCredentials: "Healthcare Litigator & Patient Rights Advocate",
     defaultOrg: "Appellate Health Law Practice",
-    defaultPhone: "+1 (800) 555-0188",
+    defaultPhone: "",
   },
   {
     id: "patient",
@@ -123,7 +123,7 @@ const ROLES = [
     defaultName: "Patient Self-Representative",
     defaultCredentials: "Pro Se Insured Policyholder",
     defaultOrg: "Individual Policyholder",
-    defaultPhone: "+1 (800) 555-0177",
+    defaultPhone: "",
   },
 ];
 
@@ -145,7 +145,7 @@ const TARGET_PAYERS = [
   "Cigna",
 ];
 
-const STARTER_CASES = SAMPLE_CASE_PRESETS;
+const STARTER_CASES = DEMO_CASE_FIXTURES;
 
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
@@ -165,7 +165,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [advocateName, setAdvocateName] = useState<string>("Dr. Sarah Chen, MD, FACP");
   const [advocateCredentials, setAdvocateCredentials] = useState<string>("Board Certified Internal Medicine / Clinical Advocate");
   const [advocateOrg, setAdvocateOrg] = useState<string>("ClaimHero Health Advocacy Group");
-  const [advocatePhone, setAdvocatePhone] = useState<string>("+1 (800) 555-0199");
+  const [advocatePhone, setAdvocatePhone] = useState<string>("");
 
   const [selectedJurisdiction, setSelectedJurisdiction] = useState<string>("CA");
   const [selectedPayers, setSelectedPayers] = useState<string[]>([
@@ -184,7 +184,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [extractedResult, setExtractedResult] = useState<
     (DenialExtractionResult & { claimId: string; pipelineResult?: unknown }) | null
   >(null);
-  const [activePreset, setActivePreset] = useState<SampleCasePreset | null>(null);
+  const [activePreset, setActivePreset] = useState<DemoCaseFixture | null>(null);
   const [contextSubmitted, setContextSubmitted] = useState<boolean>(false);
   const [isPreparingContext, setIsPreparingContext] = useState<boolean>(false);
   const [intakeQuestions, setIntakeQuestions] = useState<ClinicalIntakeQuestion[]>(DEFAULT_CLINICAL_QUESTIONS);
@@ -773,6 +773,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 </div>
               )}
 
+              <div className="space-y-1">
+                <p className="text-[11px] text-muted-foreground">
+                  Fictional EOB for evaluation. Runs live extraction/crawl/scoring, no mocked results.
+                </p>
+              </div>
+
               <div className="space-y-2.5">
                 {STARTER_CASES.map((c) => {
                   const isSelected = selectedCaseId === c.id;
@@ -806,6 +812,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                             {c.title}
                           </span>
                           <div className="flex items-center gap-1.5">
+                            <Badge variant="secondary" className="font-mono text-[9px] text-amber-500 bg-amber-500/10 border-amber-500/20">
+                              Synthetic demo — not real PHI
+                            </Badge>
                             <Badge variant="outline" className="font-mono text-[10px]">
                               {c.badge}
                             </Badge>

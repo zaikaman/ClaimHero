@@ -70,6 +70,9 @@ export interface Claim {
   redactionMetadata?: RedactionMetadata;
   financialLiability?: FinancialLiabilityData;
   erisaPenalties?: ErisaPenaltyData;
+  isDemo?: boolean;
+  dataOrigin?: string;
+  isSyntheticPII?: boolean;
   createdAt: number;
   updatedAt: number;
   patient?: Patient;
@@ -192,6 +195,7 @@ export interface AppealSenderDetails {
   credentials?: string;
   email?: string;
   phone?: string;
+  npiNumber?: string;
 }
 
 export interface ClinicalFacts {
@@ -373,6 +377,8 @@ export interface OverturnScoringResult {
   keyPolicyContradictions: string[];
   winningPrecedentSummary: string;
   suggestedAppealLevel: AppealLevel;
+  llmAvailable?: boolean;
+  generatedBy?: "openai" | "fallback";
 }
 
 export interface PolicyCitation {

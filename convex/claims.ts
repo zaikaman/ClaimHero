@@ -48,6 +48,7 @@ export const list = query({
     limit: v.optional(v.number()),
     cursor: v.optional(v.union(v.string(), v.null())),
     paginationOpts: v.optional(paginationOptsValidator),
+    includeDemo: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -83,13 +84,25 @@ export const list = query({
         .withIndex("by_user", (q) => q.eq("userId", userId));
     }
 
+    if (args.includeDemo === false) {
+      try {
+        queryBuilder = queryBuilder.filter((q) => q.neq(q.field("isDemo"), true));
+      } catch {
+        // Safe fallback for mocked test runners
+      }
+    }
+
     queryBuilder = queryBuilder.order("desc");
 
     // Support reactive pagination if paginationOpts is provided
     if (args.paginationOpts) {
       const paginatedResult = await queryBuilder.paginate(args.paginationOpts);
-      const page = await Promise.all(
-        paginatedResult.page.map(async (claim) => {
+      const page = args.includeDemo === false
+        ? paginatedResult.page.filter((c) => !c.isDemo)
+        : paginatedResult.page;
+
+      const mappedPage = await Promise.all(
+        page.map(async (claim) => {
           let patientName = claim.patientName;
           let insurancePayer = claim.insurancePayer;
 
@@ -120,12 +133,15 @@ export const list = query({
 
       return {
         ...paginatedResult,
-        page,
+        page: mappedPage,
       };
     }
 
     const effectiveLimit = Math.min(args.limit ?? 50, 100);
-    const claims = await queryBuilder.take(effectiveLimit);
+    let claims = await queryBuilder.take(effectiveLimit);
+    if (args.includeDemo === false) {
+      claims = claims.filter((c) => !c.isDemo);
+    }
 
     // Map denormalized patient data into the expected Claim shape without N+1 joins
     return await Promise.all(
@@ -436,14 +452,7 @@ export const findMatchingClaimInternal = internalQuery({
     const contentMatch = recentClaims.find((c) => {
       if (!c.claimNumber) return false;
       const cNum = c.claimNumber.toLowerCase();
-      if (subjectAndBody.includes(cNum)) return true;
-      // If claim number in DB has a random suffix like "-4092", check if base appears in subject/body
-      const dashIdx = cNum.lastIndexOf("-");
-      if (dashIdx > 3) {
-        const base = cNum.slice(0, dashIdx);
-        if (subjectAndBody.includes(base)) return true;
-      }
-      return false;
+      return subjectAndBody.includes(cNum);
     });
     if (contentMatch) return contentMatch;
 
@@ -489,6 +498,9 @@ export const create = mutation({
     denialReasonDescription: v.string(),
     appealFilingDeadlineDays: v.optional(v.number()),
     denialLetterStorageId: v.optional(v.id("_storage")),
+    isDemo: v.optional(v.boolean()),
+    dataOrigin: v.optional(v.string()),
+    isSyntheticPII: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuthUser(ctx);
@@ -516,6 +528,21 @@ export const create = mutation({
         .first();
     }
 
+    const isDemoMatch =
+      args.isDemo ??
+      (patient?.name === "Eleanor Vance" ||
+        patient?.name === "Marcus Sterling" ||
+        patient?.name === "Michael Patel" ||
+        claimNumber.startsWith("CLM-8942-GEO") ||
+        claimNumber.startsWith("CLM-6104-GEO") ||
+        claimNumber.startsWith("CLM-3912-BCG") ||
+        patient?.memberId === "GEO-982341-01" ||
+        patient?.memberId === "GEO-554210-99" ||
+        patient?.memberId === "BCG-773419-02");
+    const isDemo = Boolean(isDemoMatch);
+    const dataOrigin = args.dataOrigin || (isDemo ? "demo-fixture" : "live-pipeline");
+    const isSyntheticPII = args.isSyntheticPII ?? isDemo;
+
     const claimId = await ctx.db.insert("claims", {
       userId,
       patientId: args.patientId,
@@ -536,6 +563,9 @@ export const create = mutation({
       assignedAgentEmail: "",
       agentMailProvisioningStatus: "pending",
       denialLetterStorageId: args.denialLetterStorageId,
+      isDemo,
+      dataOrigin,
+      isSyntheticPII,
       createdAt: now,
       updatedAt: now,
     });
@@ -586,6 +616,9 @@ interface CreateWithPatientArgs {
   denialReasonDescription: string;
   appealFilingDeadlineDays?: number;
   denialLetterStorageId?: Id<"_storage">;
+  isDemo?: boolean;
+  dataOrigin?: string;
+  isSyntheticPII?: boolean;
   redactionMetadata?: {
     isRedacted: boolean;
     mode: string;
@@ -677,6 +710,21 @@ async function applyCreateWithPatient(
       .first();
   }
 
+  const isDemoMatch =
+    args.isDemo ??
+    (args.patientName === "Eleanor Vance" ||
+      args.patientName === "Marcus Sterling" ||
+      args.patientName === "Michael Patel" ||
+      claimNumber.startsWith("CLM-8942-GEO") ||
+      claimNumber.startsWith("CLM-6104-GEO") ||
+      claimNumber.startsWith("CLM-3912-BCG") ||
+      args.memberId === "GEO-982341-01" ||
+      args.memberId === "GEO-554210-99" ||
+      args.memberId === "BCG-773419-02");
+  const isDemo = Boolean(isDemoMatch);
+  const dataOrigin = args.dataOrigin || (isDemo ? "demo-fixture" : "live-pipeline");
+  const isSyntheticPII = args.isSyntheticPII ?? isDemo;
+
   const claimId = await ctx.db.insert("claims", {
     userId,
     patientId,
@@ -698,6 +746,9 @@ async function applyCreateWithPatient(
     agentMailProvisioningStatus: "pending",
     denialLetterStorageId: args.denialLetterStorageId,
     redactionMetadata: args.redactionMetadata,
+    isDemo,
+    dataOrigin,
+    isSyntheticPII,
     createdAt: now,
     updatedAt: now,
   });
@@ -751,6 +802,9 @@ export const createWithPatient = mutation({
     denialReasonDescription: v.string(),
     appealFilingDeadlineDays: v.optional(v.number()),
     denialLetterStorageId: v.optional(v.id("_storage")),
+    isDemo: v.optional(v.boolean()),
+    dataOrigin: v.optional(v.string()),
+    isSyntheticPII: v.optional(v.boolean()),
     redactionMetadata: v.optional(
       v.object({
         isRedacted: v.boolean(),
@@ -789,6 +843,9 @@ export const createWithPatientInternal = internalMutation({
     appealFilingDeadlineDays: v.optional(v.number()),
     denialLetterStorageId: v.optional(v.id("_storage")),
     userId: v.optional(v.id("users")),
+    isDemo: v.optional(v.boolean()),
+    dataOrigin: v.optional(v.string()),
+    isSyntheticPII: v.optional(v.boolean()),
     redactionMetadata: v.optional(
       v.object({
         isRedacted: v.boolean(),
@@ -1119,8 +1176,10 @@ export const sweepDeadlinesBatch = internalMutation({
  * using denormalized payer fields to eliminate cross-table patient joins.
  */
 export const getPortfolioStats = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    includeDemo: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
       return {
@@ -1165,11 +1224,22 @@ export const getPortfolioStats = query({
     }
 
     // Bounded fetch of recent claims for status, risk, and payer breakdown (max 500)
-    const claims = (await ctx.db
+    let claimsQuery = ctx.db
       .query("claims")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId));
+    if (args.includeDemo === false) {
+      try {
+        claimsQuery = claimsQuery.filter((q) => q.neq(q.field("isDemo"), true));
+      } catch {
+        // Safe fallback for mocked test runners
+      }
+    }
+    const rawClaims = (await claimsQuery
       .order("desc")
       .take(500)) as Doc<"claims">[];
+    const claims = args.includeDemo === false
+      ? rawClaims.filter((c) => !c.isDemo)
+      : rawClaims;
 
     let totalDisputedAmount = 0;
     let activeDisputedAmount = 0;
@@ -1871,3 +1941,92 @@ export const updateErisaPenalties = mutation({
     return { success: true };
   },
 });
+
+/**
+ * Scoped purge of synthetic demo claims and cascading records.
+ * Leaves real uploaded / imported claims completely intact.
+ */
+export const clearDemoData = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+
+    const demoClaims = userId
+      ? await ctx.db
+          .query("claims")
+          .withIndex("by_user_demo", (q) => q.eq("userId", userId).eq("isDemo", true))
+          .collect()
+      : (await ctx.db.query("claims").collect()).filter((c) => c.isDemo === true);
+
+    let deletedCount = 0;
+    for (const claim of demoClaims) {
+      // Cascade delete related records
+      const evidences = await ctx.db
+        .query("clinicalEvidences")
+        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+        .collect();
+      for (const ev of evidences) {
+        await ctx.db.delete(ev._id);
+      }
+
+      const appeals = await ctx.db
+        .query("appeals")
+        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+        .collect();
+      for (const ap of appeals) {
+        await ctx.db.delete(ap._id);
+      }
+
+      const threads = await ctx.db
+        .query("emailThreads")
+        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+        .collect();
+      for (const th of threads) {
+        const msgs = await ctx.db
+          .query("emailMessages")
+          .withIndex("by_thread", (q) => q.eq("threadId", th._id))
+          .collect();
+        for (const m of msgs) {
+          await ctx.db.delete(m._id);
+        }
+        await ctx.db.delete(th._id);
+      }
+
+      const p2p = await ctx.db
+        .query("p2pScripts")
+        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+        .collect();
+      for (const p of p2p) {
+        await ctx.db.delete(p._id);
+      }
+
+      const sessions = await ctx.db
+        .query("p2pCallSessions")
+        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+        .collect();
+      for (const s of sessions) {
+        await ctx.db.delete(s._id);
+      }
+
+      const logs = await ctx.db
+        .query("appealAuditLogs")
+        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+        .collect();
+      for (const l of logs) {
+        await ctx.db.delete(l._id);
+      }
+
+      try {
+        await claimsAggregate.delete(ctx, claim);
+      } catch {
+        // Aggregate may not track this claim
+      }
+
+      await ctx.db.delete(claim._id);
+      deletedCount++;
+    }
+
+    return { success: true, deletedClaimsCount: deletedCount };
+  },
+});
+

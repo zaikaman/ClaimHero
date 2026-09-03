@@ -78,7 +78,7 @@ const ADJUDICATION_SCHEMA = {
   properties: {
     determination: {
       type: "string",
-      enum: ["OVERTURNED_APPROVED", "ADDITIONAL_RECORDS_REQUIRED"],
+      enum: ["OVERTURNED_APPROVED", "ADDITIONAL_RECORDS_REQUIRED", "DENIAL_UPHELD"],
     },
     determinationSummary: { type: "string" },
     clinicalRationale: { type: "string" },
@@ -100,7 +100,7 @@ const ADJUDICATION_SCHEMA = {
 };
 
 interface AdjudicationResponse {
-  determination: "OVERTURNED_APPROVED" | "ADDITIONAL_RECORDS_REQUIRED";
+  determination: "OVERTURNED_APPROVED" | "ADDITIONAL_RECORDS_REQUIRED" | "DENIAL_UPHELD";
   determinationSummary: string;
   clinicalRationale: string;
   formalDeterminationLetter: string;
@@ -122,25 +122,30 @@ interface AdjudicationClaimContext {
 }
 
 function buildInitialAdjudicationPrompt(claim: AdjudicationClaimContext, payer: string): string {
-  return `You are Dr. Arthur Vance, MD, Senior Medical Director & Appellate Review Officer for ${payer}.
+  return `You are Demo AI Reviewer, a simulated independent clinical reviewer evaluating an appeal against ${payer} for platform demonstration and technical evaluation purposes.
 You have just received a formal Level 1 ERISA Medical Appeal and cited Clinical Reconsideration Memorandum for Claim #${claim.claimNumber} (Patient: ${claim.patient?.name}).
-Evaluate the appeal objectively against published clinical policy guidelines and medical necessity requirements:
+Evaluate the appeal objectively and impartially against published clinical policy guidelines and medical necessity requirements:
 - Review the clinical CPT codes: [${(claim.cptCodes || []).join(", ")}], ICD-10 diagnosis: [${(claim.icd10Codes || []).join(", ")}], denied amount: $${claim.deniedAmount}.
 - If the appeal demonstrates that conservative therapy, radiographic evidence, or emergency exceptions meet the clinical criteria, issue determination "OVERTURNED_APPROVED".
-  - Write a formal, professional insurance payer determination letter addressed to the treating provider, acknowledging the ERISA memorandum, citing the clinical coverage criteria, and confirming the overturn and release of funds.
+- If the appeal lacks necessary clinical documentation (such as dated x-rays, physical therapy records, or operative notes) that could cure the deficiency, issue "ADDITIONAL_RECORDS_REQUIRED" and specify what is missing.
+- If the documentation confirms that coverage criteria cannot be met or the service represents an unbending contractual exclusion, issue determination "DENIAL_UPHELD".
+  - Write a formal, professional determination letter addressed to the treating provider. Acknowledge the memorandum, cite the clinical coverage criteria, and clearly explain the decision.
+  - Set reviewerName to "Demo AI Reviewer" and reviewerTitle to "Independent Clinical Reviewer (Simulated)".
   - Write the letter as natural business correspondence: use a salutation, short paragraphs, a clear decision, and a professional closing. Return letter content only. Do not use Markdown syntax, all-caps filler, AI meta-commentary, or generic phrases such as "as an AI".`;
 }
 
 function buildFollowUpAdjudicationPrompt(claim: AdjudicationClaimContext, payer: string): string {
-  return `You are Dr. Arthur Vance, MD, Senior Medical Director & Appellate Review Officer for ${payer}.
-You are in an ongoing Level 1 ERISA medical appeal correspondence for Claim #${claim.claimNumber} (Patient: ${claim.patient?.name}).
-The appellant has sent a follow-up addendum or reply after your prior determination.
-Evaluate the complete correspondence against published clinical policy guidelines and medical necessity requirements:
+  return `You are Demo AI Reviewer, a simulated independent clinical reviewer evaluating ongoing appeal correspondence against ${payer} for demonstration and testing purposes.
+You are in ongoing Level 1 ERISA medical appeal correspondence for Claim #${claim.claimNumber} (Patient: ${claim.patient?.name}).
+The appellant has sent a follow-up addendum or reply after prior correspondence.
+Evaluate the complete correspondence objectively against published clinical policy guidelines and medical necessity requirements:
 - Review the clinical CPT codes: [${(claim.cptCodes || []).join(", ")}], ICD-10 diagnosis: [${(claim.icd10Codes || []).join(", ")}], denied amount: $${claim.deniedAmount}.
 - If the addendum supplies missing conservative-therapy documentation, radiographic evidence, or other records that now meet clinical criteria, issue determination "OVERTURNED_APPROVED".
-- If the clinical record remains incomplete, issue "ADDITIONAL_RECORDS_REQUIRED" and specify exactly which records are still outstanding.
-- If you already overturned this claim, acknowledge the addendum and reaffirm the approval. Do not reverse a prior overturn.
-  - Write a formal, professional insurance payer determination letter addressed to the treating provider that responds specifically to this addendum.
+- If the clinical record remains incomplete but could be cured with further specific documents, issue "ADDITIONAL_RECORDS_REQUIRED" and specify exactly which records are still outstanding.
+- If the submitted record demonstrates that clinical criteria are definitively not met, issue "DENIAL_UPHELD".
+- If you already overturned this claim and no new contrary facts emerged, reaffirm the approval.
+  - Write a formal, professional determination letter addressed to the treating provider that responds specifically to this addendum.
+  - Set reviewerName to "Demo AI Reviewer" and reviewerTitle to "Independent Clinical Reviewer (Simulated)".
   - Write the letter as natural business correspondence: use a salutation, short paragraphs, a clear decision, and a professional closing. Return letter content only. Do not use Markdown syntax, all-caps filler, AI meta-commentary, or generic phrases such as "as an AI".`;
 }
 
@@ -179,17 +184,22 @@ async function deliverAiAdjudication(
   });
 
   const claimTag = `[ClaimHero #${claim.claimNumber}]`;
-  const rawDeterminationSubject = `RE: Formal Medical Appeal | Claim #${claim.claimNumber} | ${
+  const determinationLabel =
     adjudicationResult.determination === "OVERTURNED_APPROVED"
       ? "Appeal Overturned"
-      : "Additional Records Requested"
-  }`;
+      : adjudicationResult.determination === "DENIAL_UPHELD"
+      ? "Denial Upheld"
+      : "Additional Records Requested";
+  const rawDeterminationSubject = `RE: Formal Medical Appeal | Claim #${claim.claimNumber} | ${determinationLabel}`;
   const determinationSubject = rawDeterminationSubject.includes(claimTag)
     ? rawDeterminationSubject
     : `${claimTag} ${rawDeterminationSubject}`;
 
+  const footerNotice = "\n\n[NOTICE: This determination was generated by ClaimHero Demo AI Reviewer in Simulation Mode for platform evaluation and demonstration purposes. It does not represent an actual insurance payer adjudication or real legal determination.]";
+  const formalLetterWithNotice = `${adjudicationResult.formalDeterminationLetter.trim()}${footerNotice}`;
+
   const determinationEmail = formatCorrespondenceEmail(
-    adjudicationResult.formalDeterminationLetter,
+    formalLetterWithNotice,
     {
       claimNumber: claim.claimNumber,
       payer,
@@ -200,9 +210,7 @@ async function deliverAiAdjudication(
       cptCodes: claim.cptCodes,
       providerName: adjudicationResult.reviewerName,
     },
-    adjudicationResult.determination === "OVERTURNED_APPROVED"
-      ? "Appeal Determination: Overturned"
-      : "Appeal Determination: Additional Records Requested"
+    `Appeal Determination: ${determinationLabel}`
   );
 
   const liveReply = await sendAgentMailMessage({
@@ -240,8 +248,15 @@ async function deliverAiAdjudication(
     await ctx.runMutation(internal.claims.updateStatusInternal, {
       claimId: claim._id,
       status: "won",
-      actor: `${payer} Chief Medical Officer`,
-      details: `VICTORY: ${payer} Medical Review Board overturned adverse determination. Authorized full recovery of $${(claim.deniedAmount || 0).toLocaleString()} released for payment.`,
+      actor: `${payer} Demo Reviewer`,
+      details: `VICTORY: Demo AI Reviewer overturned adverse determination. Authorized full recovery of $${(claim.deniedAmount || 0).toLocaleString()} released for payment. (Simulated evaluation)`,
+    });
+  } else if (adjudicationResult.determination === "DENIAL_UPHELD") {
+    await ctx.runMutation(internal.claims.updateStatusInternal, {
+      claimId: claim._id,
+      status: "lost",
+      actor: `${payer} Demo Reviewer`,
+      details: `DENIAL UPHELD: Demo AI Reviewer confirmed adverse determination after clinical evaluation. Coverage criteria not satisfied. (Simulated evaluation)`,
     });
   }
 

@@ -8,7 +8,7 @@ export const DEFAULT_ADVOCATE_PROFILE = {
   name: "Dr. Sarah Chen, MD, FACP",
   credentials: "Board Certified Internal Medicine / Clinical Advocate",
   organization: "ClaimHero Health Advocacy Group",
-  phone: "+1 (800) 555-0199",
+  phone: "",
   state: "CA",
 };
 

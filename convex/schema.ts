@@ -158,10 +158,14 @@ export default defineSchema({
         updatedAt: v.number(),
       })
     ),
+    isDemo: v.optional(v.boolean()),
+    dataOrigin: v.optional(v.string()),
+    isSyntheticPII: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
+    .index("by_user_demo", ["userId", "isDemo"])
     .index("by_user_status", ["userId", "status"])
     .index("by_user_payer", ["userId", "insurancePayer"])
     .index("by_payer", ["insurancePayer"])
@@ -257,6 +261,13 @@ export default defineSchema({
     .index("by_thread", ["threadId"])
     .index("by_claim", ["claimId"])
     .index("by_agent_mail_message_id", ["agentMailMessageId"]),
+
+  // Ignored / unmatched AgentMail messages that have no matching claim to prevent perpetual re-processing
+  ignoredAgentMailMessages: defineTable({
+    agentMailMessageId: v.string(),
+    reason: v.string(),
+    ignoredAt: v.number(),
+  }).index("by_agent_mail_message_id", ["agentMailMessageId"]),
 
   // Precedent Vector Archive — winning briefs, commissioner rulings, court overturns
   precedents: defineTable({

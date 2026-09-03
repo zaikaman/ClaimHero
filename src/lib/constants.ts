@@ -459,9 +459,14 @@ export interface SampleCasePreset {
     recordsAreIncomplete: boolean;
   };
   physicianNotes: string;
+  origin?: "demo-fixture";
+  isSyntheticPII?: boolean;
+  isDemo?: boolean;
 }
 
-export const SAMPLE_CASE_PRESETS: SampleCasePreset[] = [
+export type DemoCaseFixture = SampleCasePreset;
+
+export const DEMO_CASE_FIXTURES: DemoCaseFixture[] = [
   {
     id: "geoblue_meniscus",
     title: "GeoBlue Worldwide — Knee Arthroscopy & Meniscectomy (Carelon)",
@@ -470,6 +475,9 @@ export const SAMPLE_CASE_PRESETS: SampleCasePreset[] = [
     cpt: "29881",
     carc: "CO-50 (Not Medically Necessary)",
     badge: "Recommended",
+    origin: "demo-fixture",
+    isSyntheticPII: true,
+    isDemo: true,
     content: `GEOBLUE WORLDWIDE MEDICAL INSURANCE
 EXPLANATION OF BENEFITS / ADVERSE BENEFIT DETERMINATION
 Claim Reference: CLM-8942-GEO
@@ -561,6 +569,9 @@ Attending Orthopedic Surgeon: Dr. Robert Langston, MD, FAAOS (Metropolitan Surgi
     cpt: "63047",
     carc: "CO-197 (Prior Auth Lacking)",
     badge: "High Value",
+    origin: "demo-fixture",
+    isSyntheticPII: true,
+    isDemo: true,
     content: `GEOBLUE WORLDWIDE MEDICAL INSURANCE
 NOTICE OF CLAIM ADVERSE DETERMINATION & BENEFIT SUMMARY
 Claim Reference: CLM-6104-GEO
@@ -650,6 +661,9 @@ Attending Neurosurgeon: Dr. Sarah Chen, MD, FAANS (Spine & Neurosurgery Associat
     cpt: "73721",
     carc: "CO-16 (Missing Plain Radiographs)",
     badge: "Imaging Criteria",
+    origin: "demo-fixture",
+    isSyntheticPII: true,
+    isDemo: true,
     content: `BLUE CROSS BLUE SHIELD GLOBAL CORE
 ADVERSE CLAIM ADJUDICATION NOTICE
 Claim Number: CLM-3912-BCG
@@ -731,4 +745,7 @@ Magnetic Resonance Imaging of the knee without contrast (CPT 73721) is medically
 Attending Physician: Dr. Angela Martinez, MD (Global Diagnostic Imaging Group)`,
   },
 ];
+
+export const SAMPLE_CASE_PRESETS: SampleCasePreset[] = DEMO_CASE_FIXTURES;
+
 

@@ -24,7 +24,10 @@ import {
   PhoneCall,
   FileCode,
   CaretDown,
+  Flask,
 } from "@phosphor-icons/react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
 import { CPT_CODES, DENIAL_REASON_CODES, INSURERS } from "../../lib/constants";
@@ -64,6 +67,8 @@ interface CaseRadarProps {
   ) => void;
   onDeleteCase?: (claimId: string) => Promise<unknown>;
   onRunAutonomousPipeline?: (claimId: string) => Promise<unknown>;
+  includeDemo?: boolean;
+  onToggleIncludeDemo?: () => void;
 }
 
 const formatPayerName = (payer: string | undefined): string => {
@@ -90,35 +95,53 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   onNavigateView,
   onDeleteCase,
   onRunAutonomousPipeline,
+  includeDemo = true,
+  onToggleIncludeDemo,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [payerFilter, setPayerFilter] = useState("all");
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
   const [runningPipelineClaimId, setRunningPipelineClaimId] = useState<string | null>(null);
+  const [isClearingDemo, setIsClearingDemo] = useState(false);
 
-  const totalDisputed = claims.reduce((acc, c) => acc + c.deniedAmount, 0);
-  const wonClaims = claims.filter((c) => c.status === "won");
+  const clearDemoDataMutation = useMutation(api.claims.clearDemoData);
+
+  const handleClearDemoData = async () => {
+    try {
+      setIsClearingDemo(true);
+      await clearDemoDataMutation({});
+    } catch (err) {
+      console.error("Failed to clear demo cases:", err);
+    } finally {
+      setIsClearingDemo(false);
+    }
+  };
+
+  const activeClaims = claims;
+
+  const totalDisputed = activeClaims.reduce((acc, c) => acc + c.deniedAmount, 0);
+  const wonClaims = activeClaims.filter((c) => c.status === "won");
   const totalWon = wonClaims.reduce((acc, c) => acc + c.deniedAmount, 0);
-  const avgScore = claims.length
+  const avgScore = activeClaims.length
     ? Math.round(
-        claims.reduce((acc, c) => acc + (c.overturnProbabilityScore || 0), 0) /
-          claims.length
+        activeClaims.reduce((acc, c) => acc + (c.overturnProbabilityScore || 0), 0) /
+          activeClaims.length
       )
     : 0;
-  const highRiskCount = claims.filter(
+  const highRiskCount = activeClaims.filter(
     (c) =>
       c.overturnProbabilityScore !== undefined &&
       c.overturnProbabilityScore >= 80
   ).length;
-  const criticalCount = claims.filter(
+  const criticalCount = activeClaims.filter(
     (c) => c.daysRemaining <= 14 && c.status !== "won"
   ).length;
 
   // Compute status breakdown counts for filter tabs
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {
-      all: claims.length,
+      all: activeClaims.length,
       critical_deadline: 0,
       ingested: 0,
       analyzing: 0,
@@ -127,7 +150,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
       won: 0,
     };
 
-    for (const c of claims) {
+    for (const c of activeClaims) {
       if (counts[c.status] !== undefined) {
         counts[c.status]++;
       }
@@ -137,7 +160,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     }
 
     return counts;
-  }, [claims]);
+  }, [activeClaims]);
 
   const filtered = useMemo(() => {
     return claims.filter((c) => {
@@ -433,9 +456,21 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
               </DropdownMenu>
 
               <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearDemoData}
+                disabled={isClearingDemo}
+                className="h-8 gap-1.5 text-xs text-destructive hover:bg-destructive/10 border-destructive/30 shrink-0 cursor-pointer"
+                title="Clear all synthetic demo fixtures from this portfolio"
+              >
+                <Trash className="size-3.5" />
+                <span>{isClearingDemo ? "Clearing..." : "Clear Demo Data"}</span>
+              </Button>
+
+              <Button
                 size="sm"
                 onClick={onOpenIngestion}
-                className="gap-1.5 text-xs h-8 shadow-xs"
+                className="h-8 gap-1.5 text-xs bg-primary text-primary-foreground font-semibold shadow-xs shrink-0 cursor-pointer"
               >
                 <PlusCircle className="size-3.5" />
                 <span>Ingest Denial</span>
@@ -510,6 +545,22 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                   ))}
                 </Select>
               </div>
+
+              {/* Include Demo Cases Toggle */}
+              <button
+                type="button"
+                onClick={onToggleIncludeDemo}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer",
+                  includeDemo
+                    ? "bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400 font-semibold"
+                    : "bg-muted/30 hover:bg-muted/60 text-muted-foreground border-border/70"
+                )}
+                title="Toggle visibility of synthetic evaluation demo cases in portfolio"
+              >
+                <Flask className="size-3.5" />
+                <span>{includeDemo ? "Demo cases included" : "Include demo cases"}</span>
+              </button>
 
               {/* Reset Filters CTA if active */}
               {hasActiveFilters && (
@@ -620,9 +671,16 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 </Badge>
                               )}
                             </div>
-                            <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[120px]">
-                              {claim.claimNumber}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[120px]">
+                                {claim.claimNumber}
+                              </span>
+                              {claim.isDemo && (
+                                <Badge variant="secondary" className="font-mono text-[8px] px-1 py-0 text-amber-500 bg-amber-500/10 border-amber-500/20">
+                                  Synthetic Demo
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </TableCell>

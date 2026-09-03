@@ -232,11 +232,11 @@ export function buildDossierData(
   const physicianInfo: DossierPhysicianInfo = {
     name: sender?.name || claim.providerName || "Treating Physician, MD",
     credentials: sender?.credentials || "MD, Board Certified Specialist",
-    npiNumber: "1982736450",
+    npiNumber: sender?.npiNumber || ((claim as unknown as Record<string, unknown>).providerNpi as string) || "Not provided",
     medicalLicenseState: claim.patient?.state || "US",
     specialty: "Orthopedic Surgery / Internal Medicine",
     facility: "Attending Medical Center & Surgical Group",
-    phone: sender?.phone || "1-800-555-0199",
+    phone: sender?.phone || "Not provided",
     email: sender?.email || claim.assignedAgentEmail || "appeals@claimhero.io",
     attestationDate: formatDossierDate(appeal?.updatedAt || Date.now()),
   };

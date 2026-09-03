@@ -229,6 +229,14 @@ async function handleInboundClaimReply(
 
     if (!matchingClaim) {
       console.warn(`No ClaimHero case matched inbound AgentMail message ${args.messageId}.`);
+      try {
+        await ctx.runMutation(internal.emails.recordIgnoredAgentMailMessageInternal, {
+          agentMailMessageId: args.messageId,
+          reason: "No ClaimHero case matched inbound message",
+        });
+      } catch {
+        // Safe fallback
+      }
       return null;
     }
 

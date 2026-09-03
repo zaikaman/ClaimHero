@@ -38,6 +38,7 @@ describe("Feature G: Court-Ready Appeal Dossier & Exhibit PDF Binder", () => {
         credentials: "Board Certified Orthopedic Surgeon",
         email: "sjenkins@orthoclinic.org",
         phone: "1-800-555-0199",
+        npiNumber: "1982736450",
       },
       clinicalFacts: {
         symptomsAndFunctionalImpact: "Severe right knee osteoarthritis with severe functional impairment and inability to ambulate > 50 feet.",

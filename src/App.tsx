@@ -42,6 +42,8 @@ export default function App() {
     selectedClaim,
     selectedClaimId,
     setSelectedClaimId,
+    includeDemo,
+    setIncludeDemo,
     stats,
     uploadAndParseDocument,
     parseDocumentText,
@@ -99,6 +101,7 @@ export default function App() {
   };
 
   const handleIngestionSuccess = (claimId: string, directView?: string) => {
+    setIncludeDemo(true);
     setSelectedClaimId(claimId);
     setCurrentView((directView as NavigationView) || "evidence");
   };
@@ -206,6 +209,8 @@ export default function App() {
               onNavigateView={setCurrentView}
               onDeleteCase={deleteCase}
               onRunAutonomousPipeline={runFullPipeline}
+              includeDemo={includeDemo}
+              onToggleIncludeDemo={() => setIncludeDemo((prev) => !prev)}
             />
           )}
 

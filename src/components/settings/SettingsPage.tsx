@@ -15,7 +15,10 @@ import {
   MapPin,
   FloppyDisk,
   Sparkle,
+  Trash,
 } from "@phosphor-icons/react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useSettings, UserSettings } from "../../hooks/useSettings";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui/card";
 import { Button } from "../ui/button";
@@ -42,6 +45,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
   const [resetConfirmInput, setResetConfirmInput] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+  const [isClearingDemo, setIsClearingDemo] = useState(false);
+  const [demoPurgeMessage, setDemoPurgeMessage] = useState<string | null>(null);
+
+  const clearDemoDataMutation = useMutation(api.claims.clearDemoData);
+
+  const handleClearDemoData = async () => {
+    try {
+      setIsClearingDemo(true);
+      const res = await clearDemoDataMutation({});
+      setDemoPurgeMessage(`Successfully purged ${res.deletedClaimsCount} synthetic demo cases.`);
+      setTimeout(() => setDemoPurgeMessage(null), 4000);
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : "Failed to purge demo cases");
+    } finally {
+      setIsClearingDemo(false);
+    }
+  };
 
   const senderEmail = import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL || "claimhero-sender@agentmail.to";
   const adjudicatorEmail = import.meta.env.VITE_AGENTMAIL_ADJUDICATOR_EMAIL || "claimhero-adjudicator@agentmail.to";
@@ -546,7 +566,33 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="pt-4">
+          <CardContent className="pt-4 space-y-4">
+            {demoPurgeMessage && (
+              <div className="text-[11px] text-emerald-500 font-medium bg-emerald-500/10 border border-emerald-500/30 rounded px-2.5 py-1.5">
+                {demoPurgeMessage}
+              </div>
+            )}
+
+            {/* Scoped Demo Purge */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-destructive/15">
+              <div className="space-y-0.5 max-w-lg">
+                <div className="text-xs font-semibold text-foreground">Purge synthetic evaluation demo data</div>
+                <div className="text-[11px] text-muted-foreground leading-relaxed">
+                  Removes only evaluation demo fixtures, associated evidence, and simulated review threads without touching your real patient cases.
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearDemoData}
+                disabled={isClearingDemo}
+                className="h-8 text-xs font-medium text-destructive hover:bg-destructive/10 border-destructive/30 shrink-0 cursor-pointer"
+              >
+                <Trash className="size-3.5 mr-1" />
+                <span>{isClearingDemo ? "Purging..." : "Purge Demo Data"}</span>
+              </Button>
+            </div>
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-0.5 max-w-lg">
                 <div className="text-xs font-semibold text-foreground">Reset case portfolio</div>

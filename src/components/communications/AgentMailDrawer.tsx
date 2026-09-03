@@ -453,18 +453,18 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <div className="flex items-center justify-between gap-1.5 mb-1.5">
                     <div className="flex items-center gap-1.5">
                       <Robot className={cn("size-4", dispatchMode === "ai_adjudicator" ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-xs font-semibold text-foreground">AI Payer Adjudicator</span>
+                      <span className="text-xs font-semibold text-foreground">Demo AI Reviewer</span>
                     </div>
-                    <Badge variant="outline" className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
-                      2-Way Review
+                    <Badge variant="outline" className="text-[9px] font-mono text-amber-500 border-amber-500/30">
+                      Evaluation Only
                     </Badge>
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-snug">
-                    Autonomous medical review agent reviews CPB criteria and responds with formal determination letter.
+                    Simulated clinical reviewer evaluates CPB criteria and responds with realistic determination for platform demo.
                   </p>
                 </div>
                 <div className="mt-2.5 pt-2 border-t border-border/50 text-[10px] font-mono text-primary/90 truncate">
-                  {aiAdjudicatorEmail || "AI Adjudicator mailbox"}
+                  {aiAdjudicatorEmail || "Simulated Reviewer Mailbox"}
                 </div>
               </div>
 
@@ -553,9 +553,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   </span>
                   <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
                     {dispatchMode === "ai_adjudicator"
-                      ? "AI Simulation Mode"
+                      ? "Demo AI Simulation Mode"
                       : dispatchMode === "custom_email"
-                      ? "Test Delivery Mode"
+                      ? "Real Interactive Test Mode"
                       : "Official Insurer Mode"}
                   </Badge>
                 </div>
@@ -569,7 +569,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               size="sm"
               onClick={handleRunDispatch}
               disabled={isDispatching || !canDispatch || !effectiveAppeal}
-              className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9 px-4"
+              className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9 px-4 cursor-pointer"
             >
               {isDispatching ? (
                 <>
@@ -581,15 +581,24 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <PaperPlaneTilt className="size-4" />
                   <span>
                     {dispatchMode === "ai_adjudicator"
-                      ? "Transmit to AI Payer Reviewer"
+                      ? "Transmit to Demo AI Reviewer"
                       : dispatchMode === "custom_email"
-                      ? "Transmit to My Email Address"
+                      ? "Transmit to Personal Test Inbox"
                       : "Transmit to Official Gateway"}
                   </span>
                 </>
               )}
             </Button>
           </div>
+
+          {dispatchMode === "ai_adjudicator" && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
+              <Info className="size-4 shrink-0 mt-0.5" />
+              <p className="text-[11px] leading-relaxed">
+                <strong>Evaluation Disclosure:</strong> Mode 1 uses a simulated AI reviewer for self-contained demonstration. To verify live two-way email delivery to a real inbox and test inbound replies, select <strong>Interactive Test (My Email)</strong> or <strong>Official Insurer Gateway</strong>.
+              </p>
+            </div>
+          )}
 
           {/* Submission Instructions & Insurer Gateway Notice */}
           <div className="flex items-start gap-2.5 bg-background/70 border border-border/80 rounded-lg p-2.5 text-xs text-muted-foreground">

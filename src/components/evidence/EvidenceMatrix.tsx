@@ -16,6 +16,7 @@ import {
   Scales,
   Globe,
   Info,
+  Calculator,
 } from "@phosphor-icons/react";
 import { Claim, ClinicalEvidence, OverturnScoringResult, ScoringCriterion } from "../../types";
 import { PolicyViewer } from "./PolicyViewer";
@@ -120,59 +121,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
     }
   };
 
-  // Derive active scoring breakdown
+  // Derive active scoring breakdown strictly from real computation without fabricating math
   const breakdown: ScoringCriterion[] | undefined =
-    scoringResult?.scoringBreakdown ||
-    claim.scoringBreakdown ||
-    (claim.overturnProbabilityScore !== undefined
-      ? [
-          {
-            category: "policy_alignment",
-            criterion: "Clinical Policy Bulletin (CPB) & Indication Alignment",
-            score: Math.round(claim.overturnProbabilityScore * 0.35),
-            maxScore: 35,
-            status: "strong",
-            rationale: `Adverse determination contradicts coverage criteria in published clinical policy for CPT ${claim.cptCodes[0] || "procedure"}.`,
-          },
-          {
-            category: "clinical_documentation",
-            criterion: "Objective Clinical Documentation & Step-Therapy",
-            score: Math.round(claim.overturnProbabilityScore * 0.25),
-            maxScore: 25,
-            status: "strong",
-            rationale: "Treating physician medical records confirm diagnostic necessity and documented step-therapy trial.",
-          },
-          {
-            category: "statutory_erisa",
-            criterion: "ERISA 29 CFR § 2560.503-1 & Procedural Protections",
-            score: Math.round(claim.overturnProbabilityScore * 0.2),
-            maxScore: 20,
-            status: "strong",
-            rationale: "Denial notice failed to articulate specific clinical rationale required under federal claims procedure rules.",
-          },
-          {
-            category: "precedent_strength",
-            criterion: "External Review Precedents & Overturn Benchmark",
-            score:
-              claim.overturnProbabilityScore -
-              Math.round(claim.overturnProbabilityScore * 0.35) -
-              Math.round(claim.overturnProbabilityScore * 0.25) -
-              Math.round(claim.overturnProbabilityScore * 0.2),
-            maxScore: 20,
-            status: "strong",
-            rationale: `Historical Independent Medical Review benchmark indicates high overturn rate for ${claim.denialReasonCode}.`,
-          },
-        ]
-      : undefined);
+    scoringResult?.scoringBreakdown || claim.scoringBreakdown;
 
   const keyContradictions =
-    scoringResult?.keyPolicyContradictions ||
-    (claim.overturnProbabilityScore !== undefined
-      ? [
-          `Payer CPB Section 1 criteria fully satisfied by documented prior conservative care for CPT ${claim.cptCodes[0] || "27447"}.`,
-          `Adverse determination under ${claim.denialReasonCode} fails ERISA 29 CFR § 2560.503-1 specific disclosure requirements.`,
-        ]
-      : []);
+    scoringResult?.keyPolicyContradictions || [];
 
   const getCriteriaIcon = (category: string) => {
     switch (category) {
@@ -371,6 +325,24 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           </div>
 
           {/* 4-Pillar Deterministic Rubric Criteria Breakdown */}
+          {(!breakdown || breakdown.length === 0) && (
+            <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 p-4 text-center space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Scoring breakdown unavailable — re-run scoring to evaluate 4-pillar criteria.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRunScoring}
+                disabled={isScoring || isUnifiedAnalyzing}
+                className="h-7 text-xs gap-1.5"
+              >
+                <Calculator className="size-3.5" />
+                <span>{isScoring ? "Computing..." : "Run 4-Pillar Scoring"}</span>
+              </Button>
+            </div>
+          )}
+
           {breakdown && breakdown.length > 0 && (
             <div className="space-y-2.5">
               <div className="flex items-center justify-between flex-wrap gap-2">

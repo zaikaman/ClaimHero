@@ -9,8 +9,28 @@ export function useClaims(options?: {
   statusFilter?: string;
   payerFilter?: string;
   searchQuery?: string;
+  includeDemo?: boolean;
 }) {
   const [selectedClaimId, setSelectedClaimId] = useState<string>("");
+
+  const [includeDemo, setIncludeDemoState] = useState<boolean>(() => {
+    if (typeof options?.includeDemo !== "undefined") return options.includeDemo;
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("claimhero_include_demo");
+      if (saved !== null) return saved === "true";
+    }
+    return true; // Default to true so demo cases and newly ingested cases are visible
+  });
+
+  const setIncludeDemo = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
+    setIncludeDemoState((prev) => {
+      const next = typeof val === "function" ? val(prev) : val;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("claimhero_include_demo", String(next));
+      }
+      return next;
+    });
+  }, []);
 
   const statusArg = options?.statusFilter && options.statusFilter !== "all" && options.statusFilter !== "critical_deadline"
     ? options.statusFilter
@@ -24,9 +44,12 @@ export function useClaims(options?: {
   const rawClaims = useQuery(api.claims.list, {
     status: statusArg,
     payer: payerArg,
+    includeDemo,
   }) as Claim[] | undefined;
 
-  const rawPortfolioStats = useQuery(api.claims.getPortfolioStats, {});
+  const rawPortfolioStats = useQuery(api.claims.getPortfolioStats, {
+    includeDemo,
+  });
 
   const searchQuery = options?.searchQuery?.toLowerCase().trim() || "";
 
@@ -156,25 +179,26 @@ export function useClaims(options?: {
   }, [rawClaims, rawPortfolioStats, options?.payerFilter, searchQuery]);
 
   // Active selected claim with deep resolution of latestAppeal and evidenceCount
-  const rawSelectedClaim = useMemo(() => {
-    if (!rawClaims || rawClaims.length === 0) return null;
-    return rawClaims.find((c) => c._id === selectedClaimId) || rawClaims[0] || null;
-  }, [rawClaims, selectedClaimId]);
+  const effectiveClaimId = (selectedClaimId || rawClaims?.[0]?._id) as Id<"claims"> | undefined;
 
   const selectedClaimDetail = useQuery(
     api.claims.getById,
-    rawSelectedClaim?._id ? { claimId: rawSelectedClaim._id as Id<"claims"> } : "skip"
+    effectiveClaimId ? { claimId: effectiveClaimId } : "skip"
   ) as Claim | null | undefined;
 
+  const rawSelectedClaim = useMemo(() => {
+    if (!rawClaims || rawClaims.length === 0) return null;
+    return rawClaims.find((c) => c._id === effectiveClaimId) || rawClaims[0] || null;
+  }, [rawClaims, effectiveClaimId]);
+
   const selectedClaim: Claim | null = useMemo(() => {
-    if (!rawSelectedClaim) return null;
     if (selectedClaimDetail) {
       return {
-        ...rawSelectedClaim,
+        ...(rawSelectedClaim || {}),
         ...selectedClaimDetail,
-        patient: selectedClaimDetail.patient || rawSelectedClaim.patient,
-        latestAppeal: selectedClaimDetail.latestAppeal || rawSelectedClaim.latestAppeal,
-        evidenceCount: selectedClaimDetail.evidenceCount ?? rawSelectedClaim.evidenceCount,
+        patient: selectedClaimDetail.patient || rawSelectedClaim?.patient,
+        latestAppeal: selectedClaimDetail.latestAppeal || rawSelectedClaim?.latestAppeal,
+        evidenceCount: selectedClaimDetail.evidenceCount ?? rawSelectedClaim?.evidenceCount,
       } as Claim;
     }
     return rawSelectedClaim;
@@ -309,6 +333,8 @@ export function useClaims(options?: {
     selectedClaim,
     selectedClaimId: selectedClaimId || (rawClaims?.[0]?._id ?? ""),
     setSelectedClaimId,
+    includeDemo,
+    setIncludeDemo,
     stats,
     claimCountsByStatus,
     uploadAndParseDocument,
