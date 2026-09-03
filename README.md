@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-368%2F368%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-371%2F371%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -381,7 +381,7 @@ ClaimHero ships with six independent anti-hallucination layers:
 
 ## 11. Security, Privacy & HIPAA
  
-* **Auth & Server-Side Multi-Tenant Authorization** — `@convex-dev/auth` with Google OAuth + Email/Password (`convex/auth.ts`, `convex/auth.config.ts`), deterministic RS256 JWT, and centralized authorization primitives in `convex/lib/auth.ts` / `convex/model/auth.ts` (`requireAuthUser`, `requireIdentity`, `requireClaimOwner`, `getClaimIfAuthorized`, `requireChatbotSessionOwner`, `requireOwner`). All queries and mutations strictly verify authenticated identity and document ownership (`claim.userId === userId`), ensuring zero unauthenticated PHI leakage and full compliance with `convex-authz` audits.
+* **Auth & Server-Side Multi-Tenant Authorization** — Convex Auth v2 (`@convex-dev/auth@alpha`) with native Google OAuth + Email/Password components (`convex/auth.ts`, `convex/auth.config.ts`, `convex/convex.config.ts`), deterministic RS256 JWT tokens, and centralized authorization primitives in `convex/lib/auth.ts` / `convex/model/auth.ts` (`requireAuthUser`, `requireIdentity`, `requireClaimOwner`, `getClaimIfAuthorized`, `requireChatbotSessionOwner`, `requireOwner`). All queries and mutations strictly verify authenticated identity and document ownership (`claim.userId === userId`), ensuring zero unauthenticated PHI leakage and full compliance with `convex-authz` audits.
 * **Strict Zero-Any Type Safety & FunctionReference Integrity** — Strict `@typescript-eslint/no-explicit-any: "error"` enforced across both `convex/` and `src/`. Zero `as any`, `(api as any)`, or `(internal as any)` casts anywhere in the repository. All Convex backend queries, mutations, actions, internal endpoints, and background `crons.cron` schedulers use canonical, type-safe `FunctionReference` bindings (`internal.claims.sweepDeadlines`, `internal.actions.agentMail.*`, `api.actions.*`) and data model IDs (`Id<"claims">`, `Id<"appeals">`, `Id<"clinicalEvidences">`), ensuring zero runtime scheduling or routing failures.
 * **Redaction Engine** (`src/lib/redactionEngine.ts`) — Deterministic PII detection: SSN (hyphen/space/labeled), Member ID suffix (`MBN9823412-01 -> MBN9823412-**`), DOB, MRN, phone, email, street address, plus user-defined terms. Three presets: **HIPAA Safe Harbor** (45 CFR §164.514(b)(2)), **Balanced Appellate**, **Public Legal Exhibit**. Persisted in `claims.redactionMetadata` with `appealAuditLogs:hipaa_redaction_applied`.
 * **Transport** — AgentMail REST uses `Authorization: Bearer` with `AGENTMAIL_API_KEY`; Convex dashboard env vars are never exposed to the client.
@@ -395,14 +395,14 @@ ClaimHero ships with six independent anti-hallucination layers:
 | Layer | Technology |
 |---|---|
 | **Backend** | Convex (DB, Queries/Mutations/Actions, Vector Search, File Storage, Crons, HTTP Router) |
-| **Auth** | `@convex-dev/auth` (Google OAuth + Password), `convex/auth.config.ts`, `convex/lib/auth.ts` |
+| **Auth** | Convex Auth v2 (`@convex-dev/auth@alpha` with core, password, oauthGoogle, username components), `convex/auth.config.ts`, `convex/lib/auth.ts` |
 | **Crawl** | `@firecrawl/firecrawl-convex` (official Convex component) / Firecrawl v2 API |
 | **Email** | AgentMail REST `api.agentmail.to`, inbound `POST /agentmail-webhook` |
 | **AI** | OpenAI `gpt-5.4-nano` (Structured Outputs, Vision, Embeddings 1536-d) via `openai` SDK |
 | **Frontend** | React 18 + TypeScript (strict mode, `@typescript-eslint/no-explicit-any: error`, zero `any` casts) + Vite 6 + Tailwind CSS 3.4 |
 | **UI** | Radix Primitives, Phosphor Icons (`@phosphor-icons/react`), `react-markdown` + `remark-gfm`/`remark-breaks`, `three`/`@react-three/fiber` Silk shader |
 | **State** | Convex reactive hooks (`useQuery`, `useMutation`, `useAction`, `useConvexAuth`) + custom hooks (`useClaims`, `useEvidence`, `useAppealStudio`, `useLiveCallCopilot`, `useLiabilityCalculator`, `usePrecedents`) with 100% typed `api.*` FunctionReferences |
-| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 368 unit tests across 27 suites, 100% line coverage in backend libs and core utils |
+| **Tests** | Vitest 3 + `@vitest/coverage-v8`, 371 unit tests across 27 suites, 100% line coverage in backend libs and core utils |
 
 Theme: **Precision Medical Dark Mode** — obsidian `#0b0f17` canvas, cyan `#0ea5e9` primary, emerald/amber/crimson semantic tokens, glassmorphism (`backdrop-blur-md`, `bg-card/75`), tabular-nums for monetary values (`src/index.css:7`, `tailwind.config.js`).
 
@@ -500,14 +500,12 @@ npm run dev          # Vite on http://localhost:5173
 
 Copy `.env.example` to `.env.local` (Convex) and `.env` (Vite). Required keys:
 
-```
-# Convex deployment (auto-injected by npx convex dev)
-CONVEX_URL=
-
-# Auth (Convex dashboard -> Environment Variables)
+# Auth (Convex Auth v2 - components.auth & components.oauthGoogle)
 SITE_URL=http://localhost:5173
-JWT_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----
-JWT_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----
+AUTH_PRIVATE_KEY=<base64-encoded RS256 PKCS8 private key>
+AUTH_JWKS={"keys":[{"use":"sig","kty":"RSA","kid":"...","alg":"RS256","n":"...","e":"AQAB"}]}
+AUTH_GOOGLE_ID=<Google OAuth Client ID>
+AUTH_GOOGLE_SECRET=<Google OAuth Client Secret>
 
 # OpenAI (Convex env)
 OPENAI_API_KEY=sk-...
@@ -526,7 +524,15 @@ AGENTMAIL_SENDER_INBOX_ID=inb_shared_sender
 AGENTMAIL_SENDER_EMAIL=claimhero-sender@agentmail.to
 AGENTMAIL_ADJUDICATOR_INBOX_ID=inb_shared_adjudicator
 AGENTMAIL_ADJUDICATOR_EMAIL=claimhero-adjudicator@agentmail.to
-```
+
+### Google OAuth Redirect URI Setup
+
+In your [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials):
+* **Authorized JavaScript origins**:
+  - `http://localhost:5173`
+  - `https://<deployment-name>.convex.site`
+* **Authorized redirect URIs**:
+  - `https://<deployment-name>.convex.site/oauth/google/callback`
 
 ### Setting Convex Deployment Secrets
 
@@ -551,12 +557,12 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (368 tests)
+npm run test            # vitest run tests  (371 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **368/368 passing** across 27 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
+Current: **371/371 passing** across 27 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
@@ -570,18 +576,18 @@ Current: **368/368 passing** across 27 comprehensive test suites covering end-to
 | [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest, out-of-pocket maximum offsets, and No Surprises Act protections |
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking, and API key validation |
 | [`tests/convexClaimsFull.test.ts`](file:///d:/ClaimHero/tests/convexClaimsFull.test.ts) | 13 | Claims CRUD, financial liability calculations, ERISA penalty tracking, `by_threadId` index queries, `setAgentMailThreadIdInternal` mutations, bounded pagination, and deadline sweeps |
-| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting (cents precision), resilient date/datetime formatting against invalid values, statutory countdown math, risk badge styling, and payer appellate contact directory lookup |
-| [`tests/convexAuditLogsAndUsers.test.ts`](file:///d:/ClaimHero/tests/convexAuditLogsAndUsers.test.ts) | 12 | Immutable audit trail logging, user profile management, crons registration, and auth methods |
+| [`tests/convexAuditLogsAndUsers.test.ts`](file:///d:/ClaimHero/tests/convexAuditLogsAndUsers.test.ts) | 13 | Immutable audit trail logging, user profile management and updates, crons registration, and auth methods |
+| [`tests/actionsAgentMailAndDispatcher.test.ts`](file:///d:/ClaimHero/tests/actionsAgentMailAndDispatcher.test.ts) | 11 | AgentMail actions, attachment download, transmission dispatching, bidirectional threadId routing, missing claimNumber fallback matching, user account notification routing & fake clinical sender suppression, and universal `[ClaimHero #${claimNumber}]` subject/footer injection |
 | [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, and 3-tier appellate escalation |
-| [`tests/convexEmails.test.ts`](file:///d:/ClaimHero/tests/convexEmails.test.ts) | 6 | Email threads, messages, inbound intake states, and multi-tenant access boundaries |
-| [`tests/convexHttp.test.ts`](file:///d:/ClaimHero/tests/convexHttp.test.ts) | 8 | Svix HMAC-SHA256 signature verification, AgentMail intake webhooks, claim replies, and error handling |
+| [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting (cents precision), resilient date/datetime formatting against invalid values, statutory countdown math, risk badge styling, and payer appellate contact directory lookup |
 | [`tests/convexP2P.test.ts`](file:///d:/ClaimHero/tests/convexP2P.test.ts) | 9 | Live call sessions, real-time transcripts, fast answers, checklist scoring, and tele-scripts |
 | [`tests/convexPrecedents.test.ts`](file:///d:/ClaimHero/tests/convexPrecedents.test.ts) | 9 | Vector matching attachments, corpus key lookup, hydration, and search index |
-| [`tests/actionsAgentMailAndDispatcher.test.ts`](file:///d:/ClaimHero/tests/actionsAgentMailAndDispatcher.test.ts) | 9 | AgentMail actions, attachment download, transmission dispatching, bidirectional threadId routing, missing claimNumber fallback matching, user account notification routing & fake clinical sender suppression, and universal `[ClaimHero #${claimNumber}]` subject/footer injection |
 | [`tests/actionsPrecedentsAndPipeline.test.ts`](file:///d:/ClaimHero/tests/actionsPrecedentsAndPipeline.test.ts) | 8 | Precedent vector indexing, 4-pillar evidence-proportional rubric matching, zero/weak/strong evidence testing, and autonomous pipeline orchestration |
-| [`tests/convexSettings.test.ts`](file:///d:/ClaimHero/tests/convexSettings.test.ts) | 7 | User settings defaults, profile updates, manual sync sweep triggers, and safe portfolio reset cascading |
+| [`tests/convexHttp.test.ts`](file:///d:/ClaimHero/tests/convexHttp.test.ts) | 8 | Svix HMAC-SHA256 signature verification, AgentMail intake webhooks, claim replies, and error handling |
 | [`tests/actionsClinicalAndParser.test.ts`](file:///d:/ClaimHero/tests/actionsClinicalAndParser.test.ts) | 7 | Clinical intake question generation, optical parser vision extraction, non-claim document classification & rejection, and payer contact resolver |
+| [`tests/convexSettings.test.ts`](file:///d:/ClaimHero/tests/convexSettings.test.ts) | 7 | User settings defaults, profile updates, manual sync sweep triggers, and safe portfolio reset cascading |
 | [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, and STT tolerance |
+| [`tests/convexEmails.test.ts`](file:///d:/ClaimHero/tests/convexEmails.test.ts) | 6 | Email threads, messages, inbound intake states, and multi-tenant access boundaries |
 | [`tests/p2pDefense.test.ts`](file:///d:/ClaimHero/tests/p2pDefense.test.ts) | 6 | Physician tele-script generator, statutory opening, and pocket cheat sheet print |
 | [`tests/sentinelChatbot.test.ts`](file:///d:/ClaimHero/tests/sentinelChatbot.test.ts) | 6 | Agentic OpenAI tool calling (10 tools), Firecrawl live search/scrape schemas, and lean prompt builder |
 | [`tests/statutoryEscalation.test.ts`](file:///d:/ClaimHero/tests/statutoryEscalation.test.ts) | 5 | 180-day internal appeal to Level 3 DOI escalation state machine |

@@ -540,10 +540,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {!isCollapsed && (
                   <div className="text-left">
                     <div className="font-semibold text-xs text-foreground leading-tight truncate max-w-[130px]">
-                      {userName}
+                      {userName || "Advocate"}
                     </div>
                     <div className="text-[10px] text-muted-foreground leading-tight truncate max-w-[130px]">
-                      {userEmail}
+                      {userEmail || "Signed In"}
                     </div>
                   </div>
                 )}
@@ -556,7 +556,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <DropdownMenuContent align="end" className="w-60">
             <DropdownMenuLabel className="flex flex-col gap-0.5">
-              <span className="font-semibold text-xs text-foreground">{userName}</span>
+              <span className="font-semibold text-xs text-foreground">{userName || "Advocate"}</span>
               <span className="text-[10px] text-muted-foreground font-normal truncate">{userEmail}</span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

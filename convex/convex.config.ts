@@ -4,9 +4,17 @@ import staticHosting from "@convex-dev/static-hosting/convex.config";
 import rateLimiter from "@convex-dev/rate-limiter/convex.config";
 import aggregate from "@convex-dev/aggregate/convex.config";
 import firecrawl from "@firecrawl/firecrawl-convex/convex.config";
+import auth from "@convex-dev/auth/core/convex.config.js";
+import passwordProvider from "@convex-dev/auth/providers/password/convex.config.js";
+import oauth from "@convex-dev/auth/providers/oauth/convex.config.js";
+import username from "@convex-dev/auth/username/convex.config.js";
 
 const app = defineApp({
   env: {
+    AUTH_PRIVATE_KEY: v.string(),
+    AUTH_JWKS: v.string(),
+    AUTH_GOOGLE_ID: v.string(),
+    AUTH_GOOGLE_SECRET: v.string(),
     FIRECRAWL_API_KEY: v.string(),
     FIRECRAWL_WEBHOOK_SECRET: v.optional(v.string()),
     AGENTMAIL_WEBHOOK_SECRET: v.string(),
@@ -24,4 +32,23 @@ app.use(firecrawl, {
   },
 });
 
+app.use(auth, {
+  httpPrefix: "/auth",
+  env: {
+    AUTH_PRIVATE_KEY: app.env.AUTH_PRIVATE_KEY,
+    AUTH_JWKS: app.env.AUTH_JWKS,
+  },
+});
+app.use(username);
+app.use(passwordProvider);
+app.use(oauth, {
+  name: "oauthGoogle",
+  httpPrefix: "/oauth/google",
+  env: {
+    CLIENT_ID: app.env.AUTH_GOOGLE_ID,
+    CLIENT_SECRET: app.env.AUTH_GOOGLE_SECRET,
+  },
+});
+
 export default app;
+

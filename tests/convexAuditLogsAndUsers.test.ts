@@ -50,6 +50,20 @@ describe("Convex Audit Logs, Users, Auth & Crons", () => {
       const res = await (users.viewer as any)._handler(mockCtx, {});
       expect(res).toEqual(mockUser);
     });
+
+    it("updateProfile: updates authenticated user profile fields", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const updatedUser = { _id: "user_123", name: "Dr. Jane Updated" };
+      const mockCtx: any = {
+        db: {
+          patch: vi.fn().mockResolvedValue(undefined),
+          get: vi.fn().mockResolvedValue(updatedUser),
+        },
+      };
+      const res = await (users.updateProfile as any)._handler(mockCtx, { name: "Dr. Jane Updated" });
+      expect(res).toEqual(updatedUser);
+      expect(mockCtx.db.patch).toHaveBeenCalledWith("user_123", { name: "Dr. Jane Updated" });
+    });
   });
 
   describe("convex/auditLogs", () => {
@@ -211,10 +225,14 @@ describe("Convex Audit Logs, Users, Auth & Crons", () => {
       expect(res[1].timestamp).toBe(150);
     });
 
-    it("convex/auth: exports configured auth methods", () => {
-      expect(convexAuthModule.auth).toBeDefined();
-      expect(convexAuthModule.signIn).toBeDefined();
+    it("convex/auth: exports configured Convex Auth v2 methods", () => {
+      expect(convexAuthModule.signInWithPassword).toBeDefined();
+      expect(convexAuthModule.signUpWithPassword).toBeDefined();
+      expect(convexAuthModule.startSignInGoogle).toBeDefined();
+      expect(convexAuthModule.completeSignInGoogle).toBeDefined();
       expect(convexAuthModule.signOut).toBeDefined();
+      expect(convexAuthModule.refreshSession).toBeDefined();
+      expect(convexAuthModule.isAuthenticated).toBeDefined();
     });
   });
 });

@@ -1,7 +1,35 @@
 import { QueryCtx, MutationCtx, ActionCtx } from "../_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id, Doc, TableNames } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
+import * as serverAuth from "@convex-dev/auth/server";
+
+interface LegacyAuthModule {
+  getAuthUserId?: (ctx: QueryCtx | MutationCtx | ActionCtx) => Promise<Id<"users"> | null>;
+}
+
+/**
+ * Returns the currently authenticated user ID from context or null if unauthenticated.
+ * Works natively with Convex Auth v2, and honors test mocks if present.
+ */
+export async function getAuthUserId(
+  ctx: QueryCtx | MutationCtx | ActionCtx
+): Promise<Id<"users"> | null> {
+  const legacyAuth = serverAuth as unknown as LegacyAuthModule;
+  if (typeof legacyAuth.getAuthUserId === "function") {
+    return await legacyAuth.getAuthUserId(ctx);
+  }
+  if (!ctx?.auth?.getUserIdentity) {
+    return null;
+  }
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    return null;
+  }
+  if ("db" in ctx && ctx.db?.normalizeId) {
+    return ctx.db.normalizeId("users", identity.subject);
+  }
+  return (identity.subject as Id<"users">) || null;
+}
 
 /**
  * Require an authenticated user identity.

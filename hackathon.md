@@ -7,12 +7,12 @@
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://kindhearted-elephant-992.convex.cloud
-- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex
+- **Components:** @convex-dev/auth (v2 core, password, oauthGoogle, username), @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex
 - **Convex features:** database schema, relational indexes, vector search (1536-d), full-text search (searchIndex), queries, mutations, actions, scheduled functions, file storage, crons, httpRouter, auth, components
-- **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
+- **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-03T04:26:00Z
+- **Last updated:** 2026-09-03T06:14:32Z
 
 ## Log
 
@@ -555,7 +555,7 @@ Fixed Won / Overturned Claims Visual Presentation & Adjudication States (`src/co
 - **Verification**:
   - Verified 100% clean with `npm run typecheck` and `npm run test`: 368/368 passing tests across 27 suites with zero errors.
 
-### 2026-09-03 - working tree
+### 2026-09-03 - 2c0e594
 Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bounce Spammer Notifications (`convex/emails.ts`, `convex/actions/agentMail.ts`, `src/hooks/useCommunications.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`):
 - **Root Cause Analysis (Convex Free Plan Limit Alert & Gmail Spamming)**:
   - **Unbounded React Re-Render & Polling Loop**: In `src/hooks/useCommunications.ts`, `isSyncingInboxes` state was included in `useCallback` dependency array for `syncInboxes`, which in turn was in the dependency array of `useEffect`. When `syncInboxes` changed syncing state from false -> true -> false, it mutated callback identity, re-triggering the effect in an unending continuous loop on top of a 4-second active `setInterval` across every open tab, executing `actions/agentMail.syncInboxes` over 45,000 times.
@@ -570,6 +570,28 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
   - Added unit tests in `tests/actionsAgentMailAndDispatcher.test.ts` asserting bounce suppression and batch candidate ID synchronization.
   - Executed `npm run verify`: 370/370 passing tests across 27 suites, 0 TypeScript/ESLint errors, 80.81% statement coverage, and clean production build.
   - Pushed and deployed updated functions to both Dev (`groovy-hippopotamus-924`) and Production (`usable-sturgeon-376`). Convex features: internalQuery, internalMutation, actions, database indexes, reactive subscriptions.
+
+### 2026-09-03 - working tree
+- **Convex Auth v2 Preview Migration (@convex-dev/auth@alpha)**:
+  - Upgraded authentication architecture from legacy `@convex-dev/auth` v1 / `@auth/core` to native Convex Components (`@convex-dev/auth` v2 alpha): `auth` (core), `authPasswordProvider`, `oauthGoogle`, and `authUsername`. Removed passkey component.
+  - Configured component declarations in `convex/convex.config.ts` with environment bindings (`AUTH_PRIVATE_KEY` and `AUTH_JWKS`), mounting the HTTP auth handler at `/auth` and OAuth callback at `/oauth/google`.
+  - Resolved `InvalidCharacterError: Failed to execute 'atob'` in `mintAccessToken` by regenerating RS256 signing key pairs and strictly base64-encoding `AUTH_PRIVATE_KEY` (`Buffer.from(pem).toString("base64")`) across both development (`peaceful-sparrow-520`) and production (`kindhearted-elephant-992`) deployments.
+  - Streamlined `convex/schema.ts` by removing legacy `...authTables` in favor of an explicit `users` table definition with secondary index `by_email`.
+  - Updated `convex/auth.config.ts` to support multi-issuer JWT verification (accepting tokens issued dynamically by `CONVEX_SITE_URL`, `kindhearted-elephant-992.convex.site`, and `peaceful-sparrow-520.convex.site`).
+  - Rebuilt `convex/auth.ts` using `setupCore`, `setupUsernamePassword`, and `setupGoogle`, exporting typed mutations for password authentication (`signUpWithPassword`, `signInWithPassword`) and Google OAuth (`startSignInGoogle`, `completeSignInGoogle`).
+  - Added backward-compatible `signIn` export in `convex/auth.ts` to safely bridge legacy client invocations without crashing with `Could not find public function for 'auth:signIn'`.
+  - Implemented typed user creation callbacks (`createPasswordUser`, `createGoogleUser`) and `updateProfile` mutation in `convex/users.ts`.
+  - Modernized `convex/lib/auth.ts` to resolve user IDs natively using `ctx.auth.getUserIdentity()`, preserving compatibility across all application authorization guards (`requireAuthUser`, `requireClaimOwner`).
+  - Updated frontend entry point `src/main.tsx` to initialize `ConvexAuthProvider` with `api.auth` and added automated migration token purging (`claimhero_auth_migrated_v4`) to permanently eliminate stale JWT reconnect loops.
+  - Enhanced `src/components/auth/AuthPage.tsx` using `useSignInWithPassword`, `useSignUpWithPassword`, and `useSignInWithGoogle` hooks with support for both password credentials and Google OAuth. Removed passkey dependencies and fake client caching.
+  - Eliminated legacy mock fallback ("Sentinel Officer / sentinel@claimhero.ai") from `src/hooks/useCurrentUser.ts`, strictly enforcing authentic Convex server-validated sessions.
+  - Updated test assertions in `tests/convexAuditLogsAndUsers.test.ts` and verified full verification suite with `npm run verify` (100% typecheck pass, 0 ESLint errors, 27/27 test suites passed, 371/371 tests passed, and clean production build).
+- **Production Deployment (kindhearted-elephant-992)**:
+  - Configured production environment variables `AUTH_PRIVATE_KEY` and `AUTH_JWKS` via `npx convex env set --prod`.
+  - Pushed Convex Auth v2 schema, tables, and components (`auth`, `authPasswordProvider`, `oauthGoogle`, `authUsername`) to production backend (`kindhearted-elephant-992.convex.cloud`).
+  - Compiled and uploaded production frontend bundle to Convex static hosting (`kindhearted-elephant-992.convex.site`).
+
+
 
 
 

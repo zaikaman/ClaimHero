@@ -1,12 +1,12 @@
 import { query, mutation, internalQuery, internalMutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   getChatbotSessionIfAuthorized,
   requireAuthUser,
   requireChatbotSessionOwner,
   requireClaimOwner,
+  getAuthUserId,
 } from "./lib/auth";
 
 /**
