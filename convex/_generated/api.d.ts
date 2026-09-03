@@ -127,4 +127,8 @@ export declare const components: {
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
   aggregate: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"aggregate">;
   firecrawl: import("@firecrawl/firecrawl-convex/_generated/component.js").ComponentApi<"firecrawl">;
+  auth: import("@convex-dev/auth/core/_generated/component.js").ComponentApi<"auth">;
+  authPasswordProvider: import("@convex-dev/auth/providers/password/_generated/component.js").ComponentApi<"authPasswordProvider">;
+  authPasskey: import("@convex-dev/auth/providers/passkey/_generated/component.js").ComponentApi<"authPasskey">;
+  authUsername: import("@convex-dev/auth/username/_generated/component.js").ComponentApi<"authUsername">;
 };

@@ -1,9 +1,8 @@
 import { internalMutation, internalQuery, query } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { precedentMatchValidator } from "./lib/precedentValidators";
-import { getClaimIfAuthorized } from "./lib/auth";
+import { getClaimIfAuthorized, getAuthUserId } from "./lib/auth";
 
 export { precedentMatchValidator };
 

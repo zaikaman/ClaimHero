@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthUserId } from "./lib/auth";
 import { Id } from "./_generated/dataModel";
 
 export const DEFAULT_ADVOCATE_PROFILE = {

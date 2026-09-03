@@ -1,15 +1,11 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { auth } from "./auth";
 import { normalizeAgentMailWebhook, verifySvixWebhook } from "./lib/agentMailWebhook";
 import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { components } from "./_generated/api";
 
 const http = httpRouter();
-
-// Convex Auth endpoints (/api/auth/...)
-auth.addHttpRoutes(http);
 
 /**
  * AgentMail sends a lightweight event here. Case reply and adjudicator message

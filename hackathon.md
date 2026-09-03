@@ -7,12 +7,12 @@
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://kindhearted-elephant-992.convex.cloud
-- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex
+- **Components:** @convex-dev/auth (v2 core, password, passkey, username), @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex
 - **Convex features:** database schema, relational indexes, vector search (1536-d), full-text search (searchIndex), queries, mutations, actions, scheduled functions, file storage, crons, httpRouter, auth, components
-- **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
+- **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Username + Password and Username + Passkey components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-03T04:26:00Z
+- **Last updated:** 2026-09-03T05:33:00Z
 
 ## Log
 
@@ -570,6 +570,26 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
   - Added unit tests in `tests/actionsAgentMailAndDispatcher.test.ts` asserting bounce suppression and batch candidate ID synchronization.
   - Executed `npm run verify`: 370/370 passing tests across 27 suites, 0 TypeScript/ESLint errors, 80.81% statement coverage, and clean production build.
   - Pushed and deployed updated functions to both Dev (`groovy-hippopotamus-924`) and Production (`usable-sturgeon-376`). Convex features: internalQuery, internalMutation, actions, database indexes, reactive subscriptions.
+
+### 2026-09-03 - working tree
+- **Convex Auth v2 Preview Migration (@convex-dev/auth@alpha)**:
+  - Upgraded authentication architecture from legacy `@convex-dev/auth` v1 / `@auth/core` to native Convex Components (`@convex-dev/auth` v2 alpha): `auth` (core), `authPasswordProvider`, `authPasskey`, and `authUsername`.
+  - Configured component declarations in `convex/convex.config.ts` with environment bindings (`AUTH_PRIVATE_KEY` and `AUTH_JWKS`), mounting the HTTP auth handler at `/auth`.
+  - Generated RS256 signing key pair and securely configured `AUTH_PRIVATE_KEY` and `AUTH_JWKS` on the development deployment via Convex CLI.
+  - Streamlined `convex/schema.ts` by removing legacy `...authTables` in favor of an explicit `users` table definition with secondary index `by_email`.
+  - Updated `convex/auth.config.ts` to use `customJwt` provider with dynamic JWKS discovery from the deployment site URL.
+  - Rebuilt `convex/auth.ts` using `setupCore`, `setupUsernamePassword`, and `setupUsernamePasskey`, exporting typed mutations for password authentication and WebAuthn passkeys.
+  - Implemented typed user creation callbacks (`createPasswordUser`, `createPasskeyUser`) in `convex/users.ts`.
+  - Modernized `convex/lib/auth.ts` to resolve user IDs natively using `ctx.auth.getUserIdentity()`, preserving compatibility across all application authorization guards (`requireAuthUser`, `requireClaimOwner`).
+  - Updated frontend entry point `src/main.tsx` to initialize `ConvexAuthProvider` with `api.auth`.
+  - Enhanced `src/components/auth/AuthPage.tsx` using `useSignInWithPassword`, `useSignUpWithPassword`, and `usePasskey` hooks with support for both password credentials and biometric/hardware passkeys.
+  - Updated test assertions in `tests/convexAuditLogsAndUsers.test.ts` and verified full verification suite with `npm run verify` (100% typecheck pass, 0 ESLint errors, 27/27 test suites passed, 370/370 tests passed, and clean production build).
+- **Production Deployment (kindhearted-elephant-992)**:
+  - Configured production environment variables `AUTH_PRIVATE_KEY` and `AUTH_JWKS` via `npx convex env set --prod`.
+  - Pushed Convex Auth v2 schema, tables, and components (`auth`, `authPasswordProvider`, `authPasskey`, `authUsername`) to production backend (`kindhearted-elephant-992.convex.cloud`).
+  - Compiled and uploaded production frontend bundle to Convex static hosting (`kindhearted-elephant-992.convex.site`).
+
+
 
 
 

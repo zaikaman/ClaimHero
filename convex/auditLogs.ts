@@ -1,7 +1,6 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
-import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
+import { getClaimIfAuthorized, requireClaimOwner, getAuthUserId } from "./lib/auth";
 
 /**
  * List chronological audit trail events for a specific claim, checking authorization

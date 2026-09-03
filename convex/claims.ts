@@ -1,11 +1,10 @@
 import { MutationCtx, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { claimsAggregate } from "./lib/aggregates";
-import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner } from "./lib/auth";
+import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner, getAuthUserId } from "./lib/auth";
 
 /**
  * Full-text search across claims using Convex native searchIndex

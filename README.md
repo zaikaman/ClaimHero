@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-368%2F368%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-370%2F370%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -507,7 +507,7 @@ CONVEX_URL=
 # Auth (Convex dashboard -> Environment Variables)
 SITE_URL=http://localhost:5173
 JWT_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----
-JWT_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----
+JWKS={"keys":[{"use":"sig","kty":"RSA","n":"...","e":"AQAB"}]}
 
 # OpenAI (Convex env)
 OPENAI_API_KEY=sk-...

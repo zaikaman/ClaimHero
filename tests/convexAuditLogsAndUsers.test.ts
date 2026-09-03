@@ -211,10 +211,12 @@ describe("Convex Audit Logs, Users, Auth & Crons", () => {
       expect(res[1].timestamp).toBe(150);
     });
 
-    it("convex/auth: exports configured auth methods", () => {
-      expect(convexAuthModule.auth).toBeDefined();
-      expect(convexAuthModule.signIn).toBeDefined();
+    it("convex/auth: exports configured Convex Auth v2 methods", () => {
+      expect(convexAuthModule.signInWithPassword).toBeDefined();
+      expect(convexAuthModule.signUpWithPassword).toBeDefined();
       expect(convexAuthModule.signOut).toBeDefined();
+      expect(convexAuthModule.refreshSession).toBeDefined();
+      expect(convexAuthModule.isAuthenticated).toBeDefined();
     });
   });
 });
