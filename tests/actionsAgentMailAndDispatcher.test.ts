@@ -264,6 +264,139 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         to: "alex.morgan@spineinstitute.org",
       }));
     });
+
+    it("processInboundClaimReply: suppresses bounce / delivery status notifications without emailing user or updating claim status", async () => {
+      const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+        messageId: "msg_sent_out",
+        threadId: "thread_sent_out",
+      });
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_bounce_1",
+        inbox_id: "in_send",
+        from: "mailer-daemon@amazonses.com",
+        to: ["send@claimhero.com"],
+        subject: "Delivery Status Notification (Failure)",
+        text: "An error occurred while trying to deliver mail: 550 5.1.1 Email address not found. Reference #CLM-BOUNCE-99",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_bounce_1",
+        messageId: "msg_bounce_1",
+        inboxId: "in_send",
+        from: "mailer-daemon@amazonses.com",
+        recipients: ["send@claimhero.com"],
+        subject: "Delivery Status Notification (Failure)",
+        text: "An error occurred while trying to deliver mail: 550 5.1.1 Email address not found. Reference #CLM-BOUNCE-99",
+        attachments: [],
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn: any, args: any) => {
+          if (args?.claimNumber === "CLM-BOUNCE-99") {
+            return Promise.resolve({
+              _id: "claim_bounce_99",
+              claimNumber: "CLM-BOUNCE-99",
+              userId: "user_real_99",
+            });
+          }
+          if (args?.userId === "user_real_99") {
+            return Promise.resolve({
+              _id: "user_real_99",
+              email: "real_user@myclinic.com",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue("id_mut_bounce"),
+      };
+
+      const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_bounce_1",
+        messageId: "msg_bounce_1",
+        inboxId: "in_send",
+      });
+
+      expect(res).toBeNull();
+      // Must NOT send any alert email to user
+      expect(sendMailSpy).not.toHaveBeenCalled();
+      // Must record as DELIVERY_FAILURE and autoReplyStatus skipped
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          detectedDetermination: "DELIVERY_FAILURE",
+          autoReplyStatus: "skipped",
+        })
+      );
+      // Must NOT update claim status to won or under_review
+      expect(mockCtx.runMutation).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          status: "won",
+        })
+      );
+    });
+
+    it("performInboxSync: batch checks candidate IDs and skips already recorded messages", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
+
+      vi.spyOn(libAgentMail, "listAgentMailMessages").mockResolvedValue([
+        { id: "msg_existing_1", from: "payer@bcbs.com", to: ["send@claimhero.com"] },
+        { id: "msg_new_2", from: "payer@bcbs.com", to: ["send@claimhero.com"] },
+      ] as any);
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_new_2",
+        inbox_id: "in_send",
+        from: "payer@bcbs.com",
+        to: ["send@claimhero.com"],
+        subject: "Claim #CLM-100 Approved",
+        text: "Approved",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_2",
+        messageId: "msg_new_2",
+        inboxId: "in_send",
+        from: "payer@bcbs.com",
+        recipients: ["send@claimhero.com"],
+        subject: "Claim #CLM-100 Approved",
+        text: "Approved",
+        attachments: [],
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn: any, args: any) => {
+          if (args?.agentMailMessageIds) {
+            // Batch query returns msg_existing_1 as already existing
+            return Promise.resolve(["msg_existing_1"]);
+          }
+          if (args?.claimNumber === "CLM-100") {
+            return Promise.resolve({ _id: "c_1", claimNumber: "CLM-100" });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue("id_mut"),
+      };
+
+      const result = await (actionAgentMail.syncInboxes as any)._handler(mockCtx, { limit: 10 });
+      expect(result.success).toBe(true);
+      // Only 1 batch query for agentMailMessageIds should be executed across inboxes
+      expect(mockCtx.runQuery).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          agentMailMessageIds: expect.arrayContaining(["msg_existing_1", "msg_new_2"]),
+        })
+      );
+    });
   });
 
   describe("convex/actions/mailDispatcher", () => {

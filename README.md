@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://usable-sturgeon-376.convex.site"><strong>Live App (convex.site)</strong></a> &nbsp;|&nbsp;
+  <a href="https://kindhearted-elephant-992.convex.site"><strong>Live App (convex.site)</strong></a> &nbsp;|&nbsp;
   <a href="https://www.youtube.com/watch?v=wLW_ZL093a8"><strong>3-Min Demo Video</strong></a> &nbsp;|&nbsp;
   <a href="./hackathon.md"><strong>Build Log (hackathon.md)</strong></a> &nbsp;|&nbsp;
   <a href="./BRIEF.md"><strong>Hackathon Brief</strong></a>
@@ -83,7 +83,7 @@ ClaimHero automates the entire lifecycle from denial ingestion to payer adjudica
 
 ### Option A — 1-Click Preset Flow (Recommended)
 
-1. Open **[https://usable-sturgeon-376.convex.site](https://usable-sturgeon-376.convex.site)**.
+1. Open **[https://kindhearted-elephant-992.convex.site](https://kindhearted-elephant-992.convex.site)**.
 2. Click **Quick Ingest** (sidebar) or `Cmd+K` -> *Ingest Denial Notice*.
 3. Pick a preset:
    * **GeoBlue Worldwide — Knee Arthroscopy & Meniscectomy (Carelon)** — $6,400 / CPT 29881 / CO-50 (`geoblue_meniscus`)

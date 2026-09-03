@@ -46,3 +46,4 @@ Thumbs.db
 # Cloned docs / external large assets
 firecrawl/
 example
+*-snapshot.zip

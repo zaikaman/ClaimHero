@@ -274,6 +274,66 @@ export const hasMessageByAgentMailId = internalQuery({
 });
 
 /**
+ * Batch check which AgentMail message IDs are already recorded in emailMessages.
+ * Eliminates running dozens of single queries across the network.
+ */
+export const getExistingAgentMailMessageIds = internalQuery({
+  args: {
+    agentMailMessageIds: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existingIds: string[] = [];
+    for (const rawId of args.agentMailMessageIds) {
+      const trimmed = rawId.trim();
+      if (!trimmed) continue;
+      const existing = await ctx.db
+        .query("emailMessages")
+        .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmed))
+        .first();
+      if (existing !== null) {
+        existingIds.push(trimmed);
+      }
+    }
+    return existingIds;
+  },
+});
+
+/**
+ * Clean up existing bounce / delivery failure messages so they don't trigger auto-replies or alerts
+ */
+export const markBounceMessagesSkippedInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const messages = await ctx.db.query("emailMessages").collect();
+    let patched = 0;
+    for (const msg of messages) {
+      const subj = (msg.subject || "").toLowerCase();
+      const sender = (msg.sender || "").toLowerCase();
+      const body = (msg.bodyText || "").toLowerCase();
+      const isBounce =
+        subj.includes("delivery status notification") ||
+        subj.includes("undelivered mail") ||
+        subj.includes("mail delivery failed") ||
+        sender.includes("mailer-daemon") ||
+        sender.includes("postmaster") ||
+        sender.includes("amazonses.com") ||
+        body.includes("550 5.1.1") ||
+        body.includes("diagnostic-code: smtp");
+
+      if (isBounce && (msg.autoReplyStatus === "pending" || msg.detectedDetermination !== "DELIVERY_FAILURE")) {
+        await ctx.db.patch(msg._id, {
+          detectedDetermination: "DELIVERY_FAILURE",
+          autoReplyStatus: "skipped",
+          clinicalRationale: "Outbound delivery bounced or rejected by mail server.",
+        });
+        patched++;
+      }
+    }
+    return { patched };
+  },
+});
+
+/**
  * Toggle or update Auto-Pilot status on a claim
  */
 export const setClaimAutoPilot = mutation({

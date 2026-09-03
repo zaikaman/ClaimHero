@@ -157,13 +157,14 @@ async function handleInboundClaimReply(
       });
     }
 
-    // 2. Fallback to subject regex /#CH-\d+/ (and [ClaimHero #...])
-    if (!matchingClaim && subject) {
+    // 2. Fallback to regex /#CH-\d+/ and [ClaimHero #...] across subject and body
+    if (!matchingClaim) {
+      const searchTarget = `${subject} ${bodyContent.slice(0, 2000)}`;
       const chMatch =
-        subject.match(/#(CH-\d+)/i) ||
-        subject.match(/\[ClaimHero\s*#([^\]]+)\]/i) ||
-        subject.match(/#(CLM-[A-Za-z0-9-]+)/i) ||
-        subject.match(/(CH-\d+)/i);
+        searchTarget.match(/#(CH-\d+)/i) ||
+        searchTarget.match(/\[ClaimHero\s*#([^\]]+)\]/i) ||
+        searchTarget.match(/#(CLM-[A-Za-z0-9-]+)/i) ||
+        searchTarget.match(/(CH-\d+)/i);
       if (chMatch && chMatch[1]) {
         matchingClaim = await ctx.runQuery(internal.claims.getByClaimNumberInternal, {
           claimNumber: chMatch[1].trim(),
@@ -201,6 +202,74 @@ async function handleInboundClaimReply(
 
     const sender = normalized.from || "Insurance Payer";
     const payer = matchingClaim.insurancePayer || "Health Insurer";
+
+    const lowerFrom = (normalized.from || "").toLowerCase();
+    const lowerSubject = subject.toLowerCase();
+    const lowerBody = (normalized.text || normalized.html || "").toLowerCase();
+
+    // Detect system bounce / Delivery Status Notification / mailer-daemon / auto-responder
+    const isBounceSender =
+      lowerFrom.includes("mailer-daemon") ||
+      lowerFrom.includes("postmaster") ||
+      lowerFrom.includes("amazonses.com") ||
+      lowerFrom.includes("bounces@") ||
+      lowerFrom.includes("noreply") ||
+      lowerFrom.includes("no-reply");
+
+    const isBounceSubject =
+      lowerSubject.includes("delivery status notification") ||
+      lowerSubject.includes("undelivered mail") ||
+      lowerSubject.includes("mail delivery failed") ||
+      lowerSubject.includes("failure notice") ||
+      lowerSubject.includes("returned mail") ||
+      lowerSubject.includes("delivery failure");
+
+    const isBounceBody =
+      lowerBody.includes("diagnostic-code: smtp") ||
+      lowerBody.includes("action: failed") ||
+      lowerBody.includes("550 5.1.1") ||
+      lowerBody.includes("reporting-mta:");
+
+    const isBounce = isBounceSender || isBounceSubject || isBounceBody;
+
+    // Handle system bounce / non-delivery notifications quietly without triggering payer alerts or state mutations
+    if (isBounce) {
+      const threadId = await ctx.runMutation(internal.emails.getOrCreateThreadInternal, {
+        claimId: matchingClaim._id,
+        agentEmail: normalized.recipients[0] || "",
+        payerEmail: extractEmailAddress(sender) || sender,
+        subject,
+      });
+
+      await ctx.runMutation(internal.emails.insertMessageInternal, {
+        threadId,
+        claimId: matchingClaim._id,
+        direction: "inbound",
+        sender,
+        recipient: normalized.recipients[0] || "",
+        subject,
+        bodyHtml: normalized.html || `<p>${normalized.text || ""}</p>`,
+        bodyText: normalized.text || normalized.html || "",
+        hasAttachments: normalized.attachments.length > 0,
+        agentMailMessageId: normalized.messageId,
+        detectedDetermination: "DELIVERY_FAILURE",
+        clinicalRationale: "Outbound transmission bounced or rejected by mail transfer agent.",
+        autoReplyStatus: "skipped",
+      });
+
+      try {
+        await ctx.runMutation(internal.auditLogs.logEventInternal, {
+          claimId: matchingClaim._id,
+          eventType: "outbound_delivery_failed",
+          actor: "Mailer Daemon",
+          details: `Outbound delivery failure detected for claim #${matchingClaim.claimNumber}: ${subject}`,
+        });
+      } catch (logErr) {
+        console.warn("Failed to log delivery failure audit event:", logErr);
+      }
+
+      return null;
+    }
 
     // Fast heuristic classification for instantaneous sub-second UI rendering
     const lowerText = (normalized.text || normalized.html || subject || "").toLowerCase();
@@ -392,9 +461,9 @@ Evaluate the inbound correspondence text rigorously:
       });
     }
 
-    // User Email Notification: Notify user account owner whenever an inbound reply arrives
+    // User Email Notification: Notify user account owner whenever a valid inbound reply arrives (never for bounces or daemons)
     let userEmail: string | undefined;
-    if (matchingClaim.userId) {
+    if (!isBounce && matchingClaim.userId) {
       try {
         const userRecord = await ctx.runQuery(internal.users.getUserByIdInternal, {
           userId: matchingClaim.userId,
@@ -407,9 +476,9 @@ Evaluate the inbound correspondence text rigorously:
       }
     }
 
-    // Skip notification if the inbound message originated from the user themselves
+    // Skip notification if the inbound message originated from the user themselves or is a daemon
     const senderEmail = extractEmailAddress(sender) || sender.toLowerCase();
-    if (userEmail && senderEmail.toLowerCase() === userEmail.toLowerCase()) {
+    if (userEmail && (senderEmail.toLowerCase() === userEmail.toLowerCase() || isBounceSender)) {
       userEmail = undefined;
     }
 
@@ -425,18 +494,19 @@ Evaluate the inbound correspondence text rigorously:
             ? "Payer Upheld Initial Denial"
             : "New Inbound Correspondence Received";
 
+        const appSiteUrl = (process.env.SITE_URL || "https://kindhearted-elephant-992.convex.site").replace(/\/$/, "");
         const alertSubject = `[ClaimHero Alert] Payer Response: Claim #${matchingClaim.claimNumber} (${determinationHeadline})`;
         const alertText = `Hello,\n\nA new response has been received from ${payer} regarding Claim #${matchingClaim.claimNumber} (${matchingClaim.patientName || "Patient"}).\n\nDetermination: ${determinationHeadline}\nSummary: ${clinicalRationale}\n\n${
           matchingClaim.autoPilotEnabled !== false
             ? "Sentinel Auto-Pilot is ACTIVE for this claim. If no manual action is taken within 1 hour, Auto-Pilot will autonomously synthesize and dispatch the cited clinical rebuttal addendum."
             : "Sentinel Auto-Pilot is currently OFF. Please log in to ClaimHero to review this response."
-        }\n\nReview Claim Docket: https://usable-sturgeon-376.convex.site/app/inbox\n\nClaimHero Sentinel System`;
+        }\n\nReview Claim Docket: ${appSiteUrl}/app/inbox\n\nClaimHero Sentinel System`;
 
         const alertHtml = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:24px;background-color:#0b0f17;color:#f8fafc;border-radius:8px;border:1px solid #1e293b;"><div style="font-size:18px;font-weight:700;color:#00e5ff;margin-bottom:16px;">ClaimHero Sentinel Alert</div><p style="font-size:14px;line-height:1.6;color:#cbd5e1;">A new inbound response was received from <strong>${payer}</strong> for <strong>Claim #${matchingClaim.claimNumber}</strong>.</p><div style="background-color:#141c2c;border:1px solid #1e293b;padding:16px;border-radius:6px;margin:16px 0;"><div style="font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:4px;">Payer Determination</div><div style="font-size:15px;font-weight:600;color:#f8fafc;margin-bottom:8px;">${determinationHeadline}</div><div style="font-size:13px;color:#94a3b8;line-height:1.5;">${clinicalRationale}</div></div><p style="font-size:13px;color:#94a3b8;line-height:1.6;">${
           matchingClaim.autoPilotEnabled !== false
             ? "<strong style='color:#00e5ff;'>⚡ Sentinel Auto-Pilot is ACTIVE.</strong> If no manual action is taken within 1 hour, ClaimHero will autonomously synthesize and dispatch the cited rebuttal addendum."
             : "Please log in to your ClaimHero console to review this communication."
-        }</p><div style="margin-top:24px;"><a href="https://usable-sturgeon-376.convex.site/app/inbox" style="display:inline-block;background-color:#0ea5e9;color:#ffffff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Open Claim Inbox</a></div></div>`;
+        }</p><div style="margin-top:24px;"><a href="${appSiteUrl}/app/inbox" style="display:inline-block;background-color:#0ea5e9;color:#ffffff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Open Claim Inbox</a></div></div>`;
 
         await sendAgentMailMessage({
           inboxId: mailboxes.senderInboxId,
@@ -488,48 +558,77 @@ async function performInboxSync(
   let syncedCount = 0;
   let totalChecked = 0;
 
+  // 1. Fetch messages across all target inboxes
+  const inboxMessagesMap: Array<{ inboxId: string; messages: Array<Record<string, unknown>> }> = [];
+  const candidateIds: string[] = [];
+
   for (const inboxId of inboxesToCheck) {
     try {
       const messages = await listAgentMailMessages(inboxId, limit);
+      inboxMessagesMap.push({ inboxId, messages });
       for (const msg of messages) {
-        totalChecked++;
         const rawMessageId =
           (typeof msg.message_id === "string" ? msg.message_id : undefined) ||
           (typeof msg.messageId === "string" ? msg.messageId : undefined) ||
           (typeof msg.id === "string" ? msg.id : undefined);
-
-        if (!rawMessageId) continue;
-
-        const labels = Array.isArray(msg.labels) ? (msg.labels as string[]) : [];
-        const fromStr = typeof msg.from === "string" ? msg.from.toLowerCase() : "";
-        const isOwnInboxSender = fromStr.includes(inboxId.toLowerCase());
-
-        // Process if marked as received or if sender is not this inbox itself
-        const isReceived = labels.includes("received") || !isOwnInboxSender;
-        if (!isReceived) continue;
-
-        // Check if already in DB
-        const alreadyExists = await ctx.runQuery(
-          internal.emails.hasMessageByAgentMailId,
-          { agentMailMessageId: rawMessageId }
-        );
-        if (alreadyExists) continue;
-
-        // Process the inbound claim reply
-        try {
-          const sanitizedId = rawMessageId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
-          await handleInboundClaimReply(ctx, {
-            eventId: `sync_${Date.now()}_${sanitizedId}`,
-            messageId: rawMessageId,
-            inboxId,
-          });
-          syncedCount++;
-        } catch (processErr) {
-          console.warn(`Failed to process synced message ${rawMessageId}:`, processErr);
+        if (rawMessageId) {
+          candidateIds.push(rawMessageId);
         }
       }
     } catch (inboxErr) {
       console.warn(`Failed to list messages for inbox ${inboxId}:`, inboxErr);
+    }
+  }
+
+  // 2. Single batch query to check all candidate IDs against DB (eliminates N sequential queries)
+  let existingIdSet = new Set<string>();
+  if (candidateIds.length > 0) {
+    try {
+      const existingList = await ctx.runQuery(
+        internal.emails.getExistingAgentMailMessageIds,
+        { agentMailMessageIds: candidateIds }
+      );
+      existingIdSet = new Set(existingList);
+    } catch (batchErr) {
+      console.warn("Failed batch query for existing AgentMail IDs:", batchErr);
+    }
+  }
+
+  // 3. Process only unrecorded messages
+  for (const { inboxId, messages } of inboxMessagesMap) {
+    for (const msg of messages) {
+      totalChecked++;
+      const rawMessageId =
+        (typeof msg.message_id === "string" ? msg.message_id : undefined) ||
+        (typeof msg.messageId === "string" ? msg.messageId : undefined) ||
+        (typeof msg.id === "string" ? msg.id : undefined);
+
+      if (!rawMessageId) continue;
+
+      const labels = Array.isArray(msg.labels) ? (msg.labels as string[]) : [];
+      const fromStr = typeof msg.from === "string" ? msg.from.toLowerCase() : "";
+      const isOwnInboxSender = fromStr.includes(inboxId.toLowerCase());
+
+      // Process if marked as received or if sender is not this inbox itself
+      const isReceived = labels.includes("received") || !isOwnInboxSender;
+      if (!isReceived) continue;
+
+      // Check if already in DB via pre-fetched in-memory set
+      if (existingIdSet.has(rawMessageId)) continue;
+
+      // Process the inbound claim reply
+      try {
+        const sanitizedId = rawMessageId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
+        await handleInboundClaimReply(ctx, {
+          eventId: `sync_${Date.now()}_${sanitizedId}`,
+          messageId: rawMessageId,
+          inboxId,
+        });
+        existingIdSet.add(rawMessageId);
+        syncedCount++;
+      } catch (processErr) {
+        console.warn(`Failed to process synced message ${rawMessageId}:`, processErr);
+      }
     }
   }
 

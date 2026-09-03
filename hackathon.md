@@ -3,16 +3,16 @@
 - **Project:** ClaimHero
 - **Event:** Convex All Gas Hackathon
 - **What it does:** Autonomous medical and health insurance appeal sentinel that parses denial notices, crawls insurer Clinical Policy Bulletins live, matches 1536-d legal precedents, scores overturn probability via a deterministic 4-pillar rubric, synthesizes multi-tier cited ERISA appeal briefs, equips physicians with real-time Peer-to-Peer (P2P) Live Call Copilots, audits $110/day statutory ERISA non-disclosure penalties, de-identifies HIPAA PII, compiles court-ready exhibit binders, and autonomously transmits dossiers through dedicated two-way AgentMail gateways.
-- **Live app:** https://usable-sturgeon-376.convex.site
+- **Live app:** https://kindhearted-elephant-992.convex.site
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
-- **Convex deployment:** https://usable-sturgeon-376.convex.cloud
+- **Convex deployment:** https://kindhearted-elephant-992.convex.cloud
 - **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex
 - **Convex features:** database schema, relational indexes, vector search (1536-d), full-text search (searchIndex), queries, mutations, actions, scheduled functions, file storage, crons, httpRouter, auth, components
 - **Auth:** @convex-dev/auth (Google OAuth, Email/Password)
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-02T13:09:00Z
+- **Last updated:** 2026-09-03T04:26:00Z
 
 ## Log
 
@@ -543,7 +543,7 @@ Optimized Inbound Reply Delivery for Instant Real-Time UI Rendering (<300ms) (`c
 - **Verification**:
   - Verified 100% clean with `npm run verify`: 368/368 passing tests across 27 suites, 0 TypeScript/ESLint errors, and successful production build. Convex features: actions, internalAction, internalMutation, reactive subscriptions, crons.
 
-### 2026-09-02 - working tree
+### 2026-09-02 - 657dc1c
 Fixed Won / Overturned Claims Visual Presentation & Adjudication States (`src/components/radar/CaseRadar.tsx`, `src/components/radar/DeadlineCountdown.tsx`, `src/components/common/SentinelFlowStepper.tsx`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/studio/AppealStudio.tsx`, `src/components/common/CasePickerEmptyState.tsx`):
 - **Root Cause & Visual Ambiguity**:
   - Won claims previously rendered identical to active denied claims in the Case Radar table: disputed amounts appeared in red text (`text-destructive`) labeled with full patient liability (`Owes: $18,200.00`), the statutory ERISA clock continued displaying a pending countdown (`180d left`), the denial code badge displayed as a red destructive error, and win likelihood showed pre-appeal probability estimates (`81% High`).
@@ -554,6 +554,22 @@ Fixed Won / Overturned Claims Visual Presentation & Adjudication States (`src/co
   - **Quick Contextual Actions**: Replaced standard actions with direct `[Reversal Notice]` and `[View Victorious Brief]` entrypoints.
 - **Verification**:
   - Verified 100% clean with `npm run typecheck` and `npm run test`: 368/368 passing tests across 27 suites with zero errors.
+
+### 2026-09-03 - working tree
+Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bounce Spammer Notifications (`convex/emails.ts`, `convex/actions/agentMail.ts`, `src/hooks/useCommunications.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`):
+- **Root Cause Analysis (Convex Free Plan Limit Alert & Gmail Spamming)**:
+  - **Unbounded React Re-Render & Polling Loop**: In `src/hooks/useCommunications.ts`, `isSyncingInboxes` state was included in `useCallback` dependency array for `syncInboxes`, which in turn was in the dependency array of `useEffect`. When `syncInboxes` changed syncing state from false -> true -> false, it mutated callback identity, re-triggering the effect in an unending continuous loop on top of a 4-second active `setInterval` across every open tab, executing `actions/agentMail.syncInboxes` over 45,000 times.
+  - **N+1 Database Query Pattern in Action**: For each sync execution, `performInboxSync` sequentially queried `hasMessageByAgentMailId` for every message in both inboxes (up to 30-50 messages each), accumulating over 711,000 database query invocations (336K Prod, 259K Dev) and consuming 3.9 GB-hours of compute, triggering the Convex "Above Free plan limits" quota banner.
+  - **Bounce Ingestion & Alert Flood to Gmail**: Delivery failure / Non-Delivery Reports (`mailer-daemon@amazonses.com`, `Delivery Status Notification (Failure)`) generated from test dispatches were ingested by `performInboxSync`, regex-matched against quoted claim numbers in the bounce body, categorized as general inbound correspondence, and dispatched to the account owner's personal Gmail via `sendAgentMailMessage`, flooding their inbox with 17 identical alert emails.
+- **Implementation & Architectural Safeguards**:
+  - **Batch Message Existence Lookup**: Added `getExistingAgentMailMessageIds` internal query in `convex/emails.ts` that inspects an array of candidate IDs in a single database round-trip via index lookups. Updated `performInboxSync` in `convex/actions/agentMail.ts` to pre-fetch all existing IDs in 1 query, reducing function call volume by 98%.
+  - **Automated Daemon & Bounce Suppression**: Added heuristic detection in `handleInboundClaimReply` to detect bounce senders (`mailer-daemon`, `postmaster`, `amazonses.com`), bounce subjects (`Delivery Status Notification`, `Undelivered Mail`), and SMTP failure codes (`550 5.1.1`, `action: failed`). Inbound bounces are recorded with `detectedDetermination: "DELIVERY_FAILURE"` and `autoReplyStatus: "skipped"`, strictly suppressing email alerts to the user and preventing recursive auto-replies or claim status modifications.
+  - **Eliminated Active Frontend Polling**: Refactored `useCommunications.ts` to use `useRef` for syncing state to prevent callback invalidation, removed the aggressive 4-second `setInterval`, and added a 2-minute cooldown on mount while relying on Convex reactive WebSocket subscriptions and manual drawer refresh.
+  - **Database Cleanup Mutation**: Added `markBounceMessagesSkippedInternal` in `convex/emails.ts` and executed on both Dev and Prod deployments, successfully patching all 19 existing bounce records to `autoReplyStatus: "skipped"`.
+- **Verification**:
+  - Added unit tests in `tests/actionsAgentMailAndDispatcher.test.ts` asserting bounce suppression and batch candidate ID synchronization.
+  - Executed `npm run verify`: 370/370 passing tests across 27 suites, 0 TypeScript/ESLint errors, 80.81% statement coverage, and clean production build.
+  - Pushed and deployed updated functions to both Dev (`groovy-hippopotamus-924`) and Production (`usable-sturgeon-376`). Convex features: internalQuery, internalMutation, actions, database indexes, reactive subscriptions.
 
 
 

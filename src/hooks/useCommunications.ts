@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Claim, EmailThread, EmailMessage, AuditLog } from "../types";
@@ -40,42 +40,32 @@ export function useCommunications(claim?: Claim | null) {
   const resolvePayerGatewayAction = useAction(api.actions.payerContactResolver.resolvePayerGateway);
   const syncInboxesAction = useAction(api.actions.agentMail.syncInboxes);
 
+  const isSyncingRef = useRef(false);
+  const lastSyncTimeRef = useRef(0);
+
   const syncInboxes = useCallback(async () => {
-    if (isSyncingInboxes || !syncInboxesAction) return;
+    if (isSyncingRef.current || !syncInboxesAction) return;
+    isSyncingRef.current = true;
     setIsSyncingInboxes(true);
     try {
       await syncInboxesAction({ limit: 30 });
+      lastSyncTimeRef.current = Date.now();
     } catch (err) {
       console.warn("Failed to sync AgentMail inboxes:", err);
     } finally {
+      isSyncingRef.current = false;
       setIsSyncingInboxes(false);
     }
-  }, [syncInboxesAction, isSyncingInboxes]);
+  }, [syncInboxesAction]);
 
-  // Automatically poll/sync inboxes when mounted or claim changes, and on window focus/tab switch
+  // Synchronize on mount once with a cooldown; user can trigger manual refresh via the drawer
   useEffect(() => {
-    syncInboxes();
-
-    // Fast active polling (every 4 seconds) so inbound emails appear in near-real-time
-    const interval = setInterval(() => {
+    const now = Date.now();
+    // At least 2 minutes between automatic sync attempts on mount
+    if (now - lastSyncTimeRef.current > 120_000) {
       syncInboxes();
-    }, 4000);
-
-    const handleFocusOrVisibility = () => {
-      if (document.visibilityState === "visible") {
-        syncInboxes();
-      }
-    };
-
-    window.addEventListener("focus", handleFocusOrVisibility);
-    document.addEventListener("visibilitychange", handleFocusOrVisibility);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", handleFocusOrVisibility);
-      document.removeEventListener("visibilitychange", handleFocusOrVisibility);
-    };
-  }, [claimId, syncInboxes]);
+    }
+  }, [syncInboxes]);
 
   // Send an outbound reply/addendum message via live AgentMail
   const sendMessage = useCallback(
