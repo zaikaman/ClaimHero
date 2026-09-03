@@ -58,13 +58,33 @@ export function useCommunications(claim?: Claim | null) {
     }
   }, [syncInboxesAction]);
 
-  // Synchronize on mount once with a cooldown; user can trigger manual refresh via the drawer
+  // Synchronize on mount and maintain active fallback polling (every 15s) only while tab is active
   useEffect(() => {
-    const now = Date.now();
-    // At least 2 minutes between automatic sync attempts on mount
-    if (now - lastSyncTimeRef.current > 120_000) {
-      syncInboxes();
-    }
+    syncInboxes();
+
+    const onFocus = () => {
+      const now = Date.now();
+      if (now - lastSyncTimeRef.current > 10_000) {
+        syncInboxes();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    const interval = setInterval(() => {
+      // Pause completely if tab is hidden or user navigated away
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      const now = Date.now();
+      if (now - lastSyncTimeRef.current > 15_000) {
+        syncInboxes();
+      }
+    }, 15_000);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      clearInterval(interval);
+    };
   }, [syncInboxes]);
 
   // Send an outbound reply/addendum message via live AgentMail

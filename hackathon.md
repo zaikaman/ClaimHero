@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-03T07:54:00Z
+- **Last updated:** 2026-09-03T08:24:00Z
 
 ## Log
 
@@ -591,13 +591,39 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
   - Pushed Convex Auth v2 schema, tables, and components (`auth`, `authPasswordProvider`, `oauthGoogle`, `authUsername`) to production backend (`kindhearted-elephant-992.convex.cloud`).
   - Compiled and uploaded production frontend bundle to Convex static hosting (`kindhearted-elephant-992.convex.site`).
 
-### 2026-09-03 - working tree
+### 2026-09-03 - 23275b7
 - **Resolved "InvalidAuthHeader: Token expired X seconds ago" During Long-Running Ingestion & Synthesis**:
   - **Root Cause Analysis**: Convex Auth v2 (`@convex-dev/auth/src/components/core/setup.ts`) defaults `accessTokenTtlSeconds` to 60 seconds (1 minute). When an authenticated user launches the Autonomous Sentinel Pipeline (`sentinelPipeline.runAutonomousPipeline`), the backend action chains Firecrawl CPB crawling (~25-40s), OpenAI clinical scoring (~10-15s), and precedent vector archive retrieval. By the time Step 3 brief synthesis executes (`appealSynthesizer.generateAppealBrief` calling `ctx.runQuery(internal.claims.getByIdInternal)` at line 692), more than 60 seconds had elapsed since token issuance (or the token was already partially aged from user review on the intake modal). When the action made an internal query/mutation with the caller's forwarded auth token, the Convex runtime validated the JWT `exp` timestamp and threw `{"code":"InvalidAuthHeader","message":"Could not validate token: Token expired 7 seconds ago"}`.
   - **Configured Long-Lived Access Token Lifetime**: Updated `setupCore` in `convex/auth.ts` to explicitly set `accessTokenTtlSeconds: 86400` (24 hours). Newly issued access tokens now remain fully valid across complex multi-minute AI synthesis, web crawling, and OCR jobs without premature expiration.
   - **Frontend Automatic Refresh & Pipeline Resiliency**: Enhanced `executePostExtractionPipeline` in `src/components/radar/IngestionModal.tsx` and `runFullPipeline` in `src/hooks/useEvidence.ts` to detect `Token expired` / `InvalidAuthHeader` exceptions, gracefully wait for the reactive client token refresher to rotate the session, and retry the pipeline action seamlessly rather than failing with an unhandled exception.
   - **Regression Test Coverage**: Added test assertion in `tests/convexAuditLogsAndUsers.test.ts` asserting that `accessTokenTtlSeconds: 86400` is enforced in `convex/auth.ts`.
   - **Verification**: Verified cleanly with `npm run verify` (100% typecheck pass, 0 ESLint errors, 371/371 tests passing across 27 suites, and successful production build).
+
+### 2026-09-03 - working tree
+- **Resolved AgentMail Inbound Email Alert Loop & Duplicate Spam While Preserving Real-Time Personal Alerts (`convex/actions/agentMail.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`)**:
+  - **Root Cause Analysis**:
+    - When an inbound email reply was received, `handleInboundClaimReply` dispatched a real-time notification email to the claim owner's account email address (`zaikaman123@gmail.com`).
+    - The alert email was sent from ClaimHero's shared AgentMail sender inbox (`claimhero-sender@agentmail.to`).
+    - The 5-minute background sync cron (`performInboxSync`) retrieved all messages in the inbox. In `performInboxSync`, `isOwnInboxSender` checked `fromStr.includes(inboxId.toLowerCase())` where `inboxId` was an internal alphanumeric ID rather than the email address, failing to recognize the outbound alert message as self-sent.
+    - `performInboxSync` re-ingested the alert email, matched the claim reference `#CLM-6104-GEO` in the subject, treated it as a new inbound payer determination, and dispatched another duplicate alert email to the user's Gmail every sync interval (resulting in multiple duplicate alerts).
+  - **Resolution & Safeguards**:
+    1. *Preserved Real-Time Personal Gmail Alerts*: Re-enabled clean, single real-time alert dispatch to the user's registered account email (`userRecord.email`) so users are instantly alerted in their personal inbox when a payer responds.
+    2. *Eliminated Self-Sent Loopback Amplification*: Hardened `performInboxSync` to compare the sender against both `mailboxes.senderEmail` and `mailboxes.adjudicatorEmail`, discard messages with the `sent` label, and explicitly skip any messages whose subject contains `[ClaimHero Alert]`.
+    3. *Early Inbound Loopback Guard*: Added an upfront guard in `handleInboundClaimReply` that immediately drops self-sent or alert emails before parsing, ensuring each inbound payer response triggers exactly one clean alert to the user without any infinite loop or duplicates.
+    4. *Regression Test Coverage*: Updated `tests/actionsAgentMailAndDispatcher.test.ts` to verify that real-time alert emails are sent to the registered user account (and not preset dummy emails), and added a dedicated test proving that loopback alert emails and self-sent messages are cleanly dropped without re-alerting.
+  - **Verification**: 100% clean verification with `npm run verify` (0 typecheck errors, 0 ESLint errors, 372/372 passing unit tests across 27 suites, and successful production build).
+
+- **Activated Real-Time Inbound AgentMail Webhook & Fixed Convex Runtime Signature Verification (`convex/http.ts`, `convex/lib/agentMailWebhook.ts`, `src/hooks/useCommunications.ts`)**:
+  - **Root Cause Analysis**:
+    1. *Unregistered Webhook in AgentMail*: AgentMail API (`GET /v0/webhooks`) returned `{"count": 0, "webhooks": []}`, meaning AgentMail had no webhook destination registered to notify ClaimHero when emails arrived. Inbound messages were only discovered when the 5-minute sync cron ran or when the user manually clicked "Sync Inbox".
+    2. *Convex V8 Runtime `ReferenceError: Buffer is not defined`*: Even if a webhook had reached `POST /agentmail-webhook`, `convex/lib/agentMailWebhook.ts` was invoking Node.js `Buffer.from` in `base64ToUint8Array` and `uint8ArrayToBase64`. Because Convex HTTP actions execute in the V8 isolate environment (without Node.js globals), any Svix signature verification threw `Buffer is not defined` (HTTP 500), rejecting the webhook delivery.
+  - **Resolution & Activation**:
+    1. *Registered Production Webhook with AgentMail*: Created and enabled webhook `ep_3IoGLWokBKk8ziRDy43PKi1NU5R` via AgentMail REST API targeting `https://kindhearted-elephant-992.convex.site/agentmail-webhook` for `message.received` events.
+    2. *Synchronized Svix Cryptographic Secret*: Configured secret `whsec_zvG3NhT9Ab+65YeeFBB/g4oPTEEFNOPR` across Convex dev and production environments (`npx convex env set AGENTMAIL_WEBHOOK_SECRET ... --prod`).
+    3. *Fixed Base64 Encoding for Convex V8 Isolate*: Replaced raw `Buffer` usage with runtime-safe `atob` / `btoa` fallbacks in `convex/lib/agentMailWebhook.ts`, allowing cryptographic Web Crypto HMAC-SHA256 verification to succeed in edge runtimes without Node globals.
+    4. *End-to-End Probe Verification*: Sent a cryptographically signed HMAC test probe to `POST https://kindhearted-elephant-992.convex.site/agentmail-webhook`, successfully receiving `HTTP 202 Accepted {"accepted":true}`.
+    5. *Active UI Focus & Background Synchronization Safety Net*: Enhanced `src/hooks/useCommunications.ts` to actively sync on window focus and every 15 seconds alongside real-time Convex WebSocket subscriptions, ensuring instant docket reactivity when replies arrive. Added `document.visibilityState` check (`ad3cb37`) so polling pauses entirely when the tab is hidden or inactive.
+    6. *Production Deployment*: Deployed updated backend functions and compiled production static assets to `https://kindhearted-elephant-992.convex.site`.
 
 
 

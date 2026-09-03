@@ -115,14 +115,29 @@ export function extractEmailAddress(value?: string): string | undefined {
  * Decodes a base64 string to Uint8Array safely across Node and Convex runtimes.
  */
 export function base64ToUint8Array(base64: string): Uint8Array {
-  return new Uint8Array(Buffer.from(base64, "base64"));
+  if (typeof Buffer !== "undefined") {
+    return new Uint8Array(Buffer.from(base64, "base64"));
+  }
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }
 
 /**
  * Encodes a Uint8Array to a base64 string safely across Node and Convex runtimes.
  */
 export function uint8ArrayToBase64(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString("base64");
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes).toString("base64");
+  }
+  let binaryString = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binaryString += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binaryString);
 }
 
 /**

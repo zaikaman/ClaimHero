@@ -339,6 +339,67 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       );
     });
 
+    it("processInboundClaimReply: drops loopback alert emails and self-sent messages without re-alerting", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
+
+      const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+        messageId: "msg_sent_out",
+        threadId: "thread_sent_out",
+      });
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_loopback_1",
+        inbox_id: "in_send",
+        from: "send@claimhero.com",
+        to: ["user@myclinic.com"],
+        subject: "[ClaimHero Alert] Payer Response: Claim #CLM-LOOP-1 (Payer Upheld Initial Denial)",
+        text: "Summary of response",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_loopback_1",
+        messageId: "msg_loopback_1",
+        inboxId: "in_send",
+        from: "send@claimhero.com",
+        recipients: ["user@myclinic.com"],
+        subject: "[ClaimHero Alert] Payer Response: Claim #CLM-LOOP-1 (Payer Upheld Initial Denial)",
+        text: "Summary of response",
+        attachments: [],
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn: any, args: any) => {
+          if (args?.claimNumber === "CLM-LOOP-1") {
+            return Promise.resolve({
+              _id: "claim_loop_1",
+              claimNumber: "CLM-LOOP-1",
+              userId: "user_real_99",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue("id_mut_loop"),
+      };
+
+      const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_loopback_1",
+        messageId: "msg_loopback_1",
+        inboxId: "in_send",
+      });
+
+      expect(res).toBeNull();
+      // Must NOT dispatch another alert email for loopback messages
+      expect(sendMailSpy).not.toHaveBeenCalled();
+      // Must NOT insert message or update claim status
+      expect(mockCtx.runMutation).not.toHaveBeenCalled();
+    });
+
     it("performInboxSync: batch checks candidate IDs and skips already recorded messages", async () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";

@@ -207,7 +207,28 @@ async function handleInboundClaimReply(
     const lowerSubject = subject.toLowerCase();
     const lowerBody = (normalized.text || normalized.html || "").toLowerCase();
 
-    // Detect system bounce / Delivery Status Notification / mailer-daemon / auto-responder
+    // Detect system bounce / Delivery Status Notification / mailer-daemon / auto-responder or self-sent / alert loopback
+    let sharedMailboxes;
+    try {
+      sharedMailboxes = getSharedAgentMailboxes();
+    } catch {
+      // Ignore if mailboxes not configured in test environment
+    }
+    const ownSenderEmail = sharedMailboxes?.senderEmail?.toLowerCase();
+    const ownAdjudicatorEmail = sharedMailboxes?.adjudicatorEmail?.toLowerCase();
+    const senderClean = (extractEmailAddress(sender) || sender).toLowerCase();
+
+    const isSelfSender =
+      (Boolean(ownSenderEmail) && (lowerFrom.includes(ownSenderEmail!) || senderClean === ownSenderEmail)) ||
+      (Boolean(ownAdjudicatorEmail) && (lowerFrom.includes(ownAdjudicatorEmail!) || senderClean === ownAdjudicatorEmail));
+
+    const isAlertMessage = lowerSubject.includes("[claimhero alert]") || isSelfSender;
+
+    // Silently ignore loopback alert emails or self-sent emails from AgentMail inboxes
+    if (isAlertMessage) {
+      return null;
+    }
+
     const isBounceSender =
       lowerFrom.includes("mailer-daemon") ||
       lowerFrom.includes("postmaster") ||
@@ -461,7 +482,7 @@ Evaluate the inbound correspondence text rigorously:
       });
     }
 
-    // User Email Notification: Notify user account owner whenever a valid inbound reply arrives (never for bounces or daemons)
+    // User Email Notification: Notify user account owner whenever a valid inbound reply arrives (never for bounces, daemons, or self-sent)
     let userEmail: string | undefined;
     if (!isBounce && matchingClaim.userId) {
       try {
@@ -607,10 +628,21 @@ async function performInboxSync(
 
       const labels = Array.isArray(msg.labels) ? (msg.labels as string[]) : [];
       const fromStr = typeof msg.from === "string" ? msg.from.toLowerCase() : "";
-      const isOwnInboxSender = fromStr.includes(inboxId.toLowerCase());
+      const senderEmail = (extractEmailAddress(fromStr) || fromStr).toLowerCase();
+      const ownSenderEmail = mailboxes.senderEmail?.toLowerCase();
+      const ownAdjudicatorEmail = mailboxes.adjudicatorEmail?.toLowerCase();
 
-      // Process if marked as received or if sender is not this inbox itself
-      const isReceived = labels.includes("received") || !isOwnInboxSender;
+      const isOwnInboxSender =
+        (Boolean(ownSenderEmail) && (senderEmail === ownSenderEmail || fromStr.includes(ownSenderEmail!))) ||
+        (Boolean(ownAdjudicatorEmail) && (senderEmail === ownAdjudicatorEmail || fromStr.includes(ownAdjudicatorEmail!))) ||
+        fromStr.includes(inboxId.toLowerCase());
+
+      const subjectStr = typeof msg.subject === "string" ? msg.subject.toLowerCase() : "";
+      const isAlertSubject = subjectStr.includes("[claimhero alert]");
+      const isSent = labels.includes("sent");
+
+      // Process if marked as received or if sender is not this inbox itself, and not an alert or self-sent message
+      const isReceived = (labels.includes("received") || !isOwnInboxSender) && !isSent && !isOwnInboxSender && !isAlertSubject;
       if (!isReceived) continue;
 
       // Check if already in DB via pre-fetched in-memory set
