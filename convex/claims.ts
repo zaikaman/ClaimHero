@@ -288,6 +288,17 @@ export const getByInboxEmailInternal = internalQuery({
     const normalizedEmail = args.email.trim().toLowerCase();
     if (!normalizedEmail) return null;
 
+    // Shared mailboxes (like claimhero-sender@agentmail.to) are shared by all claims
+    // and CANNOT be matched 1-to-1 to an arbitrary claim by recipient alone!
+    if (
+      normalizedEmail.includes("claimhero-sender@") ||
+      normalizedEmail.includes("claimhero-adjudicator@") ||
+      normalizedEmail === "claimhero-sender@agentmail.to" ||
+      normalizedEmail === "claimhero-adjudicator@agentmail.to"
+    ) {
+      return null;
+    }
+
     const byInbox = await ctx.db
       .query("claims")
       .withIndex("by_inbox_email", (q) => q.eq("agentMailInboxEmail", normalizedEmail))
@@ -314,7 +325,7 @@ export const getByInboxEmailInternal = internalQuery({
  * Robust, production-grade internal query for matching inbound AgentMail webhook messages to claims.
  * 1) Tries threadId match first via by_threadId index.
  * 2) Falls back to explicit claim number or subject regex (#CH-\d+, [ClaimHero #...], CLM-...).
- * 3) Falls back to dedicated recipient indexed lookups.
+ * 3) Falls back to dedicated recipient indexed lookups (strictly excluding shared inboxes).
  * 4) Bounded content scan.
  */
 export const findMatchingClaimInternal = internalQuery({
@@ -368,10 +379,18 @@ export const findMatchingClaimInternal = internalQuery({
       }
     }
 
-    // 4. Match across recipient email addresses using dedicated email indexes
+    // 4. Match across dedicated recipient email addresses (excluding shared inboxes)
     for (const rawRecipient of args.recipients) {
       const normalized = rawRecipient.trim().toLowerCase();
-      if (!normalized) continue;
+      if (
+        !normalized ||
+        normalized.includes("claimhero-sender@") ||
+        normalized.includes("claimhero-adjudicator@") ||
+        normalized === "claimhero-sender@agentmail.to" ||
+        normalized === "claimhero-adjudicator@agentmail.to"
+      ) {
+        continue;
+      }
 
       const byInbox = await ctx.db
         .query("claims")
@@ -405,10 +424,18 @@ export const findMatchingClaimInternal = internalQuery({
     );
     if (contentMatch) return contentMatch;
 
-    // Resilient recipient fallback match in memory
+    // Resilient recipient fallback match in memory (excluding shared mailboxes)
     const recipientMatch = recentClaims.find((c) =>
       args.recipients.some((r) => {
         const nr = r.trim().toLowerCase();
+        if (
+          nr.includes("claimhero-sender@") ||
+          nr.includes("claimhero-adjudicator@") ||
+          nr === "claimhero-sender@agentmail.to" ||
+          nr === "claimhero-adjudicator@agentmail.to"
+        ) {
+          return false;
+        }
         return (
           c.agentMailInboxEmail?.toLowerCase() === nr ||
           c.agentMailAdjudicatorEmail?.toLowerCase() === nr ||
@@ -1270,6 +1297,24 @@ export const purgeDuplicateClaimInternal = internalMutation({
   handler: async (ctx, args) => {
     const claim = await ctx.db.get(args.claimId);
     if (!claim) return false;
+
+    // Cascade delete associated messages and threads
+    const messages = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .collect();
+    for (const msg of messages) {
+      await ctx.db.delete(msg._id);
+    }
+
+    const threads = await ctx.db
+      .query("emailThreads")
+      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .collect();
+    for (const thr of threads) {
+      await ctx.db.delete(thr._id);
+    }
+
     await ctx.db.delete(args.claimId);
     try {
       await claimsAggregate.delete(ctx, claim);

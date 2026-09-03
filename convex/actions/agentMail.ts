@@ -172,9 +172,18 @@ async function handleInboundClaimReply(
       }
     }
 
-    // 3. Fallback to recipient exact match
+    // 3. Fallback to dedicated recipient exact match (strictly excluding shared inboxes)
     if (!matchingClaim) {
       for (const recipient of recipientEmails) {
+        const norm = recipient.toLowerCase();
+        if (
+          norm.includes("claimhero-sender@") ||
+          norm.includes("claimhero-adjudicator@") ||
+          norm === "claimhero-sender@agentmail.to" ||
+          norm === "claimhero-adjudicator@agentmail.to"
+        ) {
+          continue;
+        }
         matchingClaim = await ctx.runQuery(internal.claims.getByInboxEmailInternal, {
           email: recipient,
         });
