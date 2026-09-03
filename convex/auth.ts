@@ -3,7 +3,11 @@ import { setupCore } from "@convex-dev/auth/core/setup";
 import { setupUsernamePassword } from "@convex-dev/auth/providers/password/setup";
 import { setupGoogle } from "@convex-dev/auth/providers/oauth/google";
 
-const core = setupCore({ component: components.auth, usersTable: "users" });
+const core = setupCore({
+  component: components.auth,
+  usersTable: "users",
+  accessTokenTtlSeconds: 86400, // 24 hours (prevents token expiration during multi-step AI pipelines, web crawling, and document synthesis)
+});
 export const { signOut, refreshSession, isAuthenticated } = core;
 
 export const { signUpWithPassword, signInWithPassword } = setupUsernamePassword(

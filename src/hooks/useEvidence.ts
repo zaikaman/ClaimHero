@@ -189,11 +189,25 @@ export function useEvidence(claim?: Claim | null) {
       if (!activeClaimId) throw new Error("No claim selected for autonomous pipeline");
 
       if (runPipelineAction) {
-        return await runPipelineAction({
-          claimId: activeClaimId,
-          customPolicyUrl,
-          physicianNotes,
-        });
+        try {
+          return await runPipelineAction({
+            claimId: activeClaimId,
+            customPolicyUrl,
+            physicianNotes,
+          });
+        } catch (err) {
+          const errStr = err instanceof Error ? err.message : String(err);
+          if (errStr.includes("Token expired") || errStr.includes("InvalidAuthHeader")) {
+            console.warn("Auth token expired mid-pipeline; retrying after session refresh...", err);
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+            return await runPipelineAction({
+              claimId: activeClaimId,
+              customPolicyUrl,
+              physicianNotes,
+            });
+          }
+          throw err;
+        }
       } else {
         // Fallback execution
         await crawlPolicy(activeClaimId, customPolicyUrl);

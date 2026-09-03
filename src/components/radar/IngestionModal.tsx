@@ -211,6 +211,23 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       setProcessingMessage("Step 3/3: Synthesizing cited ERISA medical appeal brief...");
       return pipelineRes;
     } catch (pipelineErr) {
+      const errStr = pipelineErr instanceof Error ? pipelineErr.message : String(pipelineErr);
+      if (errStr.includes("Token expired") || errStr.includes("InvalidAuthHeader")) {
+        console.warn("Auth token expired mid-pipeline execution; waiting for session refresh and retrying...", pipelineErr);
+        setProcessingMessage("Refreshing authentication session & finalizing brief...");
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        return await runPipelineAction({
+          claimId: claimId as Id<"claims">,
+          sender: {
+            name: senderName.trim(),
+            credentials: senderCredentials.trim() || undefined,
+            email: senderEmail.trim() || undefined,
+            phone: senderPhone.trim() || undefined,
+          },
+          clinicalFacts,
+          physicianNotes: physicianNotes.trim() || undefined,
+        });
+      }
       console.warn("Pipeline stopped because clinical policy evidence could not be retrieved:", pipelineErr);
       throw pipelineErr;
     }

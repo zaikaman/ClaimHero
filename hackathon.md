@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-03T06:14:32Z
+- **Last updated:** 2026-09-03T07:54:00Z
 
 ## Log
 
@@ -571,7 +571,7 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
   - Executed `npm run verify`: 370/370 passing tests across 27 suites, 0 TypeScript/ESLint errors, 80.81% statement coverage, and clean production build.
   - Pushed and deployed updated functions to both Dev (`groovy-hippopotamus-924`) and Production (`usable-sturgeon-376`). Convex features: internalQuery, internalMutation, actions, database indexes, reactive subscriptions.
 
-### 2026-09-03 - working tree
+### 2026-09-03 - b24f9e2
 - **Convex Auth v2 Preview Migration (@convex-dev/auth@alpha)**:
   - Upgraded authentication architecture from legacy `@convex-dev/auth` v1 / `@auth/core` to native Convex Components (`@convex-dev/auth` v2 alpha): `auth` (core), `authPasswordProvider`, `oauthGoogle`, and `authUsername`. Removed passkey component.
   - Configured component declarations in `convex/convex.config.ts` with environment bindings (`AUTH_PRIVATE_KEY` and `AUTH_JWKS`), mounting the HTTP auth handler at `/auth` and OAuth callback at `/oauth/google`.
@@ -590,6 +590,14 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
   - Configured production environment variables `AUTH_PRIVATE_KEY` and `AUTH_JWKS` via `npx convex env set --prod`.
   - Pushed Convex Auth v2 schema, tables, and components (`auth`, `authPasswordProvider`, `oauthGoogle`, `authUsername`) to production backend (`kindhearted-elephant-992.convex.cloud`).
   - Compiled and uploaded production frontend bundle to Convex static hosting (`kindhearted-elephant-992.convex.site`).
+
+### 2026-09-03 - working tree
+- **Resolved "InvalidAuthHeader: Token expired X seconds ago" During Long-Running Ingestion & Synthesis**:
+  - **Root Cause Analysis**: Convex Auth v2 (`@convex-dev/auth/src/components/core/setup.ts`) defaults `accessTokenTtlSeconds` to 60 seconds (1 minute). When an authenticated user launches the Autonomous Sentinel Pipeline (`sentinelPipeline.runAutonomousPipeline`), the backend action chains Firecrawl CPB crawling (~25-40s), OpenAI clinical scoring (~10-15s), and precedent vector archive retrieval. By the time Step 3 brief synthesis executes (`appealSynthesizer.generateAppealBrief` calling `ctx.runQuery(internal.claims.getByIdInternal)` at line 692), more than 60 seconds had elapsed since token issuance (or the token was already partially aged from user review on the intake modal). When the action made an internal query/mutation with the caller's forwarded auth token, the Convex runtime validated the JWT `exp` timestamp and threw `{"code":"InvalidAuthHeader","message":"Could not validate token: Token expired 7 seconds ago"}`.
+  - **Configured Long-Lived Access Token Lifetime**: Updated `setupCore` in `convex/auth.ts` to explicitly set `accessTokenTtlSeconds: 86400` (24 hours). Newly issued access tokens now remain fully valid across complex multi-minute AI synthesis, web crawling, and OCR jobs without premature expiration.
+  - **Frontend Automatic Refresh & Pipeline Resiliency**: Enhanced `executePostExtractionPipeline` in `src/components/radar/IngestionModal.tsx` and `runFullPipeline` in `src/hooks/useEvidence.ts` to detect `Token expired` / `InvalidAuthHeader` exceptions, gracefully wait for the reactive client token refresher to rotate the session, and retry the pipeline action seamlessly rather than failing with an unhandled exception.
+  - **Regression Test Coverage**: Added test assertion in `tests/convexAuditLogsAndUsers.test.ts` asserting that `accessTokenTtlSeconds: 86400` is enforced in `convex/auth.ts`.
+  - **Verification**: Verified cleanly with `npm run verify` (100% typecheck pass, 0 ESLint errors, 371/371 tests passing across 27 suites, and successful production build).
 
 
 

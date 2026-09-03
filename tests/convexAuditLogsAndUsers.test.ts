@@ -225,7 +225,7 @@ describe("Convex Audit Logs, Users, Auth & Crons", () => {
       expect(res[1].timestamp).toBe(150);
     });
 
-    it("convex/auth: exports configured Convex Auth v2 methods", () => {
+    it("convex/auth: exports configured Convex Auth v2 methods and enforces long-lived accessTokenTtlSeconds", async () => {
       expect(convexAuthModule.signInWithPassword).toBeDefined();
       expect(convexAuthModule.signUpWithPassword).toBeDefined();
       expect(convexAuthModule.startSignInGoogle).toBeDefined();
@@ -233,6 +233,10 @@ describe("Convex Audit Logs, Users, Auth & Crons", () => {
       expect(convexAuthModule.signOut).toBeDefined();
       expect(convexAuthModule.refreshSession).toBeDefined();
       expect(convexAuthModule.isAuthenticated).toBeDefined();
+
+      const fs = await import("fs");
+      const authSource = fs.readFileSync("convex/auth.ts", "utf-8");
+      expect(authSource).toContain("accessTokenTtlSeconds: 86400");
     });
   });
 });
