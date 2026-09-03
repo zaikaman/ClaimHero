@@ -318,7 +318,12 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     setErrorMessage(null);
 
     try {
-      const result = await onParseText(preset.content, patientState);
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      const uniqueContent = preset.content.replace(
+        /(CLM-[A-Za-z0-9-]+)/g,
+        `$1-${randomSuffix}`
+      );
+      const result = await onParseText(uniqueContent, patientState);
       await prepareContextReview(result, preset);
     } catch (err) {
       setErrorMessage(

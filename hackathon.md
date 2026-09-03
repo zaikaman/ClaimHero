@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-03T08:46:00Z
+- **Last updated:** 2026-09-03T11:08:00Z
 
 ## Log
 
@@ -625,7 +625,7 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
     5. *Active UI Focus & Background Synchronization Safety Net*: Enhanced `src/hooks/useCommunications.ts` to actively sync on window focus and every 15 seconds alongside real-time Convex WebSocket subscriptions, ensuring instant docket reactivity when replies arrive. Added `document.visibilityState` check (`ad3cb37`) so polling pauses entirely when the tab is hidden or inactive.
     6. *Production Deployment*: Deployed updated backend functions and compiled production static assets to `https://kindhearted-elephant-992.convex.site`.
 
-### 2026-09-03 - working tree
+### 2026-09-03 - ca2af48
 - **Fixed Autonomous Clinical Addendum Rebuttal Stale State on Consecutive Inbound Replies Without Page Refresh (`AgentMailDrawer.tsx`, `convex/actions/agentMail.ts`, `convex/actions/mailDispatcher.ts`)**:
   - **Root Cause Analysis**:
     1. *Frontend Stale Draft Lock & Inbound ID Desync (`AgentMailDrawer.tsx`)*:
@@ -655,13 +655,7 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
        - Updated `deliverAiAdjudication` to record `detectedDetermination` and `clinicalRationale` when inserting inbound adjudicator messages.
   - **Verification**: Verified cleanly with `npm run verify` (100% typecheck pass, 0 ESLint errors, 372/372 passing tests across 27 suites, and successful Vite production build in 7.04s).
 
-
-
-
-
-
-
-
-
+### 2026-09-03 - working tree
+Prevented cross-account routing collisions on shared AgentMail inboxes by appending a randomized suffix to sample preset claim numbers upon intake (`src/components/radar/IngestionModal.tsx`) and enforcing claim number uniqueness during database creation (`convex/claims.ts`). Convex features: mutations, indexes (`by_claim_number`).
 
 

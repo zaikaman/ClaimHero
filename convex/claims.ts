@@ -448,12 +448,22 @@ export const create = mutation({
 
     const patient = (await ctx.db.get(args.patientId)) as Doc<"patients"> | null;
 
+    let claimNumber = args.claimNumber.trim();
+    const existingWithSameNumber = await ctx.db
+      .query("claims")
+      .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
+      .first();
+    if (existingWithSameNumber) {
+      const suffix = Math.floor(1000 + Math.random() * 9000);
+      claimNumber = `${claimNumber}-${suffix}`;
+    }
+
     const claimId = await ctx.db.insert("claims", {
       userId,
       patientId: args.patientId,
       patientName: patient?.name || "Patient",
       insurancePayer: patient?.insurancePayer || "Health Insurer",
-      claimNumber: args.claimNumber,
+      claimNumber,
       serviceDate: args.serviceDate,
       providerName: args.providerName,
       deniedAmount: args.deniedAmount,
@@ -591,12 +601,22 @@ async function applyCreateWithPatient(
   const deadlineDays = args.appealFilingDeadlineDays || 180;
   const statutoryDeadline = now + deadlineDays * 86400000;
 
+  let claimNumber = args.claimNumber.trim();
+  const existingWithSameNumber = await ctx.db
+    .query("claims")
+    .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
+    .first();
+  if (existingWithSameNumber) {
+    const suffix = Math.floor(1000 + Math.random() * 9000);
+    claimNumber = `${claimNumber}-${suffix}`;
+  }
+
   const claimId = await ctx.db.insert("claims", {
     userId,
     patientId,
     patientName: args.patientName,
     insurancePayer: args.insurancePayer || "Molina Healthcare",
-    claimNumber: args.claimNumber,
+    claimNumber,
     serviceDate: args.serviceDate,
     providerName: args.providerName,
     deniedAmount: args.deniedAmount,
