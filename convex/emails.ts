@@ -256,6 +256,55 @@ export const updateMessageAnalysisInternal = internalMutation({
 });
 
 /**
+ * Atomically insert an inbound message, returning isNew: false if this agentMailMessageId was already recorded
+ */
+export const insertInboundMessageInternal = internalMutation({
+  args: {
+    threadId: v.id("emailThreads"),
+    claimId: v.id("claims"),
+    sender: v.string(),
+    recipient: v.string(),
+    subject: v.string(),
+    bodyHtml: v.string(),
+    bodyText: v.string(),
+    hasAttachments: v.boolean(),
+    agentMailMessageId: v.string(),
+    detectedDetermination: v.optional(v.string()),
+    clinicalRationale: v.optional(v.string()),
+    autoReplyStatus: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const trimmedId = args.agentMailMessageId.trim();
+    if (trimmedId) {
+      const existing = await ctx.db
+        .query("emailMessages")
+        .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmedId))
+        .first();
+      if (existing) {
+        return { messageId: existing._id, isNew: false };
+      }
+    }
+    const messageId = await ctx.db.insert("emailMessages", {
+      threadId: args.threadId,
+      claimId: args.claimId,
+      direction: "inbound",
+      sender: args.sender,
+      recipient: args.recipient,
+      subject: args.subject,
+      bodyHtml: args.bodyHtml,
+      bodyText: args.bodyText,
+      hasAttachments: args.hasAttachments,
+      agentMailMessageId: trimmedId,
+      detectedDetermination: args.detectedDetermination,
+      clinicalRationale: args.clinicalRationale,
+      autoReplyStatus: args.autoReplyStatus,
+      receivedAt: Date.now(),
+    });
+    return { messageId, isNew: true };
+  },
+});
+
+/**
  * Check if a message with the given agentMailMessageId has already been recorded
  */
 export const hasMessageByAgentMailId = internalQuery({

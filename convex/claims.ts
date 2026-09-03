@@ -272,6 +272,7 @@ export const getByClaimNumberInternal = internalQuery({
     return await ctx.db
       .query("claims")
       .withIndex("by_claim_number", (q) => q.eq("claimNumber", trimmed))
+      .order("desc")
       .first();
   },
 });
@@ -339,6 +340,7 @@ export const findMatchingClaimInternal = internalQuery({
       const direct = await ctx.db
         .query("claims")
         .withIndex("by_claim_number", (q) => q.eq("claimNumber", args.claimNumber!.trim()))
+        .order("desc")
         .first();
       if (direct) return direct;
     }
@@ -359,6 +361,7 @@ export const findMatchingClaimInternal = internalQuery({
           const found = await ctx.db
             .query("claims")
             .withIndex("by_claim_number", (q) => q.eq("claimNumber", candidate))
+            .order("desc")
             .first();
           if (found) return found;
         }
@@ -1234,6 +1237,26 @@ export const clearUnassignedDemoCases = internalMutation({
     }
 
     return unassigned.length;
+  },
+});
+
+/**
+ * Internal mutation to purge a specific duplicate or orphaned claim case.
+ */
+export const purgeDuplicateClaimInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) return false;
+    await ctx.db.delete(args.claimId);
+    try {
+      await claimsAggregate.delete(ctx, claim);
+    } catch {
+      // Ignore if not present in aggregate
+    }
+    return true;
   },
 });
 

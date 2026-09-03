@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-03T08:24:00Z
+- **Last updated:** 2026-09-03T08:46:00Z
 
 ## Log
 
@@ -599,7 +599,7 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
   - **Regression Test Coverage**: Added test assertion in `tests/convexAuditLogsAndUsers.test.ts` asserting that `accessTokenTtlSeconds: 86400` is enforced in `convex/auth.ts`.
   - **Verification**: Verified cleanly with `npm run verify` (100% typecheck pass, 0 ESLint errors, 371/371 tests passing across 27 suites, and successful production build).
 
-### 2026-09-03 - working tree
+### 2026-09-03 - 4516c57
 - **Resolved AgentMail Inbound Email Alert Loop & Duplicate Spam While Preserving Real-Time Personal Alerts (`convex/actions/agentMail.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`)**:
   - **Root Cause Analysis**:
     - When an inbound email reply was received, `handleInboundClaimReply` dispatched a real-time notification email to the claim owner's account email address (`zaikaman123@gmail.com`).
@@ -624,6 +624,36 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
     4. *End-to-End Probe Verification*: Sent a cryptographically signed HMAC test probe to `POST https://kindhearted-elephant-992.convex.site/agentmail-webhook`, successfully receiving `HTTP 202 Accepted {"accepted":true}`.
     5. *Active UI Focus & Background Synchronization Safety Net*: Enhanced `src/hooks/useCommunications.ts` to actively sync on window focus and every 15 seconds alongside real-time Convex WebSocket subscriptions, ensuring instant docket reactivity when replies arrive. Added `document.visibilityState` check (`ad3cb37`) so polling pauses entirely when the tab is hidden or inactive.
     6. *Production Deployment*: Deployed updated backend functions and compiled production static assets to `https://kindhearted-elephant-992.convex.site`.
+
+### 2026-09-03 - working tree
+- **Fixed Autonomous Clinical Addendum Rebuttal Stale State on Consecutive Inbound Replies Without Page Refresh (`AgentMailDrawer.tsx`, `convex/actions/agentMail.ts`, `convex/actions/mailDispatcher.ts`)**:
+  - **Root Cause Analysis**:
+    1. *Frontend Stale Draft Lock & Inbound ID Desync (`AgentMailDrawer.tsx`)*:
+       - In `AgentMailDrawer.tsx`, `activeAutoDraft` state was only initialized if `!activeAutoDraft` was true (`if (latestInbound?.autoReplyDraft && !activeAutoDraft)`). When the user stayed on the same page, the first inbound message set `activeAutoDraft`.
+       - When a reply was sent via `handleSendReply` (the composer input at the bottom), `activeAutoDraft` was never cleared.
+       - When a subsequent (second) inbound reply arrived, `!activeAutoDraft` was false, preventing `setActiveAutoDraft` from updating to the new inbound reply's draft.
+       - Additionally, `AgentMailDrawer` did not track the message ID (`_id`) of the latest inbound message, nor did it detect whether the latest message in the thread was outbound (`isAwaitingPayer`), which resulted in the old draft persisting on the screen even after being sent.
+    2. *Inbound Determination Analysis Omission on Upheld Denials (`convex/actions/agentMail.ts`)*:
+       - The OpenAI system prompt for inbound analysis instructed the model to synthesize a clinical addendum only if "additional records or inquiry are needed".
+       - When the payer responded with an explicit refusal / denial upheld (e.g., "no, i ain't paying"), the LLM classified it as `DENIAL_UPHELD` and returned an empty string for `suggestedAutoReplyAddendum`, leaving `autoReplyDraft: undefined` on the newly recorded inbound message.
+    3. *Missing Auto-Draft Database Persistence (`convex/actions/mailDispatcher.ts`)*:
+       - `generateAutoReplyDraft` accepted `inboundMessageId` but never persisted the generated rebuttal draft back to `emailMessages` via `updateMessageAnalysisInternal`.
+  - **Resolution & Architecture**:
+    1. *Reactive Inbound Tracking & Lifecycle Transition in `AgentMailDrawer.tsx`*:
+       - Added `trackedInboundId` state and `evaluatingMessageIdRef` to monitor the latest inbound message ID.
+       - Added `isAwaitingPayer` detection: when the latest message in the thread is outbound, ClaimHero has already replied and is awaiting the insurer's response, so stale drafts are immediately cleared.
+       - When a new inbound reply arrives (`currentInboundId !== trackedInboundId`):
+         - If `autoReplyDraft` exists, it immediately sets `activeAutoDraft`.
+         - If `autoReplyDraft` is missing or pending on a non-won determination, it automatically triggers `generateDraftAction` in the background, updating the UI with a subtle synthesizing spinner and populating the new draft seamlessly.
+       - Cleared `activeAutoDraft` inside both `handleApproveAndSendDraft` and `handleSendReply` upon dispatch.
+       - Added reset logic when switching between active claims (`claim._id`).
+    2. *Comprehensive Appellate Escalation Synthesis in `agentMail.ts`*:
+       - Updated the OpenAI system prompt in `handleInboundClaimReply` to require synthesized clinical escalation addenda for ALL non-overturned determinations (including `DENIAL_UPHELD`, `ADDITIONAL_RECORDS_REQUIRED`, and `GENERAL_INQUIRY`), specifically demanding Independent Review Organization (IRO) external review and citing ERISA 29 C.F.R. § 2560.503-1 rights.
+       - Added a deterministic fallback addendum generator in `handleInboundClaimReply` to ensure `suggestedAutoReply` is never empty for unapproved claims.
+    3. *Backend Persistence in `mailDispatcher.ts`*:
+       - Updated `generateAutoReplyDraft` to automatically patch `inboundMessageId` with `draftText` and set `autoReplyStatus: "pending"` in the database.
+       - Updated `deliverAiAdjudication` to record `detectedDetermination` and `clinicalRationale` when inserting inbound adjudicator messages.
+  - **Verification**: Verified cleanly with `npm run verify` (100% typecheck pass, 0 ESLint errors, 372/372 passing tests across 27 suites, and successful Vite production build in 7.04s).
 
 
 

@@ -231,6 +231,9 @@ async function deliverAiAdjudication(
     bodyHtml: determinationEmail.html,
     bodyText: determinationEmail.text,
     hasAttachments: false,
+    detectedDetermination: adjudicationResult.determination,
+    clinicalRationale: adjudicationResult.clinicalRationale,
+    autoReplyStatus: adjudicationResult.determination === "OVERTURNED_APPROVED" ? undefined : "pending",
   }, liveReply.messageId));
 
   if (adjudicationResult.determination === "OVERTURNED_APPROVED") {
@@ -638,9 +641,23 @@ Guidelines:
       temperature: 0.2,
     });
 
+    const trimmedDraft = draft.trim();
+
+    if (args.inboundMessageId && trimmedDraft) {
+      try {
+        await ctx.runMutation(internal.emails.updateMessageAnalysisInternal, {
+          messageId: args.inboundMessageId,
+          autoReplyDraft: trimmedDraft,
+          autoReplyStatus: "pending",
+        });
+      } catch (patchErr) {
+        console.warn("Failed to persist generated auto-reply draft to message:", patchErr);
+      }
+    }
+
     return {
       success: true,
-      draftText: draft.trim(),
+      draftText: trimmedDraft,
       suggestedSubject: `Re: Formal Medical Appeal | Claim #${claim.claimNumber} | Clinical Reconsideration Addendum`,
     };
   },

@@ -3,7 +3,7 @@
 import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { v } from "convex/values";
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import {
   getAgentMailMessage,
   getSharedAgentMailboxes,
@@ -330,11 +330,10 @@ async function handleInboundClaimReply(
       subject,
     });
 
-    // ⚡ INSTANT REAL-TIME PERSISTENCE: Insert message immediately so user sees it in <300ms
-    const messageDbId = await ctx.runMutation(internal.emails.insertMessageInternal, {
+    // ⚡ ATOMIC REAL-TIME PERSISTENCE & LOCK: Atomically claim and insert message
+    const insertResult = await ctx.runMutation(internal.emails.insertInboundMessageInternal, {
       threadId,
       claimId: matchingClaim._id,
-      direction: "inbound",
       sender,
       recipient: normalized.recipients[0] || "",
       subject,
@@ -352,6 +351,15 @@ async function handleInboundClaimReply(
         : "Inbound correspondence received and recorded.",
       autoReplyStatus: "pending",
     });
+
+    if (insertResult && typeof insertResult === "object" && "isNew" in insertResult && !insertResult.isNew) {
+      // Concurrently processed by parallel webhook/sync execution; abort immediately
+      return null;
+    }
+    const messageDbId =
+      insertResult && typeof insertResult === "object" && "messageId" in insertResult
+        ? insertResult.messageId
+        : (insertResult as Id<"emailMessages">);
 
     // Update claim status based on initial instant assessment
     if (fallbackDetermination === "OVERTURNED_APPROVED") {
@@ -399,8 +407,8 @@ Evaluate the inbound correspondence text rigorously:
    - "GENERAL_INQUIRY": General administrative question or status check.
 2. Extract specific missing clinical documentation or evidence demanded.
 3. If overturned, extract the authorized settlement dollar amount (default to denied amount $${matchingClaim.deniedAmount} if full approval).
-4. If additional records or inquiry are needed, synthesize a professional, court-ready clinical addendum response referencing the claim's clinical evidence to supply the demanded justification.
-5. CRITICAL RULE: If determination is "OVERTURNED_APPROVED" (claim won/approved), set shouldAutoReply to false and set suggestedAutoReplyAddendum to empty string "". Do not reply to victory/overturn notices.`,
+4. For ANY determination other than OVERTURNED_APPROVED (especially DENIAL_UPHELD, ADDITIONAL_RECORDS_REQUIRED, or GENERAL_INQUIRY), synthesize a professional, court-ready clinical rebuttal or escalation addendum response referencing the claim's clinical evidence (e.g., formally demanding Independent Review Organization (IRO) external review citing statutory ERISA 29 C.F.R. § 2560.503-1 rights if the denial is upheld, or supplying requested records if additional records are requested).
+5. CRITICAL RULE: If determination is "OVERTURNED_APPROVED" (claim won/approved), set shouldAutoReply to false and set suggestedAutoReplyAddendum to empty string "". For ALL other determinations, set shouldAutoReply to true and provide a non-empty suggestedAutoReplyAddendum.`,
         userPrompt: `Evaluate the following inbound email from ${sender}:\n\nSubject: ${subject}\n\n${bodyContent}`,
         schemaName: "InboundAnalysisResult",
         schema: INBOUND_ANALYSIS_SCHEMA,
@@ -425,7 +433,10 @@ Evaluate the inbound correspondence text rigorously:
     const settlementAmount =
       analysis?.authorizedSettlementAmount ||
       (determination === "OVERTURNED_APPROVED" ? matchingClaim.deniedAmount : undefined);
-    const suggestedAutoReply = isOverturned ? "" : (analysis?.suggestedAutoReplyAddendum || "");
+    let suggestedAutoReply = isOverturned ? "" : (analysis?.suggestedAutoReplyAddendum || "");
+    if (!isOverturned && !suggestedAutoReply.trim()) {
+      suggestedAutoReply = `We acknowledge your correspondence regarding Claim #${matchingClaim.claimNumber}. Given your maintenance of the adverse determination despite documented emergency medical necessity for CPT [${(matchingClaim.cptCodes || []).join(", ")}], we formally request immediate escalation to Independent External Review (IRO) under 29 C.F.R. § 2560.503-1. Please provide the designated IRO contact details and statutory appellate documentation requirements.`;
+    }
 
     // Refine the stored message with deep clinical analysis & auto-reply draft
     await ctx.runMutation(internal.emails.updateMessageAnalysisInternal, {

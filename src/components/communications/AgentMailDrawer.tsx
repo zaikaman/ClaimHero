@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -85,15 +85,90 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const [isTogglingAutoPilot, setIsTogglingAutoPilot] = useState(false);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [activeAutoDraft, setActiveAutoDraft] = useState<string>("");
+  const [trackedInboundId, setTrackedInboundId] = useState<string | null>(null);
+  const evaluatingMessageIdRef = useRef<string | null>(null);
 
-  // Find latest inbound message with autoReplyDraft or need for reply
+  // Identify latest message in thread and latest inbound message
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const isAwaitingPayer = lastMessage?.direction === "outbound";
   const latestInbound = [...messages].reverse().find((m) => m.direction === "inbound");
 
+  // Reset state when switching between claims
   useEffect(() => {
-    if (latestInbound?.autoReplyDraft && !activeAutoDraft) {
-      setActiveAutoDraft(latestInbound.autoReplyDraft);
+    setActiveAutoDraft("");
+    setTrackedInboundId(null);
+    evaluatingMessageIdRef.current = null;
+  }, [claim._id]);
+
+  // Synchronize and auto-evaluate autonomous draft whenever messages update or new reply arrives
+  useEffect(() => {
+    // If case is won or last message in thread was outbound (already replied to payer), do not show active draft
+    if (claim.status === "won" || isAwaitingPayer) {
+      if (activeAutoDraft) {
+        setActiveAutoDraft("");
+      }
+      return;
     }
-  }, [latestInbound?.autoReplyDraft, activeAutoDraft]);
+
+    if (!latestInbound) {
+      if (activeAutoDraft) {
+        setActiveAutoDraft("");
+      }
+      return;
+    }
+
+    const currentInboundId = latestInbound._id;
+
+    // A new inbound reply arrived or initial load of message
+    if (currentInboundId !== trackedInboundId) {
+      setTrackedInboundId(currentInboundId);
+
+      if (latestInbound.autoReplyDraft) {
+        setActiveAutoDraft(latestInbound.autoReplyDraft);
+      } else if (
+        latestInbound.detectedDetermination !== "OVERTURNED_APPROVED" &&
+        evaluatingMessageIdRef.current !== currentInboundId
+      ) {
+        // Auto-evaluate / synthesize smart rebuttal addendum for this newly arrived inbound reply
+        evaluatingMessageIdRef.current = currentInboundId;
+        setIsGeneratingDraft(true);
+        generateDraftAction({
+          claimId: claim._id as Id<"claims">,
+          inboundMessageId: currentInboundId as Id<"emailMessages">,
+          customPayerInquiry: latestInbound.bodyText,
+        })
+          .then((res) => {
+            if (res?.draftText) {
+              setActiveAutoDraft(res.draftText);
+            }
+          })
+          .catch((err) => {
+            console.warn("Failed to auto-evaluate inbound message draft:", err);
+          })
+          .finally(() => {
+            setIsGeneratingDraft(false);
+          });
+      } else {
+        setActiveAutoDraft("");
+      }
+    } else {
+      // Same inbound message, but autoReplyDraft was updated reactively by backend
+      if (latestInbound.autoReplyDraft && latestInbound.autoReplyDraft !== activeAutoDraft) {
+        setActiveAutoDraft(latestInbound.autoReplyDraft);
+      }
+    }
+  }, [
+    latestInbound?._id,
+    latestInbound?.autoReplyDraft,
+    latestInbound?.detectedDetermination,
+    latestInbound?.bodyText,
+    claim.status,
+    claim._id,
+    isAwaitingPayer,
+    trackedInboundId,
+    activeAutoDraft,
+    generateDraftAction,
+  ]);
 
   const handleToggleAutoPilot = async () => {
     if (isTogglingAutoPilot || !claim._id) return;
@@ -111,13 +186,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   };
 
   const handleGenerateSmartDraft = async (customPrompt?: string) => {
-    if (isGeneratingDraft || !claim._id) return;
+    if (isGeneratingDraft || !claim._id || !latestInbound) return;
     setIsGeneratingDraft(true);
     try {
       const res = await generateDraftAction({
         claimId: claim._id as Id<"claims">,
-        inboundMessageId: latestInbound?._id as Id<"emailMessages"> | undefined,
-        customPayerInquiry: customPrompt || latestInbound?.bodyText,
+        inboundMessageId: latestInbound._id as Id<"emailMessages">,
+        customPayerInquiry: customPrompt || latestInbound.bodyText,
       });
       if (res?.draftText) {
         setActiveAutoDraft(res.draftText);
@@ -218,6 +293,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     try {
       await onSendMessage(replyText);
       setReplyText("");
+      setActiveAutoDraft("");
     } finally {
       setIsSending(false);
     }
@@ -1015,7 +1091,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
           </div>
 
           {/* Autonomous Clinical Addendum Draft Card */}
-          {activeAutoDraft && claim.status !== "won" && (
+          {(activeAutoDraft || isGeneratingDraft) && claim.status !== "won" && !isAwaitingPayer && (
             <div className="p-3 bg-muted/20 border-t border-border space-y-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
@@ -1035,15 +1111,22 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 </div>
               </div>
 
-              <div className="max-h-28 overflow-y-auto rounded-md bg-background/90 p-2.5 border border-border text-[11px] font-mono text-foreground/90 leading-relaxed whitespace-pre-wrap select-text">
-                {activeAutoDraft}
-              </div>
+              {isGeneratingDraft && !activeAutoDraft ? (
+                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground p-3 bg-background/80 rounded-md border border-border">
+                  <CircleNotch className="size-3.5 animate-spin text-primary shrink-0" />
+                  <span>Synthesizing autonomous clinical rebuttal from latest payer reply...</span>
+                </div>
+              ) : (
+                <div className="max-h-28 overflow-y-auto rounded-md bg-background/90 p-2.5 border border-border text-[11px] font-mono text-foreground/90 leading-relaxed whitespace-pre-wrap select-text">
+                  {activeAutoDraft}
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="xs"
                   onClick={handleApproveAndSendDraft}
-                  disabled={isSending}
+                  disabled={isSending || !activeAutoDraft.trim() || isGeneratingDraft}
                   className="gap-1.5 h-7 px-3 text-xs font-medium"
                 >
                   {isSending ? (
@@ -1058,6 +1141,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   size="xs"
                   variant="outline"
                   onClick={() => setReplyText(activeAutoDraft)}
+                  disabled={!activeAutoDraft.trim() || isGeneratingDraft}
                   className="gap-1.5 h-7 px-2.5 text-xs font-medium"
                 >
                   <FileText className="size-3.5" />
