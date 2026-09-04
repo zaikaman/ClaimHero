@@ -61,11 +61,7 @@ app.use(oauth, {
     CLIENT_SECRET: app.env.AUTH_GOOGLE_SECRET,
   },
 });
-app.use(agentmail, {
-  env: {
-    AGENTMAIL_API_KEY: app.env.AGENTMAIL_API_KEY,
-  },
-});
+app.use(agentmail);
 app.use(workflow);
 
 export default app;
