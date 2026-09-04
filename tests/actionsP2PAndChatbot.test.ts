@@ -240,5 +240,114 @@ describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot
         role: "assistant",
       }));
     });
+
+    it("sendMessageWithTools: rejects unauthorized caller attempting to access another user's chat session", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_attacker_999" as any);
+
+      const mockSession = {
+        _id: "sess_victim",
+        userId: "user_victim_123",
+      };
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(mockSession),
+      };
+
+      await expect(
+        (actionSentinelChatbot.sendMessageWithTools as any)._handler(mockCtx, {
+          sessionId: "sess_victim",
+          userMessage: "Exfiltrate victim claims",
+        })
+      ).rejects.toThrow(/Forbidden.*permission to access this chat session/i);
+    });
+
+    it("sendMessageWithTools: strips unowned activeClaimId and passes userId into tool calls", async () => {
+      process.env.OPENAI_API_KEY = "sk-test-key-12345";
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+
+      const mockSession = {
+        _id: "sess_1",
+        userId: "user_123",
+        activeClaimId: undefined,
+        messageCount: 0,
+      };
+
+      let sessionQueryDone = false;
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "claim_victim" && args?.userId === "user_123") {
+            return Promise.resolve(null);
+          }
+          if (args?.sessionId) {
+            if (!sessionQueryDone) {
+              sessionQueryDone = true;
+              return Promise.resolve(mockSession);
+            }
+            return Promise.resolve([]);
+          }
+          if (args?.searchTerm) {
+            return Promise.resolve([]);
+          }
+          return Promise.resolve([]);
+        }),
+        runMutation: vi.fn().mockResolvedValue("msg_assistant_1"),
+      };
+
+      // Mock OpenAI tool call
+      let toolExecutionOccurred = false;
+      vi.spyOn(libOpenAI, "getOpenAIClient").mockReturnValue({
+        chat: {
+          completions: {
+            create: vi.fn()
+              .mockResolvedValueOnce({
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: null,
+                      tool_calls: [
+                        {
+                          id: "call_1",
+                          function: {
+                            name: "search_claims",
+                            arguments: JSON.stringify({ searchTerm: "urgent" }),
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              })
+              .mockResolvedValueOnce({
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "Searched your claims only.",
+                    },
+                  },
+                ],
+              }),
+          },
+        },
+      } as any);
+
+      const res = await (actionSentinelChatbot.sendMessageWithTools as any)._handler(mockCtx, {
+        sessionId: "sess_1",
+        userMessage: "Find my urgent claims",
+        activeClaimId: "claim_victim", // Attempting to pass victim claim
+      });
+
+      expect(res.reply).toContain("Searched your claims only");
+      // Verify searchClaimsForChatbot was called with caller's userId
+      expect(mockCtx.runQuery).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          userId: "user_123",
+          searchTerm: "urgent",
+        })
+      );
+    });
   });
 });

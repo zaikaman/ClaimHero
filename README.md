@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-390%2F390%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-408%2F408%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -558,12 +558,12 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (390 tests)
+npm run test            # vitest run tests  (408 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **390/390 passing** across 28 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
+Current: **408/408 passing** across 28 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
@@ -571,8 +571,8 @@ Current: **390/390 passing** across 28 comprehensive test suites covering end-to
 | [`tests/authorization.test.ts`](file:///d:/ClaimHero/tests/authorization.test.ts) | 29 | Convex multi-tenant authorization, searchIndex & vector isolation, strict document & shared intake claim ownership validation, unauthenticated rejection, session isolation, optical parser 15MB/MIME gates, idempotent thread lookups |
 | [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 25 | AgentMail delivery, binary attachments, webhook normalizers, Svix signature verification, key rotation, free-tier intake routing |
 | [`tests/convexAppeals.test.ts`](file:///d:/ClaimHero/tests/convexAppeals.test.ts) | 21 | Versioned appeal drafts, Level 1-3 statutory escalation, draft auto-saving, PDF storage ID mutations, and ownership access controls |
+| [`tests/convexChatbot.test.ts`](file:///d:/ClaimHero/tests/convexChatbot.test.ts) | 21 | Chatbot sessions, message history, auto-titling, conversation summaries, multi-tenant caller userId isolation, and prompt injection data exfiltration defense |
 | [`tests/redactionEngine.test.ts`](file:///d:/ClaimHero/tests/redactionEngine.test.ts) | 17 | HIPAA Safe Harbor 18-identifier redaction, boundary masking, regex patterns, and deterministic tokenization |
-| [`tests/convexChatbot.test.ts`](file:///d:/ClaimHero/tests/convexChatbot.test.ts) | 17 | Chatbot sessions, message history, auto-titling, conversation summaries, and internal lookup tool queries for claims, evidence, and briefs |
 | [`tests/convexClinicalEvidences.test.ts`](file:///d:/ClaimHero/tests/convexClinicalEvidences.test.ts) | 16 | Clinical evidence clause sanitization, batch insertions, search indexes, deletion, and source counting |
 | [`tests/actionsAgentMailAndDispatcher.test.ts`](file:///d:/ClaimHero/tests/actionsAgentMailAndDispatcher.test.ts) | 16 | AgentMail actions, attachment download, transmission dispatching, bidirectional threadId routing, RFC in-reply-to threading, base claim prefix matching, registered user notification for test & real accounts, and universal `[ClaimHero #${claimNumber}]` injection |
 | [`tests/financialErisaCalculator.test.ts`](file:///d:/ClaimHero/tests/financialErisaCalculator.test.ts) | 15 | ERISA § 502(c) statutory non-disclosure daily penalties, compounding interest, out-of-pocket maximum offsets, and No Surprises Act protections |
@@ -589,13 +589,13 @@ Current: **390/390 passing** across 28 comprehensive test suites covering end-to
 | [`tests/actionsClinicalAndParser.test.ts`](file:///d:/ClaimHero/tests/actionsClinicalAndParser.test.ts) | 7 | Clinical intake question generation, optical parser vision extraction, non-claim document classification & rejection, and payer contact resolver |
 | [`tests/convexSettings.test.ts`](file:///d:/ClaimHero/tests/convexSettings.test.ts) | 7 | User settings defaults, profile updates, manual sync sweep triggers, and safe portfolio reset cascading |
 | [`tests/p2pLiveCopilot.test.ts`](file:///d:/ClaimHero/tests/p2pLiveCopilot.test.ts) | 7 | Interactive Medical Director 3-turn lifecycle, Fast Answer cards, and STT tolerance |
+| [`tests/actionsP2PAndChatbot.test.ts`](file:///d:/ClaimHero/tests/actionsP2PAndChatbot.test.ts) | 6 | Physician P2P defense generation, live copilot fast answers, interactive pushback, multi-turn agentic chatbot, session ownership verification, and activeClaimId validation |
 | [`tests/convexEmails.test.ts`](file:///d:/ClaimHero/tests/convexEmails.test.ts) | 6 | Email threads, messages, inbound intake states, and multi-tenant access boundaries |
 | [`tests/p2pDefense.test.ts`](file:///d:/ClaimHero/tests/p2pDefense.test.ts) | 6 | Physician tele-script generator, statutory opening, and pocket cheat sheet print |
 | [`tests/sentinelChatbot.test.ts`](file:///d:/ClaimHero/tests/sentinelChatbot.test.ts) | 6 | Agentic OpenAI tool calling (10 tools), Firecrawl live search/scrape schemas, and lean prompt builder |
 | [`tests/statutoryEscalation.test.ts`](file:///d:/ClaimHero/tests/statutoryEscalation.test.ts) | 5 | 180-day internal appeal to Level 3 DOI escalation state machine |
 | [`tests/actionsPolicyAndSynthesizer.test.ts`](file:///d:/ClaimHero/tests/actionsPolicyAndSynthesizer.test.ts) | 5 | Policy crawler multi-tier search query generation, Carelon/NASS clinical candidate selection, student safety filtering, PubMed research, and appeal brief synthesis |
 | [`tests/demoIsolationAndHonestPipelines.test.ts`](file:///d:/ClaimHero/tests/demoIsolationAndHonestPipelines.test.ts) | 8 | Demo fixture provenance tagging, HIPAA Safe Harbor metadata, scoped demo cascade purge, purged hardcoded fake NPIs, honest LLM fallbacks, and generation attribution |
-| [`tests/actionsP2PAndChatbot.test.ts`](file:///d:/ClaimHero/tests/actionsP2PAndChatbot.test.ts) | 4 | Physician P2P defense generation, live copilot fast answers, interactive pushback, and multi-turn agentic chatbot |
 
 ---
 

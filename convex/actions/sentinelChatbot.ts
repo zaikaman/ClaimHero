@@ -7,6 +7,7 @@ import { internal, api, components } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { Doc, Id } from "../_generated/dataModel";
 import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
+import { getAuthUserId } from "../lib/auth";
 
 const firecrawl = new FirecrawlClient(components.firecrawl);
 
@@ -350,14 +351,15 @@ async function performFirecrawlScrapeUrl(
 async function triggerFirecrawlEvidenceIngestion(
   ctx: ActionCtx,
   claimId: Id<"claims">,
-  customUrl?: string
+  customUrl?: string,
+  userId?: Id<"users">
 ): Promise<{ success: boolean; message: string; claimId: string }> {
   try {
-    const claim = await ctx.runQuery(internal.chatbot.getClaimDataForChatbot, { claimId });
+    const claim = await ctx.runQuery(internal.chatbot.getClaimDataForChatbot, { claimId, userId });
     if (!claim) {
       return {
         success: false,
-        message: `Claim ${claimId} not found.`,
+        message: `Claim ${claimId} not found or access denied.`,
         claimId,
       };
     }
@@ -441,7 +443,8 @@ async function executeToolCall(
   ctx: ActionCtx,
   name: string,
   args: Record<string, unknown>,
-  defaultActiveClaimId?: string
+  defaultActiveClaimId?: string,
+  userId?: Id<"users">
 ): Promise<{ toolName: string; output: string; raw: unknown }> {
   try {
     switch (name) {
@@ -460,12 +463,13 @@ async function executeToolCall(
         const data = await ctx.runQuery(internal.chatbot.getClaimDataForChatbot, {
           claimId,
           claimNumber,
+          userId,
         });
 
         if (!data) {
           return {
             toolName: name,
-            output: `Claim not found for query ${claimId || claimNumber}.`,
+            output: `Claim not found or access denied for query ${claimId || claimNumber}.`,
             raw: null,
           };
         }
@@ -482,6 +486,7 @@ async function executeToolCall(
           searchTerm: args.searchTerm as string | undefined,
           status: args.status as string | undefined,
           limit: typeof args.limit === "number" ? args.limit : 5,
+          userId,
         });
 
         return {
@@ -501,7 +506,7 @@ async function executeToolCall(
           };
         }
 
-        const data = await ctx.runQuery(internal.chatbot.getEvidencesForChatbot, { claimId });
+        const data = await ctx.runQuery(internal.chatbot.getEvidencesForChatbot, { claimId, userId });
         return {
           toolName: name,
           output: JSON.stringify(data, null, 2),
@@ -519,7 +524,7 @@ async function executeToolCall(
           };
         }
 
-        const data = await ctx.runQuery(internal.chatbot.getAppealBriefForChatbot, { claimId });
+        const data = await ctx.runQuery(internal.chatbot.getAppealBriefForChatbot, { claimId, userId });
         return {
           toolName: name,
           output: JSON.stringify(data, null, 2),
@@ -537,7 +542,7 @@ async function executeToolCall(
           };
         }
 
-        const data = await ctx.runQuery(internal.chatbot.getP2PScriptForChatbot, { claimId });
+        const data = await ctx.runQuery(internal.chatbot.getP2PScriptForChatbot, { claimId, userId });
         return {
           toolName: name,
           output: JSON.stringify(data, null, 2),
@@ -555,7 +560,7 @@ async function executeToolCall(
           };
         }
 
-        const data = await ctx.runQuery(internal.chatbot.getAuditLogsForChatbot, { claimId });
+        const data = await ctx.runQuery(internal.chatbot.getAuditLogsForChatbot, { claimId, userId });
         return {
           toolName: name,
           output: JSON.stringify(data, null, 2),
@@ -618,7 +623,7 @@ async function executeToolCall(
         }
 
         const customUrl = args.customUrl as string | undefined;
-        const result = await triggerFirecrawlEvidenceIngestion(ctx, claimId, customUrl);
+        const result = await triggerFirecrawlEvidenceIngestion(ctx, claimId, customUrl, userId);
         return {
           toolName: name,
           output: JSON.stringify(result, null, 2),
@@ -714,31 +719,58 @@ export const sendMessageWithTools = action({
       // Continue if rate limiter is not configured
     }
 
-    // 2. Persist user message to session
+    // 2. Fetch session and verify ownership
+    const session = await ctx.runQuery(internal.chatbot.getSessionInternal, {
+      sessionId: args.sessionId,
+    });
+    if (!session) {
+      throw new Error("Chatbot session not found");
+    }
+
+    const authUserId = await getAuthUserId(ctx);
+    if (authUserId && session.userId && session.userId !== authUserId) {
+      throw new Error("Forbidden: You do not have permission to access this chat session");
+    }
+    const callerUserId = authUserId || session.userId;
+
+    let activeClaimId = args.activeClaimId;
+    let activeClaimNumber = args.activeClaimNumber;
+    let activePayer = args.activePayer;
+
+    if (activeClaimId && callerUserId) {
+      const activeClaim = await ctx.runQuery(internal.chatbot.getClaimDataForChatbot, {
+        claimId: activeClaimId,
+        userId: callerUserId,
+      });
+      if (!activeClaim) {
+        activeClaimId = undefined;
+        activeClaimNumber = undefined;
+        activePayer = undefined;
+      }
+    }
+
+    // 3. Persist user message to session
     await ctx.runMutation(internal.chatbot.addMessageInternal, {
       sessionId: args.sessionId,
       role: "user",
       content: args.userMessage,
     });
 
-    // 3. Fetch session history and existing summary
-    const session = await ctx.runQuery(internal.chatbot.getSessionInternal, {
-      sessionId: args.sessionId,
-    });
+    // 4. Fetch session history
     const history: Doc<"chatbotMessages">[] = (await ctx.runQuery(internal.chatbot.listMessagesInternal, {
       sessionId: args.sessionId,
     })) || [];
 
-    // 4. Build lean system prompt with conversation summary
+    // 5. Build lean system prompt with conversation summary
     const systemPrompt = buildLeanSentinelPrompt({
       currentView: args.currentView,
-      activeClaimId: args.activeClaimId,
-      activeClaimNumber: args.activeClaimNumber,
-      activePayer: args.activePayer,
+      activeClaimId,
+      activeClaimNumber,
+      activePayer,
       conversationSummary: session?.summary,
     });
 
-    // 5. Build recent message window (last 8 messages)
+    // 6. Build recent message window (last 8 messages)
     const recentMessages = history.slice(-8).map((m) => ({
       role: m.role as "user" | "assistant" | "system",
       content: m.content,
@@ -798,7 +830,8 @@ export const sendMessageWithTools = action({
             ctx,
             toolCall.function.name,
             parsedArgs,
-            args.activeClaimId
+            activeClaimId,
+            callerUserId
           );
 
           executedToolCalls.push({

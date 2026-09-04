@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as chatbot from "../convex/chatbot";
+// @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 vi.mock("@convex-dev/auth/server", () => ({
@@ -371,6 +372,129 @@ describe("Convex Sentinel Chatbot Server Functions", () => {
 
       const logs = await (chatbot.getAuditLogsForChatbot as any)._handler(mockCtx, { claimId: "c1" });
       expect(logs).toHaveLength(1);
+    });
+
+    it("getClaimDataForChatbot: blocks cross-tenant exfiltration when userId does not match", async () => {
+      const victimClaim = {
+        _id: "claim_victim",
+        userId: "user_victim_123",
+        patientId: "pat_victim",
+        claimNumber: "CLM-SECRET-999",
+      };
+
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockImplementation((id) => {
+            if (id === "claim_victim") return Promise.resolve(victimClaim);
+            return Promise.resolve(null);
+          }),
+        },
+      };
+
+      // Attacker passes victim's claimId
+      const res = await (chatbot.getClaimDataForChatbot as any)._handler(mockCtx, {
+        claimId: "claim_victim",
+        userId: "user_attacker_999",
+      });
+
+      expect(res).toBeNull();
+    });
+
+    it("getClaimDataForChatbot: filters by userId when searching by claimNumber", async () => {
+      const claims = [
+        { _id: "c_other", userId: "user_other", claimNumber: "CLM-DUP-1", patientId: "p1" },
+        { _id: "c_mine", userId: "user_me", claimNumber: "CLM-DUP-1", patientId: "p2" },
+      ];
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              take: vi.fn().mockResolvedValue(claims),
+            }),
+          }),
+          get: vi.fn().mockResolvedValue({ name: "My Patient", insurancePayer: "Cigna" }),
+        },
+      };
+
+      const res = await (chatbot.getClaimDataForChatbot as any)._handler(mockCtx, {
+        claimNumber: "CLM-DUP-1",
+        userId: "user_me",
+      });
+
+      expect(res).not.toBeNull();
+      expect(res?.claimId).toBe("c_mine");
+      expect(res?.patientName).toBe("My Patient");
+    });
+
+    it("searchClaimsForChatbot: strictly scopes query with by_user and by_user_status when userId is provided", async () => {
+      let usedIndexName = "";
+      const queryChain = {
+        withIndex: vi.fn().mockImplementation((indexName, cb) => {
+          usedIndexName = indexName;
+          const q = { eq: vi.fn().mockReturnThis() };
+          if (cb) cb(q);
+          return {
+            order: vi.fn().mockReturnValue({
+              take: vi.fn().mockResolvedValue([
+                { _id: "c_scoped", userId: "user_me", claimNumber: "CLM-SCOPE-1", patientId: "p1", cptCodes: [], status: "ready_for_review" },
+              ]),
+            }),
+          };
+        }),
+      };
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue(queryChain),
+          get: vi.fn().mockResolvedValue({ name: "Scoped Patient", insurancePayer: "Aetna" }),
+        },
+      };
+
+      // Search without status
+      await (chatbot.searchClaimsForChatbot as any)._handler(mockCtx, { userId: "user_me" });
+      expect(usedIndexName).toBe("by_user");
+
+      // Search with status
+      await (chatbot.searchClaimsForChatbot as any)._handler(mockCtx, { userId: "user_me", status: "ready_for_review" });
+      expect(usedIndexName).toBe("by_user_status");
+    });
+
+    it("getEvidencesForChatbot, getAppealBriefForChatbot, getP2PScriptForChatbot & getAuditLogsForChatbot: verify claim owner before returning data", async () => {
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockImplementation((id) => {
+            if (id === "claim_victim") {
+              return Promise.resolve({ _id: "claim_victim", userId: "user_victim_123" });
+            }
+            return Promise.resolve(null);
+          }),
+        },
+      };
+
+      const evs = await (chatbot.getEvidencesForChatbot as any)._handler(mockCtx, {
+        claimId: "claim_victim",
+        userId: "user_attacker_999",
+      });
+      expect(evs).toEqual([]);
+
+      const brief = await (chatbot.getAppealBriefForChatbot as any)._handler(mockCtx, {
+        claimId: "claim_victim",
+        userId: "user_attacker_999",
+      });
+      expect(brief).toBeNull();
+
+      const script = await (chatbot.getP2PScriptForChatbot as any)._handler(mockCtx, {
+        claimId: "claim_victim",
+        userId: "user_attacker_999",
+      });
+      expect(script).toBeNull();
+
+      const logs = await (chatbot.getAuditLogsForChatbot as any)._handler(mockCtx, {
+        claimId: "claim_victim",
+        userId: "user_attacker_999",
+      });
+      expect(logs).toEqual([]);
     });
   });
 });

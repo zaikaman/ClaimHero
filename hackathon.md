@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-04T08:54:00Z
+- **Last updated:** 2026-09-04T09:12:00Z
 
 ## Log
 
@@ -690,9 +690,12 @@ Resolved email conversation thread bifurcation across AgentMail payer transmissi
 - Guarded `applyGetOrCreateThread` in `convex/emails.ts` from mutating existing thread subjects when recording replies.
 - Added comprehensive unit tests in `tests/agentMail.test.ts` and `tests/actionsAgentMailAndDispatcher.test.ts`. Verified with `npm run verify` (100% typecheck, 0 ESLint errors, 402/402 passing unit tests across 28 suites, and successful production build). Convex features: actions, internalAction, mutations, queries.
 
-### 2026-09-04 - working tree
+### 2026-09-04 - 9b82487
 Optimized CI/CD build pipeline and resolved GitHub Actions dependency installation hangs (`.npmrc`, `.github/workflows/deploy.yml`, `.github/workflows/ci.yml`):
 - Diagnosed root causes for `npm ci` hanging on runner execution: NPM advisory audit service endpoint latency stalls, terminal progress bar buffer redrawing deadlocks in headless runners, and lack of `node_modules` caching forcing repeated ~900 MB unpack and link cycles across every job.
 - Added `.npmrc` configuring `audit=false`, `fund=false`, `progress=false`, `prefer-offline=true`, and resilient network retry/timeout limits (`fetch-retries=5`, `fetch-retry-mintimeout=20000`, `fetch-retry-maxtimeout=120000`).
 - Integrated `actions/cache@v4` targeting `node_modules` keyed by OS and `package-lock.json` hash across all jobs in `.github/workflows/deploy.yml` (`verify`, `deploy`) and `.github/workflows/ci.yml` (`typecheck`, `lint`, `test`, `build`), bypassing `npm ci` on cache hits and dropping dependency setup time from over 4 minutes to under 10 seconds.
 - Hardened job execution with explicit `timeout-minutes` boundaries to prevent unbounded runner stalls.
+
+### 2026-09-04 - working tree
+Remediated prompt injection data exfiltration across Sentinel Chatbot tool execution and internal queries (`convex/chatbot.ts`, `convex/actions/sentinelChatbot.ts`): eliminated cross-tenant claim data and PHI leakage in `getClaimDataForChatbot` and `searchClaimsForChatbot` by accepting caller `userId`, scoping searches strictly through `by_user` and `by_user_status` indexes, verifying claim ownership on lookups, and asserting `claim.userId === args.userId` before returning child clinical evidences, appeal briefs, P2P tele-scripts, and audit logs; hardened `sendMessageWithTools` by validating session ownership before persisting user messages, validating `activeClaimId` against caller `userId` to prevent prompt injection poisoning, and forwarding caller `userId` through all tool executions (`executeToolCall`, `triggerFirecrawlEvidenceIngestion`); and expanded test coverage with 6 dedicated isolation and injection prevention tests across `tests/convexChatbot.test.ts` and `tests/actionsP2PAndChatbot.test.ts`. Convex features: actions, internalQuery, internalMutation, indexes (`by_user`, `by_user_status`, `by_claim_number`).
