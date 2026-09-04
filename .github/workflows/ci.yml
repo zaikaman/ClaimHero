@@ -14,6 +14,7 @@ jobs:
   typecheck:
     name: TypeScript Strict Typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -22,10 +23,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "npm"
+
+      - name: Cache Node Modules
+        id: node-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
 
       - name: Install Dependencies
-        run: npm ci
+        if: steps.node-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Run Typecheck
         run: npm run typecheck
@@ -33,6 +41,7 @@ jobs:
   lint:
     name: ESLint Code Quality
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -41,10 +50,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "npm"
+
+      - name: Cache Node Modules
+        id: node-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
 
       - name: Install Dependencies
-        run: npm ci
+        if: steps.node-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Run ESLint
         run: npm run lint
@@ -52,6 +68,7 @@ jobs:
   test:
     name: Vitest Automated Test Suite & 100% Coverage Verification
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -60,10 +77,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "npm"
+
+      - name: Cache Node Modules
+        id: node-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
 
       - name: Install Dependencies
-        run: npm ci
+        if: steps.node-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Run Tests with 100% Coverage Gate
         run: npm run test:coverage
@@ -91,6 +115,7 @@ jobs:
   build:
     name: Production Bundle Build Verification
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [typecheck, lint, test]
     steps:
       - name: Checkout Repository
@@ -100,10 +125,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "npm"
+
+      - name: Cache Node Modules
+        id: node-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
 
       - name: Install Dependencies
-        run: npm ci
+        if: steps.node-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Build Frontend & Backend Types
         run: npm run build
@@ -113,4 +145,3 @@ jobs:
           VITE_AGENTMAIL_SENDER_EMAIL: ${{ vars.VITE_AGENTMAIL_SENDER_EMAIL || 'claimhero-sender@agentmail.to' }}
           VITE_AGENTMAIL_ADJUDICATOR_EMAIL: ${{ vars.VITE_AGENTMAIL_ADJUDICATOR_EMAIL || 'claimhero-adjudicator@agentmail.to' }}
           VITE_AGENTMAIL_INTAKE_EMAIL: ${{ vars.VITE_AGENTMAIL_INTAKE_EMAIL || 'claimhero-intake@agentmail.to' }}
-

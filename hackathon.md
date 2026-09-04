@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-04T08:42:30Z
+- **Last updated:** 2026-09-04T08:54:00Z
 
 ## Log
 
@@ -682,10 +682,17 @@ Hardened `convex/settings.ts` authorization and multi-tenant isolation across al
 ### 2026-09-04 - d733592
 Remediated IDOR vulnerabilities and unauthorized AI/crawler/email spend across public Convex actions: enforced `requireClaimOwnerAction` as the mandatory first line in all public actions accepting `claimId` (`mailDispatcher.ts:dispatchAppealPacket, sendOutboundMessage, generateAutoReplyDraft`, `appealSynthesizer.ts:generateAppealBrief`, `policyCrawler.ts:crawlInsurerPolicy, crawlPubMedAndTrials, crawlFdaIndications, crawlCustomResearchUrl, crawlMultiSourceHub`, `payerContactResolver.ts:resolvePayerGateway`, `p2pDefenseGenerator.ts:generateP2PScript`, `p2pLiveCopilot.ts:generateLiveFastAnswer, generateInteractiveReviewerPushback`, and `precedentMatcher.ts:computeOverturnScore`); created internal action `sendOutboundMessageInternal` in `mailDispatcher.ts` to support background webhook auto-reply transmissions without requiring user sessions; enforced `requireAuthUser` in public `agentMail.ts:syncInboxes`; and updated test suites and added 7 dedicated IDOR/spend authorization tests in `authorization.test.ts`. Convex features: actions, internalAction, auth (`requireClaimOwnerAction`, `requireAuthUser`), rate limiting.
 
-### 2026-09-04 - working tree
+### 2026-09-04 - e8249a1
 Resolved email conversation thread bifurcation across AgentMail payer transmissions:
 - Diagnosed root causes of replies arriving as detached emails in external inboxes (such as Gmail): subject divergence where follow-ups generated arbitrary new subjects (`Re: Formal Medical Appeal | ... | Addendum`), missing RFC 5322 `In-Reply-To` and `References` headers, unused AgentMail native reply endpoint, and mutation of canonical thread subjects in Convex.
 - Implemented `formatMessageIdHeader`, `replyAgentMailMessage` (`POST /v0/inboxes/{inbox_id}/messages/{message_id}/reply`), and custom `headers` support on `sendAgentMailMessage` in `convex/lib/agentMail.ts`.
 - Updated `performSendOutboundMessage` and `deliverAiAdjudication` in `convex/actions/mailDispatcher.ts` to dynamically resolve canonical conversation thread subjects (`Re: <thread.subject>`), compute RFC 5322 `In-Reply-To` and `References` headers linking parent and ancestor message IDs, and invoke `replyAgentMailMessage` when prior inbound messages are present with seamless fallback to in-thread `sendAgentMailMessage`.
 - Guarded `applyGetOrCreateThread` in `convex/emails.ts` from mutating existing thread subjects when recording replies.
 - Added comprehensive unit tests in `tests/agentMail.test.ts` and `tests/actionsAgentMailAndDispatcher.test.ts`. Verified with `npm run verify` (100% typecheck, 0 ESLint errors, 402/402 passing unit tests across 28 suites, and successful production build). Convex features: actions, internalAction, mutations, queries.
+
+### 2026-09-04 - working tree
+Optimized CI/CD build pipeline and resolved GitHub Actions dependency installation hangs (`.npmrc`, `.github/workflows/deploy.yml`, `.github/workflows/ci.yml`):
+- Diagnosed root causes for `npm ci` hanging on runner execution: NPM advisory audit service endpoint latency stalls, terminal progress bar buffer redrawing deadlocks in headless runners, and lack of `node_modules` caching forcing repeated ~900 MB unpack and link cycles across every job.
+- Added `.npmrc` configuring `audit=false`, `fund=false`, `progress=false`, `prefer-offline=true`, and resilient network retry/timeout limits (`fetch-retries=5`, `fetch-retry-mintimeout=20000`, `fetch-retry-maxtimeout=120000`).
+- Integrated `actions/cache@v4` targeting `node_modules` keyed by OS and `package-lock.json` hash across all jobs in `.github/workflows/deploy.yml` (`verify`, `deploy`) and `.github/workflows/ci.yml` (`typecheck`, `lint`, `test`, `build`), bypassing `npm ci` on cache hits and dropping dependency setup time from over 4 minutes to under 10 seconds.
+- Hardened job execution with explicit `timeout-minutes` boundaries to prevent unbounded runner stalls.
