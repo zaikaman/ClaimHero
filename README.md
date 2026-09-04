@@ -198,6 +198,8 @@ Copy the variable names from [`.env.example`](./.env.example). Keep provider cre
 
 For a full production-style configuration, set the Convex Auth, OpenAI, Firecrawl, and AgentMail variables described in `.env.example`. The AgentMail webhook route is `/agentmail/webhook` (with legacy compatibility preserved at `/agentmail-webhook`).
 
+AgentMail is mounted as an isolated Convex component. The app explicitly binds `AGENTMAIL_API_KEY` into that component at deploy time, so the key must exist on the target deployment (for production, use `npx convex env set AGENTMAIL_API_KEY '<key>' --prod`). Do not place the key in a function argument or a `VITE_*` variable.
+
 ## Verification
 
 ```bash

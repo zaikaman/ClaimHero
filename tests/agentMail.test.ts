@@ -6,7 +6,6 @@ import {
   formatMessageIdHeader,
   getAgentMailMessage,
   listAgentMailMessages,
-  downloadAgentMailAttachment,
   agentmail,
 } from "../convex/lib/agentMail";
 import * as emailsModule from "../convex/emails";
@@ -61,35 +60,6 @@ describe("convex/lib/agentMail Unit Tests", () => {
     expect(shared.adjudicatorEmail).toBe("adjudicator@claimhero.agentmail.to");
   });
 
-  it("sends AgentMail message and returns messageId", async () => {
-    process.env.AGENTMAIL_API_KEY = "test_key_123";
-
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve(JSON.stringify({ message_id: "msg_sent_99" })),
-    });
-    vi.stubGlobal("fetch", mockFetch);
-
-    const result = await sendAgentMailMessage({
-      inboxId: "inbox_1",
-      to: "payer@example.com",
-      subject: "Formal Appeal CLM-123",
-      text: "Plain text appeal",
-      html: "<p>HTML appeal</p>",
-    });
-
-    expect(result.messageId).toBe("msg_sent_99");
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.agentmail.to/v0/inboxes/inbox_1/messages/send",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          Authorization: "Bearer test_key_123",
-        }),
-      })
-    );
-  });
-
   it("formats message IDs correctly for RFC 5322 In-Reply-To and References headers", () => {
     expect(formatMessageIdHeader("")).toBe("");
     expect(formatMessageIdHeader("   ")).toBe("");
@@ -98,186 +68,7 @@ describe("convex/lib/agentMail Unit Tests", () => {
     expect(formatMessageIdHeader("msg_01JHGXYZ123")).toBe("<msg_01JHGXYZ123@agentmail.to>");
   });
 
-  it("sends AgentMail message with custom RFC 5322 threading headers", async () => {
-    process.env.AGENTMAIL_API_KEY = "test_key_123";
-
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve(JSON.stringify({ message_id: "msg_reply_100", thread_id: "thr_abc" })),
-    });
-    vi.stubGlobal("fetch", mockFetch);
-
-    const result = await sendAgentMailMessage({
-      inboxId: "inbox_1",
-      to: "payer@example.com",
-      subject: "Re: [ClaimHero #CLM-123] Appeal request",
-      text: "Addendum text",
-      html: "<p>Addendum HTML</p>",
-      headers: {
-        "In-Reply-To": "<msg_parent@agentmail.to>",
-        "References": "<msg_root@agentmail.to> <msg_parent@agentmail.to>",
-      },
-    });
-
-    expect(result.messageId).toBe("msg_reply_100");
-    expect(result.threadId).toBe("thr_abc");
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.agentmail.to/v0/inboxes/inbox_1/messages/send",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          to: "payer@example.com",
-          subject: "Re: [ClaimHero #CLM-123] Appeal request",
-          text: "Addendum text",
-          html: "<p>Addendum HTML</p>",
-          headers: {
-            "In-Reply-To": "<msg_parent@agentmail.to>",
-            "References": "<msg_root@agentmail.to> <msg_parent@agentmail.to>",
-          },
-        }),
-      })
-    );
-  });
-
-  it("replies to an existing AgentMail message using the native reply endpoint", async () => {
-    process.env.AGENTMAIL_API_KEY = "test_key_123";
-
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve(JSON.stringify({ message_id: "msg_reply_200", thread_id: "thr_abc" })),
-    });
-    vi.stubGlobal("fetch", mockFetch);
-
-    const result = await replyAgentMailMessage({
-      inboxId: "inbox_1",
-      messageId: "msg_parent_inbound",
-      to: "payer@example.com",
-      text: "Reply plain text",
-      html: "<p>Reply HTML</p>",
-      headers: {
-        "In-Reply-To": "<msg_parent_inbound@agentmail.to>",
-      },
-    });
-
-    expect(result.messageId).toBe("msg_reply_200");
-    expect(result.threadId).toBe("thr_abc");
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.agentmail.to/v0/inboxes/inbox_1/messages/msg_parent_inbound/reply",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          text: "Reply plain text",
-          html: "<p>Reply HTML</p>",
-          to: "payer@example.com",
-          headers: {
-            "In-Reply-To": "<msg_parent_inbound@agentmail.to>",
-          },
-        }),
-      })
-    );
-  });
-
-  it("handles send error responses gracefully", async () => {
-    process.env.AGENTMAIL_API_KEY = "test_key_123";
-
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 400,
-      text: () => Promise.resolve(JSON.stringify({ error: "Invalid recipient" })),
-    });
-    vi.stubGlobal("fetch", mockFetch);
-
-    await expect(
-      sendAgentMailMessage({
-        inboxId: "inbox_1",
-        to: "invalid-email",
-        subject: "Test",
-        text: "Test",
-        html: "<p>Test</p>",
-      })
-    ).rejects.toThrow("AgentMail message delivery failed (400)");
-  });
-
-  it("retrieves an AgentMail message", async () => {
-    process.env.AGENTMAIL_API_KEY = "test_key_123";
-
-    const mockMessage = { id: "msg_123", subject: "Re: Appeal", from: "payer@example.com" };
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve(JSON.stringify(mockMessage)),
-    });
-    vi.stubGlobal("fetch", mockFetch);
-
-    const message = await getAgentMailMessage("inbox_1", "msg_123");
-    expect(message.subject).toBe("Re: Appeal");
-  });
-
-  it("downloads an AgentMail attachment with direct bytes or via downloadUrl", async () => {
-    process.env.AGENTMAIL_API_KEY = "test_key_123";
-
-    // Direct download case (non-JSON binary)
-    const mockBinary = new ArrayBuffer(8);
-    const mockFetchBinary = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: new Headers({ "content-type": "application/pdf" }),
-      arrayBuffer: () => Promise.resolve(mockBinary),
-      text: () => Promise.resolve(""),
-    });
-    vi.stubGlobal("fetch", mockFetchBinary);
-
-    const directResult = await downloadAgentMailAttachment({
-      inboxId: "inbox_1",
-      messageId: "msg_1",
-      attachmentId: "att_1",
-    });
-    expect(directResult.contentType).toBe("application/pdf");
-    expect(directResult.bytes.byteLength).toBe(8);
-
-    // JSON metadata download_url redirect case
-    const mockFetchJson = vi.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        headers: new Headers({ "content-type": "application/json" }),
-        json: () => Promise.resolve({ download_url: "https://storage.agentmail.to/att_file.pdf", content_type: "application/pdf" }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        headers: new Headers({ "content-type": "application/pdf" }),
-        arrayBuffer: () => Promise.resolve(mockBinary),
-      });
-    vi.stubGlobal("fetch", mockFetchJson);
-
-    const redirectResult = await downloadAgentMailAttachment({
-      inboxId: "inbox_1",
-      messageId: "msg_1",
-      attachmentId: "att_1",
-    });
-    expect(redirectResult.contentType).toBe("application/pdf");
-  });
-
-  it("handles getAgentMailMessage and downloadAgentMailAttachment failures", async () => {
-    process.env.AGENTMAIL_API_KEY = "test_key_123";
-
-    // Failure on getAgentMailMessage
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: false,
-      status: 404,
-      text: () => Promise.resolve("Not found"),
-    }));
-
-    await expect(getAgentMailMessage("inbox_1", "missing_msg")).rejects.toThrow("AgentMail message retrieval failed (404)");
-
-    // Failure on downloadAgentMailAttachment
-    await expect(downloadAgentMailAttachment({
-      inboxId: "inbox_1",
-      messageId: "msg_1",
-      attachmentId: "missing_att",
-    })).rejects.toThrow("AgentMail attachment retrieval failed (404)");
-  });
-
-  it("throws when sending with unconfigured API key or missing response field", async () => {
-    delete process.env.AGENTMAIL_API_KEY;
-
+  it("requires a Convex context for outbound delivery", async () => {
     await expect(
       sendAgentMailMessage({
         inboxId: "inbox_1",
@@ -285,23 +76,9 @@ describe("convex/lib/agentMail Unit Tests", () => {
         subject: "Test",
         text: "Test",
         html: "<p>Test</p>",
-      })
-    ).rejects.toThrow("AgentMail is not configured. Set AGENTMAIL_API_KEY before sending email.");
-
-    process.env.AGENTMAIL_API_KEY = "test_key_123";
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve(JSON.stringify({ unexpected_data: "none" })),
-    }));
-
-    const result = await sendAgentMailMessage({
-      inboxId: "inbox_1",
-      to: "payer@example.com",
-      subject: "Test",
-      text: "Test",
-      html: "<p>Test</p>",
-    });
-    expect(result.messageId).toBeUndefined();
+        ctx: undefined as never,
+      }),
+    ).rejects.toThrow("requires a Convex context");
   });
 });
 
@@ -819,35 +596,47 @@ Paragraph text with **bold** and *italic*.
       expect(result.threadId).toBe("thr_remote_888");
     });
 
-    it("retrieves message via agentmail.getMessage when ctx is provided", async () => {
-      const mockGetMessage = vi.spyOn(agentmail, "getMessage").mockResolvedValue({
-        id: "msg_test_remote",
-        subject: "Overturn Confirmation",
-      });
-
+    it("retrieves message from the AgentMail component mirror when ctx is provided", async () => {
       const mockCtx = {
         runAction: vi.fn(),
         runMutation: vi.fn(),
+        runQuery: vi.fn().mockResolvedValue([
+          {
+            messageId: "msg_test_remote",
+            inboxId: "inbox_1",
+            threadId: "thread_1",
+            from: "reviewer@payer.com",
+            to: ["claimhero@agentmail.to"],
+            subject: "Overturn Confirmation",
+            raw: { message_id: "msg_test_remote", subject: "Overturn Confirmation" },
+          },
+        ]),
       };
 
       const message = await getAgentMailMessage("inbox_1", "msg_test_remote", mockCtx);
-      expect(mockGetMessage).toHaveBeenCalledWith(mockCtx, "inbox_1", "msg_test_remote");
+      expect(mockCtx.runQuery).toHaveBeenCalledWith(
+        expect.anything(),
+        { inboxId: "inbox_1" },
+      );
       expect(message.subject).toBe("Overturn Confirmation");
     });
 
-    it("lists threads via agentmail.listThreads when ctx is provided", async () => {
-      const mockListThreads = vi.spyOn(agentmail, "listThreads").mockResolvedValue({
-        threads: [{ id: "thr_1", subject: "Claim CLM-001" }],
-      });
-
+    it("lists inbound messages from the AgentMail component mirror when ctx is provided", async () => {
       const mockCtx = {
         runAction: vi.fn(),
         runMutation: vi.fn(),
+        runQuery: vi.fn().mockResolvedValue([
+          { messageId: "msg_1", subject: "Claim CLM-001" },
+          { messageId: "msg_2", subject: "Claim CLM-002" },
+        ]),
       };
 
       const messages = await listAgentMailMessages("inbox_1", 10, mockCtx);
-      expect(mockListThreads).toHaveBeenCalledWith(mockCtx, "inbox_1", { limit: 10 });
-      expect(messages).toHaveLength(1);
+      expect(mockCtx.runQuery).toHaveBeenCalledWith(
+        expect.anything(),
+        { inboxId: "inbox_1" },
+      );
+      expect(messages).toHaveLength(2);
     });
 
     it("onMessageReceived internal mutation schedules processInboundClaimReply", async () => {

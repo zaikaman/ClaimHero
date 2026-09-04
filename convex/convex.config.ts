@@ -61,8 +61,14 @@ app.use(oauth, {
     CLIENT_SECRET: app.env.AUTH_GOOGLE_SECRET,
   },
 });
-app.use(agentmail);
+// @agentmail/convex runs its send worker inside the isolated component
+// runtime. Bind the deployment secret explicitly so component actions receive
+// the same production value as the app without putting it in function args.
+app.use(agentmail, {
+  env: {
+    AGENTMAIL_API_KEY: app.env.AGENTMAIL_API_KEY,
+  },
+});
 app.use(workflow);
 
 export default app;
-

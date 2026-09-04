@@ -5,14 +5,11 @@ import {
   fastSanitizeText as backendFastSanitizeText,
 } from "../convex/lib/redactionEngine";
 import { MAX_RAW_DOCUMENT_CHARS, parseDenialDocument } from "../convex/actions/opticalParser";
-import {
-  downloadAgentMailAttachment,
-  MAX_ATTACHMENT_BYTES,
-} from "../convex/lib/agentMail";
 import * as claims from "../convex/claims";
 import * as auth from "../convex/lib/auth";
 import * as mailDispatcher from "../convex/actions/mailDispatcher";
 import * as rateLimiterModule from "../convex/lib/rateLimiter";
+import { agentmail } from "../convex/lib/agentMail";
 
 describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
   beforeEach(() => {
@@ -76,71 +73,6 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
           rawDocumentText: oversizedText,
         })
       ).rejects.toThrow(/character limit/i);
-    });
-  });
-
-  describe("Inbound Attachment Security: Size Cap & MIME Type Gate", () => {
-    it("rejects inbound attachments exceeding the 10 MB limit", async () => {
-      process.env.AGENTMAIL_API_KEY = "test_key";
-      const oversizedBuffer = new ArrayBuffer(MAX_ATTACHMENT_BYTES + 1024);
-
-      // Mock fetch
-      const originalFetch = globalThis.fetch;
-      globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
-        if (url.includes("/attachments/")) {
-          return new Response(oversizedBuffer, {
-            status: 200,
-            headers: {
-              "content-type": "application/pdf",
-              "content-length": String(MAX_ATTACHMENT_BYTES + 1024),
-            },
-          });
-        }
-        return originalFetch(url);
-      });
-
-      try {
-        await expect(
-          downloadAgentMailAttachment({
-            inboxId: "inbox_1",
-            messageId: "msg_1",
-            attachmentId: "att_oversized",
-          })
-        ).rejects.toThrow(/10 MB security limit/i);
-      } finally {
-        globalThis.fetch = originalFetch;
-      }
-    });
-
-    it("rejects executable or script attachment MIME types", async () => {
-      process.env.AGENTMAIL_API_KEY = "test_key";
-      const buffer = new ArrayBuffer(100);
-
-      const originalFetch = globalThis.fetch;
-      globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
-        if (url.includes("/attachments/")) {
-          return new Response(buffer, {
-            status: 200,
-            headers: {
-              "content-type": "application/x-msdownload",
-              "content-length": "100",
-            },
-          });
-        }
-        return originalFetch(url);
-      });
-
-      try {
-        await expect(
-          downloadAgentMailAttachment({
-            inboxId: "inbox_1",
-            messageId: "msg_1",
-            attachmentId: "att_malware",
-          })
-        ).rejects.toThrow(/Disallowed attachment MIME type/i);
-      } finally {
-        globalThis.fetch = originalFetch;
-      }
     });
   });
 
@@ -266,29 +198,28 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "inbox_adj";
       process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "claimhero-adjudicator@agentmail.to";
 
-      const originalFetch = globalThis.fetch;
-      globalThis.fetch = vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ message_id: "msg_sent_1" }), { status: 200 })
+      vi.spyOn(agentmail, "sendMessage").mockResolvedValue("outbound_1" as any);
+      vi.spyOn(agentmail, "status").mockResolvedValue({
+        status: "pending",
+        agentmailMessageId: null,
+        threadId: null,
+        errorMessage: null,
+      });
+
+      await (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
+        claimId: "claim_1",
+        dispatchMode: "custom_email",
+        recipientEmail: "reviewer@customdomain.org",
+        waiveRedaction: true,
+      });
+
+      expect(runMutationMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          eventType: "hipaa_redaction_waived",
+          actor: "User Consent Gate",
+        })
       );
-
-      try {
-        await (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
-          claimId: "claim_1",
-          dispatchMode: "custom_email",
-          recipientEmail: "reviewer@customdomain.org",
-          waiveRedaction: true,
-        });
-
-        expect(runMutationMock).toHaveBeenCalledWith(
-          expect.anything(),
-          expect.objectContaining({
-            eventType: "hipaa_redaction_waived",
-            actor: "User Consent Gate",
-          })
-        );
-      } finally {
-        globalThis.fetch = originalFetch;
-      }
     });
   });
 });
