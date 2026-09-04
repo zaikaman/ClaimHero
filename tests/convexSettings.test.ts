@@ -1,9 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as settings from "../convex/settings";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { claimsAggregate } from "../convex/lib/aggregates";
 
 vi.mock("@convex-dev/auth/server", () => ({
   getAuthUserId: vi.fn(),
+}));
+
+vi.mock("../convex/lib/aggregates", () => ({
+  claimsAggregate: {
+    delete: vi.fn(),
+    insert: vi.fn(),
+  },
 }));
 
 describe("Convex Settings API (convex/settings.ts)", () => {
@@ -12,21 +20,36 @@ describe("Convex Settings API (convex/settings.ts)", () => {
   });
 
   describe("getSettings", () => {
-    it("returns default settings if no user or record exists", async () => {
+    it("throws unauthorized error if user is unauthenticated", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const mockCtx: any = { db: {} };
+
+      await expect(
+        (settings.getSettings as any)._handler(mockCtx, {})
+      ).rejects.toThrow("Unauthorized: Authentication required");
+    });
+
+    it("returns default settings for authenticated user if no record exists", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const mockCtx: any = {
         db: {
           query: vi.fn().mockReturnValue({
-            first: vi.fn().mockResolvedValue(null),
+            withIndex: vi.fn().mockReturnValue({
+              first: vi.fn().mockResolvedValue(null),
+            }),
           }),
         },
       };
 
       const res = await (settings.getSettings as any)._handler(mockCtx, {});
       expect(res).toBeDefined();
+      expect(res.userId).toBe("user_123");
       expect(res.approvalMode).toBe("manual_review");
       expect(res.followUpCadenceDays).toBe(14);
       expect(res.advocateProfile.name).toContain("Dr. Sarah Chen");
+      // Verifies only scoped by_user was queried, never a global fallback
+      expect(mockCtx.db.query).toHaveBeenCalledTimes(1);
+      expect(mockCtx.db.query).toHaveBeenCalledWith("userSettings");
     });
 
     it("returns user specific settings when found", async () => {
@@ -67,6 +90,29 @@ describe("Convex Settings API (convex/settings.ts)", () => {
   });
 
   describe("updateSettings", () => {
+    it("throws unauthorized error if user is unauthenticated", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const mockCtx: any = { db: {} };
+
+      await expect(
+        (settings.updateSettings as any)._handler(mockCtx, {
+          approvalMode: "manual_review",
+          followUpCadenceDays: 14,
+          defaultLegalPosture: "administrative_reconsideration",
+          autoReplyInbound: true,
+          autoRescanPolicies: true,
+          criticalDeadlineAlerts: true,
+          advocateProfile: {
+            name: "Dr. Test",
+            credentials: "MD",
+            organization: "Org",
+            phone: "+1-555-0000",
+            state: "CA",
+          },
+        })
+      ).rejects.toThrow("Unauthorized: Authentication required");
+    });
+
     it("inserts new settings record if none exists", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const mockCtx: any = {
@@ -151,22 +197,34 @@ describe("Convex Settings API (convex/settings.ts)", () => {
   });
 
   describe("triggerManualSweepAndSync", () => {
-    it("recalculates deadline days for claims and updates sync timestamp", async () => {
+    it("throws unauthorized error if user is unauthenticated", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const mockCtx: any = { db: {} };
+
+      await expect(
+        (settings.triggerManualSweepAndSync as any)._handler(mockCtx, {})
+      ).rejects.toThrow("Unauthorized: Authentication required");
+    });
+
+    it("recalculates deadline days for claims scoped to user and updates sync timestamp", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const now = Date.now();
       const mockClaim = {
         _id: "claim_1",
+        userId: "user_123",
         statutoryDeadline: now + 5 * 24 * 60 * 60 * 1000,
         daysRemaining: 10, // stale value
       };
-      const mockSetting = { _id: "setting_1" };
+      const mockSetting = { _id: "setting_1", userId: "user_123" };
 
       const mockCtx: any = {
         db: {
           query: vi.fn().mockImplementation((table) => {
             if (table === "claims") {
               return {
-                take: vi.fn().mockResolvedValue([mockClaim]),
+                withIndex: vi.fn().mockReturnValue({
+                  take: vi.fn().mockResolvedValue([mockClaim]),
+                }),
               };
             }
             if (table === "userSettings") {
@@ -199,11 +257,24 @@ describe("Convex Settings API (convex/settings.ts)", () => {
       ).rejects.toThrow("Confirmation phrase mismatch");
     });
 
-    it("cascades and deletes all claim records and artifacts upon confirmation", async () => {
+    it("throws unauthorized error if user is unauthenticated", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const mockCtx: any = { db: {} };
+
+      await expect(
+        (settings.resetPortfolio as any)._handler(mockCtx, { confirmText: "RESET_PORTFOLIO" })
+      ).rejects.toThrow("Unauthorized: Authentication required");
+    });
+
+    it("cascades and deletes all claim records, artifacts, and storage attachments upon confirmation", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
-      const mockClaim = { _id: "claim_1" };
+      const mockClaim = {
+        _id: "claim_1",
+        userId: "user_123",
+        denialLetterStorageId: "storage_denial_1",
+      };
       const mockEv = [{ _id: "ev_1" }];
-      const mockAppeal = [{ _id: "ap_1" }];
+      const mockAppeal = [{ _id: "ap_1", pdfExportStorageId: "storage_pdf_1" }];
       const mockThread = [{ _id: "th_1" }];
       const mockMsg = [{ _id: "msg_1" }];
       const mockP2P = [{ _id: "p2p_1" }];
@@ -227,9 +298,11 @@ describe("Convex Settings API (convex/settings.ts)", () => {
                   return Promise.resolve([]);
                 }),
               }),
-              collect: vi.fn().mockResolvedValue([mockClaim]),
             };
           }),
+          delete: vi.fn().mockResolvedValue(undefined),
+        },
+        storage: {
           delete: vi.fn().mockResolvedValue(undefined),
         },
       };
@@ -239,7 +312,15 @@ describe("Convex Settings API (convex/settings.ts)", () => {
       expect(res.deletedClaimsCount).toBe(1);
       expect(mockCtx.db.delete).toHaveBeenCalledWith("ev_1");
       expect(mockCtx.db.delete).toHaveBeenCalledWith("ap_1");
+      expect(mockCtx.db.delete).toHaveBeenCalledWith("th_1");
+      expect(mockCtx.db.delete).toHaveBeenCalledWith("msg_1");
+      expect(mockCtx.db.delete).toHaveBeenCalledWith("p2p_1");
+      expect(mockCtx.db.delete).toHaveBeenCalledWith("sess_1");
+      expect(mockCtx.db.delete).toHaveBeenCalledWith("log_1");
       expect(mockCtx.db.delete).toHaveBeenCalledWith("claim_1");
+      expect(mockCtx.storage.delete).toHaveBeenCalledWith("storage_pdf_1");
+      expect(mockCtx.storage.delete).toHaveBeenCalledWith("storage_denial_1");
+      expect(claimsAggregate.delete).toHaveBeenCalledWith(mockCtx, mockClaim);
     });
   });
 });

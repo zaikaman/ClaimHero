@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-03T15:05:00Z
+- **Last updated:** 2026-09-04T08:08:00Z
 
 ## Log
 
@@ -673,5 +673,8 @@ Eliminated duplicate execution and answer flashing during autonomous clinical ad
 ### 2026-09-03 - 71df48b
 Resolved payer response user notification suppression and hardened inbound email thread correlation by removing the erroneous self-sender email check in `handleInboundClaimReply` (`convex/actions/agentMail.ts`) so test replies dispatch user alerts, implementing RFC-compliant `In-Reply-To` and `References` threading via `getClaimByAgentMailMessageIdInternal` (`convex/emails.ts`), and adding resilient prefix/base claim number fallback matching in `getByClaimNumberInternal` and `findMatchingClaimInternal` (`convex/claims.ts`). Convex features: internalQuery, internalMutation, actions, relational indexes (`by_agent_mail_message_id`, `by_claim_number`).
 
-### 2026-09-03 - working tree
+### 2026-09-03 - 4d7520e
 Hardened evaluation pipeline integrity, demo case isolation, and inbound email routing: tagged demo fixtures with HIPAA Safe Harbor provenance metadata (`convex/schema.ts`, `src/lib/constants.ts`), enabled demo case inclusion by default across reactive queries and radar filters with an atomic cascading purge mutation (`convex/claims.ts: clearDemoData`), purged hardcoded 555 numbers and fake NPIs from production dossier and onboarding paths (`src/lib/dossierBuilder.ts`, `convex/settings.ts`), eliminated fabricated mathematical scoring breakdowns and fake policy citations in favor of grounded deterministic baselines with generation attribution (`convex/actions/precedentMatcher.ts`, `p2pDefenseGenerator.ts`, `src/components/evidence/EvidenceMatrix.tsx`), enforced exact claim number matching in `convex/claims.ts:findMatchingClaimInternal` to eliminate cross-claim email pollution, and added `ignoredAgentMailMessages` deduplication in `convex/emails.ts` and `convex/actions/agentMail.ts` to prevent repeated sync warning loops. Convex features: schema, queries, mutations, actions, relational indexes (`by_user_demo`, `by_agent_mail_message_id`).
+
+### 2026-09-04 - working tree
+Hardened `convex/settings.ts` authorization and multi-tenant isolation across all endpoints: eliminated cross-tenant advocate profile data leakage in `getSettings` by enforcing `requireAuthUser`, scoping queries strictly by `by_user`, removing fallback to global documents (`query("userSettings").first()`), and returning standard defaults (`DEFAULT_USER_SETTINGS`) when no record exists; prevented unauthenticated and cross-tenant profile mutation in `updateSettings` by requiring authentication and scoping lookup/patch/insert to `userId`; secured `triggerManualSweepAndSync` against unauthorized invocation and cross-tenant claim modifications by requiring authentication and scoping deadline recalculation and sync updates to the caller's claims (`by_user`); secured `resetPortfolio` against unauthenticated mass database deletion by enforcing `requireAuthUser` and scoping claim cascading deletion strictly to `by_user`; and eliminated storage and financial analytics leaks during portfolio resets by cleaning up denial letter attachments (`denialLetterStorageId`) and exported appeal PDFs (`pdfExportStorageId`) from Convex Storage and decrementing the TableAggregate index (`claimsAggregate.delete`). Convex features: queries, mutations, auth (`requireAuthUser`), indexes (`by_user`, `by_claim`), file storage (`ctx.storage.delete`), components (`@convex-dev/aggregate`).

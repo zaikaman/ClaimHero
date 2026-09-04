@@ -1,7 +1,8 @@
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { getAuthUserId } from "./lib/auth";
+import { requireAuthUser } from "./lib/auth";
+import { claimsAggregate } from "./lib/aggregates";
 import { Id } from "./_generated/dataModel";
 
 export const DEFAULT_ADVOCATE_PROFILE = {
@@ -29,29 +30,21 @@ export const DEFAULT_USER_SETTINGS = {
 export const getSettings = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuthUser(ctx);
 
-    if (userId) {
-      const userSettings = await ctx.db
-        .query("userSettings")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .first();
+    const userSettings = await ctx.db
+      .query("userSettings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
 
-      if (userSettings) {
-        return userSettings;
-      }
-    }
-
-    // Fallback to first global settings or defaults
-    const firstSettings = await ctx.db.query("userSettings").first();
-    if (firstSettings) {
-      return firstSettings;
+    if (userSettings) {
+      return userSettings;
     }
 
     return {
       _id: "default" as unknown as Id<"userSettings">,
       _creationTime: Date.now(),
-      userId: userId || undefined,
+      userId,
       ...DEFAULT_USER_SETTINGS,
     };
   },
@@ -84,18 +77,13 @@ export const updateSettings = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuthUser(ctx);
     const now = Date.now();
 
-    let existing = null;
-    if (userId) {
-      existing = await ctx.db
-        .query("userSettings")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .first();
-    } else {
-      existing = await ctx.db.query("userSettings").first();
-    }
+    const existing = await ctx.db
+      .query("userSettings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -111,7 +99,7 @@ export const updateSettings = mutation({
       return existing._id;
     } else {
       const newId = await ctx.db.insert("userSettings", {
-        userId: userId || undefined,
+        userId,
         approvalMode: args.approvalMode,
         followUpCadenceDays: Math.max(1, Math.min(90, args.followUpCadenceDays)),
         defaultLegalPosture: args.defaultLegalPosture,
@@ -134,11 +122,14 @@ export const updateSettings = mutation({
 export const triggerManualSweepAndSync = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuthUser(ctx);
     const now = Date.now();
 
-    // Recalculate daysRemaining on active claims
-    const claims = await ctx.db.query("claims").take(100);
+    // Recalculate daysRemaining on active claims belonging to this user
+    const claims = await ctx.db
+      .query("claims")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(100);
     let updatedCount = 0;
 
     for (const claim of claims) {
@@ -153,16 +144,11 @@ export const triggerManualSweepAndSync = mutation({
       }
     }
 
-    // Update settings lastSyncTimestamp
-    let userSetting = null;
-    if (userId) {
-      userSetting = await ctx.db
-        .query("userSettings")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .first();
-    } else {
-      userSetting = await ctx.db.query("userSettings").first();
-    }
+    // Update settings lastSyncTimestamp for this user
+    const userSetting = await ctx.db
+      .query("userSettings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
 
     if (userSetting) {
       await ctx.db.patch(userSetting._id, {
@@ -189,7 +175,7 @@ export const triggerManualSweepAndSync = mutation({
 });
 
 /**
- * Danger Zone: Purge all claims or reset portfolio to zero cases.
+ * Danger Zone: Purge all claims or reset portfolio to zero cases for the authenticated user.
  */
 export const resetPortfolio = mutation({
   args: {
@@ -200,18 +186,16 @@ export const resetPortfolio = mutation({
       throw new Error("Confirmation phrase mismatch. Please type RESET_PORTFOLIO to proceed.");
     }
 
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuthUser(ctx);
 
-    // Delete claims, clinicalEvidences, appeals, emailThreads, emailMessages, p2pScripts, p2pCallSessions
-    const claims = userId
-      ? await ctx.db
-          .query("claims")
-          .withIndex("by_user", (q) => q.eq("userId", userId))
-          .collect()
-      : await ctx.db.query("claims").collect();
+    // Delete claims, clinicalEvidences, appeals, emailThreads, emailMessages, p2pScripts, p2pCallSessions strictly scoped to user
+    const claims = await ctx.db
+      .query("claims")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
 
     for (const claim of claims) {
-      // Cascade delete related records
+      // 1. Cascade delete related clinical evidence records
       const evidences = await ctx.db
         .query("clinicalEvidences")
         .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
@@ -220,14 +204,23 @@ export const resetPortfolio = mutation({
         await ctx.db.delete(ev._id);
       }
 
+      // 2. Cascade delete related appeal drafts & clean up exported PDFs from storage
       const appeals = await ctx.db
         .query("appeals")
         .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
         .collect();
       for (const ap of appeals) {
+        if (ap.pdfExportStorageId) {
+          try {
+            await ctx.storage.delete(ap.pdfExportStorageId);
+          } catch {
+            // File may already have been removed
+          }
+        }
         await ctx.db.delete(ap._id);
       }
 
+      // 3. Cascade delete associated email threads and messages
       const threads = await ctx.db
         .query("emailThreads")
         .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
@@ -243,6 +236,7 @@ export const resetPortfolio = mutation({
         await ctx.db.delete(th._id);
       }
 
+      // 4. Cascade delete P2P scripts
       const p2p = await ctx.db
         .query("p2pScripts")
         .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
@@ -251,6 +245,7 @@ export const resetPortfolio = mutation({
         await ctx.db.delete(p._id);
       }
 
+      // 5. Cascade delete P2P call copilot sessions
       const sessions = await ctx.db
         .query("p2pCallSessions")
         .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
@@ -259,6 +254,7 @@ export const resetPortfolio = mutation({
         await ctx.db.delete(s._id);
       }
 
+      // 6. Cascade delete appeal audit trail logs
       const logs = await ctx.db
         .query("appealAuditLogs")
         .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
@@ -267,7 +263,24 @@ export const resetPortfolio = mutation({
         await ctx.db.delete(l._id);
       }
 
+      // 7. Delete denial letter file attachment from Convex Storage
+      if (claim.denialLetterStorageId) {
+        try {
+          await ctx.storage.delete(claim.denialLetterStorageId);
+        } catch {
+          // File may already have been removed
+        }
+      }
+
+      // 8. Delete the claim document
       await ctx.db.delete(claim._id);
+
+      // 9. Decrement financial TableAggregate
+      try {
+        await claimsAggregate.delete(ctx, claim);
+      } catch (err) {
+        console.warn("Could not delete claim from aggregate:", err);
+      }
     }
 
     return {

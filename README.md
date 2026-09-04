@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-378%2F378%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-390%2F390%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -558,12 +558,12 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (378 tests)
+npm run test            # vitest run tests  (390 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **378/378 passing** across 27 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
+Current: **390/390 passing** across 28 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
@@ -579,7 +579,7 @@ Current: **378/378 passing** across 27 comprehensive test suites covering end-to
 | [`tests/openai.test.ts`](file:///d:/ClaimHero/tests/openai.test.ts) | 15 | Structured completions, vision file inputs, 1536-d vector embeddings, ranking, and API key validation |
 | [`tests/convexClaimsFull.test.ts`](file:///d:/ClaimHero/tests/convexClaimsFull.test.ts) | 13 | Claims CRUD, financial liability calculations, ERISA penalty tracking, `by_threadId` index queries, `setAgentMailThreadIdInternal` mutations, bounded pagination, and deadline sweeps |
 | [`tests/convexAuditLogsAndUsers.test.ts`](file:///d:/ClaimHero/tests/convexAuditLogsAndUsers.test.ts) | 13 | Immutable audit trail logging, user profile management and updates, crons registration, and auth methods |
-| [`tests/actionsAgentMailAndDispatcher.test.ts`](file:///d:/ClaimHero/tests/actionsAgentMailAndDispatcher.test.ts) | 11 | AgentMail actions, attachment download, transmission dispatching, bidirectional threadId routing, missing claimNumber fallback matching, user account notification routing & fake clinical sender suppression, and universal `[ClaimHero #${claimNumber}]` subject/footer injection |
+| [`tests/convexSettings.test.ts`](file:///d:/ClaimHero/tests/convexSettings.test.ts) | 11 | Strict user authentication enforcement, scoped tenant isolation, advocate profile leak prevention, manual sync sweep triggers, and safe portfolio reset with storage cleanup & TableAggregate decrements |
 | [`tests/appealDossierBinder.test.ts`](file:///d:/ClaimHero/tests/appealDossierBinder.test.ts) | 11 | Plain-text dossier serialization, fallback exhibits, and 3-tier appellate escalation |
 | [`tests/utils.test.ts`](file:///d:/ClaimHero/tests/utils.test.ts) | 11 | Healthcare currency formatting (cents precision), resilient date/datetime formatting against invalid values, statutory countdown math, risk badge styling, and payer appellate contact directory lookup |
 | [`tests/convexP2P.test.ts`](file:///d:/ClaimHero/tests/convexP2P.test.ts) | 9 | Live call sessions, real-time transcripts, fast answers, checklist scoring, and tele-scripts |
