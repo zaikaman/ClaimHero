@@ -63,6 +63,7 @@ export const logEvent = mutation({
 export const logEventInternal = internalMutation({
   args: {
     claimId: v.id("claims"),
+    userId: v.optional(v.id("users")),
     eventType: v.string(),
     actor: v.string(),
     details: v.string(),
@@ -70,10 +71,11 @@ export const logEventInternal = internalMutation({
   handler: async (ctx, args) => {
     const timestamp = Date.now();
     const claim = typeof ctx.db.get === "function" ? await ctx.db.get(args.claimId) : null;
+    const resolvedUserId = args.userId || claim?.userId;
 
     return await ctx.db.insert("appealAuditLogs", {
       claimId: args.claimId,
-      ...(claim?.userId ? { userId: claim.userId } : {}),
+      ...(resolvedUserId ? { userId: resolvedUserId } : {}),
       eventType: args.eventType,
       actor: args.actor,
       details: args.details,

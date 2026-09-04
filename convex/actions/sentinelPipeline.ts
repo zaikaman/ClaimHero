@@ -11,6 +11,7 @@ import { ERISA_STATUTORY_EVIDENCE } from "./policyCrawler";
 export interface PipelineResult {
   success: boolean;
   claimId: string;
+  workflowId?: string;
   policyTitle?: string;
   clausesExtracted?: number;
   overturnProbabilityScore?: number;
@@ -33,6 +34,7 @@ export const runAutonomousPipeline = action({
     customPolicyUrl: v.optional(v.string()),
     physicianNotes: v.optional(v.string()),
     appealLevel: v.optional(v.string()),
+    useDurableWorkflow: v.optional(v.boolean()),
     sender: v.optional(
       v.object({
         name: v.string(),
@@ -53,6 +55,22 @@ export const runAutonomousPipeline = action({
     ),
   },
   handler: async (ctx, args): Promise<PipelineResult> => {
+    if (args.useDurableWorkflow) {
+      const res = await ctx.runMutation(api.workflows.startDurablePipeline, {
+        claimId: args.claimId,
+        customPolicyUrl: args.customPolicyUrl,
+        physicianNotes: args.physicianNotes,
+        appealLevel: args.appealLevel,
+        sender: args.sender,
+        clinicalFacts: args.clinicalFacts,
+      });
+      return {
+        success: true,
+        claimId: args.claimId,
+        workflowId: res.workflowId,
+      };
+    }
+
     // 1. Fetch and authorize claim ownership
     const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
 
@@ -233,5 +251,40 @@ export const runAutonomousPipeline = action({
       riskLevel: scoreResult?.riskLevel,
       appealId: synthesisResult?.appealId,
     };
+  },
+});
+
+/**
+ * Action wrapper to initiate the durable Convex workflow pipeline
+ */
+export const startDurablePipelineAction = action({
+  args: {
+    claimId: v.id("claims"),
+    customPolicyUrl: v.optional(v.string()),
+    physicianNotes: v.optional(v.string()),
+    appealLevel: v.optional(v.string()),
+    sender: v.optional(
+      v.object({
+        name: v.string(),
+        credentials: v.optional(v.string()),
+        email: v.optional(v.string()),
+        phone: v.optional(v.string()),
+      })
+    ),
+    clinicalFacts: v.optional(
+      v.object({
+        symptomsAndFunctionalImpact: v.optional(v.string()),
+        examinationFindings: v.optional(v.string()),
+        imagingAndDiagnostics: v.optional(v.string()),
+        treatmentHistoryAndResponse: v.optional(v.string()),
+        otherDocumentedFacts: v.optional(v.string()),
+        recordsAreIncomplete: v.boolean(),
+      })
+    ),
+    autoDispatch: v.optional(v.boolean()),
+    followUpCadenceDays: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<{ workflowId: string; claimId: string }> => {
+    return await ctx.runMutation(api.workflows.startDurablePipeline, args);
   },
 });

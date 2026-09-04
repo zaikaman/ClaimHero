@@ -21,6 +21,7 @@
     "@convex-dev/auth": "^2.0.0-alpha.1",
     "@convex-dev/rate-limiter": "^0.3.2",
     "@convex-dev/static-hosting": "^0.2.1",
+    "@convex-dev/workflow": "0.3.12",
     "@firecrawl/firecrawl-convex": "^0.1.1",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-dialog": "^1.1.6",

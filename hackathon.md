@@ -7,12 +7,12 @@
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://kindhearted-elephant-992.convex.cloud
-- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex, @agentmail/convex
-- **Convex features:** schema, tables, indexes, vector search, full-text search, queries, mutations, actions, HTTP actions, crons, scheduled functions, file storage, realtime queries
+- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/workflow
+- **Convex features:** schema, tables, indexes, vector search, full-text search, queries, mutations, actions, HTTP actions, crons, scheduled functions, file storage, realtime queries, durable workflows
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-04T13:38:26Z
+- **Last updated:** 2026-09-04T15:10:00Z
 
 ## Log
 
@@ -774,7 +774,7 @@ Fixed Sentinel Auto-Pilot 1-hour autonomous rebuttal dispatch and background rec
 - Added comprehensive unit test suite in `tests/autopilotSLA.test.ts` (10 tests) covering SLA expiration, thread resolution, dismissal, and sweep reconciliation.
 - Verified with `npm run verify`: 100% clean typecheck, 0 ESLint errors/warnings under strict rules, 444/444 passing tests across 31 suites (80.5% statement coverage), and clean production build. Convex features: schema, relational indexes (`by_auto_reply_status`), internalQuery, internalMutation, scheduled functions (`ctx.scheduler.runAfter`), crons, actions.
 
-### 2026-09-04 - working tree
+### 2026-09-04 - 041723c
 Adopted official @agentmail/convex component for stateful email handling and durable Workpool dispatching:
 - Installed @agentmail/convex and mounted the component in convex/convex.config.ts via app.use(agentmail), giving ClaimHero dedicated isolated component tables (inboxes, inboundMessages, outboundMessages, events) and type-safe component APIs.
 - Replaced direct REST API fetch calls for email sending and thread querying with @agentmail/convex component client (AgentMail) in convex/lib/agentMail.ts, supporting durable message enqueueing (sendMessage, replyToMessage) with automatic retry policies and delivery tracking.
@@ -785,3 +785,6 @@ Adopted official @agentmail/convex component for stateful email handling and dur
 - Updated convex/actions/mailDispatcher.ts and convex/actions/agentMail.ts to pass Convex context to email operations and record outboundId in message entities.
 - Added 8 dedicated unit tests in tests/agentMail.test.ts verifying component initialization, durable sending, message retrieval, inbound webhook handling, and delivery queries, expanding the test suite to 452 passing tests across 31 test files.
 - Verified with npm run verify: 100% clean typecheck, 0 ESLint warnings/errors under strict rules, 452/452 passing tests across 31 suites (81.0% statement coverage), and production Vite build succeeded. Convex features: components (@agentmail/convex), schema, relational indexes (by_outbound_id), queries, mutations, internalMutation, actions, HTTP actions, Workpool.
+
+### 2026-09-04 - working tree
+Implemented durable claim orchestration via `@convex-dev/workflow`, resolved Convex component environment variable isolation for `@agentmail/convex`, and hardened audit log schema validation: mounted `@convex-dev/workflow` in `convex/convex.config.ts` and defined `durableClaimPipeline` and `erisaStatutoryCountdownWorkflow` (`convex/workflows.ts`, `convex/schema.ts`, `convex/claims.ts`) to checkpoint multi-stage claim processing (payer resolution, Firecrawl policy crawling with ERISA fallback, precedent vector matching, cited brief synthesis, and auto-dispatch) with step retries and suspended timer execution via `step.sleep()`; diagnosed and resolved `AGENTMAIL_API_KEY is not set` in the `@agentmail/convex` component by declaring typed environment variables and explicitly forwarding `AGENTMAIL_API_KEY` via `app.use(agentmail, { env: ... })`; and resolved `ArgumentValidationError` in `logEventInternal` (`convex/auditLogs.ts`) by supporting optional caller-provided `userId`. Added test coverage in `tests/workflows.test.ts`, verified with `npm run verify` across 465 passing unit tests (32 suites), 0 lint warnings, clean typecheck, and successful production build. Convex features: components (`@convex-dev/workflow`, `@agentmail/convex`), durable workflows (`step.runAction`, `step.runMutation`, `step.runQuery`, `step.sleep`), component env isolation, internalMutation, schema validators.

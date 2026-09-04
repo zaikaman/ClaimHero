@@ -211,7 +211,7 @@ npm run build
 npm run verify
 ```
 
-The current repository verification record is **452/452 tests passing** across 31 suites, with strict typechecking, linting, coverage, and a production Vite build. The suites cover the master pipeline, Convex authorization and ownership isolation, OpenAI structured outputs and embeddings, Firecrawl policy selection, AgentMail component integration and webhook signatures, deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo isolation.
+The current repository verification record is **465/465 tests passing** across 32 suites, with strict typechecking, linting, coverage, and a production Vite build. The suites cover the master pipeline, Convex authorization and ownership isolation, OpenAI structured outputs and embeddings, Firecrawl policy selection, AgentMail component integration and webhook signatures, deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, durable workflows, and demo isolation.
 
 The build log records the command, commit, and affected files for each milestone: [`hackathon.md`](./hackathon.md).
 

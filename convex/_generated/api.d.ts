@@ -48,6 +48,7 @@ import type * as p2pScripts from "../p2pScripts.js";
 import type * as precedents from "../precedents.js";
 import type * as settings from "../settings.js";
 import type * as users from "../users.js";
+import type * as workflows from "../workflows.js";
 
 import type {
   ApiFromModules,
@@ -96,6 +97,7 @@ declare const fullApi: ApiFromModules<{
   precedents: typeof precedents;
   settings: typeof settings;
   users: typeof users;
+  workflows: typeof workflows;
 }>;
 
 /**
@@ -134,4 +136,5 @@ export declare const components: {
   authPasswordProvider: import("@convex-dev/auth/providers/password/_generated/component.js").ComponentApi<"authPasswordProvider">;
   oauthGoogle: import("@convex-dev/auth/providers/oauth/_generated/component.js").ComponentApi<"oauthGoogle">;
   agentmail: import("@agentmail/convex/_generated/component.js").ComponentApi<"agentmail">;
+  workflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"workflow">;
 };

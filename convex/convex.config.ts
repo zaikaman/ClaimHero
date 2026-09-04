@@ -9,6 +9,7 @@ import passwordProvider from "@convex-dev/auth/providers/password/convex.config.
 import oauth from "@convex-dev/auth/providers/oauth/convex.config.js";
 import username from "@convex-dev/auth/username/convex.config.js";
 import agentmail from "@agentmail/convex/convex.config";
+import workflow from "@convex-dev/workflow/convex.config";
 
 const app = defineApp({
   env: {
@@ -23,7 +24,7 @@ const app = defineApp({
     OPENAI_MODEL: v.optional(v.string()),
     OPENAI_BASE_URL: v.optional(v.string()),
     OPENAI_EMBEDDING_MODEL: v.optional(v.string()),
-    AGENTMAIL_API_KEY: v.optional(v.string()),
+    AGENTMAIL_API_KEY: v.string(),
     AGENTMAIL_SENDER_INBOX_ID: v.optional(v.string()),
     AGENTMAIL_SENDER_EMAIL: v.optional(v.string()),
     AGENTMAIL_ADJUDICATOR_INBOX_ID: v.optional(v.string()),
@@ -60,7 +61,12 @@ app.use(oauth, {
     CLIENT_SECRET: app.env.AUTH_GOOGLE_SECRET,
   },
 });
-app.use(agentmail);
+app.use(agentmail, {
+  env: {
+    AGENTMAIL_API_KEY: app.env.AGENTMAIL_API_KEY,
+  },
+});
+app.use(workflow);
 
 export default app;
 

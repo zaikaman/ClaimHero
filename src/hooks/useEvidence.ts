@@ -29,6 +29,15 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
   const runPipelineAction = useAction(api.actions.sentinelPipeline.runAutonomousPipeline);
   const deleteEvidenceMutation = useMutation(api.clinicalEvidences.deleteEvidence);
   const insertSingleEvidenceMutation = useMutation(api.clinicalEvidences.insertSingle);
+  const startDurablePipelineMutation = useMutation(api.workflows.startDurablePipeline);
+  const cancelDurableWorkflowMutation = useMutation(api.workflows.cancelDurableWorkflow);
+  const startStatutoryCountdownMutation = useMutation(api.workflows.startStatutoryCountdown);
+
+  // Real-time reactive query tracking durable workflow execution status
+  const workflowExecutionStatus = useQuery(
+    api.workflows.getWorkflowExecutionStatus,
+    isEnabled && claimId ? { claimId } : "skip"
+  );
 
   // Trigger Firecrawl policy crawler with claim parameters
   const crawlPolicy = useCallback(
@@ -219,10 +228,66 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
     [runPipelineAction, crawlPolicy, computeOverturnScore, claim]
   );
 
+  // Start the resilient durable workflow pipeline (@convex-dev/workflow)
+  const startDurablePipeline = useCallback(
+    async (
+      targetClaimId?: string,
+      options?: {
+        customPolicyUrl?: string;
+        physicianNotes?: string;
+        appealLevel?: string;
+        autoDispatch?: boolean;
+        followUpCadenceDays?: number;
+      }
+    ) => {
+      const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
+      if (!activeClaimId) throw new Error("No claim selected for durable workflow");
+
+      return await startDurablePipelineMutation({
+        claimId: activeClaimId,
+        customPolicyUrl: options?.customPolicyUrl,
+        physicianNotes: options?.physicianNotes,
+        appealLevel: options?.appealLevel,
+        autoDispatch: options?.autoDispatch,
+        followUpCadenceDays: options?.followUpCadenceDays,
+      });
+    },
+    [startDurablePipelineMutation, claim]
+  );
+
+  // Cancel an in-progress durable workflow
+  const cancelWorkflow = useCallback(
+    async (targetClaimId?: string, workflowId?: string) => {
+      const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
+      if (!activeClaimId) throw new Error("No claim selected for workflow cancellation");
+
+      return await cancelDurableWorkflowMutation({
+        claimId: activeClaimId,
+        workflowId,
+      });
+    },
+    [cancelDurableWorkflowMutation, claim]
+  );
+
+  // Trigger dedicated ERISA statutory countdown workflow using step.sleep()
+  const startStatutoryCountdown = useCallback(
+    async (targetClaimId?: string, cadenceDays?: number) => {
+      const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
+      if (!activeClaimId) throw new Error("No claim selected for statutory countdown");
+
+      return await startStatutoryCountdownMutation({
+        claimId: activeClaimId,
+        cadenceDays,
+      });
+    },
+    [startStatutoryCountdownMutation, claim]
+  );
+
   return {
     evidences: rawEvidences || [],
     isLoadingEvidences: claimId ? rawEvidences === undefined : false,
     sourcesSummary,
+    workflowExecutionStatus,
     crawlPolicy,
     crawlPubMed,
     crawlFda,
@@ -233,6 +298,9 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
     computeOverturnScore,
     runCompleteAnalysis,
     runFullPipeline,
+    startDurablePipeline,
+    cancelWorkflow,
+    startStatutoryCountdown,
   };
 }
 

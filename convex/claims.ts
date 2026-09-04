@@ -1021,6 +1021,44 @@ export const updateStatusInternal = internalMutation({
 });
 
 /**
+ * Link a durable workflow execution ID to a claim
+ */
+export const setClaimWorkflowIdInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    workflowId: v.string(),
+    workflowStatus: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) throw new Error(`Claim ${args.claimId} not found`);
+    await ctx.db.patch(args.claimId, {
+      workflowId: args.workflowId,
+      workflowStatus: args.workflowStatus ?? "inProgress",
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Update the execution status of a linked durable workflow
+ */
+export const updateClaimWorkflowStatusInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    workflowStatus: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) return;
+    await ctx.db.patch(args.claimId, {
+      workflowStatus: args.workflowStatus,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
  * Generate Convex File Storage upload URL for denial document attachments
  */
 export const generateUploadUrl = mutation({

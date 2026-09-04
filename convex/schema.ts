@@ -162,6 +162,8 @@ export default defineSchema({
     dataOrigin: v.optional(v.string()),
     isSyntheticPII: v.optional(v.boolean()),
     evidenceCount: v.optional(v.number()),
+    workflowId: v.optional(v.string()),
+    workflowStatus: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

@@ -35,7 +35,6 @@ specs/001-appeal-sentinel/plan.md
 - When you're done with your tasks, remember to run npm run verify to make sure everything is clean, and only run this when it's actually necessary, like large refactors, big code work, don't run it when you only updated docs for example.
 - Do not use the browser agent to verify the UI, the user will do that himself.
 - Do not use emojis anywhere, docs, frontend code, no where.
-- If there are new tests or you're modifying tests, update README.md, if what you're working on is a new feature or something worth adding to the README.md, add it.
 - You don't have to run npm run deploy or deploy to prod, we already have github actions that do that when it's pushed to Github, and do not commit anything yourself.
 
 <!-- convex-ai-start -->
