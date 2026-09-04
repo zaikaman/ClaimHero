@@ -621,6 +621,77 @@ Paragraph text with **bold** and *italic*.
       expect(message.subject).toBe("Overturn Confirmation");
     });
 
+    it("retrieves message from mirror with angle-bracketed ID normalization", async () => {
+      const mockCtx = {
+        runAction: vi.fn(),
+        runMutation: vi.fn(),
+        runQuery: vi.fn().mockResolvedValue([
+          {
+            messageId: "CAO5KOQoTT=AfGA3jD6kQbqitSPSHWGaJ_5xKLdj-Efq6dD_yjA@mail.gmail.com",
+            inboxId: "inbox_1",
+            threadId: "thread_1",
+            from: "adjudicator@gmail.com",
+            to: ["claimhero@agentmail.to"],
+            subject: "Re: Claim Evaluation",
+            raw: {
+              message_id: "<CAO5KOQoTT=AfGA3jD6kQbqitSPSHWGaJ_5xKLdj-Efq6dD_yjA@mail.gmail.com>",
+              subject: "Re: Claim Evaluation",
+            },
+          },
+        ]),
+      };
+
+      const message = await getAgentMailMessage(
+        "inbox_1",
+        "<CAO5KOQoTT=AfGA3jD6kQbqitSPSHWGaJ_5xKLdj-Efq6dD_yjA@mail.gmail.com>",
+        mockCtx
+      );
+      expect(message.subject).toBe("Re: Claim Evaluation");
+    });
+
+    it("falls back to agentmail.getMessage action when message is not in component mirror", async () => {
+      const mockGetMessage = vi.spyOn(agentmail, "getMessage").mockResolvedValue({
+        message_id: "msg_remote_fallback",
+        subject: "Remote Subject",
+      });
+
+      const mockCtx = {
+        runAction: vi.fn(),
+        runMutation: vi.fn(),
+        runQuery: vi.fn().mockResolvedValue([]),
+      };
+
+      const message = await getAgentMailMessage("inbox_1", "msg_remote_fallback", mockCtx);
+      expect(message.subject).toBe("Remote Subject");
+      expect(mockGetMessage).toHaveBeenCalledWith(mockCtx, "inbox_1", "msg_remote_fallback");
+      mockGetMessage.mockRestore();
+    });
+
+    it("falls back to direct REST fetch when message is neither in mirror nor component action", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key_abc";
+      vi.spyOn(agentmail, "getMessage").mockRejectedValue(new Error("Component action unavailable"));
+
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message_id: "msg_rest_fallback",
+          subject: "REST Subject",
+        }),
+      }) as any;
+
+      const mockCtx = {
+        runAction: vi.fn(),
+        runMutation: vi.fn(),
+        runQuery: vi.fn().mockResolvedValue([]),
+      };
+
+      const message = await getAgentMailMessage("inbox_1", "msg_rest_fallback", mockCtx);
+      expect(message.subject).toBe("REST Subject");
+
+      globalThis.fetch = originalFetch;
+    });
+
     it("lists inbound messages from the AgentMail component mirror when ctx is provided", async () => {
       const mockCtx = {
         runAction: vi.fn(),

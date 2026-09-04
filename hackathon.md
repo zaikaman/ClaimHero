@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-04T16:21:30Z
+- **Last updated:** 2026-09-04T16:40:00Z
 
 ## Log
 
@@ -792,8 +792,11 @@ Implemented durable claim orchestration via `@convex-dev/workflow` and hardened 
 ### 2026-09-04 - c878b40
 Resolved the prior Convex production deployment evaluation error by restoring the standard `@agentmail/convex` mount in `convex/convex.config.ts`.
 
-### 2026-09-04 - working tree
+### 2026-09-04 - 06cb86f
 Fixed the actual production send failure caused by component environment isolation: patched `@agentmail/convex@0.1.0` to declare `AGENTMAIL_API_KEY`, bound it from the app deployment with `app.env.AGENTMAIL_API_KEY`, and made the AgentMail helper component-only with no REST fallback or synthetic delivery IDs (`convex/convex.config.ts`, `convex/lib/agentMail.ts`, `patches/`, `package.json`). Reconciled the follow-up production `InvalidReference` by reading the component's durable inbound mirror for inbox sync and message retrieval instead of calling the unavailable `lib.listThreads` or optional remote message action. Added regression coverage and documented the production environment requirement (`tests/agentMail.test.ts`, `tests/securityComplianceHardening.test.ts`, `README.md`). Validated with clean typecheck, lint, 456/456 tests across 32 suites, coverage, Convex code generation, and a successful production Vite build. Convex features: component environment binding, components (`@agentmail/convex`), durable Workpool sending, queries, mutations, actions, and HTTP actions.
 
-### 2026-09-04 - working tree
+### 2026-09-04 - f113773
 Hardened structured model response handling in `convex/lib/openai.ts` with two semantic retries, corrective JSON-only instructions, balanced JSON extraction, required-field checks, and PHI-safe errors. Appeal synthesis now stops after three failed attempts and tells the user to try again without persisting or displaying synthetic content (`convex/actions/appealSynthesizer.ts`). Added regression coverage and verified 458 tests, typecheck, lint, coverage, and production build.
+
+### 2026-09-04 - working tree
+Hardened AgentMail message retrieval, angle-bracketed ID matching, and component remote action export: resolved uncaught "was not found in the component mirror" exception for inbound Gmail RFC 5322 Message-IDs by implementing fuzzy bracket normalization (`matchesMessageId`) and resilient multi-tier fallback (component mirror -> `agentmail.getMessage` remote action -> direct REST API fetch via `AGENTMAIL_API_KEY`) in `convex/lib/agentMail.ts`. Applied official upstream PR #2 fix from `docs/convex` (`@agentmail/convex`) via `patches/@agentmail+convex+0.1.0.patch` to expose `getMessage`, `listThreads`, `getThread`, `createInbox`, `listInboxes`, `getInboxRemote`, and `deleteInbox` as public component actions across the mount boundary. Added automated unit tests in `tests/agentMail.test.ts` covering angle-bracket normalization and multi-tier fallbacks, verified with `npm run verify` across 461 passing unit tests (32 suites), 100% clean typecheck, 0 lint errors/warnings, and successful production build. Convex features: components (`@agentmail/convex`), actions, queries, patch-package.

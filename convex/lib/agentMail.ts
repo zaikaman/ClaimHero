@@ -15,6 +15,7 @@ export interface SharedAgentMailboxes {
 }
 
 type SendContext = Parameters<AgentMail["sendMessage"]>[0];
+type ActionContext = Parameters<AgentMail["getMessage"]>[0];
 type QueryContext = Parameters<AgentMail["status"]>[0];
 
 export type AgentMailContext = {
@@ -178,31 +179,74 @@ export async function replyAgentMailMessage(options: {
   return { ...(await readOutboundIdentifiers(ctx, outboundId)), outboundId };
 }
 
+function matchesMessageId(candidateId: string | undefined, targetId: string): boolean {
+  if (!candidateId) return false;
+  if (candidateId === targetId) return true;
+  const cleanCandidate = candidateId.replace(/^<|>$/g, "").trim().toLowerCase();
+  const cleanTarget = targetId.replace(/^<|>$/g, "").trim().toLowerCase();
+  return cleanCandidate === cleanTarget;
+}
+
 export async function listAgentMailMessages(
   inboxId: string,
   limit = 20,
   ctx: AgentMailContext,
 ): Promise<Array<Record<string, unknown>>> {
   const componentContext = requireActionContext(ctx, "list messages");
-  if (typeof componentContext.runQuery !== "function") {
-    throw new Error(
-      "AgentMail list messages requires a Convex action context with runQuery.",
-    );
+  const boundedLimit = Math.min(Math.max(1, limit), 50);
+
+  // 1. Try reading from the component's durable webhook mirror
+  if (typeof componentContext.runQuery === "function") {
+    try {
+      const localMessages = await componentContext.runQuery(
+        components.agentmail.lib.listInboundMessages,
+        { inboxId },
+      );
+      if (Array.isArray(localMessages) && localMessages.length > 0) {
+        return localMessages.slice(0, boundedLimit).filter(isRecord);
+      }
+    } catch {
+      // Proceed to remote fetch
+    }
   }
 
-  // Reconcile from the component's durable webhook mirror. This avoids the
-  // remote listThreads action, which is not present in older deployed
-  // component instances, and still recovers messages whose callback failed.
-  const localMessages = await componentContext.runQuery(
-    components.agentmail.lib.listInboundMessages,
-    { inboxId },
-  );
-  if (!Array.isArray(localMessages)) return [];
+  // 2. Try the component's listThreads action
+  if (typeof componentContext.runAction === "function") {
+    try {
+      const threads = await agentmail.listThreads(
+        componentContext as unknown as ActionContext,
+        inboxId,
+        { limit: boundedLimit },
+      );
+      if (Array.isArray(threads) && threads.length > 0) return threads.filter(isRecord);
+      if (isRecord(threads) && Array.isArray(threads.threads) && threads.threads.length > 0) {
+        return (threads.threads as Array<Record<string, unknown>>).filter(isRecord);
+      }
+    } catch {
+      // Proceed to direct REST fallback
+    }
+  }
 
-  const boundedLimit = Math.min(Math.max(1, limit), 50);
-  return localMessages
-    .slice(0, boundedLimit)
-    .filter(isRecord);
+  // 3. Fallback to direct REST API
+  const apiKey = configuredValue("AGENTMAIL_API_KEY");
+  if (apiKey) {
+    try {
+      const baseUrl = (configuredValue("AGENTMAIL_BASE_URL") || "https://api.agentmail.to/v0").replace(/\/$/, "");
+      const res = await fetch(`${baseUrl}/inboxes/${encodeURIComponent(inboxId)}/messages?limit=${boundedLimit}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (res.ok) {
+        const body = await res.json();
+        if (Array.isArray(body)) return body.filter(isRecord);
+        if (isRecord(body) && Array.isArray(body.messages)) return (body.messages as Array<Record<string, unknown>>).filter(isRecord);
+      }
+    } catch {
+      // Return empty array
+    }
+  }
+
+  return [];
 }
 
 export async function getAgentMailMessage(
@@ -211,51 +255,96 @@ export async function getAgentMailMessage(
   ctx: AgentMailContext,
 ): Promise<Record<string, unknown>> {
   const componentContext = requireActionContext(ctx, "get message");
-  if (typeof componentContext.runQuery !== "function") {
-    throw new Error(
-      "AgentMail get message requires a Convex action context with runQuery.",
-    );
+
+  // 1. Try reading from the component's durable inbound mirror
+  if (typeof componentContext.runQuery === "function") {
+    try {
+      const localMessages = await componentContext.runQuery(
+        components.agentmail.lib.listInboundMessages,
+        { inboxId },
+      );
+      if (Array.isArray(localMessages)) {
+        const localMessage = localMessages.find(
+          (candidate) =>
+            isRecord(candidate) &&
+            typeof candidate.messageId === "string" &&
+            matchesMessageId(candidate.messageId, messageId),
+        );
+        if (isRecord(localMessage)) {
+          if (isRecord(localMessage.raw)) {
+            return localMessage.raw;
+          }
+          return {
+            message_id: localMessage.messageId,
+            inbox_id: localMessage.inboxId,
+            thread_id: localMessage.threadId,
+            from: localMessage.from,
+            to: localMessage.to,
+            subject: localMessage.subject,
+            preview: localMessage.preview,
+            text: localMessage.text,
+            html: localMessage.html,
+            extracted_text: localMessage.extractedText,
+            extracted_html: localMessage.extractedHtml,
+            in_reply_to: localMessage.inReplyTo,
+            references: localMessage.references,
+          };
+        }
+      }
+    } catch {
+      // Proceed to remote fetch
+    }
   }
 
-  // The component stores the complete inbound payload when its webhook
-  // mutation succeeds. Read that durable record instead of calling the
-  // optional remote getMessage action.
-  const localMessages = await componentContext.runQuery(
-    components.agentmail.lib.listInboundMessages,
-    { inboxId },
+  // 2. Try fetching from the component's remote getMessage action
+  if (typeof componentContext.runAction === "function") {
+    const candidateIds = [messageId];
+    const cleanId = messageId.replace(/^<|>$/g, "").trim();
+    if (cleanId !== messageId) candidateIds.push(cleanId);
+    if (!messageId.startsWith("<") && messageId.includes("@")) candidateIds.push(`<${messageId}>`);
+
+    for (const cid of candidateIds) {
+      try {
+        const remoteMsg = await agentmail.getMessage(
+          componentContext as unknown as ActionContext,
+          inboxId,
+          cid,
+        );
+        if (isRecord(remoteMsg)) {
+          return remoteMsg;
+        }
+      } catch {
+        // Try next candidate ID or proceed to REST fallback
+      }
+    }
+  }
+
+  // 3. Fallback to direct REST API
+  const apiKey = configuredValue("AGENTMAIL_API_KEY");
+  if (apiKey) {
+    const candidateIds = [messageId];
+    const cleanId = messageId.replace(/^<|>$/g, "").trim();
+    if (cleanId !== messageId) candidateIds.push(cleanId);
+    if (!messageId.startsWith("<") && messageId.includes("@")) candidateIds.push(`<${messageId}>`);
+
+    const baseUrl = (configuredValue("AGENTMAIL_BASE_URL") || "https://api.agentmail.to/v0").replace(/\/$/, "");
+    for (const cid of candidateIds) {
+      try {
+        const res = await fetch(`${baseUrl}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(cid)}`, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (res.ok) {
+          const body = await res.json();
+          if (isRecord(body)) return body;
+        }
+      } catch {
+        // Try next candidate ID
+      }
+    }
+  }
+
+  throw new Error(
+    `AgentMail message ${messageId} was not found in the component mirror or remote API.`,
   );
-  if (!Array.isArray(localMessages)) {
-    throw new Error("AgentMail component returned an invalid message list.");
-  }
-
-  const localMessage = localMessages.find(
-    (candidate) =>
-      isRecord(candidate) &&
-      candidate.messageId === messageId,
-  );
-  if (!isRecord(localMessage)) {
-    throw new Error(
-      `AgentMail message ${messageId} was not found in the component mirror.`,
-    );
-  }
-
-  if (isRecord(localMessage.raw)) {
-    return localMessage.raw;
-  }
-
-  return {
-    message_id: localMessage.messageId,
-    inbox_id: localMessage.inboxId,
-    thread_id: localMessage.threadId,
-    from: localMessage.from,
-    to: localMessage.to,
-    subject: localMessage.subject,
-    preview: localMessage.preview,
-    text: localMessage.text,
-    html: localMessage.html,
-    extracted_text: localMessage.extractedText,
-    extracted_html: localMessage.extractedHtml,
-    in_reply_to: localMessage.inReplyTo,
-    references: localMessage.references,
-  };
 }
