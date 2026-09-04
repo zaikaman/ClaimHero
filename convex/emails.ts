@@ -1,6 +1,8 @@
 import { internalMutation, internalQuery, mutation, query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { OutboundId } from "@agentmail/convex";
 import type { Doc, Id } from "./_generated/dataModel";
+import { components, internal } from "./_generated/api";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
 
 /**
@@ -141,6 +143,7 @@ interface InsertMessageArgs {
   bodyText: string;
   hasAttachments: boolean;
   agentMailMessageId?: string;
+  outboundId?: string;
   detectedDetermination?: string;
   clinicalRationale?: string;
   missingRecordsRequested?: string[];
@@ -163,6 +166,7 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
     bodyText: args.bodyText,
     hasAttachments: args.hasAttachments,
     agentMailMessageId: args.agentMailMessageId,
+    outboundId: args.outboundId,
     detectedDetermination: args.detectedDetermination,
     clinicalRationale: args.clinicalRationale,
     missingRecordsRequested: args.missingRecordsRequested,
@@ -246,6 +250,7 @@ export const insertMessage = mutation({
     bodyText: v.string(),
     hasAttachments: v.boolean(),
     agentMailMessageId: v.optional(v.string()),
+    outboundId: v.optional(v.string()),
     detectedDetermination: v.optional(v.string()),
     clinicalRationale: v.optional(v.string()),
     missingRecordsRequested: v.optional(v.array(v.string())),
@@ -274,6 +279,7 @@ export const insertMessageInternal = internalMutation({
     bodyText: v.string(),
     hasAttachments: v.boolean(),
     agentMailMessageId: v.optional(v.string()),
+    outboundId: v.optional(v.string()),
     detectedDetermination: v.optional(v.string()),
     clinicalRationale: v.optional(v.string()),
     missingRecordsRequested: v.optional(v.array(v.string())),
@@ -747,6 +753,61 @@ export const dismissAutoReplyDraft = mutation({
       autoReplyStatus: "dismissed",
     });
     return { success: true };
+  },
+});
+
+/**
+ * Hook invoked by the AgentMail component when an inbound message lands.
+ * Automatically delegates to processInboundClaimReply for clinical extraction,
+ * auto-pilot scheduling, and proactive notifications.
+ */
+export const onMessageReceived = internalMutation({
+  args: {
+    message: v.any(),
+    thread: v.any(),
+    eventId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const msg = args.message as { inbox_id?: string; message_id?: string } | undefined;
+    const inboxId = msg?.inbox_id;
+    const messageId = msg?.message_id;
+    if (inboxId && messageId) {
+      await ctx.scheduler.runAfter(0, internal.actions.agentMail.processInboundClaimReply, {
+        inboxId,
+        messageId,
+        eventId: args.eventId,
+      });
+    }
+  },
+});
+
+/**
+ * Reactive query over inbound messages persisted directly in the AgentMail component database
+ */
+export const listComponentInboundMessages = query({
+  args: {
+    threadId: v.optional(v.string()),
+    inboxId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.runQuery(components.agentmail.lib.listInboundMessages, {
+      threadId: args.threadId,
+      inboxId: args.inboxId,
+    });
+  },
+});
+
+/**
+ * Reactive query for live delivery status of an outbound email from the AgentMail component
+ */
+export const getOutboundDeliveryStatus = query({
+  args: {
+    outboundId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.runQuery(components.agentmail.lib.getOutboundStatus, {
+      outboundId: args.outboundId as unknown as OutboundId,
+    });
   },
 });
 

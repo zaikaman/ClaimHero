@@ -7,6 +7,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { createEmbedding } from "../lib/openai";
 import { PRECEDENT_CORPUS } from "../lib/precedentCorpus";
+import type { HydratedPrecedent } from "../precedents";
 import {
   buildClaimQueryText,
   buildPrecedentEmbedText,
@@ -184,9 +185,9 @@ export const retrieveTopPrecedents = action({
     }
 
     const ids = hits.map((hit) => hit._id);
-    const docs = (await ctx.runQuery(internal.precedents.hydrateByIds, { ids })) || [];
-    const docsById = new Map<Id<"precedents">, (typeof docs)[number]>(
-      docs.map((doc) => [doc._id, doc])
+    const docs: Array<HydratedPrecedent> = (await ctx.runQuery(internal.precedents.hydrateByIds, { ids })) || [];
+    const docsById = new Map<Id<"precedents">, HydratedPrecedent>(
+      docs.map((doc: HydratedPrecedent) => [doc._id, doc])
     );
 
     const rankable = hits

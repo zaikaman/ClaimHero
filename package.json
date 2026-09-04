@@ -16,6 +16,7 @@
     "deploy": "npx @convex-dev/static-hosting deploy"
   },
   "dependencies": {
+    "@agentmail/convex": "^0.1.0",
     "@convex-dev/aggregate": "^0.3.0",
     "@convex-dev/auth": "^2.0.0-alpha.1",
     "@convex-dev/rate-limiter": "^0.3.2",

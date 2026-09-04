@@ -30,6 +30,11 @@ import type { DataModel } from "./dataModel.js";
 type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
+  readonly AGENTMAIL_ADJUDICATOR_EMAIL: string | undefined;
+  readonly AGENTMAIL_ADJUDICATOR_INBOX_ID: string | undefined;
+  readonly AGENTMAIL_API_KEY: string | undefined;
+  readonly AGENTMAIL_SENDER_EMAIL: string | undefined;
+  readonly AGENTMAIL_SENDER_INBOX_ID: string | undefined;
   readonly AGENTMAIL_WEBHOOK_SECRET: string;
   readonly AUTH_GOOGLE_ID: string;
   readonly AUTH_GOOGLE_SECRET: string;
@@ -37,6 +42,11 @@ type Env = {
   readonly AUTH_PRIVATE_KEY: string;
   readonly FIRECRAWL_API_KEY: string;
   readonly FIRECRAWL_WEBHOOK_SECRET: string | undefined;
+  readonly OPENAI_API_KEY: string | undefined;
+  readonly OPENAI_BASE_URL: string | undefined;
+  readonly OPENAI_EMBEDDING_MODEL: string | undefined;
+  readonly OPENAI_MODEL: string | undefined;
+  readonly SITE_URL: string | undefined;
 };
 
 /**

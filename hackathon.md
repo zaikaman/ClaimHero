@@ -7,12 +7,12 @@
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://kindhearted-elephant-992.convex.cloud
-- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex
+- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex, @agentmail/convex
 - **Convex features:** schema, tables, indexes, vector search, full-text search, queries, mutations, actions, HTTP actions, crons, scheduled functions, file storage, realtime queries
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-04T13:00:00Z
+- **Last updated:** 2026-09-04T13:38:26Z
 
 ## Log
 
@@ -761,7 +761,7 @@ Remediated cross-tenant PHI data leakage vulnerability in Sentinel Chatbot inter
 - Updated automated test suite in `tests/convexChatbot.test.ts` to pass required `userId` parameters and added dedicated unit tests proving that unowned or cross-tenant claims fail closed and return `null` / `[]`.
 - Verified with `npm run verify`: 100% clean typecheck, 0 ESLint warnings/errors, 434/434 passing unit tests across 30 suites, and clean production build. Convex features: internalQuery, schema, indexes (`by_user`, `by_user_status`), actions.
 
-### 2026-09-04 - working tree
+### 2026-09-04 - 8cd7e12
 Fixed Sentinel Auto-Pilot 1-hour autonomous rebuttal dispatch and background reconciliation:
 - Diagnosed production incident in user account `zaikaman123@gmail.com` where an inbound adverse determination (`DENIAL_UPHELD`) remained in pending auto-reply state without autonomous transmission after the 1-hour SLA elapsed.
 - Identified root causes: lack of delayed scheduler invocation (`ctx.scheduler.runAfter`) upon inbound reply evaluation, omission of dispatch logic for adverse determination types in `convex/actions/agentMail.ts`, absence of a background reconciliation cron to sweep expired pending drafts, and missing resolution of prior pending messages upon manual outbound transmissions.
@@ -773,3 +773,15 @@ Fixed Sentinel Auto-Pilot 1-hour autonomous rebuttal dispatch and background rec
 - Enhanced AgentMail Drawer (`src/components/communications/AgentMailDrawer.tsx`) with dynamic live SLA countdown badge and manual draft dismissal.
 - Added comprehensive unit test suite in `tests/autopilotSLA.test.ts` (10 tests) covering SLA expiration, thread resolution, dismissal, and sweep reconciliation.
 - Verified with `npm run verify`: 100% clean typecheck, 0 ESLint errors/warnings under strict rules, 444/444 passing tests across 31 suites (80.5% statement coverage), and clean production build. Convex features: schema, relational indexes (`by_auto_reply_status`), internalQuery, internalMutation, scheduled functions (`ctx.scheduler.runAfter`), crons, actions.
+
+### 2026-09-04 - working tree
+Adopted official @agentmail/convex component for stateful email handling and durable Workpool dispatching:
+- Installed @agentmail/convex and mounted the component in convex/convex.config.ts via app.use(agentmail), giving ClaimHero dedicated isolated component tables (inboxes, inboundMessages, outboundMessages, events) and type-safe component APIs.
+- Replaced direct REST API fetch calls for email sending and thread querying with @agentmail/convex component client (AgentMail) in convex/lib/agentMail.ts, supporting durable message enqueueing (sendMessage, replyToMessage) with automatic retry policies and delivery tracking.
+- Added outboundId tracking to emailMessages table (convex/schema.ts) and indexed it via by_outbound_id to correlate outbound appeal dispatches and AI adjudications with live component delivery states.
+- Implemented onMessageReceived internal mutation hook in convex/emails.ts, registered with AgentMail client to process inbound emails asynchronously via the component's decoupled callback workpool, seamlessly triggering processInboundClaimReply without blocking webhook responses.
+- Added reactive queries listComponentInboundMessages and getOutboundDeliveryStatus in convex/emails.ts querying components.agentmail.lib.listInboundMessages and components.agentmail.lib.getOutboundStatus for real-time delivery lifecycle updates (pending -> sent -> delivered / bounced).
+- Mounted official /agentmail/webhook HTTP POST route in convex/http.ts dispatching directly to agentmail.handleWebhook, complete with Svix cryptographic signature verification, idempotent event_id deduplication, and IP rate limiting, while retaining legacy /agentmail-webhook endpoint for backwards compatibility.
+- Updated convex/actions/mailDispatcher.ts and convex/actions/agentMail.ts to pass Convex context to email operations and record outboundId in message entities.
+- Added 8 dedicated unit tests in tests/agentMail.test.ts verifying component initialization, durable sending, message retrieval, inbound webhook handling, and delivery queries, expanding the test suite to 452 passing tests across 31 test files.
+- Verified with npm run verify: 100% clean typecheck, 0 ESLint warnings/errors under strict rules, 452/452 passing tests across 31 suites (81.0% statement coverage), and production Vite build succeeded. Convex features: components (@agentmail/convex), schema, relational indexes (by_outbound_id), queries, mutations, internalMutation, actions, HTTP actions, Workpool.

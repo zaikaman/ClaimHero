@@ -1,6 +1,10 @@
+import { AgentMail } from "@agentmail/convex";
+import { components, internal } from "../_generated/api";
+
 export interface AgentMailSendResult {
   messageId?: string;
   threadId?: string;
+  outboundId?: string;
 }
 
 export interface SharedAgentMailboxes {
@@ -9,6 +13,20 @@ export interface SharedAgentMailboxes {
   adjudicatorInboxId: string;
   adjudicatorEmail: string;
 }
+
+type SendContext = Parameters<AgentMail["sendMessage"]>[0];
+type ActionContext = Parameters<AgentMail["getMessage"]>[0];
+type QueryContext = Parameters<AgentMail["status"]>[0];
+
+export type AgentMailContext = {
+  runMutation: unknown;
+  runQuery?: unknown;
+  runAction?: unknown;
+};
+
+export const agentmail: AgentMail = new AgentMail(components.agentmail, {
+  onMessageReceived: internal.emails.onMessageReceived,
+});
 
 const AGENTMAIL_API_BASE_URL = "https://api.agentmail.to/v0";
 
@@ -128,7 +146,53 @@ export async function sendAgentMailMessage(options: {
   text: string;
   html: string;
   headers?: Record<string, string>;
+  labels?: string[];
+  ctx?: AgentMailContext;
 }): Promise<AgentMailSendResult> {
+  // 1. Prefer @agentmail/convex component when Convex context is provided
+  if (options.ctx && typeof options.ctx.runMutation === "function") {
+    try {
+      const sendCtx = options.ctx as unknown as SendContext;
+      const outboundId = await agentmail.sendMessage(sendCtx, options.inboxId, {
+        to: options.to,
+        subject: options.subject,
+        text: options.text,
+        html: options.html,
+        headers: options.headers,
+        labels: options.labels,
+      });
+
+      let messageId: string | undefined;
+      let threadId: string | undefined;
+      if (typeof options.ctx.runQuery === "function") {
+        try {
+          const status = await agentmail.status(options.ctx as unknown as QueryContext, outboundId);
+          if (status) {
+            messageId = status.agentmailMessageId ?? undefined;
+            threadId = status.threadId ?? undefined;
+          }
+        } catch {
+          // Status query is non-blocking
+        }
+      }
+
+      return {
+        messageId: messageId || (outboundId ? `msg_${outboundId}` : undefined),
+        threadId: threadId || (outboundId ? `thr_${outboundId}` : undefined),
+        outboundId,
+      };
+    } catch (err) {
+      // In isolated Vitest mocks where Convex backend syscalls (createFunctionHandle) aren't present,
+      // fallback to direct REST fetch
+      if (String(err).includes("outside of a Convex backend")) {
+        // Fall through to REST API
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  // 2. Fallback to direct REST API for standalone execution or unit testing
   const response = await agentMailFetch(
     `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(options.inboxId)}/messages/send`,
     {
@@ -143,6 +207,7 @@ export async function sendAgentMailMessage(options: {
         text: options.text,
         html: options.html,
         ...(options.headers ? { headers: options.headers } : {}),
+        ...(options.labels ? { labels: options.labels } : {}),
       }),
     }
   );
@@ -165,8 +230,58 @@ export async function replyAgentMailMessage(options: {
   text: string;
   html: string;
   to?: string;
+  subject?: string;
   headers?: Record<string, string>;
+  labels?: string[];
+  ctx?: AgentMailContext;
 }): Promise<AgentMailSendResult> {
+  // 1. Prefer @agentmail/convex component when Convex context is provided
+  if (options.ctx && typeof options.ctx.runMutation === "function") {
+    try {
+      const sendCtx = options.ctx as unknown as SendContext;
+      const outboundId = await agentmail.replyToMessage(
+        sendCtx,
+        options.inboxId,
+        options.messageId,
+        {
+          text: options.text,
+          html: options.html,
+          to: options.to,
+          subject: options.subject,
+          headers: options.headers,
+          labels: options.labels,
+        }
+      );
+
+      let resolvedMessageId: string | undefined;
+      let threadId: string | undefined;
+      if (typeof options.ctx.runQuery === "function") {
+        try {
+          const status = await agentmail.status(options.ctx as unknown as QueryContext, outboundId);
+          if (status) {
+            resolvedMessageId = status.agentmailMessageId ?? undefined;
+            threadId = status.threadId ?? undefined;
+          }
+        } catch {
+          // Status query is non-blocking
+        }
+      }
+
+      return {
+        messageId: resolvedMessageId || (outboundId ? `msg_${outboundId}` : undefined),
+        threadId: threadId || (outboundId ? `thr_${outboundId}` : undefined),
+        outboundId,
+      };
+    } catch (err) {
+      if (String(err).includes("outside of a Convex backend")) {
+        // Fall through to REST API
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  // 2. Fallback to direct REST API for standalone execution or unit testing
   const response = await agentMailFetch(
     `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(options.inboxId)}/messages/${encodeURIComponent(options.messageId)}/reply`,
     {
@@ -198,8 +313,31 @@ export async function replyAgentMailMessage(options: {
 
 export async function listAgentMailMessages(
   inboxId: string,
-  limit = 20
+  limit = 20,
+  ctx?: AgentMailContext
 ): Promise<Array<Record<string, unknown>>> {
+  // 1. Prefer @agentmail/convex component when Convex context is provided
+  if (ctx) {
+    try {
+      if (typeof ctx.runAction === "function") {
+        const threads = await agentmail.listThreads(ctx as unknown as ActionContext, inboxId, { limit });
+        if (Array.isArray(threads)) return threads;
+        if (isRecord(threads) && Array.isArray(threads.threads)) {
+          return threads.threads as Array<Record<string, unknown>>;
+        }
+      }
+      if (typeof ctx.runQuery === "function") {
+        const localMessages = await ctx.runQuery(components.agentmail.lib.listInboundMessages, { inboxId });
+        if (Array.isArray(localMessages) && localMessages.length > 0) {
+          return localMessages as Array<Record<string, unknown>>;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  // 2. Fallback to direct REST API
   const response = await agentMailFetch(
     `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(inboxId)}/messages?limit=${limit}`,
     {
@@ -217,7 +355,22 @@ export async function listAgentMailMessages(
   return [];
 }
 
-export async function getAgentMailMessage(inboxId: string, messageId: string): Promise<Record<string, unknown>> {
+export async function getAgentMailMessage(
+  inboxId: string,
+  messageId: string,
+  ctx?: AgentMailContext
+): Promise<Record<string, unknown>> {
+  // 1. Prefer @agentmail/convex component when Convex context is provided
+  if (ctx && typeof ctx.runAction === "function") {
+    try {
+      const message = await agentmail.getMessage(ctx as unknown as ActionContext, inboxId, messageId);
+      if (isRecord(message)) return message;
+    } catch {
+      // Fallback
+    }
+  }
+
+  // 2. Fallback to direct REST API
   const response = await agentMailFetch(
     `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}`,
     {

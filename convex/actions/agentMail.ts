@@ -130,7 +130,7 @@ async function handleInboundClaimReply(
     return null;
   }
 
-  const message = await getAgentMailMessage(args.inboxId, args.messageId);
+  const message = await getAgentMailMessage(args.inboxId, args.messageId, ctx);
     const normalized = normalizeAgentMailWebhook({
       event_type: "message.received",
       event_id: args.eventId,
@@ -598,6 +598,7 @@ Evaluate the inbound correspondence text rigorously:
           subject: alertSubject,
           text: alertText,
           html: alertHtml,
+          ctx,
         });
       } catch (notifyErr) {
         console.warn("User email notification dispatch bypassed (AgentMail not active or in test):", notifyErr);
@@ -659,7 +660,7 @@ async function performInboxSync(
 
   for (const inboxId of inboxesToCheck) {
     try {
-      const messages = await listAgentMailMessages(inboxId, effectiveLimit);
+      const messages = await listAgentMailMessages(inboxId, effectiveLimit, ctx);
       inboxMessagesMap.push({ inboxId, messages });
       for (const msg of messages) {
         const rawMessageId =

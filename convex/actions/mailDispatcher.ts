@@ -44,12 +44,17 @@ interface ClaimMailboxes {
 
 function withAgentMailMessageId<T extends Record<string, unknown>>(
   payload: T,
-  messageId: string | undefined
-): T & { agentMailMessageId?: string } {
+  messageId: string | undefined,
+  outboundId?: string | undefined
+): T & { agentMailMessageId?: string; outboundId?: string } {
+  const res: Record<string, unknown> = { ...payload };
   if (messageId) {
-    return { ...payload, agentMailMessageId: messageId };
+    res.agentMailMessageId = messageId;
   }
-  return payload;
+  if (outboundId) {
+    res.outboundId = outboundId;
+  }
+  return res as T & { agentMailMessageId?: string; outboundId?: string };
 }
 
 async function ensureClaimMailboxes(
@@ -254,6 +259,7 @@ async function deliverAiAdjudication(
     text: determinationEmail.text,
     html: determinationEmail.html,
     ...(Object.keys(headers).length > 0 ? { headers } : {}),
+    ctx,
   });
 
   const replyThreadId = liveReply.threadId || liveReply.messageId;
@@ -277,7 +283,7 @@ async function deliverAiAdjudication(
     detectedDetermination: adjudicationResult.determination,
     clinicalRationale: adjudicationResult.clinicalRationale,
     autoReplyStatus: adjudicationResult.determination === "OVERTURNED_APPROVED" ? undefined : "pending",
-  }, liveReply.messageId));
+  }, liveReply.messageId, liveReply.outboundId));
 
   if (claim.autoPilotEnabled !== false && adjudicationResult.determination !== "OVERTURNED_APPROVED" && insertedMsgId && ctx.scheduler?.runAfter) {
     try {
@@ -435,6 +441,7 @@ export const dispatchAppealPacket = action({
       subject,
       text: appealEmail.text,
       html: appealEmail.html,
+      ctx,
     });
 
     const recordedThreadId = liveTransmission.threadId || liveTransmission.messageId;
@@ -464,7 +471,7 @@ export const dispatchAppealPacket = action({
       bodyHtml: appealEmail.html,
       bodyText: appealEmail.text,
       hasAttachments: true,
-    }, liveTransmission.messageId));
+    }, liveTransmission.messageId, liveTransmission.outboundId));
 
     // 5. Update claim status to dispatched
     await ctx.runMutation(internal.claims.updateStatusInternal, {
@@ -647,6 +654,7 @@ async function performSendOutboundMessage(
         text: correspondenceEmail.text,
         html: correspondenceEmail.html,
         ...(Object.keys(headers).length > 0 ? { headers } : {}),
+        ctx,
       });
     } catch (replyErr) {
       console.warn("AgentMail reply endpoint failed, falling back to in-thread send:", replyErr);
@@ -661,6 +669,7 @@ async function performSendOutboundMessage(
       text: correspondenceEmail.text,
       html: correspondenceEmail.html,
       ...(Object.keys(headers).length > 0 ? { headers } : {}),
+      ctx,
     });
   }
 
@@ -689,7 +698,7 @@ async function performSendOutboundMessage(
     bodyHtml: correspondenceEmail.html,
     bodyText: correspondenceEmail.text,
     hasAttachments: false,
-  }, liveTransmission.messageId));
+  }, liveTransmission.messageId, liveTransmission.outboundId));
 
   let adjudicationDetermination: string | undefined;
   if (isAiAdjudicatorReply && threadId) {

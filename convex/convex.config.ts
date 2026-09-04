@@ -8,6 +8,7 @@ import auth from "@convex-dev/auth/core/convex.config.js";
 import passwordProvider from "@convex-dev/auth/providers/password/convex.config.js";
 import oauth from "@convex-dev/auth/providers/oauth/convex.config.js";
 import username from "@convex-dev/auth/username/convex.config.js";
+import agentmail from "@agentmail/convex/convex.config";
 
 const app = defineApp({
   env: {
@@ -59,6 +60,7 @@ app.use(oauth, {
     CLIENT_SECRET: app.env.AUTH_GOOGLE_SECRET,
   },
 });
+app.use(agentmail);
 
 export default app;
 

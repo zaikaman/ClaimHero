@@ -5,8 +5,11 @@ import {
   replyAgentMailMessage,
   formatMessageIdHeader,
   getAgentMailMessage,
+  listAgentMailMessages,
   downloadAgentMailAttachment,
+  agentmail,
 } from "../convex/lib/agentMail";
+import * as emailsModule from "../convex/emails";
 import {
   normalizeAgentMailWebhook,
   extractEmailAddress,
@@ -721,6 +724,196 @@ Paragraph text with **bold** and *italic*.
         intakeClaim.agentMailAdjudicatorEmail?.toLowerCase() === normalized;
 
       expect(isMatch).toBe(true);
+    });
+  });
+
+  describe("@agentmail/convex Component Integration", () => {
+    it("exposes singleton agentmail instance connected to components.agentmail", () => {
+      expect(agentmail).toBeDefined();
+      expect(agentmail.component).toBeDefined();
+      expect(typeof agentmail.sendMessage).toBe("function");
+      expect(typeof agentmail.replyToMessage).toBe("function");
+      expect(typeof agentmail.getThread).toBe("function");
+      expect(typeof agentmail.getMessage).toBe("function");
+      expect(typeof agentmail.listThreads).toBe("function");
+      expect(typeof agentmail.handleWebhook).toBe("function");
+      expect(typeof agentmail.status).toBe("function");
+    });
+
+    it("sends message via agentmail.sendMessage when ctx is provided", async () => {
+      const mockSendMessage = vi.spyOn(agentmail, "sendMessage").mockResolvedValue("outbound_123" as any);
+      const mockStatus = vi.spyOn(agentmail, "status").mockResolvedValue({
+        status: "sent",
+        agentmailMessageId: "msg_remote_777",
+        threadId: "thr_remote_888",
+        errorMessage: null,
+      });
+
+      const mockCtx = {
+        runMutation: vi.fn(),
+        runQuery: vi.fn(),
+      };
+
+      const result = await sendAgentMailMessage({
+        inboxId: "inbox_custom",
+        to: "payer@gateway.com",
+        subject: "Medical Appeal Dossier",
+        text: "Brief text",
+        html: "<p>Brief html</p>",
+        ctx: mockCtx,
+      });
+
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        mockCtx,
+        "inbox_custom",
+        expect.objectContaining({
+          to: "payer@gateway.com",
+          subject: "Medical Appeal Dossier",
+          text: "Brief text",
+          html: "<p>Brief html</p>",
+        })
+      );
+      expect(mockStatus).toHaveBeenCalledWith(mockCtx, "outbound_123");
+      expect(result.outboundId).toBe("outbound_123");
+      expect(result.messageId).toBe("msg_remote_777");
+      expect(result.threadId).toBe("thr_remote_888");
+    });
+
+    it("replies to message via agentmail.replyToMessage when ctx is provided", async () => {
+      const mockReply = vi.spyOn(agentmail, "replyToMessage").mockResolvedValue("outbound_rep_456" as any);
+      const mockStatus = vi.spyOn(agentmail, "status").mockResolvedValue({
+        status: "sent",
+        agentmailMessageId: "msg_reply_remote_999",
+        threadId: "thr_remote_888",
+        errorMessage: null,
+      });
+
+      const mockCtx = {
+        runMutation: vi.fn(),
+        runQuery: vi.fn(),
+      };
+
+      const result = await replyAgentMailMessage({
+        inboxId: "inbox_custom",
+        messageId: "parent_msg_1",
+        text: "Reply text",
+        html: "<p>Reply html</p>",
+        to: "adjudicator@payer.com",
+        subject: "Re: Appeal",
+        ctx: mockCtx,
+      });
+
+      expect(mockReply).toHaveBeenCalledWith(
+        mockCtx,
+        "inbox_custom",
+        "parent_msg_1",
+        expect.objectContaining({
+          text: "Reply text",
+          html: "<p>Reply html</p>",
+          to: "adjudicator@payer.com",
+          subject: "Re: Appeal",
+        })
+      );
+      expect(result.outboundId).toBe("outbound_rep_456");
+      expect(result.messageId).toBe("msg_reply_remote_999");
+      expect(result.threadId).toBe("thr_remote_888");
+    });
+
+    it("retrieves message via agentmail.getMessage when ctx is provided", async () => {
+      const mockGetMessage = vi.spyOn(agentmail, "getMessage").mockResolvedValue({
+        id: "msg_test_remote",
+        subject: "Overturn Confirmation",
+      });
+
+      const mockCtx = {
+        runAction: vi.fn(),
+        runMutation: vi.fn(),
+      };
+
+      const message = await getAgentMailMessage("inbox_1", "msg_test_remote", mockCtx);
+      expect(mockGetMessage).toHaveBeenCalledWith(mockCtx, "inbox_1", "msg_test_remote");
+      expect(message.subject).toBe("Overturn Confirmation");
+    });
+
+    it("lists threads via agentmail.listThreads when ctx is provided", async () => {
+      const mockListThreads = vi.spyOn(agentmail, "listThreads").mockResolvedValue({
+        threads: [{ id: "thr_1", subject: "Claim CLM-001" }],
+      });
+
+      const mockCtx = {
+        runAction: vi.fn(),
+        runMutation: vi.fn(),
+      };
+
+      const messages = await listAgentMailMessages("inbox_1", 10, mockCtx);
+      expect(mockListThreads).toHaveBeenCalledWith(mockCtx, "inbox_1", { limit: 10 });
+      expect(messages).toHaveLength(1);
+    });
+
+    it("onMessageReceived internal mutation schedules processInboundClaimReply", async () => {
+      const mockCtx: any = {
+        scheduler: {
+          runAfter: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      await (emailsModule.onMessageReceived as any)._handler(mockCtx, {
+        message: {
+          inbox_id: "inbox_active",
+          message_id: "msg_inbound_abc",
+        },
+        thread: {},
+        eventId: "evt_webhook_123",
+      });
+
+      expect(mockCtx.scheduler.runAfter).toHaveBeenCalledWith(
+        0,
+        expect.anything(),
+        expect.objectContaining({
+          inboxId: "inbox_active",
+          messageId: "msg_inbound_abc",
+          eventId: "evt_webhook_123",
+        })
+      );
+    });
+
+    it("listComponentInboundMessages queries component inboundMessages table", async () => {
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue([
+          { messageId: "msg_inbound_1", subject: "Adjudication Determination" },
+        ]),
+      };
+
+      const result = await (emailsModule.listComponentInboundMessages as any)._handler(mockCtx, {
+        threadId: "thr_99",
+      });
+
+      expect(mockCtx.runQuery).toHaveBeenCalledWith(
+        expect.anything(),
+        { threadId: "thr_99", inboxId: undefined }
+      );
+      expect(result).toHaveLength(1);
+    });
+
+    it("getOutboundDeliveryStatus queries component outbound message status", async () => {
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          status: "delivered",
+          agentmailMessageId: "msg_remote_100",
+          threadId: "thr_100",
+          errorMessage: null,
+        }),
+      };
+
+      const result = await (emailsModule.getOutboundDeliveryStatus as any)._handler(mockCtx, {
+        outboundId: "outbound_100",
+      });
+
+      expect(mockCtx.runQuery).toHaveBeenCalledWith(
+        expect.anything(),
+        { outboundId: "outbound_100" }
+      );
+      expect(result.status).toBe("delivered");
     });
   });
 });

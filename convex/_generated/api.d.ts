@@ -41,6 +41,7 @@ import type * as lib_openai from "../lib/openai.js";
 import type * as lib_precedentCorpus from "../lib/precedentCorpus.js";
 import type * as lib_precedentValidators from "../lib/precedentValidators.js";
 import type * as lib_rateLimiter from "../lib/rateLimiter.js";
+import type * as lib_redactionEngine from "../lib/redactionEngine.js";
 import type * as model_auth from "../model/auth.js";
 import type * as p2pCallSessions from "../p2pCallSessions.js";
 import type * as p2pScripts from "../p2pScripts.js";
@@ -88,6 +89,7 @@ declare const fullApi: ApiFromModules<{
   "lib/precedentCorpus": typeof lib_precedentCorpus;
   "lib/precedentValidators": typeof lib_precedentValidators;
   "lib/rateLimiter": typeof lib_rateLimiter;
+  "lib/redactionEngine": typeof lib_redactionEngine;
   "model/auth": typeof model_auth;
   p2pCallSessions: typeof p2pCallSessions;
   p2pScripts: typeof p2pScripts;
@@ -131,4 +133,5 @@ export declare const components: {
   authUsername: import("@convex-dev/auth/username/_generated/component.js").ComponentApi<"authUsername">;
   authPasswordProvider: import("@convex-dev/auth/providers/password/_generated/component.js").ComponentApi<"authPasswordProvider">;
   oauthGoogle: import("@convex-dev/auth/providers/oauth/_generated/component.js").ComponentApi<"oauthGoogle">;
+  agentmail: import("@agentmail/convex/_generated/component.js").ComponentApi<"agentmail">;
 };

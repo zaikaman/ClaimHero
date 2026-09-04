@@ -252,6 +252,7 @@ export default defineSchema({
     bodyText: v.string(),
     hasAttachments: v.boolean(),
     agentMailMessageId: v.optional(v.string()),
+    outboundId: v.optional(v.string()),
     detectedDetermination: v.optional(v.string()), // OVERTURNED_APPROVED, ADDITIONAL_RECORDS_REQUIRED, DENIAL_UPHELD, ACKNOWLEDGMENT_ONLY, GENERAL_INQUIRY
     clinicalRationale: v.optional(v.string()),
     missingRecordsRequested: v.optional(v.array(v.string())),
@@ -263,6 +264,7 @@ export default defineSchema({
     .index("by_thread", ["threadId"])
     .index("by_claim", ["claimId"])
     .index("by_agent_mail_message_id", ["agentMailMessageId"])
+    .index("by_outbound_id", ["outboundId"])
     .index("by_auto_reply_status", ["autoReplyStatus"]),
 
   // Ignored / unmatched AgentMail messages that have no matching claim to prevent perpetual re-processing

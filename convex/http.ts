@@ -5,6 +5,7 @@ import { normalizeAgentMailWebhook, verifySvixWebhook } from "./lib/agentMailWeb
 import { rateLimiter } from "./lib/rateLimiter";
 import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { components } from "./_generated/api";
+import { agentmail } from "./lib/agentMail";
 
 const http = httpRouter();
 
@@ -108,6 +109,42 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
     }
+  }),
+});
+
+/**
+ * Official AgentMail Convex component webhook endpoint.
+ * Handles Svix signature verification, deduping, component message persistence,
+ * and callbacks via onMessageReceived.
+ */
+http.route({
+  path: "/agentmail/webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "agentMailWebhook", {
+        key: request.headers.get("svix-id") || "global",
+      });
+      if (!limitStatus.ok) {
+        return new Response(
+          JSON.stringify({ error: "Too many webhook requests" }),
+          {
+            status: 429,
+            headers: {
+              "Content-Type": "application/json",
+              "Retry-After": String(Math.ceil((limitStatus.retryAfter || 1000) / 1000)),
+            },
+          }
+        );
+      }
+    } catch {
+      // Continue if rate limiter is not configured
+    }
+
+    return await agentmail.handleWebhook(
+      ctx as unknown as Parameters<typeof agentmail.handleWebhook>[0],
+      request
+    );
   }),
 });
 

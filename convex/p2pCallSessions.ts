@@ -1,13 +1,13 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
 
 export const getLatestByClaim = query({
   args: {
     claimId: v.id("claims"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Doc<"p2pCallSessions"> | null> => {
     const authorized = await getClaimIfAuthorized(ctx, args.claimId);
     if (!authorized) return null;
 

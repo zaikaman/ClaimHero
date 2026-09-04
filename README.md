@@ -196,7 +196,7 @@ npm run dev
 
 Copy the variable names from [`.env.example`](./.env.example). Keep provider credentials in Convex deployment environment variables; do not put secrets in `VITE_*` variables or commit `.env.local`.
 
-For a full production-style configuration, set the Convex Auth, OpenAI, Firecrawl, and AgentMail variables described in `.env.example`. The AgentMail webhook route is `/agentmail-webhook`.
+For a full production-style configuration, set the Convex Auth, OpenAI, Firecrawl, and AgentMail variables described in `.env.example`. The AgentMail webhook route is `/agentmail/webhook` (with legacy compatibility preserved at `/agentmail-webhook`).
 
 ## Verification
 
@@ -211,7 +211,7 @@ npm run build
 npm run verify
 ```
 
-The current repository verification record is **444/444 tests passing** across 31 suites, with strict typechecking, linting, coverage, and a production Vite build. The suites cover the master pipeline, Convex authorization and ownership isolation, OpenAI structured outputs and embeddings, Firecrawl policy selection, AgentMail webhook signatures and threading, deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo isolation.
+The current repository verification record is **452/452 tests passing** across 31 suites, with strict typechecking, linting, coverage, and a production Vite build. The suites cover the master pipeline, Convex authorization and ownership isolation, OpenAI structured outputs and embeddings, Firecrawl policy selection, AgentMail component integration and webhook signatures, deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo isolation.
 
 The build log records the command, commit, and affected files for each milestone: [`hackathon.md`](./hackathon.md).
 
