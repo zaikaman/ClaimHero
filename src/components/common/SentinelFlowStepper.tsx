@@ -274,10 +274,10 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
           <div className="flex items-center justify-between gap-2 mb-1.5 px-0.5">
             <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-1">
               <Shield className="size-3 text-primary" />
-              Strategic Defense Vectors
+              Defense Suite Deliverables
             </span>
             <span className="text-[10px] text-muted-foreground font-mono">
-              3 Active Armaments
+              Brief & Companion Collateral
             </span>
           </div>
 

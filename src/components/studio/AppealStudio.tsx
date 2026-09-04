@@ -6,7 +6,6 @@ import {
 
   Eye,
   PencilSimpleLine,
-  PhoneCall,
   Printer,
   ArrowRight,
   Scales,
@@ -428,31 +427,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap 2xl:flex-nowrap shrink-0">
-            {/* P2P Defense Tele-Script Navigation */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onNavigateView?.("p2p")}
-              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
-              title="Open 3-Minute Physician Peer-to-Peer Defense Tele-Script & Pocket Cheat Sheet"
-            >
-              <PhoneCall className="size-3.5" />
-              <span>Doctor P2P Script</span>
-            </Button>
-
-            {/* ERISA Penalties & Financial Liability Navigation */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onNavigateView?.("calculator")}
-              className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
-              title="Open ERISA 29 U.S.C. § 1132(c) Statutory Penalty Calculator and Out-of-Pocket Liability Audit"
-            >
-              <Scales className="size-3.5" />
-              <span>ERISA Penalties</span>
-            </Button>
-
+          <div className="flex items-center gap-2 shrink-0">
             {/* Export & Preview Trigger */}
             <Button
               variant="outline"
@@ -845,6 +820,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         appeal={appeal}
         markdownContent={markdownContent}
         evidences={evidences}
+        onNavigateView={onNavigateView}
         onProceedToDispatch={() => {
           setIsExportOpen(false);
           if (onNavigateToDispatch) onNavigateToDispatch();

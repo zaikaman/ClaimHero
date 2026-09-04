@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-04T16:40:00Z
+- **Last updated:** 2026-09-04T17:09:00Z
 
 ## Log
 
@@ -798,5 +798,9 @@ Fixed the actual production send failure caused by component environment isolati
 ### 2026-09-04 - f113773
 Hardened structured model response handling in `convex/lib/openai.ts` with two semantic retries, corrective JSON-only instructions, balanced JSON extraction, required-field checks, and PHI-safe errors. Appeal synthesis now stops after three failed attempts and tells the user to try again without persisting or displaying synthetic content (`convex/actions/appealSynthesizer.ts`). Added regression coverage and verified 458 tests, typecheck, lint, coverage, and production build.
 
-### 2026-09-04 - working tree
+### 2026-09-04 - aca21ef
 Hardened AgentMail message retrieval, angle-bracketed ID matching, and component remote action export: resolved uncaught "was not found in the component mirror" exception for inbound Gmail RFC 5322 Message-IDs by implementing fuzzy bracket normalization (`matchesMessageId`) and resilient multi-tier fallback (component mirror -> `agentmail.getMessage` remote action -> direct REST API fetch via `AGENTMAIL_API_KEY`) in `convex/lib/agentMail.ts`. Applied official upstream PR #2 fix from `docs/convex` (`@agentmail/convex`) via `patches/@agentmail+convex+0.1.0.patch` to expose `getMessage`, `listThreads`, `getThread`, `createInbox`, `listInboxes`, `getInboxRemote`, and `deleteInbox` as public component actions across the mount boundary. Added automated unit tests in `tests/agentMail.test.ts` covering angle-bracket normalization and multi-tier fallbacks, verified with `npm run verify` across 461 passing unit tests (32 suites), 100% clean typecheck, 0 lint errors/warnings, and successful production build. Convex features: components (`@agentmail/convex`), actions, queries, patch-package.
+
+### 2026-09-04 - working tree
+- Streamlined Defense Suite Information Architecture and UI Duplication: Preserved Doctor P2P Copilot and ERISA & Liability Audit as specialized clinical/statutory companion assets while decluttering the primary appeal workflow (Ingest -> Evidence Matrix -> Appeal Brief -> Dispatch). Removed duplicate Doctor P2P Script and ERISA Penalties navigation buttons from the Collaborative Appeal Studio card header in `src/components/studio/AppealStudio.tsx`, keeping primary focus on Preview Email and AI Synthesis. Reframed defense vector sub-tabs as "Defense Suite Deliverables: Brief & Companion Collateral" in `src/components/common/SentinelFlowStepper.tsx` and simplified sidebar badges. Integrated companion collateral quick-links directly into `src/components/studio/ExportDrawer.tsx`, allowing users to open the P2P Tele-Script or ERISA Audit directly from the appeal packet view.
+- Redesigned ERISA & Liability Audit Header Bar: Fixed cramped truncation and layout overflow in `src/components/calculator/FinancialLiabilityCalculator.tsx` to match the exact design language of `AppealStudio` and `P2PDefenseStudio`. Standardized title to "ERISA & Liability Audit", badge to "29 U.S.C. § 1132(c)", and replaced wordy cut-off paragraph with clean metadata pills (`Patient` • `Payer` • `Disputed: $X,XXX.XX`). Shortened button labels ("Embed in Brief") and updated responsive flex layout (`lg:flex-row`). Verified with 100% clean typecheck and production Vite build.

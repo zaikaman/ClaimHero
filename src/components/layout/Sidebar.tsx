@@ -130,8 +130,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: "studio",
       label: "Defense Suite",
-      badge: "3 Vectors",
-      description: "Legal Brief, Doctor P2P & ERISA Penalties",
+      badge: "Suite",
+      description: "Legal Brief & Companion Collateral",
       icon: Shield,
       isDefenseSuite: true,
       subItems: [

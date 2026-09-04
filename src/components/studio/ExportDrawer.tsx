@@ -13,8 +13,11 @@ import {
   FolderSimpleStar,
   FileText,
   Code,
+  PhoneCall,
+  Scales,
 } from "@phosphor-icons/react";
 import { Claim, Appeal, ClinicalEvidence } from "../../types";
+import { FlowView } from "../common/SentinelFlowStepper";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +45,7 @@ export interface ExportDrawerProps {
   markdownContent: string;
   onProceedToDispatch: () => void;
   evidences?: ClinicalEvidence[];
+  onNavigateView?: (view: FlowView) => void;
 }
 
 export const ExportDrawer: React.FC<ExportDrawerProps> = ({
@@ -52,6 +56,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
   markdownContent,
   onProceedToDispatch,
   evidences: propEvidences,
+  onNavigateView,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isPublicExhibitRedacted, setIsPublicExhibitRedacted] = useState(false);
@@ -327,6 +332,39 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 <ShieldCheck className="size-3.5" />
                 <span>{isPublicExhibitRedacted ? "Exhibit Redacted" : "Redact Exhibit"}</span>
               </Button>
+
+              {/* Companion Deliverables Navigation */}
+              {onNavigateView && (
+                <>
+                  <div className="h-4 w-px bg-border mx-0.5 hidden lg:block" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      onClose();
+                      onNavigateView("p2p");
+                    }}
+                    className="h-8 rounded-md px-2 text-xs gap-1 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 shrink-0"
+                    title="Open Doctor P2P Tele-Script Companion Asset"
+                  >
+                    <PhoneCall className="size-3.5" />
+                    <span className="hidden md:inline">P2P Script</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      onClose();
+                      onNavigateView("calculator");
+                    }}
+                    className="h-8 rounded-md px-2 text-xs gap-1 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 shrink-0"
+                    title="Open ERISA Statutory Penalty Calculator & Liability Audit"
+                  >
+                    <Scales className="size-3.5" />
+                    <span className="hidden md:inline">ERISA Audit</span>
+                  </Button>
+                </>
+              )}
             </div>
 
             {/* Right: Action Toolbar */}

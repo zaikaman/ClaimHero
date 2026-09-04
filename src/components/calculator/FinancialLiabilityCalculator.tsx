@@ -131,7 +131,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
 
       {/* Top Header Card */}
       <Card className="p-3.5 shrink-0 overflow-visible no-print">
-        <div className="flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Left: Case & Engine Info */}
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground shrink-0 shadow-xs">
@@ -139,14 +139,14 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm font-semibold text-foreground font-sans truncate">
-                  Financial Liability & Statutory ERISA Penalty Calculator
+                <h2 className="text-sm font-semibold text-foreground font-sans">
+                  ERISA & Liability Audit
                 </h2>
                 <Badge variant="outline" className="font-mono text-[10px] text-cyan-400 border-cyan-500/30">
-                  29 U.S.C. § 1132(c) Engine
+                  29 U.S.C. § 1132(c)
                 </Badge>
                 <Badge variant="outline" className="font-mono text-[10px]">
-                  {claim.claimNumber}
+                  Claim #{claim.claimNumber}
                 </Badge>
                 {isSaving && (
                   <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground animate-pulse">
@@ -162,13 +162,15 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
                 )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
-                Patient out-of-pocket exposure modeling vs annual plan maximums and accrued $110/day failure-to-disclose penalties
+                Patient: <span className="text-foreground font-medium">{claim.patient?.name || "Insured Patient"}</span> • Payer:{" "}
+                <span className="text-foreground font-medium">{claim.patient?.insurancePayer || "Health Insurer"}</span> • Disputed:{" "}
+                <span className="text-foreground font-medium">{formatCurrency(claim.deniedAmount)}</span>
               </p>
             </div>
           </div>
 
           {/* Right: Actions Toolbar */}
-          <div className="flex items-center gap-2 flex-wrap 2xl:flex-nowrap shrink-0">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
             <Button
               variant="outline"
               size="sm"
@@ -223,10 +225,9 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               title="Save calculations and open Appeal Studio to embed statutory penalties in the brief"
             >
               <FileText className="size-3.5" />
-              <span>Embed in Legal Brief</span>
+              <span>Embed in Brief</span>
               <ArrowRight className="size-3" />
             </Button>
-
           </div>
         </div>
 
