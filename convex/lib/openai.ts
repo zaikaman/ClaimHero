@@ -35,33 +35,116 @@ export function getOpenAIClient(options: { timeout?: number; maxRetries?: number
   });
 }
 
-/**
- * Execute a structured output completion with JSON schema validation
- */
-export async function createStructuredCompletion<T>(options: {
-  systemPrompt: string;
+const DEFAULT_STRUCTURED_RETRIES = 2;
+const STRUCTURED_RETRY_DELAY_MS = 250;
+
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function extractBalancedJsonCandidates(content: string): string[] {
+  const candidates: string[] = [];
+
+  for (let start = 0; start < content.length; start += 1) {
+    if (content[start] !== "{" && content[start] !== "[") continue;
+
+    const opening = content[start];
+    const closing = opening === "{" ? "}" : "]";
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = start; index < content.length; index += 1) {
+      const character = content[index];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (character === "\\") {
+          escaped = true;
+        } else if (character === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (character === '"') {
+        inString = true;
+      } else if (character === opening) {
+        depth += 1;
+      } else if (character === closing) {
+        depth -= 1;
+        if (depth === 0) {
+          candidates.push(content.slice(start, index + 1));
+          break;
+        }
+      }
+    }
+  }
+
+  return candidates;
+}
+
+function hasRequiredStructuredFields(value: unknown, schema: Record<string, unknown>): boolean {
+  if (schema.type !== "object" || !Array.isArray(schema.required)) return true;
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+
+  return (schema.required as unknown[]).every(
+    (field) => typeof field === "string" && Object.prototype.hasOwnProperty.call(value, field)
+  );
+}
+
+function parseStructuredContent<T>(content: string, model: string, schemaName: string, schema: Record<string, unknown>): T {
+  const trimmed = content.trim();
+  const candidates = [trimmed, ...extractBalancedJsonCandidates(trimmed)];
+  let lastError = "No valid JSON value was found";
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+
+    try {
+      const parsed: unknown = JSON.parse(candidate);
+      if (!hasRequiredStructuredFields(parsed, schema)) {
+        lastError = "The JSON value is missing one or more required schema fields";
+        continue;
+      }
+      return parsed as T;
+    } catch (error) {
+      lastError = String(error);
+    }
+  }
+
+  throw new Error(
+    `Failed to parse structured JSON response from model ${model} for schema ${schemaName}: ${lastError}`
+  );
+}
+
+function isStructuredOutputProtocolError(error: unknown): boolean {
+  return error instanceof Error && /Failed to parse structured JSON response|response empty for schema/i.test(error.message);
+}
+
+async function createStructuredCompletionAttempt<T>(options: {
+  client: OpenAI;
+  model: string;
   userPrompt: string;
+  systemPrompt: string;
   schemaName: string;
   schema: Record<string, unknown>;
   imageUrls?: string[];
   fileInputs?: Array<{ fileData: string; filename: string }>;
   temperature?: number;
 }): Promise<T> {
-  const { model } = getOpenAIConfig();
-  const client = getOpenAIClient({ timeout: 30_000, maxRetries: 2 });
-  const safeUserPrompt = redactBeforeLLM(options.userPrompt);
-
   if (options.fileInputs && options.fileInputs.length > 0) {
     const content = [
-      { type: "input_text" as const, text: safeUserPrompt },
+      { type: "input_text" as const, text: options.userPrompt },
       ...options.fileInputs.map((file) => ({
         type: "input_file" as const,
         file_data: file.fileData,
         filename: file.filename,
       })),
     ];
-    const response = await client.responses.create({
-      model: model as OpenAI.Responses.ResponseCreateParams["model"],
+    const response = await options.client.responses.create({
+      model: options.model as OpenAI.Responses.ResponseCreateParams["model"],
       instructions: options.systemPrompt,
       input: [{ role: "user", content }],
       text: {
@@ -75,26 +158,16 @@ export async function createStructuredCompletion<T>(options: {
     });
     const messageContent = response.output_text;
     if (!messageContent) throw new Error(`OpenAI response empty for schema ${options.schemaName}`);
-
-    try {
-      return JSON.parse(messageContent) as T;
-    } catch (error) {
-      throw new Error(
-        `Failed to parse structured JSON response from model ${model}: ${String(error)}\nRaw Content: ${messageContent}`
-      );
-    }
+    return parseStructuredContent<T>(messageContent, options.model, options.schemaName, options.schema);
   }
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    {
-      role: "system",
-      content: options.systemPrompt,
-    },
+    { role: "system", content: options.systemPrompt },
   ];
 
   if (options.imageUrls && options.imageUrls.length > 0) {
     const contentParts: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
-      { type: "text", text: safeUserPrompt },
+      { type: "text", text: options.userPrompt },
     ];
 
     for (const url of options.imageUrls) {
@@ -104,19 +177,13 @@ export async function createStructuredCompletion<T>(options: {
       });
     }
 
-    messages.push({
-      role: "user",
-      content: contentParts,
-    });
+    messages.push({ role: "user", content: contentParts });
   } else {
-    messages.push({
-      role: "user",
-      content: safeUserPrompt,
-    });
+    messages.push({ role: "user", content: options.userPrompt });
   }
 
-  const response = await client.chat.completions.create({
-    model,
+  const response = await options.client.chat.completions.create({
+    model: options.model,
     messages,
     temperature: options.temperature ?? 0.2,
     response_format: {
@@ -130,17 +197,59 @@ export async function createStructuredCompletion<T>(options: {
   });
 
   const messageContent = response.choices[0]?.message?.content;
-  if (!messageContent) {
-    throw new Error(`OpenAI response empty for schema ${options.schemaName}`);
+  if (!messageContent) throw new Error(`OpenAI response empty for schema ${options.schemaName}`);
+  return parseStructuredContent<T>(messageContent, options.model, options.schemaName, options.schema);
+}
+
+/**
+ * Execute a structured output completion with JSON schema validation
+ */
+export async function createStructuredCompletion<T>(options: {
+  systemPrompt: string;
+  userPrompt: string;
+  schemaName: string;
+  schema: Record<string, unknown>;
+  imageUrls?: string[];
+  fileInputs?: Array<{ fileData: string; filename: string }>;
+  temperature?: number;
+  /** Number of additional attempts for malformed or empty structured output. */
+  structuredRetries?: number;
+}): Promise<T> {
+  const { model } = getOpenAIConfig();
+  const client = getOpenAIClient({ timeout: 30_000, maxRetries: 2 });
+  const safeUserPrompt = redactBeforeLLM(options.userPrompt);
+
+  const retries = Math.max(0, Math.min(options.structuredRetries ?? DEFAULT_STRUCTURED_RETRIES, 4));
+  const attempts = retries + 1;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const retryInstruction = attempt === 0
+      ? ""
+      : "\n\nThe previous response did not satisfy the structured-output contract. Return only one valid JSON object matching the supplied schema. Do not return YAML, `key: value` lines, Markdown, a subject line, a preamble, or a second document. Do not omit required fields.";
+
+    try {
+      return await createStructuredCompletionAttempt<T>({
+        client,
+        model,
+        userPrompt: `${safeUserPrompt}${retryInstruction}`,
+        systemPrompt: options.systemPrompt,
+        schemaName: options.schemaName,
+        schema: options.schema,
+        imageUrls: options.imageUrls,
+        fileInputs: options.fileInputs,
+        temperature: options.temperature,
+      });
+    } catch (error) {
+      if (!isStructuredOutputProtocolError(error) || attempt === attempts - 1) throw error;
+
+      console.warn(
+        `Structured output attempt ${attempt + 1}/${attempts} failed for ${options.schemaName}; retrying without logging model content.`
+      );
+      await sleep(STRUCTURED_RETRY_DELAY_MS * 2 ** attempt);
+    }
   }
 
-  try {
-    return JSON.parse(messageContent) as T;
-  } catch (error) {
-    throw new Error(
-      `Failed to parse structured JSON response from model ${model}: ${String(error)}\nRaw Content: ${messageContent}`
-    );
-  }
+  throw new Error(`Structured output failed for schema ${options.schemaName}`);
 }
 
 /**

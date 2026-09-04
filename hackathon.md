@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-04T16:03:12Z
+- **Last updated:** 2026-09-04T16:21:30Z
 
 ## Log
 
@@ -794,3 +794,6 @@ Resolved the prior Convex production deployment evaluation error by restoring th
 
 ### 2026-09-04 - working tree
 Fixed the actual production send failure caused by component environment isolation: patched `@agentmail/convex@0.1.0` to declare `AGENTMAIL_API_KEY`, bound it from the app deployment with `app.env.AGENTMAIL_API_KEY`, and made the AgentMail helper component-only with no REST fallback or synthetic delivery IDs (`convex/convex.config.ts`, `convex/lib/agentMail.ts`, `patches/`, `package.json`). Reconciled the follow-up production `InvalidReference` by reading the component's durable inbound mirror for inbox sync and message retrieval instead of calling the unavailable `lib.listThreads` or optional remote message action. Added regression coverage and documented the production environment requirement (`tests/agentMail.test.ts`, `tests/securityComplianceHardening.test.ts`, `README.md`). Validated with clean typecheck, lint, 456/456 tests across 32 suites, coverage, Convex code generation, and a successful production Vite build. Convex features: component environment binding, components (`@agentmail/convex`), durable Workpool sending, queries, mutations, actions, and HTTP actions.
+
+### 2026-09-04 - working tree
+Hardened structured model response handling in `convex/lib/openai.ts` with two semantic retries, corrective JSON-only instructions, balanced JSON extraction, required-field checks, and PHI-safe errors. Appeal synthesis now stops after three failed attempts and tells the user to try again without persisting or displaying synthetic content (`convex/actions/appealSynthesizer.ts`). Added regression coverage and verified 458 tests, typecheck, lint, coverage, and production build.

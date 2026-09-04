@@ -303,5 +303,44 @@ Welcome to the NASS guidelines directory. Below are the published clinical pract
         appealLevel: "level_1_internal",
       }));
     });
+
+    it("generateAppealBrief: surfaces a retryable error without persisting when structured output is unusable", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockRejectedValue(
+        new Error("Failed to parse structured JSON response from model gemini-3.1-flash-lite")
+      );
+
+      const mockClaim = {
+        _id: "c-fallback",
+        userId: "user_123",
+        claimNumber: "CLM-FALLBACK-1",
+        patient: { name: "Redacted Patient", insurancePayer: "Aetna", state: "CA" },
+        cptCodes: ["27447"],
+        icd10Codes: ["M17.11"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Medical necessity not established",
+        deniedAmount: 12000,
+      };
+
+      let queryCount = 0;
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation(() => {
+          queryCount += 1;
+          return queryCount === 1 ? Promise.resolve(mockClaim) : Promise.resolve([]);
+        }),
+        runMutation: vi.fn().mockResolvedValue("appeal_fallback_123"),
+      };
+
+      await expect(
+        (actionAppealSynthesizer.generateAppealBrief as any)._handler(mockCtx, {
+          claimId: "c-fallback",
+          appealLevel: "level_1_internal",
+          vectorPrecedents: [],
+        })
+      ).rejects.toThrow("Please try again");
+
+      expect(mockCtx.runMutation).not.toHaveBeenCalled();
+    });
   });
 });

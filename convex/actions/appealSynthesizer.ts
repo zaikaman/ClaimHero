@@ -253,6 +253,10 @@ function buildPaymentRequest(claimNumber?: string): string {
   return `Reconsider and reprocess ${hasClaimNumber ? `Claim #${claimNumber}` : "this claim"} under the applicable plan terms. If benefits are payable, please issue payment according to the plan and applicable provider agreement for the covered amount.`;
 }
 
+function isStructuredSynthesisFailure(error: unknown): boolean {
+  return error instanceof Error && /Failed to parse structured JSON response|response empty for schema|structured output/i.test(error.message);
+}
+
 function buildSignature(providerName?: string, sender?: AppealSenderDetails): string {
   const senderLines = [sender?.name, sender?.credentials, sender?.email, sender?.phone]
     .map((value) => value?.trim())
@@ -440,7 +444,7 @@ export function isEvidenceSiteMismatched(
       const hasConflictInTitle = rule.conflictTokens.some((conflict) => {
         const regex = new RegExp(`\\b${conflict}\\b`, "i");
         return regex.test(titleAndClause);
-      });
+    });
 
       const hasPrimaryInTitle = rule.primaryTokens.some((primary) => {
         const regex = new RegExp(`\\b${primary}\\b`, "i");
@@ -760,9 +764,14 @@ export const generateAppealBrief = action({
     const cptList = (claim.cptCodes || []).join(", ");
     const icdList = (claim.icd10Codes || []).join(", ");
 
-    // 3. Call OpenAI with structured JSON schema
-    const rawResult = await createStructuredCompletion<AppealBriefSynthesisResult>({
-      systemPrompt: `You draft professional healthcare payer correspondence. Produce content that can be sent as the body of a normal appeal email, not a litigation memorandum and not legal advice.
+    // 3. Call the configured model with structured JSON schema. Some
+    // OpenAI-compatible providers acknowledge the schema request but still
+    // return prose/YAML, so the shared helper retries protocol failures. If
+    // all attempts fail, do not persist or display synthetic appeal content.
+    let rawResult: AppealBriefSynthesisResult;
+    try {
+      rawResult = await createStructuredCompletion<AppealBriefSynthesisResult>({
+        systemPrompt: `You draft professional healthcare payer correspondence. Produce content that can be sent as the body of a normal appeal email, not a litigation memorandum and not legal advice.
 
 Evidence and safety rules:
 1. Use only facts explicitly present in the case details, indexed evidence, and treating-provider notes. Never invent symptoms, severity grades, measurements, treatment dates, medication names or doses, outcome scores, functional limitations, clearance, authorization, representation authority, plan type, jurisdiction, deadlines, or eligibility.
@@ -807,7 +816,16 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       schemaName: "AppealBriefSynthesisResult",
       schema: APPEAL_SYNTHESIS_SCHEMA,
       temperature: 0.15,
+      structuredRetries: 2,
     });
+    } catch (error) {
+      if (isStructuredSynthesisFailure(error)) {
+        throw new Error(
+          "Appeal brief generation could not obtain valid structured model output after three attempts. Please try again."
+        );
+      }
+      throw error;
+    }
 
     const groundedPolicyCitations = buildGroundedPolicyCitations(evidences);
     const groundedMedicalNecessityArguments = buildGroundedClinicalBasis(
@@ -902,7 +920,7 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       medicalNecessityArguments: result.medicalNecessityArguments,
       legalCitations: citationsSummary,
       fullAppealMarkdown: result.fullAppealMarkdown,
-      lastEditedBy: "OpenAI gpt-5.4-nano Appeal Synthesizer",
+      lastEditedBy: "Configured model Appeal Synthesizer",
     });
 
     return {

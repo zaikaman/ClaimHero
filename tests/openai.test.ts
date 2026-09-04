@@ -103,6 +103,32 @@ describe("convex/lib/openai Unit Tests", () => {
     expect(mockChatCreate).toHaveBeenCalled();
   });
 
+  it("retries malformed structured output and accepts a valid JSON object on the next attempt", async () => {
+    mockChatCreate
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: "subject: This is not JSON" } }],
+      })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: "```json\n{\"value\":\"recovered\"}\n```" } }],
+      });
+
+    const result = await createStructuredCompletion<{ value: string }>({
+      systemPrompt: "Return structured data.",
+      userPrompt: "Recover this value",
+      schemaName: "RecoveryResult",
+      schema: {
+        type: "object",
+        properties: { value: { type: "string" } },
+        required: ["value"],
+        additionalProperties: false,
+      },
+    });
+
+    expect(result).toEqual({ value: "recovered" });
+    expect(mockChatCreate).toHaveBeenCalledTimes(2);
+    expect(mockChatCreate.mock.calls[1][0].messages[1].content).toContain("previous response did not satisfy");
+  });
+
   it("creates structured completions with file inputs", async () => {
     const mockOutput = {
       parsedSummary: "Document parsed",
@@ -167,7 +193,7 @@ describe("convex/lib/openai Unit Tests", () => {
   });
 
   it("throws error when structured completion response is empty or unparseable", async () => {
-    mockChatCreate.mockResolvedValueOnce({
+    mockChatCreate.mockResolvedValue({
       choices: [{ message: { content: null } }],
     });
 
@@ -180,7 +206,7 @@ describe("convex/lib/openai Unit Tests", () => {
       })
     ).rejects.toThrow("OpenAI response empty for schema TestSchema");
 
-    mockChatCreate.mockResolvedValueOnce({
+    mockChatCreate.mockResolvedValue({
       choices: [{ message: { content: "INVALID_NOT_JSON" } }],
     });
 
@@ -192,10 +218,11 @@ describe("convex/lib/openai Unit Tests", () => {
         schema: {},
       })
     ).rejects.toThrow("Failed to parse structured JSON response");
+    expect(mockChatCreate).toHaveBeenCalledTimes(6);
   });
 
   it("throws error when file responses are empty or unparseable", async () => {
-    mockResponsesCreate.mockResolvedValueOnce({
+    mockResponsesCreate.mockResolvedValue({
       output_text: null,
     });
 
@@ -209,7 +236,7 @@ describe("convex/lib/openai Unit Tests", () => {
       })
     ).rejects.toThrow("OpenAI response empty for schema FileSchema");
 
-    mockResponsesCreate.mockResolvedValueOnce({
+    mockResponsesCreate.mockResolvedValue({
       output_text: "NOT_VALID_JSON",
     });
 
@@ -222,6 +249,7 @@ describe("convex/lib/openai Unit Tests", () => {
         fileInputs: [{ fileData: "base64", filename: "doc.pdf" }],
       })
     ).rejects.toThrow("Failed to parse structured JSON response");
+    expect(mockResponsesCreate).toHaveBeenCalledTimes(6);
   });
 
   it("throws error when embedding response is invalid or empty", async () => {
