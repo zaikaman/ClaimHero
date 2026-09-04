@@ -324,7 +324,7 @@ async function handleInboundClaimReply(
           claimId: matchingClaim._id,
           eventType: "outbound_delivery_failed",
           actor: "Mailer Daemon",
-          details: `Outbound delivery failure detected for claim #${matchingClaim.claimNumber}: ${subject}`,
+          details: `Outbound delivery failure detected for claim #${matchingClaim.claimNumber}`,
         });
       } catch (logErr) {
         console.warn("Failed to log delivery failure audit event:", logErr);

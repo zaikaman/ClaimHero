@@ -51,5 +51,12 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 20,
   },
+  // AgentMail inbound webhook rate limiter (burst: 30, rate: 30/min)
+  agentMailWebhook: {
+    kind: "token bucket",
+    rate: 30,
+    period: MINUTE,
+    capacity: 30,
+  },
 });
 

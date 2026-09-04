@@ -22,6 +22,7 @@ import {
   formatCorrespondenceEmail,
 } from "../lib/appealEmail";
 import { rateLimiter } from "../lib/rateLimiter";
+import { redactBeforeLLM, maskPatientName } from "../lib/redactionEngine";
 
 export interface DispatchReceipt {
   transmissionId: string;
@@ -310,6 +311,7 @@ export const dispatchAppealPacket = action({
     recipientEmail: v.optional(v.string()),
     customSubject: v.optional(v.string()),
     dispatchMode: v.optional(v.string()), // "ai_adjudicator" | "custom_email" | "official_payer"
+    waiveRedaction: v.optional(v.boolean()),
   },
   handler: async (
     ctx,
@@ -379,10 +381,30 @@ export const dispatchAppealPacket = action({
       `Appeal request | Claim #${claim.claimNumber} | ${payer}`;
     const subject = rawSubject.includes(claimTag) ? rawSubject : `${claimTag} ${rawSubject}`;
     const transmissionId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const appealEmail = formatAppealEmail(appeal.fullAppealMarkdown, {
+    const isCustomEmail = mode === "custom_email";
+    const isRedacted = Boolean(claim.redactionMetadata?.isRedacted);
+    const waiveRedaction = Boolean(args.waiveRedaction);
+
+    if (isCustomEmail && waiveRedaction) {
+      await ctx.runMutation(internal.auditLogs.logEventInternal, {
+        claimId: args.claimId,
+        eventType: "hipaa_redaction_waived",
+        actor: "User Consent Gate",
+        details: `User explicitly waived PII de-identification for outbound transmission to ${finalRecipient}.`,
+      });
+    }
+
+    let briefMarkdown = appeal.fullAppealMarkdown;
+    let patientName = claim.patient?.name;
+    if (isCustomEmail && !waiveRedaction && !isRedacted) {
+      briefMarkdown = redactBeforeLLM(briefMarkdown);
+      patientName = patientName ? maskPatientName(patientName, "HIPAA_SAFE_HARBOR") : undefined;
+    }
+
+    const appealEmail = formatAppealEmail(briefMarkdown, {
       claimNumber: claim.claimNumber,
       payer,
-      patientName: claim.patient?.name,
+      patientName,
       serviceDate: claim.serviceDate,
       deniedAmount: claim.deniedAmount,
       denialReason: [claim.denialReasonCode, claim.denialReasonDescription].filter(Boolean).join(" - "),
@@ -478,6 +500,7 @@ const sendOutboundMessageArgs = {
   text: v.string(),
   customRecipient: v.optional(v.string()),
   customSubject: v.optional(v.string()),
+  waiveRedaction: v.optional(v.boolean()),
 };
 
 async function performSendOutboundMessage(
@@ -488,6 +511,7 @@ async function performSendOutboundMessage(
     text: string;
     customRecipient?: string;
     customSubject?: string;
+    waiveRedaction?: boolean;
   },
   claim: Doc<"claims"> & { patient?: Doc<"patients"> | null }
 ) {
@@ -552,10 +576,30 @@ async function performSendOutboundMessage(
   if (inReplyTo) headers["In-Reply-To"] = inReplyTo;
   if (references) headers["References"] = references;
 
-  const correspondenceEmail = formatCorrespondenceEmail(args.text, {
+  const isRedacted = Boolean(claim.redactionMetadata?.isRedacted);
+  const waiveRedaction = Boolean(args.waiveRedaction);
+  const isCustomEmail = Boolean(args.customRecipient && !isAiAdjudicatorAddress(args.customRecipient));
+
+  if (isCustomEmail && waiveRedaction) {
+    await ctx.runMutation(internal.auditLogs.logEventInternal, {
+      claimId: args.claimId,
+      eventType: "hipaa_redaction_waived",
+      actor: "User Consent Gate",
+      details: `User explicitly waived PII de-identification for outbound transmission to ${recipient}.`,
+    });
+  }
+
+  let outboundText = args.text;
+  let patientName = claim.patient?.name;
+  if (isCustomEmail && !waiveRedaction && !isRedacted) {
+    outboundText = redactBeforeLLM(outboundText);
+    patientName = patientName ? maskPatientName(patientName, "HIPAA_SAFE_HARBOR") : undefined;
+  }
+
+  const correspondenceEmail = formatCorrespondenceEmail(outboundText, {
     claimNumber: claim.claimNumber,
     payer,
-    patientName: claim.patient?.name,
+    patientName,
     serviceDate: claim.serviceDate,
     deniedAmount: claim.deniedAmount,
     denialReason: claim.denialReasonCode,

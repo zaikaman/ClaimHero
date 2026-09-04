@@ -204,13 +204,14 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
     }
   }
 
-  // Insert audit log
+  // Insert audit log (omitting raw subject to prevent storing unredacted PHI in immutable audit trail)
+  const auditClaimTag = claim?.claimNumber ? `regarding claim #${claim.claimNumber}` : `regarding claim`;
   await ctx.db.insert("appealAuditLogs", {
     claimId: args.claimId,
     ...(claim?.userId ? { userId: claim.userId } : {}),
     eventType: args.direction === "inbound" ? "payer_response_received" : "appeal_dispatched",
     actor: args.direction === "inbound" ? `Payer (${args.sender})` : `AgentMail (${args.sender})`,
-    details: `${args.direction === "inbound" ? "Received reply from" : "Transmitted appeal document to"} ${args.recipient}: "${args.subject}"`,
+    details: `${args.direction === "inbound" ? "Received reply from" : "Transmitted appeal document to"} ${args.recipient} ${auditClaimTag}`,
     timestamp: now,
   });
 

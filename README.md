@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-423%2F423%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-433%2F433%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -383,10 +383,16 @@ ClaimHero ships with six independent anti-hallucination layers:
 ## 11. Security, Privacy & HIPAA
  
 * **Auth & Server-Side Multi-Tenant Authorization** — Convex Auth v2 (`@convex-dev/auth@alpha`) with native Google OAuth + Email/Password components (`convex/auth.ts`, `convex/auth.config.ts`, `convex/convex.config.ts`), deterministic RS256 JWT tokens, and centralized authorization primitives in `convex/lib/auth.ts` / `convex/model/auth.ts` (`requireAuthUser`, `requireIdentity`, `requireClaimOwner`, `getClaimIfAuthorized`, `requireChatbotSessionOwner`, `requireOwner`). All queries and mutations strictly verify authenticated identity and document ownership (`claim.userId === userId`), ensuring zero unauthenticated PHI leakage and full compliance with `convex-authz` audits.
+* **Server-Side Redaction Gate & Demo-Only / Non-BAA Compliance** — Operating in demo evaluation mode without an enterprise OpenAI Business Associate Agreement (BAA). To eliminate PHI exposure to external LLM endpoints, ClaimHero enforces a server-side `redactBeforeLLM` gate in `convex/lib/openai.ts` that deterministically masks all 18 HIPAA Safe Harbor identifiers (SSNs, member IDs, DOBs, MRNs, phone numbers, emails, addresses, and direct patient names) before transmitting prompts to OpenAI.
+* **Outbound Redaction Enforcement & Consent Audit Logging** — Outbound email transmissions via AgentMail (`dispatchAppealPacket`, `sendOutboundMessage`) require that claims are marked as de-identified (`claim.redactionMetadata.isRedacted === true`) or that the user explicitly passes `waiveRedaction: true`. If waived, an immutable audit event (`appealAuditLogs: hipaa_redaction_waived`) is recorded.
+* **Immutable Audit Trail Privacy Hygiene** — Strips direct PHI (patient names, member IDs, raw correspondence subjects) from immutable `appealAuditLogs` (`claims.ts`, `emails.ts`, `agentMail.ts`), preserving audit trail accountability without permanent PHI retention.
+* **Inbound Attachment Security** — Implements a 10 MB size cap (`MAX_ATTACHMENT_BYTES`) and MIME type whitelist (`application/pdf`, `image/png`, `image/jpeg`, `image/webp`, `text/plain`) on inbound AgentMail attachments (`convex/lib/agentMail.ts`), neutralizing executable or script payload vectors.
+* **Frontend Markdown & Link Sanitization** — Sanitizes all rendered markdown in `AppealBriefRenderer.tsx` and `SentinelChatbot.tsx` using `rehype-sanitize`, and validates external hyperlinks using `safeExternalHref` (`src/lib/urlUtils.ts`) to prevent `javascript:` XSS vectors.
+* **Referrer Privacy** — Strict `strict-origin-when-cross-origin` policy in `index.html` preventing sensitive URL parameters (`?claimId=...`) from leaking across origins.
 * **Strict Zero-Any Type Safety & FunctionReference Integrity** — Strict `@typescript-eslint/no-explicit-any: "error"` enforced across both `convex/` and `src/`. Zero `as any`, `(api as any)`, or `(internal as any)` casts anywhere in the repository. All Convex backend queries, mutations, actions, internal endpoints, and background `crons.cron` schedulers use canonical, type-safe `FunctionReference` bindings (`internal.claims.sweepDeadlines`, `internal.actions.agentMail.*`, `api.actions.*`) and data model IDs (`Id<"claims">`, `Id<"appeals">`, `Id<"clinicalEvidences">`), ensuring zero runtime scheduling or routing failures.
-* **Redaction Engine** (`src/lib/redactionEngine.ts`) — Deterministic PII detection: SSN (hyphen/space/labeled), Member ID suffix (`MBN9823412-01 -> MBN9823412-**`), DOB, MRN, phone, email, street address, plus user-defined terms. Three presets: **HIPAA Safe Harbor** (45 CFR §164.514(b)(2)), **Balanced Appellate**, **Public Legal Exhibit**. Persisted in `claims.redactionMetadata` with `appealAuditLogs:hipaa_redaction_applied`.
+* **Redaction Engine** (`src/lib/redactionEngine.ts`, `convex/lib/redactionEngine.ts`) — Deterministic PII detection: SSN (hyphen/space/labeled), Member ID suffix (`MBN9823412-01 -> MBN9823412-**`), DOB, MRN, phone, email, street address, plus user-defined terms. Three presets: **HIPAA Safe Harbor** (45 CFR §164.514(b)(2)), **Balanced Appellate**, **Public Legal Exhibit**. Persisted in `claims.redactionMetadata` with `appealAuditLogs:hipaa_redaction_applied`.
 * **Transport** — AgentMail REST uses `Authorization: Bearer` with `AGENTMAIL_API_KEY`; Convex dashboard env vars are never exposed to the client.
-* **Webhook Security & Replay Prevention** — Inbound AgentMail (`POST /agentmail-webhook`, `AGENTMAIL_WEBHOOK_SECRET`) and Firecrawl (`/firecrawl/*`, `FIRECRAWL_WEBHOOK_SECRET`) endpoints enforce cryptographic HMAC-SHA256 signature verification (`svix-signature` / `svix-timestamp` / `svix-id`) with 300-second timestamp drift tolerances and timing-safe equality checks to eliminate forged intake or replay attacks.
+* **Webhook Security & Rate Limiting** — Inbound AgentMail (`POST /agentmail-webhook`, `AGENTMAIL_WEBHOOK_SECRET`) and Firecrawl (`/firecrawl/*`, `FIRECRAWL_WEBHOOK_SECRET`) endpoints enforce cryptographic HMAC-SHA256 signature verification (`svix-signature` / `svix-timestamp` / `svix-id`) with 300-second timestamp drift tolerances, timing-safe equality checks, and rate limiting (30 requests/min token bucket) to eliminate forged intake or replay attacks.
 * **Print hygiene** — `@media print` strips sidebars/headers/dialog chrome and forces white-paper, single-column flow with `page-break-inside: avoid` on clinical blocks.
 
 ---
@@ -558,15 +564,16 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (423 tests)
+npm run test            # vitest run tests  (433 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **423/423 passing** across 29 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
+Current: **433/433 passing** across 30 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
+| [`tests/securityComplianceHardening.test.ts`](file:///d:/ClaimHero/tests/securityComplianceHardening.test.ts) | 10 | Safe external URL validation, XSS prevention, server-side redactBeforeLLM Safe Harbor gate, bounded raw text inputs, inbound attachment size/MIME gates, createWithPatient auth/tenant isolation, and outbound consent waiver audit logging |
 | [`tests/claimhero.test.ts`](file:///d:/ClaimHero/tests/claimhero.test.ts) | 70 | Master end-to-end integration, 4-pillar rubric scoring, ERISA rules, portfolio aggregation, bounded batch deadline sweep, bounded indexed claim listing & pagination, N+1 query elimination, competitor payer domain rejection, and global Carelon/BCBS template verification |
 | [`tests/authorization.test.ts`](file:///d:/ClaimHero/tests/authorization.test.ts) | 29 | Convex multi-tenant authorization, searchIndex & vector isolation, strict document & shared intake claim ownership validation, unauthenticated rejection, session isolation, optical parser 15MB/MIME gates, idempotent thread lookups |
 | [`tests/agentMail.test.ts`](file:///d:/ClaimHero/tests/agentMail.test.ts) | 25 | AgentMail delivery, binary attachments, webhook normalizers, Svix signature verification, key rotation, free-tier intake routing |

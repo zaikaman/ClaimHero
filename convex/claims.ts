@@ -611,19 +611,18 @@ async function applyCreateWithPatient(
 
   const effectiveUserId: Id<"users"> = userId;
 
-  // Check if patient already exists by email (bounded scan)
+  // Strictly scope patient matching to effectiveUserId to prevent cross-tenant patient hijack
   const cleanEmail = args.patientEmail?.trim() || "";
   let matchingPatient: Doc<"patients"> | undefined;
 
   if (cleanEmail) {
     const existingPatients = await ctx.db
       .query("patients")
-      .withIndex("by_email", (q) => q.eq("email", cleanEmail))
-      .take(10);
-    matchingPatient = existingPatients.find((p) => (userId ? p.userId === userId : true) || !p.userId);
-    if (!userId && matchingPatient?.userId) {
-      userId = matchingPatient.userId;
-    }
+      .withIndex("by_user", (q) => q.eq("userId", effectiveUserId))
+      .take(50);
+    matchingPatient = existingPatients.find(
+      (p) => p.email && p.email.toLowerCase() === cleanEmail.toLowerCase()
+    );
   } else if (args.patientName.trim()) {
     // If no email, check if user has an existing patient record matching name and memberId/payer
     const userPatients = await ctx.db
@@ -733,12 +732,12 @@ async function applyCreateWithPatient(
     { claimId }
   );
 
-  // Log audit event
+  // Log audit event (omitting direct patient name to prevent storing unredacted PHI in immutable audit trail)
   await ctx.db.insert("appealAuditLogs", {
     claimId,
     eventType: "denial_ingested",
     actor: "Optical OCR Parser",
-    details: `Extracted denial document for ${args.patientName} (${args.insurancePayer} - ${args.claimNumber})`,
+    details: `Extracted denial document for claim #${args.claimNumber} (${args.insurancePayer})`,
     timestamp: now,
   });
 
@@ -790,7 +789,8 @@ export const createWithPatient = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    return await applyCreateWithPatient(ctx, args);
+    const userId = await requireAuthUser(ctx);
+    return await applyCreateWithPatient(ctx, args, userId);
   },
 });
 

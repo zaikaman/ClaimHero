@@ -2,23 +2,14 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
+import rehypeSanitize from "rehype-sanitize";
 import { Scales, ShieldCheck, FileText } from "@phosphor-icons/react";
+import { safeExternalHref } from "../../lib/urlUtils";
 
 interface AppealBriefRendererProps {
   content: string;
   isPrintMode?: boolean;
   className?: string;
-}
-
-function safeExternalHref(href?: string): string | undefined {
-  if (!href) return undefined;
-
-  try {
-    const url = new URL(href);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
@@ -47,6 +38,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
+        rehypePlugins={[rehypeSanitize]}
         components={{
           h1: ({ children }) => (
             <div className={`pb-2 mb-3 border-b-2 [break-after:avoid] [page-break-after:avoid] ${isPrintMode ? "border-slate-900" : "border-border"}`}>

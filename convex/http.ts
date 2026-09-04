@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { normalizeAgentMailWebhook, verifySvixWebhook } from "./lib/agentMailWebhook";
+import { rateLimiter } from "./lib/rateLimiter";
 import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { components } from "./_generated/api";
 
@@ -69,6 +70,27 @@ http.route({
         });
       }
       if (event.eventType !== "message.received") return new Response(null, { status: 204 });
+
+      // Enforce rate limiting before scheduling asynchronous background jobs
+      try {
+        const limitStatus = await rateLimiter.limit(ctx, "agentMailWebhook", {
+          key: event.inboxId || "global",
+        });
+        if (!limitStatus.ok) {
+          return new Response(
+            JSON.stringify({ error: "Too many webhook requests" }),
+            {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": String(Math.ceil((limitStatus.retryAfter || 1000) / 1000)),
+              },
+            }
+          );
+        }
+      } catch {
+        // Continue if rate limiter is not configured
+      }
 
       await ctx.scheduler.runAfter(0, internal.actions.agentMail.processInboundClaimReply, {
         eventId: event.eventId,

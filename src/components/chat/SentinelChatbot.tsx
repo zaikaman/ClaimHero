@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
+import { safeExternalHref } from "../../lib/urlUtils";
 import {
   PaperPlaneRight,
   Trash,
@@ -535,7 +537,26 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                       >
                         {isAssistant ? (
                           <div className="prose prose-invert prose-xs max-w-none text-foreground space-y-2">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              rehypePlugins={[rehypeSanitize]}
+                              components={{
+                                a: ({ href, children }) => {
+                                  const safeHref = safeExternalHref(href);
+                                  if (!safeHref) return <span>{children}</span>;
+                                  return (
+                                    <a
+                                      href={safeHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-primary underline decoration-1 underline-offset-2 hover:text-primary/80"
+                                    >
+                                      {children}
+                                    </a>
+                                  );
+                                },
+                              }}
+                            >
                               {msg.content}
                             </ReactMarkdown>
                           </div>

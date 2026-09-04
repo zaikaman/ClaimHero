@@ -3,6 +3,7 @@ import {
   EMBEDDING_DIMENSIONS,
   fitDimensions,
 } from "./embeddings";
+import { redactBeforeLLM } from "./redactionEngine";
 
 /**
  * Singleton OpenAI Client Instance
@@ -48,10 +49,11 @@ export async function createStructuredCompletion<T>(options: {
 }): Promise<T> {
   const { model } = getOpenAIConfig();
   const client = getOpenAIClient({ timeout: 30_000, maxRetries: 2 });
+  const safeUserPrompt = redactBeforeLLM(options.userPrompt);
 
   if (options.fileInputs && options.fileInputs.length > 0) {
     const content = [
-      { type: "input_text" as const, text: options.userPrompt },
+      { type: "input_text" as const, text: safeUserPrompt },
       ...options.fileInputs.map((file) => ({
         type: "input_file" as const,
         file_data: file.fileData,
@@ -92,7 +94,7 @@ export async function createStructuredCompletion<T>(options: {
 
   if (options.imageUrls && options.imageUrls.length > 0) {
     const contentParts: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
-      { type: "text", text: options.userPrompt },
+      { type: "text", text: safeUserPrompt },
     ];
 
     for (const url of options.imageUrls) {
@@ -109,7 +111,7 @@ export async function createStructuredCompletion<T>(options: {
   } else {
     messages.push({
       role: "user",
-      content: options.userPrompt,
+      content: safeUserPrompt,
     });
   }
 
@@ -150,13 +152,14 @@ export async function createChatCompletion(options: {
   temperature?: number;
 }): Promise<string> {
   const { model } = getOpenAIConfig();
-    const client = getOpenAIClient({ timeout: 30_000, maxRetries: 2 });
+  const client = getOpenAIClient({ timeout: 30_000, maxRetries: 2 });
+  const safeUserPrompt = redactBeforeLLM(options.userPrompt);
 
   const response = await client.chat.completions.create({
     model,
     messages: [
       { role: "system", content: options.systemPrompt },
-      { role: "user", content: options.userPrompt },
+      { role: "user", content: safeUserPrompt },
     ],
     temperature: options.temperature ?? 0.3,
   });

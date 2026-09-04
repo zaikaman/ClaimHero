@@ -85,6 +85,7 @@ export interface DenialExtractionResult {
 }
 
 const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024; // 15 MB
+export const MAX_RAW_DOCUMENT_CHARS = 100_000; // 100k characters max input
 
 function detectFileFormat(
   contentType: string,
@@ -164,14 +165,24 @@ export const parseDenialDocument = action({
     autoRunPipeline: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<DenialExtractionResult & { claimId: string; pipelineResult?: Record<string, unknown> }> => {
+    if (args.rawDocumentText && args.rawDocumentText.length > MAX_RAW_DOCUMENT_CHARS) {
+      throw new Error(`Submitted raw document text exceeds the ${MAX_RAW_DOCUMENT_CHARS.toLocaleString()} character limit.`);
+    }
+
     // Enforce rate limiting
-    const limitStatus = await rateLimiter.limit(ctx, "opticalParser", {
-      key: args.patientEmail || "global",
-    });
-    if (!limitStatus.ok) {
-      throw new Error(
-        `Rate limit reached for optical document parsing. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
-      );
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "opticalParser", {
+        key: args.patientEmail || "global",
+      });
+      if (!limitStatus.ok) {
+        throw new Error(
+          `Rate limit reached for optical document parsing. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+        );
+      }
+    } catch (rateErr) {
+      if (rateErr instanceof Error && rateErr.message.includes("Rate limit reached")) {
+        throw rateErr;
+      }
     }
 
     let documentContent = args.rawDocumentText?.trim() || "";

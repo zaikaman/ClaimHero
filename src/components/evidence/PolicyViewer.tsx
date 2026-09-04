@@ -19,6 +19,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { stripMarkdownFormatting, cn } from "../../lib/utils";
+import { safeExternalHref } from "../../lib/urlUtils";
 
 interface PolicyViewerProps {
   evidences: ClinicalEvidence[];
@@ -240,11 +241,11 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
                       )}
                     </Button>
 
-                    {item.sourceUrl && (
+                    {safeExternalHref(item.sourceUrl) && (
                       <a
-                        href={item.sourceUrl}
+                        href={safeExternalHref(item.sourceUrl)!}
                         target="_blank"
-                        rel="noreferrer"
+                        rel="noopener noreferrer"
                         className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                         title="Open policy source URL"
                       >

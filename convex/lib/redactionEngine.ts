@@ -1,5 +1,5 @@
 /**
- * HIPAA-Compliant Automated Redaction Engine
+ * HIPAA-Compliant Automated Redaction Engine (Backend Convex Library)
  * 
  * Deterministic detection and masking of Protected Health Information (PHI)
  * and Personally Identifiable Information (PII) in accordance with HIPAA Safe Harbor
@@ -133,10 +133,8 @@ export function maskSsn(ssn: string, standard: ComplianceStandard): string {
  * Mask Member ID or Suffix based on compliance standard
  */
 export function maskMemberId(fullMatch: string, standard: ComplianceStandard): string {
-  // If match has a suffix like -01, -02
   const suffixMatch = fullMatch.match(/^(.+?)(-[A-Za-z0-9]{1,4})$/);
   if (suffixMatch && standard === "BALANCED_APPELLATE") {
-    // Keep root ID, mask the suffix
     return `${suffixMatch[1]}-**`;
   }
   if (standard === "PUBLIC_EXHIBIT") {
@@ -148,7 +146,6 @@ export function maskMemberId(fullMatch: string, standard: ComplianceStandard): s
     }
     return `${fullMatch.slice(0, 3)}***`;
   }
-  // Balanced default: mask suffix if present or last 3 characters
   if (suffixMatch) {
     return `${suffixMatch[1]}-**`;
   }
@@ -159,10 +156,8 @@ export function maskMemberId(fullMatch: string, standard: ComplianceStandard): s
  * Mask Date of Birth based on compliance standard
  */
 export function maskDob(dobString: string, standard: ComplianceStandard): string {
-  // Try extracting year
   const yearMatch = dobString.match(/\b(19\d{2}|20\d{2})\b/);
   if (yearMatch && standard === "BALANCED_APPELLATE") {
-    // HIPAA Safe Harbor allows year of birth for individuals under 89
     return `**/**/${yearMatch[1]}`;
   }
   if (standard === "PUBLIC_EXHIBIT") {
@@ -176,7 +171,6 @@ export function maskDob(dobString: string, standard: ComplianceStandard): string
  */
 export function maskPatientName(name: string, standard: ComplianceStandard): string {
   if (standard === "BALANCED_APPELLATE") {
-    // Keep initials or first name initial
     const parts = name.trim().split(/\s+/);
     if (parts.length >= 2) {
       return `${parts[0][0]}. ${parts[parts.length - 1][0]}.`;
@@ -244,7 +238,6 @@ export function detectPiiEntities(
   const disabledIds = new Set(options.disabledEntityIds || []);
   const entities: DetectedPiiEntity[] = [];
 
-  // Helper to add entity with collision avoidance
   const addEntity = (
     category: PiiCategory,
     label: string,
@@ -255,7 +248,6 @@ export function detectPiiEntities(
     rule: string,
     confidence = 0.95
   ) => {
-    // Avoid exact duplicate ranges
     const exists = entities.some(
       (e) =>
         (startIndex >= e.startIndex && startIndex < e.endIndex) ||
@@ -281,7 +273,6 @@ export function detectPiiEntities(
   };
 
   // 1. Social Security Numbers (SSN)
-  // Formats: XXX-XX-XXXX, XXX XX XXXX, or SSN: XXXXXXXXX
   const ssnRegex = /\b(?:\d{3}[- ]\d{2}[- ]\d{4})\b/g;
   let match: RegExpExecArray | null;
   while ((match = ssnRegex.exec(text)) !== null) {
@@ -336,7 +327,6 @@ export function detectPiiEntities(
   }
 
   // 3. Member ID & Suffixes
-  // E.g. Member ID: MBN9823412-01, Subscriber ID: W123456789-02, Policy # ABC12345678
   const memberIdPrefixedRegex = /\b(?:Member\s*(?:ID|#|No\.?)|Subscriber\s*(?:ID|#|No\.?)|Policy\s*(?:ID|#|No\.?)|Insured\s*(?:ID|#|No\.?))[\s:]*([A-Z0-9]{6,16}(?:-[A-Z0-9]{1,4})?)\b/gi;
   while ((match = memberIdPrefixedRegex.exec(text)) !== null) {
     const rawId = match[1];
@@ -355,7 +345,6 @@ export function detectPiiEntities(
     );
   }
 
-  // Standalone Member ID suffix pattern e.g. MBN1234567-01 or XYZ9876543-02
   const memberIdSuffixStandaloneRegex = /\b([A-Z]{2,4}[0-9]{6,10}(-[0-9]{2}))\b/g;
   while ((match = memberIdSuffixStandaloneRegex.exec(text)) !== null) {
     const rawId = match[1];
@@ -393,7 +382,6 @@ export function detectPiiEntities(
   // 5. Patient Direct Name Identifiers
   if (options.patientName && options.patientName.trim().length > 2) {
     const pName = options.patientName.trim();
-    // Escape regex special chars
     const escaped = pName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const nameRegex = new RegExp(`\\b${escaped}\\b`, "gi");
     while ((match = nameRegex.exec(text)) !== null) {
@@ -410,11 +398,9 @@ export function detectPiiEntities(
     }
   }
 
-  // Contextual Patient Name e.g. Patient: Johnathan Doe, Insured: Jane Smith
   const contextualNameRegex = /\b(?:Patient(?:\s*Name)?|Insured(?:\s*Name)?|Member(?:\s*Name)?|Claimant)[\s:]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/g;
   while ((match = contextualNameRegex.exec(text)) !== null) {
     const rawName = match[1];
-    // Skip if contains common false positive header words
     if (/^(Record|Portal|Service|Claim|Notice|Appeal|Denial|Provider|Physician)$/i.test(rawName)) continue;
     const fullText = match[0];
     const nameOffset = fullText.lastIndexOf(rawName);
@@ -451,7 +437,6 @@ export function detectPiiEntities(
   const emailRegex = /\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/g;
   while ((match = emailRegex.exec(text)) !== null) {
     const rawEmail = match[1];
-    // Skip official agentmail sender address to avoid breaking instructions
     if (rawEmail.toLowerCase().includes("claimhero-sender@agentmail.to") || rawEmail.toLowerCase().includes("payer-review@claimhero.agentmail.com")) {
       continue;
     }
@@ -505,7 +490,6 @@ export function detectPiiEntities(
     }
   }
 
-  // Sort entities ascending by start index
   return entities.sort((a, b) => a.startIndex - b.startIndex);
 }
 
@@ -532,7 +516,6 @@ export function applyRedaction(
     };
   }
 
-  // Filter only enabled entities and sort by start index descending to replace cleanly without offset skew
   const enabledEntities = entities.filter((e) => e.isEnabled);
   const sortedForReplacement = [...enabledEntities].sort((a, b) => b.startIndex - a.startIndex);
 
@@ -545,7 +528,6 @@ export function applyRedaction(
     }
   }
 
-  // Compute category statistics
   const byCategory: Record<PiiCategory, number> = {
     ssn: 0,
     member_id: 0,
@@ -589,4 +571,18 @@ export function fastSanitizeText(
   const standard = options.standard || "HIPAA_SAFE_HARBOR";
   const entities = detectPiiEntities(text, options);
   return applyRedaction(text, entities, standard);
+}
+
+/**
+ * Server-Side Redaction Gate:
+ * Enforces mandatory de-identification before sending any prompt or data payload
+ * to third-party LLM APIs (OpenAI) when operating without a signed HIPAA BAA.
+ */
+export function redactBeforeLLM(text: string, options?: RedactionEngineOptions): string {
+  if (!text || typeof text !== "string") return "";
+  const result = fastSanitizeText(text, {
+    standard: "HIPAA_SAFE_HARBOR",
+    ...options,
+  });
+  return result.sanitizedText;
 }

@@ -69,8 +69,8 @@ jobs:
         run: npm run deploy
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL || 'https://usable-sturgeon-376.convex.cloud' }}
-          VITE_CONVEX_SITE_URL: ${{ vars.VITE_CONVEX_SITE_URL || 'https://usable-sturgeon-376.convex.site' }}
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL || 'https://kindhearted-elephant-992.convex.cloud' }}
+          VITE_CONVEX_SITE_URL: ${{ vars.VITE_CONVEX_SITE_URL || 'https://kindhearted-elephant-992.convex.site' }}
           VITE_AGENTMAIL_SENDER_EMAIL: ${{ vars.VITE_AGENTMAIL_SENDER_EMAIL || 'claimhero-sender@agentmail.to' }}
           VITE_AGENTMAIL_ADJUDICATOR_EMAIL: ${{ vars.VITE_AGENTMAIL_ADJUDICATOR_EMAIL || 'claimhero-adjudicator@agentmail.to' }}
           VITE_AGENTMAIL_INTAKE_EMAIL: ${{ vars.VITE_AGENTMAIL_INTAKE_EMAIL || 'claimhero-intake@agentmail.to' }}
@@ -78,10 +78,10 @@ jobs:
       - name: Post-Deploy Smoke Test
         run: |
           echo "Running synthetic health check against live deployment..."
-          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://usable-sturgeon-376.convex.site" || echo "000")
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://kindhearted-elephant-992.convex.site" || echo "000")
           echo "Received HTTP status code: $STATUS_CODE"
           if [ "$STATUS_CODE" -ne 200 ]; then
-            echo "Smoke test failed: expected HTTP 200 from https://usable-sturgeon-376.convex.site, got $STATUS_CODE"
+            echo "Smoke test failed: expected HTTP 200 from https://kindhearted-elephant-992.convex.site, got $STATUS_CODE"
             exit 1
           fi
           echo "Smoke test passed successfully."
@@ -94,6 +94,6 @@ jobs:
           echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Quality Gate**: 161/161 unit tests passed with 100% line coverage" >> $GITHUB_STEP_SUMMARY
-          echo "- **Live Application**: [https://usable-sturgeon-376.convex.site](https://usable-sturgeon-376.convex.site)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Convex Cloud Backend**: [https://usable-sturgeon-376.convex.cloud](https://usable-sturgeon-376.convex.cloud)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Live Application**: [https://kindhearted-elephant-992.convex.site](https://kindhearted-elephant-992.convex.site)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Convex Cloud Backend**: [https://kindhearted-elephant-992.convex.cloud](https://kindhearted-elephant-992.convex.cloud)" >> $GITHUB_STEP_SUMMARY
           echo "- **Deployment Timestamp**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_STEP_SUMMARY

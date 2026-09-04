@@ -233,6 +233,8 @@ export async function getAgentMailMessage(inboxId: string, messageId: string): P
   return body;
 }
 
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB intake security limit
+
 export async function downloadAgentMailAttachment(options: {
   inboxId: string;
   messageId: string;
@@ -252,19 +254,43 @@ export async function downloadAgentMailAttachment(options: {
     throw new Error(`AgentMail attachment retrieval failed (${response.status}): ${detail}`);
   }
 
-  const contentType = response.headers.get("content-type") || undefined;
-  if (contentType?.includes("application/json")) {
+  const rawContentType = response.headers.get("content-type") || undefined;
+  let bytes: ArrayBuffer;
+  let finalContentType = rawContentType;
+
+  if (rawContentType?.includes("application/json")) {
     const metadata = await response.json() as Record<string, unknown>;
     const downloadUrl = responseField(metadata, "download_url", "downloadUrl", "url");
     if (!downloadUrl) throw new Error("AgentMail attachment response did not include a download URL.");
 
     const downloadResponse = await fetch(downloadUrl);
     if (!downloadResponse.ok) throw new Error(`AgentMail attachment download failed (${downloadResponse.status}).`);
-    return {
-      bytes: await downloadResponse.arrayBuffer(),
-      contentType: downloadResponse.headers.get("content-type") || responseField(metadata, "content_type", "contentType"),
-    };
+    
+    const contentLength = downloadResponse.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > MAX_ATTACHMENT_BYTES) {
+      throw new Error(`Inbound attachment exceeds the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB security limit.`);
+    }
+
+    bytes = await downloadResponse.arrayBuffer();
+    finalContentType = downloadResponse.headers.get("content-type") || responseField(metadata, "content_type", "contentType");
+  } else {
+    bytes = await response.arrayBuffer();
   }
 
-  return { bytes: await response.arrayBuffer(), contentType };
+  if (bytes.byteLength > MAX_ATTACHMENT_BYTES) {
+    throw new Error(`Inbound attachment exceeds the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB security limit.`);
+  }
+
+  // Neutralize hazardous executable payloads
+  const normalizedMime = (finalContentType || "").toLowerCase().trim();
+  if (
+    normalizedMime.includes("javascript") ||
+    normalizedMime.includes("x-msdownload") ||
+    normalizedMime.includes("x-sh") ||
+    normalizedMime.includes("x-bat")
+  ) {
+    throw new Error(`Disallowed attachment MIME type: ${finalContentType}`);
+  }
+
+  return { bytes, contentType: finalContentType };
 }
