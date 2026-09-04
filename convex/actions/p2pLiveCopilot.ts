@@ -5,6 +5,7 @@ import { action } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { createStructuredCompletion } from "../lib/openai";
 import type { Doc, Id } from "../_generated/dataModel";
+import { requireClaimOwnerAction } from "../lib/auth";
 
 export interface P2PLiveClaimContext {
   _id: Id<"claims">;
@@ -48,17 +49,11 @@ export const generateLiveFastAnswer = action({
     speakerContext: v.optional(v.string()), // e.g. "insurer"
   },
   handler: async (ctx, args): Promise<LiveFastAnswerResult> => {
-    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
-    });
+    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
 
-    if (!claim) {
-      throw new Error(`Claim not found: ${args.claimId}`);
-    }
-
-    const evidences = await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
+    const evidences: Doc<"clinicalEvidences">[] = (await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
-    });
+    })) || [];
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
     const cptList = (claim.cptCodes || []).join(", ") || "the procedure";
@@ -227,17 +222,11 @@ export const generateInteractiveReviewerPushback = action({
     ),
   },
   handler: async (ctx, args): Promise<InteractiveReviewerPushbackResult> => {
-    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
-    });
+    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
 
-    if (!claim) {
-      throw new Error(`Claim not found: ${args.claimId}`);
-    }
-
-    const evidences = await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
+    const evidences: Doc<"clinicalEvidences">[] = (await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
-    });
+    })) || [];
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
     const cptList = (claim.cptCodes || []).join(", ") || "the procedure";

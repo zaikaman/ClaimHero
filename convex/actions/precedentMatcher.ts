@@ -4,6 +4,8 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { internal } from "../_generated/api";
+import { requireClaimOwnerAction } from "../lib/auth";
+import type { Doc } from "../_generated/dataModel";
 
 const OVERTURN_ANALYSIS_SCHEMA = {
   type: "object",
@@ -236,19 +238,14 @@ export const computeOverturnScore = action({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args): Promise<OverturnScoringResult> => {
-    // 1. Fetch claim details with joined patient data
-    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
-    });
-
-    if (!claim) {
-      throw new Error(`Claim ${args.claimId} not found`);
-    }
+    // 1. Authorize claim ownership
+    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
 
     // 2. Fetch indexed clinical evidence clauses
-    const evidences = await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
-      claimId: args.claimId,
-    });
+    const evidences: Doc<"clinicalEvidences">[] =
+      (await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
+        claimId: args.claimId,
+      })) || [];
 
     // 3. Compute deterministic 4-pillar score
     const deterministicCalculation = calculateDeterministicRubric(claim, evidences);

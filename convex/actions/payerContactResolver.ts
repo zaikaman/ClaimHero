@@ -4,6 +4,7 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { components, internal } from "../_generated/api";
 import { createStructuredCompletion } from "../lib/openai";
+import { requireClaimOwnerAction } from "../lib/auth";
 import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
 
 const firecrawl = new FirecrawlClient(components.firecrawl);
@@ -102,14 +103,8 @@ export const resolvePayerGateway = action({
     forceWebSearch: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<ResolvedPayerContact> => {
-    // 1. Fetch claim context
-    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
-    });
-
-    if (!claim) {
-      throw new Error(`Claim ${args.claimId} not found`);
-    }
+    // 1. Authorize claim ownership and fetch context
+    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
 
     const payer = args.payerName || claim.patient?.insurancePayer || "Health Insurer";
     const cleanName = payer.toLowerCase().replace(/[^a-z0-9]/g, "");

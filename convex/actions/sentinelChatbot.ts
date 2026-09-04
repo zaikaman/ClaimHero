@@ -5,7 +5,7 @@ import { v } from "convex/values";
 import { getOpenAIClient, getOpenAIConfig } from "../lib/openai";
 import { internal, api, components } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
-import { Id } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
 import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
 
 const firecrawl = new FirecrawlClient(components.firecrawl);
@@ -725,9 +725,9 @@ export const sendMessageWithTools = action({
     const session = await ctx.runQuery(internal.chatbot.getSessionInternal, {
       sessionId: args.sessionId,
     });
-    const history = await ctx.runQuery(internal.chatbot.listMessagesInternal, {
+    const history: Doc<"chatbotMessages">[] = (await ctx.runQuery(internal.chatbot.listMessagesInternal, {
       sessionId: args.sessionId,
-    });
+    })) || [];
 
     // 4. Build lean system prompt with conversation summary
     const systemPrompt = buildLeanSentinelPrompt({

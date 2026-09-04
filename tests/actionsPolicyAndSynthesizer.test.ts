@@ -3,6 +3,7 @@ import * as actionPolicyCrawler from "../convex/actions/policyCrawler";
 import * as actionAppealSynthesizer from "../convex/actions/appealSynthesizer";
 import * as libOpenAI from "../convex/lib/openai";
 import { rateLimiter } from "../convex/lib/rateLimiter";
+// @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 vi.mock("@convex-dev/auth/server", () => ({
@@ -41,6 +42,7 @@ describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
         "objective medical indications and coverage thresholds for reconstructive orthopedic knee procedures across all commercial plans.";
 
       const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "c1", userId: "user_123" }),
         runAction: vi.fn().mockResolvedValue({
           markdown: substantiveMarkdown,
           sourceUrl: "https://aaos.org/guidelines/tka",
@@ -86,6 +88,7 @@ describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
         "and statistically significant reductions in opioid usage across all cohorts in the surgical arm.";
 
       const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "c1", userId: "user_123" }),
         runAction: vi.fn().mockResolvedValue({
           markdown: substantiveMarkdown,
           sourceUrl: "https://pubmed.ncbi.nlm.nih.gov/31245678",
@@ -131,6 +134,7 @@ describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
         "confirm nerve root compromise matching CPT 63047 indications.";
 
       const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "c1", userId: "user_123" }),
         runAction: vi.fn().mockResolvedValue({
           markdown: substantiveMarkdown,
           sourceUrl: "https://accessdata.fda.gov/cdrh_docs/pdf19/P190012.pdf",

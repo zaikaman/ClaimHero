@@ -1,3 +1,4 @@
+/// <reference path="./auth-mock.d.ts" />
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as actionAgentMail from "../convex/actions/agentMail";
 import * as actionMailDispatcher from "../convex/actions/mailDispatcher";
@@ -5,6 +6,12 @@ import * as libAgentMail from "../convex/lib/agentMail";
 import * as libAgentMailWebhook from "../convex/lib/agentMailWebhook";
 import * as libOpenAI from "../convex/lib/openai";
 import { rateLimiter } from "../convex/lib/rateLimiter";
+// @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
+import { getAuthUserId } from "@convex-dev/auth/server";
+
+vi.mock("@convex-dev/auth/server", () => ({
+  getAuthUserId: vi.fn(),
+}));
 
 describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
   const originalEnv = process.env;
@@ -12,6 +19,7 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     vi.clearAllMocks();
+    vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
   });
 
   describe("convex/actions/agentMail", () => {
@@ -675,6 +683,7 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       const mockClaim = {
         _id: "c1",
         claimNumber: "CLM-100",
+        userId: "user_123",
         deniedAmount: 5000,
         patient: { name: "John Doe", insurancePayer: "Aetna" },
       };
@@ -732,6 +741,7 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       const mockClaim = {
         _id: "c1",
         claimNumber: "CLM-100",
+        userId: "user_123",
         status: "under_review",
         deniedAmount: 5000,
         patientName: "John Doe",
@@ -769,6 +779,7 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       const mockClaim = {
         _id: "c1",
         claimNumber: "CLM-100",
+        userId: "user_123",
         status: "under_review",
         deniedAmount: 5000,
         patientName: "John Doe",

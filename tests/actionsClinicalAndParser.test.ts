@@ -4,10 +4,17 @@ import * as actionOpticalParser from "../convex/actions/opticalParser";
 import * as actionPayerContactResolver from "../convex/actions/payerContactResolver";
 import * as libOpenAI from "../convex/lib/openai";
 import { rateLimiter } from "../convex/lib/rateLimiter";
+// @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
+import { getAuthUserId } from "@convex-dev/auth/server";
+
+vi.mock("@convex-dev/auth/server", () => ({
+  getAuthUserId: vi.fn(),
+}));
 
 describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolver", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
   });
 
   describe("convex/actions/clinicalIntake", () => {
@@ -191,6 +198,7 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
       const mockClaim = {
         _id: "c1",
         claimNumber: "CLM-100",
+        userId: "user_123",
         patient: { insurancePayer: "UnitedHealthcare", state: "CA" },
       };
       const mockCtx: any = {
@@ -233,6 +241,7 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
       const mockClaim = {
         _id: "c2",
         claimNumber: "CLM-200",
+        userId: "user_123",
         patient: { insurancePayer: "Obscure Regional Health Plan", state: "TX" },
       };
       const mockCtx: any = {

@@ -1,9 +1,10 @@
 "use node";
 
-import { action, type ActionCtx } from "../_generated/server";
+import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
+import { requireClaimOwnerAction } from "../lib/auth";
 import { createChatCompletion, createStructuredCompletion } from "../lib/openai";
 import {
   formatCorrespondenceTranscript,
@@ -112,7 +113,7 @@ interface AdjudicationResponse {
 interface AdjudicationClaimContext {
   _id: Id<"claims">;
   claimNumber: string;
-  patient?: { name?: string };
+  patient?: { name?: string } | null;
   cptCodes?: string[];
   icd10Codes?: string[];
   deniedAmount: number;
@@ -282,18 +283,12 @@ export const dispatchAppealPacket = action({
     ctx,
     args
   ): Promise<DispatchReceipt> => {
-    // 1. Fetch claim & appeal details
-    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
-    });
-
-    if (!claim) {
-      throw new Error(`Claim ${args.claimId} not found`);
-    }
+    // 1. Authorize claim ownership
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
 
     // Enforce rate limiting per user
     const limitStatus = await rateLimiter.limit(ctx, "mailDispatcher", {
-      key: claim.userId || "global",
+      key: userId || "global",
     });
     if (!limitStatus.ok) {
       throw new Error(
@@ -445,125 +440,124 @@ export const dispatchAppealPacket = action({
   },
 });
 
-/**
- * Send Outbound Communication Message via AgentMail
- */
-export const sendOutboundMessage = action({
+const sendOutboundMessageArgs = {
+  claimId: v.id("claims"),
+  threadId: v.optional(v.id("emailThreads")),
+  text: v.string(),
+  customRecipient: v.optional(v.string()),
+  customSubject: v.optional(v.string()),
+};
+
+async function performSendOutboundMessage(
+  ctx: ActionCtx,
   args: {
-    claimId: v.id("claims"),
-    threadId: v.optional(v.id("emailThreads")),
-    text: v.string(),
-    customRecipient: v.optional(v.string()),
-    customSubject: v.optional(v.string()),
+    claimId: Id<"claims">;
+    threadId?: Id<"emailThreads">;
+    text: string;
+    customRecipient?: string;
+    customSubject?: string;
   },
-  handler: async (ctx, args) => {
-    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
+  claim: Doc<"claims"> & { patient?: Doc<"patients"> | null }
+) {
+  let threadData: {
+    thread: Doc<"emailThreads"> | null;
+    messages: Doc<"emailMessages">[];
+  } | null = null;
+
+  if (args.threadId) {
+    threadData = await ctx.runQuery(api.emails.getThreadWithMessages, {
+      threadId: args.threadId,
     });
+  }
 
-    if (!claim) {
-      throw new Error(`Claim ${args.claimId} not found`);
-    }
+  const recipient =
+    args.customRecipient ||
+    threadData?.thread?.payerEmail ||
+    claim.payerContact?.officialAppealsEmail;
+  const claimTag = `[ClaimHero #${claim.claimNumber}]`;
+  const rawSubject = args.customSubject || `Re: Formal Medical Appeal | Claim #${claim.claimNumber} | Addendum`;
+  const subject = rawSubject.includes(claimTag) ? rawSubject : `${claimTag} ${rawSubject}`;
+  const payer = claim.patient?.insurancePayer || "Health Insurer";
+  const correspondenceEmail = formatCorrespondenceEmail(args.text, {
+    claimNumber: claim.claimNumber,
+    payer,
+    patientName: claim.patient?.name,
+    serviceDate: claim.serviceDate,
+    deniedAmount: claim.deniedAmount,
+    denialReason: claim.denialReasonCode,
+    cptCodes: claim.cptCodes,
+    providerName: claim.providerName,
+  }, "Appeal Addendum");
 
-    let threadData: {
-      thread: Doc<"emailThreads"> | null;
-      messages: Doc<"emailMessages">[];
-    } | null = null;
+  const isAiAdjudicatorReply = isAiAdjudicatorAddress(recipient);
+  const mailboxes = await ensureClaimMailboxes(ctx, claim);
+  const sender = mailboxes.claimEmail;
+  const resolvedRecipient = isAiAdjudicatorReply
+    ? mailboxes.adjudicatorEmail
+    : recipient;
+  if (!resolvedRecipient) {
+    throw new Error(`No email recipient is configured for claim ${claim.claimNumber}.`);
+  }
+  if (isAiAdjudicatorReply && !mailboxes.adjudicatorInboxId) {
+    throw new Error("AgentMail did not return a payer adjudicator inbox for this claim.");
+  }
 
-    if (args.threadId) {
-      threadData = await ctx.runQuery(api.emails.getThreadWithMessages, {
-        threadId: args.threadId,
-      });
-    }
+  const liveTransmission = await sendAgentMailMessage({
+    inboxId: mailboxes.claimInboxId,
+    to: resolvedRecipient,
+    subject,
+    text: correspondenceEmail.text,
+    html: correspondenceEmail.html,
+  });
 
-    const recipient =
-      args.customRecipient ||
-      threadData?.thread?.payerEmail ||
-      claim.payerContact?.officialAppealsEmail;
-    const claimTag = `[ClaimHero #${claim.claimNumber}]`;
-    const rawSubject = args.customSubject || `Re: Formal Medical Appeal | Claim #${claim.claimNumber} | Addendum`;
-    const subject = rawSubject.includes(claimTag) ? rawSubject : `${claimTag} ${rawSubject}`;
-    const payer = claim.patient?.insurancePayer || "Health Insurer";
-    const correspondenceEmail = formatCorrespondenceEmail(args.text, {
-      claimNumber: claim.claimNumber,
-      payer,
-      patientName: claim.patient?.name,
-      serviceDate: claim.serviceDate,
-      deniedAmount: claim.deniedAmount,
-      denialReason: claim.denialReasonCode,
-      cptCodes: claim.cptCodes,
-      providerName: claim.providerName,
-    }, "Appeal Addendum");
-
-    const isAiAdjudicatorReply = isAiAdjudicatorAddress(recipient);
-    const mailboxes = await ensureClaimMailboxes(ctx, claim);
-    const sender = mailboxes.claimEmail;
-    const resolvedRecipient = isAiAdjudicatorReply
-      ? mailboxes.adjudicatorEmail
-      : recipient;
-    if (!resolvedRecipient) {
-      throw new Error(`No email recipient is configured for claim ${claim.claimNumber}.`);
-    }
-    if (isAiAdjudicatorReply && !mailboxes.adjudicatorInboxId) {
-      throw new Error("AgentMail did not return a payer adjudicator inbox for this claim.");
-    }
-
-    const liveTransmission = await sendAgentMailMessage({
-      inboxId: mailboxes.claimInboxId,
-      to: resolvedRecipient,
-      subject,
-      text: correspondenceEmail.text,
-      html: correspondenceEmail.html,
-    });
-
-    const recordedThreadId = liveTransmission.threadId || liveTransmission.messageId;
-    if (recordedThreadId) {
-      await ctx.runMutation(internal.claims.setAgentMailThreadIdInternal, {
-        claimId: args.claimId,
-        agentMailThreadId: recordedThreadId,
-      });
-    }
-
-    const threadId = await ctx.runMutation(internal.emails.getOrCreateThreadInternal, {
+  const recordedThreadId = liveTransmission.threadId || liveTransmission.messageId;
+  if (recordedThreadId) {
+    await ctx.runMutation(internal.claims.setAgentMailThreadIdInternal, {
       claimId: args.claimId,
-      agentEmail: sender,
-      payerEmail: resolvedRecipient,
-      subject,
+      agentMailThreadId: recordedThreadId,
     });
+  }
 
-    await ctx.runMutation(internal.emails.insertMessageInternal, withAgentMailMessageId({
-      threadId,
-      claimId: args.claimId,
-      direction: "outbound",
-      sender,
-      recipient: resolvedRecipient,
-      subject,
-      bodyHtml: correspondenceEmail.html,
-      bodyText: correspondenceEmail.text,
-      hasAttachments: false,
-    }, liveTransmission.messageId));
+  const threadId = await ctx.runMutation(internal.emails.getOrCreateThreadInternal, {
+    claimId: args.claimId,
+    agentEmail: sender,
+    payerEmail: resolvedRecipient,
+    subject,
+  });
 
-    let adjudicationDetermination: string | undefined;
-    if (isAiAdjudicatorReply && threadId) {
-      try {
-        const historyMessages = [
-          ...((threadData?.messages || []) as Array<{
-            direction: string;
-            subject: string;
-            bodyText: string;
-          }>),
-          { direction: "outbound", subject, bodyText: args.text },
-        ];
-        const transcript = formatCorrespondenceTranscript(historyMessages);
+  await ctx.runMutation(internal.emails.insertMessageInternal, withAgentMailMessageId({
+    threadId,
+    claimId: args.claimId,
+    direction: "outbound",
+    sender,
+    recipient: resolvedRecipient,
+    subject,
+    bodyHtml: correspondenceEmail.html,
+    bodyText: correspondenceEmail.text,
+    hasAttachments: false,
+  }, liveTransmission.messageId));
 
-        const adjudicationResult = await deliverAiAdjudication(ctx, {
-          claim,
-          threadId,
-          sender,
-          recipient: resolvedRecipient,
-          payer,
-          adjudicatorInboxId: mailboxes.adjudicatorInboxId as string,
-          userPrompt: `The following is the ongoing appellate correspondence for Claim #${claim.claimNumber}.
+  let adjudicationDetermination: string | undefined;
+  if (isAiAdjudicatorReply && threadId) {
+    try {
+      const historyMessages = [
+        ...((threadData?.messages || []) as Array<{
+          direction: string;
+          subject: string;
+          bodyText: string;
+        }>),
+        { direction: "outbound", subject, bodyText: args.text },
+      ];
+      const transcript = formatCorrespondenceTranscript(historyMessages);
+
+      const adjudicationResult = await deliverAiAdjudication(ctx, {
+        claim,
+        threadId,
+        sender,
+        recipient: resolvedRecipient,
+        payer,
+        adjudicatorInboxId: mailboxes.adjudicatorInboxId as string,
+        userPrompt: `The following is the ongoing appellate correspondence for Claim #${claim.claimNumber}.
 
 ${transcript}
 
@@ -572,19 +566,50 @@ The appellant has just submitted this addendum:
 ${args.text}
 
 Issue an updated formal determination letter that responds specifically to this addendum.`,
-          isFollowUp: true,
-        });
-        adjudicationDetermination = adjudicationResult.determination;
-      } catch (aiErr) {
-        throw new Error(
-          `AI payer adjudication failed after the addendum was sent: ${
-            aiErr instanceof Error ? aiErr.message : String(aiErr)
-          }`
-        );
-      }
+        isFollowUp: true,
+      });
+      adjudicationDetermination = adjudicationResult.determination;
+    } catch (aiErr) {
+      throw new Error(
+        `AI payer adjudication failed after the addendum was sent: ${
+          aiErr instanceof Error ? aiErr.message : String(aiErr)
+        }`
+      );
+    }
+  }
+
+  return { success: true, adjudicationDetermination };
+}
+
+/**
+ * Send Outbound Communication Message via AgentMail (Public Action with Claim Ownership Guard)
+ */
+export const sendOutboundMessage = action({
+  args: sendOutboundMessageArgs,
+  handler: async (ctx, args) => {
+    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
+    return await performSendOutboundMessage(ctx, args, claim);
+  },
+});
+
+/**
+ * Send Outbound Communication Message via AgentMail (Internal Action for Server Automation)
+ */
+export const sendOutboundMessageInternal = internalAction({
+  args: sendOutboundMessageArgs,
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ success: boolean; adjudicationDetermination?: string }> => {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
+      claimId: args.claimId,
+    });
+
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
     }
 
-    return { success: true, adjudicationDetermination };
+    return await performSendOutboundMessage(ctx, args, claim);
   },
 });
 
@@ -602,13 +627,7 @@ export const generateAutoReplyDraft = action({
     ctx,
     args
   ): Promise<{ success: boolean; draftText: string; suggestedSubject: string }> => {
-    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
-    });
-
-    if (!claim) {
-      throw new Error(`Claim ${args.claimId} not found`);
-    }
+    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
 
     if (claim.status === "won") {
       return {

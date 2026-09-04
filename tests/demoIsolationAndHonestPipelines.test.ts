@@ -2,6 +2,11 @@ import { describe, it, expect, vi } from "vitest";
 import { DEMO_CASE_FIXTURES, SAMPLE_CASE_PRESETS } from "../src/lib/constants";
 import { buildDossierData } from "../src/lib/dossierBuilder";
 import { Claim, Appeal } from "../src/types";
+import { getAuthUserId } from "@convex-dev/auth/server";
+
+vi.mock("@convex-dev/auth/server", () => ({
+  getAuthUserId: vi.fn().mockResolvedValue("user_123"),
+}));
 
 describe("Demo Isolation, Provenance Attribution & Honest Evaluation Pipeline", () => {
   describe("Demo Fixtures Provenance & Safe Harbor Tagging", () => {
@@ -175,6 +180,7 @@ describe("Demo Isolation, Provenance Attribution & Honest Evaluation Pipeline", 
       const mockClaim = {
         _id: "claim_test_99",
         claimNumber: "CLM-TEST-99",
+        userId: "user_123",
         patient: { name: "Test Patient", memberId: "MEM-99", insurancePayer: "Aetna" },
         providerName: "Dr. Test",
         serviceDate: "2024-01-01",
@@ -219,6 +225,7 @@ describe("Demo Isolation, Provenance Attribution & Honest Evaluation Pipeline", 
       const mockClaim = {
         _id: "claim_p2p_1",
         claimNumber: "CLM-P2P-1",
+        userId: "user_123",
         patient: { name: "Test Patient", insurancePayer: "UnitedHealthcare", state: "TX" },
         cptCodes: ["29881"],
         icd10Codes: ["M23.22"],

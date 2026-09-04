@@ -4,7 +4,7 @@ import { action, internalAction } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { createEmbedding } from "../lib/openai";
 import { PRECEDENT_CORPUS } from "../lib/precedentCorpus";
 import {
@@ -167,8 +167,8 @@ export const retrieveTopPrecedents = action({
     });
 
     const ids = hits.map((hit) => hit._id);
-    const docs = await ctx.runQuery(internal.precedents.hydrateByIds, { ids });
-    const docsById = new Map(docs.map((doc) => [doc._id, doc]));
+    const docs: Doc<"precedents">[] = (await ctx.runQuery(internal.precedents.hydrateByIds, { ids })) || [];
+    const docsById = new Map<Id<"precedents">, Doc<"precedents">>(docs.map((doc: Doc<"precedents">) => [doc._id, doc]));
 
     const rankable = hits
       .map((hit) => {

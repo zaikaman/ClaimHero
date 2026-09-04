@@ -4,6 +4,7 @@ import * as actionPrecedentMatcher from "../convex/actions/precedentMatcher";
 import * as actionSentinelPipeline from "../convex/actions/sentinelPipeline";
 import * as libOpenAI from "../convex/lib/openai";
 import { rateLimiter } from "../convex/lib/rateLimiter";
+// @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 vi.mock("@convex-dev/auth/server", () => ({
@@ -13,6 +14,7 @@ vi.mock("@convex-dev/auth/server", () => ({
 describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
   });
 
   describe("convex/actions/precedentArchive", () => {
@@ -76,6 +78,7 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
       const mockClaim = {
         _id: "c1",
         claimNumber: "CLM-100",
+        userId: "user_123",
         cptCodes: ["63047"],
         icd10Codes: ["M51.1"],
         denialReasonCode: "CO-50",

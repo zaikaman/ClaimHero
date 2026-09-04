@@ -5,6 +5,8 @@ import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
+import { requireClaimOwnerAction } from "../lib/auth";
+import type { Doc, Id } from "../_generated/dataModel";
 
 const P2P_DEFENSE_SCHEMA = {
   type: "object",
@@ -124,8 +126,6 @@ export interface P2PDefenseSynthesisResult {
   fullScriptMarkdown: string;
   generatedBy?: "openai" | "fallback";
 }
-
-import type { Doc, Id } from "../_generated/dataModel";
 
 interface P2PClaimContext {
   _id: Id<"claims">;
@@ -329,18 +329,12 @@ export const generateP2PScript = action({
     ctx,
     args
   ): Promise<P2PDefenseSynthesisResult & { scriptId: string }> => {
-    // 1. Fetch claim details
-    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
-    });
-
-    if (!claim) {
-      throw new Error(`Claim ${args.claimId} not found`);
-    }
+    // 1. Authorize claim ownership
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
 
     // Enforce rate limiting per user
     const limitStatus = await rateLimiter.limit(ctx, "p2pGenerator", {
-      key: claim.userId || "global",
+      key: userId || "global",
     });
     if (!limitStatus.ok) {
       throw new Error(
@@ -349,10 +343,11 @@ export const generateP2PScript = action({
     }
 
     // 2. Fetch clinical evidence
-    const evidences = await ctx.runQuery(
-      internal.clinicalEvidences.listByClaimInternal,
-      { claimId: args.claimId }
-    );
+    const evidences: Doc<"clinicalEvidences">[] =
+      (await ctx.runQuery(
+        internal.clinicalEvidences.listByClaimInternal,
+        { claimId: args.claimId }
+      )) || [];
 
     const physicianName =
       args.physicianName ||

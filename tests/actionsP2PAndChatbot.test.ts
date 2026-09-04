@@ -4,6 +4,7 @@ import * as actionP2PLiveCopilot from "../convex/actions/p2pLiveCopilot";
 import * as actionSentinelChatbot from "../convex/actions/sentinelChatbot";
 import * as libOpenAI from "../convex/lib/openai";
 import { rateLimiter } from "../convex/lib/rateLimiter";
+// @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 vi.mock("@convex-dev/auth/server", () => ({
@@ -13,6 +14,7 @@ vi.mock("@convex-dev/auth/server", () => ({
 describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
   });
 
   describe("convex/actions/p2pDefenseGenerator", () => {
@@ -89,6 +91,7 @@ describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot
       const mockClaim = {
         _id: "c1",
         claimNumber: "CLM-100",
+        userId: "user_123",
         providerName: "Dr. Amanda Vance",
         patient: { name: "Marcus", insurancePayer: "UHC" },
         cptCodes: ["63047"],
@@ -137,6 +140,7 @@ describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot
       const mockClaim = {
         _id: "c1",
         claimNumber: "CLM-100",
+        userId: "user_123",
         patient: { name: "Marcus", insurancePayer: "UHC" },
         cptCodes: ["63047"],
         icd10Codes: ["M51.16"],

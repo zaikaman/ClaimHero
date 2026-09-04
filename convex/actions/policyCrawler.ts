@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { api, components, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
+import { requireClaimOwnerAction } from "../lib/auth";
 import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
 
 const firecrawl = new FirecrawlClient(components.firecrawl);
@@ -1359,9 +1360,11 @@ export const crawlInsurerPolicy = action({
     customPolicyUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { userId } = await requireClaimOwnerAction(ctx, args.claimId);
+
     // Enforce rate limiting
     const limitStatus = await rateLimiter.limit(ctx, "policyCrawler", {
-      key: args.payer || "global",
+      key: userId || args.payer || "global",
     });
     if (!limitStatus.ok) {
       throw new Error(
@@ -1760,6 +1763,8 @@ export const crawlPubMedAndTrials = action({
     customUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireClaimOwnerAction(ctx, args.claimId);
+
     const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
     if (!firecrawlApiKey?.trim()) {
       throw new Error("PubMed & clinical trials research requires FIRECRAWL_API_KEY.");
@@ -1887,6 +1892,8 @@ export const crawlFdaIndications = action({
     drugOrDeviceName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireClaimOwnerAction(ctx, args.claimId);
+
     let sourceMarkdown = "";
     let sourceUrl = args.customUrl || "";
 
@@ -2005,6 +2012,8 @@ export const crawlCustomResearchUrl = action({
     clinicalNotes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireClaimOwnerAction(ctx, args.claimId);
+
     if (!isAcceptableSourceUrl(args.customUrl)) {
       throw new Error("Please provide a valid HTTP or HTTPS web URL.");
     }
@@ -2072,6 +2081,8 @@ export const crawlMultiSourceHub = action({
     customPolicyUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireClaimOwnerAction(ctx, args.claimId);
+
     await ctx.runMutation(internal.auditLogs.logEventInternal, {
       eventType: "multi_source_crawl_started",
       actor: "Sentinel Multi-Source Policy Hub",

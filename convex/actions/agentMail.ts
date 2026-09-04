@@ -1,7 +1,7 @@
 "use node";
 
 import { action, internalAction, type ActionCtx } from "../_generated/server";
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
@@ -11,6 +11,7 @@ import {
   sendAgentMailMessage,
 } from "../lib/agentMail";
 import { extractEmailAddress, normalizeAgentMailWebhook } from "../lib/agentMailWebhook";
+import { requireAuthUser } from "../lib/auth";
 
 /**
  * Binds a claim to the two real AgentMail identities provisioned for the app.
@@ -507,7 +508,7 @@ Evaluate the inbound correspondence text rigorously:
       // Autonomous Sentinel Auto-Pilot: If enabled, automatically dispatch the synthesized clinical addendum
       if (matchingClaim.autoPilotEnabled !== false && suggestedAutoReply.trim()) {
         try {
-          await ctx.runAction(api.actions.mailDispatcher.sendOutboundMessage, {
+          await ctx.runAction(internal.actions.mailDispatcher.sendOutboundMessageInternal, {
             claimId: matchingClaim._id,
             threadId,
             text: suggestedAutoReply,
@@ -747,6 +748,7 @@ export const syncInboxes = action({
     totalChecked: v.number(),
   }),
   handler: async (ctx, args) => {
+    await requireAuthUser(ctx);
     const result = await performInboxSync(ctx, args.limit);
     return {
       success: true,

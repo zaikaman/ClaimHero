@@ -6,6 +6,8 @@ import { createStructuredCompletion } from "../lib/openai";
 import { api, internal } from "../_generated/api";
 import { precedentMatchValidator } from "../lib/precedentValidators";
 import { rateLimiter } from "../lib/rateLimiter";
+import { requireClaimOwnerAction } from "../lib/auth";
+import type { Doc } from "../_generated/dataModel";
 
 const APPEAL_SYNTHESIS_SCHEMA = {
   type: "object",
@@ -688,18 +690,12 @@ export const generateAppealBrief = action({
   ): Promise<AppealBriefSynthesisResult & { appealId: string }> => {
     const appealLevel = args.appealLevel || "level_1_internal";
 
-    // 1. Fetch claim details with joined patient data
-    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
-    });
-
-    if (!claim) {
-      throw new Error(`Claim ${args.claimId} not found`);
-    }
+    // 1. Authorize claim ownership
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
 
     // Enforce rate limiting per user
     const limitStatus = await rateLimiter.limit(ctx, "appealSynthesizer", {
-      key: claim.userId || "global",
+      key: userId || "global",
     });
     if (!limitStatus.ok) {
       throw new Error(
@@ -708,9 +704,9 @@ export const generateAppealBrief = action({
     }
 
     // 2. Fetch indexed clinical evidence clauses
-    const evidences = await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
+    const evidences: Doc<"clinicalEvidences">[] = (await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
-    });
+    })) || [];
 
     const externalEvidences = evidences.filter(
       (e) => isExternalEvidence(e) && !isBlockedEvidence(e) && !isPayerMismatchedEvidence(e, claim) && !isEvidenceSiteMismatched(e, claim)

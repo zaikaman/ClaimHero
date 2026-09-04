@@ -577,4 +577,220 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
       }
     });
   });
+
+  describe("Public Actions IDOR & Unauthorized Spend Guards (requireClaimOwnerAction)", () => {
+    const claimOtherUser = {
+      _id: "claim_victim_456",
+      userId: "user_victim_456",
+      claimNumber: "CLM-VIC-456",
+      patient: { name: "Victim Patient", insurancePayer: "Aetna" },
+      cptCodes: ["63047"],
+      icd10Codes: ["M51.16"],
+      denialReasonCode: "CO-50",
+    };
+
+    const makeMockCtx = (authenticatedUserId: string | null) => {
+      vi.mocked(getAuthUserId).mockResolvedValue(authenticatedUserId as any);
+      return {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "claim_victim_456") {
+            return Promise.resolve(claimOtherUser);
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+        runAction: vi.fn().mockResolvedValue(undefined),
+      };
+    };
+
+    it("mailDispatcher: rejects unauthenticated caller and non-owner (IDOR guard)", async () => {
+      const { dispatchAppealPacket, sendOutboundMessage, generateAutoReplyDraft } = await import(
+        "../convex/actions/mailDispatcher"
+      );
+
+      // 1. Unauthenticated caller
+      const unauthCtx = makeMockCtx(null);
+      await expect(
+        (dispatchAppealPacket as any)._handler(unauthCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Unauthorized/i);
+      await expect(
+        (sendOutboundMessage as any)._handler(unauthCtx, { claimId: "claim_victim_456", text: "hi" })
+      ).rejects.toThrow(/Unauthorized/i);
+      await expect(
+        (generateAutoReplyDraft as any)._handler(unauthCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      // 2. Authenticated attacker attempting IDOR on victim's claim
+      const attackerCtx = makeMockCtx("user_attacker_999");
+      await expect(
+        (dispatchAppealPacket as any)._handler(attackerCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Forbidden/i);
+      await expect(
+        (sendOutboundMessage as any)._handler(attackerCtx, { claimId: "claim_victim_456", text: "hi" })
+      ).rejects.toThrow(/Forbidden/i);
+      await expect(
+        (generateAutoReplyDraft as any)._handler(attackerCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Forbidden/i);
+    });
+
+    it("appealSynthesizer: rejects unauthenticated caller and non-owner (LLM spend guard)", async () => {
+      const { generateAppealBrief } = await import("../convex/actions/appealSynthesizer");
+
+      const unauthCtx = makeMockCtx(null);
+      await expect(
+        (generateAppealBrief as any)._handler(unauthCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      const attackerCtx = makeMockCtx("user_attacker_999");
+      await expect(
+        (generateAppealBrief as any)._handler(attackerCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Forbidden/i);
+    });
+
+    it("policyCrawler: rejects unauthenticated caller and non-owner on all crawl endpoints", async () => {
+      const {
+        crawlInsurerPolicy,
+        crawlPubMedAndTrials,
+        crawlFdaIndications,
+        crawlCustomResearchUrl,
+        crawlMultiSourceHub,
+      } = await import("../convex/actions/policyCrawler");
+
+      const unauthCtx = makeMockCtx(null);
+      await expect(
+        (crawlInsurerPolicy as any)._handler(unauthCtx, {
+          claimId: "claim_victim_456",
+          payer: "Aetna",
+          cptCodes: ["63047"],
+          icd10Codes: ["M51.16"],
+          denialReasonCode: "CO-50",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      await expect(
+        (crawlPubMedAndTrials as any)._handler(unauthCtx, {
+          claimId: "claim_victim_456",
+          cptCodes: ["63047"],
+          icd10Codes: ["M51.16"],
+          denialReasonCode: "CO-50",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      await expect(
+        (crawlFdaIndications as any)._handler(unauthCtx, {
+          claimId: "claim_victim_456",
+          cptCodes: ["63047"],
+          icd10Codes: ["M51.16"],
+          denialReasonCode: "CO-50",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      await expect(
+        (crawlCustomResearchUrl as any)._handler(unauthCtx, {
+          claimId: "claim_victim_456",
+          customUrl: "https://nih.gov/guidelines",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      await expect(
+        (crawlMultiSourceHub as any)._handler(unauthCtx, {
+          claimId: "claim_victim_456",
+          payer: "Aetna",
+          cptCodes: ["63047"],
+          icd10Codes: ["M51.16"],
+          denialReasonCode: "CO-50",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      // Authenticated attacker attempting IDOR on victim's claim
+      const attackerCtx = makeMockCtx("user_attacker_999");
+      await expect(
+        (crawlInsurerPolicy as any)._handler(attackerCtx, {
+          claimId: "claim_victim_456",
+          payer: "Aetna",
+          cptCodes: ["63047"],
+          icd10Codes: ["M51.16"],
+          denialReasonCode: "CO-50",
+        })
+      ).rejects.toThrow(/Forbidden/i);
+    });
+
+    it("payerContactResolver: rejects unauthenticated caller and non-owner", async () => {
+      const { resolvePayerGateway } = await import("../convex/actions/payerContactResolver");
+
+      const unauthCtx = makeMockCtx(null);
+      await expect(
+        (resolvePayerGateway as any)._handler(unauthCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      const attackerCtx = makeMockCtx("user_attacker_999");
+      await expect(
+        (resolvePayerGateway as any)._handler(attackerCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Forbidden/i);
+    });
+
+    it("p2pDefenseGenerator & p2pLiveCopilot: reject unauthenticated caller and non-owner", async () => {
+      const { generateP2PScript } = await import("../convex/actions/p2pDefenseGenerator");
+      const { generateLiveFastAnswer, generateInteractiveReviewerPushback } = await import(
+        "../convex/actions/p2pLiveCopilot"
+      );
+
+      const unauthCtx = makeMockCtx(null);
+      await expect(
+        (generateP2PScript as any)._handler(unauthCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Unauthorized/i);
+      await expect(
+        (generateLiveFastAnswer as any)._handler(unauthCtx, {
+          claimId: "claim_victim_456",
+          recentTranscript: "objection",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+      await expect(
+        (generateInteractiveReviewerPushback as any)._handler(unauthCtx, {
+          claimId: "claim_victim_456",
+          doctorSpeech: "rebuttal",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      const attackerCtx = makeMockCtx("user_attacker_999");
+      await expect(
+        (generateP2PScript as any)._handler(attackerCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Forbidden/i);
+      await expect(
+        (generateLiveFastAnswer as any)._handler(attackerCtx, {
+          claimId: "claim_victim_456",
+          recentTranscript: "objection",
+        })
+      ).rejects.toThrow(/Forbidden/i);
+      await expect(
+        (generateInteractiveReviewerPushback as any)._handler(attackerCtx, {
+          claimId: "claim_victim_456",
+          doctorSpeech: "rebuttal",
+        })
+      ).rejects.toThrow(/Forbidden/i);
+    });
+
+    it("precedentMatcher: rejects unauthenticated caller and non-owner", async () => {
+      const { computeOverturnScore } = await import("../convex/actions/precedentMatcher");
+
+      const unauthCtx = makeMockCtx(null);
+      await expect(
+        (computeOverturnScore as any)._handler(unauthCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      const attackerCtx = makeMockCtx("user_attacker_999");
+      await expect(
+        (computeOverturnScore as any)._handler(attackerCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Forbidden/i);
+    });
+
+    it("agentMail.syncInboxes: rejects unauthenticated caller", async () => {
+      const { syncInboxes } = await import("../convex/actions/agentMail");
+
+      const unauthCtx = makeMockCtx(null);
+      await expect(
+        (syncInboxes as any)._handler(unauthCtx, { limit: 5 })
+      ).rejects.toThrow(/Unauthorized/i);
+    });
+  });
 });
