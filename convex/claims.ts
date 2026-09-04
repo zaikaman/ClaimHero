@@ -101,57 +101,29 @@ export const list = query({
         ? paginatedResult.page.filter((c) => !c.isDemo)
         : paginatedResult.page;
 
-      const mappedPage = await Promise.all(
-        page.map(async (claim) => {
-          let patientName = claim.patientName;
-          let insurancePayer = claim.insurancePayer;
-
-          if (!patientName || !insurancePayer) {
-            const patient = (await ctx.db.get(claim.patientId)) as Doc<"patients"> | null;
-            if (patient) {
-              patientName = patientName || patient.name;
-              insurancePayer = insurancePayer || patient.insurancePayer;
-            }
-          }
-
-          return {
-            ...claim,
-            patientName,
-            insurancePayer,
-            patient: {
-              _id: claim.patientId,
-              name: patientName || "Patient",
-              email: "",
-              memberId: "PENDING",
-              insurancePayer: insurancePayer || "Health Insurer",
-              state: "FL",
-              createdAt: claim.createdAt,
-            },
-          };
-        })
+      const missingPatientIds = Array.from(
+        new Set(
+          page
+            .filter((c) => !c.patientName || !c.insurancePayer)
+            .map((c) => c.patientId)
+        )
       );
+      const patientMap = new Map<Id<"patients">, Doc<"patients"> | null>();
+      if (missingPatientIds.length > 0) {
+        await Promise.all(
+          missingPatientIds.map(async (pid) => {
+            const p = (await ctx.db.get(pid)) as Doc<"patients"> | null;
+            patientMap.set(pid, p);
+          })
+        );
+      }
 
-      return {
-        ...paginatedResult,
-        page: mappedPage,
-      };
-    }
-
-    const effectiveLimit = Math.min(args.limit ?? 50, 100);
-    let claims = await queryBuilder.take(effectiveLimit);
-    if (args.includeDemo === false) {
-      claims = claims.filter((c) => !c.isDemo);
-    }
-
-    // Map denormalized patient data into the expected Claim shape without N+1 joins
-    return await Promise.all(
-      claims.map(async (claim) => {
+      const mappedPage = page.map((claim) => {
         let patientName = claim.patientName;
         let insurancePayer = claim.insurancePayer;
 
-        // Graceful fallback for legacy documents
         if (!patientName || !insurancePayer) {
-          const patient = (await ctx.db.get(claim.patientId)) as Doc<"patients"> | null;
+          const patient = patientMap.get(claim.patientId);
           if (patient) {
             patientName = patientName || patient.name;
             insurancePayer = insurancePayer || patient.insurancePayer;
@@ -172,8 +144,66 @@ export const list = query({
             createdAt: claim.createdAt,
           },
         };
-      })
+      });
+
+      return {
+        ...paginatedResult,
+        page: mappedPage,
+      };
+    }
+
+    const effectiveLimit = Math.min(args.limit ?? 50, 100);
+    let claims = await queryBuilder.take(effectiveLimit);
+    if (args.includeDemo === false) {
+      claims = claims.filter((c) => !c.isDemo);
+    }
+
+    const missingPatientIds = Array.from(
+      new Set(
+        claims
+          .filter((c) => !c.patientName || !c.insurancePayer)
+          .map((c) => c.patientId)
+      )
     );
+    const patientMap = new Map<Id<"patients">, Doc<"patients"> | null>();
+    if (missingPatientIds.length > 0) {
+      await Promise.all(
+        missingPatientIds.map(async (pid) => {
+          const p = (await ctx.db.get(pid)) as Doc<"patients"> | null;
+          patientMap.set(pid, p);
+        })
+      );
+    }
+
+    // Map denormalized patient data into the expected Claim shape without N+1 joins
+    return claims.map((claim) => {
+      let patientName = claim.patientName;
+      let insurancePayer = claim.insurancePayer;
+
+      // Graceful fallback for legacy documents
+      if (!patientName || !insurancePayer) {
+        const patient = patientMap.get(claim.patientId);
+        if (patient) {
+          patientName = patientName || patient.name;
+          insurancePayer = insurancePayer || patient.insurancePayer;
+        }
+      }
+
+      return {
+        ...claim,
+        patientName,
+        insurancePayer,
+        patient: {
+          _id: claim.patientId,
+          name: patientName || "Patient",
+          email: "",
+          memberId: "PENDING",
+          insurancePayer: insurancePayer || "Health Insurer",
+          state: "FL",
+          createdAt: claim.createdAt,
+        },
+      };
+    });
   },
 });
 
@@ -191,22 +221,27 @@ export const getById = query({
 
     const patient = (await ctx.db.get(claim.patientId)) as Doc<"patients"> | null;
 
-    const evidences = await ctx.db
-      .query("clinicalEvidences")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .take(50);
-
-    const appeals = await ctx.db
+    // Fetch the single latest appeal brief directly using compound index (reads 1 doc instead of 20)
+    const latestAppeal = await ctx.db
       .query("appeals")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .take(20);
+      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId))
+      .order("desc")
+      .first();
 
-    const latestAppeal = appeals.sort((a, b) => b.version - a.version)[0] || null;
+    // Use denormalized evidenceCount if present to avoid reading up to 50 large evidence docs
+    let evidenceCount = claim.evidenceCount;
+    if (evidenceCount === undefined) {
+      const evidences = await ctx.db
+        .query("clinicalEvidences")
+        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+        .take(50);
+      evidenceCount = evidences.length;
+    }
 
     return {
       ...claim,
       patient: patient || undefined,
-      evidenceCount: evidences.length,
+      evidenceCount,
       latestAppeal,
     };
   },
@@ -225,22 +260,27 @@ export const getByIdInternal = internalQuery({
 
     const patient = await ctx.db.get(claim.patientId);
 
-    const evidences = await ctx.db
-      .query("clinicalEvidences")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .take(50);
-
-    const appeals = await ctx.db
+    // Fetch the single latest appeal brief directly using compound index (reads 1 doc instead of 20)
+    const latestAppeal = await ctx.db
       .query("appeals")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .take(20);
+      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId))
+      .order("desc")
+      .first();
 
-    const latestAppeal = appeals.sort((a, b) => b.version - a.version)[0] || null;
+    // Use denormalized evidenceCount if present to avoid reading up to 50 large evidence docs
+    let evidenceCount = claim.evidenceCount;
+    if (evidenceCount === undefined) {
+      const evidences = await ctx.db
+        .query("clinicalEvidences")
+        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+        .take(50);
+      evidenceCount = evidences.length;
+    }
 
     return {
       ...claim,
       patient: patient || undefined,
-      evidenceCount: evidences.length,
+      evidenceCount,
       latestAppeal,
     };
   },

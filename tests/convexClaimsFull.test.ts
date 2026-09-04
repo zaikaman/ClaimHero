@@ -1,3 +1,4 @@
+/// <reference path="./auth-mock.d.ts" />
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as claims from "../convex/claims";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -84,6 +85,32 @@ describe("Convex Claims CRUD, Financials & Analytics Engine", () => {
 
       const resInternal = await (claims.getByIdInternal as any)._handler(mockCtx, { claimId: "c1" });
       expect(resInternal?.patient?.name).toBe("Alice");
+    });
+
+    it("getById: utilizes denormalized evidenceCount without reading clinicalEvidences", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockClaim = { _id: "c2", userId: "user_123", patientId: "p1", evidenceCount: 7 };
+      const mockPatient = { _id: "p1", name: "Bob" };
+
+      const querySpy = vi.fn().mockReturnValue({
+        withIndex: vi.fn().mockReturnValue({
+          order: vi.fn().mockReturnValue({
+            first: vi.fn().mockResolvedValue(null),
+          }),
+        }),
+      });
+
+      const mockDb = createMockDb({
+        get: vi.fn().mockImplementation((id) => (id === "c2" ? Promise.resolve(mockClaim) : Promise.resolve(mockPatient))),
+        query: querySpy,
+      });
+      const mockCtx: any = { db: mockDb };
+
+      const res = await (claims.getById as any)._handler(mockCtx, { claimId: "c2" });
+      expect(res?.evidenceCount).toBe(7);
+      // Query should only have been called for appeals, NOT clinicalEvidences
+      expect(querySpy).toHaveBeenCalledWith("appeals");
+      expect(querySpy).not.toHaveBeenCalledWith("clinicalEvidences");
     });
 
     it("listAllInternal & getByClaimNumberInternal", async () => {

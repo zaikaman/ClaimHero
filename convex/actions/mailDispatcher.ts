@@ -212,7 +212,7 @@ async function deliverAiAdjudication(
       : `${claimTag} ${rawDeterminationSubject}`;
   }
 
-  const priorMessages = threadData?.messages || [];
+  const priorMessages: Array<{ agentMailMessageId?: string }> = threadData?.messages || [];
   const messageIds = priorMessages
     .map((m) => m.agentMailMessageId?.trim())
     .filter((id): id is string => Boolean(id));

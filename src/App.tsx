@@ -73,7 +73,7 @@ export default function App() {
     dispatchAppeal,
     syncInboxes,
     isSyncingInboxes,
-  } = useCommunications(selectedClaim);
+  } = useCommunications(selectedClaim, { activeView: currentView });
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarCollapsed((prev) => !prev);

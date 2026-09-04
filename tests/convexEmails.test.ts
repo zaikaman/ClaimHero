@@ -1,3 +1,4 @@
+/// <reference path="./auth-mock.d.ts" />
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as emails from "../convex/emails";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -170,6 +171,79 @@ describe("Convex Emails & Communications API", () => {
       expect(mockCtx.db.patch).toHaveBeenCalledWith("t1", expect.objectContaining({ status: "response_received" }));
       expect(mockCtx.db.patch).toHaveBeenCalledWith("c1", expect.objectContaining({ status: "under_review" }));
       expect(mockCtx.db.insert).toHaveBeenCalledWith("appealAuditLogs", expect.objectContaining({ eventType: "payer_response_received" }));
+    });
+  });
+
+  describe("getExistingAgentMailMessageIds & hasMessageByAgentMailId", () => {
+    it("getExistingAgentMailMessageIds: returns IDs found in compact index without reading emailMessages", async () => {
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockImplementation((table: string) => {
+            if (table === "recordedAgentMailMessageIds") {
+              return {
+                withIndex: vi.fn().mockImplementation((_name, fn) => {
+                  const queryObj: any = {
+                    eq: vi.fn().mockImplementation((_field, val) => {
+                      if (val === "msg_compact_1") return { first: vi.fn().mockResolvedValue({ _id: "rec_1" }) };
+                      return { first: vi.fn().mockResolvedValue(null) };
+                    }),
+                  };
+                  return fn(queryObj);
+                }),
+              };
+            }
+            if (table === "emailMessages") {
+              return {
+                withIndex: vi.fn().mockImplementation((_name, fn) => {
+                  const queryObj: any = {
+                    eq: vi.fn().mockImplementation((_field, val) => {
+                      if (val === "msg_legacy_2") return { first: vi.fn().mockResolvedValue({ _id: "m_leg" }) };
+                      return { first: vi.fn().mockResolvedValue(null) };
+                    }),
+                  };
+                  return fn(queryObj);
+                }),
+              };
+            }
+            return {
+              withIndex: vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValue(null) }),
+            };
+          }),
+        },
+      };
+
+      const res = await (emails.getExistingAgentMailMessageIds as any)._handler(mockCtx, {
+        agentMailMessageIds: ["msg_compact_1", "msg_legacy_2", "msg_unknown_3"],
+      });
+
+      expect(res).toEqual(["msg_compact_1", "msg_legacy_2"]);
+    });
+
+    it("hasMessageByAgentMailId: returns true when found in compact index table", async () => {
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockImplementation((table: string) => {
+            if (table === "recordedAgentMailMessageIds") {
+              return {
+                withIndex: vi.fn().mockReturnValue({
+                  first: vi.fn().mockResolvedValue({ agentMailMessageId: "msg_exist_1" }),
+                }),
+              };
+            }
+            return {
+              withIndex: vi.fn().mockReturnValue({
+                first: vi.fn().mockResolvedValue(null),
+              }),
+            };
+          }),
+        },
+      };
+
+      const res = await (emails.hasMessageByAgentMailId as any)._handler(mockCtx, {
+        agentMailMessageId: "msg_exist_1",
+      });
+
+      expect(res).toBe(true);
     });
   });
 });

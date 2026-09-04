@@ -159,9 +159,19 @@ async function applyBatchInsert(ctx: MutationCtx, args: BatchInsertEvidenceArgs)
     insertedIds.push(id);
   }
 
-  // Append audit log event
+  // Update denormalized evidence count on claim to prevent full table scans in getById
+  if (typeof ctx.db.patch === "function") {
+    const newCount = (claim.evidenceCount || 0) + insertedIds.length;
+    await ctx.db.patch(args.claimId, {
+      evidenceCount: newCount,
+      updatedAt: now,
+    });
+  }
+
+  // Append audit log event with user association
   await ctx.db.insert("appealAuditLogs", {
     claimId: args.claimId,
+    userId: claim.userId,
     eventType: "policy_crawled",
     actor: "Firecrawl & Policy Engine",
     details: `Indexed ${args.evidences.length} clinical policy clauses and medical precedents.`,
@@ -250,6 +260,13 @@ async function applyClearByClaim(ctx: MutationCtx, claimId: Id<"claims">) {
   for (const item of existing) {
     await ctx.db.delete(item._id);
   }
+
+  if (typeof ctx.db.patch === "function") {
+    await ctx.db.patch(claimId, {
+      evidenceCount: 0,
+      updatedAt: Date.now(),
+    });
+  }
 }
 
 /**
@@ -291,9 +308,18 @@ export const deleteEvidence = mutation({
     await requireClaimOwner(ctx, evidence.claimId);
     await ctx.db.delete(args.evidenceId);
 
+    const claim = typeof ctx.db.get === "function" ? await ctx.db.get(evidence.claimId) : null;
+    if (claim && typeof claim.evidenceCount === "number" && claim.evidenceCount > 0 && typeof ctx.db.patch === "function") {
+      await ctx.db.patch(evidence.claimId, {
+        evidenceCount: claim.evidenceCount - 1,
+        updatedAt: Date.now(),
+      });
+    }
+
     // Audit log
     await ctx.db.insert("appealAuditLogs", {
       claimId: evidence.claimId,
+      userId: claim?.userId,
       eventType: "evidence_removed",
       actor: "Clinical Research Officer",
       details: `Removed clinical evidence clause: ${evidence.title} (${evidence.citationClause}).`,
@@ -322,8 +348,17 @@ async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArg
     createdAt: now,
   });
 
+  const claim = typeof ctx.db.get === "function" ? await ctx.db.get(args.claimId) : null;
+  if (claim && typeof ctx.db.patch === "function") {
+    await ctx.db.patch(args.claimId, {
+      evidenceCount: (claim.evidenceCount || 0) + 1,
+      updatedAt: now,
+    });
+  }
+
   await ctx.db.insert("appealAuditLogs", {
     claimId: args.claimId,
+    userId: claim?.userId,
     eventType: "evidence_added",
     actor: "Clinical Research Hub",
     details: `Added ${args.sourceType} evidence clause: ${args.title} (${cleanClause}).`,

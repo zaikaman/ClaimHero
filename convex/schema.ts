@@ -161,6 +161,7 @@ export default defineSchema({
     isDemo: v.optional(v.boolean()),
     dataOrigin: v.optional(v.string()),
     isSyntheticPII: v.optional(v.boolean()),
+    evidenceCount: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -269,6 +270,14 @@ export default defineSchema({
     ignoredAt: v.number(),
   }).index("by_agent_mail_message_id", ["agentMailMessageId"]),
 
+  // Compact index table for fast AgentMail message ID existence checks without loading heavy MIME bodies
+  recordedAgentMailMessageIds: defineTable({
+    agentMailMessageId: v.string(),
+    claimId: v.optional(v.id("claims")),
+    status: v.optional(v.string()), // processed, ignored
+    recordedAt: v.number(),
+  }).index("by_agent_mail_message_id", ["agentMailMessageId"]),
+
   // Precedent Vector Archive — winning briefs, commissioner rulings, court overturns
   precedents: defineTable({
     sourceKind: v.union(
@@ -313,6 +322,7 @@ export default defineSchema({
   // Immutable Event Audit Trail
   appealAuditLogs: defineTable({
     claimId: v.id("claims"),
+    userId: v.optional(v.id("users")),
     eventType: v.string(), // denial_ingested, policy_crawled, overturn_score_computed, appeal_edited, appeal_dispatched, decision_recorded, p2p_script_generated, p2p_live_call_completed
     actor: v.string(),
     details: v.string(),
@@ -320,6 +330,7 @@ export default defineSchema({
   })
     .index("by_claim", ["claimId"])
     .index("by_claim_and_timestamp", ["claimId", "timestamp"])
+    .index("by_user_and_timestamp", ["userId", "timestamp"])
     .index("by_timestamp", ["timestamp"]),
 
   // Physician Peer-to-Peer (P2P) Defense Tele-Scripts

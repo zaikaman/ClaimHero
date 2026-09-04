@@ -35,12 +35,13 @@ export const logEvent = mutation({
     details: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    const { userId } = await requireClaimOwner(ctx, args.claimId);
 
     const timestamp = Date.now();
 
     const logId = await ctx.db.insert("appealAuditLogs", {
       claimId: args.claimId,
+      userId,
       eventType: args.eventType,
       actor: args.actor,
       details: args.details,
@@ -68,9 +69,11 @@ export const logEventInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     const timestamp = Date.now();
+    const claim = typeof ctx.db.get === "function" ? await ctx.db.get(args.claimId) : null;
 
     return await ctx.db.insert("appealAuditLogs", {
       claimId: args.claimId,
+      ...(claim?.userId ? { userId: claim.userId } : {}),
       eventType: args.eventType,
       actor: args.actor,
       details: args.details,
@@ -80,7 +83,8 @@ export const logEventInternal = internalMutation({
 });
 
 /**
- * List the most recent audit events strictly across the authenticated user's claims
+ * List the most recent audit events strictly across the authenticated user's claims.
+ * Uses bounded queries (take(10) instead of unbounded/oversized scans) to eliminate unnecessary I/O.
  */
 export const listRecent = query({
   args: {
@@ -96,14 +100,14 @@ export const listRecent = query({
       .query("claims")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
-      .take(30);
+      .take(10);
 
     if (userClaims.length === 0) return [];
 
     // Focus on active/recent claims if user has many
     const activeClaims = userClaims
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-      .slice(0, 30);
+      .slice(0, 10);
 
     // Fetch indexed recent logs for each claim in parallel
     const logsPerClaim = await Promise.all(

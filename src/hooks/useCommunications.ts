@@ -4,33 +4,41 @@ import { api } from "../../convex/_generated/api";
 import { Claim, EmailThread, EmailMessage, AuditLog } from "../types";
 import { Id } from "../../convex/_generated/dataModel";
 
-export function useCommunications(claim?: Claim | null) {
+export interface UseCommunicationsOptions {
+  activeView?: string;
+  enableAudit?: boolean;
+}
+
+export function useCommunications(claim?: Claim | null, options?: UseCommunicationsOptions) {
   const claimId = claim?._id as Id<"claims"> | undefined;
   const [isSyncingInboxes, setIsSyncingInboxes] = useState(false);
 
-  // Query threads for this claim
+  const isCommunicationsActive = !options?.activeView || options.activeView === "communications";
+  const isAuditActive = !options?.activeView || options.activeView === "audit" || Boolean(options?.enableAudit);
+
+  // Query threads for this claim only when communications view is active
   const threads = useQuery(
     api.emails.listThreadsByClaim,
-    claimId ? { claimId } : "skip"
+    isCommunicationsActive && claimId ? { claimId } : "skip"
   ) as EmailThread[] | undefined;
 
   const activeThreadId = threads && threads.length > 0 ? (threads[0]?._id as Id<"emailThreads"> | undefined) : undefined;
 
-  // Query thread details and messages
+  // Query thread details and messages only when communications view is active
   const threadDetails = useQuery(
     api.emails.getThreadWithMessages,
-    activeThreadId ? { threadId: activeThreadId } : "skip"
+    isCommunicationsActive && activeThreadId ? { threadId: activeThreadId } : "skip"
   ) as { thread: EmailThread; messages: EmailMessage[] } | null | undefined;
 
-  // Query audit logs for this claim or recent portfolio-wide logs
+  // Query audit logs strictly when audit view is active, and skip listRecent when a claim is selected
   const claimAuditLogs = useQuery(
     api.auditLogs.listByClaim,
-    claimId ? { claimId } : "skip"
+    isAuditActive && claimId ? { claimId } : "skip"
   ) as AuditLog[] | undefined;
 
   const recentAuditLogs = useQuery(
     api.auditLogs.listRecent,
-    { limit: 30 }
+    isAuditActive && !claimId ? { limit: 15 } : "skip"
   ) as AuditLog[] | undefined;
 
   const insertMessageMutation = useMutation(api.emails.insertMessage);
@@ -58,13 +66,19 @@ export function useCommunications(claim?: Claim | null) {
     }
   }, [syncInboxesAction]);
 
-  // Synchronize on mount and when window regains focus
+  // Synchronize on mount and when window regains focus only if communications view is active
   useEffect(() => {
-    syncInboxes();
+    if (!isCommunicationsActive) return;
+
+    // Initial check when opening communications view
+    const now = Date.now();
+    if (now - lastSyncTimeRef.current > 60_000) {
+      syncInboxes();
+    }
 
     const onFocus = () => {
-      const now = Date.now();
-      if (now - lastSyncTimeRef.current > 30_000) {
+      const focusNow = Date.now();
+      if (focusNow - lastSyncTimeRef.current > 120_000) {
         syncInboxes();
       }
     };
@@ -73,7 +87,7 @@ export function useCommunications(claim?: Claim | null) {
     return () => {
       window.removeEventListener("focus", onFocus);
     };
-  }, [syncInboxes]);
+  }, [syncInboxes, isCommunicationsActive]);
 
   // Send an outbound reply/addendum message via live AgentMail
   const sendMessage = useCallback(
