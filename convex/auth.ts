@@ -25,7 +25,6 @@ export const { startSignInGoogle, completeSignInGoogle } = setupGoogle(
     allowedRedirectOrigins: [
       "http://localhost:5173",
       "https://kindhearted-elephant-992.convex.site",
-      "https://peaceful-sparrow-520.convex.site",
     ],
   }
 ).attachUserCallbacks({ createUser: internal.users.createGoogleUser });

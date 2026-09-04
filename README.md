@@ -486,7 +486,7 @@ ClaimHero/
 ### Prerequisites
 
 * Node.js 18+ and npm
-* Convex account (`npx convex dev` creates `dev:groovy-hippopotamus-924`-style deployment)
+* Convex account 
 * API keys: OpenAI, Firecrawl, AgentMail (see `.env.example`)
 
 ### Setup

@@ -17,8 +17,8 @@ Configure the following in `.env.local` for the Vite frontend and Convex backend
 
 ```env
 # 1. Convex Backend Deployment
-CONVEX_DEPLOYMENT=dev:groovy-hippopotamus-924
-VITE_CONVEX_URL=https://groovy-hippopotamus-924.convex.cloud
+CONVEX_DEPLOYMENT=dev:peaceful-sparrow-520
+VITE_CONVEX_URL=https://peaceful-sparrow-520.convex.cloud
 
 # 2. OpenAI AI Client (3 Core Variables)
 OPENAI_API_KEY=sk-proj-your-openai-api-key

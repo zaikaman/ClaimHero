@@ -238,6 +238,7 @@ describe("Convex Sentinel Chatbot Server Functions", () => {
     it("getClaimDataForChatbot: fetches claim by ID or number with joined patient details", async () => {
       const mockClaim = {
         _id: "claim_1",
+        userId: "user_1",
         patientId: "pat_1",
         claimNumber: "CLM-999",
         serviceDate: "2026-01-01",
@@ -269,7 +270,7 @@ describe("Convex Sentinel Chatbot Server Functions", () => {
         },
       };
 
-      const res = await (chatbot.getClaimDataForChatbot as any)._handler(mockCtx, { claimId: "claim_1" });
+      const res = await (chatbot.getClaimDataForChatbot as any)._handler(mockCtx, { claimId: "claim_1", userId: "user_1" });
       expect(res).toBeDefined();
       expect(res?.patientName).toBe("Alice Patient");
       expect(res?.insurancePayer).toBe("Aetna");
@@ -277,18 +278,18 @@ describe("Convex Sentinel Chatbot Server Functions", () => {
     });
 
     it("getClaimDataForChatbot: searches by claimNumber if claimId not passed", async () => {
-      const mockClaim = { _id: "c1", patientId: "pat_1", claimNumber: "CLM-888" };
+      const mockClaim = { _id: "c1", userId: "user_1", patientId: "pat_1", claimNumber: "CLM-888" };
       const mockCtx: any = {
         db: {
           query: vi.fn().mockReturnValue({
             withIndex: vi.fn().mockReturnValue({
-              first: vi.fn().mockResolvedValue(mockClaim),
+              take: vi.fn().mockResolvedValue([mockClaim]),
             }),
           }),
           get: vi.fn().mockResolvedValue({ name: "Bob" }),
         },
       };
-      const res = await (chatbot.getClaimDataForChatbot as any)._handler(mockCtx, { claimNumber: "CLM-888" });
+      const res = await (chatbot.getClaimDataForChatbot as any)._handler(mockCtx, { claimNumber: "CLM-888", userId: "user_1" });
       expect(res?.claimId).toBe("c1");
       expect(res?.patientName).toBe("Bob");
     });
@@ -311,7 +312,7 @@ describe("Convex Sentinel Chatbot Server Functions", () => {
         },
       };
 
-      const res = await (chatbot.searchClaimsForChatbot as any)._handler(mockCtx, { searchTerm: "27447", status: "won" });
+      const res = await (chatbot.searchClaimsForChatbot as any)._handler(mockCtx, { searchTerm: "27447", status: "won", userId: "user_1" });
       expect(res.length).toBe(1);
       expect(res[0].claimNumber).toBe("CLM-100");
     });
@@ -343,6 +344,10 @@ describe("Convex Sentinel Chatbot Server Functions", () => {
 
       const mockCtx: any = {
         db: {
+          get: vi.fn().mockImplementation((id: string) => {
+            if (id === "c1") return Promise.resolve({ _id: "c1", userId: "user_1" });
+            return Promise.resolve(null);
+          }),
           query: vi.fn().mockImplementation((table: string) => {
             if (table === "clinicalEvidences") {
               return { withIndex: vi.fn().mockReturnValue({ take: vi.fn().mockResolvedValue(mockEvs) }) };
@@ -361,16 +366,16 @@ describe("Convex Sentinel Chatbot Server Functions", () => {
         },
       };
 
-      const evs = await (chatbot.getEvidencesForChatbot as any)._handler(mockCtx, { claimId: "c1" });
+      const evs = await (chatbot.getEvidencesForChatbot as any)._handler(mockCtx, { claimId: "c1", userId: "user_1" });
       expect(evs).toHaveLength(1);
 
-      const app = await (chatbot.getAppealBriefForChatbot as any)._handler(mockCtx, { claimId: "c1" });
+      const app = await (chatbot.getAppealBriefForChatbot as any)._handler(mockCtx, { claimId: "c1", userId: "user_1" });
       expect(app?.appealId).toBe("a1");
 
-      const script = await (chatbot.getP2PScriptForChatbot as any)._handler(mockCtx, { claimId: "c1" });
+      const script = await (chatbot.getP2PScriptForChatbot as any)._handler(mockCtx, { claimId: "c1", userId: "user_1" });
       expect(script?.physicianName).toBe("Dr. Smith");
 
-      const logs = await (chatbot.getAuditLogsForChatbot as any)._handler(mockCtx, { claimId: "c1" });
+      const logs = await (chatbot.getAuditLogsForChatbot as any)._handler(mockCtx, { claimId: "c1", userId: "user_1" });
       expect(logs).toHaveLength(1);
     });
 
@@ -493,6 +498,49 @@ describe("Convex Sentinel Chatbot Server Functions", () => {
       const logs = await (chatbot.getAuditLogsForChatbot as any)._handler(mockCtx, {
         claimId: "claim_victim",
         userId: "user_attacker_999",
+      });
+      expect(logs).toEqual([]);
+    });
+
+    it("internal queries fail closed when claim has no userId or wrong userId", async () => {
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockImplementation((id) => {
+            if (id === "claim_unowned") {
+              return Promise.resolve({ _id: "claim_unowned", userId: undefined });
+            }
+            return Promise.resolve(null);
+          }),
+        },
+      };
+
+      const res = await (chatbot.getClaimDataForChatbot as any)._handler(mockCtx, {
+        claimId: "claim_unowned",
+        userId: "user_123",
+      });
+      expect(res).toBeNull();
+
+      const evs = await (chatbot.getEvidencesForChatbot as any)._handler(mockCtx, {
+        claimId: "claim_unowned",
+        userId: "user_123",
+      });
+      expect(evs).toEqual([]);
+
+      const brief = await (chatbot.getAppealBriefForChatbot as any)._handler(mockCtx, {
+        claimId: "claim_unowned",
+        userId: "user_123",
+      });
+      expect(brief).toBeNull();
+
+      const script = await (chatbot.getP2PScriptForChatbot as any)._handler(mockCtx, {
+        claimId: "claim_unowned",
+        userId: "user_123",
+      });
+      expect(script).toBeNull();
+
+      const logs = await (chatbot.getAuditLogsForChatbot as any)._handler(mockCtx, {
+        claimId: "claim_unowned",
+        userId: "user_123",
       });
       expect(logs).toEqual([]);
     });

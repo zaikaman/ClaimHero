@@ -91,7 +91,6 @@ Every valid project submission on [vibeapps.dev](https://vibeapps.dev) must incl
 
 3. **Publicly Accessible Live URL:**
    - Deployed and reachable on a `convex.site` or `chatgpt.site` domain.
-   - Must allow instant public evaluation without requiring private access requests or gated invites.
 
 4. **3-Minute Demo Video:**
    - Maximum length of 3 minutes.

@@ -281,30 +281,23 @@ export const getClaimDataForChatbot = internalQuery({
   args: {
     claimId: v.optional(v.id("claims")),
     claimNumber: v.optional(v.string()),
-    userId: v.optional(v.id("users")),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
     let claim = null;
     if (args.claimId) {
       claim = await ctx.db.get(args.claimId);
     } else if (args.claimNumber) {
-      if (args.userId) {
-        const candidateClaims = await ctx.db
-          .query("claims")
-          .withIndex("by_claim_number", (q) => q.eq("claimNumber", args.claimNumber!))
-          .take(5);
-        claim = candidateClaims.find((c) => c.userId === args.userId) || null;
-      } else {
-        claim = await ctx.db
-          .query("claims")
-          .withIndex("by_claim_number", (q) => q.eq("claimNumber", args.claimNumber!))
-          .first();
-      }
+      const candidateClaims = await ctx.db
+        .query("claims")
+        .withIndex("by_claim_number", (q) => q.eq("claimNumber", args.claimNumber!))
+        .take(5);
+      claim = candidateClaims.find((c) => c.userId === args.userId) || null;
     }
 
     if (!claim) return null;
 
-    if (args.userId && (!claim.userId || claim.userId !== args.userId)) {
+    if (!claim.userId || claim.userId !== args.userId) {
       return null;
     }
 
@@ -349,40 +342,23 @@ export const searchClaimsForChatbot = internalQuery({
     searchTerm: v.optional(v.string()),
     status: v.optional(v.string()),
     limit: v.optional(v.number()),
-    userId: v.optional(v.id("users")),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 5;
-    let claims;
-    if (args.userId) {
-      if (args.status) {
-        claims = await ctx.db
+    const claims = args.status
+      ? await ctx.db
           .query("claims")
           .withIndex("by_user_status", (q) =>
-            q.eq("userId", args.userId!).eq("status", args.status!)
+            q.eq("userId", args.userId).eq("status", args.status!)
           )
           .order("desc")
-          .take(limit);
-      } else {
-        claims = await ctx.db
+          .take(limit)
+      : await ctx.db
           .query("claims")
-          .withIndex("by_user", (q) => q.eq("userId", args.userId!))
+          .withIndex("by_user", (q) => q.eq("userId", args.userId))
           .order("desc")
           .take(limit);
-      }
-    } else {
-      claims = args.status
-        ? await ctx.db
-            .query("claims")
-            .withIndex("by_status", (q) => q.eq("status", args.status!))
-            .order("desc")
-            .take(limit)
-        : await ctx.db
-            .query("claims")
-            .withIndex("by_created")
-            .order("desc")
-            .take(limit);
-    }
 
     // Populate patient names
     const populated = await Promise.all(
@@ -429,14 +405,12 @@ export const searchClaimsForChatbot = internalQuery({
 export const getEvidencesForChatbot = internalQuery({
   args: {
     claimId: v.id("claims"),
-    userId: v.optional(v.id("users")),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    if (args.userId) {
-      const claim = await ctx.db.get(args.claimId);
-      if (!claim || !claim.userId || claim.userId !== args.userId) {
-        return [];
-      }
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim || !claim.userId || claim.userId !== args.userId) {
+      return [];
     }
 
     const evidences = await ctx.db
@@ -462,14 +436,12 @@ export const getEvidencesForChatbot = internalQuery({
 export const getAppealBriefForChatbot = internalQuery({
   args: {
     claimId: v.id("claims"),
-    userId: v.optional(v.id("users")),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    if (args.userId) {
-      const claim = await ctx.db.get(args.claimId);
-      if (!claim || !claim.userId || claim.userId !== args.userId) {
-        return null;
-      }
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim || !claim.userId || claim.userId !== args.userId) {
+      return null;
     }
 
     const appeal = await ctx.db
@@ -502,14 +474,12 @@ export const getAppealBriefForChatbot = internalQuery({
 export const getP2PScriptForChatbot = internalQuery({
   args: {
     claimId: v.id("claims"),
-    userId: v.optional(v.id("users")),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    if (args.userId) {
-      const claim = await ctx.db.get(args.claimId);
-      if (!claim || !claim.userId || claim.userId !== args.userId) {
-        return null;
-      }
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim || !claim.userId || claim.userId !== args.userId) {
+      return null;
     }
 
     const script = await ctx.db
@@ -538,14 +508,12 @@ export const getP2PScriptForChatbot = internalQuery({
 export const getAuditLogsForChatbot = internalQuery({
   args: {
     claimId: v.id("claims"),
-    userId: v.optional(v.id("users")),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    if (args.userId) {
-      const claim = await ctx.db.get(args.claimId);
-      if (!claim || !claim.userId || claim.userId !== args.userId) {
-        return [];
-      }
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim || !claim.userId || claim.userId !== args.userId) {
+      return [];
     }
 
     const logs = await ctx.db

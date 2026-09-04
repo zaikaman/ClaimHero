@@ -354,6 +354,14 @@ async function triggerFirecrawlEvidenceIngestion(
   customUrl?: string,
   userId?: Id<"users">
 ): Promise<{ success: boolean; message: string; claimId: string }> {
+  if (!userId) {
+    return {
+      success: false,
+      message: `Authentication required to ingest clinical evidence for claim ${claimId}.`,
+      claimId,
+    };
+  }
+
   try {
     const claim = await ctx.runQuery(internal.chatbot.getClaimDataForChatbot, { claimId, userId });
     if (!claim) {
@@ -449,6 +457,14 @@ async function executeToolCall(
   try {
     switch (name) {
       case "get_active_claim_details": {
+        if (!userId) {
+          return {
+            toolName: name,
+            output: "Error: Authentication required to access claim details.",
+            raw: null,
+          };
+        }
+
         const claimId = (args.claimId || defaultActiveClaimId) as Id<"claims"> | undefined;
         const claimNumber = args.claimNumber as string | undefined;
 
@@ -482,6 +498,14 @@ async function executeToolCall(
       }
 
       case "search_claims": {
+        if (!userId) {
+          return {
+            toolName: name,
+            output: "Error: Authentication required to search claims.",
+            raw: null,
+          };
+        }
+
         const data = await ctx.runQuery(internal.chatbot.searchClaimsForChatbot, {
           searchTerm: args.searchTerm as string | undefined,
           status: args.status as string | undefined,
@@ -505,6 +529,13 @@ async function executeToolCall(
             raw: null,
           };
         }
+        if (!userId) {
+          return {
+            toolName: name,
+            output: "Error: Authentication required to fetch clinical evidence.",
+            raw: null,
+          };
+        }
 
         const data = await ctx.runQuery(internal.chatbot.getEvidencesForChatbot, { claimId, userId });
         return {
@@ -520,6 +551,13 @@ async function executeToolCall(
           return {
             toolName: name,
             output: "Error: claimId is required to fetch appeal brief.",
+            raw: null,
+          };
+        }
+        if (!userId) {
+          return {
+            toolName: name,
+            output: "Error: Authentication required to fetch appeal brief.",
             raw: null,
           };
         }
@@ -541,6 +579,13 @@ async function executeToolCall(
             raw: null,
           };
         }
+        if (!userId) {
+          return {
+            toolName: name,
+            output: "Error: Authentication required to fetch P2P defense script.",
+            raw: null,
+          };
+        }
 
         const data = await ctx.runQuery(internal.chatbot.getP2PScriptForChatbot, { claimId, userId });
         return {
@@ -556,6 +601,13 @@ async function executeToolCall(
           return {
             toolName: name,
             output: "Error: claimId is required to fetch audit trail.",
+            raw: null,
+          };
+        }
+        if (!userId) {
+          return {
+            toolName: name,
+            output: "Error: Authentication required to fetch audit trail.",
             raw: null,
           };
         }

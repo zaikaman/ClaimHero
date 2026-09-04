@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-04T11:50:00Z
+- **Last updated:** 2026-09-04T12:28:00Z
 
 ## Log
 
@@ -242,7 +242,7 @@ Unified Physician Peer-to-Peer (P2P) Defense and ERISA Statutory Penalty Calcula
 Authored the definitive Convex All Gas judges README (`README.md`) for `BRIEF.md`. Built a 581-line production brief anchored on the 4 pillars (Convex, Firecrawl, AgentMail, OpenAI) with a 60-second judge quickstart (3 1-click presets `molina_knee`/`geoblue_spine`/`bcbsglobal_mri`), Feature Atlas, ASCII + Mermaid architecture, 4-pillar deep dive with `file:line` call sites (`convex/schema.ts:5`, `convex/schema.ts:271`, `convex/claims.ts:478`, `convex/http.ts:17`, `convex/crons.ts:10`, `convex/actions/policyCrawler.ts:314`, `convex/actions/appealSynthesizer.ts:527`), 6-layer anti-hallucination guardrails, grounded synthesis rules, HIPAA Safe Harbor privacy filter, Data Model, Defense Suite (Appeal Studio / P2P Script & Live Copilot / ERISA $110/day Calculator / Court-Ready Dossier), Security/Privacy, Tech Stack, Project Structure, Local Development, Verification (112/112 tests), Convex Hosting, Build Log, Submission Checklist (BRIEF.md §5), and Judging Criteria mapping (BRIEF.md §6). Previous `working tree` entry reconciled to `4a7d3c3` via `git log --oneline`. Verified with `npm run verify` readiness (typecheck, lint, 112/112 tests, production build). Convex features: documentation, static hosting.
 
 ### 2026-08-30 - b3bdf99
-Synchronized production live app links and deployment endpoints across `README.md` and `hackathon.md` to point to `https://usable-sturgeon-376.convex.site`.
+Synchronized production live app links and deployment endpoints across `README.md` and `hackathon.md` to point to `https://kindhearted-elephant-992.convex.site`.
 
 ### 2026-08-30 - b398ac1
 Hardened vector embedding pipeline by removing silent deterministic hash fallbacks from `convex/lib/openai.ts:createEmbedding`. Unset `OPENAI_EMBEDDING_MODEL` environment variable now fails hard with an explicit descriptive error (`OPENAI_EMBEDDING_MODEL is not configured`) and OpenAI API errors bubble up rather than silently generating synthetic pseudo-embeddings. Updated `.env.example` and `README.md` to document `OPENAI_EMBEDDING_MODEL=text-embedding-3-small` as required for authentic vector similarity searches across the Precedent Vector Archive (`convex/lib/embeddings.ts`, `convex/actions/precedentArchive.ts`). Added dedicated unit tests (`tests/claimhero.test.ts`) validating fail-hard error semantics. Validated complete test suite and production build with `npm run verify` (100% clean typecheck, lint, 113/113 passing unit tests, and production build). Convex features: vector search, actions, configuration.
@@ -569,7 +569,7 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
 - **Verification**:
   - Added unit tests in `tests/actionsAgentMailAndDispatcher.test.ts` asserting bounce suppression and batch candidate ID synchronization.
   - Executed `npm run verify`: 370/370 passing tests across 27 suites, 0 TypeScript/ESLint errors, 80.81% statement coverage, and clean production build.
-  - Pushed and deployed updated functions to both Dev (`groovy-hippopotamus-924`) and Production (`usable-sturgeon-376`). Convex features: internalQuery, internalMutation, actions, database indexes, reactive subscriptions.
+  - Pushed and deployed updated functions to both Dev (`peaceful-sparrow-520`) and Production (`kindhearted-elephant-992`). Convex features: internalQuery, internalMutation, actions, database indexes, reactive subscriptions.
 
 ### 2026-09-03 - b24f9e2
 - **Convex Auth v2 Preview Migration (@convex-dev/auth@alpha)**:
@@ -619,7 +619,7 @@ Eliminated Convex Compute & Function Call Exhaustion and Suppressed Automated Bo
     2. *Convex V8 Runtime `ReferenceError: Buffer is not defined`*: Even if a webhook had reached `POST /agentmail-webhook`, `convex/lib/agentMailWebhook.ts` was invoking Node.js `Buffer.from` in `base64ToUint8Array` and `uint8ArrayToBase64`. Because Convex HTTP actions execute in the V8 isolate environment (without Node.js globals), any Svix signature verification threw `Buffer is not defined` (HTTP 500), rejecting the webhook delivery.
   - **Resolution & Activation**:
     1. *Registered Production Webhook with AgentMail*: Created and enabled webhook `ep_3IoGLWokBKk8ziRDy43PKi1NU5R` via AgentMail REST API targeting `https://kindhearted-elephant-992.convex.site/agentmail-webhook` for `message.received` events.
-    2. *Synchronized Svix Cryptographic Secret*: Configured secret `whsec_zvG3NhT9Ab+65YeeFBB/g4oPTEEFNOPR` across Convex dev and production environments (`npx convex env set AGENTMAIL_WEBHOOK_SECRET ... --prod`).
+    2. *Synchronized Svix Cryptographic Secret*: Configured webhook secret across Convex dev and production environments (`npx convex env set AGENTMAIL_WEBHOOK_SECRET ... --prod`).
     3. *Fixed Base64 Encoding for Convex V8 Isolate*: Replaced raw `Buffer` usage with runtime-safe `atob` / `btoa` fallbacks in `convex/lib/agentMailWebhook.ts`, allowing cryptographic Web Crypto HMAC-SHA256 verification to succeed in edge runtimes without Node globals.
     4. *End-to-End Probe Verification*: Sent a cryptographically signed HMAC test probe to `POST https://kindhearted-elephant-992.convex.site/agentmail-webhook`, successfully receiving `HTTP 202 Accepted {"accepted":true}`.
     5. *Active UI Focus & Background Synchronization Safety Net*: Enhanced `src/hooks/useCommunications.ts` to actively sync on window focus and every 15 seconds alongside real-time Convex WebSocket subscriptions, ensuring instant docket reactivity when replies arrive. Added `document.visibilityState` check (`ad3cb37`) so polling pauses entirely when the tab is hidden or inactive.
@@ -741,7 +741,7 @@ Overhauled frontend demo reliability, runtime performance, bundle optimization, 
 - Improved conference WiFi resilience and input accessibility: added dark radial gradient placeholders and `preload="metadata"` to fullscreen video elements in `CinematicHero.tsx` and `AuthPage.tsx` for immediate first paint; guarded global `ArrowLeft` / `ArrowRight` slide shortcuts from firing when text inputs, textareas, or contentEditable elements are focused.
 - Verified with `npm run verify`: 100% clean typecheck, 0 ESLint errors/warnings, 423/423 passing unit tests across 29 suites with 81.24% statement coverage, and successful production build with clean code-splitting in 6.46s. Convex features: queries, mutations, actions, static hosting (`convex.site`).
 
-### 2026-09-04 - working tree
+### 2026-09-04 - da2098d
 Hardened end-to-end security, HIPAA compliance posture, abuse mitigation, and authorization guards across frontend, backend, and external AI/storage pipelines:
 - Frontend XSS & Referrer Protection: Integrated `rehype-sanitize` across `AppealBriefRenderer.tsx` and `SentinelChatbot.tsx` to eliminate DOM-based XSS in Markdown rendering; created `safeExternalHref` utility (`src/lib/urlUtils.ts`) enforcing strict `http:`/`https:` protocols with `#` fallbacks, neutralizing `javascript:` URI attacks in `PolicyViewer.tsx` criteria sources and chatbot external hyperlinks; and updated `index.html` referrer policy to `strict-origin-when-cross-origin` preventing URL query leakages (`?claimId=...`) across external navigation.
 - PHI Redaction & Audit Log Sanitization: Implemented server-side deterministic redaction engine (`convex/lib/redactionEngine.ts`) and enhanced client-side masking (`src/lib/redactionEngine.ts`) with expanded address, SSN, MRN, phone, DOB, and email regular expressions; scrubbed raw patient names and PHI email subjects from immutable `appealAuditLogs` across case creation (`convex/claims.ts`), outbound/inbound email indexing (`convex/emails.ts`), and delivery failure tracking (`convex/actions/agentMail.ts`).
@@ -752,3 +752,11 @@ Hardened end-to-end security, HIPAA compliance posture, abuse mitigation, and au
 - Optical Ingestion Abuse Guard: Bounded `rawDocumentText` parsing in `convex/actions/opticalParser.ts` to 100,000 characters to prevent LLM memory and cost exhaustion.
 - Authorization & Cross-Tenant Hijack Prevention: Enforced user authentication via `requireAuthUser` on `claims.createWithPatient` (`convex/claims.ts`) and strictly scoped patient deduplication and matching to caller `userId` via `by_user`, preventing unauthorized case creation and cross-account patient profile hijacking.
 - Comprehensive Security Verification: Added 10 security and compliance test cases in `tests/securityComplianceHardening.test.ts` validating safe external link sanitization, regex PII masking, LLM prompt redaction, attachment size/MIME guards, webhook rate limit quotas, optical parser input bounds, and claim ownership scoping. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 433/433 passing unit tests across 30 suites, clean production build). Convex features: schema, indexes (`by_user`), internalQuery, internalMutation, queries, mutations, actions, httpRouter, rate-limiter.
+
+### 2026-09-04 - working tree
+Remediated cross-tenant PHI data leakage vulnerability in Sentinel Chatbot internal tool queries (`convex/chatbot.ts`, `convex/actions/sentinelChatbot.ts`):
+- Made `userId: v.id("users")` strictly required across all 6 chatbot tool internal queries: `getClaimDataForChatbot`, `searchClaimsForChatbot`, `getEvidencesForChatbot`, `getAppealBriefForChatbot`, `getP2PScriptForChatbot`, and `getAuditLogsForChatbot`.
+- Eliminated global fallback queries and un-scoped DB scans: removed global `by_claim_number` fallback in `getClaimDataForChatbot` that returned the first matching claim without tenant isolation; purged un-scoped `by_status` and `by_created` full-table query fallbacks in `searchClaimsForChatbot`, strictly restricting searches to `by_user` and `by_user_status` compound indexes; and removed conditional `if (args.userId)` guards in evidence, appeal brief, P2P script, and audit log retrievals, enforcing unconditional claim ownership checks (`claim.userId === args.userId`) before releasing sensitive clinical and statutory data.
+- Hardened chatbot tool execution pipeline (`convex/actions/sentinelChatbot.ts`): added pre-query authentication checks in `executeToolCall` and `triggerFirecrawlEvidenceIngestion` to fail closed and return clear error responses (`"Error: Authentication required..."`) if `userId` is not present, preventing unauthenticated internal query invocations.
+- Updated automated test suite in `tests/convexChatbot.test.ts` to pass required `userId` parameters and added dedicated unit tests proving that unowned or cross-tenant claims fail closed and return `null` / `[]`.
+- Verified with `npm run verify`: 100% clean typecheck, 0 ESLint warnings/errors, 434/434 passing unit tests across 30 suites, and clean production build. Convex features: internalQuery, schema, indexes (`by_user`, `by_user_status`), actions.
