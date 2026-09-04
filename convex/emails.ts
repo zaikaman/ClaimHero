@@ -66,7 +66,7 @@ async function applyGetOrCreateThread(ctx: MutationCtx, args: GetOrCreateThreadA
     await ctx.db.patch(existing._id, {
       agentEmail: args.agentEmail,
       payerEmail: args.payerEmail,
-      subject: args.subject,
+      ...(existing.subject ? {} : { subject: args.subject }),
     });
     return existing._id;
   }

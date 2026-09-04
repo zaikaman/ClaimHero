@@ -69,12 +69,28 @@ async function parseResponse(response: Response): Promise<unknown> {
   }
 }
 
+/**
+ * Normalizes an AgentMail or external Message-ID into a valid RFC 5322 Message-ID header format.
+ */
+export function formatMessageIdHeader(id: string): string {
+  const trimmed = id.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
+    return trimmed;
+  }
+  if (trimmed.includes("@")) {
+    return `<${trimmed}>`;
+  }
+  return `<${trimmed}@agentmail.to>`;
+}
+
 export async function sendAgentMailMessage(options: {
   inboxId: string;
   to: string;
   subject: string;
   text: string;
   html: string;
+  headers?: Record<string, string>;
 }): Promise<AgentMailSendResult> {
   const response = await fetch(
     `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(options.inboxId)}/messages/send`,
@@ -89,6 +105,7 @@ export async function sendAgentMailMessage(options: {
         subject: options.subject,
         text: options.text,
         html: options.html,
+        ...(options.headers ? { headers: options.headers } : {}),
       }),
     }
   );
@@ -97,6 +114,43 @@ export async function sendAgentMailMessage(options: {
   if (!response.ok) {
     const detail = typeof body === "string" ? body : JSON.stringify(body);
     throw new Error(`AgentMail message delivery failed (${response.status}): ${detail}`);
+  }
+
+  return {
+    messageId: responseField(body, "message_id", "messageId", "id"),
+    threadId: responseField(body, "thread_id", "threadId", "conversation_id", "conversationId"),
+  };
+}
+
+export async function replyAgentMailMessage(options: {
+  inboxId: string;
+  messageId: string;
+  text: string;
+  html: string;
+  to?: string;
+  headers?: Record<string, string>;
+}): Promise<AgentMailSendResult> {
+  const response = await fetch(
+    `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(options.inboxId)}/messages/${encodeURIComponent(options.messageId)}/reply`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${configuredApiKey()}`,
+      },
+      body: JSON.stringify({
+        text: options.text,
+        html: options.html,
+        ...(options.to ? { to: options.to } : {}),
+        ...(options.headers ? { headers: options.headers } : {}),
+      }),
+    }
+  );
+
+  const body = await parseResponse(response);
+  if (!response.ok) {
+    const detail = typeof body === "string" ? body : JSON.stringify(body);
+    throw new Error(`AgentMail message reply failed (${response.status}): ${detail}`);
   }
 
   return {

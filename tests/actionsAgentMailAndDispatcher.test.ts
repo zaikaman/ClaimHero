@@ -737,6 +737,146 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       }));
     });
 
+    it("sendOutboundMessage: preserves canonical thread subject and attaches In-Reply-To/References headers", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
+
+      const mockClaim = {
+        _id: "c1",
+        claimNumber: "CLM-100",
+        userId: "user_123",
+        deniedAmount: 5000,
+        patient: { name: "John Doe", insurancePayer: "GeoBlue" },
+      };
+      const mockThread = {
+        thread: {
+          _id: "t1",
+          subject: "[ClaimHero #CLM-100] Appeal request | Claim #CLM-100 | GeoBlue",
+          payerEmail: "payer@geoblue.com",
+        },
+        messages: [
+          {
+            direction: "outbound",
+            sender: "send@claimhero.com",
+            recipient: "payer@geoblue.com",
+            subject: "[ClaimHero #CLM-100] Appeal request | Claim #CLM-100 | GeoBlue",
+            bodyText: "Initial appeal brief",
+            agentMailMessageId: "msg_initial_123",
+          },
+          {
+            direction: "inbound",
+            sender: "payer@geoblue.com",
+            recipient: "send@claimhero.com",
+            subject: "Re: [ClaimHero #CLM-100] Appeal request | Claim #CLM-100 | GeoBlue",
+            bodyText: "Need more info",
+            agentMailMessageId: "msg_inbound_456",
+          },
+        ],
+      };
+
+      const replySpy = vi.spyOn(libAgentMail, "replyAgentMailMessage").mockResolvedValue({
+        messageId: "msg_outbound_789",
+        threadId: "thr_conv_1",
+      });
+
+      let queryCalls = 0;
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation(() => {
+          queryCalls++;
+          if (queryCalls === 1) return Promise.resolve(mockClaim);
+          return Promise.resolve(mockThread);
+        }),
+        runMutation: vi.fn().mockResolvedValue("t1"),
+      };
+
+      const res = await (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+        claimId: "c1",
+        threadId: "t1",
+        text: "Here is the requested addendum and operative note.",
+      });
+
+      expect(res.success).toBe(true);
+      // Verify that replyAgentMailMessage was called with the last inbound messageId
+      expect(replySpy).toHaveBeenCalledWith(expect.objectContaining({
+        inboxId: "in_send",
+        messageId: "msg_inbound_456",
+        to: "payer@geoblue.com",
+        headers: {
+          "In-Reply-To": "<msg_inbound_456@agentmail.to>",
+          "References": "<msg_initial_123@agentmail.to> <msg_inbound_456@agentmail.to>",
+        },
+      }));
+    });
+
+    it("sendOutboundMessage: falls back to sendAgentMailMessage with in-thread subject and headers when reply fails", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
+
+      const mockClaim = {
+        _id: "c1",
+        claimNumber: "CLM-100",
+        userId: "user_123",
+        deniedAmount: 5000,
+        patient: { name: "John Doe", insurancePayer: "GeoBlue" },
+      };
+      const mockThread = {
+        thread: {
+          _id: "t1",
+          subject: "[ClaimHero #CLM-100] Appeal request | Claim #CLM-100 | GeoBlue",
+          payerEmail: "payer@geoblue.com",
+        },
+        messages: [
+          {
+            direction: "outbound",
+            sender: "send@claimhero.com",
+            recipient: "payer@geoblue.com",
+            subject: "[ClaimHero #CLM-100] Appeal request | Claim #CLM-100 | GeoBlue",
+            bodyText: "Initial appeal brief",
+            agentMailMessageId: "msg_initial_123",
+          },
+        ],
+      };
+
+      vi.spyOn(libAgentMail, "replyAgentMailMessage").mockRejectedValue(new Error("Cannot reply to outbound"));
+      const sendSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+        messageId: "msg_outbound_999",
+        threadId: "thr_conv_1",
+      });
+
+      let queryCalls = 0;
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation(() => {
+          queryCalls++;
+          if (queryCalls === 1) return Promise.resolve(mockClaim);
+          return Promise.resolve(mockThread);
+        }),
+        runMutation: vi.fn().mockResolvedValue("t1"),
+      };
+
+      const res = await (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+        claimId: "c1",
+        threadId: "t1",
+        text: "Follow-up addendum sent before payer replied.",
+      });
+
+      expect(res.success).toBe(true);
+      expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({
+        inboxId: "in_send",
+        to: "payer@geoblue.com",
+        subject: "Re: [ClaimHero #CLM-100] Appeal request | Claim #CLM-100 | GeoBlue",
+        headers: {
+          "In-Reply-To": "<msg_initial_123@agentmail.to>",
+          "References": "<msg_initial_123@agentmail.to>",
+        },
+      }));
+    });
+
     it("generateAutoReplyDraft: deduplicates and returns existing draft without re-synthesizing", async () => {
       const mockClaim = {
         _id: "c1",

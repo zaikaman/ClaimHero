@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   getSharedAgentMailboxes,
   sendAgentMailMessage,
+  replyAgentMailMessage,
+  formatMessageIdHeader,
   getAgentMailMessage,
   downloadAgentMailAttachment,
 } from "../convex/lib/agentMail";
@@ -80,6 +82,93 @@ describe("convex/lib/agentMail Unit Tests", () => {
         method: "POST",
         headers: expect.objectContaining({
           Authorization: "Bearer test_key_123",
+        }),
+      })
+    );
+  });
+
+  it("formats message IDs correctly for RFC 5322 In-Reply-To and References headers", () => {
+    expect(formatMessageIdHeader("")).toBe("");
+    expect(formatMessageIdHeader("   ")).toBe("");
+    expect(formatMessageIdHeader("<010001a@email.amazonses.com>")).toBe("<010001a@email.amazonses.com>");
+    expect(formatMessageIdHeader("user@example.com")).toBe("<user@example.com>");
+    expect(formatMessageIdHeader("msg_01JHGXYZ123")).toBe("<msg_01JHGXYZ123@agentmail.to>");
+  });
+
+  it("sends AgentMail message with custom RFC 5322 threading headers", async () => {
+    process.env.AGENTMAIL_API_KEY = "test_key_123";
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify({ message_id: "msg_reply_100", thread_id: "thr_abc" })),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await sendAgentMailMessage({
+      inboxId: "inbox_1",
+      to: "payer@example.com",
+      subject: "Re: [ClaimHero #CLM-123] Appeal request",
+      text: "Addendum text",
+      html: "<p>Addendum HTML</p>",
+      headers: {
+        "In-Reply-To": "<msg_parent@agentmail.to>",
+        "References": "<msg_root@agentmail.to> <msg_parent@agentmail.to>",
+      },
+    });
+
+    expect(result.messageId).toBe("msg_reply_100");
+    expect(result.threadId).toBe("thr_abc");
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.agentmail.to/v0/inboxes/inbox_1/messages/send",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          to: "payer@example.com",
+          subject: "Re: [ClaimHero #CLM-123] Appeal request",
+          text: "Addendum text",
+          html: "<p>Addendum HTML</p>",
+          headers: {
+            "In-Reply-To": "<msg_parent@agentmail.to>",
+            "References": "<msg_root@agentmail.to> <msg_parent@agentmail.to>",
+          },
+        }),
+      })
+    );
+  });
+
+  it("replies to an existing AgentMail message using the native reply endpoint", async () => {
+    process.env.AGENTMAIL_API_KEY = "test_key_123";
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify({ message_id: "msg_reply_200", thread_id: "thr_abc" })),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await replyAgentMailMessage({
+      inboxId: "inbox_1",
+      messageId: "msg_parent_inbound",
+      to: "payer@example.com",
+      text: "Reply plain text",
+      html: "<p>Reply HTML</p>",
+      headers: {
+        "In-Reply-To": "<msg_parent_inbound@agentmail.to>",
+      },
+    });
+
+    expect(result.messageId).toBe("msg_reply_200");
+    expect(result.threadId).toBe("thr_abc");
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.agentmail.to/v0/inboxes/inbox_1/messages/msg_parent_inbound/reply",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          text: "Reply plain text",
+          html: "<p>Reply HTML</p>",
+          to: "payer@example.com",
+          headers: {
+            "In-Reply-To": "<msg_parent_inbound@agentmail.to>",
+          },
         }),
       })
     );
