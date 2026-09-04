@@ -124,6 +124,7 @@ interface AdjudicationClaimContext {
   denialReasonCode?: string;
   serviceDate?: string;
   providerName?: string;
+  autoPilotEnabled?: boolean;
 }
 
 function buildInitialAdjudicationPrompt(claim: AdjudicationClaimContext, payer: string): string {
@@ -263,7 +264,7 @@ async function deliverAiAdjudication(
     });
   }
 
-  await ctx.runMutation(internal.emails.insertMessageInternal, withAgentMailMessageId({
+  const insertedMsgId = await ctx.runMutation(internal.emails.insertMessageInternal, withAgentMailMessageId({
     threadId,
     claimId: claim._id,
     direction: "inbound",
@@ -277,6 +278,22 @@ async function deliverAiAdjudication(
     clinicalRationale: adjudicationResult.clinicalRationale,
     autoReplyStatus: adjudicationResult.determination === "OVERTURNED_APPROVED" ? undefined : "pending",
   }, liveReply.messageId));
+
+  if (claim.autoPilotEnabled !== false && adjudicationResult.determination !== "OVERTURNED_APPROVED" && insertedMsgId && ctx.scheduler?.runAfter) {
+    try {
+      await ctx.scheduler.runAfter(
+        60 * 60 * 1000,
+        internal.actions.mailDispatcher.dispatchScheduledAutoPilotReply,
+        {
+          messageId: insertedMsgId as Id<"emailMessages">,
+          claimId: claim._id,
+          threadId,
+        }
+      );
+    } catch (schedErr) {
+      console.warn("Failed to schedule auto-pilot in deliverAiAdjudication:", schedErr);
+    }
+  }
 
   if (adjudicationResult.determination === "OVERTURNED_APPROVED") {
     await ctx.runMutation(internal.claims.updateStatusInternal, {
@@ -848,3 +865,169 @@ Guidelines:
     };
   },
 });
+
+/**
+ * Autonomous Sentinel Auto-Pilot 1-Hour SLA Dispatch Core Logic:
+ * Checks prerequisites, ensures no subsequent manual response was sent, and autonomously transmits rebuttal.
+ */
+async function performDispatchScheduledAutoPilotReply(
+  ctx: ActionCtx,
+  args: {
+    messageId: Id<"emailMessages">;
+    claimId: Id<"claims">;
+    threadId: Id<"emailThreads">;
+  }
+): Promise<{ executed: boolean; reason?: string; claimNumber?: string }> {
+  const threadData = await ctx.runQuery(api.emails.getThreadWithMessages, {
+    threadId: args.threadId,
+  });
+  if (!threadData) return { executed: false, reason: "thread_not_found" };
+
+  const messagesList = (threadData.messages || []) as Array<{
+    _id: string;
+    direction: string;
+    receivedAt?: number;
+    _creationTime?: number;
+    autoReplyStatus?: string;
+    autoReplyDraft?: string;
+  }>;
+
+  const targetMsg = messagesList.find((m) => m._id === args.messageId);
+  if (!targetMsg) return { executed: false, reason: "message_not_found" };
+
+  if (targetMsg.autoReplyStatus !== "pending") {
+    return { executed: false, reason: `status_not_pending_${targetMsg.autoReplyStatus}` };
+  }
+
+  const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
+    claimId: args.claimId,
+  });
+  if (!claim) return { executed: false, reason: "claim_not_found" };
+  if (claim.status === "won") {
+    await ctx.runMutation(internal.emails.markAutoReplyDispatchedInternal, {
+      messageId: args.messageId,
+    });
+    return { executed: false, reason: "claim_already_won" };
+  }
+  if (claim.autoPilotEnabled === false) {
+    return { executed: false, reason: "autopilot_disabled" };
+  }
+
+  // Check if an outbound reply was already sent on this thread AFTER this message
+  const msgReceivedAt = targetMsg.receivedAt || targetMsg._creationTime || 0;
+  const hasSubsequentOutbound = messagesList.some(
+    (m) => m.direction === "outbound" && (m.receivedAt || m._creationTime || 0) > msgReceivedAt
+  );
+  if (hasSubsequentOutbound) {
+    await ctx.runMutation(internal.emails.markAutoReplyDispatchedInternal, {
+      messageId: args.messageId,
+    });
+    return { executed: false, reason: "already_replied" };
+  }
+
+  let rebuttalText = targetMsg.autoReplyDraft?.trim();
+  if (!rebuttalText) {
+    rebuttalText = `We acknowledge your correspondence regarding Claim #${claim.claimNumber}. In accordance with statutory ERISA protections under 29 C.F.R. § 2560.503-1, we formally maintain our demand for full claim reimbursement based on documented medical necessity and request immediate escalation to Independent External Review (IRO).`;
+  }
+
+  const subject = `Re: Formal Medical Appeal | Claim #${claim.claimNumber} | Sentinel 1-Hour SLA Addendum`;
+  await performSendOutboundMessage(
+    ctx,
+    {
+      claimId: args.claimId,
+      threadId: args.threadId,
+      text: rebuttalText,
+      customSubject: subject,
+    },
+    claim
+  );
+
+  await ctx.runMutation(internal.emails.markAutoReplyDispatchedInternal, {
+    messageId: args.messageId,
+  });
+
+  await ctx.runMutation(internal.auditLogs.logEventInternal, {
+    claimId: args.claimId,
+    ...(claim.userId ? { userId: claim.userId } : {}),
+    eventType: "appeal_dispatched",
+    actor: "Sentinel Auto-Pilot (1-Hour SLA)",
+    details: `Autonomous Sentinel SLA: Transmitted clinical rebuttal addendum to payer for Claim #${claim.claimNumber} after 1-hour review window elapsed without manual intervention.`,
+  });
+
+  return { executed: true, claimNumber: claim.claimNumber };
+}
+
+/**
+ * Scheduled execution action for a single inbound message after 1 hour SLA
+ */
+export const dispatchScheduledAutoPilotReply = internalAction({
+  args: {
+    messageId: v.id("emailMessages"),
+    claimId: v.id("claims"),
+    threadId: v.id("emailThreads"),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ executed: boolean; reason?: string; claimNumber?: string }> => {
+    return await performDispatchScheduledAutoPilotReply(ctx, args);
+  },
+});
+
+/**
+ * Sentinel Auto-Pilot SLA Cron Sweep:
+ * Runs periodically (every 5 minutes) to detect any inbound messages with pending auto-reply drafts
+ * older than 1 hour (3,600,000 ms) and dispatches them autonomously.
+ */
+export const sweepPendingAutoPilotReplies = internalAction({
+  args: {
+    customMaxAgeMs: v.optional(v.number()),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ totalFound: number; dispatchedCount: number; skippedCount: number }> => {
+    const maxAgeMs = args.customMaxAgeMs ?? 60 * 60 * 1000;
+    const maxReceivedAt = Date.now() - maxAgeMs;
+
+    const pendingMessages: Array<{
+      messageId: Id<"emailMessages">;
+      claimId: Id<"claims">;
+      threadId: Id<"emailThreads">;
+      autoReplyDraft?: string;
+      receivedAt: number;
+      detectedDetermination?: string;
+    }> = await ctx.runQuery(
+      internal.emails.getPendingAutoPilotMessagesInternal,
+      { maxReceivedAt }
+    );
+
+    let dispatchedCount = 0;
+    let skippedCount = 0;
+
+    for (const pending of pendingMessages) {
+      try {
+        const res = await performDispatchScheduledAutoPilotReply(ctx, {
+          messageId: pending.messageId,
+          claimId: pending.claimId,
+          threadId: pending.threadId,
+        });
+        if (res.executed) {
+          dispatchedCount++;
+        } else {
+          skippedCount++;
+        }
+      } catch (err) {
+        console.warn(`Sentinel Auto-Pilot sweep error for message ${pending.messageId}:`, err);
+        skippedCount++;
+      }
+    }
+
+    return {
+      totalFound: pendingMessages.length,
+      dispatchedCount,
+      skippedCount,
+    };
+  },
+});
+

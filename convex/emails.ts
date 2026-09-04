@@ -178,6 +178,19 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
     status: args.direction === "inbound" ? "response_received" : "dispatched",
   });
 
+  // If outbound message, resolve any pending auto-replies on this thread to prevent duplicate/late auto-pilot dispatches
+  if (args.direction === "outbound" && typeof ctx.db.query === "function") {
+    const pendingMessages = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+      .collect();
+    for (const msg of pendingMessages) {
+      if (msg.autoReplyStatus === "pending") {
+        await ctx.db.patch(msg._id, { autoReplyStatus: "dispatched" });
+      }
+    }
+  }
+
   // Update claim's status
   const claim = typeof ctx.db.get === "function" ? await ctx.db.get(args.claimId) : null;
   await ctx.db.patch(args.claimId, {
@@ -666,3 +679,74 @@ export const setClaimAutoPilot = mutation({
     return { success: true, enabled: args.enabled };
   },
 });
+
+/**
+ * Query inbound messages with pending auto-reply drafts whose SLA delay has elapsed
+ */
+export const getPendingAutoPilotMessagesInternal = internalQuery({
+  args: {
+    maxReceivedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const pendingMessages = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_auto_reply_status", (q) => q.eq("autoReplyStatus", "pending"))
+      .take(50);
+
+    const readyMessages = [];
+    for (const msg of pendingMessages) {
+      if (
+        msg.direction === "inbound" &&
+        msg.receivedAt <= args.maxReceivedAt &&
+        msg.autoReplyDraft &&
+        msg.autoReplyDraft.trim()
+      ) {
+        readyMessages.push({
+          messageId: msg._id,
+          claimId: msg.claimId,
+          threadId: msg.threadId,
+          autoReplyDraft: msg.autoReplyDraft,
+          receivedAt: msg.receivedAt,
+          detectedDetermination: msg.detectedDetermination,
+        });
+      }
+    }
+    return readyMessages;
+  },
+});
+
+/**
+ * Mark a message's auto-reply status as dispatched
+ */
+export const markAutoReplyDispatchedInternal = internalMutation({
+  args: {
+    messageId: v.id("emailMessages"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.messageId, {
+      autoReplyStatus: "dispatched",
+    });
+  },
+});
+
+/**
+ * User mutation to dismiss a pending auto-reply draft from the UI
+ */
+export const dismissAutoReplyDraft = mutation({
+  args: {
+    claimId: v.id("claims"),
+    messageId: v.id("emailMessages"),
+  },
+  handler: async (ctx, args) => {
+    await requireClaimOwner(ctx, args.claimId);
+    const msg = await ctx.db.get(args.messageId);
+    if (!msg || msg.claimId !== args.claimId) {
+      throw new Error("Message not found or mismatch with claim");
+    }
+    await ctx.db.patch(args.messageId, {
+      autoReplyStatus: "dismissed",
+    });
+    return { success: true };
+  },
+});
+

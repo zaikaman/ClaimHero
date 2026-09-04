@@ -262,7 +262,8 @@ export default defineSchema({
   })
     .index("by_thread", ["threadId"])
     .index("by_claim", ["claimId"])
-    .index("by_agent_mail_message_id", ["agentMailMessageId"]),
+    .index("by_agent_mail_message_id", ["agentMailMessageId"])
+    .index("by_auto_reply_status", ["autoReplyStatus"]),
 
   // Ignored / unmatched AgentMail messages that have no matching claim to prevent perpetual re-processing
   ignoredAgentMailMessages: defineTable({

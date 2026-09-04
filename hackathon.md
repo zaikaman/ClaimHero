@@ -2,17 +2,17 @@
 
 - **Project:** ClaimHero
 - **Event:** Convex All Gas Hackathon
-- **What it does:** Autonomous medical and health insurance appeal sentinel that parses denial notices, crawls insurer Clinical Policy Bulletins live, matches 1536-d legal precedents, scores overturn probability via a deterministic 4-pillar rubric, synthesizes multi-tier cited ERISA appeal briefs, equips physicians with real-time Peer-to-Peer (P2P) Live Call Copilots, audits $110/day statutory ERISA non-disclosure penalties, de-identifies HIPAA PII, compiles court-ready exhibit binders, and autonomously transmits dossiers through dedicated two-way AgentMail gateways.
+- **What it does:** Turns a health-insurance denial into a source-linked, human-reviewed appeal workflow with live policy evidence, a cited brief, deadline tracking, and two-way case communication.
 - **Live app:** https://kindhearted-elephant-992.convex.site
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://kindhearted-elephant-992.convex.cloud
-- **Components:** @convex-dev/auth (v2 core, password, oauthGoogle, username), @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex
-- **Convex features:** database schema, relational indexes, vector search (1536-d), full-text search (searchIndex), queries, mutations, actions, scheduled functions, file storage, crons, httpRouter, auth, components
-- **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
-- **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
-- **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-04T12:28:00Z
+- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex
+- **Convex features:** schema, tables, indexes, vector search, full-text search, queries, mutations, actions, HTTP actions, crons, scheduled functions, file storage, realtime queries
+- **Auth:** Convex Auth
+- **AI models:** gpt-5.4-nano
+- **Started:** 2026-08-26T10:31:25Z
+- **Last updated:** 2026-09-04T13:00:00Z
 
 ## Log
 
@@ -753,10 +753,23 @@ Hardened end-to-end security, HIPAA compliance posture, abuse mitigation, and au
 - Authorization & Cross-Tenant Hijack Prevention: Enforced user authentication via `requireAuthUser` on `claims.createWithPatient` (`convex/claims.ts`) and strictly scoped patient deduplication and matching to caller `userId` via `by_user`, preventing unauthorized case creation and cross-account patient profile hijacking.
 - Comprehensive Security Verification: Added 10 security and compliance test cases in `tests/securityComplianceHardening.test.ts` validating safe external link sanitization, regex PII masking, LLM prompt redaction, attachment size/MIME guards, webhook rate limit quotas, optical parser input bounds, and claim ownership scoping. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 433/433 passing unit tests across 30 suites, clean production build). Convex features: schema, indexes (`by_user`), internalQuery, internalMutation, queries, mutations, actions, httpRouter, rate-limiter.
 
-### 2026-09-04 - working tree
+### 2026-09-04 - 92e3e21
 Remediated cross-tenant PHI data leakage vulnerability in Sentinel Chatbot internal tool queries (`convex/chatbot.ts`, `convex/actions/sentinelChatbot.ts`):
 - Made `userId: v.id("users")` strictly required across all 6 chatbot tool internal queries: `getClaimDataForChatbot`, `searchClaimsForChatbot`, `getEvidencesForChatbot`, `getAppealBriefForChatbot`, `getP2PScriptForChatbot`, and `getAuditLogsForChatbot`.
 - Eliminated global fallback queries and un-scoped DB scans: removed global `by_claim_number` fallback in `getClaimDataForChatbot` that returned the first matching claim without tenant isolation; purged un-scoped `by_status` and `by_created` full-table query fallbacks in `searchClaimsForChatbot`, strictly restricting searches to `by_user` and `by_user_status` compound indexes; and removed conditional `if (args.userId)` guards in evidence, appeal brief, P2P script, and audit log retrievals, enforcing unconditional claim ownership checks (`claim.userId === args.userId`) before releasing sensitive clinical and statutory data.
 - Hardened chatbot tool execution pipeline (`convex/actions/sentinelChatbot.ts`): added pre-query authentication checks in `executeToolCall` and `triggerFirecrawlEvidenceIngestion` to fail closed and return clear error responses (`"Error: Authentication required..."`) if `userId` is not present, preventing unauthenticated internal query invocations.
 - Updated automated test suite in `tests/convexChatbot.test.ts` to pass required `userId` parameters and added dedicated unit tests proving that unowned or cross-tenant claims fail closed and return `null` / `[]`.
 - Verified with `npm run verify`: 100% clean typecheck, 0 ESLint warnings/errors, 434/434 passing unit tests across 30 suites, and clean production build. Convex features: internalQuery, schema, indexes (`by_user`, `by_user_status`), actions.
+
+### 2026-09-04 - working tree
+Fixed Sentinel Auto-Pilot 1-hour autonomous rebuttal dispatch and background reconciliation:
+- Diagnosed production incident in user account `zaikaman123@gmail.com` where an inbound adverse determination (`DENIAL_UPHELD`) remained in pending auto-reply state without autonomous transmission after the 1-hour SLA elapsed.
+- Identified root causes: lack of delayed scheduler invocation (`ctx.scheduler.runAfter`) upon inbound reply evaluation, omission of dispatch logic for adverse determination types in `convex/actions/agentMail.ts`, absence of a background reconciliation cron to sweep expired pending drafts, and missing resolution of prior pending messages upon manual outbound transmissions.
+- Implemented delayed 1-hour SLA autonomous dispatch: updated `handleInboundClaimReply` (`convex/actions/agentMail.ts`) and `deliverAiAdjudication` (`convex/actions/mailDispatcher.ts`) to schedule `dispatchScheduledAutoPilotReply` via `ctx.scheduler.runAfter(3_600_000, ...)` whenever determination is not `OVERTURNED_APPROVED` and `claim.autoPilotEnabled !== false`.
+- Added compound index `by_auto_reply_status` (`["autoReplyStatus"]`) to `emailMessages` table (`convex/schema.ts`).
+- Added `getPendingAutoPilotMessagesInternal`, `markAutoReplyDispatchedInternal`, and `dismissAutoReplyDraft` mutations (`convex/emails.ts`); updated `applyInsertMessage` to automatically resolve prior pending messages to `"dispatched"` on manual outbound send.
+- Created `dispatchScheduledAutoPilotReply` and `sweepPendingAutoPilotReplies` actions (`convex/actions/mailDispatcher.ts`) enforcing thread deduplication, manual reply preemption, and immutable `appealAuditLogs` generation.
+- Registered 5-minute `sentinel-autopilot-sla-sweep` background cron (`convex/crons.ts`) to sweep and auto-dispatch any unreviewed pending drafts older than 1 hour.
+- Enhanced AgentMail Drawer (`src/components/communications/AgentMailDrawer.tsx`) with dynamic live SLA countdown badge and manual draft dismissal.
+- Added comprehensive unit test suite in `tests/autopilotSLA.test.ts` (10 tests) covering SLA expiration, thread resolution, dismissal, and sweep reconciliation.
+- Verified with `npm run verify`: 100% clean typecheck, 0 ESLint errors/warnings under strict rules, 444/444 passing tests across 31 suites (80.5% statement coverage), and clean production build. Convex features: schema, relational indexes (`by_auto_reply_status`), internalQuery, internalMutation, scheduled functions (`ctx.scheduler.runAfter`), crons, actions.

@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   FileText,
   WarningCircle,
+  X,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
@@ -81,12 +82,14 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
   // Auto-Pilot & Smart Rebuttal State
   const setAutoPilotMutation = useMutation(api.emails.setClaimAutoPilot);
+  const dismissDraftMutation = useMutation(api.emails.dismissAutoReplyDraft);
   const generateDraftAction = useAction(api.actions.mailDispatcher.generateAutoReplyDraft);
   const [autoPilotEnabled, setAutoPilotEnabled] = useState<boolean>(
     claim.autoPilotEnabled !== false
   );
   const [isTogglingAutoPilot, setIsTogglingAutoPilot] = useState(false);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+  const [isDismissingDraft, setIsDismissingDraft] = useState(false);
   const [activeAutoDraft, setActiveAutoDraft] = useState<string>("");
   const trackedInboundIdRef = useRef<string | null>(null);
   const evaluatingMessageIdRef = useRef<string | null>(null);
@@ -236,6 +239,22 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
       setReplyText("");
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleDismissDraft = async () => {
+    if (!latestInbound?._id || !claim._id || isDismissingDraft) return;
+    setIsDismissingDraft(true);
+    try {
+      await dismissDraftMutation({
+        claimId: claim._id as Id<"claims">,
+        messageId: latestInbound._id as Id<"emailMessages">,
+      });
+      setActiveAutoDraft("");
+    } catch (err) {
+      console.warn("Failed to dismiss draft:", err);
+    } finally {
+      setIsDismissingDraft(false);
     }
   };
 
@@ -1136,7 +1155,16 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   {autoPilotEnabled && (
                     <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
                       <Clock className="size-3 text-primary animate-pulse" />
-                      <span>Auto-dispatch in 1h if unreviewed</span>
+                      <span>
+                        {(() => {
+                          const slaReceivedAt = latestInbound?.receivedAt || 0;
+                          const elapsedMinutes = slaReceivedAt ? Math.floor((Date.now() - slaReceivedAt) / 60000) : 0;
+                          const remainingSlaMinutes = Math.max(0, 60 - elapsedMinutes);
+                          return remainingSlaMinutes > 0
+                            ? `Auto-dispatch in ${remainingSlaMinutes}m if unreviewed`
+                            : "1-Hour SLA elapsed — Auto-dispatching";
+                        })()}
+                      </span>
                     </span>
                   )}
                   <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
@@ -1191,6 +1219,18 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 >
                   <ArrowsClockwise className={cn("size-3.5", isSynthesizing && "animate-spin")} />
                   <span>Regenerate</span>
+                </Button>
+
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={handleDismissDraft}
+                  disabled={isDismissingDraft || isSynthesizing}
+                  className="gap-1 text-muted-foreground hover:text-rose-400 h-7 px-2 text-xs"
+                  title="Dismiss autonomous rebuttal draft"
+                >
+                  <X className="size-3.5" />
+                  <span>Dismiss</span>
                 </Button>
               </div>
             </div>
