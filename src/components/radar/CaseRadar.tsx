@@ -24,9 +24,12 @@ import {
   PhoneCall,
   FileCode,
   CaretDown,
+  CaretLeft,
+  CaretRight,
   Flask,
 } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
+import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
@@ -108,11 +111,14 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   const clearDemoDataMutation = useMutation(api.claims.clearDemoData);
 
   const handleClearDemoData = async () => {
+    const toastId = toast.loading("Purging seeded demo records...");
     try {
       setIsClearingDemo(true);
       await clearDemoDataMutation({});
+      toast.success("Demo cases successfully purged", { id: toastId });
     } catch (err) {
       console.error("Failed to clear demo cases:", err);
+      toast.error("Failed to clear demo cases", { id: toastId });
     } finally {
       setIsClearingDemo(false);
     }
@@ -120,23 +126,30 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
 
   const activeClaims = claims;
 
-  const totalDisputed = activeClaims.reduce((acc, c) => acc + c.deniedAmount, 0);
-  const wonClaims = activeClaims.filter((c) => c.status === "won");
-  const totalWon = wonClaims.reduce((acc, c) => acc + c.deniedAmount, 0);
-  const avgScore = activeClaims.length
-    ? Math.round(
-        activeClaims.reduce((acc, c) => acc + (c.overturnProbabilityScore || 0), 0) /
-          activeClaims.length
-      )
-    : 0;
-  const highRiskCount = activeClaims.filter(
-    (c) =>
-      c.overturnProbabilityScore !== undefined &&
-      c.overturnProbabilityScore >= 80
-  ).length;
-  const criticalCount = activeClaims.filter(
-    (c) => c.daysRemaining <= 14 && c.status !== "won"
-  ).length;
+  const { totalDisputed, totalWon, avgScore, highRiskCount, criticalCount } = useMemo(() => {
+    const totalDisputed = activeClaims.reduce((acc, c) => acc + c.deniedAmount, 0);
+    const wonClaims = activeClaims.filter((c) => c.status === "won");
+    const totalWon = wonClaims.reduce((acc, c) => acc + c.deniedAmount, 0);
+    const avgScore = activeClaims.length
+      ? Math.round(
+          activeClaims.reduce((acc, c) => acc + (c.overturnProbabilityScore || 0), 0) /
+            activeClaims.length
+        )
+      : 0;
+    const highRiskCount = activeClaims.filter(
+      (c) =>
+        c.overturnProbabilityScore !== undefined &&
+        c.overturnProbabilityScore >= 80
+    ).length;
+    const criticalCount = activeClaims.filter(
+      (c) => c.daysRemaining <= 14 && c.status !== "won"
+    ).length;
+
+    return { totalDisputed, totalWon, avgScore, highRiskCount, criticalCount };
+  }, [activeClaims]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   // Compute status breakdown counts for filter tabs
   const statusCounts = useMemo(() => {
@@ -204,6 +217,18 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
       return true;
     });
   }, [claims, statusFilter, payerFilter, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+  // Reset page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, payerFilter, searchQuery]);
+
+  const paginatedClaims = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
 
   const hasActiveFilters =
     statusFilter !== "all" || payerFilter !== "all" || Boolean(searchQuery);
@@ -583,7 +608,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
         </CardHeader>
 
         {/* Data Table */}
-        <div className="overflow-hidden">
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader className="bg-muted/30">
               <TableRow>
@@ -623,7 +648,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((claim) => {
+                paginatedClaims.map((claim) => {
                   const isSelected = claim._id === selectedClaimId;
                   const isWon = claim.status === "won";
                   const denialReason = DENIAL_REASON_CODES[claim.denialReasonCode];
@@ -881,9 +906,13 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 onSelectClaim(claim._id);
                                 if (onRunAutonomousPipeline) {
                                   setRunningPipelineClaimId(claim._id);
+                                  const toastId = toast.loading(`Running Autonomous Sentinel Pipeline for Case #${claim.claimNumber}...`);
                                   try {
                                     await onRunAutonomousPipeline(claim._id);
+                                    toast.success(`Pipeline resolved Case #${claim.claimNumber}: Evidence indexed & brief compiled`, { id: toastId });
                                     onNavigateView("studio");
+                                  } catch (err) {
+                                    toast.error(err instanceof Error ? err.message : "Pipeline execution failed", { id: toastId });
                                   } finally {
                                     setRunningPipelineClaimId(null);
                                   }
@@ -1021,6 +1050,41 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination Bar */}
+        {filtered.length > pageSize && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 border-t border-border bg-muted/10 text-xs">
+            <div className="text-muted-foreground font-mono text-[11px]">
+              Showing {Math.min(filtered.length, (currentPage - 1) * pageSize + 1)}–
+              {Math.min(filtered.length, currentPage * pageSize)} of {filtered.length} claims
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="xs"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="h-7 px-2.5 gap-1 text-xs"
+              >
+                <CaretLeft className="size-3.5" />
+                <span>Previous</span>
+              </Button>
+              <span className="px-2 font-mono text-[11px] text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="xs"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="h-7 px-2.5 gap-1 text-xs"
+              >
+                <span>Next</span>
+                <CaretRight className="size-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Delete Case Confirmation Modal */}

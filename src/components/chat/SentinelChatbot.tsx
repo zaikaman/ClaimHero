@@ -327,7 +327,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        className="select-none group"
+        className="select-none group no-print"
       >
         <button
           type="button"
@@ -374,7 +374,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
       {isOpen && (
         <Card
           style={chatWindowStyle}
-          className="fixed z-50 bg-card/95 border-border shadow-2xl backdrop-blur-2xl flex flex-col rounded-2xl overflow-hidden p-0 animate-blur-fade-up border"
+          className="fixed z-50 bg-card/95 border-border shadow-2xl backdrop-blur-2xl flex flex-col rounded-2xl overflow-hidden p-0 animate-blur-fade-up border no-print"
         >
           {/* Header Bar (also acts as secondary drag handle) */}
           <div className="p-3.5 pb-3 border-b border-border/80 flex items-center justify-between bg-muted/40 select-none">

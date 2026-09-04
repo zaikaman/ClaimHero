@@ -1,8 +1,9 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { Header } from "./Header";
 import { Sidebar, NavigationView } from "./Sidebar";
 import { Claim } from "../../types";
-import { Silk } from "../ui/Silk";
+
+const LazySilk = React.lazy(() => import("../ui/Silk").then((m) => ({ default: m.Silk })));
 
 interface ShellProps {
   currentView: NavigationView;
@@ -44,13 +45,15 @@ export const Shell: React.FC<ShellProps> = ({
       {/* Ambient Silk Shader Dynamic Canvas Background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
         <div className="absolute -top-[10%] -left-[10%] w-[120vw] h-[120vh] opacity-45 dark:opacity-35 transition-opacity duration-700">
-          <Silk
-            speed={10}
-            scale={0.9}
-            color="#59677b"
-            noiseIntensity={1}
-            rotation={0}
-          />
+          <Suspense fallback={<div className="w-full h-full bg-background" />}>
+            <LazySilk
+              speed={10}
+              scale={0.9}
+              color="#59677b"
+              noiseIntensity={1}
+              rotation={0}
+            />
+          </Suspense>
         </div>
         {/* Subtle gradient vignette to preserve high contrast and readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/60 to-background/85" />

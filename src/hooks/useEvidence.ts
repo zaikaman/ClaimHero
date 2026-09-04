@@ -4,19 +4,20 @@ import { api } from "../../convex/_generated/api";
 import { Claim, ClinicalEvidence, OverturnScoringResult } from "../types";
 import { Id } from "../../convex/_generated/dataModel";
 
-export function useEvidence(claim?: Claim | null) {
+export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean }) {
+  const isEnabled = options?.enabled !== false;
   const claimId = claim?._id as Id<"claims"> | undefined;
 
   // Query all evidences for the selected claim
   const rawEvidences = useQuery(
     api.clinicalEvidences.listByClaim,
-    claimId ? { claimId } : "skip"
+    isEnabled && claimId ? { claimId } : "skip"
   ) as ClinicalEvidence[] | undefined;
 
   // Query summary breakdown of evidence sources
   const sourcesSummary = useQuery(
     api.clinicalEvidences.listSourcesSummary,
-    claimId ? { claimId } : "skip"
+    isEnabled && claimId ? { claimId } : "skip"
   );
 
   const crawlPolicyAction = useAction(api.actions.policyCrawler.crawlInsurerPolicy);

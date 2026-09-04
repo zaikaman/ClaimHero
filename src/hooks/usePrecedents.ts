@@ -56,7 +56,7 @@ export function usePrecedents(claim?: Claim | null) {
   const [error, setError] = useState<string | null>(null);
 
   const retrievePrecedents = useCallback(
-    async (targetClaimId?: string): Promise<VectorPrecedentMatch[]> => {
+    async (targetClaimId?: string, forceRefresh = false): Promise<VectorPrecedentMatch[]> => {
       const activeClaimId = targetClaimId ? (targetClaimId as Id<"claims">) : claimId;
       if (!activeClaimId) {
         throw new Error("No claim selected for precedent retrieval");
@@ -73,7 +73,7 @@ export function usePrecedents(claim?: Claim | null) {
           requestKey,
           activeClaimId,
           retrieveAction,
-          true
+          forceRefresh
         );
         setMatches(next);
         return next;

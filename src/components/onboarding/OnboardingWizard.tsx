@@ -41,6 +41,7 @@ import {
   fastSanitizeText,
   ComplianceStandard,
 } from "../../lib/redactionEngine";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 
 interface OnboardingWizardProps {
   isOpen: boolean;
@@ -239,6 +240,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     setErrorMessage(null);
   };
 
+  const { user } = useCurrentUser();
+
+  const markOnboardingCompleted = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("claimhero_onboarding_completed", "true");
+      if (user?._id) {
+        localStorage.setItem(`claimhero_onboarding_completed_${user._id}`, "true");
+      }
+    }
+  };
+
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       handleFileSelect(e.target.files[0]);
@@ -246,19 +258,22 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   };
 
   const saveProfileSettings = async () => {
-    localStorage.setItem("claimhero_onboarding_completed", "true");
-    localStorage.setItem(
-      "claimhero_user_profile",
-      JSON.stringify({
-        role: selectedRole,
-        name: advocateName,
-        credentials: advocateCredentials,
-        organization: advocateOrg,
-        phone: advocatePhone,
-        jurisdiction: selectedJurisdiction,
-        payers: selectedPayers,
-      })
-    );
+    markOnboardingCompleted();
+    const profileData = {
+      role: selectedRole,
+      name: advocateName,
+      credentials: advocateCredentials,
+      organization: advocateOrg,
+      phone: advocatePhone,
+      jurisdiction: selectedJurisdiction,
+      payers: selectedPayers,
+    };
+    if (typeof window !== "undefined") {
+      localStorage.setItem("claimhero_user_profile", JSON.stringify(profileData));
+      if (user?._id) {
+        localStorage.setItem(`claimhero_user_profile_${user._id}`, JSON.stringify(profileData));
+      }
+    }
 
     try {
       await updateSettingsMutation({
@@ -492,7 +507,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   };
 
   const handleDone = (targetView?: string) => {
-    localStorage.setItem("claimhero_onboarding_completed", "true");
+    markOnboardingCompleted();
     if (extractedResult?.claimId) {
       onSuccess(extractedResult.claimId, targetView || "evidence");
     }
@@ -500,7 +515,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   };
 
   const handleSkip = () => {
-    localStorage.setItem("claimhero_onboarding_completed", "true");
+    markOnboardingCompleted();
     onClose();
   };
 

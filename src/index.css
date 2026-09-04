@@ -246,7 +246,12 @@
   aside,
   nav,
   button,
-  canvas {
+  canvas,
+  .sticky,
+  .fixed:not([role="dialog"]):not([role="dialog"] *),
+  .sentinel-chatbot,
+  [data-chatbot],
+  #sentinel-chatbot-container {
     display: none !important;
   }
 

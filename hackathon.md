@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-04T10:57:00Z
+- **Last updated:** 2026-09-04T11:18:20Z
 
 ## Log
 
@@ -713,7 +713,7 @@ Optimized Convex Database I/O across top read-heavy functions (`emails.getExisti
 - Optimized `auditLogs.listRecent` (`convex/auditLogs.ts`) with bounded queries (`take(10)` instead of unbounded scans) and gated reactive subscriptions in `src/hooks/useCommunications.ts` and `src/App.tsx` so communication threads and audit logs are only subscribed to when their respective views are active.
 - Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors/warnings, 423/423 passing unit tests across 29 suites with 81.66% statement coverage, and successful production build in 7.60s). Convex features: schema, compound indexes (`by_agent_mail_message_id`, `by_claimId_and_version`, `by_user_and_timestamp`), internalQuery, internalMutation, queries, mutations, actions.
 
-### 2026-09-04 - working tree
+### 2026-09-04 - 9eb1c5a
 Hardened Convex DB query performance, eliminated N+1 queries, unindexed scans, TOCTOU race conditions, and cron over-fetching:
 - Eliminated N+1 `ctx.db.get(patientId)` fallback queries in `claims.list` by relying strictly on denormalized `patientName` and `insurancePayer`; routed combined payer and status queries through new composite index `by_user_payer_status` (`convex/schema.ts`, `convex/claims.ts`); purged unindexed 500-claim in-memory search fallback in `findMatchingClaimInternal` in favor of indexed lookups (`by_claim_number`, `by_threadId`, recipient); and bounded `executeSweepDeadlinesBatch` to 50 items with `by_deadline` index pagination.
 - Replaced unbounded `.collect() + sort` across `convex/appeals.ts` and `convex/p2pScripts.ts` (`getLatestByClaim`, `getLatestByClaimInternal`, `getByClaimAndLevel`, `listVersions`) with indexed `order("desc").first()` and `take(50)` via `by_claimId_and_version`, and optimized chatbot session queries in `convex/chatbot.ts` via `by_session_and_time`.
@@ -722,3 +722,21 @@ Hardened Convex DB query performance, eliminated N+1 queries, unindexed scans, T
 - Eliminated AgentMail webhook/cron TOCTOU double-processing via atomic reservation mutation `reserveAgentMailMessageProcessing` (`convex/emails.ts`), capped sync polling to 30 items with 60-second cooldown `SYNC_COOLDOWN_MS` (`convex/crons.ts`, `convex/actions/agentMail.ts`), and bounded email thread queries (`take(50)`).
 - Hardened external integrations with 30s timeouts and retries on OpenAI completions (`convex/lib/openai.ts`), added `agentMailFetch` with 15s timeout and exponential backoff on transient errors (`convex/lib/agentMail.ts`), and added OCC deduplication guards to P2P live sessions (`convex/p2pCallSessions.ts`).
 - Verified with `npm run verify`: 100% clean typecheck, 0 ESLint errors/warnings under strict `@typescript-eslint/no-explicit-any`, 423/423 passing unit tests across 29 suites with 81.24% statement coverage, and successful production build in 6.49s. Convex features: schema, compound indexes (`by_user_payer_status`, `by_claimId_and_version`, `by_deadline`, `by_session_and_time`), internalQuery, internalMutation, queries, mutations, actions, vector search.
+
+### 2026-09-04 - working tree
+Overhauled frontend demo reliability, runtime performance, bundle optimization, and user experience for live hackathon judging:
+- Resolved premature Convex subscriptions in `src/App.tsx` by passing `enabled: isDashboardActive` to `useClaims`, `useEvidence`, and `useCommunications`, skipping all reactive queries on landing and login pages until authenticated.
+- Preserved deep target view intent across authentication (`src/App.tsx`, `src/components/landing/CinematicHero.tsx`): judges clicking specific feature CTAs from the landing page now route directly to their target view (e.g. `evidence`, `studio`) post-login instead of defaulting to generic `radar`.
+- Eliminated `CasePickerEmptyState` flashing upon case ingestion in `src/App.tsx` by rendering an active case dossier hydration loader while `selectedClaim` is fetched.
+- Hardened selection state in `src/hooks/useClaims.ts`: removed `rawClaims[0]` fallbacks that masked empty selections and eliminated race-condition flickering post-case deletion; exported `isLoadingSelectedClaim`.
+- Deduplicated redundant queries and vector executions: passed parent `evidences` directly to `src/components/studio/ExportDrawer.tsx` to eliminate duplicate `clinicalEvidences.listByClaim` subscriptions and skipped query when drawer is closed; sorted threads in `src/hooks/useCommunications.ts` by latest activity/creation time; and removed unconditional `forceRefresh=true` in `src/hooks/usePrecedents.ts` to leverage in-memory cache and prevent double-firing OpenAI embedding vector actions.
+- Implemented route and component code-splitting with `React.lazy()` in `src/App.tsx` across all 11+ views and modals; lazy-loaded Three.js `Silk` WebGL background in `src/components/layout/Shell.tsx` and isolated it into its own async chunk (`827 kB`), dropping the main entry bundle to 157 kB (47 kB gzipped).
+- Optimized `src/components/ui/Silk.tsx` shader rendering: added visibility change detection and `prefers-reduced-motion` checks to throttle/suspend WebGL `frameloop` when inactive, saving CPU/GPU resources.
+- Removed unused `canvas-confetti` and `@types/canvas-confetti` dependencies (~1 MB unneeded bundle weight).
+- Accelerated `src/components/radar/CaseRadar.tsx` rendering: memoized financial and risk aggregations with `useMemo`, added client-side pagination (10 claims/page) with previous/next controls and page indicators, and changed table wrapper from `overflow-hidden` to `overflow-x-auto` to prevent layout clipping on mobile viewports.
+- Integrated Sonner toast notification system (`sonner`, `src/App.tsx`): wired informative loading, success, and error feedback for auto-solve pipeline runs, Firecrawl policy crawling, PubMed/FDA scrapers, Overturn Probability calculations, appeal brief compilation, and statutory escalation tiers.
+- Fixed multi-tenant judge laptop collision in `src/components/onboarding/OnboardingWizard.tsx` and `src/components/onboarding/OnboardingChecklist.tsx` by scoping `localStorage` keys to the authenticated user ID (`claimhero_onboarding_completed_${user._id}`, `claimhero_checklist_dismissed_${user._id}`).
+- Hardened Appeal Studio in `src/hooks/useAppealStudio.ts`: added cleanup effect for debounced save timeouts on claim switch to prevent cross-case overwrites, and upgraded `insertTextAtCursor` to insert text at active textarea caret with range preservation and focus restoration.
+- Upgraded dossier printing in `src/components/studio/ExportDrawer.tsx` to use a hidden detached iframe print flow (`iframe.contentWindow?.print()`), bypassing browser pop-up blockers completely; expanded `@media print` rules in `src/index.css` and added `no-print` classes to hide sticky headers/bottom bars, HUD checklist, and the floating Sentinel Copilot chatbot during printing.
+- Improved conference WiFi resilience and input accessibility: added dark radial gradient placeholders and `preload="metadata"` to fullscreen video elements in `CinematicHero.tsx` and `AuthPage.tsx` for immediate first paint; guarded global `ArrowLeft` / `ArrowRight` slide shortcuts from firing when text inputs, textareas, or contentEditable elements are focused.
+- Verified with `npm run verify`: 100% clean typecheck, 0 ESLint errors/warnings, 423/423 passing unit tests across 29 suites with 81.24% statement coverage, and successful production build with clean code-splitting in 6.46s. Convex features: queries, mutations, actions, static hosting (`convex.site`).

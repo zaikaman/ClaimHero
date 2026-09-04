@@ -319,6 +319,8 @@ export interface EmailThread {
   subject: string;
   status: "active" | "dispatched" | "response_received" | "resolved";
   lastMessageAt: number;
+  lastActivityAt?: number;
+  _creationTime?: number;
 }
 
 export interface EmailMessage {

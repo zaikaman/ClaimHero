@@ -31,6 +31,7 @@ import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { toast } from "sonner";
 
 interface EvidenceMatrixProps {
   claim: Claim;
@@ -79,14 +80,16 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   const handleRunCompleteAnalysis = async () => {
     setIsUnifiedAnalyzing(true);
     setErrorMessage(null);
+    const toastId = toast.loading("Crawling payer Clinical Policy Bulletin & computing Overturn Probability...");
     try {
       await onCrawlPolicy(claim._id);
       const result = await onComputeScore(claim._id);
       setScoringResult(result);
+      toast.success("Policy indexed & Overturn Probability calculated successfully", { id: toastId });
     } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "Failed to execute complete clinical policy analysis."
-      );
+      const msg = err instanceof Error ? err.message : "Failed to execute complete clinical policy analysis.";
+      setErrorMessage(msg);
+      toast.error(msg, { id: toastId });
     } finally {
       setIsUnifiedAnalyzing(false);
     }
@@ -95,12 +98,14 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   const handleRunCrawl = async () => {
     setIsCrawling(true);
     setErrorMessage(null);
+    const toastId = toast.loading(`Crawling ${claim.patient?.insurancePayer || "payer"} Clinical Policy Bulletin via Firecrawl...`);
     try {
       await onCrawlPolicy(claim._id);
+      toast.success("Clinical Policy Bulletin crawled and indexed", { id: toastId });
     } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "Failed to crawl insurer Clinical Policy Bulletin."
-      );
+      const msg = err instanceof Error ? err.message : "Failed to crawl insurer Clinical Policy Bulletin.";
+      setErrorMessage(msg);
+      toast.error(msg, { id: toastId });
     } finally {
       setIsCrawling(false);
     }
@@ -109,13 +114,15 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   const handleRunScoring = async () => {
     setIsScoring(true);
     setErrorMessage(null);
+    const toastId = toast.loading("Calculating legal & clinical Overturn Probability Score...");
     try {
       const result = await onComputeScore(claim._id);
       setScoringResult(result);
+      toast.success(`Score calculated: ${result.overturnProbabilityScore}% Overturn Probability`, { id: toastId });
     } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "Failed to calculate Overturn Probability Score."
-      );
+      const msg = err instanceof Error ? err.message : "Failed to calculate Overturn Probability Score.";
+      setErrorMessage(msg);
+      toast.error(msg, { id: toastId });
     } finally {
       setIsScoring(false);
     }

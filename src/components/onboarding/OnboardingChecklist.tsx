@@ -20,6 +20,7 @@ import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Progress } from "../ui/progress";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 
 interface OnboardingChecklistProps {
   currentView: NavigationView;
@@ -34,50 +35,64 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
   claims,
   onOpenIngestion,
 }) => {
+  const { user } = useCurrentUser();
+  const getUserKey = (key: string) => user?._id ? `${key}_${user._id}` : key;
+
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
-  const [isDismissed, setIsDismissed] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("claimhero_checklist_dismissed") === "true";
-    }
-    return false;
-  });
+  const [isDismissed, setIsDismissed] = useState<boolean>(false);
+  const [hasVisitedEvidence, setHasVisitedEvidence] = useState<boolean>(false);
+  const [hasVisitedStudio, setHasVisitedStudio] = useState<boolean>(false);
+  const [hasVisitedCommunications, setHasVisitedCommunications] = useState<boolean>(false);
 
-  const [hasVisitedEvidence, setHasVisitedEvidence] = useState<boolean>(() => {
+  // Sync state when user becomes available or mounts
+  useEffect(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("claimhero_visited_evidence") === "true";
-    }
-    return false;
-  });
+      const dismissed =
+        localStorage.getItem(getUserKey("claimhero_checklist_dismissed")) === "true" ||
+        localStorage.getItem("claimhero_checklist_dismissed") === "true";
+      setIsDismissed(dismissed);
 
-  const [hasVisitedStudio, setHasVisitedStudio] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("claimhero_visited_studio") === "true";
-    }
-    return false;
-  });
+      const visitedEv =
+        localStorage.getItem(getUserKey("claimhero_visited_evidence")) === "true" ||
+        localStorage.getItem("claimhero_visited_evidence") === "true";
+      setHasVisitedEvidence(visitedEv);
 
-  const [hasVisitedCommunications, setHasVisitedCommunications] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("claimhero_visited_comms") === "true";
+      const visitedSt =
+        localStorage.getItem(getUserKey("claimhero_visited_studio")) === "true" ||
+        localStorage.getItem("claimhero_visited_studio") === "true";
+      setHasVisitedStudio(visitedSt);
+
+      const visitedCom =
+        localStorage.getItem(getUserKey("claimhero_visited_comms")) === "true" ||
+        localStorage.getItem("claimhero_visited_comms") === "true";
+      setHasVisitedCommunications(visitedCom);
     }
-    return false;
-  });
+  }, [user?._id]);
 
   // Track page visits to automatically check items
   useEffect(() => {
     if (currentView === "evidence" && !hasVisitedEvidence) {
       setHasVisitedEvidence(true);
-      localStorage.setItem("claimhero_visited_evidence", "true");
+      if (typeof window !== "undefined") {
+        localStorage.setItem(getUserKey("claimhero_visited_evidence"), "true");
+        localStorage.setItem("claimhero_visited_evidence", "true");
+      }
     }
     if (currentView === "studio" && !hasVisitedStudio) {
       setHasVisitedStudio(true);
-      localStorage.setItem("claimhero_visited_studio", "true");
+      if (typeof window !== "undefined") {
+        localStorage.setItem(getUserKey("claimhero_visited_studio"), "true");
+        localStorage.setItem("claimhero_visited_studio", "true");
+      }
     }
     if (currentView === "communications" && !hasVisitedCommunications) {
       setHasVisitedCommunications(true);
-      localStorage.setItem("claimhero_visited_comms", "true");
+      if (typeof window !== "undefined") {
+        localStorage.setItem(getUserKey("claimhero_visited_comms"), "true");
+        localStorage.setItem("claimhero_visited_comms", "true");
+      }
     }
-  }, [currentView, hasVisitedEvidence, hasVisitedStudio, hasVisitedCommunications]);
+  }, [currentView, hasVisitedEvidence, hasVisitedStudio, hasVisitedCommunications, user?._id]);
 
   // Tasks definitions
   const tasks = [
@@ -149,7 +164,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
   }
 
   return (
-    <Card className="fixed bottom-16 right-5 z-40 w-[340px] sm:w-[370px] bg-card/95 border-border shadow-2xl backdrop-blur-md overflow-hidden text-left p-0 animate-blur-fade-up">
+    <Card className="fixed bottom-16 right-5 z-40 w-[340px] sm:w-[370px] bg-card/95 border-border shadow-2xl backdrop-blur-md overflow-hidden text-left p-0 animate-blur-fade-up no-print">
 
       
       {/* Header Bar */}
@@ -187,7 +202,10 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
             size="icon-xs"
             onClick={() => {
               setIsDismissed(true);
-              localStorage.setItem("claimhero_checklist_dismissed", "true");
+              if (typeof window !== "undefined") {
+                localStorage.setItem(getUserKey("claimhero_checklist_dismissed"), "true");
+                localStorage.setItem("claimhero_checklist_dismissed", "true");
+              }
             }}
             className="text-muted-foreground hover:text-foreground"
             title="Dismiss checklist"

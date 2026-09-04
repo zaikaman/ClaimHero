@@ -53,6 +53,7 @@ export function useCurrentUser() {
 
   return {
     viewer: user,
+    user,
     isAuthenticated,
     isAuthLoading,
     userName,

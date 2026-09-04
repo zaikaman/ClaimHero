@@ -132,13 +132,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
     <div className="min-h-screen h-screen w-screen bg-black text-white font-sans flex items-center justify-center p-3 sm:p-6 md:p-8 lg:p-10 relative overflow-hidden select-none">
       
       {/* 1. Fullscreen Ambient Video Background */}
-      <div className="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none">
+      <div className="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none bg-radial from-slate-900 to-black">
         <video
           src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260406_094145_4a271a6c-3869-4f1c-8aa7-aeb0cb227994.mp4"
           autoPlay
           loop
           muted
           playsInline
+          preload="metadata"
           className="w-full h-full object-cover scale-105"
         />
       </div>

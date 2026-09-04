@@ -10,8 +10,11 @@ export function useClaims(options?: {
   payerFilter?: string;
   searchQuery?: string;
   includeDemo?: boolean;
+  enabled?: boolean;
+  defaultClaimId?: string;
 }) {
-  const [selectedClaimId, setSelectedClaimId] = useState<string>("");
+  const isEnabled = options?.enabled !== false;
+  const [selectedClaimId, setSelectedClaimId] = useState<string>(options?.defaultClaimId || "");
 
   const [includeDemo, setIncludeDemoState] = useState<boolean>(() => {
     if (typeof options?.includeDemo !== "undefined") return options.includeDemo;
@@ -41,15 +44,21 @@ export function useClaims(options?: {
     : undefined;
 
   // Real Convex query to fetch claims
-  const rawClaims = useQuery(api.claims.list, {
-    status: statusArg,
-    payer: payerArg,
-    includeDemo,
-  }) as Claim[] | undefined;
+  const rawClaims = useQuery(
+    api.claims.list,
+    isEnabled
+      ? {
+          status: statusArg,
+          payer: payerArg,
+          includeDemo,
+        }
+      : "skip"
+  ) as Claim[] | undefined;
 
-  const rawPortfolioStats = useQuery(api.claims.getPortfolioStats, {
-    includeDemo,
-  });
+  const rawPortfolioStats = useQuery(
+    api.claims.getPortfolioStats,
+    isEnabled ? { includeDemo } : "skip"
+  );
 
   const searchQuery = options?.searchQuery?.toLowerCase().trim() || "";
 
@@ -179,16 +188,16 @@ export function useClaims(options?: {
   }, [rawClaims, rawPortfolioStats, options?.payerFilter, searchQuery]);
 
   // Active selected claim with deep resolution of latestAppeal and evidenceCount
-  const effectiveClaimId = (selectedClaimId || rawClaims?.[0]?._id) as Id<"claims"> | undefined;
+  const effectiveClaimId = (selectedClaimId ? selectedClaimId : options?.defaultClaimId) as Id<"claims"> | undefined;
 
   const selectedClaimDetail = useQuery(
     api.claims.getById,
-    effectiveClaimId ? { claimId: effectiveClaimId } : "skip"
+    isEnabled && effectiveClaimId ? { claimId: effectiveClaimId } : "skip"
   ) as Claim | null | undefined;
 
   const rawSelectedClaim = useMemo(() => {
-    if (!rawClaims || rawClaims.length === 0) return null;
-    return rawClaims.find((c) => c._id === effectiveClaimId) || rawClaims[0] || null;
+    if (!rawClaims || rawClaims.length === 0 || !effectiveClaimId) return null;
+    return rawClaims.find((c) => c._id === effectiveClaimId) || null;
   }, [rawClaims, effectiveClaimId]);
 
   const selectedClaim: Claim | null = useMemo(() => {
@@ -301,10 +310,10 @@ export function useClaims(options?: {
         claimId: claimId as Id<"claims">,
       });
 
-      // If currently selected claim was deleted, switch to next available claim
+      // If currently selected claim was deleted, switch to next available claim or clear
       if (selectedClaimId === claimId) {
         const remaining = (rawClaims || []).filter((c) => c._id !== claimId);
-        setSelectedClaimId(remaining[0]?._id || "");
+        setSelectedClaimId(remaining.length > 0 ? remaining[0]._id : "");
       }
 
       return result;
@@ -331,7 +340,8 @@ export function useClaims(options?: {
     },
     isLoadingPortfolioStats: rawPortfolioStats === undefined,
     selectedClaim,
-    selectedClaimId: selectedClaimId || (rawClaims?.[0]?._id ?? ""),
+    selectedClaimId,
+    isLoadingSelectedClaim: Boolean(selectedClaimId && !selectedClaim),
     setSelectedClaimId,
     includeDemo,
     setIncludeDemo,

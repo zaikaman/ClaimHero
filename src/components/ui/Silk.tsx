@@ -129,6 +129,25 @@ export const Silk: React.FC<SilkProps> = ({
   style,
 }) => {
   const meshRef = useRef<Mesh>(null);
+  const [isVisible, setIsVisible] = React.useState<boolean>(() => {
+    return typeof document !== "undefined" ? document.visibilityState === "visible" : true;
+  });
+
+  const prefersReducedMotion = React.useMemo(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsVisible(document.visibilityState === "visible");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   const uniforms = useMemo<SilkUniforms>(
     () => ({
@@ -152,7 +171,7 @@ export const Silk: React.FC<SilkProps> = ({
 
   return (
     <div className={className} style={{ width: '100%', height: '100%', ...style }}>
-      <Canvas dpr={[1, 2]} frameloop="always">
+      <Canvas dpr={[1, 2]} frameloop={prefersReducedMotion ? "never" : isVisible ? "always" : "never"}>
         <SilkPlane ref={meshRef} uniforms={uniforms} />
       </Canvas>
     </div>

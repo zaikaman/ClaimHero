@@ -34,13 +34,14 @@ import { cn } from "../../lib/utils";
 
 import { Id } from "../../../convex/_generated/dataModel";
 
-interface ExportDrawerProps {
+export interface ExportDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   claim: Claim;
   appeal: Appeal | null;
   markdownContent: string;
   onProceedToDispatch: () => void;
+  evidences?: ClinicalEvidence[];
 }
 
 export const ExportDrawer: React.FC<ExportDrawerProps> = ({
@@ -50,16 +51,19 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
   appeal,
   markdownContent,
   onProceedToDispatch,
+  evidences: propEvidences,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isPublicExhibitRedacted, setIsPublicExhibitRedacted] = useState(false);
   const [viewMode, setViewMode] = useState<"binder" | "brief">("binder");
 
-  // Fetch indexed clinical evidences for Exhibit B & C
+  // Fetch indexed clinical evidences for Exhibit B & C only if not supplied by parent and drawer is open
   const rawEvidences = useQuery(
     api.clinicalEvidences.listByClaim,
-    claim?._id ? { claimId: claim._id as Id<"claims"> } : "skip"
+    !propEvidences && isOpen && claim?._id ? { claimId: claim._id as Id<"claims"> } : "skip"
   ) as ClinicalEvidence[] | undefined;
+
+  const effectiveEvidences = propEvidences || rawEvidences || [];
 
   const processedContent = useMemo(() => {
     if (!isPublicExhibitRedacted) return markdownContent;
@@ -76,10 +80,10 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
       appeal
         ? { ...appeal, fullAppealMarkdown: processedContent }
         : null,
-      rawEvidences || [],
+      effectiveEvidences,
       isPublicExhibitRedacted
     );
-  }, [claim, appeal, processedContent, rawEvidences, isPublicExhibitRedacted]);
+  }, [claim, appeal, processedContent, effectiveEvidences, isPublicExhibitRedacted]);
 
   const needsClinicalDocumentation =
     /does not independently document the patient-specific/i.test(processedContent) &&
@@ -160,21 +164,39 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
 
   const handlePrint = () => {
     const printable = document.querySelector<HTMLElement>(".printable-dossier");
-    const printWindow = window.open("", "_blank");
-
-    if (!printable || !printWindow) {
+    if (!printable) {
       window.print();
       return;
     }
 
-    printWindow.opener = null;
+    // Use hidden iframe to avoid popup blocker issues
+    let iframe = document.getElementById("claimhero-dossier-print-frame") as HTMLIFrameElement | null;
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.id = "claimhero-dossier-print-frame";
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.style.opacity = "0";
+      iframe.style.pointerEvents = "none";
+      document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      window.print();
+      return;
+    }
 
     const styles = Array.from(document.querySelectorAll("link[rel='stylesheet'], style"))
       .map((style) => style.outerHTML)
       .join("\n");
 
-    printWindow.document.open();
-    printWindow.document.write(`<!doctype html>
+    doc.open();
+    doc.write(`<!doctype html>
       <html lang="en">
         <head>
           <meta charset="UTF-8" />
@@ -213,10 +235,12 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
           </div>
         </body>
       </html>`);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.onafterprint = () => printWindow.close();
-    window.setTimeout(() => printWindow.print(), 250);
+    doc.close();
+
+    iframe.contentWindow?.focus();
+    window.setTimeout(() => {
+      iframe?.contentWindow?.print();
+    }, 250);
   };
 
   return (

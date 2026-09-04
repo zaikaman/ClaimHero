@@ -30,6 +30,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Textarea } from "../ui/textarea";
+import { toast } from "sonner";
 
 interface AppealStudioProps {
   claim: Claim;
@@ -163,6 +164,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
   const handleRunSynthesis = async () => {
     setSynthesisError(null);
+    const toastId = toast.loading("Synthesizing legal appeal brief with clinical citations...");
     try {
       await synthesizeAppeal(appealLevel, physicianNotes, {
         name: senderName,
@@ -170,24 +172,26 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         email: senderEmail,
         phone: senderPhone,
       });
+      toast.success("Appeal brief successfully compiled with statutory citations", { id: toastId });
     } catch (err) {
-      setSynthesisError(
-        err instanceof Error ? err.message : "Failed to synthesize appeal brief. Please try again."
-      );
+      const msg = err instanceof Error ? err.message : "Failed to synthesize appeal brief. Please try again.";
+      setSynthesisError(msg);
+      toast.error(msg, { id: toastId });
     }
   };
 
   const handleConfirmEscalation = async () => {
     if (!currentTierConfig.nextTier) return;
     setSynthesisError(null);
+    const toastId = toast.loading("Escalating statutory tier and re-synthesizing brief...");
     try {
       await escalateTier(currentTierConfig.nextTier, escalationReason);
       setShowEscalationModal(false);
-      setEscalationReason("");
+      toast.success("Statutory appeal tier successfully escalated", { id: toastId });
     } catch (err) {
-      setSynthesisError(
-        err instanceof Error ? err.message : "Failed to escalate appeal tier. Please try again."
-      );
+      const msg = err instanceof Error ? err.message : "Failed to escalate tier";
+      setSynthesisError(msg);
+      toast.error(msg, { id: toastId });
     }
   };
 
@@ -840,6 +844,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         claim={claim}
         appeal={appeal}
         markdownContent={markdownContent}
+        evidences={evidences}
         onProceedToDispatch={() => {
           setIsExportOpen(false);
           if (onNavigateToDispatch) onNavigateToDispatch();

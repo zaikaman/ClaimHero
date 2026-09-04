@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Claim, EmailThread, EmailMessage, AuditLog } from "../types";
@@ -7,14 +7,16 @@ import { Id } from "../../convex/_generated/dataModel";
 export interface UseCommunicationsOptions {
   activeView?: string;
   enableAudit?: boolean;
+  enabled?: boolean;
 }
 
 export function useCommunications(claim?: Claim | null, options?: UseCommunicationsOptions) {
+  const isEnabled = options?.enabled !== false;
   const claimId = claim?._id as Id<"claims"> | undefined;
   const [isSyncingInboxes, setIsSyncingInboxes] = useState(false);
 
-  const isCommunicationsActive = !options?.activeView || options.activeView === "communications";
-  const isAuditActive = !options?.activeView || options.activeView === "audit" || Boolean(options?.enableAudit);
+  const isCommunicationsActive = isEnabled && (!options?.activeView || options.activeView === "communications");
+  const isAuditActive = isEnabled && (!options?.activeView || options.activeView === "audit" || Boolean(options?.enableAudit));
 
   // Query threads for this claim only when communications view is active
   const threads = useQuery(
@@ -22,7 +24,16 @@ export function useCommunications(claim?: Claim | null, options?: UseCommunicati
     isCommunicationsActive && claimId ? { claimId } : "skip"
   ) as EmailThread[] | undefined;
 
-  const activeThreadId = threads && threads.length > 0 ? (threads[0]?._id as Id<"emailThreads"> | undefined) : undefined;
+  const sortedThreads = useMemo(() => {
+    if (!threads || threads.length === 0) return [];
+    return [...threads].sort((a, b) => {
+      const timeA = a.lastActivityAt || a.lastMessageAt || a._creationTime || 0;
+      const timeB = b.lastActivityAt || b.lastMessageAt || b._creationTime || 0;
+      return timeB - timeA;
+    });
+  }, [threads]);
+
+  const activeThreadId = sortedThreads.length > 0 ? (sortedThreads[0]._id as Id<"emailThreads">) : undefined;
 
   // Query thread details and messages only when communications view is active
   const threadDetails = useQuery(
@@ -162,7 +173,7 @@ export function useCommunications(claim?: Claim | null, options?: UseCommunicati
   );
 
   return {
-    threads: threads || [],
+    threads: sortedThreads,
     messages: threadDetails?.messages || [],
     auditLogs: claimId ? claimAuditLogs || [] : recentAuditLogs || [],
     isLoadingCommunications: claimId ? threads === undefined : false,

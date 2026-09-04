@@ -86,6 +86,16 @@ export function useAppealStudio(claim?: Claim | null) {
   // Debounced auto-save markdown changes
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Clear pending debounce timer on claim switch or unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+    };
+  }, [claim?._id]);
+
   const handleUpdateMarkdown = useCallback(
     (newContent: string) => {
       setMarkdownContent(newContent);
@@ -187,10 +197,31 @@ export function useAppealStudio(claim?: Claim | null) {
     setSelectedAppealId(versionId);
   }, []);
 
-  // Helper to append a citation or note into the editor
+  // Helper to insert a citation or note into the editor at active cursor
   const insertTextAtCursor = useCallback(
     (snippet: string) => {
-      const updated = `${markdownContent}\n\n${snippet}\n`;
+      if (typeof document !== "undefined") {
+        const editorEl = document.querySelector(".studio-editor-textarea") as HTMLTextAreaElement | null;
+        if (editorEl && typeof editorEl.selectionStart === "number") {
+          const start = editorEl.selectionStart;
+          const end = editorEl.selectionEnd;
+          const before = markdownContent.substring(0, start);
+          const after = markdownContent.substring(end);
+          const updated = `${before}${snippet}${after}`;
+          handleUpdateMarkdown(updated);
+
+          // Restore cursor position immediately after inserted text
+          window.requestAnimationFrame(() => {
+            editorEl.focus();
+            const newCursor = start + snippet.length;
+            editorEl.setSelectionRange(newCursor, newCursor);
+          });
+          return;
+        }
+      }
+
+      // Fallback: append if editor textarea is not focused or mounted
+      const updated = markdownContent.trim().length > 0 ? `${markdownContent}\n\n${snippet}\n` : snippet;
       handleUpdateMarkdown(updated);
     },
     [markdownContent, handleUpdateMarkdown]
