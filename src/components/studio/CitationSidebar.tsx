@@ -142,24 +142,31 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
       </div>
 
       <div className="space-y-2">
-        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-          <Medal className="size-3" />
-          <span>Vector Archive Top 3 ({vectorMatches.length})</span>
+        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Medal className="size-3" />
+            <span>Hybrid Precedent Archive Top 3 ({vectorMatches.length})</span>
+          </div>
+          <Badge variant="secondary" className="font-mono text-[9px] bg-primary/10 text-primary border-primary/20">
+            RRF Fusion
+          </Badge>
         </div>
 
         {isLoadingPrecedents && vectorMatches.length === 0 ? (
           <Card className="p-4 flex items-center gap-2 text-xs text-muted-foreground">
             <CircleNotch className="size-3.5 animate-spin text-primary" />
-            <span>Querying Precedent Vector Archive...</span>
+            <span>Running Hybrid Precedent Retrieval (Vector + BM25 RRF)...</span>
           </Card>
         ) : vectorMatches.length === 0 ? (
           <Card className="p-4 text-center text-xs text-muted-foreground bg-muted/20 border-dashed">
-            Synthesize a brief or open this case to retrieve controlling authorities by ICD-10, CPT, and CARC.
+            Synthesize a brief or open this case to retrieve controlling authorities by ICD-10, CPT, and CARC via Hybrid RRF.
           </Card>
         ) : (
           <div className="space-y-2">
             {vectorMatches.map((match) => {
               const similarity = similarityPercent(match.vectorScore);
+              const isHybrid = match.retrievalSource === "hybrid_fusion";
+              const isBm25 = match.retrievalSource === "bm25_only";
               return (
                 <Card
                   key={match._id}
@@ -174,10 +181,24 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
                         <Badge variant="success" className="text-[9px] font-mono px-1.5 py-0">
                           {similarity}% match
                         </Badge>
+                        {isHybrid ? (
+                          <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
+                            Hybrid RRF
+                          </Badge>
+                        ) : isBm25 ? (
+                          <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 border-blue-500/40 text-blue-600 dark:text-blue-400 bg-blue-500/10">
+                            BM25
+                          </Badge>
+                        ) : null}
                       </div>
-                      <span className="text-[10px] text-muted-foreground block font-mono">
-                        {match.citation}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap text-[10px] text-muted-foreground font-mono">
+                        <span>{match.citation}</span>
+                        {match.rrfScore && match.rrfScore > 0 && (
+                          <span>• RRF: {match.rrfScore.toFixed(4)}</span>
+                        )}
+                        {match.vectorRank && <span>• V#{match.vectorRank}</span>}
+                        {match.textRank && <span>• T#{match.textRank}</span>}
+                      </div>
                     </div>
                     <Button
                       variant="ghost"

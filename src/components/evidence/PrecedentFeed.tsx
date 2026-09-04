@@ -61,8 +61,11 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
         <div className="flex items-center gap-2">
           <Medal className="size-4 text-emerald-500" />
           <span className="text-xs font-semibold text-foreground">
-            Vector-Matched Overturn Precedents ({matches.length})
+            Hybrid-Matched Precedents ({matches.length})
           </span>
+          <Badge variant="secondary" className="font-mono text-[9px] bg-primary/10 text-primary border-primary/20">
+            Vector + BM25 RRF
+          </Badge>
         </div>
         <div className="flex items-center gap-1.5">
           <Badge variant="outline" className="font-mono text-[10px]">
@@ -71,9 +74,9 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
           <Button
             variant="ghost"
             size="icon-xs"
-            onClick={() => retrievePrecedents(claim._id).catch(() => undefined)}
+            onClick={() => retrievePrecedents(claim._id, true).catch(() => undefined)}
             disabled={isLoading}
-            title="Re-run vector search"
+            title="Re-run hybrid precedent search"
           >
             {isLoading ? (
               <CircleNotch className="size-3 animate-spin" />
@@ -94,13 +97,13 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
       {isLoading && matches.length === 0 && (
         <Card className="p-6 flex flex-col items-center justify-center gap-2 text-muted-foreground">
           <CircleNotch className="size-5 animate-spin text-primary" />
-          <p className="text-xs">Running Convex vector search against the Precedent Archive...</p>
+          <p className="text-xs">Running Hybrid Search (Vector + Full-Text RRF Fusion) across the Precedent Archive...</p>
         </Card>
       )}
 
       {!isLoading && matches.length === 0 && !error && (
         <Card className="p-4 text-center text-xs text-muted-foreground bg-muted/20 border-dashed">
-          No vector matches yet. Run evidence analysis or synthesize a brief to query the archive by ICD-10, CPT, and CARC.
+          No precedent matches yet. Run evidence analysis or synthesize a brief to execute hybrid search by ICD-10, CPT, and CARC.
         </Card>
       )}
 
@@ -108,6 +111,8 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
         {matches.map((item) => {
           const isCopied = copiedId === item._id;
           const similarity = similarityPercent(item.vectorScore);
+          const isHybrid = item.retrievalSource === "hybrid_fusion";
+          const isBm25Only = item.retrievalSource === "bm25_only";
 
           return (
             <Card
@@ -119,8 +124,26 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="secondary" className="gap-1 font-mono text-xs text-emerald-600 dark:text-emerald-400">
                       <TrendUp className="size-3" />
-                      <span>{similarity}% similar</span>
+                      <span>{similarity}% similarity</span>
                     </Badge>
+                    {isHybrid ? (
+                      <Badge variant="outline" className="font-mono text-[9px] border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
+                        Hybrid RRF Fusion
+                      </Badge>
+                    ) : isBm25Only ? (
+                      <Badge variant="outline" className="font-mono text-[9px] border-blue-500/40 text-blue-600 dark:text-blue-400 bg-blue-500/10">
+                        BM25 Lexical Hit
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="font-mono text-[9px] border-purple-500/40 text-purple-600 dark:text-purple-400 bg-purple-500/10">
+                        Dense Vector Hit
+                      </Badge>
+                    )}
+                    {typeof item.rrfScore === "number" && item.rrfScore > 0 && (
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        RRF: {item.rrfScore.toFixed(4)}
+                      </span>
+                    )}
                     <Badge variant="outline" className="font-mono text-[10px]">
                       {sourceKindLabel(item.sourceKind)}
                     </Badge>
@@ -128,6 +151,19 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
                   <h4 className="text-xs font-semibold text-foreground mt-1">
                     {item.title}
                   </h4>
+                  {(item.vectorRank || item.textRank) && (
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground mt-0.5">
+                      {item.vectorRank && <span>Vector Rank #{item.vectorRank}</span>}
+                      {item.vectorRank && item.textRank && <span>•</span>}
+                      {item.textRank && <span>BM25 Rank #{item.textRank}</span>}
+                      {item.codeOverlap > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="text-foreground">Code Overlap {Math.round(item.codeOverlap * 100)}%</span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <Button

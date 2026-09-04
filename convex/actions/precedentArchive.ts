@@ -9,9 +9,10 @@ import { createEmbedding } from "../lib/openai";
 import { PRECEDENT_CORPUS } from "../lib/precedentCorpus";
 import type { HydratedPrecedent } from "../precedents";
 import {
+  buildClaimLexicalTerms,
   buildClaimQueryText,
   buildPrecedentEmbedText,
-  rankPrecedentHits,
+  reciprocalRankFusion,
   weightedTokensForCodes,
 } from "../lib/embeddings";
 import { precedentMatchValidator } from "../lib/precedentValidators";
@@ -120,32 +121,18 @@ export const reindexArchive = internalAction({
 });
 
 /**
- * Real-time semantic retrieval: embed the claim, run ctx.vectorSearch,
- * hydrate, re-rank by ICD-10 / CPT / CARC overlap, return top 3, and
- * attach proven statutory language onto the claim as legal_precedent evidence.
+ * Real-time Hybrid Precedent Search (Vector Search + Full-Text RRF Fusion):
+ * 1. Semantic vector search (1536-d OpenAI embedding)
+ * 2. Convex BM25 full-text search (.searchIndex on winning arguments)
+ * 3. Reciprocal Rank Fusion (RRF, k=60) + clinical code overlap
+ * 4. Persist top matches as legal_precedent evidence on the claim
  */
 export const retrieveTopPrecedents = action({
   args: {
     claimId: v.id("claims"),
   },
   returns: matchListValidator,
-  handler: async (ctx, args): Promise<Array<{
-    _id: Id<"precedents">;
-    sourceKind: string;
-    title: string;
-    citation: string;
-    jurisdiction: string;
-    sourceUrl?: string;
-    icd10Codes: string[];
-    cptCodes: string[];
-    carcCodes: string[];
-    winningArgument: string;
-    statutoryLanguage: string;
-    outcome: string;
-    vectorScore: number;
-    combinedScore: number;
-    codeOverlap: number;
-  }>> => {
+  handler: async (ctx, args) => {
     const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
 
     const icd10Codes: string[] = claim.icd10Codes || [];
@@ -153,12 +140,15 @@ export const retrieveTopPrecedents = action({
     const denialReasonCode: string = claim.denialReasonCode || "CO-50";
     const denialReasonDescription: string = claim.denialReasonDescription || "";
 
-    const queryText = buildClaimQueryText({
+    const queryFields = {
       icd10Codes,
       cptCodes,
       denialReasonCode,
       denialReasonDescription,
-    });
+    };
+
+    // 1. Dense Vector Search Path (Semantic matching)
+    const queryText = buildClaimQueryText(queryFields);
     const extraTokens = weightedTokensForCodes(icd10Codes, cptCodes, [denialReasonCode]);
     const embedding = await createEmbedding(queryText, extraTokens);
 
@@ -184,41 +174,78 @@ export const retrieveTopPrecedents = action({
       });
     }
 
-    const ids = hits.map((hit) => hit._id);
-    const docs: Array<HydratedPrecedent> = (await ctx.runQuery(internal.precedents.hydrateByIds, { ids })) || [];
-    const docsById = new Map<Id<"precedents">, HydratedPrecedent>(
-      docs.map((doc: HydratedPrecedent) => [doc._id, doc])
-    );
+    // 2. Full-Text BM25 Lexical Search Path (Exact keyword matching)
+    const lexicalQuery = buildClaimLexicalTerms(queryFields);
+    let lexicalDocs: HydratedPrecedent[] = [];
+    try {
+      lexicalDocs = await ctx.runQuery(internal.precedents.searchLexicalPrecedentsInternal, {
+        query: lexicalQuery,
+        primaryCpt: primaryCpt || undefined,
+        carcCode: cleanCarc || undefined,
+        limit: 16,
+      });
 
-    const rankable = hits
+      if (lexicalDocs.length < 3) {
+        const broadLexical = await ctx.runQuery(internal.precedents.searchLexicalPrecedentsInternal, {
+          query: lexicalQuery,
+          limit: 16,
+        });
+        const existingIds = new Set(lexicalDocs.map((d) => d._id));
+        for (const doc of broadLexical) {
+          if (!existingIds.has(doc._id)) {
+            lexicalDocs.push(doc);
+            existingIds.add(doc._id);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Lexical BM25 search failed in hybrid retrieval, falling back to pure vector path:", err);
+    }
+
+    // 3. Hydrate vector hits
+    const lexicalIds = new Set(lexicalDocs.map((d) => d._id));
+    const missingVectorIds = hits
+      .map((h) => h._id)
+      .filter((id) => !lexicalIds.has(id));
+
+    const hydratedVectorDocs: HydratedPrecedent[] = missingVectorIds.length > 0
+      ? (await ctx.runQuery(internal.precedents.hydrateByIds, { ids: missingVectorIds })) || []
+      : [];
+
+    const allDocsById = new Map<Id<"precedents">, HydratedPrecedent>();
+    for (const doc of lexicalDocs) {
+      allDocsById.set(doc._id, doc);
+    }
+    for (const doc of hydratedVectorDocs) {
+      allDocsById.set(doc._id, doc);
+    }
+
+    // 4. Build rankable candidate inputs
+    const vectorCandidates = hits
       .map((hit) => {
-        const doc = docsById.get(hit._id);
+        const doc = allDocsById.get(hit._id);
         if (!doc) return null;
         return {
-          _id: doc._id,
+          ...doc,
           vectorScore: hit._score,
-          icd10Codes: doc.icd10Codes,
-          cptCodes: doc.cptCodes,
-          carcCodes: doc.carcCodes,
-          sourceKind: doc.sourceKind,
-          title: doc.title,
-          citation: doc.citation,
-          jurisdiction: doc.jurisdiction,
-          sourceUrl: doc.sourceUrl,
-          winningArgument: doc.winningArgument,
-          statutoryLanguage: doc.statutoryLanguage,
-          outcome: doc.outcome,
         };
       })
       .filter((row): row is NonNullable<typeof row> => row !== null);
 
-    const top = rankPrecedentHits(
-      rankable,
-      { icd10Codes, cptCodes, denialReasonCode, denialReasonDescription },
-      3
+    const lexicalCandidates = lexicalDocs.map((doc, idx) => ({
+      ...doc,
+      textScore: Math.max(0.1, 1 / (idx + 1)),
+    }));
+
+    // 5. Reciprocal Rank Fusion (RRF, k=60) + Domain Code Overlap
+    const fusedMatches = reciprocalRankFusion(
+      vectorCandidates,
+      lexicalCandidates,
+      queryFields,
+      { limit: 3, k: 60 }
     );
 
-    const matches = top.map((row) => ({
+    const matches = fusedMatches.map((row) => ({
       _id: row._id,
       sourceKind: row.sourceKind,
       title: row.title,
@@ -234,6 +261,11 @@ export const retrieveTopPrecedents = action({
       vectorScore: row.vectorScore,
       combinedScore: row.combinedScore,
       codeOverlap: row.codeOverlap,
+      vectorRank: row.vectorRank,
+      textRank: row.textRank,
+      rrfScore: row.rrfScore,
+      textScore: row.textScore,
+      retrievalSource: row.retrievalSource,
     }));
 
     if (matches.length > 0) {
@@ -246,6 +278,109 @@ export const retrieveTopPrecedents = action({
     return matches;
   },
 });
+
+/**
+ * Public Hybrid Search action for free-text queries, clinical codes, and filters using RRF
+ */
+export const hybridSearchPrecedents = action({
+  args: {
+    query: v.string(),
+    cptCodes: v.optional(v.array(v.string())),
+    icd10Codes: v.optional(v.array(v.string())),
+    carcCode: v.optional(v.string()),
+    sourceKind: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  returns: matchListValidator,
+  handler: async (ctx, args) => {
+    const cptCodes = args.cptCodes || [];
+    const icd10Codes = args.icd10Codes || [];
+    const carcCode = args.carcCode || "CO-50";
+    const userQuery = args.query.trim();
+
+    if (!userQuery && cptCodes.length === 0 && icd10Codes.length === 0) {
+      return [];
+    }
+
+    const queryFields = {
+      cptCodes,
+      icd10Codes,
+      denialReasonCode: carcCode,
+      denialReasonDescription: userQuery,
+    };
+
+    // 1. Vector search path
+    let vectorCandidates: Array<HydratedPrecedent & { vectorScore: number }> = [];
+    try {
+      const queryText = buildClaimQueryText(queryFields);
+      const extraTokens = weightedTokensForCodes(icd10Codes, cptCodes, [carcCode]);
+      const embedding = await createEmbedding(queryText, extraTokens);
+      const hits = await ctx.vectorSearch("precedents", "by_embedding", {
+        vector: embedding,
+        limit: 16,
+      });
+      const ids = hits.map((h) => h._id);
+      const docs: HydratedPrecedent[] = (await ctx.runQuery(internal.precedents.hydrateByIds, { ids })) || [];
+      const docsById = new Map(docs.map((d) => [d._id, d]));
+      vectorCandidates = hits
+        .map((h) => {
+          const doc = docsById.get(h._id);
+          return doc ? { ...doc, vectorScore: h._score } : null;
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+    } catch (err) {
+      console.warn("Hybrid search vector branch failed:", err);
+    }
+
+    // 2. Lexical search path
+    let lexicalCandidates: Array<HydratedPrecedent & { textScore: number }> = [];
+    try {
+      const lexicalQuery = userQuery || buildClaimLexicalTerms(queryFields);
+      const docs = await ctx.runQuery(internal.precedents.searchLexicalPrecedentsInternal, {
+        query: lexicalQuery,
+        limit: 16,
+      });
+      lexicalCandidates = docs.map((doc, idx) => ({
+        ...doc,
+        textScore: Math.max(0.1, 1 / (idx + 1)),
+      }));
+    } catch (err) {
+      console.warn("Hybrid search lexical branch failed:", err);
+    }
+
+    // 3. Reciprocal Rank Fusion
+    const fused = reciprocalRankFusion(
+      vectorCandidates,
+      lexicalCandidates,
+      queryFields,
+      { limit: args.limit || 5, k: 60 }
+    );
+
+    return fused.map((row) => ({
+      _id: row._id,
+      sourceKind: row.sourceKind,
+      title: row.title,
+      citation: row.citation,
+      jurisdiction: row.jurisdiction,
+      sourceUrl: row.sourceUrl,
+      icd10Codes: row.icd10Codes,
+      cptCodes: row.cptCodes,
+      carcCodes: row.carcCodes,
+      winningArgument: row.winningArgument,
+      statutoryLanguage: row.statutoryLanguage,
+      outcome: row.outcome,
+      vectorScore: row.vectorScore,
+      combinedScore: row.combinedScore,
+      codeOverlap: row.codeOverlap,
+      vectorRank: row.vectorRank,
+      textRank: row.textRank,
+      rrfScore: row.rrfScore,
+      textScore: row.textScore,
+      retrievalSource: row.retrievalSource,
+    }));
+  },
+});
+
 
 /**
  * Index a de-identified winning appeal brief into the vector archive.

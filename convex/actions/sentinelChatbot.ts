@@ -138,7 +138,7 @@ export const SENTINEL_CHAT_TOOLS = [
     function: {
       name: "search_precedents",
       description:
-        "Perform 1536-d semantic vector search against historical winning briefs, state insurance commissioner rulings, and court overturns.",
+        "Perform Hybrid Precedent Search (Vector Search + Full-Text BM25 RRF Fusion) combining 1536-d semantic embeddings with BM25 keyword matching and clinical code overlap across winning briefs, commissioner rulings, and court overturns.",
       parameters: {
         type: "object",
         properties: {
@@ -622,11 +622,26 @@ async function executeToolCall(
 
       case "search_precedents": {
         try {
-          const results = await ctx.runQuery(api.precedents.searchTextPrecedents, {
-            query: (args.query || "") as string,
-            primaryCpt: args.primaryCpt as string | undefined,
-            limit: 3,
-          });
+          const query = (args.query || "") as string;
+          const primaryCpt = args.primaryCpt as string | undefined;
+          const carcCode = args.carcCode as string | undefined;
+
+          let results: unknown[] = [];
+          try {
+            results = await ctx.runAction(api.actions.precedentArchive.hybridSearchPrecedents, {
+              query,
+              cptCodes: primaryCpt ? [primaryCpt] : undefined,
+              carcCode,
+              limit: 3,
+            });
+          } catch {
+            results = await ctx.runQuery(api.precedents.searchTextPrecedents, {
+              query,
+              primaryCpt,
+              limit: 3,
+            });
+          }
+
           return {
             toolName: name,
             output: JSON.stringify(results, null, 2),

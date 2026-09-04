@@ -176,13 +176,19 @@ export const attachMatchesToClaim = internalMutation({
     const inserted: Id<"clinicalEvidences">[] = [];
 
     for (const match of args.matches) {
+      const rrfInfo = match.rrfScore ? ` | RRF score: ${match.rrfScore.toFixed(4)}` : "";
+      const sourceBadge = match.retrievalSource === "hybrid_fusion"
+        ? " [HYBRID FUSION: Vector + BM25]"
+        : match.retrievalSource === "bm25_only"
+          ? " [BM25 LEXICAL]"
+          : " [DENSE VECTOR]";
       const markdown = [
         match.statutoryLanguage,
         "",
         match.winningArgument,
         "",
         `Outcome: ${match.outcome}`,
-        `Vector similarity: ${match.vectorScore.toFixed(4)} | Combined score: ${match.combinedScore.toFixed(4)}`,
+        `Retrieval: ${sourceBadge.trim()} | Vector similarity: ${match.vectorScore.toFixed(4)} | Combined score: ${match.combinedScore.toFixed(4)}${rrfInfo}`,
       ].join("\n");
       const relevanceScore = Math.max(0, Math.min(1, (match.combinedScore + 1) / 2));
       const prior = existingByTitle.get(match.title);
@@ -220,11 +226,16 @@ export const attachMatchesToClaim = internalMutation({
       const uniqueCitations = Array.from(
         new Set(args.matches.map((m) => m.citation.trim()).filter(Boolean))
       );
+      const hybridCount = args.matches.filter((m) => m.retrievalSource === "hybrid_fusion").length;
+      const details = hybridCount > 0
+        ? `Hybrid Precedent Search (Vector + Full-Text RRF Fusion) retrieved ${args.matches.length} controlling authorities (${hybridCount} dual-matched): ${uniqueCitations.join("; ")}.`
+        : `Convex vector search returned ${args.matches.length} controlling authorities: ${uniqueCitations.join("; ")}.`;
+
       await ctx.db.insert("appealAuditLogs", {
         claimId: args.claimId,
         eventType: "precedent_vectors_retrieved",
         actor: "Precedent Vector Archive",
-        details: `Convex vector search returned ${args.matches.length} controlling authorities: ${uniqueCitations.join("; ")}.`,
+        details,
         timestamp: now,
       });
     }
@@ -263,6 +274,48 @@ export const listAttachedForClaim = query({
         winningArgument: row.extractedEvidenceMarkdown,
         relevanceScore: row.relevanceScore,
       }));
+  },
+});
+
+/**
+ * Internal full-text search across precedent winning arguments using Convex searchIndex
+ * Strips 12KB raw embeddings for fast action payload transport.
+ */
+export const searchLexicalPrecedentsInternal = internalQuery({
+  args: {
+    query: v.string(),
+    sourceKind: v.optional(sourceKindValidator),
+    primaryCpt: v.optional(v.string()),
+    carcCode: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<HydratedPrecedent[]> => {
+    const trimmed = args.query.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const results = await ctx.db
+      .query("precedents")
+      .withSearchIndex("search_precedents", (q) => {
+        let builder = q.search("winningArgument", trimmed);
+        if (args.sourceKind) {
+          builder = builder.eq("sourceKind", args.sourceKind);
+        }
+        if (args.primaryCpt) {
+          builder = builder.eq("primaryCpt", args.primaryCpt);
+        }
+        if (args.carcCode) {
+          builder = builder.eq("carcCode", args.carcCode);
+        }
+        return builder;
+      })
+      .take(args.limit || 16);
+
+    return results.map((row) => {
+      const { embedding: _, ...rest } = row;
+      return rest;
+    });
   },
 });
 
@@ -308,4 +361,5 @@ export const searchTextPrecedents = query({
     }));
   },
 });
+
 

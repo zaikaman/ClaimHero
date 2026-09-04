@@ -1,10 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as precedents from "../convex/precedents";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthUserId, getClaimIfAuthorized } from "../convex/lib/auth";
 
-vi.mock("@convex-dev/auth/server", () => ({
-  getAuthUserId: vi.fn(),
-}));
+vi.mock("../convex/lib/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../convex/lib/auth")>();
+  return {
+    ...actual,
+    getAuthUserId: vi.fn(),
+    getClaimIfAuthorized: vi.fn(),
+  };
+});
+
+
 
 describe("Convex Precedents & Controlling Authorities Engine", () => {
   beforeEach(() => {
@@ -213,8 +220,10 @@ describe("Convex Precedents & Controlling Authorities Engine", () => {
     });
 
     it("listAttachedForClaim: returns top 3 legal precedent rows", async () => {
-      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const mockClaim = { _id: "c1", userId: "user_123" };
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      vi.mocked(getClaimIfAuthorized).mockResolvedValue({ claim: mockClaim as any, userId: "user_123" as any });
+
       const rows = [
         { _id: "ev1", title: "T1", citationClause: "C1", sourceUrl: "u1", extractedEvidenceMarkdown: "arg1", relevanceScore: 0.95 },
         { _id: "ev2", title: "T2", citationClause: "C2", sourceUrl: "u2", extractedEvidenceMarkdown: "arg2", relevanceScore: 0.85 },
@@ -269,5 +278,54 @@ describe("Convex Precedents & Controlling Authorities Engine", () => {
       expect(res).toHaveLength(1);
       expect(res[0].primaryCpt).toBe("63047");
     });
+
+    it("searchLexicalPrecedentsInternal: returns empty on empty query, else stripped precedent results", async () => {
+      const mockCtx: any = { db: {} };
+      expect(await (precedents.searchLexicalPrecedentsInternal as any)._handler(mockCtx, { query: "" })).toEqual([]);
+
+      const mockRawResults = [
+        {
+          _id: "p1",
+          sourceKind: "winning_brief",
+          title: "Brief 1",
+          citation: "Cit 1",
+          primaryCpt: "63047",
+          carcCode: "CO-50",
+          winningArgument: "Arg",
+          statutoryLanguage: "Stat",
+          outcome: "Overturned",
+          sourceUrl: "url",
+          embedding: [0.1, 0.2, 0.3], // should be stripped
+        },
+      ];
+
+      const mockCtxSearch: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            withSearchIndex: vi.fn().mockImplementation((_name, fn) => {
+              const qObj: any = {};
+              qObj.search = vi.fn().mockReturnValue(qObj);
+              qObj.eq = vi.fn().mockReturnValue(qObj);
+              fn(qObj);
+              return {
+                take: vi.fn().mockResolvedValue(mockRawResults),
+              };
+            }),
+          }),
+        },
+      };
+
+      const res = await (precedents.searchLexicalPrecedentsInternal as any)._handler(mockCtxSearch, {
+        query: "arthroplasty criteria",
+        primaryCpt: "63047",
+        carcCode: "CO-50",
+        limit: 5,
+      });
+
+      expect(res).toHaveLength(1);
+      expect(res[0]._id).toBe("p1");
+      expect((res[0] as any).embedding).toBeUndefined();
+    });
   });
 });
+

@@ -266,7 +266,13 @@ export interface VectorPrecedentMatch {
   vectorScore: number;
   combinedScore: number;
   codeOverlap: number;
+  vectorRank?: number;
+  textRank?: number;
+  rrfScore?: number;
+  textScore?: number;
+  retrievalSource?: "hybrid_fusion" | "vector_only" | "bm25_only";
 }
+
 
 export interface ClinicalEvidence {
   _id: string;

@@ -16,4 +16,16 @@ export const precedentMatchValidator = v.object({
   vectorScore: v.number(),
   combinedScore: v.number(),
   codeOverlap: v.number(),
+  vectorRank: v.optional(v.number()),
+  textRank: v.optional(v.number()),
+  rrfScore: v.optional(v.number()),
+  textScore: v.optional(v.number()),
+  retrievalSource: v.optional(
+    v.union(
+      v.literal("hybrid_fusion"),
+      v.literal("vector_only"),
+      v.literal("bm25_only")
+    )
+  ),
 });
+
