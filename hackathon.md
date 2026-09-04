@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-04T09:46:00Z
+- **Last updated:** 2026-09-04T10:57:00Z
 
 ## Log
 
@@ -703,7 +703,7 @@ Remediated prompt injection data exfiltration across Sentinel Chatbot tool execu
 ### 2026-09-04 - f5555a8
 Hardened ingestion pipeline evidence persistence, file storage cleanup, and case deletion scalability: eliminated evidence orphaning on Firecrawl 429/WAF errors by moving policy clause replacement to clear-after-success via atomic `replaceForClaimInternal` (`convex/actions/policyCrawler.ts`, `convex/clinicalEvidences.ts`) and preserving existing clauses in Sentinel pipeline fallbacks (`convex/actions/sentinelPipeline.ts`); resolved adverse determination document storage leaks by linking `denialLetterStorageId` on intake and executing immediate cleanup via `cleanupStorageFileInternal` on document rejection or parsing error (`convex/actions/opticalParser.ts`); and eliminated `TransactionTooLarge` limits during case purging by refactoring `deleteCase` to a scheduler fan-out architecture (`convex/claims.ts`), deleting root claims immediately and fanning out bounded batch cleanups across child tables and storage via `ctx.scheduler.runAfter`. Added test coverage across `tests/ingestionAndDeletionPipeline.test.ts`, `tests/actionsClinicalAndParser.test.ts`, and `tests/convexClinicalEvidences.test.ts`. Convex features: actions, internalMutation, scheduled functions (`ctx.scheduler.runAfter`), file storage (`ctx.storage.delete`), components (`@convex-dev/aggregate`, `@firecrawl/firecrawl-convex`).
 
-### 2026-09-04 - working tree
+### 2026-09-04 - 8da52d8
 Optimized Convex Database I/O across top read-heavy functions (`emails.getExistingAgentMailMessageIds`, `emails.getThreadWithMessages`, `auditLogs.listRecent`, `claims.getById`, and `claims.list`):
 - Diagnosed root causes of 154 MB Database I/O: full-document MIME scanning (`bodyHtml`, `bodyText`) in `getExistingAgentMailMessageIds` during 5-minute cron sweeps and window focus events; whole-brief array scans in `claims.getById` just to fetch the latest version and calculate evidence count; unbounded multi-claim fan-out in `auditLogs.listRecent`; and unthrottled background reactive queries in `useCommunications` across non-communications views.
 - Added compact index table `recordedAgentMailMessageIds` (`convex/schema.ts`) and updated `getExistingAgentMailMessageIds` and `hasMessageByAgentMailId` (`convex/emails.ts`) to query lightweight index records (~50 bytes) before touching `emailMessages`, reducing message existence I/O by >99%.
@@ -712,3 +712,13 @@ Optimized Convex Database I/O across top read-heavy functions (`emails.getExisti
 - Batched and deduplicated patient lookups in `claims.list` (`convex/claims.ts`) to eliminate redundant `patientId` queries.
 - Optimized `auditLogs.listRecent` (`convex/auditLogs.ts`) with bounded queries (`take(10)` instead of unbounded scans) and gated reactive subscriptions in `src/hooks/useCommunications.ts` and `src/App.tsx` so communication threads and audit logs are only subscribed to when their respective views are active.
 - Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors/warnings, 423/423 passing unit tests across 29 suites with 81.66% statement coverage, and successful production build in 7.60s). Convex features: schema, compound indexes (`by_agent_mail_message_id`, `by_claimId_and_version`, `by_user_and_timestamp`), internalQuery, internalMutation, queries, mutations, actions.
+
+### 2026-09-04 - working tree
+Hardened Convex DB query performance, eliminated N+1 queries, unindexed scans, TOCTOU race conditions, and cron over-fetching:
+- Eliminated N+1 `ctx.db.get(patientId)` fallback queries in `claims.list` by relying strictly on denormalized `patientName` and `insurancePayer`; routed combined payer and status queries through new composite index `by_user_payer_status` (`convex/schema.ts`, `convex/claims.ts`); purged unindexed 500-claim in-memory search fallback in `findMatchingClaimInternal` in favor of indexed lookups (`by_claim_number`, `by_threadId`, recipient); and bounded `executeSweepDeadlinesBatch` to 50 items with `by_deadline` index pagination.
+- Replaced unbounded `.collect() + sort` across `convex/appeals.ts` and `convex/p2pScripts.ts` (`getLatestByClaim`, `getLatestByClaimInternal`, `getByClaimAndLevel`, `listVersions`) with indexed `order("desc").first()` and `take(50)` via `by_claimId_and_version`, and optimized chatbot session queries in `convex/chatbot.ts` via `by_session_and_time`.
+- Enforced `userId: v.id("users")` foreign keys on `patients`, `claims`, `chatbotSessions`, and `userSettings` to prevent unassociated records.
+- Accelerated precedent retrieval in `convex/precedents.ts` with concurrent `Promise.all` hydration and stripped 12KB `embedding` vectors from client payloads; added declared vector search pre-filtering on `carcCode` and `primaryCpt` with graceful fallback in `convex/actions/precedentArchive.ts`.
+- Eliminated AgentMail webhook/cron TOCTOU double-processing via atomic reservation mutation `reserveAgentMailMessageProcessing` (`convex/emails.ts`), capped sync polling to 30 items with 60-second cooldown `SYNC_COOLDOWN_MS` (`convex/crons.ts`, `convex/actions/agentMail.ts`), and bounded email thread queries (`take(50)`).
+- Hardened external integrations with 30s timeouts and retries on OpenAI completions (`convex/lib/openai.ts`), added `agentMailFetch` with 15s timeout and exponential backoff on transient errors (`convex/lib/agentMail.ts`), and added OCC deduplication guards to P2P live sessions (`convex/p2pCallSessions.ts`).
+- Verified with `npm run verify`: 100% clean typecheck, 0 ESLint errors/warnings under strict `@typescript-eslint/no-explicit-any`, 423/423 passing unit tests across 29 suites with 81.24% statement coverage, and successful production build in 6.49s. Convex features: schema, compound indexes (`by_user_payer_status`, `by_claimId_and_version`, `by_deadline`, `by_session_and_time`), internalQuery, internalMutation, queries, mutations, actions, vector search.

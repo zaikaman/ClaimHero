@@ -63,15 +63,18 @@ export const list = query({
     const hasPayer = Boolean(args.payer && args.payer !== "all");
 
     let queryBuilder;
-    if (hasPayer) {
+    if (hasPayer && hasStatus) {
+      queryBuilder = ctx.db
+        .query("claims")
+        .withIndex("by_user_payer_status", (q) =>
+          q.eq("userId", userId).eq("insurancePayer", args.payer!).eq("status", args.status!)
+        );
+    } else if (hasPayer) {
       queryBuilder = ctx.db
         .query("claims")
         .withIndex("by_user_payer", (q) =>
           q.eq("userId", userId).eq("insurancePayer", args.payer!)
         );
-      if (hasStatus) {
-        queryBuilder = queryBuilder.filter((q) => q.eq(q.field("status"), args.status!));
-      }
     } else if (hasStatus) {
       queryBuilder = ctx.db
         .query("claims")
@@ -101,34 +104,9 @@ export const list = query({
         ? paginatedResult.page.filter((c) => !c.isDemo)
         : paginatedResult.page;
 
-      const missingPatientIds = Array.from(
-        new Set(
-          page
-            .filter((c) => !c.patientName || !c.insurancePayer)
-            .map((c) => c.patientId)
-        )
-      );
-      const patientMap = new Map<Id<"patients">, Doc<"patients"> | null>();
-      if (missingPatientIds.length > 0) {
-        await Promise.all(
-          missingPatientIds.map(async (pid) => {
-            const p = (await ctx.db.get(pid)) as Doc<"patients"> | null;
-            patientMap.set(pid, p);
-          })
-        );
-      }
-
       const mappedPage = page.map((claim) => {
-        let patientName = claim.patientName;
-        let insurancePayer = claim.insurancePayer;
-
-        if (!patientName || !insurancePayer) {
-          const patient = patientMap.get(claim.patientId);
-          if (patient) {
-            patientName = patientName || patient.name;
-            insurancePayer = insurancePayer || patient.insurancePayer;
-          }
-        }
+        const patientName = claim.patientName || "Patient";
+        const insurancePayer = claim.insurancePayer || "Health Insurer";
 
         return {
           ...claim,
@@ -136,10 +114,10 @@ export const list = query({
           insurancePayer,
           patient: {
             _id: claim.patientId,
-            name: patientName || "Patient",
+            name: patientName,
             email: "",
             memberId: "PENDING",
-            insurancePayer: insurancePayer || "Health Insurer",
+            insurancePayer,
             state: "FL",
             createdAt: claim.createdAt,
           },
@@ -158,36 +136,10 @@ export const list = query({
       claims = claims.filter((c) => !c.isDemo);
     }
 
-    const missingPatientIds = Array.from(
-      new Set(
-        claims
-          .filter((c) => !c.patientName || !c.insurancePayer)
-          .map((c) => c.patientId)
-      )
-    );
-    const patientMap = new Map<Id<"patients">, Doc<"patients"> | null>();
-    if (missingPatientIds.length > 0) {
-      await Promise.all(
-        missingPatientIds.map(async (pid) => {
-          const p = (await ctx.db.get(pid)) as Doc<"patients"> | null;
-          patientMap.set(pid, p);
-        })
-      );
-    }
-
     // Map denormalized patient data into the expected Claim shape without N+1 joins
     return claims.map((claim) => {
-      let patientName = claim.patientName;
-      let insurancePayer = claim.insurancePayer;
-
-      // Graceful fallback for legacy documents
-      if (!patientName || !insurancePayer) {
-        const patient = patientMap.get(claim.patientId);
-        if (patient) {
-          patientName = patientName || patient.name;
-          insurancePayer = insurancePayer || patient.insurancePayer;
-        }
-      }
+      const patientName = claim.patientName || "Patient";
+      const insurancePayer = claim.insurancePayer || "Health Insurer";
 
       return {
         ...claim,
@@ -195,10 +147,10 @@ export const list = query({
         insurancePayer,
         patient: {
           _id: claim.patientId,
-          name: patientName || "Patient",
+          name: patientName,
           email: "",
           memberId: "PENDING",
-          insurancePayer: insurancePayer || "Health Insurer",
+          insurancePayer,
           state: "FL",
           createdAt: claim.createdAt,
         },
@@ -481,42 +433,6 @@ export const findMatchingClaimInternal = internalQuery({
       if (byAssigned) return byAssigned;
     }
 
-    // 5. Fallback: Scan recent claims and check if any claim's claimNumber appears in subject/body
-    const recentClaims = await ctx.db
-      .query("claims")
-      .withIndex("by_created")
-      .order("desc")
-      .take(500);
-    const subjectAndBody = textToScan.toLowerCase();
-
-    const contentMatch = recentClaims.find((c) => {
-      if (!c.claimNumber) return false;
-      const cNum = c.claimNumber.toLowerCase();
-      return subjectAndBody.includes(cNum);
-    });
-    if (contentMatch) return contentMatch;
-
-    // Resilient recipient fallback match in memory (excluding shared mailboxes)
-    const recipientMatch = recentClaims.find((c) =>
-      args.recipients.some((r) => {
-        const nr = r.trim().toLowerCase();
-        if (
-          nr.includes("claimhero-sender@") ||
-          nr.includes("claimhero-adjudicator@") ||
-          nr === "claimhero-sender@agentmail.to" ||
-          nr === "claimhero-adjudicator@agentmail.to"
-        ) {
-          return false;
-        }
-        return (
-          c.agentMailInboxEmail?.toLowerCase() === nr ||
-          c.agentMailAdjudicatorEmail?.toLowerCase() === nr ||
-          c.assignedAgentEmail?.toLowerCase() === nr
-        );
-      })
-    );
-    if (recipientMatch) return recipientMatch;
-
     return null;
   },
 });
@@ -677,6 +593,24 @@ async function applyCreateWithPatient(
   let userId: Id<"users"> | undefined = explicitUserId || authUserId || undefined;
   const now = Date.now();
 
+  if (!userId) {
+    const defaultUser = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", "sentinel@claimhero.internal"))
+      .first();
+    if (defaultUser) {
+      userId = defaultUser._id;
+    } else {
+      userId = await ctx.db.insert("users", {
+        name: "ClaimHero Sentinel System",
+        email: "sentinel@claimhero.internal",
+        createdAt: now,
+      });
+    }
+  }
+
+  const effectiveUserId: Id<"users"> = userId;
+
   // Check if patient already exists by email (bounded scan)
   const cleanEmail = args.patientEmail?.trim() || "";
   let matchingPatient: Doc<"patients"> | undefined;
@@ -690,11 +624,11 @@ async function applyCreateWithPatient(
     if (!userId && matchingPatient?.userId) {
       userId = matchingPatient.userId;
     }
-  } else if (args.patientName.trim() && userId) {
+  } else if (args.patientName.trim()) {
     // If no email, check if user has an existing patient record matching name and memberId/payer
     const userPatients = await ctx.db
       .query("patients")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", effectiveUserId))
       .take(50);
     matchingPatient = userPatients.find(
       (p) =>
@@ -708,7 +642,7 @@ async function applyCreateWithPatient(
   if (matchingPatient) {
     patientId = matchingPatient._id;
     await ctx.db.patch(patientId, {
-      ...(userId ? { userId } : {}),
+      userId: effectiveUserId,
       name: args.patientName,
       email: cleanEmail || matchingPatient.email || "",
       memberId: args.memberId || matchingPatient.memberId || "PENDING",
@@ -718,7 +652,7 @@ async function applyCreateWithPatient(
     });
   } else {
     patientId = await ctx.db.insert("patients", {
-      userId,
+      userId: effectiveUserId,
       name: args.patientName,
       email: cleanEmail,
       memberId: args.memberId || "PENDING",
@@ -766,7 +700,7 @@ async function applyCreateWithPatient(
   const isSyntheticPII = args.isSyntheticPII ?? isDemo;
 
   const claimId = await ctx.db.insert("claims", {
-    userId,
+    userId: effectiveUserId,
     patientId,
     patientName: args.patientName,
     insurancePayer: args.insurancePayer || "Molina Healthcare",
@@ -1112,11 +1046,19 @@ async function executeSweepDeadlinesBatch(
   }
 ) {
   const now = Date.now();
-  const batchSize = Math.min(Math.max(1, args.batchSize ?? 100), 250);
+  const batchSize = Math.min(Math.max(1, args.batchSize ?? 50), 50);
 
-  const pageResult = await ctx.db
-    .query("claims")
-    .paginate({ cursor: args.cursor, numItems: batchSize });
+  const q = ctx.db.query("claims");
+  const queryWithIndex = q as unknown as {
+    withIndex?: (name: string) => {
+      paginate: typeof q.paginate;
+    };
+    paginate: typeof q.paginate;
+  };
+  const indexedQuery = typeof queryWithIndex.withIndex === "function"
+    ? queryWithIndex.withIndex("by_deadline")
+    : queryWithIndex;
+  const pageResult = await indexedQuery.paginate({ cursor: args.cursor, numItems: batchSize });
 
   let batchUpdated = 0;
   let batchCritical = 0;
@@ -1188,7 +1130,7 @@ export const sweepDeadlines = internalMutation({
   handler: async (ctx, args) => {
     return await executeSweepDeadlinesBatch(ctx, {
       cursor: args.cursor ?? null,
-      batchSize: args.batchSize ?? 100,
+      batchSize: args.batchSize ?? 50,
       totalUpdated: 0,
       totalCritical: 0,
     });

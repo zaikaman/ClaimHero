@@ -84,6 +84,43 @@ export function formatMessageIdHeader(id: string): string {
   return `<${trimmed}@agentmail.to>`;
 }
 
+async function agentMailFetch(
+  url: string,
+  init: RequestInit,
+  options: { timeoutMs?: number; maxRetries?: number } = {}
+): Promise<Response> {
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  const maxRetries = options.maxRetries ?? 2;
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(url, {
+        ...init,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.status >= 500 && attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      lastError = err;
+      if (attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+      }
+    }
+  }
+
+  throw new Error(`AgentMail request to ${url} timed out or failed after retries: ${String(lastError)}`);
+}
+
 export async function sendAgentMailMessage(options: {
   inboxId: string;
   to: string;
@@ -92,7 +129,7 @@ export async function sendAgentMailMessage(options: {
   html: string;
   headers?: Record<string, string>;
 }): Promise<AgentMailSendResult> {
-  const response = await fetch(
+  const response = await agentMailFetch(
     `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(options.inboxId)}/messages/send`,
     {
       method: "POST",
@@ -130,7 +167,7 @@ export async function replyAgentMailMessage(options: {
   to?: string;
   headers?: Record<string, string>;
 }): Promise<AgentMailSendResult> {
-  const response = await fetch(
+  const response = await agentMailFetch(
     `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(options.inboxId)}/messages/${encodeURIComponent(options.messageId)}/reply`,
     {
       method: "POST",
@@ -163,7 +200,7 @@ export async function listAgentMailMessages(
   inboxId: string,
   limit = 20
 ): Promise<Array<Record<string, unknown>>> {
-  const response = await fetch(
+  const response = await agentMailFetch(
     `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(inboxId)}/messages?limit=${limit}`,
     {
       method: "GET",
@@ -181,7 +218,7 @@ export async function listAgentMailMessages(
 }
 
 export async function getAgentMailMessage(inboxId: string, messageId: string): Promise<Record<string, unknown>> {
-  const response = await fetch(
+  const response = await agentMailFetch(
     `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}`,
     {
       method: "GET",
@@ -201,7 +238,7 @@ export async function downloadAgentMailAttachment(options: {
   messageId: string;
   attachmentId: string;
 }): Promise<{ bytes: ArrayBuffer; contentType?: string }> {
-  const response = await fetch(
+  const response = await agentMailFetch(
     `${AGENTMAIL_API_BASE_URL}/inboxes/${encodeURIComponent(options.inboxId)}/messages/${encodeURIComponent(options.messageId)}/attachments/${encodeURIComponent(options.attachmentId)}`,
     {
       method: "GET",

@@ -47,7 +47,7 @@ export async function createStructuredCompletion<T>(options: {
   temperature?: number;
 }): Promise<T> {
   const { model } = getOpenAIConfig();
-  const client = getOpenAIClient();
+  const client = getOpenAIClient({ timeout: 30_000, maxRetries: 2 });
 
   if (options.fileInputs && options.fileInputs.length > 0) {
     const content = [
@@ -150,7 +150,7 @@ export async function createChatCompletion(options: {
   temperature?: number;
 }): Promise<string> {
   const { model } = getOpenAIConfig();
-  const client = getOpenAIClient();
+    const client = getOpenAIClient({ timeout: 30_000, maxRetries: 2 });
 
   const response = await client.chat.completions.create({
     model,

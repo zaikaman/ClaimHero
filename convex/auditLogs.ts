@@ -94,7 +94,7 @@ export const listRecent = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    const limit = args.limit || 15;
+    const limit = Math.min(Math.max(1, args.limit ?? 20), 20);
 
     const userClaims = await ctx.db
       .query("claims")
@@ -109,7 +109,7 @@ export const listRecent = query({
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
       .slice(0, 10);
 
-    // Fetch indexed recent logs for each claim in parallel
+    // Fetch indexed recent logs for each claim in parallel, strictly capped at 20
     const logsPerClaim = await Promise.all(
       activeClaims.map((claim) =>
         ctx.db

@@ -608,10 +608,21 @@ export const processInboundClaimReply = internalAction({
   },
 });
 
+let lastSyncTimestamp = 0;
+const SYNC_COOLDOWN_MS = 60_000;
+
 async function performInboxSync(
   ctx: ActionCtx,
   limit = 30
 ): Promise<{ syncedCount: number; totalChecked: number }> {
+  const now = Date.now();
+  if (now - lastSyncTimestamp < SYNC_COOLDOWN_MS) {
+    return { syncedCount: 0, totalChecked: 0 };
+  }
+  lastSyncTimestamp = now;
+
+  const effectiveLimit = Math.min(Math.max(1, limit ?? 30), 30);
+
   if (!process.env.AGENTMAIL_API_KEY?.trim()) {
     return { syncedCount: 0, totalChecked: 0 };
   }
@@ -636,7 +647,7 @@ async function performInboxSync(
 
   for (const inboxId of inboxesToCheck) {
     try {
-      const messages = await listAgentMailMessages(inboxId, limit);
+      const messages = await listAgentMailMessages(inboxId, effectiveLimit);
       inboxMessagesMap.push({ inboxId, messages });
       for (const msg of messages) {
         const rawMessageId =

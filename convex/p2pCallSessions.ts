@@ -118,8 +118,18 @@ export const appendTranscript = mutation({
     await requireClaimOwner(ctx, session.claimId);
 
     const existingIndex = session.transcripts.findIndex((t) => t.id === args.transcriptItem.id);
-    let updatedTranscripts = [...session.transcripts];
+    if (existingIndex >= 0) {
+      const existing = session.transcripts[existingIndex];
+      if (
+        existing.text === args.transcriptItem.text &&
+        existing.isFinal === args.transcriptItem.isFinal &&
+        existing.speaker === args.transcriptItem.speaker
+      ) {
+        return;
+      }
+    }
 
+    let updatedTranscripts = [...session.transcripts];
     if (existingIndex >= 0) {
       updatedTranscripts[existingIndex] = args.transcriptItem;
     } else {
@@ -157,7 +167,12 @@ async function applyAddFastAnswer(ctx: MutationCtx, args: AddFastAnswerArgs) {
   const session = await ctx.db.get(args.sessionId);
   if (!session) return;
 
-  const fastAnswers = [args.fastAnswer, ...(session.fastAnswers || [])].slice(0, 30);
+  const existingAnswers = session.fastAnswers || [];
+  if (existingAnswers.some((a) => a.id === args.fastAnswer.id)) {
+    return;
+  }
+
+  const fastAnswers = [args.fastAnswer, ...existingAnswers].slice(0, 30);
 
   // Dynamic boost to win score when high confidence fast answer is available
   const newWinScore = Math.min(100, Math.max(0, session.winScore + 5));

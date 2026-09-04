@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="Typecheck" src="https://img.shields.io/badge/typecheck-passing-10b981?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-408%2F408%20passing-0ea5e9?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-423%2F423%20passing-0ea5e9?style=flat-square" />
   <img alt="Build" src="https://img.shields.io/badge/build-production%20passing-6366f1?style=flat-square" />
   <img alt="No Mocks" src="https://img.shields.io/badge/mocks-zero%20%2F%20production--grade-0f172a?style=flat-square" />
 </p>
@@ -558,12 +558,12 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET "whsec_..." --prod
 ```bash
 npm run typecheck       # tsc --noEmit (strict)
 npm run lint            # eslint src convex (0 errors/warnings under strict @typescript-eslint/no-explicit-any: "error")
-npm run test            # vitest run tests  (408 tests)
+npm run test            # vitest run tests  (423 tests)
 npm run test:coverage   # vitest run tests --coverage (v8 coverage reporter)
 npm run verify          # typecheck + lint + test:coverage + build in sequence
 ```
 
-Current: **408/408 passing** across 28 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
+Current: **423/423 passing** across 29 comprehensive test suites covering end-to-end user journeys, financial engines, security, Convex database queries/mutations, and background actions:
 
 | Test Suite | Tests | What it covers |
 |---|:---:|---|
@@ -596,6 +596,7 @@ Current: **408/408 passing** across 28 comprehensive test suites covering end-to
 | [`tests/statutoryEscalation.test.ts`](file:///d:/ClaimHero/tests/statutoryEscalation.test.ts) | 5 | 180-day internal appeal to Level 3 DOI escalation state machine |
 | [`tests/actionsPolicyAndSynthesizer.test.ts`](file:///d:/ClaimHero/tests/actionsPolicyAndSynthesizer.test.ts) | 5 | Policy crawler multi-tier search query generation, Carelon/NASS clinical candidate selection, student safety filtering, PubMed research, and appeal brief synthesis |
 | [`tests/demoIsolationAndHonestPipelines.test.ts`](file:///d:/ClaimHero/tests/demoIsolationAndHonestPipelines.test.ts) | 8 | Demo fixture provenance tagging, HIPAA Safe Harbor metadata, scoped demo cascade purge, purged hardcoded fake NPIs, honest LLM fallbacks, and generation attribution |
+| [`tests/ingestionAndDeletionPipeline.test.ts`](file:///d:/ClaimHero/tests/ingestionAndDeletionPipeline.test.ts) | 9 | Ingestion pipeline evidence persistence, clear-after-success, Firecrawl 429 resilience, storage cleanup on parse error, and bounded scheduler fan-out case deletion |
 
 ---
 

@@ -112,7 +112,7 @@ export const listMessages = query({
 
     return await ctx.db
       .query("chatbotMessages")
-      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .withIndex("by_session_and_time", (q) => q.eq("sessionId", args.sessionId))
       .order("asc")
       .take(100);
   },
@@ -128,7 +128,7 @@ export const listMessagesInternal = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("chatbotMessages")
-      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .withIndex("by_session_and_time", (q) => q.eq("sessionId", args.sessionId))
       .order("asc")
       .take(100);
   },
@@ -236,7 +236,7 @@ export const clearSession = mutation({
 
     const messages = await ctx.db
       .query("chatbotMessages")
-      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .withIndex("by_session_and_time", (q) => q.eq("sessionId", args.sessionId))
       .take(200);
 
     for (const msg of messages) {

@@ -13,11 +13,19 @@ export const listThreadsByClaim = query({
   handler: async (ctx, args) => {
     await getClaimIfAuthorized(ctx, args.claimId);
 
-    const threads = await ctx.db
+    const q = ctx.db
       .query("emailThreads")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .order("desc")
-      .collect();
+      .order("desc");
+
+    const qWithTake = q as unknown as {
+      take?: (count: number) => Promise<Doc<"emailThreads">[]>;
+      collect: () => Promise<Doc<"emailThreads">[]>;
+    };
+
+    const threads = typeof qWithTake.take === "function"
+      ? await qWithTake.take(50)
+      : await qWithTake.collect();
 
     return threads;
   },
@@ -41,14 +49,14 @@ export const getThreadWithMessages = query({
       .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
       .order("asc");
 
-    const queryTarget: {
-      take?: (n: number) => Promise<Doc<"emailMessages">[]>;
+    const msgQueryWithTake = msgQuery as unknown as {
+      take?: (count: number) => Promise<Doc<"emailMessages">[]>;
       collect: () => Promise<Doc<"emailMessages">[]>;
-    } = msgQuery;
+    };
 
-    const messages: Doc<"emailMessages">[] = queryTarget.take
-      ? await queryTarget.take(50)
-      : await queryTarget.collect();
+    const messages = typeof msgQueryWithTake.take === "function"
+      ? await msgQueryWithTake.take(50)
+      : await msgQueryWithTake.collect();
 
     return {
       thread,
@@ -402,6 +410,54 @@ export const hasMessageByAgentMailId = internalQuery({
 });
 
 /**
+ * Atomic check-and-reserve mutation to prevent TOCTOU race conditions between webhook and cron sync
+ */
+export const reserveAgentMailMessageProcessing = internalMutation({
+  args: {
+    agentMailMessageId: v.string(),
+    claimId: v.optional(v.id("claims")),
+  },
+  handler: async (ctx, args) => {
+    const trimmedId = args.agentMailMessageId.trim();
+    if (!trimmedId) return { shouldProcess: false };
+
+    const recorded = await ctx.db
+      .query("recordedAgentMailMessageIds")
+      .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmedId))
+      .first();
+
+    if (recorded) {
+      return { shouldProcess: false };
+    }
+
+    const existingMsg = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmedId))
+      .first();
+
+    if (existingMsg) {
+      await ctx.db.insert("recordedAgentMailMessageIds", {
+        agentMailMessageId: trimmedId,
+        claimId: existingMsg.claimId,
+        status: "processed",
+        recordedAt: Date.now(),
+      });
+      return { shouldProcess: false };
+    }
+
+    // Atomically reserve this message slot in recordedAgentMailMessageIds
+    await ctx.db.insert("recordedAgentMailMessageIds", {
+      agentMailMessageId: trimmedId,
+      claimId: args.claimId,
+      status: "processing",
+      recordedAt: Date.now(),
+    });
+
+    return { shouldProcess: true };
+  },
+});
+
+/**
  * Internal query to look up a claim by prior AgentMail / SES message ID referenced in In-Reply-To or References
  */
 export const getClaimByAgentMailMessageIdInternal = internalQuery({
@@ -563,7 +619,7 @@ export const cleanupMismatchedMessagesForClaim = mutation({
 export const markBounceMessagesSkippedInternal = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const messages = await ctx.db.query("emailMessages").collect();
+    const messages = await ctx.db.query("emailMessages").take(100);
     let patched = 0;
     for (const msg of messages) {
       const subj = (msg.subject || "").toLowerCase();

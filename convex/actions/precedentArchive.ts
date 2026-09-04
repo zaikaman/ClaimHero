@@ -4,7 +4,7 @@ import { action, internalAction } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import type { Doc, Id } from "../_generated/dataModel";
+import type { Id } from "../_generated/dataModel";
 import { createEmbedding } from "../lib/openai";
 import { PRECEDENT_CORPUS } from "../lib/precedentCorpus";
 import {
@@ -161,14 +161,33 @@ export const retrieveTopPrecedents = action({
     const extraTokens = weightedTokensForCodes(icd10Codes, cptCodes, [denialReasonCode]);
     const embedding = await createEmbedding(queryText, extraTokens);
 
-    const hits = await ctx.vectorSearch("precedents", "by_embedding", {
+    const primaryCpt = cptCodes[0]?.trim();
+    const cleanCarc = denialReasonCode?.trim();
+
+    let hits = await ctx.vectorSearch("precedents", "by_embedding", {
       vector: embedding,
       limit: 16,
+      ...(cleanCarc && primaryCpt
+        ? { filter: (q) => q.or(q.eq("carcCode", cleanCarc), q.eq("primaryCpt", primaryCpt)) }
+        : cleanCarc
+        ? { filter: (q) => q.eq("carcCode", cleanCarc) }
+        : primaryCpt
+        ? { filter: (q) => q.eq("primaryCpt", primaryCpt) }
+        : {}),
     });
 
+    if (hits.length === 0 && (cleanCarc || primaryCpt)) {
+      hits = await ctx.vectorSearch("precedents", "by_embedding", {
+        vector: embedding,
+        limit: 16,
+      });
+    }
+
     const ids = hits.map((hit) => hit._id);
-    const docs: Doc<"precedents">[] = (await ctx.runQuery(internal.precedents.hydrateByIds, { ids })) || [];
-    const docsById = new Map<Id<"precedents">, Doc<"precedents">>(docs.map((doc: Doc<"precedents">) => [doc._id, doc]));
+    const docs = (await ctx.runQuery(internal.precedents.hydrateByIds, { ids })) || [];
+    const docsById = new Map<Id<"precedents">, (typeof docs)[number]>(
+      docs.map((doc) => [doc._id, doc])
+    );
 
     const rankable = hits
       .map((hit) => {

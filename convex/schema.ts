@@ -18,7 +18,7 @@ export default defineSchema({
 
   // Patients / Insured Policyholders
   patients: defineTable({
-    userId: v.optional(v.id("users")),
+    userId: v.id("users"),
     name: v.string(),
     email: v.string(),
     memberId: v.string(),
@@ -33,7 +33,7 @@ export default defineSchema({
 
   // Core Medical Appeal Claims
   claims: defineTable({
-    userId: v.optional(v.id("users")),
+    userId: v.id("users"),
     patientId: v.id("patients"),
     patientName: v.optional(v.string()),
     insurancePayer: v.optional(v.string()),
@@ -169,6 +169,7 @@ export default defineSchema({
     .index("by_user_demo", ["userId", "isDemo"])
     .index("by_user_status", ["userId", "status"])
     .index("by_user_payer", ["userId", "insurancePayer"])
+    .index("by_user_payer_status", ["userId", "insurancePayer", "status"])
     .index("by_payer", ["insurancePayer"])
     .index("by_status", ["status"])
     .index("by_patient", ["patientId"])
@@ -372,7 +373,9 @@ export default defineSchema({
     lastEditedBy: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_claim", ["claimId"]),
+  })
+    .index("by_claim", ["claimId"])
+    .index("by_claimId_and_version", ["claimId", "version"]),
 
   // Real-Time P2P Live Call Copilot Sessions
   p2pCallSessions: defineTable({
@@ -420,7 +423,7 @@ export default defineSchema({
 
   // Sentinel Chatbot Persistent Conversation Sessions
   chatbotSessions: defineTable({
-    userId: v.optional(v.id("users")),
+    userId: v.id("users"),
     title: v.string(),
     activeClaimId: v.optional(v.id("claims")),
     summary: v.optional(v.string()), // Compressed summary of older conversation turns
@@ -454,7 +457,7 @@ export default defineSchema({
 
   // Global & Per-User Sentinel Operational Settings
   userSettings: defineTable({
-    userId: v.optional(v.id("users")),
+    userId: v.id("users"),
     approvalMode: v.union(
       v.literal("manual_review"),
       v.literal("autonomous_high_confidence")

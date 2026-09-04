@@ -18,6 +18,16 @@ const app = defineApp({
     FIRECRAWL_API_KEY: v.string(),
     FIRECRAWL_WEBHOOK_SECRET: v.optional(v.string()),
     AGENTMAIL_WEBHOOK_SECRET: v.string(),
+    OPENAI_API_KEY: v.optional(v.string()),
+    OPENAI_MODEL: v.optional(v.string()),
+    OPENAI_BASE_URL: v.optional(v.string()),
+    OPENAI_EMBEDDING_MODEL: v.optional(v.string()),
+    AGENTMAIL_API_KEY: v.optional(v.string()),
+    AGENTMAIL_SENDER_INBOX_ID: v.optional(v.string()),
+    AGENTMAIL_SENDER_EMAIL: v.optional(v.string()),
+    AGENTMAIL_ADJUDICATOR_INBOX_ID: v.optional(v.string()),
+    AGENTMAIL_ADJUDICATOR_EMAIL: v.optional(v.string()),
+    SITE_URL: v.optional(v.string()),
   },
 });
 

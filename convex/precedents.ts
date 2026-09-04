@@ -13,19 +13,22 @@ const sourceKindValidator = v.union(
   v.literal("statutory_authority")
 );
 
+export type HydratedPrecedent = Omit<Doc<"precedents">, "embedding">;
+
 /**
- * Hydrate vector-search hits and preserve caller order.
+ * Hydrate vector-search hits in parallel and strip 12KB raw embedding vectors.
  */
 export const hydrateByIds = internalQuery({
   args: {
     ids: v.array(v.id("precedents")),
   },
-  handler: async (ctx, args): Promise<Doc<"precedents">[]> => {
-    const docs: Doc<"precedents">[] = [];
-    for (const id of args.ids) {
-      const doc = await ctx.db.get(id);
+  handler: async (ctx, args): Promise<HydratedPrecedent[]> => {
+    const rawDocs = await Promise.all(args.ids.map((id) => ctx.db.get(id)));
+    const docs: HydratedPrecedent[] = [];
+    for (const doc of rawDocs) {
       if (doc) {
-        docs.push(doc);
+        const { embedding: _, ...rest } = doc;
+        docs.push(rest);
       }
     }
     return docs;
