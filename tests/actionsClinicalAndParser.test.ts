@@ -191,7 +191,108 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
 
       expect(mockCtx.runMutation).not.toHaveBeenCalled();
     });
+
+    it("parseDenialDocument: passes denialLetterStorageId to createWithPatientInternal on successful ingestion", async () => {
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        isMedicalClaimDenial: true,
+        claimNumber: "CLM-999",
+        patientName: "Jane Doe",
+        memberId: "MEM-123",
+        insurancePayer: "Aetna",
+        serviceDate: "2026-01-01",
+        providerName: "General Hospital",
+        deniedAmount: 5000,
+        patientOwedAmount: 5000,
+        cptCodes: ["99213"],
+        icd10Codes: ["M54.5"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+        appealFilingDeadlineDays: 180,
+      } as any);
+
+      const mockCtx: any = {
+        storage: {
+          getUrl: vi.fn().mockResolvedValue("https://storage.test/file.txt"),
+        },
+        runMutation: vi.fn().mockResolvedValue("claim_new_id"),
+        runAction: vi.fn().mockResolvedValue({}),
+      };
+
+      // Mock fetch for text file
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: new Headers({ "content-type": "text/plain", "content-length": "100" }),
+        arrayBuffer: vi.fn().mockResolvedValue(new TextEncoder().encode("Medical denial text").buffer),
+      } as any);
+
+      const res = await (actionOpticalParser.parseDenialDocument as any)._handler(mockCtx, {
+        storageId: "storage_file_123",
+        patientEmail: "jane@test.org",
+        patientState: "CA",
+      });
+
+      expect(res.claimId).toBe("claim_new_id");
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          claimNumber: "CLM-999",
+          denialLetterStorageId: "storage_file_123",
+        })
+      );
+    });
+
+    it("parseDenialDocument: cleans up uploaded storageId when document is rejected as non-claim", async () => {
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        isMedicalClaimDenial: false,
+        documentClassificationReason: "Image of a dog",
+        claimNumber: "",
+        patientName: "",
+        memberId: "",
+        insurancePayer: "",
+        serviceDate: "",
+        providerName: "",
+        deniedAmount: 0,
+        patientOwedAmount: 0,
+        cptCodes: [],
+        icd10Codes: [],
+        denialReasonCode: "",
+        denialReasonDescription: "",
+        appealFilingDeadlineDays: 180,
+      } as any);
+
+      const mockCtx: any = {
+        storage: {
+          getUrl: vi.fn().mockResolvedValue("https://storage.test/file.txt"),
+        },
+        runMutation: vi.fn().mockResolvedValue(undefined),
+        runAction: vi.fn(),
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: new Headers({ "content-type": "text/plain", "content-length": "50" }),
+        arrayBuffer: vi.fn().mockResolvedValue(new TextEncoder().encode("Not a denial").buffer),
+      } as any);
+
+      await expect(
+        (actionOpticalParser.parseDenialDocument as any)._handler(mockCtx, {
+          storageId: "storage_leak_test_id",
+          patientState: "CA",
+        })
+      ).rejects.toThrow(/Non-claim document detected/);
+
+      // Verify that cleanupStorageFileInternal was called with the orphaned storageId
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          storageId: "storage_leak_test_id",
+        })
+      );
+    });
   });
+
 
   describe("convex/actions/payerContactResolver", () => {
     it("resolvePayerGateway: falls back to statutory registry when web crawl returns inconclusive results", async () => {

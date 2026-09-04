@@ -216,6 +216,31 @@ export const insertBatchInternal = internalMutation({
   },
 });
 
+/**
+ * Atomically replaces all clinical evidences for a claim with fresh verified clauses.
+ * Clear-after-success pattern guarantees no orphaned 0-clause state if crawlers fail.
+ */
+export const replaceForClaimInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    evidences: v.array(
+      v.object({
+        sourceType: v.string(),
+        title: v.string(),
+        sourceUrl: v.optional(v.string()),
+        citationClause: v.string(),
+        extractedEvidenceMarkdown: v.string(),
+        relevanceScore: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args): Promise<Id<"clinicalEvidences">[]> => {
+    await applyClearByClaim(ctx, args.claimId);
+    return await applyBatchInsert(ctx, args);
+  },
+});
+
+
 async function applyClearByClaim(ctx: MutationCtx, claimId: Id<"claims">) {
   const existing = await ctx.db
     .query("clinicalEvidences")

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth v2 (@convex-dev/auth@alpha) with Google OAuth and Email/Password components
 - **AI models:** OpenAI gpt-5.4-nano (Structured Outputs, Vision & Clinical Reasoning Engine)
 - **Started:** 2026-08-26T08:03:12Z
-- **Last updated:** 2026-09-04T09:12:00Z
+- **Last updated:** 2026-09-04T09:28:30Z
 
 ## Log
 
@@ -697,5 +697,8 @@ Optimized CI/CD build pipeline and resolved GitHub Actions dependency installati
 - Integrated `actions/cache@v4` targeting `node_modules` keyed by OS and `package-lock.json` hash across all jobs in `.github/workflows/deploy.yml` (`verify`, `deploy`) and `.github/workflows/ci.yml` (`typecheck`, `lint`, `test`, `build`), bypassing `npm ci` on cache hits and dropping dependency setup time from over 4 minutes to under 10 seconds.
 - Hardened job execution with explicit `timeout-minutes` boundaries to prevent unbounded runner stalls.
 
-### 2026-09-04 - working tree
+### 2026-09-04 - 641ec2b
 Remediated prompt injection data exfiltration across Sentinel Chatbot tool execution and internal queries (`convex/chatbot.ts`, `convex/actions/sentinelChatbot.ts`): eliminated cross-tenant claim data and PHI leakage in `getClaimDataForChatbot` and `searchClaimsForChatbot` by accepting caller `userId`, scoping searches strictly through `by_user` and `by_user_status` indexes, verifying claim ownership on lookups, and asserting `claim.userId === args.userId` before returning child clinical evidences, appeal briefs, P2P tele-scripts, and audit logs; hardened `sendMessageWithTools` by validating session ownership before persisting user messages, validating `activeClaimId` against caller `userId` to prevent prompt injection poisoning, and forwarding caller `userId` through all tool executions (`executeToolCall`, `triggerFirecrawlEvidenceIngestion`); and expanded test coverage with 6 dedicated isolation and injection prevention tests across `tests/convexChatbot.test.ts` and `tests/actionsP2PAndChatbot.test.ts`. Convex features: actions, internalQuery, internalMutation, indexes (`by_user`, `by_user_status`, `by_claim_number`).
+
+### 2026-09-04 - working tree
+Hardened ingestion pipeline evidence persistence, file storage cleanup, and case deletion scalability: eliminated evidence orphaning on Firecrawl 429/WAF errors by moving policy clause replacement to clear-after-success via atomic `replaceForClaimInternal` (`convex/actions/policyCrawler.ts`, `convex/clinicalEvidences.ts`) and preserving existing clauses in Sentinel pipeline fallbacks (`convex/actions/sentinelPipeline.ts`); resolved adverse determination document storage leaks by linking `denialLetterStorageId` on intake and executing immediate cleanup via `cleanupStorageFileInternal` on document rejection or parsing error (`convex/actions/opticalParser.ts`); and eliminated `TransactionTooLarge` limits during case purging by refactoring `deleteCase` to a scheduler fan-out architecture (`convex/claims.ts`), deleting root claims immediately and fanning out bounded batch cleanups across child tables and storage via `ctx.scheduler.runAfter`. Added test coverage across `tests/ingestionAndDeletionPipeline.test.ts`, `tests/actionsClinicalAndParser.test.ts`, and `tests/convexClinicalEvidences.test.ts`. Convex features: actions, internalMutation, scheduled functions (`ctx.scheduler.runAfter`), file storage (`ctx.storage.delete`), components (`@convex-dev/aggregate`, `@firecrawl/firecrawl-convex`).

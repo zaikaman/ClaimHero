@@ -1383,12 +1383,6 @@ export const crawlInsurerPolicy = action({
       throw new Error("The custom policy URL must be a valid HTTP or HTTPS source URL.");
     }
 
-    // Do not leave stale, previously accepted citations visible while a new
-    // source-only crawl is in progress or when the crawl fails.
-    await ctx.runMutation(internal.clinicalEvidences.clearByClaimInternal, {
-      claimId: args.claimId,
-    });
-
     let policySource: FirecrawlPolicySource | null = null;
     if (args.customPolicyUrl) {
       const candidateSource = await scrapeFirecrawlPolicySource(ctx, args.customPolicyUrl);
@@ -1650,7 +1644,9 @@ For each clause:
       ...ERISA_STATUTORY_EVIDENCE,
     });
 
-    await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
+    // Clear-after-success: atomically replace prior evidence only after new
+    // policy clauses have been successfully retrieved, extracted, and verified.
+    await ctx.runMutation(internal.clinicalEvidences.replaceForClaimInternal, {
       claimId: args.claimId,
       evidences: evidencesToInsert,
     });

@@ -112,25 +112,34 @@ export const runAutonomousPipeline = action({
       );
     } catch (crawlError) {
       const crawlMessage = crawlError instanceof Error ? crawlError.message : String(crawlError);
-      console.warn("Policy crawl yielded no publicly accessible document:", crawlMessage);
-      // Ensure at least the statutory ERISA precedent is available so the brief
-      // can be synthesized without citing an inaccessible or irrelevant URL.
-      // The crawler already cleared prior evidences, so we insert the fallback.
-      try {
-        await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
-          claimId: args.claimId,
-          evidences: [{ ...ERISA_STATUTORY_EVIDENCE }],
-        });
-      } catch (e) {
-        console.warn("Fallback ERISA insertion note:", e);
+      // Check if clinical evidences already exist for this claim (preserved via clear-after-success).
+      // If none exist (e.g. brand new claim where crawl failed due to 429/WAF), insert the statutory ERISA fallback.
+      const existingEvidences = await ctx.runQuery(
+        internal.clinicalEvidences.listByClaimInternal,
+        { claimId: args.claimId }
+      );
+      if (existingEvidences.length === 0) {
+        try {
+          await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
+            claimId: args.claimId,
+            evidences: [{ ...ERISA_STATUTORY_EVIDENCE }],
+          });
+        } catch (e) {
+          console.warn("Fallback ERISA insertion note:", e);
+        }
       }
       await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
         actor: "Autonomous Sentinel Pipeline",
-        details: `Policy crawl unavailable: ${crawlMessage}. Proceeding with statutory precedent only.`,
+        details: `Policy crawl unavailable: ${crawlMessage}. Proceeding with ${existingEvidences.length > 0 ? "retained clinical evidence and " : ""}statutory precedent.`,
       });
-      crawlResult = { policyTitle: "No publicly accessible policy source (ERISA statutory protocol applied)", clausesExtracted: 1 };
+      crawlResult = {
+        policyTitle: existingEvidences.length > 0
+          ? "Retained existing clinical evidence (live crawler fallback applied)"
+          : "No publicly accessible policy source (ERISA statutory protocol applied)",
+        clausesExtracted: Math.max(existingEvidences.length, 1),
+      };
     }
 
     // Step 2: Precedent Matching & Overturn Probability Scoring

@@ -2,6 +2,7 @@
 
 import { action } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { createStructuredCompletion } from "../lib/openai";
 import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
@@ -177,63 +178,66 @@ export const parseDenialDocument = action({
     const imageUrls: string[] = [];
     const fileInputs: Array<{ fileData: string; filename: string }> = [];
 
-    // If storage file was uploaded, fetch and prepare document content with strict size & MIME validation
-    if (args.storageId) {
-      const fileUrl = await ctx.storage.getUrl(args.storageId);
-      if (!fileUrl) {
-        throw new Error(`File storage ID ${args.storageId} not found`);
+    let claimId: Id<"claims">;
+    let extraction: DenialExtractionResult;
+    try {
+      // If storage file was uploaded, fetch and prepare document content with strict size & MIME validation
+      if (args.storageId) {
+        const fileUrl = await ctx.storage.getUrl(args.storageId);
+        if (!fileUrl) {
+          throw new Error(`File storage ID ${args.storageId} not found`);
+        }
+
+        try {
+          const response = await fetch(fileUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch file from storage: ${response.statusText}`);
+          }
+
+          const contentLength = response.headers.get("content-length");
+          if (contentLength && parseInt(contentLength, 10) > MAX_DOCUMENT_BYTES) {
+            throw new Error(`Uploaded document exceeds the ${MAX_DOCUMENT_BYTES / (1024 * 1024)} MB intake limit.`);
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          if (arrayBuffer.byteLength > MAX_DOCUMENT_BYTES) {
+            throw new Error(`Uploaded document exceeds the ${MAX_DOCUMENT_BYTES / (1024 * 1024)} MB intake limit.`);
+          }
+
+          const rawContentType = response.headers.get("content-type") || "";
+          const detected = detectFileFormat(rawContentType, new Uint8Array(arrayBuffer));
+
+          if (detected.type === "image") {
+            const buffer = Buffer.from(arrayBuffer);
+            const base64 = buffer.toString("base64");
+            imageUrls.push(`data:${detected.mime};base64,${base64}`);
+            documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached image.`.trim();
+          } else if (detected.type === "pdf") {
+            const buffer = Buffer.from(arrayBuffer);
+            const base64 = buffer.toString("base64");
+            fileInputs.push({
+              fileData: `data:application/pdf;base64,${base64}`,
+              filename: "denial-document.pdf",
+            });
+            documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached document.`.trim();
+          } else if (detected.type === "text") {
+            const text = new TextDecoder("utf-8").decode(arrayBuffer);
+            documentContent = [documentContent, text].filter(Boolean).join("\n\n");
+          } else {
+            throw new Error(`Unsupported document format (${rawContentType || "binary"}). Please upload a PDF, image (PNG/JPEG/WebP), or text document.`);
+          }
+        } catch (err) {
+          throw new Error(`Failed to read uploaded document from storage: ${String(err)}`);
+        }
       }
 
-      try {
-        const response = await fetch(fileUrl);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch file from storage: ${response.statusText}`);
-        }
-
-        const contentLength = response.headers.get("content-length");
-        if (contentLength && parseInt(contentLength, 10) > MAX_DOCUMENT_BYTES) {
-          throw new Error(`Uploaded document exceeds the ${MAX_DOCUMENT_BYTES / (1024 * 1024)} MB intake limit.`);
-        }
-
-        const arrayBuffer = await response.arrayBuffer();
-        if (arrayBuffer.byteLength > MAX_DOCUMENT_BYTES) {
-          throw new Error(`Uploaded document exceeds the ${MAX_DOCUMENT_BYTES / (1024 * 1024)} MB intake limit.`);
-        }
-
-        const rawContentType = response.headers.get("content-type") || "";
-        const detected = detectFileFormat(rawContentType, new Uint8Array(arrayBuffer));
-
-        if (detected.type === "image") {
-          const buffer = Buffer.from(arrayBuffer);
-          const base64 = buffer.toString("base64");
-          imageUrls.push(`data:${detected.mime};base64,${base64}`);
-          documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached image.`.trim();
-        } else if (detected.type === "pdf") {
-          const buffer = Buffer.from(arrayBuffer);
-          const base64 = buffer.toString("base64");
-          fileInputs.push({
-            fileData: `data:application/pdf;base64,${base64}`,
-            filename: "denial-document.pdf",
-          });
-          documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached document.`.trim();
-        } else if (detected.type === "text") {
-          const text = new TextDecoder("utf-8").decode(arrayBuffer);
-          documentContent = [documentContent, text].filter(Boolean).join("\n\n");
-        } else {
-          throw new Error(`Unsupported document format (${rawContentType || "binary"}). Please upload a PDF, image (PNG/JPEG/WebP), or text document.`);
-        }
-      } catch (err) {
-        throw new Error(`Failed to read uploaded document from storage: ${String(err)}`);
+      if (!documentContent && imageUrls.length === 0) {
+        throw new Error("No document content or file provided for optical extraction.");
       }
-    }
 
-    if (!documentContent && imageUrls.length === 0) {
-      throw new Error("No document content or file provided for optical extraction.");
-    }
-
-    // Call OpenAI Structured Outputs with gpt-5.4-nano
-    const extraction = await createStructuredCompletion<DenialExtractionResult>({
-      systemPrompt: `You are an expert Certified Professional Medical Coder (CPC) and ERISA Insurance Claims Auditor.
+      // Call OpenAI Structured Outputs with gpt-5.4-nano
+      extraction = await createStructuredCompletion<DenialExtractionResult>({
+        systemPrompt: `You are an expert Certified Professional Medical Coder (CPC) and ERISA Insurance Claims Auditor.
 Your job is to rigorously classify uploaded documents/images and extract structured medical claim denial data.
 
 CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
@@ -250,59 +254,73 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
    - If CPT or ICD-10 codes are missing, return [].
    - If statutory appeal deadline is not explicitly mentioned, default appealFilingDeadlineDays to 180.
 4. Always extract and output all textual metadata, denial reasons, descriptions, and classification reasons exclusively in English.`,
-      userPrompt: `Extract structured medical claim metadata from the following denial document:\n\n${documentContent}`,
-      schemaName: "DenialExtractionResult",
-      schema: DENIAL_EXTRACTION_SCHEMA,
-      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-      fileInputs: fileInputs.length > 0 ? fileInputs : undefined,
-      temperature: 0.1,
-    });
+        userPrompt: `Extract structured medical claim metadata from the following denial document:\n\n${documentContent}`,
+        schemaName: "DenialExtractionResult",
+        schema: DENIAL_EXTRACTION_SCHEMA,
+        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+        fileInputs: fileInputs.length > 0 ? fileInputs : undefined,
+        temperature: 0.1,
+      });
 
-    // Enforce claim validation safeguards - reject non-claim documents
-    if (extraction.isMedicalClaimDenial === false) {
-      const reason =
-        extraction.documentClassificationReason?.trim() ||
-        "The uploaded file is not a valid healthcare insurance claim denial letter or Explanation of Benefits (EOB).";
-      throw new ConvexError(
-        `Non-claim document detected: ${reason} Please upload a genuine adverse determination letter, medical denial notice, or EOB document.`
-      );
+      // Enforce claim validation safeguards - reject non-claim documents
+      if (extraction.isMedicalClaimDenial === false) {
+        const reason =
+          extraction.documentClassificationReason?.trim() ||
+          "The uploaded file is not a valid healthcare insurance claim denial letter or Explanation of Benefits (EOB).";
+        throw new ConvexError(
+          `Non-claim document detected: ${reason} Please upload a genuine adverse determination letter, medical denial notice, or EOB document.`
+        );
+      }
+
+      // Additional sanity check: ensure at least one core claim signal exists
+      const hasFinancials = (extraction.deniedAmount || 0) > 0 || (extraction.patientOwedAmount || 0) > 0;
+      const hasCodes =
+        (extraction.cptCodes && extraction.cptCodes.length > 0) ||
+        (extraction.icd10Codes && extraction.icd10Codes.length > 0) ||
+        Boolean(extraction.denialReasonCode?.trim());
+      const hasClaimIdentifiers =
+        Boolean(extraction.claimNumber?.trim()) ||
+        Boolean(extraction.memberId?.trim()) ||
+        Boolean(extraction.denialReasonDescription?.trim());
+
+      if (!hasFinancials && !hasCodes && !hasClaimIdentifiers) {
+        throw new ConvexError(
+          "The uploaded document does not contain recognizable medical claim denial details (missing denial reason, CPT codes, claim identifiers, and denied amount). Please upload a complete Explanation of Benefits or adverse determination letter."
+        );
+      }
+
+      // Save patient and claim into Convex database with denialLetterStorageId linked
+      claimId = await ctx.runMutation(internal.claims.createWithPatientInternal, {
+        patientName: extraction.patientName?.trim() || "",
+        patientEmail: args.patientEmail?.trim() || "",
+        memberId: extraction.memberId?.trim() || "",
+        insurancePayer: extraction.insurancePayer?.trim() || "Unspecified Payer",
+        state: args.patientState || "California",
+        claimNumber: extraction.claimNumber?.trim() || "",
+        serviceDate: extraction.serviceDate?.trim() || "",
+        providerName: extraction.providerName?.trim() || "",
+        deniedAmount: typeof extraction.deniedAmount === "number" ? extraction.deniedAmount : 0,
+        patientOwedAmount: typeof extraction.patientOwedAmount === "number" ? extraction.patientOwedAmount : 0,
+        cptCodes: Array.isArray(extraction.cptCodes) ? extraction.cptCodes.filter(Boolean) : [],
+        icd10Codes: Array.isArray(extraction.icd10Codes) ? extraction.icd10Codes.filter(Boolean) : [],
+        denialReasonCode: extraction.denialReasonCode?.trim() || "",
+        denialReasonDescription: extraction.denialReasonDescription?.trim() || "",
+        appealFilingDeadlineDays: extraction.appealFilingDeadlineDays || 180,
+        denialLetterStorageId: args.storageId,
+      });
+    } catch (ingestionError) {
+      // Clean up orphaned storage file immediately on document rejection or parsing error
+      if (args.storageId) {
+        try {
+          await ctx.runMutation(internal.claims.cleanupStorageFileInternal, {
+            storageId: args.storageId,
+          });
+        } catch (cleanupErr) {
+          console.warn("Storage cleanup note on parser error:", cleanupErr);
+        }
+      }
+      throw ingestionError;
     }
-
-    // Additional sanity check: ensure at least one core claim signal exists
-    const hasFinancials = (extraction.deniedAmount || 0) > 0 || (extraction.patientOwedAmount || 0) > 0;
-    const hasCodes =
-      (extraction.cptCodes && extraction.cptCodes.length > 0) ||
-      (extraction.icd10Codes && extraction.icd10Codes.length > 0) ||
-      Boolean(extraction.denialReasonCode?.trim());
-    const hasClaimIdentifiers =
-      Boolean(extraction.claimNumber?.trim()) ||
-      Boolean(extraction.memberId?.trim()) ||
-      Boolean(extraction.denialReasonDescription?.trim());
-
-    if (!hasFinancials && !hasCodes && !hasClaimIdentifiers) {
-      throw new ConvexError(
-        "The uploaded document does not contain recognizable medical claim denial details (missing denial reason, CPT codes, claim identifiers, and denied amount). Please upload a complete Explanation of Benefits or adverse determination letter."
-      );
-    }
-
-    // Save patient and claim into Convex database
-    const claimId = await ctx.runMutation(internal.claims.createWithPatientInternal, {
-      patientName: extraction.patientName?.trim() || "",
-      patientEmail: args.patientEmail?.trim() || "",
-      memberId: extraction.memberId?.trim() || "",
-      insurancePayer: extraction.insurancePayer?.trim() || "Unspecified Payer",
-      state: args.patientState || "California",
-      claimNumber: extraction.claimNumber?.trim() || "",
-      serviceDate: extraction.serviceDate?.trim() || "",
-      providerName: extraction.providerName?.trim() || "",
-      deniedAmount: typeof extraction.deniedAmount === "number" ? extraction.deniedAmount : 0,
-      patientOwedAmount: typeof extraction.patientOwedAmount === "number" ? extraction.patientOwedAmount : 0,
-      cptCodes: Array.isArray(extraction.cptCodes) ? extraction.cptCodes.filter(Boolean) : [],
-      icd10Codes: Array.isArray(extraction.icd10Codes) ? extraction.icd10Codes.filter(Boolean) : [],
-      denialReasonCode: extraction.denialReasonCode?.trim() || "",
-      denialReasonDescription: extraction.denialReasonDescription?.trim() || "",
-      appealFilingDeadlineDays: extraction.appealFilingDeadlineDays || 180,
-    });
 
     // Autonomously resolve the payer intake gateway right from the moment of ingestion
     try {

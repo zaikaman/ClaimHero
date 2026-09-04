@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as clinicalEvidences from "../convex/clinicalEvidences";
+// @ts-expect-error - getAuthUserId is provided via vitest mock
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 vi.mock("@convex-dev/auth/server", () => ({
@@ -299,5 +300,43 @@ describe("Convex Clinical Evidences Database & Retrieval Functions", () => {
       expect(res).toHaveLength(1);
       expect(res[0]._id).toBe("ev1");
     });
+
+    it("replaceForClaimInternal: atomically clears existing evidences and inserts new batch", async () => {
+      const mockClaim = { _id: "c1" };
+      const oldEvidences = [{ _id: "old_1" }, { _id: "old_2" }];
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+          delete: vi.fn().mockResolvedValue(undefined),
+          insert: vi.fn().mockResolvedValue("new_ev_1"),
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              collect: vi.fn().mockResolvedValue(oldEvidences),
+            }),
+          }),
+        },
+      };
+
+      const res = await (clinicalEvidences.replaceForClaimInternal as any)._handler(mockCtx, {
+        claimId: "c1",
+        evidences: [
+          {
+            sourceType: "payer_cpb",
+            title: "New Policy",
+            citationClause: "Sec 1",
+            extractedEvidenceMarkdown: "Clinical rule",
+            relevanceScore: 92,
+          },
+        ],
+      });
+
+      expect(mockCtx.db.delete).toHaveBeenCalledWith("old_1");
+      expect(mockCtx.db.delete).toHaveBeenCalledWith("old_2");
+      expect(mockCtx.db.insert).toHaveBeenCalledWith("clinicalEvidences", expect.objectContaining({
+        title: "New Policy",
+      }));
+      expect(res).toEqual(["new_ev_1"]);
+    });
   });
 });
+
