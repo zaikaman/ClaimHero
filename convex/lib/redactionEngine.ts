@@ -40,6 +40,7 @@ export interface RedactionEngineOptions {
   standard?: ComplianceStandard;
   customTerms?: string[];
   patientName?: string;
+  preservePatientName?: boolean;
   disabledEntityIds?: string[];
   maskingStyleOverrides?: Partial<Record<PiiCategory, "full" | "partial" | "safe_harbor">>;
 }
@@ -380,41 +381,43 @@ export function detectPiiEntities(
   }
 
   // 5. Patient Direct Name Identifiers
-  if (options.patientName && options.patientName.trim().length > 2) {
-    const pName = options.patientName.trim();
-    const escaped = pName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const nameRegex = new RegExp(`\\b${escaped}\\b`, "gi");
-    while ((match = nameRegex.exec(text)) !== null) {
+  if (!options.preservePatientName) {
+    if (options.patientName && options.patientName.trim().length > 2) {
+      const pName = options.patientName.trim();
+      const escaped = pName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const nameRegex = new RegExp(`\\b${escaped}\\b`, "gi");
+      while ((match = nameRegex.exec(text)) !== null) {
+        addEntity(
+          "name",
+          "Patient Full Name",
+          match[0],
+          maskPatientName(match[0], standard),
+          match.index,
+          match.index + match[0].length,
+          "Known patient name match",
+          0.99
+        );
+      }
+    }
+
+    const contextualNameRegex = /\b(?:Patient(?:\s*Name)?|Insured(?:\s*Name)?|Member(?:\s*Name)?|Claimant)[\s:]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/g;
+    while ((match = contextualNameRegex.exec(text)) !== null) {
+      const rawName = match[1];
+      if (/^(Record|Portal|Service|Claim|Notice|Appeal|Denial|Provider|Physician)$/i.test(rawName)) continue;
+      const fullText = match[0];
+      const nameOffset = fullText.lastIndexOf(rawName);
+      const startIdx = match.index + nameOffset;
       addEntity(
         "name",
-        "Patient Full Name",
-        match[0],
-        maskPatientName(match[0], standard),
-        match.index,
-        match.index + match[0].length,
-        "Known patient name match",
-        0.99
+        "Patient Direct Name",
+        rawName,
+        maskPatientName(rawName, standard),
+        startIdx,
+        startIdx + rawName.length,
+        "Contextual patient header label",
+        0.85
       );
     }
-  }
-
-  const contextualNameRegex = /\b(?:Patient(?:\s*Name)?|Insured(?:\s*Name)?|Member(?:\s*Name)?|Claimant)[\s:]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/g;
-  while ((match = contextualNameRegex.exec(text)) !== null) {
-    const rawName = match[1];
-    if (/^(Record|Portal|Service|Claim|Notice|Appeal|Denial|Provider|Physician)$/i.test(rawName)) continue;
-    const fullText = match[0];
-    const nameOffset = fullText.lastIndexOf(rawName);
-    const startIdx = match.index + nameOffset;
-    addEntity(
-      "name",
-      "Patient Direct Name",
-      rawName,
-      maskPatientName(rawName, standard),
-      startIdx,
-      startIdx + rawName.length,
-      "Contextual patient header label",
-      0.85
-    );
   }
 
   // 6. Telephone Numbers

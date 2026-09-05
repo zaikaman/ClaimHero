@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-05T10:30:00Z
+- **Last updated:** 2026-09-05T10:46:00Z
 
 ## Log
 
@@ -845,10 +845,16 @@ Production-Grade Convex Database I/O Optimization & Free-Tier Spend Hardening:
 ### 2026-09-05 - 21bde8d
 Refined landing hero typography and polished P2P Live Call Copilot UI: split showcase slide titles into two-line structures (`src/components/landing/CinematicHero.tsx`) to prevent irregular wrapping on responsive viewports; replaced the truncated empty-state icon with an enclosed tele-conference `Headset` badge and resolved duplicate lightning icons in Fast Answers Generated using `ChatCenteredDots` (`src/components/p2p/P2PLiveCopilot.tsx`). Verified with clean typecheck and zero lint errors.
 
-### 2026-09-05 - working tree
+### 2026-09-05 - 5b04c91
 Hardened Firecrawl Policy Crawler & Relevance Classifier to enforce temporal recency and prevent returning superseded/archived guideline editions:
 - Root-Cause Elimination of Archived Guideline Ingestion: Identified that `evaluatePolicySourceRelevance` previously contained an explicit historical exemption directive instructing the LLM never to reject documents bearing "ARCHIVED" disclaimers, causing early termination on legacy pages (e.g. Carelon 2024 editions) while bypassing current editions. Re-engineered Directive 4 to mandate that clinical coverage guidelines must be active and effective on the claim's Date of Service / target year, explicitly rejecting expired historical archives.
 - Date-Aware Policy Search Query Strategy: Upgraded `generatePolicySearchQueries` in `convex/actions/policyCrawler.ts` to derive the active policy target year from `claim.serviceDate` (e.g., 2026) and inject temporal directives into LLM query generation (`${targetYear}`, `updated ${targetYear}`, `-archived`), ensuring Firecrawl queries target active policies rather than high-pagerank historical archives.
 - Recency Scoring & Archive Penalty: Hardened candidate URL selection in `selectFirecrawlPolicyUrls` (`convex/actions/policyCrawler.ts`) by introducing a +15 recency bonus for active/updated year matches, a -15 staleness penalty for historical year slugs, a -30 penalty for explicitly archived titles/paths, and eliminating the over-broad date regex that previously penalized valid dated Carelon guideline slugs.
 - Active Link Prioritization in Directory Scrapes: Enhanced `extractGuidelineLinksFromMarkdown` (`convex/actions/policyCrawler.ts`) with recency bonus and archive penalties, adding keyword coverage for "spine" and "surgery" to ensure active child guidelines sort ahead of legacy archives.
 - Pipeline Propagation & Verification: Passed `serviceDate` through `convex/workflows.ts`, `convex/actions/sentinelPipeline.ts`, and `crawlInsurerPolicy`. Added regression unit tests in `tests/actionsPolicyAndSynthesizer.test.ts` and verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint errors/warnings, 486/486 passing unit tests across 34 suites, and production build in 6.16s. Convex features: actions, queries, mutations, components (`@firecrawl/firecrawl-convex`).
+
+### 2026-09-05 - working tree
+Scoped HIPAA redaction engine to prevent destructive patient name masking on case intake and outbound payer transmissions:
+- Preserved Patient Identity on Intake & Ingestion: Upgraded `detectPiiEntities` and `RedactionEngineOptions` in `src/lib/redactionEngine.ts` and `convex/lib/redactionEngine.ts` with `preservePatientName: boolean` to de-identify SSNs, phone numbers, and addresses without destroying authentic patient names during intake sanitization. Corrected `IngestionModal.tsx` preset selection and context saving to avoid forcing `isRedacted: true` on clean intake cases.
+- Payer Appeal Identity Compliance under HIPAA TPO: Hardened `formatAppealEmail` in `convex/actions/appealSynthesizer.ts` and `mailDispatcher.ts` to guarantee genuine patient identification (`Marcus Sterling`, `Eleanor Vance`, `Michael Patel`) on outbound ERISA reconsideration briefs sent to health plans (45 CFR § 164.506), preventing insurer claim rejection while keeping public court docket de-identification intact in `ExportDrawer.tsx` (FRCP 5.2).
+- Convex Database Self-Healing & Query Sanitization: Added `resolveClaimPatientName` helper and `healRedactedPatientNames` mutation in `convex/claims.ts` that dynamically resolves masked placeholder names across `claims.list`, `getById`, and `getByIdInternal`. Executed live self-healing across dev deployment, restoring all 3 claims, patient records, and generated appeal briefs from `[PATIENT REDACTED]` to their authentic names. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint errors/warnings, 486/486 passing tests across 34 suites, and production build in 6.81s. Convex features: schema, queries, internal queries, mutations, actions, self-healing data repair.

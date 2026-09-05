@@ -270,10 +270,10 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       setContextAcknowledged(true);
       setIsPreparingContext(false);
       setPrivacyRedactionState({
-        isRedacted: true,
-        mode: "HIPAA_SAFE_HARBOR",
-        count: 2,
-        categories: ["member_id", "dob"],
+        isRedacted: false,
+        mode: "BALANCED_APPELLATE",
+        count: 0,
+        categories: [],
       });
       return;
     }
@@ -423,10 +423,10 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
         },
         physicianNotes: physicianNotes.trim() || undefined,
         redactionMetadata: {
-          isRedacted: privacyRedactionState.isRedacted || true,
-          mode: privacyRedactionState.mode || "HIPAA_SAFE_HARBOR",
-          redactedEntityCount: privacyRedactionState.count || 2,
-          maskedCategories: privacyRedactionState.categories.length > 0 ? privacyRedactionState.categories : ["member_id", "dob"],
+          isRedacted: Boolean(privacyRedactionState.isRedacted),
+          mode: privacyRedactionState.mode || "BALANCED_APPELLATE",
+          redactedEntityCount: privacyRedactionState.count || 0,
+          maskedCategories: privacyRedactionState.categories,
           appliedAt: Date.now(),
         },
       });
@@ -725,11 +725,14 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                           variant="secondary"
                           size="sm"
                           onClick={() => {
-                            const res = fastSanitizeText(pastedText, { standard: "HIPAA_SAFE_HARBOR" });
+                            const res = fastSanitizeText(pastedText, {
+                              standard: "BALANCED_APPELLATE",
+                              preservePatientName: true,
+                            });
                             setPastedText(res.sanitizedText);
                             setPrivacyRedactionState({
-                              isRedacted: true,
-                              mode: "HIPAA_SAFE_HARBOR",
+                              isRedacted: res.stats.redactedCount > 0,
+                              mode: "BALANCED_APPELLATE",
                               count: res.stats.redactedCount,
                               categories: Object.keys(res.stats.byCategory).filter(
                                 (k) => (res.stats.byCategory as Record<string, number>)[k] > 0
