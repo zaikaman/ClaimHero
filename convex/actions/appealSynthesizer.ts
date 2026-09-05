@@ -667,7 +667,7 @@ export function assembleProfessionalAppealEmail(
           : (claim.serviceDate || "Date of Service");
         const cleanUrl = evidence.sourceUrl ? sanitizePublicPolicyUrl(evidence.sourceUrl) : "";
         const sourceInfo = cleanUrl ? ` (Source: ${cleanUrl})` : "";
-        email += `### Exhibit ${exhibitLetter}: Proof of Policy on Date of Service — ${evidence.title}\n`;
+        email += `### Exhibit ${exhibitLetter}: Proof of Policy on Date of Service — ${evidence.title}\n\n`;
         email += `- Verified full-page visual capture recorded on ${captureDate}${sourceInfo}\n`;
         email += `- Clinical coverage clause: ${evidence.citationClause}\n`;
         if (rawEv.screenshotUrl) {

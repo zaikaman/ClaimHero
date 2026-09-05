@@ -7,6 +7,7 @@ import * as authLib from "../convex/lib/auth";
 import * as emailsModule from "../convex/emails";
 import { rateLimiter } from "../convex/lib/rateLimiter";
 import { api, internal } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
 import { dispatchAppealPacket } from "../convex/actions/mailDispatcher";
 import { processInboundClaimReply } from "../convex/actions/agentMail";
 
@@ -76,6 +77,43 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
       expect(pdfText).toContain("/Type /Page");
       expect(pdfText).toContain("Page 1 of");
       expect(pdfText).toContain("%%EOF");
+    });
+
+    it("correctly advances vertical coordinates for multiline headings without overlapping following bullets", () => {
+      const buffer = generateFormalAppealPdf({
+        claimNumber: "CH-HEADING-TEST",
+        patientName: "Jane Doe",
+        insurancePayer: "Aetna",
+        appealMarkdown: [
+          "## Evidentiary Exhibits & Proof of Policy on Date of Service",
+          "### Exhibit B: Proof of Policy on Date of Service - Clinical Policy for Laminectomy and Prior Authorization Requirements",
+          "- Verified full-page visual capture recorded on 2026-09-05",
+          "- Clinical coverage clause: Medical Necessity Criteria Sec. 1",
+        ].join("\n"),
+      });
+
+      const pdfText = buffer.toString("binary");
+      expect(pdfText).toContain("Exhibit B: Proof of Policy on Date of Service - Clinical Policy for");
+      expect(pdfText).toContain("Laminectomy and Prior Authorization Requirements");
+      expect(pdfText).toContain("- Verified full-page visual capture recorded on 2026-09-05");
+
+      // Extract y coordinates for the second line of heading and the following bullet line
+      const line2Regex = /45\s+([0-9.]+)\s+Td\s*\n\((Laminectomy and Prior Authorization Requirements)\)\s*Tj/;
+      const bulletRegex = /53\s+([0-9.]+)\s+Td\s*\n\((- Verified full-page visual capture recorded on 2026-09-05)\)\s*Tj/;
+
+      const line2Match = pdfText.match(line2Regex);
+      const bulletMatch = pdfText.match(bulletRegex);
+
+      expect(line2Match).toBeTruthy();
+      expect(bulletMatch).toBeTruthy();
+
+      const line2Y = parseFloat(line2Match![1]);
+      const bulletY = parseFloat(bulletMatch![1]);
+
+      // Bullet baseline MUST be positioned cleanly below heading line 2
+      // Prior to the fix, line2Y - bulletY was only 4 pt, rendering the bullet directly on top of line 2.
+      // With the fix, line2Y - bulletY is 18 pt (lineHeight 13 + marginBottom 5).
+      expect(line2Y - bulletY).toBe(18);
     });
 
     it("ensureAppealPdfStored: reuses existing storage blob if available", async () => {
@@ -156,7 +194,7 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
           deniedAmount: 25000,
           payerContact: { officialAppealsEmail: "appeals@bcbs.com" },
         } as any,
-        userId: "user_test",
+        userId: "user_test" as Id<"users">,
       });
 
       const mockPdfBuffer = Buffer.from("%PDF-1.4 mock pdf content %%EOF");

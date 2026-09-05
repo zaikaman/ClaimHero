@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-05T13:41:03Z
+- **Last updated:** 2026-09-05T14:33:30Z
 
 ## Log
 
@@ -870,9 +870,15 @@ Architected Visual Proof & Audit Archive capturing full-page insurer policy scre
 - Studio Email Preview & Dossier Navigation Polishing: Updated `ExportDrawer.tsx` to default to "Appeal Brief" view mode on open (`defaultViewMode="brief"` via `AppealStudio.tsx`), ensuring clicking "Preview Email" immediately presents the formatted substantive appeal brief rather than the multi-page court binder. Swapped the toggle button order so "Appeal Brief" is primary on the left and "Exhibit Binder" is secondary on the right. Verified with clean TypeScript typecheck and ESLint.
 - Resolved Appeal Studio Preview Horizontal Overflow: Fixed long uninterrupted URL strings (such as Firecrawl policy bulletin source links and Convex storage signed proof URLs) overflowing the rendered markdown preview card in `AppealStudio.tsx`. Added `break-words`, `[overflow-wrap:anywhere]`, `break-all` on links and code elements, and `min-w-0 max-w-full` constraints across `AppealBriefRenderer.tsx` and the studio dual-pane split view layout. Verified with clean build and zero compiler warnings.
 
-### 2026-09-05 - working tree
+### 2026-09-05 - b296532
 Shipped PDF appeal packets with Firecrawl hardening, the autonomous insurer defense adversary, and a production webhook/alert-loop fix (`convex/lib/pdfGenerator.ts`, `convex/actions/policyCrawler.ts`, `convex/lib/adversaryNegotiation.ts`, `convex/actions/mailDispatcher.ts`, `convex/actions/agentMail.ts`, `convex/http.ts`, `convex/lib/agentMailWebhook.ts`, `convex/claims.ts`, `convex/schema.ts`):
 - Formal PDF appeal dossiers are compiled in pure TypeScript, cached in Convex file storage, and auto-attached to outbound AgentMail transmissions; inbound attachments persist to storage and feed multimodal LLM extraction, with attachment badges in the inbox UI. Firecrawl scrapes hardened with longer timeouts, markdown-only fallback, marketing-domain blocklist, and payer pre-filtering.
 - Dispatched briefs now draw multi-round adversary countermoves (overturn, 40% partial settlement, RFI, conflicting-CPB citation, uphold) with tailored counter-rebuttals, 1-hour Auto-Pilot SLA scheduling, and settlement/policy inbox badges.
 - Fixed the production 401 storm (authentic-but-stale webhook retries are now accepted idempotently instead of rejected forever, with server-side rejection diagnostics) and alert flooding (10-minute per-claim cooldown with victory bypass, infrastructure-domain loopback detection, refusal to address mail to the own sender inbox).
 - Verified with `npm run verify`: clean typecheck, 0 ESLint errors, 527/527 passing tests across 37 suites, and production build. Convex features: schema, queries, mutations, actions, HTTP actions, scheduled functions, file storage.
+
+### 2026-09-05 - working tree
+Resolved visual text overlap bug in formal appeal PDF generation for multiline headings and evidentiary exhibits:
+- Root-Cause Elimination of Vertical Heading Overlap: In `convex/lib/pdfGenerator.ts`, `renderHeading` previously calculated post-heading vertical advance with `spacing - 8 - wrapped.length * 13 + 5`. When long headings wrapped across multiple lines (e.g., visual proof exhibits such as `Exhibit B: Proof of Policy on Date of Service — Clinical Policy for Laminectomy and Prior Authorization Requirements`), subtracting the total wrapped line height from fixed spacing inverted the vertical displacement (`currentY += 9`), rendering following bullet points directly on top of line 2 of the heading.
+- Robust Heading Layout Engine: Refactored `renderHeading` to take a structured `HeadingConfig` with explicit font sizing, line height, top margin, bottom margin, wrap limits, and optional underline rules. Document flow now strictly advances `currentY` downward per line (`currentY -= config.lineHeight`) followed by bottom margin (`currentY -= config.marginBottom`), guaranteeing consistent 18pt baseline spacing between heading lines and subsequent list items. Added orphan prevention via `checkSpace(totalHeadingHeight + 25)`.
+- Markdown Formatting & Regression Coverage: Added standard markdown spacing after exhibit headers in `convex/actions/appealSynthesizer.ts` and created regression test in `tests/formalPdfAttachments.test.ts` asserting exact baseline separation for multiline headings without overlap. Verified with `npm run verify`: clean typecheck, 0 ESLint errors, 528/528 passing tests across 37 suites, and production build. Convex features: actions, file storage (`_storage`).

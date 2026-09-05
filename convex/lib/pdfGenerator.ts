@@ -294,28 +294,55 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
   // Process and Render Appeal Brief Markdown (fully sanitized for formal print)
   const rawLines = options.appealMarkdown.split("\n");
 
-  function renderHeading(text: string, fontSize: string, color: string, spacing: number, underline: boolean) {
+  interface HeadingConfig {
+    fontSize: string;
+    fontKey?: string;
+    lineHeight: number;
+    marginTop: number;
+    marginBottom: number;
+    color: string;
+    wrapChars: number;
+    underline?: boolean;
+  }
+
+  function renderHeading(text: string, config: HeadingConfig) {
     const cleaned = cleanInlineMarkdown(text);
     if (!cleaned) return;
-    const wrapped = wrapLine(cleaned, 72);
-    checkSpace(spacing + wrapped.length * 13);
-    currentY -= 8;
+    const wrapped = wrapLine(cleaned, config.wrapChars);
+    if (wrapped.length === 0) return;
+
+    const totalHeadingHeight =
+      config.marginTop +
+      wrapped.length * config.lineHeight +
+      config.marginBottom +
+      (config.underline ? 4 : 0);
+
+    // Keep heading together with at least 25pt of following content to avoid orphaned headings at page boundaries
+    checkSpace(totalHeadingHeight + 25);
+
+    currentY -= config.marginTop;
+
     addCommand("q");
     for (const line of wrapped) {
       addCommand("BT");
-      addCommand(`/F2 ${fontSize} Tf`);
-      addCommand(color);
+      addCommand(`${config.fontKey || "/F2"} ${config.fontSize} Tf`);
+      addCommand(config.color);
       addCommand(`${MARGIN_LEFT} ${currentY} Td`);
       addCommand(`(${escapePdfText(line)}) Tj`);
       addCommand("ET");
-      currentY -= 13;
+      currentY -= config.lineHeight;
     }
-    if (underline) {
+
+    if (config.underline) {
+      // Draw underline 3pt below the baseline of the last line of the heading
+      const underlineY = currentY + config.lineHeight - 3;
       addCommand("0.8 0.85 0.9 RG 1 w");
-      addCommand(`${MARGIN_LEFT} ${currentY + 8} m ${MARGIN_LEFT + CONTENT_WIDTH} ${currentY + 8} l S`);
+      addCommand(`${MARGIN_LEFT} ${underlineY} m ${MARGIN_LEFT + CONTENT_WIDTH} ${underlineY} l S`);
+      currentY -= 4;
     }
     addCommand("Q");
-    currentY -= spacing - 8 - wrapped.length * 13 + 5;
+
+    currentY -= config.marginBottom;
   }
 
   function renderBodyLines(lines: string[], x: number, font: string, color: string, lineGap: number) {
@@ -347,19 +374,43 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
 
     // Heading 1
     if (/^#\s+/.test(trimmed)) {
-      renderHeading(trimmed.replace(/^#\s+/, ""), "13", "0.08 0.12 0.22 rg", 30, true);
+      renderHeading(trimmed.replace(/^#\s+/, ""), {
+        fontSize: "13",
+        lineHeight: 16,
+        marginTop: 14,
+        marginBottom: 8,
+        color: "0.08 0.12 0.22 rg",
+        wrapChars: 64,
+        underline: true,
+      });
       continue;
     }
 
     // Heading 2
     if (/^##\s+/.test(trimmed)) {
-      renderHeading(trimmed.replace(/^##\s+/, ""), "11", "0.1 0.18 0.35 rg", 24, false);
+      renderHeading(trimmed.replace(/^##\s+/, ""), {
+        fontSize: "11",
+        lineHeight: 14,
+        marginTop: 12,
+        marginBottom: 6,
+        color: "0.1 0.18 0.35 rg",
+        wrapChars: 70,
+        underline: false,
+      });
       continue;
     }
 
     // Heading 3+
     if (/^#{3,6}\s+/.test(trimmed)) {
-      renderHeading(trimmed.replace(/^#{3,6}\s+/, ""), "9.5", "0.15 0.22 0.4 rg", 20, false);
+      renderHeading(trimmed.replace(/^#{3,6}\s+/, ""), {
+        fontSize: "9.5",
+        lineHeight: 13,
+        marginTop: 10,
+        marginBottom: 5,
+        color: "0.12 0.2 0.38 rg",
+        wrapChars: 74,
+        underline: false,
+      });
       continue;
     }
 
@@ -588,7 +639,8 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
 export async function ensureAppealPdfStored(
   ctx: ActionCtx,
   claim: Doc<"claims">,
-  appeal: Doc<"appeals">
+  appeal: Doc<"appeals">,
+  optionsOverride?: { forceRegenerate?: boolean }
 ): Promise<{
   storageId: Id<"_storage">;
   buffer: Buffer;
@@ -597,7 +649,12 @@ export async function ensureAppealPdfStored(
   const filename = `Formal-Appeal-Packet-${claim.claimNumber}.pdf`;
 
   // 1. Check if valid stored PDF already exists in Convex File Storage
-  if (appeal.pdfExportStorageId && ctx.storage && typeof ctx.storage.get === "function") {
+  if (
+    !optionsOverride?.forceRegenerate &&
+    appeal.pdfExportStorageId &&
+    ctx.storage &&
+    typeof ctx.storage.get === "function"
+  ) {
     try {
       const existingBlob = await ctx.storage.get(appeal.pdfExportStorageId);
       if (existingBlob) {
