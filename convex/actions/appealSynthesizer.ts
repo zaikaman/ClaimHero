@@ -151,7 +151,7 @@ function formatDenialReason(code?: string, description?: string): string {
 import type { Id } from "../_generated/dataModel";
 
 export interface AppealSynthesizerClaimContext {
-  _id?: Id<"claims">;
+  _id?: Id<"claims"> | string;
   claimNumber: string;
   patient?: { name?: string; memberId?: string; groupNumber?: string; state?: string; insurancePayer?: string; email?: string };
   cptCodes?: string[];
@@ -652,6 +652,32 @@ export function assembleProfessionalAppealEmail(
       email += `- **${evidence.title}**${clause}${sourceLink}${details ? `: ${details}` : ""}\n`;
     });
     email += `\n`;
+
+    const visualProofEvidences = supportingEvidences.filter(
+      (e) => Boolean((e as unknown as Record<string, unknown>).screenshotStorageId || (e as unknown as Record<string, unknown>).screenshotUrl)
+    );
+    if (visualProofEvidences.length > 0) {
+      email += `## Evidentiary Exhibits & Proof of Policy on Date of Service\n\n`;
+      email += `Pursuant to ERISA 29 C.F.R. § 2560.503-1(h)(2)(iii), claimant incorporates full-page visual archive exhibits captured at the time of clinical verification to preserve the active clinical policy bulletin against retrospective modifications:\n\n`;
+      visualProofEvidences.slice(0, 5).forEach((evidence, idx) => {
+        const exhibitLetter = String.fromCharCode(65 + idx);
+        const rawEv = evidence as unknown as Record<string, unknown>;
+        const captureDate = rawEv.capturedAt
+          ? new Date(Number(rawEv.capturedAt)).toISOString().split("T")[0]
+          : (claim.serviceDate || "Date of Service");
+        const cleanUrl = evidence.sourceUrl ? sanitizePublicPolicyUrl(evidence.sourceUrl) : "";
+        const sourceInfo = cleanUrl ? ` (Source: ${cleanUrl})` : "";
+        email += `### Exhibit ${exhibitLetter}: Proof of Policy on Date of Service — ${evidence.title}\n`;
+        email += `- Verified full-page visual capture recorded on ${captureDate}${sourceInfo}\n`;
+        email += `- Clinical coverage clause: ${evidence.citationClause}\n`;
+        if (rawEv.screenshotUrl) {
+          email += `- Visual Proof Archive URL: ${rawEv.screenshotUrl}\n`;
+        } else if (rawEv.screenshotStorageId) {
+          email += `- Visual Proof Archive Reference: Convex Storage Exhibit ID [${rawEv.screenshotStorageId}]\n`;
+        }
+        email += `\n`;
+      });
+    }
   }
 
   email += `## Review requested\n\n`;

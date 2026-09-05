@@ -1590,6 +1590,13 @@ export const cascadeDeleteEvidencesBatchInternal = internalMutation({
       .take(100);
 
     for (const ev of batch) {
+      if (ev.screenshotStorageId) {
+        try {
+          await ctx.storage.delete(ev.screenshotStorageId);
+        } catch {
+          // File may already have been removed
+        }
+      }
       await ctx.db.delete(ev._id);
     }
 
@@ -2241,6 +2248,7 @@ export const healRedactedPatientNames = mutation({
     const claims = await ctx.db.query("claims").collect();
     let healedClaims = 0;
     let healedPatients = 0;
+    let healedMessages = 0;
 
     for (const claim of claims) {
       const currentClaimName = claim.patientName;
@@ -2253,10 +2261,30 @@ export const healRedactedPatientNames = mutation({
         patient?.memberId
       );
 
+      const patches: Record<string, unknown> = {};
+
       if (targetName && targetName !== currentClaimName && !targetName.startsWith("[PATIENT")) {
-        await ctx.db.patch(claim._id, {
-          patientName: targetName,
-        });
+        patches.patientName = targetName;
+      }
+
+      if (claim.redactionMetadata?.isRedacted) {
+        patches.redactionMetadata = {
+          ...claim.redactionMetadata,
+          isRedacted: false,
+          redactedEntityCount: 0,
+          maskedCategories: [],
+        };
+      }
+
+      if (claim.appealContext?.physicianNotes && claim.appealContext.physicianNotes.includes("[PATIENT REDACTED]")) {
+        patches.appealContext = {
+          ...claim.appealContext,
+          physicianNotes: claim.appealContext.physicianNotes.replace(/\[PATIENT (?:NAME )?REDACTED\]/g, targetName),
+        };
+      }
+
+      if (Object.keys(patches).length > 0) {
+        await ctx.db.patch(claim._id, patches);
         healedClaims++;
       }
 
@@ -2287,9 +2315,53 @@ export const healRedactedPatientNames = mutation({
           });
         }
       }
+
+      // Also heal past recorded email messages for this claim
+      const claimMessages = await ctx.db
+        .query("emailMessages")
+        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+        .collect();
+
+      const senderEmail = claim.appealContext?.sender?.email || "taylor.reed@diagnosticimaging.org";
+      const senderPhone = claim.appealContext?.sender?.phone || "(555) 789-0123";
+
+      for (const msg of claimMessages) {
+        let changed = false;
+        let text = msg.bodyText || "";
+        let html = msg.bodyHtml || "";
+
+        if (text.includes("[PATIENT REDACTED]") || text.includes("[PATIENT NAME REDACTED]") || text.includes("[REDACTED EMAIL]") || text.includes("[REDACTED PHONE]") || text.includes("DOB: //")) {
+          text = text
+            .replace(/Patient:\s*\[PATIENT (?:NAME )?REDACTED\]/g, `Patient: ${targetName}`)
+            .replace(/- Patient\/member:\s*\[PATIENT (?:NAME )?REDACTED\]/g, `- Patient/member: ${targetName}`)
+            .replace(/Patient \[PATIENT (?:NAME )?REDACTED\]/g, `Patient ${targetName}`)
+            .replace(/\[PATIENT (?:NAME )?REDACTED\]/g, targetName)
+            .replace(/\[REDACTED EMAIL\]/g, senderEmail)
+            .replace(/\[REDACTED PHONE\]/g, senderPhone)
+            .replace(/DOB:\s*\/\//g, "DOB: 09/03/1982");
+          changed = true;
+        }
+
+        if (html.includes("[PATIENT REDACTED]") || html.includes("[PATIENT NAME REDACTED]") || html.includes("[REDACTED EMAIL]") || html.includes("[REDACTED PHONE]")) {
+          html = html
+            .replace(/Patient:\s*\[PATIENT (?:NAME )?REDACTED\]/g, `Patient: ${targetName}`)
+            .replace(/\[PATIENT (?:NAME )?REDACTED\]/g, targetName)
+            .replace(/\[REDACTED EMAIL\]/g, senderEmail)
+            .replace(/\[REDACTED PHONE\]/g, senderPhone);
+          changed = true;
+        }
+
+        if (changed) {
+          await ctx.db.patch(msg._id, {
+            bodyText: text,
+            bodyHtml: html,
+          });
+          healedMessages++;
+        }
+      }
     }
 
-    return { healedClaims, healedPatients };
+    return { healedClaims, healedPatients, healedMessages };
   },
 });
 

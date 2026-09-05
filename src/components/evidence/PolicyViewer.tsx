@@ -7,17 +7,19 @@ import {
   BookOpen,
   MagnifyingGlass,
   Trash,
-
   Globe,
   Flask,
   ShieldCheck,
   Scales,
+  Camera,
+  Eye,
 } from "@phosphor-icons/react";
 import { ClinicalEvidence, EvidenceSourceType } from "../../types";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { stripMarkdownFormatting, cn } from "../../lib/utils";
 import { safeExternalHref } from "../../lib/urlUtils";
 
@@ -63,6 +65,11 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterSource, setFilterSource] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [activeScreenshot, setActiveScreenshot] = useState<{
+    url: string;
+    title: string;
+    date?: string;
+  } | null>(null);
 
   const handleCopyCitation = (id: string, clause: string) => {
     navigator.clipboard.writeText(clause);
@@ -215,6 +222,23 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
                       <Badge variant="secondary" className="font-mono text-[10px] shrink-0">
                         {item.relevanceScore}% Match
                       </Badge>
+                      {item.screenshotUrl && (
+                        <Badge
+                          variant="outline"
+                          className="font-mono text-[10px] shrink-0 border-blue-500/30 text-blue-400 bg-blue-500/10 cursor-pointer hover:bg-blue-500/20 transition-colors flex items-center gap-1"
+                          onClick={() =>
+                            setActiveScreenshot({
+                              url: item.screenshotUrl!,
+                              title: item.title,
+                              date: item.capturedAt ? new Date(item.capturedAt).toLocaleDateString() : undefined,
+                            })
+                          }
+                          title="Inspect full-page visual proof screenshot"
+                        >
+                          <Camera className="size-3 text-blue-400" />
+                          <span>Proof of Policy</span>
+                        </Badge>
+                      )}
                     </div>
 
                     <h4 className="text-xs font-semibold text-foreground pt-0.5 leading-snug">
@@ -277,11 +301,116 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
                     {stripMarkdownFormatting(item.extractedEvidenceMarkdown)}
                   </p>
                 </div>
+
+                {item.screenshotUrl && (
+                  <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-400">
+                        <Camera className="size-3.5 text-blue-400" />
+                        <span>Visual Proof on Date of Scraping</span>
+                        {item.capturedAt && (
+                          <span className="text-[10px] text-muted-foreground font-normal">
+                            ({new Date(item.capturedAt).toLocaleDateString()})
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() =>
+                          setActiveScreenshot({
+                            url: item.screenshotUrl!,
+                            title: item.title,
+                            date: item.capturedAt ? new Date(item.capturedAt).toLocaleDateString() : undefined,
+                          })
+                        }
+                        className="h-6 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 gap-1"
+                      >
+                        <Eye className="size-3.5" />
+                        <span>Inspect Full Page</span>
+                      </Button>
+                    </div>
+
+                    <div
+                      onClick={() =>
+                        setActiveScreenshot({
+                          url: item.screenshotUrl!,
+                          title: item.title,
+                          date: item.capturedAt ? new Date(item.capturedAt).toLocaleDateString() : undefined,
+                        })
+                      }
+                      className="relative rounded-md border border-border/80 bg-background/80 overflow-hidden cursor-pointer group max-h-48 flex items-start justify-center"
+                    >
+                      <img
+                        src={item.screenshotUrl}
+                        alt={`Policy screenshot: ${item.title}`}
+                        className="w-full object-cover object-top group-hover:scale-[1.01] transition-transform duration-200"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="bg-background/95 text-foreground text-xs font-medium px-3 py-1.5 rounded-md shadow-md border border-border flex items-center gap-1.5">
+                          <Eye className="size-3.5 text-primary" />
+                          <span>Click to Expand Full-Page Screenshot</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </Card>
             );
           })}
         </div>
       )}
+
+      {/* Full-Page Visual Proof Exhibit Modal */}
+      <Dialog
+        open={Boolean(activeScreenshot)}
+        onOpenChange={(open) => {
+          if (!open) setActiveScreenshot(null);
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-4 gap-3 bg-card border-border overflow-hidden">
+          <DialogHeader className="border-b border-border pb-2.5">
+            <div className="flex items-center justify-between gap-2 pr-6">
+              <div>
+                <DialogTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Camera className="size-4 text-blue-400" />
+                  <span>Visual Proof Archive: Proof of Policy on Date of Service</span>
+                </DialogTitle>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {activeScreenshot?.title} {activeScreenshot?.date ? `• Captured on ${activeScreenshot.date}` : ""}
+                </div>
+              </div>
+
+              {activeScreenshot?.url && (
+                <a
+                  href={activeScreenshot.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  <ArrowSquareOut className="size-3.5" />
+                  <span>Open Full Image</span>
+                </a>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto rounded-lg border border-border bg-black/40 p-2 min-h-0">
+            {activeScreenshot?.url ? (
+              <img
+                src={activeScreenshot.url}
+                alt={`Visual Proof Exhibit: ${activeScreenshot.title}`}
+                className="w-full h-auto rounded object-contain"
+              />
+            ) : (
+              <div className="flex items-center justify-center p-8 text-xs text-muted-foreground">
+                No visual preview available.
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

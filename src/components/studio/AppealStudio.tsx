@@ -474,7 +474,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       {/* Main Studio Dual Pane Editor & Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Left 8 Cols: Markdown Editor & Live Preview (Fixed height matched with right panel) */}
-        <Card className="lg:col-span-8 h-[640px] xl:h-[700px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden">
+        <Card className="lg:col-span-8 h-[640px] xl:h-[700px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden min-w-0">
           {/* Sub-view Viewport Switcher */}
           <div className="h-10 shrink-0 flex items-center justify-between border-b border-border px-4 py-2 bg-muted/30">
             <div className="flex items-center gap-1.5">
@@ -615,7 +615,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           >
             {/* Panel 1: Editor Pane */}
             {(activeTab === "edit" || activeTab === "split") && (
-              <div className="h-full overflow-hidden flex flex-col p-4 sm:p-5">
+              <div className="h-full overflow-hidden flex flex-col p-4 sm:p-5 min-w-0">
                 <textarea
                   value={markdownContent}
                   onChange={(e) => setMarkdownContent(e.target.value)}
@@ -627,9 +627,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
             {/* Panel 2: Rendered Markdown Preview Pane */}
             {(activeTab === "preview" || activeTab === "split") && (
-              <div className="studio-preview-pane h-full overflow-y-auto p-4 sm:p-6 bg-background/40">
+              <div className="studio-preview-pane h-full overflow-y-auto p-4 sm:p-6 bg-background/40 min-w-0">
                 {markdownContent ? (
-                  <div className="w-full rounded-xl border border-border/80 bg-card/70 p-5 sm:p-7 shadow-xs">
+                  <div className="w-full max-w-full rounded-xl border border-border/80 bg-card/70 p-5 sm:p-7 shadow-xs min-w-0">
                     <AppealBriefRenderer content={markdownContent} />
                   </div>
                 ) : (
@@ -821,6 +821,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         markdownContent={markdownContent}
         evidences={evidences}
         onNavigateView={onNavigateView}
+        defaultViewMode="brief"
         onProceedToDispatch={() => {
           setIsExportOpen(false);
           if (onNavigateToDispatch) onNavigateToDispatch();

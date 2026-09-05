@@ -1,6 +1,7 @@
 "use node";
 
 import { action, ActionCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { api, components, internal } from "../_generated/api";
@@ -310,7 +311,70 @@ export interface FirecrawlPolicySource {
   markdown: string;
   sourceUrl: string;
   json?: unknown;
+  screenshot?: string;
   extractionEngine?: "firecrawl_native" | "openai_fallback";
+}
+
+/**
+ * Store high-resolution visual proof screenshot into Convex File Storage (_storage).
+ * Supports base64 data URIs, raw base64 buffers, and remote image URLs.
+ */
+export async function storeScreenshotInStorage(
+  ctx: ActionCtx,
+  screenshot: string | undefined,
+): Promise<Id<"_storage"> | undefined> {
+  if (!screenshot || typeof screenshot !== "string" || !screenshot.trim()) {
+    return undefined;
+  }
+
+  try {
+    const trimmed = screenshot.trim();
+    let blob: Blob;
+
+    if (trimmed.startsWith("data:")) {
+      const commaIdx = trimmed.indexOf(",");
+      if (commaIdx === -1) return undefined;
+      const meta = trimmed.slice(5, commaIdx);
+      const isBase64 = meta.includes(";base64");
+      const mime = meta.split(";")[0] || "image/png";
+      const payload = trimmed.slice(commaIdx + 1);
+      const buffer = isBase64 ? Buffer.from(payload, "base64") : Buffer.from(decodeURIComponent(payload));
+      blob = new Blob([buffer], { type: mime });
+    } else if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      try {
+        const res = await fetch(trimmed, {
+          signal: controller.signal,
+          headers: {
+            "Accept": "image/*,*/*",
+          },
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+          console.warn(`Failed to fetch policy screenshot from Firecrawl URL (HTTP ${res.status}): ${trimmed.slice(0, 80)}`);
+          return undefined;
+        }
+        blob = await res.blob();
+      } catch (fetchErr) {
+        clearTimeout(timeoutId);
+        console.warn("Screenshot fetch failed or timed out:", fetchErr);
+        return undefined;
+      }
+    } else if (trimmed.length > 100) {
+      // Raw base64 string
+      const buffer = Buffer.from(trimmed, "base64");
+      blob = new Blob([buffer], { type: "image/png" });
+    } else {
+      return undefined;
+    }
+
+    const storageId = await ctx.storage.store(blob);
+    return storageId;
+  } catch (err) {
+    console.warn("Could not commit visual proof screenshot to Convex storage:", err);
+    return undefined;
+  }
 }
 
 /**
@@ -1130,7 +1194,13 @@ export async function scrapeFirecrawlPolicySource(
   const isPdf = /\.(pdf|ashx)(\?|#|$)/i.test(cleanSourceUrl);
 
   try {
-    const formats: Format[] = ["markdown"];
+    const formats: Format[] = [
+      "markdown",
+      {
+        type: "screenshot",
+        fullPage: true,
+      },
+    ];
 
     if (extractionOptions?.cptCodes && extractionOptions.cptCodes.length > 0) {
       formats.push({
@@ -1180,6 +1250,7 @@ export async function scrapeFirecrawlPolicySource(
       markdown,
       sourceUrl: sanitizePublicPolicyUrl(scrapedSourceUrl ?? cleanSourceUrl),
       json: doc.json,
+      screenshot: doc.screenshot,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -1985,6 +2056,15 @@ For each clause:
 
     const cleanPolicySourceUrl = sanitizePublicPolicyUrl(policySourceUrl);
 
+    let screenshotStorageId: Id<"_storage"> | undefined = undefined;
+    let capturedAt: number | undefined = undefined;
+    if (policySource.screenshot) {
+      screenshotStorageId = await storeScreenshotInStorage(ctx, policySource.screenshot);
+      if (screenshotStorageId) {
+        capturedAt = Date.now();
+      }
+    }
+
     const evidencesToInsert = extractedData.clauses.map((clause) => ({
       sourceType: clause.sourceType,
       title: (clause.title || extractedData.policyTitle).replace(/\*\*/g, ""),
@@ -1992,11 +2072,17 @@ For each clause:
       citationClause: clause.citationClause.replace(/\*\*/g, ""),
       extractedEvidenceMarkdown: clause.extractedEvidenceMarkdown.replace(/\*\*/g, ""),
       relevanceScore: clause.relevanceScore,
+      screenshotStorageId,
+      screenshotUrl: policySource.screenshot?.startsWith("http") ? policySource.screenshot : undefined,
+      capturedAt,
     }));
 
     // Add at least 1 legal precedent clause citing ERISA
     evidencesToInsert.push({
       ...ERISA_STATUTORY_EVIDENCE,
+      screenshotStorageId: undefined,
+      screenshotUrl: undefined,
+      capturedAt: undefined,
     });
 
     // Clear-after-success: atomically replace prior evidence only after new
@@ -2126,11 +2212,13 @@ export const crawlPubMedAndTrials = action({
 
     let sourceMarkdown = "";
     let sourceUrl = args.customUrl || "";
+    let sourceScreenshot: string | undefined = undefined;
 
     if (args.customUrl) {
       const scraped = await scrapeFirecrawlPolicySource(ctx, args.customUrl);
       sourceMarkdown = scraped.markdown;
       sourceUrl = scraped.sourceUrl;
+      sourceScreenshot = scraped.screenshot;
     } else {
       const searchQueries = await generatePubMedSearchQueries(
         args.cptCodes,
@@ -2174,6 +2262,16 @@ export const crawlPubMedAndTrials = action({
 
       sourceMarkdown = foundSource.markdown;
       sourceUrl = foundSource.sourceUrl;
+      sourceScreenshot = foundSource.screenshot;
+    }
+
+    let screenshotStorageId: Id<"_storage"> | undefined = undefined;
+    let capturedAt: number | undefined = undefined;
+    if (sourceScreenshot) {
+      screenshotStorageId = await storeScreenshotInStorage(ctx, sourceScreenshot);
+      if (screenshotStorageId) {
+        capturedAt = Date.now();
+      }
     }
 
     const windowedText = sourceMarkdown.slice(0, 40000);
@@ -2206,6 +2304,9 @@ Assign relevanceScore between 85 and 99.`,
         citationClause,
         extractedEvidenceMarkdown: `${clause.extractedEvidenceMarkdown}\n\nStudy Design: ${extracted.studyDesign}\nKey Clinical Findings: ${extracted.keyFindings}\nStandard of Care: ${extracted.standardOfCareConclusion}`.replace(/\*\*/g, "").trim(),
         relevanceScore: clause.relevanceScore || 90,
+        screenshotStorageId,
+        screenshotUrl: sourceScreenshot?.startsWith("http") ? sourceScreenshot : undefined,
+        capturedAt,
       };
     });
 
@@ -2250,11 +2351,13 @@ export const crawlFdaIndications = action({
 
     let sourceMarkdown = "";
     let sourceUrl = args.customUrl || "";
+    let sourceScreenshot: string | undefined = undefined;
 
     if (args.customUrl) {
       const scraped = await scrapeFirecrawlPolicySource(ctx, args.customUrl);
       sourceMarkdown = scraped.markdown;
       sourceUrl = scraped.sourceUrl;
+      sourceScreenshot = scraped.screenshot;
     } else {
       const searchQueries = await generateFdaSearchQueries(
         args.cptCodes,
@@ -2296,6 +2399,16 @@ export const crawlFdaIndications = action({
 
       sourceMarkdown = foundSource.markdown;
       sourceUrl = foundSource.sourceUrl;
+      sourceScreenshot = foundSource.screenshot;
+    }
+
+    let screenshotStorageId: Id<"_storage"> | undefined = undefined;
+    let capturedAt: number | undefined = undefined;
+    if (sourceScreenshot) {
+      screenshotStorageId = await storeScreenshotInStorage(ctx, sourceScreenshot);
+      if (screenshotStorageId) {
+        capturedAt = Date.now();
+      }
     }
 
     const windowedText = sourceMarkdown.slice(0, 40000);
@@ -2328,6 +2441,9 @@ Assign relevanceScore between 88 and 99.`,
         citationClause,
         extractedEvidenceMarkdown: `${clause.extractedEvidenceMarkdown}\n\nApproved Indications: ${extracted.approvedIndications}\nApproval Date: ${extracted.approvalDate}\nAnti-Investigational Legal Basis: ${extracted.antiInvestigationalRebuttal}`.replace(/\*\*/g, "").trim(),
         relevanceScore: clause.relevanceScore || 92,
+        screenshotStorageId,
+        screenshotUrl: sourceScreenshot?.startsWith("http") ? sourceScreenshot : undefined,
+        capturedAt,
       };
     });
 
@@ -2379,6 +2495,15 @@ export const crawlCustomResearchUrl = action({
     });
     const category = args.sourceCategory || "payer_cpb";
 
+    let screenshotStorageId: Id<"_storage"> | undefined = undefined;
+    let capturedAt: number | undefined = undefined;
+    if (scraped.screenshot) {
+      screenshotStorageId = await storeScreenshotInStorage(ctx, scraped.screenshot);
+      if (screenshotStorageId) {
+        capturedAt = Date.now();
+      }
+    }
+
     let extracted: CustomGuidelineExtractionResponse | null = null;
     let extractionEngine: "firecrawl_native" | "openai_fallback" = "openai_fallback";
 
@@ -2424,6 +2549,9 @@ Assign relevanceScore between 80 and 99.`,
       citationClause: clause.citationClause.replace(/\*\*/g, ""),
       extractedEvidenceMarkdown: clause.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
       relevanceScore: clause.relevanceScore || 88,
+      screenshotStorageId,
+      screenshotUrl: scraped.screenshot?.startsWith("http") ? scraped.screenshot : undefined,
+      capturedAt,
     }));
 
     if (evidencesToInsert.length > 0) {

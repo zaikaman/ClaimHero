@@ -203,10 +203,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     count: number;
     categories: string[];
   }>({
-    isRedacted: true,
-    mode: "HIPAA_SAFE_HARBOR",
-    count: 2,
-    categories: ["member_id", "dob"],
+    isRedacted: false,
+    mode: "BALANCED_APPELLATE",
+    count: 0,
+    categories: [],
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -425,10 +425,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       setSenderPhone(advocatePhone || preset.sender.phone);
       setContextAcknowledged(true);
       setPrivacyRedactionState({
-        isRedacted: true,
-        mode: "HIPAA_SAFE_HARBOR",
-        count: 2,
-        categories: ["member_id", "dob"],
+        isRedacted: false,
+        mode: "BALANCED_APPELLATE",
+        count: 0,
+        categories: [],
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import {
@@ -46,6 +46,7 @@ export interface ExportDrawerProps {
   onProceedToDispatch: () => void;
   evidences?: ClinicalEvidence[];
   onNavigateView?: (view: FlowView) => void;
+  defaultViewMode?: "binder" | "brief";
 }
 
 export const ExportDrawer: React.FC<ExportDrawerProps> = ({
@@ -57,10 +58,17 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
   onProceedToDispatch,
   evidences: propEvidences,
   onNavigateView,
+  defaultViewMode = "brief",
 }) => {
   const [copied, setCopied] = useState(false);
   const [isPublicExhibitRedacted, setIsPublicExhibitRedacted] = useState(false);
-  const [viewMode, setViewMode] = useState<"binder" | "brief">("binder");
+  const [viewMode, setViewMode] = useState<"binder" | "brief">(defaultViewMode);
+
+  useEffect(() => {
+    if (isOpen) {
+      setViewMode(defaultViewMode);
+    }
+  }, [isOpen, defaultViewMode]);
 
   // Fetch indexed clinical evidences for Exhibit B & C only if not supplied by parent and drawer is open
   const rawEvidences = useQuery(
@@ -288,20 +296,6 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
               <div className="flex items-center rounded-md bg-muted/80 p-0.5 border border-border">
                 <button
                   type="button"
-                  onClick={() => setViewMode("binder")}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded transition-all",
-                    viewMode === "binder"
-                      ? "bg-card text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                  title="Full multi-page court-ready legal binder with Cover Page, TOC, Statutory Summary, Exhibits A-C, and Attestation"
-                >
-                  <FolderSimpleStar className="size-3.5" />
-                  <span>Exhibit Binder</span>
-                </button>
-                <button
-                  type="button"
                   onClick={() => setViewMode("brief")}
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded transition-all",
@@ -313,6 +307,20 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 >
                   <FileText className="size-3.5" />
                   <span>Appeal Brief</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("binder")}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded transition-all",
+                    viewMode === "binder"
+                      ? "bg-card text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  title="Full multi-page court-ready legal binder with Cover Page, TOC, Statutory Summary, Exhibits A-C, and Attestation"
+                >
+                  <FolderSimpleStar className="size-3.5" />
+                  <span>Exhibit Binder</span>
                 </button>
               </div>
 

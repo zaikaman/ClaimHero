@@ -201,6 +201,13 @@ export const resetPortfolio = mutation({
         .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
         .collect();
       for (const ev of evidences) {
+        if (ev.screenshotStorageId) {
+          try {
+            await ctx.storage.delete(ev.screenshotStorageId);
+          } catch {
+            // File may already have been removed
+          }
+        }
         await ctx.db.delete(ev._id);
       }
 

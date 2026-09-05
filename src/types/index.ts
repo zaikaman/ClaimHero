@@ -283,6 +283,9 @@ export interface ClinicalEvidence {
   citationClause: string;
   extractedEvidenceMarkdown: string;
   relevanceScore: number;
+  screenshotStorageId?: string;
+  screenshotUrl?: string;
+  capturedAt?: number;
   createdAt: number;
 }
 

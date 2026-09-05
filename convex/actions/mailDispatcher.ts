@@ -22,7 +22,7 @@ import {
   formatCorrespondenceEmail,
 } from "../lib/appealEmail";
 import { rateLimiter } from "../lib/rateLimiter";
-import { redactBeforeLLM, maskPatientName } from "../lib/redactionEngine";
+import { resolveClaimPatientName } from "../claims";
 
 export interface DispatchReceipt {
   transmissionId: string;
@@ -332,6 +332,7 @@ export const dispatchAppealPacket = action({
     claimId: v.id("claims"),
     appealId: v.optional(v.id("appeals")),
     recipientEmail: v.optional(v.string()),
+    customRecipient: v.optional(v.string()),
     customSubject: v.optional(v.string()),
     dispatchMode: v.optional(v.string()), // "ai_adjudicator" | "custom_email" | "official_payer"
     waiveRedaction: v.optional(v.boolean()),
@@ -370,9 +371,9 @@ export const dispatchAppealPacket = action({
     }
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
-    const mode = args.dispatchMode || (args.recipientEmail?.includes("@") ? "custom_email" : "ai_adjudicator");
+    const mode = args.dispatchMode || ((args.recipientEmail || args.customRecipient)?.includes("@") ? "custom_email" : "ai_adjudicator");
 
-    let recipient = args.recipientEmail?.trim();
+    let recipient = (args.recipientEmail || args.customRecipient)?.trim();
     if (mode === "official_payer") {
       recipient = claim.payerContact?.officialAppealsEmail || recipient;
     }
@@ -405,7 +406,6 @@ export const dispatchAppealPacket = action({
     const subject = rawSubject.includes(claimTag) ? rawSubject : `${claimTag} ${rawSubject}`;
     const transmissionId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const isCustomEmail = mode === "custom_email";
-    const isRedacted = Boolean(claim.redactionMetadata?.isRedacted);
     const waiveRedaction = Boolean(args.waiveRedaction);
 
     if (isCustomEmail && waiveRedaction) {
@@ -417,12 +417,9 @@ export const dispatchAppealPacket = action({
       });
     }
 
-    let briefMarkdown = appeal.fullAppealMarkdown;
-    let patientName = claim.patient?.name;
-    if (isCustomEmail && !waiveRedaction && !isRedacted) {
-      briefMarkdown = redactBeforeLLM(briefMarkdown);
-      patientName = patientName ? maskPatientName(patientName, "HIPAA_SAFE_HARBOR") : undefined;
-    }
+    const briefMarkdown = appeal.fullAppealMarkdown;
+    const rawPatientName = claim.patient?.name || claim.patientName;
+    const patientName = resolveClaimPatientName(rawPatientName, claim.claimNumber, claim.patient?.memberId);
 
     const appealEmail = formatAppealEmail(briefMarkdown, {
       claimNumber: claim.claimNumber,
@@ -600,7 +597,6 @@ async function performSendOutboundMessage(
   if (inReplyTo) headers["In-Reply-To"] = inReplyTo;
   if (references) headers["References"] = references;
 
-  const isRedacted = Boolean(claim.redactionMetadata?.isRedacted);
   const waiveRedaction = Boolean(args.waiveRedaction);
   const isCustomEmail = Boolean(args.customRecipient && !isAiAdjudicatorAddress(args.customRecipient));
 
@@ -613,12 +609,9 @@ async function performSendOutboundMessage(
     });
   }
 
-  let outboundText = args.text;
-  let patientName = claim.patient?.name;
-  if (isCustomEmail && !waiveRedaction && !isRedacted) {
-    outboundText = redactBeforeLLM(outboundText);
-    patientName = patientName ? maskPatientName(patientName, "HIPAA_SAFE_HARBOR") : undefined;
-  }
+  const outboundText = args.text;
+  const rawPatientName = claim.patient?.name || claim.patientName;
+  const patientName = resolveClaimPatientName(rawPatientName, claim.claimNumber, claim.patient?.memberId);
 
   const correspondenceEmail = formatCorrespondenceEmail(outboundText, {
     claimNumber: claim.claimNumber,

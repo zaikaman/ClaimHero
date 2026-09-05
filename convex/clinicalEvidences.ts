@@ -54,16 +54,27 @@ export const listByClaim = query({
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
       .take(50);
 
-    // Sort by relevance score descending and sanitize raw formatting
-    return evidences
-      .sort((a, b) => b.relevanceScore - a.relevanceScore)
-      .map((item) => ({
-        ...item,
-        title: item.title?.replace(/\*\*/g, "") || "",
-        citationClause: sanitizeCitationClause(item.citationClause),
-        extractedEvidenceMarkdown:
-          item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
-      }));
+    // Sort by relevance score descending, resolve signed screenshot URLs, and sanitize raw formatting
+    const sorted = evidences.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    return await Promise.all(
+      sorted.map(async (item) => {
+        let screenshotUrl = item.screenshotUrl;
+        if (item.screenshotStorageId) {
+          const resolved = await ctx.storage.getUrl(item.screenshotStorageId);
+          if (resolved) {
+            screenshotUrl = resolved;
+          }
+        }
+        return {
+          ...item,
+          title: item.title?.replace(/\*\*/g, "") || "",
+          citationClause: sanitizeCitationClause(item.citationClause),
+          extractedEvidenceMarkdown:
+            item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
+          screenshotUrl,
+        };
+      })
+    );
   },
 });
 
@@ -80,15 +91,26 @@ export const listByClaimInternal = internalQuery({
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
       .take(50);
 
-    return evidences
-      .sort((a, b) => b.relevanceScore - a.relevanceScore)
-      .map((item) => ({
-        ...item,
-        title: item.title?.replace(/\*\*/g, "") || "",
-        citationClause: sanitizeCitationClause(item.citationClause),
-        extractedEvidenceMarkdown:
-          item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
-      }));
+    const sorted = evidences.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    return await Promise.all(
+      sorted.map(async (item) => {
+        let screenshotUrl = item.screenshotUrl;
+        if (item.screenshotStorageId) {
+          const resolved = await ctx.storage.getUrl(item.screenshotStorageId);
+          if (resolved) {
+            screenshotUrl = resolved;
+          }
+        }
+        return {
+          ...item,
+          title: item.title?.replace(/\*\*/g, "") || "",
+          citationClause: sanitizeCitationClause(item.citationClause),
+          extractedEvidenceMarkdown:
+            item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
+          screenshotUrl,
+        };
+      })
+    );
   },
 });
 
@@ -111,13 +133,25 @@ export const listByClaimAndSource = query({
       )
       .take(50);
 
-    return evidences.map((item) => ({
-      ...item,
-      title: item.title?.replace(/\*\*/g, "") || "",
-      citationClause: sanitizeCitationClause(item.citationClause),
-      extractedEvidenceMarkdown:
-        item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
-    }));
+    return await Promise.all(
+      evidences.map(async (item) => {
+        let screenshotUrl = item.screenshotUrl;
+        if (item.screenshotStorageId) {
+          const resolved = await ctx.storage.getUrl(item.screenshotStorageId);
+          if (resolved) {
+            screenshotUrl = resolved;
+          }
+        }
+        return {
+          ...item,
+          title: item.title?.replace(/\*\*/g, "") || "",
+          citationClause: sanitizeCitationClause(item.citationClause),
+          extractedEvidenceMarkdown:
+            item.extractedEvidenceMarkdown?.replace(/\*\*/g, "").trim() || "",
+          screenshotUrl,
+        };
+      })
+    );
   },
 });
 
@@ -128,6 +162,9 @@ interface ClinicalEvidenceItem {
   citationClause: string;
   extractedEvidenceMarkdown: string;
   relevanceScore: number;
+  screenshotStorageId?: Id<"_storage">;
+  screenshotUrl?: string;
+  capturedAt?: number;
 }
 
 interface BatchInsertEvidenceArgs {
@@ -154,6 +191,9 @@ async function applyBatchInsert(ctx: MutationCtx, args: BatchInsertEvidenceArgs)
       citationClause: sanitizeCitationClause(item.citationClause),
       extractedEvidenceMarkdown: item.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
       relevanceScore: item.relevanceScore,
+      screenshotStorageId: item.screenshotStorageId,
+      screenshotUrl: item.screenshotUrl,
+      capturedAt: item.capturedAt,
       createdAt: now,
     });
     insertedIds.push(id);
@@ -181,22 +221,25 @@ async function applyBatchInsert(ctx: MutationCtx, args: BatchInsertEvidenceArgs)
   return insertedIds;
 }
 
+const evidenceValidator = v.object({
+  sourceType: v.string(),
+  title: v.string(),
+  sourceUrl: v.optional(v.string()),
+  citationClause: v.string(),
+  extractedEvidenceMarkdown: v.string(),
+  relevanceScore: v.number(),
+  screenshotStorageId: v.optional(v.id("_storage")),
+  screenshotUrl: v.optional(v.string()),
+  capturedAt: v.optional(v.number()),
+});
+
 /**
  * Insert a batch of extracted clinical evidence items for a claim
  */
 export const insertBatch = mutation({
   args: {
     claimId: v.id("claims"),
-    evidences: v.array(
-      v.object({
-        sourceType: v.string(),
-        title: v.string(),
-        sourceUrl: v.optional(v.string()),
-        citationClause: v.string(),
-        extractedEvidenceMarkdown: v.string(),
-        relevanceScore: v.number(),
-      })
-    ),
+    evidences: v.array(evidenceValidator),
   },
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">[]> => {
     await requireClaimOwner(ctx, args.claimId);
@@ -210,16 +253,7 @@ export const insertBatch = mutation({
 export const insertBatchInternal = internalMutation({
   args: {
     claimId: v.id("claims"),
-    evidences: v.array(
-      v.object({
-        sourceType: v.string(),
-        title: v.string(),
-        sourceUrl: v.optional(v.string()),
-        citationClause: v.string(),
-        extractedEvidenceMarkdown: v.string(),
-        relevanceScore: v.number(),
-      })
-    ),
+    evidences: v.array(evidenceValidator),
   },
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">[]> => {
     return await applyBatchInsert(ctx, args);
@@ -233,16 +267,7 @@ export const insertBatchInternal = internalMutation({
 export const replaceForClaimInternal = internalMutation({
   args: {
     claimId: v.id("claims"),
-    evidences: v.array(
-      v.object({
-        sourceType: v.string(),
-        title: v.string(),
-        sourceUrl: v.optional(v.string()),
-        citationClause: v.string(),
-        extractedEvidenceMarkdown: v.string(),
-        relevanceScore: v.number(),
-      })
-    ),
+    evidences: v.array(evidenceValidator),
   },
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">[]> => {
     await applyClearByClaim(ctx, args.claimId);
@@ -258,6 +283,13 @@ async function applyClearByClaim(ctx: MutationCtx, claimId: Id<"claims">) {
     .collect();
 
   for (const item of existing) {
+    if (item.screenshotStorageId) {
+      try {
+        await ctx.storage.delete(item.screenshotStorageId);
+      } catch (err) {
+        console.warn(`Failed to delete evidence screenshot ${item.screenshotStorageId}:`, err);
+      }
+    }
     await ctx.db.delete(item._id);
   }
 
@@ -306,6 +338,15 @@ export const deleteEvidence = mutation({
     if (!evidence) return null;
 
     await requireClaimOwner(ctx, evidence.claimId);
+
+    if (evidence.screenshotStorageId) {
+      try {
+        await ctx.storage.delete(evidence.screenshotStorageId);
+      } catch (err) {
+        console.warn(`Failed to delete evidence screenshot ${evidence.screenshotStorageId}:`, err);
+      }
+    }
+
     await ctx.db.delete(args.evidenceId);
 
     const claim = typeof ctx.db.get === "function" ? await ctx.db.get(evidence.claimId) : null;
@@ -345,6 +386,9 @@ async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArg
     citationClause: cleanClause,
     extractedEvidenceMarkdown: args.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
     relevanceScore: args.relevanceScore,
+    screenshotStorageId: args.screenshotStorageId,
+    screenshotUrl: args.screenshotUrl,
+    capturedAt: args.capturedAt,
     createdAt: now,
   });
 
@@ -368,19 +412,24 @@ async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArg
   return id;
 }
 
+const singleEvidenceArgs = {
+  claimId: v.id("claims"),
+  sourceType: v.string(),
+  title: v.string(),
+  sourceUrl: v.optional(v.string()),
+  citationClause: v.string(),
+  extractedEvidenceMarkdown: v.string(),
+  relevanceScore: v.number(),
+  screenshotStorageId: v.optional(v.id("_storage")),
+  screenshotUrl: v.optional(v.string()),
+  capturedAt: v.optional(v.number()),
+};
+
 /**
  * Insert a single clinical evidence item
  */
 export const insertSingle = mutation({
-  args: {
-    claimId: v.id("claims"),
-    sourceType: v.string(),
-    title: v.string(),
-    sourceUrl: v.optional(v.string()),
-    citationClause: v.string(),
-    extractedEvidenceMarkdown: v.string(),
-    relevanceScore: v.number(),
-  },
+  args: singleEvidenceArgs,
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">> => {
     await requireClaimOwner(ctx, args.claimId);
     return await applyInsertSingle(ctx, args);
@@ -391,15 +440,7 @@ export const insertSingle = mutation({
  * Internal mutation for background actions to insert a single clinical evidence item
  */
 export const insertSingleInternal = internalMutation({
-  args: {
-    claimId: v.id("claims"),
-    sourceType: v.string(),
-    title: v.string(),
-    sourceUrl: v.optional(v.string()),
-    citationClause: v.string(),
-    extractedEvidenceMarkdown: v.string(),
-    relevanceScore: v.number(),
-  },
+  args: singleEvidenceArgs,
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">> => {
     return await applyInsertSingle(ctx, args);
   },

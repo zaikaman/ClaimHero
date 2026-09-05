@@ -13,6 +13,9 @@ export interface DossierExhibitItem {
   sourceUrl?: string;
   relevanceScore?: number;
   highlightedViolations?: string[];
+  screenshotStorageId?: string;
+  screenshotUrl?: string;
+  capturedAt?: number;
 }
 
 export interface DossierPhysicianInfo {
@@ -262,6 +265,9 @@ export function buildDossierData(
         sourceUrl: ev.sourceUrl,
         relevanceScore: ev.relevanceScore,
         highlightedViolations: extractCriteriaViolations(content, claim.denialReasonDescription),
+        screenshotStorageId: ev.screenshotStorageId,
+        screenshotUrl: ev.screenshotUrl,
+        capturedAt: ev.capturedAt,
       });
     } else {
       exhibitC_MedicalLiterature.push({
@@ -273,6 +279,9 @@ export function buildDossierData(
         content,
         sourceUrl: ev.sourceUrl,
         relevanceScore: ev.relevanceScore,
+        screenshotStorageId: ev.screenshotStorageId,
+        screenshotUrl: ev.screenshotUrl,
+        capturedAt: ev.capturedAt,
       });
     }
   });
@@ -460,6 +469,12 @@ export function generatePlainTextDossier(dossier: DossierData): string {
     out += `Citation Clause: ${item.citationClause}\n`;
     if (item.sourceUrl) out += `Source URL: ${item.sourceUrl}\n`;
     out += `Policy Excerpt:\n${item.content}\n`;
+    if (item.screenshotStorageId || item.screenshotUrl) {
+      const captureStr = item.capturedAt ? formatDossierDate(item.capturedAt) : "Date of Service";
+      out += `Visual Proof Archive: Verified full-page capture recorded on ${captureStr}\n`;
+      if (item.screenshotUrl) out += `Visual Proof Exhibit URL: ${item.screenshotUrl}\n`;
+      if (item.screenshotStorageId) out += `Visual Proof Archive Reference: Convex Storage Exhibit ID [${item.screenshotStorageId}]\n`;
+    }
     if (item.highlightedViolations && item.highlightedViolations.length > 0) {
       out += `Criteria Contradictions & Violations:\n`;
       item.highlightedViolations.forEach((v) => out += `  * ${v}\n`);

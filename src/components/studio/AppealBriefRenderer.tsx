@@ -28,7 +28,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
 
   return (
     <div
-      className={`appeal-brief-document font-sans text-xs leading-relaxed ${
+      className={`appeal-brief-document font-sans text-xs leading-relaxed break-words [overflow-wrap:anywhere] min-w-0 max-w-full ${
         isPrintMode ? "space-y-2" : "space-y-4"
       } ${
         isPrintMode
@@ -42,7 +42,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
         components={{
           h1: ({ children }) => (
             <div className={`pb-2 mb-3 border-b-2 [break-after:avoid] [page-break-after:avoid] ${isPrintMode ? "border-slate-900" : "border-border"}`}>
-              <h1 className={`text-base sm:text-lg font-bold tracking-tight flex items-center gap-2 ${
+              <h1 className={`text-base sm:text-lg font-bold tracking-tight flex items-center gap-2 break-words [overflow-wrap:anywhere] ${
                 isPrintMode ? "text-slate-950" : "text-foreground"
               }`}>
                 {!isPrintMode && <Scales className="size-4.5 text-primary shrink-0" />}
@@ -52,7 +52,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
           ),
           h2: ({ children }) => (
             <div className={`${isPrintMode ? "pt-2 pb-1 mt-3" : "pt-3 pb-1.5 mt-4"} [break-after:avoid] [page-break-after:avoid]`}>
-              <h2 className={`text-xs sm:text-sm font-bold tracking-wide flex items-center gap-2 ${
+              <h2 className={`text-xs sm:text-sm font-bold tracking-wide flex items-center gap-2 break-words [overflow-wrap:anywhere] ${
                 isPrintMode ? "text-slate-950 border-b border-slate-300 pb-1" : "text-foreground/95"
               }`}>
                 {!isPrintMode && (
@@ -63,14 +63,14 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
             </div>
           ),
           h3: ({ children }) => (
-            <h3 className={`text-xs font-semibold mt-3 mb-1 [break-after:avoid] [page-break-after:avoid] ${
+            <h3 className={`text-xs font-semibold mt-3 mb-1 [break-after:avoid] [page-break-after:avoid] break-words [overflow-wrap:anywhere] ${
               isPrintMode ? "text-slate-800" : "text-foreground/90"
             }`}>
               {children}
             </h3>
           ),
           p: ({ children }) => (
-            <p className={`${isPrintMode ? "mb-2" : "mb-3"} leading-relaxed ${
+            <p className={`${isPrintMode ? "mb-2" : "mb-3"} leading-relaxed break-words [overflow-wrap:anywhere] ${
               isPrintMode ? "text-slate-800 text-[11.5px]" : "text-foreground/85"
             }`}>
               {children}
@@ -78,17 +78,17 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
           ),
           blockquote: ({ children }) => (
             <blockquote
-              className={`${isPrintMode ? "my-2 p-2" : "my-3 p-3"} rounded-lg border-l-4 font-sans transition-colors [break-inside:avoid] [page-break-inside:avoid] ${
+              className={`${isPrintMode ? "my-2 p-2" : "my-3 p-3"} rounded-lg border-l-4 font-sans transition-colors [break-inside:avoid] [page-break-inside:avoid] min-w-0 max-w-full break-words [overflow-wrap:anywhere] ${
                 isPrintMode
                   ? "border-slate-700 bg-slate-100 text-slate-800 text-[11px]"
                   : "border-primary/70 bg-muted/40 text-foreground/90 shadow-sm"
               }`}
             >
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2 min-w-0">
                 {!isPrintMode && (
                   <ShieldCheck className="size-4 text-primary shrink-0 mt-0.5" />
                 )}
-                <div className="flex-1 space-y-1 [&>p]:mb-1 [&>p:last-child]:mb-0">
+                <div className="flex-1 space-y-1 min-w-0 [&>p]:mb-1 [&>p:last-child]:mb-0">
                   {children}
                 </div>
               </div>
@@ -109,7 +109,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
             </ol>
           ),
           li: ({ children }) => (
-            <li className="leading-relaxed pl-0.5">{children}</li>
+            <li className="leading-relaxed pl-0.5 break-words [overflow-wrap:anywhere]">{children}</li>
           ),
           hr: () => (
             <hr className={`my-4 ${isPrintMode ? "border-slate-300" : "border-border"}`} />
@@ -118,7 +118,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
             const isCodeBlock = !inline && codeClassName;
             if (isCodeBlock) {
               return (
-                <pre className={`p-3 rounded-lg font-mono text-[11px] overflow-x-auto my-2.5 ${
+                <pre className={`p-3 rounded-lg font-mono text-[11px] overflow-x-auto max-w-full my-2.5 ${
                   isPrintMode ? "bg-slate-100 text-slate-900 border border-slate-300" : "bg-muted/60 text-foreground border border-border"
                 }`}>
                   <code>{children}</code>
@@ -126,7 +126,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
               );
             }
             return (
-              <code className={`font-mono text-[11px] px-1.5 py-0.5 rounded border font-medium ${
+              <code className={`font-mono text-[11px] px-1.5 py-0.5 rounded border font-medium break-all [overflow-wrap:anywhere] ${
                 isPrintMode
                   ? "bg-slate-100 border-slate-300 text-slate-900"
                   : "bg-muted/80 border-border text-foreground/95"
@@ -136,7 +136,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
             );
           },
           table: ({ children }) => (
-            <div className="overflow-x-auto my-3 rounded-lg border border-border">
+            <div className="overflow-x-auto max-w-full my-3 rounded-lg border border-border">
               <table className={`w-full text-left text-xs border-collapse ${
                 isPrintMode ? "text-slate-900" : "text-foreground"
               }`}>
@@ -165,7 +165,7 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
             </th>
           ),
           td: ({ children }) => (
-            <td className="p-2.5 text-[11px]">
+            <td className="p-2.5 text-[11px] break-words [overflow-wrap:anywhere]">
               {children}
             </td>
           ),
@@ -178,16 +178,18 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
           ),
           a: ({ href, children }) => {
             const safeHref = safeExternalHref(href);
-            if (!safeHref) return <span>{children}</span>;
+            if (!safeHref) return <span className="break-all [overflow-wrap:anywhere]">{children}</span>;
 
             return (
               <a
                 href={safeHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={isPrintMode
-                  ? "font-medium text-blue-800 underline decoration-1 underline-offset-2 hover:text-blue-950"
-                  : "font-medium text-primary underline decoration-1 underline-offset-2 hover:text-primary/80"}
+                className={`break-all [overflow-wrap:anywhere] ${
+                  isPrintMode
+                    ? "font-medium text-blue-800 underline decoration-1 underline-offset-2 hover:text-blue-950"
+                    : "font-medium text-primary underline decoration-1 underline-offset-2 hover:text-primary/80"
+                }`}
               >
                 {children}
               </a>

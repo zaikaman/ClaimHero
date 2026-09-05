@@ -115,6 +115,7 @@ export function useCommunications(claim?: Claim | null, options?: UseCommunicati
           threadId: activeThreadId,
           text,
           customRecipient: recipient,
+          waiveRedaction: true,
         });
       } else {
         const sender = claim.assignedAgentEmail;
@@ -154,6 +155,7 @@ export function useCommunications(claim?: Claim | null, options?: UseCommunicati
         appealId: appealId ? (appealId as Id<"appeals">) : undefined,
         recipientEmail,
         dispatchMode,
+        waiveRedaction: true,
       });
     },
     [claim, dispatchAction]

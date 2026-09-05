@@ -197,6 +197,9 @@ export default defineSchema({
     citationClause: v.string(),
     extractedEvidenceMarkdown: v.string(),
     relevanceScore: v.number(),
+    screenshotStorageId: v.optional(v.id("_storage")),
+    screenshotUrl: v.optional(v.string()),
+    capturedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_claim", ["claimId"])

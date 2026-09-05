@@ -25,7 +25,9 @@ function escapeHtml(value: string): string {
 
 function cleanInlineText(value: string): string {
   return value
-    .replace(/\*/g, "")
+    .replace(/\*\*\*([^*]+)\*\*\*/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/__([^_]+)__/g, "$1")
     .replace(/_([^_]+)_/g, "$1")
@@ -242,7 +244,7 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
 
   return {
     html: htmlBlocks.join("\n"),
-    text: textBlocks.join("\n\n").replace(/\*/g, "").trim(),
+    text: textBlocks.join("\n\n").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1").trim(),
   };
 }
 
