@@ -188,8 +188,32 @@ export async function computeSvixSignature(
   return uint8ArrayToBase64(new Uint8Array(signatureBuffer));
 }
 
+export async function computeSvixSignatureFromBytes(
+  id: string,
+  timestamp: string | number,
+  payloadBytes: Uint8Array,
+  secretKeyBytes: Uint8Array
+): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    secretKeyBytes as unknown as BufferSource,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const prefixBytes = new TextEncoder().encode(`${id}.${timestamp}.`);
+  const fullBytes = new Uint8Array(prefixBytes.length + payloadBytes.length);
+  fullBytes.set(prefixBytes, 0);
+  fullBytes.set(payloadBytes, prefixBytes.length);
+
+  const signatureBuffer = await crypto.subtle.sign("HMAC", key, fullBytes);
+  return uint8ArrayToBase64(new Uint8Array(signatureBuffer));
+}
+
 export interface VerifySvixWebhookOptions {
   payload: string;
+  rawBytes?: Uint8Array;
   headers:
     | {
         id?: string | null;
@@ -220,6 +244,9 @@ export interface SvixVerificationResult {
     timestamp?: string;
     sigCount?: number;
     sigPrefix?: string;
+    expectedPrefix?: string;
+    secretCount?: number;
+    secretPrefix?: string;
     lastError?: string;
   };
 }
@@ -232,7 +259,7 @@ export interface SvixVerificationResult {
 export async function verifySvixWebhook(
   options: VerifySvixWebhookOptions
 ): Promise<SvixVerificationResult> {
-  const { payload, secret, toleranceInSeconds = 300 } = options;
+  const { payload, rawBytes, secret, toleranceInSeconds = 300 } = options;
 
   if (!secret?.trim()) {
     return { valid: false, error: "Webhook secret is not configured" };
@@ -289,18 +316,19 @@ export async function verifySvixWebhook(
     return { valid: false, error: "No v1 signature found in signature header" };
   }
 
-
   // Parse secret candidates (supporting comma/whitespace separated secrets for key rotation)
   const candidateSecrets = secret
     .split(/[,;\s]+/)
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // Candidate payload variants:
+  // Candidate payload string variants:
   // 1. Raw body received
   // 2. Stripped BOM
   // 3. Normalized CRLF -> LF
   // 4. Normalized LF -> CRLF
+  // 5. Trimmed
+  // 6. Canonical JSON re-stringification
   const candidatePayloads = [payload];
   if (payload.charCodeAt(0) === 0xfeff) {
     candidatePayloads.push(payload.slice(1));
@@ -312,6 +340,24 @@ export async function verifySvixWebhook(
   }
   if (payload.trim() !== payload) {
     candidatePayloads.push(payload.trim());
+  }
+  try {
+    const parsed = JSON.parse(payload);
+    const reStringified = JSON.stringify(parsed);
+    if (!candidatePayloads.includes(reStringified)) {
+      candidatePayloads.push(reStringified);
+    }
+  } catch {
+    // Not valid JSON; ignore
+  }
+
+  // Candidate payload byte arrays (for direct HMAC without UTF-16 re-encoding drift)
+  const candidateBytePayloads: Uint8Array[] = [];
+  if (rawBytes && rawBytes.length > 0) {
+    candidateBytePayloads.push(rawBytes);
+  }
+  for (const p of candidatePayloads) {
+    candidateBytePayloads.push(new TextEncoder().encode(p));
   }
 
   // Candidate timestamps: integer seconds (standardwebhooks standard) and raw string
@@ -325,8 +371,9 @@ export async function verifySvixWebhook(
 
   let matched = false;
   let lastErrorDetail = "";
+  let firstExpectedSig: string | undefined;
 
-  // 1. Try official Svix Webhook verification engine
+  // 1. Try official Svix Webhook verification engine across string payload candidates
   for (const sec of candidateSecrets) {
     for (const ts of candidateTimestamps) {
       for (const p of candidatePayloads) {
@@ -342,9 +389,6 @@ export async function verifySvixWebhook(
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           lastErrorDetail = msg;
-          // If the error was timestamp drift or JSON parse failure after successful signature
-          // verification (standardwebhooks calls JSON.parse only after timingSafeEqual passes),
-          // the cryptographic signature was authentic.
           if (
             msg.includes("timestamp too old") ||
             msg.includes("timestamp too new") ||
@@ -361,28 +405,46 @@ export async function verifySvixWebhook(
     if (matched) break;
   }
 
-  // 2. Web Crypto HMAC-SHA256 verification engine across all variants
+  // 2. Web Crypto HMAC-SHA256 verification engine across byte payloads and key encodings
   if (!matched) {
     const norm = (s: string) => s.trim().replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
     for (const sec of candidateSecrets) {
-      for (const ts of candidateTimestamps) {
-        for (const p of candidatePayloads) {
-          try {
-            const expected = await computeSvixSignature(cleanId, ts, p, sec);
-            const normExpected = norm(expected);
+      const cleanSecret = sec.startsWith("whsec_") ? sec.slice(6) : sec;
 
-            for (const candidate of extractedSignatures) {
-              const normCandidate = norm(candidate);
-              if (
-                timingSafeEqual(candidate.trim(), expected) ||
-                timingSafeEqual(normCandidate, normExpected)
-              ) {
-                matched = true;
-                break;
+      // Candidate key byte representations
+      const keyCandidates: Uint8Array[] = [];
+      try {
+        keyCandidates.push(base64ToUint8Array(cleanSecret));
+      } catch {
+        // Not valid base64
+      }
+      keyCandidates.push(new TextEncoder().encode(cleanSecret));
+      keyCandidates.push(new TextEncoder().encode(sec));
+
+      for (const keyBytes of keyCandidates) {
+        for (const ts of candidateTimestamps) {
+          for (const bytePayload of candidateBytePayloads) {
+            try {
+              const expected = await computeSvixSignatureFromBytes(cleanId, ts, bytePayload, keyBytes);
+              if (!firstExpectedSig) {
+                firstExpectedSig = expected;
               }
+              const normExpected = norm(expected);
+
+              for (const candidate of extractedSignatures) {
+                const normCandidate = norm(candidate);
+                if (
+                  timingSafeEqual(candidate.trim(), expected) ||
+                  timingSafeEqual(normCandidate, normExpected)
+                ) {
+                  matched = true;
+                  break;
+                }
+              }
+            } catch (cryptoErr) {
+              lastErrorDetail = cryptoErr instanceof Error ? cryptoErr.message : String(cryptoErr);
             }
-          } catch (cryptoErr) {
-            lastErrorDetail = cryptoErr instanceof Error ? cryptoErr.message : String(cryptoErr);
+            if (matched) break;
           }
           if (matched) break;
         }
@@ -400,7 +462,10 @@ export async function verifySvixWebhook(
         svixId: cleanId,
         timestamp: rawTimestamp,
         sigCount: extractedSignatures.length,
-        sigPrefix: extractedSignatures[0] ? extractedSignatures[0].slice(0, 12) : undefined,
+        sigPrefix: extractedSignatures[0] ? extractedSignatures[0].slice(0, 16) : undefined,
+        expectedPrefix: firstExpectedSig ? firstExpectedSig.slice(0, 16) : undefined,
+        secretCount: candidateSecrets.length,
+        secretPrefix: candidateSecrets[0] ? candidateSecrets[0].slice(0, 12) : undefined,
         lastError: lastErrorDetail || undefined,
       },
     };

@@ -21,7 +21,15 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     try {
-      const rawPayload = await request.text();
+      let rawPayload: string;
+      let rawBytes: Uint8Array | undefined;
+      try {
+        const buffer = await request.arrayBuffer();
+        rawBytes = new Uint8Array(buffer);
+        rawPayload = new TextDecoder("utf-8").decode(rawBytes);
+      } catch {
+        rawPayload = await request.text();
+      }
 
       const webhookSecret = process.env.AGENTMAIL_WEBHOOK_SECRET?.trim();
       if (!webhookSecret) {
@@ -36,6 +44,7 @@ http.route({
 
       const verification = await verifySvixWebhook({
         payload: rawPayload,
+        rawBytes,
         headers: request.headers,
         secret: webhookSecret,
       });
@@ -61,6 +70,9 @@ http.route({
             ` hasId=${Boolean(svixId)} hasTimestamp=${Boolean(svixTimestamp)}` +
             ` hasSignature=${Boolean(svixSignature)} sigCount=${sigCount}` +
             ` sigPrefix=${sigPrefix}` +
+            ` expectedPrefix=${verification.diagnostics?.expectedPrefix || "none"}` +
+            ` secretPrefix=${verification.diagnostics?.secretPrefix || "none"}` +
+            ` secretCount=${verification.diagnostics?.secretCount ?? 0}` +
             ` timestampAgeSec=${timestampAgeSec ?? "unknown"}` +
             ` payloadBytes=${rawPayload.length}` +
             ` detail=${verification.diagnostics?.lastError || "none"}`

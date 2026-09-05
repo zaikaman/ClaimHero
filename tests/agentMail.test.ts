@@ -304,6 +304,56 @@ Paragraph text with **bold** and *italic*.
       expect(result.error).toBeUndefined();
     });
 
+    it("verifies signatures computed directly over rawBytes", async () => {
+      const { computeSvixSignatureFromBytes } = await import("../convex/lib/agentMailWebhook");
+      const id = "msg_bytes_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const rawBytes = new TextEncoder().encode(testPayload);
+      const cleanSecret = testSecret.startsWith("whsec_") ? testSecret.slice(6) : testSecret;
+      const { base64ToUint8Array } = await import("../convex/lib/agentMailWebhook");
+      const keyBytes = base64ToUint8Array(cleanSecret);
+
+      const signature = await computeSvixSignatureFromBytes(id, timestamp, rawBytes, keyBytes);
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        rawBytes,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,${signature}`,
+        },
+        secret: testSecret,
+      });
+
+      expect(result.valid).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it("verifies signatures when payload is formatted as pretty-printed JSON vs canonical", async () => {
+      const obj = { event_type: "message.received", message: { id: "m1" } };
+      const compact = JSON.stringify(obj);
+      const pretty = JSON.stringify(obj, null, 2);
+
+      const id = "msg_json_norm_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      // Sign the compact JSON representation
+      const signature = await computeSvixSignature(id, timestamp, compact, testSecret);
+
+      // Verify with the pretty-printed JSON payload
+      const result = await verifySvixWebhook({
+        payload: pretty,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,${signature}`,
+        },
+        secret: testSecret,
+      });
+
+      expect(result.valid).toBe(true);
+    });
+
     it("supports Headers object format with alternative webhook-* header names", async () => {
       const id = "msg_alt_1";
       const timestamp = Math.floor(Date.now() / 1000).toString();

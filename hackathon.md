@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-05T16:19:26Z
+- **Last updated:** 2026-09-05T16:43:00Z
 
 ## Log
 
@@ -897,9 +897,17 @@ Hardened AgentMail Svix webhook verification and inbound HTTP action routing aga
 - Enhanced Diagnostics & Documentation: Added safe `sigCount` extraction to rejection diagnostics in `convex/http.ts` to log signature token counts without exposing secret or signature material. Documented both `/agentmail-webhook` and `/agentmail/webhook` endpoints in `README.md`.
 - Quality Assurance: Added unit and regression tests in `tests/agentMail.test.ts` covering official Svix parity, comma-separated multi-signature headers, CRLF/LF normalization, Base64URL encoding, key rotation, and decimal timestamps. Verified full gate with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint errors/warnings, 540/540 passing tests across 37 test suites, and clean production build. Convex features: HTTP actions, actions, scheduled functions.
 
-### 2026-09-05 - working tree
+### 2026-09-05 - cb09b85
 Resolved dynamic import runtime fault in Convex isolate and normalized multi-signature delimiters for standardwebhooks verification:
 - Static Svix Bundle Integration: Eliminated isolate runtime failure caused by dynamic `await import("svix")` in `convex/lib/agentMailWebhook.ts` by statically importing `Webhook` from `svix`, ensuring esbuild bundles the cryptographic module directly into the Convex deployment bundle.
 - Signature Delimiter Space-Normalization: Formatted multi-signature tokens as strictly space-delimited (`v1,sig1 v1,sig2`) when invoking `wh.verify`, ensuring `standardwebhooks`'s internal `split(" ")` correctly parses each candidate signature across proxy-joined comma-separated headers.
 - Payload Body & Parse Error Resilience: Added trimmed payload candidates and BOM stripping. Verified authentic cryptographic matches even when standardwebhooks throws a `SyntaxError` during post-verification JSON parsing of unescaped MIME control characters in large email bodies.
 - Enriched Non-Sensitive Diagnostics: Passed safe diagnostic telemetry (`svixId`, `timestamp`, `sigCount`, `sigPrefix`, `detail`) from `verifySvixWebhook` to `convex/http.ts` to log rejection attribution without exposing secret or payload material. Verified with `npm run verify`: 100% clean typecheck, 0 ESLint errors/warnings, 540/540 passing tests across 37 suites, and clean production build. Convex features: HTTP actions, actions.
+
+### 2026-09-05 - working tree
+Hardened AgentMail webhook verification with raw byte HMAC hashing, fresh endpoint provisioning, and canonical JSON normalization:
+- Provisioned Fresh Webhook Endpoint & Secret Synchronization: Replaced legacy desynchronized webhook endpoint with newly provisioned AgentMail endpoint, synchronized its signing secret into both production and development Convex environments with key rotation preservation, and cleanly decommissioned the stale endpoint.
+- Exact Wire-Byte HMAC Verification: Replaced lossy string-only body parsing in `convex/http.ts` with `request.arrayBuffer()`, passing exact `rawBytes` into `verifySvixWebhook` and `computeSvixSignatureFromBytes` (`convex/lib/agentMailWebhook.ts`) to calculate HMAC-SHA256 digests directly over incoming wire bytes, preventing signature drift caused by UTF-8 to UTF-16 character decoding replacements.
+- Canonical JSON Formatting & Key Representation Fallbacks: Added automatic canonical JSON re-stringification candidates to match payloads formatted differently across HTTP proxies, and supported raw string secret key representations alongside base64 decoding.
+- Telemetry & Diagnostic Transparency: Enhanced rejection logging in `convex/http.ts` with `expectedPrefix`, `secretPrefix`, and `secretCount` metrics to attribute any cryptographic mismatch instantly from logs without leaking sensitive key material.
+- Automated Test Suite & Full Gate Validation: Added test coverage in `tests/agentMail.test.ts` for byte-array HMAC signatures and pretty/compact JSON variations. Verified full quality gate with `npm run verify`: 100% clean TypeScript check (`tsc --noEmit`), 0 ESLint warnings or errors, 542/542 passing tests across 37 test suites, and successful production Vite bundle build. Convex features: HTTP actions, actions.
