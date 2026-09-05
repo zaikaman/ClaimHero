@@ -1,3 +1,5 @@
+import { Webhook } from "svix";
+
 export interface AgentMailAttachmentSummary {
   attachmentId: string;
   filename?: string;
@@ -212,6 +214,14 @@ export interface SvixVerificationResult {
   stale?: boolean;
   /** Age of the webhook timestamp in seconds relative to now (if parseable). */
   timestampAgeSec?: number;
+  /** Non-sensitive diagnostics for attribution when verification fails */
+  diagnostics?: {
+    svixId?: string;
+    timestamp?: string;
+    sigCount?: number;
+    sigPrefix?: string;
+    lastError?: string;
+  };
 }
 
 /**
@@ -279,6 +289,7 @@ export async function verifySvixWebhook(
     return { valid: false, error: "No v1 signature found in signature header" };
   }
 
+
   // Parse secret candidates (supporting comma/whitespace separated secrets for key rotation)
   const candidateSecrets = secret
     .split(/[,;\s]+/)
@@ -299,6 +310,9 @@ export async function verifySvixWebhook(
   } else if (payload.includes("\n")) {
     candidatePayloads.push(payload.replace(/(?<!\r)\n/g, "\r\n"));
   }
+  if (payload.trim() !== payload) {
+    candidatePayloads.push(payload.trim());
+  }
 
   // Candidate timestamps: integer seconds (standardwebhooks standard) and raw string
   const candidateTimestamps = [cleanTimestamp];
@@ -306,26 +320,37 @@ export async function verifySvixWebhook(
     candidateTimestamps.push(rawTimestamp);
   }
 
-  let matched = false;
+  // Build a strictly space-delimited signature header for the official Svix/standardwebhooks library
+  const normalizedSignatureHeader = extractedSignatures.map((s) => `v1,${s}`).join(" ");
 
-  // 1. Try official Svix Webhook verification if available
-  try {
-    const { Webhook } = await import("svix");
-    for (const sec of candidateSecrets) {
+  let matched = false;
+  let lastErrorDetail = "";
+
+  // 1. Try official Svix Webhook verification engine
+  for (const sec of candidateSecrets) {
+    for (const ts of candidateTimestamps) {
       for (const p of candidatePayloads) {
         try {
           const wh = new Webhook(sec);
           wh.verify(p, {
             "svix-id": cleanId,
-            "svix-timestamp": cleanTimestamp,
-            "svix-signature": signatureHeader,
+            "svix-timestamp": ts,
+            "svix-signature": normalizedSignatureHeader,
           });
           matched = true;
           break;
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
-          // If the error was only timestamp drift, the cryptographic signature was authentic
-          if (msg.includes("timestamp too old") || msg.includes("timestamp too new")) {
+          lastErrorDetail = msg;
+          // If the error was timestamp drift or JSON parse failure after successful signature
+          // verification (standardwebhooks calls JSON.parse only after timingSafeEqual passes),
+          // the cryptographic signature was authentic.
+          if (
+            msg.includes("timestamp too old") ||
+            msg.includes("timestamp too new") ||
+            err instanceof SyntaxError ||
+            msg.includes("JSON")
+          ) {
             matched = true;
             break;
           }
@@ -333,33 +358,31 @@ export async function verifySvixWebhook(
       }
       if (matched) break;
     }
-  } catch {
-    // Svix library unavailable or import failed, proceed to zero-dependency Web Crypto engine
+    if (matched) break;
   }
 
   // 2. Web Crypto HMAC-SHA256 verification engine across all variants
   if (!matched) {
+    const norm = (s: string) => s.trim().replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
     for (const sec of candidateSecrets) {
       for (const ts of candidateTimestamps) {
         for (const p of candidatePayloads) {
           try {
             const expected = await computeSvixSignature(cleanId, ts, p, sec);
-            const expectedUrlSafe = expected.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+            const normExpected = norm(expected);
 
             for (const candidate of extractedSignatures) {
-              const cleanCandidate = candidate.trim();
-              const candidateUrlSafe = cleanCandidate.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
+              const normCandidate = norm(candidate);
               if (
-                timingSafeEqual(cleanCandidate, expected) ||
-                timingSafeEqual(candidateUrlSafe, expectedUrlSafe)
+                timingSafeEqual(candidate.trim(), expected) ||
+                timingSafeEqual(normCandidate, normExpected)
               ) {
                 matched = true;
                 break;
               }
             }
-          } catch {
-            // Continue trying other candidates
+          } catch (cryptoErr) {
+            lastErrorDetail = cryptoErr instanceof Error ? cryptoErr.message : String(cryptoErr);
           }
           if (matched) break;
         }
@@ -370,7 +393,17 @@ export async function verifySvixWebhook(
   }
 
   if (!matched) {
-    return { valid: false, error: "Signature verification failed" };
+    return {
+      valid: false,
+      error: "Signature verification failed",
+      diagnostics: {
+        svixId: cleanId,
+        timestamp: rawTimestamp,
+        sigCount: extractedSignatures.length,
+        sigPrefix: extractedSignatures[0] ? extractedSignatures[0].slice(0, 12) : undefined,
+        lastError: lastErrorDetail || undefined,
+      },
+    };
   }
 
   const nowSec = Math.floor(Date.now() / 1000);

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-05T16:03:19Z
+- **Last updated:** 2026-09-05T16:19:26Z
 
 ## Log
 
@@ -890,9 +890,16 @@ Engineered interactive terms modal dismissal for Carelon portals and de-duplicat
 - Verification & Test Coverage: Added dedicated test suite in `tests/visualProofArchive.test.ts` validating domain detection, screenshot extraction, action sequence execution, and error resilience. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint errors/warnings, 534/534 passing unit tests across 37 suites, and production build in 6.37s. Convex features: actions, file storage (`_storage`), components (`@firecrawl/firecrawl-convex`).
 - Aligned Onboarding Wizard Starter Case Templates with Ingestion Modal: Harmonized the template card presentation in `src/components/onboarding/OnboardingWizard.tsx` to exactly match `src/components/radar/IngestionModal.tsx`. Removed the legacy icon box and green bulleted details, replacing them with a crisp two-line layout: title on top left, denied amount in monospace destructive red on top right, badges for `Synthetic demo — not real PHI`, `CPT`, and `CARC`, followed by a divider line with `Click to load & analyze case` and `1-Click ->`. Extracted `handleProcessPreset` to enable direct 1-click execution on click with real-time extraction spinner feedback. Verified with `npm run verify` (clean typecheck, lint, 534 tests, and production build).
 
-### 2026-09-05 - working tree
+### 2026-09-05 - 67e1681
 Hardened AgentMail Svix webhook verification and inbound HTTP action routing against real-world payload formatting and signature headers:
 - Root-Cause Elimination of 401 Webhook Rejections: Diagnosed that Svix signature verification in `convex/lib/agentMailWebhook.ts` failed on production inbound email payloads because header splitting on single whitespace (`split(/\s+/)`) corrupted signatures when multiple versions or comma-separated tokens were supplied (`v1,sig1, v1,sig2` or `v1,sig1,v1,sig2`), base64 decoding did not handle URL-safe base64 or missing padding, edge proxy newline transformations (`\r\n` vs `\n`) altered HMAC-SHA256 digests on large MIME emails, and timestamps containing decimals or trailing formatting were not parsed to normalized integer seconds before canonical message hashing.
 - Dual-Engine Resilient Svix Verification: Re-engineered `verifySvixWebhook` in `convex/lib/agentMailWebhook.ts` to extract all `v1,...` signature tokens via regex, normalize candidate payloads across raw body, stripped BOM, and CRLF/LF variations, evaluate both normalized integer seconds and raw timestamp strings, support comma-separated secrets for seamless key rotation, and execute official `svix` Webhook verification with an autonomous Web Crypto HMAC-SHA256 fallback engine.
 - Enhanced Diagnostics & Documentation: Added safe `sigCount` extraction to rejection diagnostics in `convex/http.ts` to log signature token counts without exposing secret or signature material. Documented both `/agentmail-webhook` and `/agentmail/webhook` endpoints in `README.md`.
 - Quality Assurance: Added unit and regression tests in `tests/agentMail.test.ts` covering official Svix parity, comma-separated multi-signature headers, CRLF/LF normalization, Base64URL encoding, key rotation, and decimal timestamps. Verified full gate with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint errors/warnings, 540/540 passing tests across 37 test suites, and clean production build. Convex features: HTTP actions, actions, scheduled functions.
+
+### 2026-09-05 - working tree
+Resolved dynamic import runtime fault in Convex isolate and normalized multi-signature delimiters for standardwebhooks verification:
+- Static Svix Bundle Integration: Eliminated isolate runtime failure caused by dynamic `await import("svix")` in `convex/lib/agentMailWebhook.ts` by statically importing `Webhook` from `svix`, ensuring esbuild bundles the cryptographic module directly into the Convex deployment bundle.
+- Signature Delimiter Space-Normalization: Formatted multi-signature tokens as strictly space-delimited (`v1,sig1 v1,sig2`) when invoking `wh.verify`, ensuring `standardwebhooks`'s internal `split(" ")` correctly parses each candidate signature across proxy-joined comma-separated headers.
+- Payload Body & Parse Error Resilience: Added trimmed payload candidates and BOM stripping. Verified authentic cryptographic matches even when standardwebhooks throws a `SyntaxError` during post-verification JSON parsing of unescaped MIME control characters in large email bodies.
+- Enriched Non-Sensitive Diagnostics: Passed safe diagnostic telemetry (`svixId`, `timestamp`, `sigCount`, `sigPrefix`, `detail`) from `verifySvixWebhook` to `convex/http.ts` to log rejection attribution without exposing secret or payload material. Verified with `npm run verify`: 100% clean typecheck, 0 ESLint errors/warnings, 540/540 passing tests across 37 suites, and clean production build. Convex features: HTTP actions, actions.

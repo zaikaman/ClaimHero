@@ -54,12 +54,16 @@ http.route({
         const sigCount = svixSignature
           ? (svixSignature.match(/(?:^|[\s,;])v1,/g) || []).length
           : 0;
+        const sigPrefix = svixSignature ? svixSignature.slice(0, 16) : "none";
         console.warn(
           `AgentMail webhook rejected: ${verification.error || "Invalid webhook signature"}` +
+            ` id=${svixId || "none"}` +
             ` hasId=${Boolean(svixId)} hasTimestamp=${Boolean(svixTimestamp)}` +
             ` hasSignature=${Boolean(svixSignature)} sigCount=${sigCount}` +
+            ` sigPrefix=${sigPrefix}` +
             ` timestampAgeSec=${timestampAgeSec ?? "unknown"}` +
-            ` payloadBytes=${rawPayload.length}`
+            ` payloadBytes=${rawPayload.length}` +
+            ` detail=${verification.diagnostics?.lastError || "none"}`
         );
         return new Response(
           JSON.stringify({ error: verification.error || "Invalid webhook signature" }),
