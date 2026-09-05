@@ -245,6 +245,218 @@ Welcome to the NASS guidelines directory. Below are the published clinical pract
       expect(links.length).toBeGreaterThanOrEqual(1);
       expect(links[0]).toBe("https://www.spine.org/Portals/0/assets/downloads/ResearchClinicalCare/Guidelines/LumbarStenosis.pdf");
     });
+
+    it("crawlInsurerPolicy: executes single-hop native Firecrawl extraction without OpenAI LLM hop", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      process.env.FIRECRAWL_API_KEY = "fc-test-key";
+
+      const openAiSpy = vi.spyOn(libOpenAI, "createStructuredCompletion").mockImplementation(async (params: any) => {
+        if (params.schemaName === "PolicyRelevanceResponse") {
+          return { relevant: true, rationale: "Authoritative clinical policy for lumbar decompression." } as any;
+        }
+        throw new Error(`Unexpected OpenAI extraction invocation for schema ${params.schemaName}`);
+      });
+
+      const substantiveMarkdown = "# Blue Cross Carelon Clinical Practice Guideline on Lumbar Decompression\n\n" +
+        "Medical necessity and clinical coverage criteria for CPT 63047 (Lumbar Laminectomy):\n" +
+        "Lumbar spinal decompression is considered medically necessary when the following clinical criteria are met:\n" +
+        "1. Documented severe neurogenic claudication or radicular pain symptoms with severe functional impairment.\n" +
+        "2. High-resolution diagnostic imaging (MRI or CT) corroborating neural canal compression matching clinical findings.\n" +
+        "3. Documented failure of at least 6 to 12 weeks of structured conservative therapy including formal physical therapy and NSAIDs.\n" +
+        "Contraindications include active local infection or uncontrolled systemic medical illness.\n" +
+        "Prior authorization protocol requires submitted physician clinical notes and objective MRI radiology reports.\n" +
+        "Effective Date: January 1, 2026. Revision History: Annual clinical policy bulletin review confirmed December 2025.\n" +
+        "This citable coverage determination establishes binding clinical standards for all commercial health plan members.";
+
+      const nativeFirecrawlJson = {
+        policyTitle: "Carelon Clinical Appropriateness Guideline: Lumbar Spine Decompression",
+        policyNumber: "CPB-63047-2026",
+        effectiveDate: "2026-01-01",
+        revisionHistory: "Reviewed December 2025",
+        medicalNecessityCriteria: [
+          "Severe neurogenic claudication with documented ambulatory impairment.",
+          "MRI confirmation of neural compression correlating to radicular symptoms.",
+          "Documented failure of 6 weeks structured conservative modalities.",
+        ],
+        contraindications: [
+          "Active systemic infection or uncontrolled medical comorbidities.",
+        ],
+        priorAuthRequirements: [
+          "Submission of diagnostic MRI reports and structured conservative therapy logs.",
+        ],
+        clauses: [
+          {
+            sourceType: "payer_cpb",
+            title: "Carelon Lumbar Decompression Coverage Criteria",
+            citationClause: "Section 2.1: Indications",
+            extractedEvidenceMarkdown: "Lumbar decompression (63047) is medically indicated following failure of conservative therapy.",
+            relevanceScore: 96,
+          },
+        ],
+      };
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "c1", userId: "user_123" }),
+        runAction: vi.fn().mockResolvedValue({
+          markdown: substantiveMarkdown,
+          sourceUrl: "https://guidelines.carelon.com/spine/lumbar-decompression.pdf",
+          json: nativeFirecrawlJson,
+        }),
+        runMutation: vi.fn().mockResolvedValue(null),
+      };
+
+      const res = await (actionPolicyCrawler.crawlInsurerPolicy as any)._handler(mockCtx, {
+        claimId: "c1",
+        payer: "Blue Cross Blue Shield",
+        cptCodes: ["63047"],
+        icd10Codes: ["M51.16"],
+        denialReasonCode: "CO-50",
+        customPolicyUrl: "https://guidelines.carelon.com/spine/lumbar-decompression.pdf",
+      });
+
+      // Assert that OpenAI LLM PolicyExtractionResponse was NOT invoked due to native Firecrawl extraction
+      expect(openAiSpy).toHaveBeenCalledTimes(1); // Only for PolicyRelevanceResponse
+      expect(openAiSpy).toHaveBeenCalledWith(expect.objectContaining({ schemaName: "PolicyRelevanceResponse" }));
+      expect(res.extractionEngine).toBe("firecrawl_native");
+      expect(res.policyTitle).toContain("Carelon");
+      expect(res.clausesExtracted).toBeGreaterThanOrEqual(2);
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        claimId: "c1",
+        evidences: expect.any(Array),
+      }));
+    });
+
+    it("crawlInsurerPolicy: falls back gracefully to OpenAI when Firecrawl json is absent", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      process.env.FIRECRAWL_API_KEY = "fc-test-key";
+
+      const openAiSpy = vi.spyOn(libOpenAI, "createStructuredCompletion").mockImplementation(async (params: any) => {
+        if (params.schemaName === "PolicyRelevanceResponse") {
+          return { relevant: true, rationale: "Authoritative clinical policy." } as any;
+        }
+        if (params.schemaName === "PolicyExtractionResponse") {
+          return {
+            policyTitle: "Carelon Spine Surgery Guidelines",
+            policyNumber: "CG-SURG-01",
+            effectiveDate: "2026-01-01",
+            clauses: [
+              {
+                sourceType: "payer_cpb",
+                title: "Carelon Spine Guidelines",
+                citationClause: "Section 3.A",
+                extractedEvidenceMarkdown: "Clinical indications for 63047 decompression include persistent radicular pain.",
+                relevanceScore: 93,
+              },
+            ],
+          } as any;
+        }
+        throw new Error(`Unexpected schema ${params.schemaName}`);
+      });
+
+      const substantiveMarkdown = "# Carelon Spine Surgery Clinical Practice Guidelines\n\n" +
+        "Medical necessity and coverage criteria for CPT 63047 (Lumbar Decompression):\n" +
+        "Decompression is covered when radicular pain persists after 6 weeks of conservative therapy.\n" +
+        "MRI documentation must demonstrate canal stenosis matching symptom distribution.\n" +
+        "Patients must have documented functional limitations in activities of daily living.\n" +
+        "Contraindications include active bacteremia or severe unstable systemic illness.\n" +
+        "Clinical review confirms adherence to evidence-based medical necessity determinations across all plans.\n" +
+        "This policy document establishes standard authorization thresholds for spinal decompression surgery.";
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "c1", userId: "user_123" }),
+        runAction: vi.fn().mockResolvedValue({
+          markdown: substantiveMarkdown,
+          sourceUrl: "https://guidelines.carelon.com/spine.pdf",
+          json: undefined,
+        }),
+        runMutation: vi.fn().mockResolvedValue(null),
+      };
+
+      const res = await (actionPolicyCrawler.crawlInsurerPolicy as any)._handler(mockCtx, {
+        claimId: "c1",
+        payer: "Blue Cross Blue Shield",
+        cptCodes: ["63047"],
+        icd10Codes: ["M51.16"],
+        denialReasonCode: "CO-50",
+        customPolicyUrl: "https://guidelines.carelon.com/spine.pdf",
+      });
+
+      // Assert that OpenAI LLM completion WAS invoked as fallback for PolicyExtractionResponse
+      expect(openAiSpy).toHaveBeenCalledWith(expect.objectContaining({ schemaName: "PolicyExtractionResponse" }));
+      expect(res.extractionEngine).toBe("openai_fallback");
+      expect(res.policyTitle).toBe("Carelon Spine Surgery Guidelines");
+      expect(res.clausesExtracted).toBeGreaterThanOrEqual(1);
+    });
+
+    it("parseNativeExtractionResponse: synthesizes discrete medical necessity and contraindications arrays", () => {
+      const parsed = actionPolicyCrawler.parseNativeExtractionResponse({
+        policyTitle: "Aetna Clinical Policy Bulletin 0123",
+        policyNumber: "0123",
+        effectiveDate: "2026-01-01",
+        revisionHistory: "Reviewed 2025",
+        medicalNecessityCriteria: [
+          "Failure of comprehensive physical therapy for at least 12 weeks.",
+          "Corroborating radiographic evidence demonstrating severe stenosis.",
+        ],
+        contraindications: [
+          "Uncontrolled active infection at the surgical site.",
+        ],
+        priorAuthRequirements: [
+          "Submission of prior authorization request form with operative notes.",
+        ],
+      }, ["63047"]);
+
+      expect(parsed).not.toBeNull();
+      expect(parsed?.policyTitle).toBe("Aetna Clinical Policy Bulletin 0123");
+      expect(parsed?.clauses.length).toBe(4);
+      expect(parsed?.clauses.some((c) => c.citationClause.includes("Medical Necessity"))).toBe(true);
+      expect(parsed?.clauses.some((c) => c.citationClause.includes("Contraindications"))).toBe(true);
+      expect(parsed?.clauses.some((c) => c.citationClause.includes("Prior Authorization"))).toBe(true);
+    });
+
+    it("extractPolicyWithFirecrawl: returns structured extraction and engine provenance", async () => {
+      const substantiveMarkdown = "# Carelon Clinical Guideline: Lumbar Spine Surgery\n\n" +
+        "Medical necessity criteria for lumbar spinal stenosis decompression procedures (CPT 63047).\n" +
+        "Patients must have persistent pain and neurogenic claudication refractory to 6 weeks of conservative care.\n" +
+        "Objective imaging must confirm spinal canal stenosis with nerve root impingement.\n" +
+        "Contraindications include active local or systemic infection or severe coagulopathy.\n" +
+        "Prior authorization protocol requires submitted operative notes and radiographic reports.\n" +
+        "Annual review date confirms effective date January 2026 across commercial health plan members.";
+
+      const mockCtx: any = {
+        runAction: vi.fn().mockResolvedValue({
+          markdown: substantiveMarkdown,
+          sourceUrl: "https://guidelines.carelon.com/spine.pdf",
+          json: {
+            policyTitle: "Carelon Clinical Guideline: Lumbar Spine Surgery",
+            medicalNecessityCriteria: [
+              "Refractory neurogenic claudication after 6 weeks conservative therapy.",
+            ],
+            clauses: [
+              {
+                sourceType: "payer_cpb",
+                title: "Carelon Lumbar Decompression",
+                citationClause: "Section 2.1",
+                extractedEvidenceMarkdown: "Decompression is indicated when conservative measures fail.",
+                relevanceScore: 95,
+              },
+            ],
+          },
+        }),
+      };
+
+      const result = await actionPolicyCrawler.extractPolicyWithFirecrawl(mockCtx, "https://guidelines.carelon.com/spine.pdf", {
+        payer: "Blue Cross Blue Shield",
+        cptCodes: ["63047"],
+        denialReasonCode: "CO-50",
+      });
+
+      expect(result.extractionEngine).toBe("firecrawl_native");
+      expect(result.extractedData?.policyTitle).toBe("Carelon Clinical Guideline: Lumbar Spine Surgery");
+      expect(result.extractedData?.clauses.length).toBeGreaterThanOrEqual(1);
+    });
   });
 
   describe("convex/actions/appealSynthesizer", () => {

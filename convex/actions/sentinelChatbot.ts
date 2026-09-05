@@ -6,7 +6,7 @@ import { getOpenAIClient, getOpenAIConfig } from "../lib/openai";
 import { internal, api, components } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { Doc, Id } from "../_generated/dataModel";
-import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
+import { FirecrawlClient, type Format } from "@firecrawl/firecrawl-convex";
 import { getAuthUserId } from "../lib/auth";
 
 const firecrawl = new FirecrawlClient(components.firecrawl);
@@ -288,7 +288,7 @@ import { isAccessDeniedDocument, sanitizePublicPolicyUrl } from "./policyCrawler
 async function performFirecrawlScrapeUrl(
   ctx: ActionCtx,
   url: string
-): Promise<{ sourceUrl: string; title?: string; markdownSnippet: string; success: boolean; error?: string }> {
+): Promise<{ sourceUrl: string; title?: string; markdownSnippet: string; structuredCriteria?: unknown; success: boolean; error?: string }> {
   if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) {
     return {
       sourceUrl: url,
@@ -301,8 +301,28 @@ async function performFirecrawlScrapeUrl(
   const cleanUrl = sanitizePublicPolicyUrl(url);
 
   try {
+    const formats: Format[] = [
+      "markdown",
+      {
+        type: "json",
+        prompt: "Extract structured medical necessity criteria, coverage indications, contraindications, prior authorization rules, and effective date.",
+        schema: {
+          type: "object",
+          properties: {
+            policyTitle: { type: "string" },
+            policyNumber: { type: "string" },
+            effectiveDate: { type: "string" },
+            medicalNecessityCriteria: { type: "array", items: { type: "string" } },
+            contraindications: { type: "array", items: { type: "string" } },
+            priorAuthRequirements: { type: "array", items: { type: "string" } },
+          },
+          required: ["policyTitle"],
+        },
+      },
+    ];
+
     const doc = await firecrawl.scrape(ctx, cleanUrl, {
-      formats: ["markdown"],
+      formats,
       onlyMainContent: true,
       proxy: "auto",
       timeout: 12000,
@@ -323,6 +343,7 @@ async function performFirecrawlScrapeUrl(
         sourceUrl: cleanUrl,
         title,
         markdownSnippet: cleanMarkdown,
+        structuredCriteria: doc.json,
         success: true,
       };
     }

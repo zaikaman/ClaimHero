@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-05T04:12:00Z
+- **Last updated:** 2026-09-05T04:28:00Z
 
 ## Log
 
@@ -813,7 +813,7 @@ Implemented Hybrid Precedent Search combining 1536-dimensional Convex semantic v
 - Frontend Indicators: Enhanced `PrecedentFeed` (`src/components/evidence/PrecedentFeed.tsx`) and `CitationSidebar` (`src/components/studio/CitationSidebar.tsx`) with hybrid badges ("Hybrid RRF Fusion", "Dense Vector", "BM25 Lexical"), RRF scores, and rank breakdowns (Vector Rank #X, BM25 Rank #Y, Code Overlap %).
 - Testing & Verification: Added automated test suite `tests/hybridSearchRRF.test.ts` (14 unit tests) covering mathematical RRF formulation, dual-model rank fusion, domain clinical code overlap, lexical term parsing, and action fallbacks. Expanded total test suite to 476 passing tests across 33 test files. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 476/476 passing tests, and successful production Vite build. Convex features: vector search (`by_embedding`), full-text search (`search_precedents`), actions, internal queries, internal mutations, schema validators, audit logs.
 
-### 2026-09-05 - working tree
+### 2026-09-05 - 95fa8ca
 Implemented Real-Time Token Streaming with Convex AI Agent (@convex-dev/agent):
 - Convex AI Agent Integration: Configured `@convex-dev/agent` with native OpenAI LLM support and streaming deltas stored directly in Convex tables.
 - Sentinel Agent & Native Tooling: Implemented `convex/actions/sentinelAgent.ts` with 10 native clinical and regulatory tools (`lookup_clinical_guidelines`, `search_precedents`, `calculate_erisa_deadlines`, `calculate_erisa_penalties`, `fetch_audit_trail`, `firecrawl_web_search`, `analyze_payer_compliance`, `suggest_rebuttal_strategy`, `draft_appeal_letter_section`, `evaluate_denial_evidence`) with `@convex-dev/rate-limiter` protection and typed Zod schemas.
@@ -821,5 +821,14 @@ Implemented Real-Time Token Streaming with Convex AI Agent (@convex-dev/agent):
 - Frontend Streaming Hook: Implemented `useSentinelChat.ts` React hook integrating `useUIMessages` for seamless streaming message reconstruction, live tool execution states, and fallback support for legacy sessions.
 - Streaming UI & Micro-interactions: Upgraded `src/components/chat/SentinelChatbot.tsx` with real-time streaming status badges, blinking terminal cursor animation (`animate-pulse`), live tool execution callouts, unified single-bubble loading state, and minimalist typography-first header bar without extraneous status pills or dots.
 - Testing & Quality Verification: Created `tests/sentinelAgent.test.ts` to validate tool schemas, execution guards, and thread initialization. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 483/483 passing tests, and successful production Vite build. Convex features: components (`@convex-dev/agent`, `@convex-dev/rate-limiter`), queries, mutations, actions, streaming sync (`listUIMessages`, `syncStreams`).
+
+### 2026-09-05 - working tree
+Implemented Single-Request Native Structured Extraction via Firecrawl (firecrawl.extract / formats: [{ type: "json" }]):
+- Single-Hop Policy Extraction Architecture: Re-engineered policy analysis pipeline (`convex/actions/policyCrawler.ts`) to request native AI JSON extraction in the initial `firecrawl.scrape` invocation by providing a strict JSON schema (`NATIVE_POLICY_EXTRACTION_SCHEMA`) covering `policyTitle`, `policyNumber`, `effectiveDate`, `revisionHistory`, `medicalNecessityCriteria`, `contraindications`, `priorAuthRequirements`, and structured citation `clauses`.
+- Zero-Token Direct Ingestion: When Firecrawl returns conforming structured criteria in `doc.json`, the pipeline skips the second LLM hop to OpenAI, eliminating 3-6 seconds of latency and cutting OpenAI token spend for policy parsing to zero.
+- Synthesized Clinical Criteria Parser: Implemented `parseNativeExtractionResponse` in `convex/actions/policyCrawler.ts` to validate and map Firecrawl output, automatically converting discrete clinical requirements (`medicalNecessityCriteria`, `contraindications`, `priorAuthRequirements`) into deduplicated citation clauses and clamping relevance scores (80-99).
+- Resilient Dual-Engine Fallback: Preserved automated fallback to OpenAI `gpt-5.4-nano` (`createStructuredCompletion`) whenever Firecrawl native JSON is absent, incomplete, or unaligned, tagging each extraction with `extractionEngine: "firecrawl_native"` or `"openai_fallback"` for transparent case audit trails.
+- Agent & Chatbot Tooling Upgrade: Extended `performFirecrawlScrapeUrl` in `convex/actions/sentinelChatbot.ts` and `firecrawlScrapeUrl` in `convex/actions/sentinelAgent.ts` to request JSON extraction and return structured criteria alongside clean markdown.
+- Unit Testing & Verification: Expanded `tests/actionsPolicyAndSynthesizer.test.ts` with unit tests verifying single-hop native Firecrawl extraction without OpenAI invocations, graceful fallback on absent JSON, discrete criteria array synthesis, and standalone `extractPolicyWithFirecrawl` execution. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 482 passing tests across 34 suites, and successful production Vite build. Convex features: components (`@firecrawl/firecrawl-convex`), actions, internal mutations, rate limiting, audit logs.
 
 

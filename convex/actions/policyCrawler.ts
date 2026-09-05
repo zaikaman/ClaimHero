@@ -6,7 +6,7 @@ import { createStructuredCompletion } from "../lib/openai";
 import { api, components, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
-import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
+import { FirecrawlClient, type Format } from "@firecrawl/firecrawl-convex";
 
 const firecrawl = new FirecrawlClient(components.firecrawl);
 
@@ -50,6 +50,64 @@ const POLICY_EXTRACTION_SCHEMA = {
   required: ["policyTitle", "policyNumber", "effectiveDate", "clauses"],
   additionalProperties: false,
 };
+
+export const NATIVE_POLICY_EXTRACTION_SCHEMA = {
+  type: "object",
+  properties: {
+    policyTitle: { type: "string", description: "Official clinical policy bulletin title or medical guideline name." },
+    policyNumber: { type: "string", description: "Policy identifier or CPB bulletin number if present." },
+    effectiveDate: { type: "string", description: "Effective or revision date of the clinical policy." },
+    revisionHistory: { type: "string", description: "Summary of recent revisions or annual reviews." },
+    medicalNecessityCriteria: {
+      type: "array",
+      items: { type: "string" },
+      description: "Direct medical necessity qualifying criteria and clinical requirements for the procedure.",
+    },
+    contraindications: {
+      type: "array",
+      items: { type: "string" },
+      description: "Documented clinical contraindications, experimental exclusions, or non-covered indications.",
+    },
+    priorAuthRequirements: {
+      type: "array",
+      items: { type: "string" },
+      description: "Prior authorization requirements, trial of conservative therapy, or step therapy criteria.",
+    },
+    clauses: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          sourceType: {
+            type: "string",
+            enum: [
+              "payer_cpb",
+              "fda_package_insert",
+              "pubmed_study",
+              "nccn_guideline",
+              "legal_precedent",
+            ],
+          },
+          title: { type: "string" },
+          citationClause: { type: "string" },
+          extractedEvidenceMarkdown: { type: "string" },
+          relevanceScore: { type: "number" },
+        },
+        required: [
+          "sourceType",
+          "title",
+          "citationClause",
+          "extractedEvidenceMarkdown",
+          "relevanceScore",
+        ],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["policyTitle"],
+  additionalProperties: false,
+};
+
 
 const POLICY_RELEVANCE_SCHEMA = {
   type: "object",
@@ -248,10 +306,120 @@ interface PolicySearchIntentResponse {
   queries: string[];
 }
 
-interface FirecrawlPolicySource {
+export interface FirecrawlPolicySource {
   markdown: string;
   sourceUrl: string;
+  json?: unknown;
+  extractionEngine?: "firecrawl_native" | "openai_fallback";
 }
+
+/**
+ * Parse and validate Firecrawl v1/v2 native JSON schema extraction output into PolicyExtractionResponse.
+ * Handles both structured clauses arrays and discrete clinical criteria fields
+ * (medicalNecessityCriteria, contraindications, priorAuthRequirements).
+ */
+export function parseNativeExtractionResponse(
+  rawJson: unknown,
+  _cptCodes: string[] = []
+): PolicyExtractionResponse | null {
+  if (!rawJson || typeof rawJson !== "object") return null;
+  const data = rawJson as Record<string, unknown>;
+
+  const rawTitle = typeof data.policyTitle === "string" ? data.policyTitle.trim() : "";
+  if (!rawTitle || isAccessDeniedDocument(rawTitle)) return null;
+  const policyTitle = rawTitle.replace(/\*\*/g, "");
+
+  const policyNumber = typeof data.policyNumber === "string" ? data.policyNumber.trim() : "";
+  const effectiveDate = typeof data.effectiveDate === "string" ? data.effectiveDate.trim() : "";
+  const revisionHistory = typeof data.revisionHistory === "string" ? data.revisionHistory.trim() : "";
+
+  const clauses: ExtractedClause[] = [];
+
+  // 1. Process explicit clauses if returned
+  if (Array.isArray(data.clauses)) {
+    for (const item of data.clauses) {
+      if (item && typeof item === "object") {
+        const c = item as Record<string, unknown>;
+        const title = (typeof c.title === "string" && c.title.trim()) ? c.title.trim().replace(/\*\*/g, "") : policyTitle;
+        const citationClause = (typeof c.citationClause === "string" && c.citationClause.trim()) ? c.citationClause.trim().replace(/\*\*/g, "") : "Coverage Criteria";
+        const extractedEvidenceMarkdown = (typeof c.extractedEvidenceMarkdown === "string") ? c.extractedEvidenceMarkdown.trim().replace(/\*\*/g, "") : "";
+        const relevanceScore = typeof c.relevanceScore === "number" ? Math.min(Math.max(c.relevanceScore, 80), 99) : 92;
+        const sourceType = typeof c.sourceType === "string" ? c.sourceType : "payer_cpb";
+
+        if (extractedEvidenceMarkdown && !isAccessDeniedDocument(extractedEvidenceMarkdown)) {
+          clauses.push({
+            sourceType,
+            title,
+            citationClause,
+            extractedEvidenceMarkdown,
+            relevanceScore,
+          });
+        }
+      }
+    }
+  }
+
+  // 2. Synthesize medical necessity criteria into clauses if present
+  if (Array.isArray(data.medicalNecessityCriteria)) {
+    data.medicalNecessityCriteria.forEach((crit, idx) => {
+      if (typeof crit === "string" && crit.trim().length > 15 && !isAccessDeniedDocument(crit)) {
+        const cleanCrit = crit.trim().replace(/\*\*/g, "");
+        const isDuplicate = clauses.some((c) => c.extractedEvidenceMarkdown.includes(cleanCrit.slice(0, 40)));
+        if (!isDuplicate) {
+          clauses.push({
+            sourceType: "payer_cpb",
+            title: policyTitle,
+            citationClause: `Medical Necessity Criteria §${idx + 1}`,
+            extractedEvidenceMarkdown: cleanCrit,
+            relevanceScore: 94,
+          });
+        }
+      }
+    });
+  }
+
+  // 3. Synthesize contraindications into clauses if present
+  if (Array.isArray(data.contraindications) && data.contraindications.length > 0) {
+    const validContra = data.contraindications
+      .filter((c): c is string => typeof c === "string" && c.trim().length > 10 && !isAccessDeniedDocument(c))
+      .map((c) => c.trim().replace(/\*\*/g, ""));
+    if (validContra.length > 0) {
+      clauses.push({
+        sourceType: "payer_cpb",
+        title: `${policyTitle} - Contraindications`,
+        citationClause: "Contraindications & Exclusions",
+        extractedEvidenceMarkdown: validContra.join("\n\n"),
+        relevanceScore: 89,
+      });
+    }
+  }
+
+  // 4. Synthesize prior authorization requirements if present
+  if (Array.isArray(data.priorAuthRequirements) && data.priorAuthRequirements.length > 0) {
+    const validAuth = data.priorAuthRequirements
+      .filter((a): a is string => typeof a === "string" && a.trim().length > 10 && !isAccessDeniedDocument(a))
+      .map((a) => a.trim().replace(/\*\*/g, ""));
+    if (validAuth.length > 0) {
+      clauses.push({
+        sourceType: "payer_cpb",
+        title: `${policyTitle} - Prior Authorization`,
+        citationClause: "Prior Authorization & Step Therapy",
+        extractedEvidenceMarkdown: validAuth.join("\n\n"),
+        relevanceScore: 90,
+      });
+    }
+  }
+
+  if (clauses.length === 0) return null;
+
+  return {
+    policyTitle,
+    policyNumber,
+    effectiveDate: effectiveDate || (revisionHistory ? `Revised: ${revisionHistory}` : ""),
+    clauses,
+  };
+}
+
 
 interface FirecrawlSearchResult {
   markdown?: unknown;
@@ -908,9 +1076,16 @@ export function selectFirecrawlPolicySource(payload: unknown): FirecrawlPolicySo
   return null;
 }
 
-async function scrapeFirecrawlPolicySource(
+export interface ScrapeExtractionOptions {
+  payer?: string;
+  cptCodes?: string[];
+  denialReasonCode?: string;
+}
+
+export async function scrapeFirecrawlPolicySource(
   ctx: ActionCtx,
   sourceUrl: string,
+  extractionOptions?: ScrapeExtractionOptions,
 ): Promise<FirecrawlPolicySource> {
   if (isPrivateMcgViewerUrl(sourceUrl)) {
     throw new Error("Source URL is a private Milliman Care Guidelines viewer and not publicly citable without authentication.");
@@ -920,8 +1095,18 @@ async function scrapeFirecrawlPolicySource(
   const isPdf = /\.(pdf|ashx)(\?|#|$)/i.test(cleanSourceUrl);
 
   try {
+    const formats: Format[] = ["markdown"];
+
+    if (extractionOptions?.cptCodes && extractionOptions.cptCodes.length > 0) {
+      formats.push({
+        type: "json",
+        prompt: `Extract structured clinical policy criteria, medical necessity guidelines, contraindications, prior authorization requirements, effective date, revision history, and specific clause identifiers for CPT codes [${extractionOptions.cptCodes.join(", ")}] and payer ${extractionOptions.payer || "Health Insurer"} to refute denial code ${extractionOptions.denialReasonCode || "CO-50"}. Focus strictly on criteria for procedures [${extractionOptions.cptCodes.join(", ")}].`,
+        schema: NATIVE_POLICY_EXTRACTION_SCHEMA,
+      });
+    }
+
     const doc = await firecrawl.scrape(ctx, cleanSourceUrl, {
-      formats: ["markdown"],
+      formats,
       onlyMainContent: true,
       proxy: "auto",
       timeout: 12000,
@@ -959,6 +1144,7 @@ async function scrapeFirecrawlPolicySource(
     return {
       markdown,
       sourceUrl: sanitizePublicPolicyUrl(scrapedSourceUrl ?? cleanSourceUrl),
+      json: doc.json,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -968,6 +1154,52 @@ async function scrapeFirecrawlPolicySource(
     throw err;
   }
 }
+
+/**
+ * Native Firecrawl Structured Extraction helper.
+ * Scrapes a policy URL and extracts structured clinical criteria in a single request,
+ * eliminating the second LLM hop to OpenAI.
+ */
+export async function extractPolicyWithFirecrawl(
+  ctx: ActionCtx,
+  sourceUrl: string,
+  options: {
+    payer?: string;
+    cptCodes: string[];
+    denialReasonCode?: string;
+  }
+): Promise<{
+  source: FirecrawlPolicySource;
+  extractedData: PolicyExtractionResponse | null;
+  extractionEngine: "firecrawl_native" | "openai_fallback";
+}> {
+  const source = await scrapeFirecrawlPolicySource(ctx, sourceUrl, {
+    payer: options.payer,
+    cptCodes: options.cptCodes,
+    denialReasonCode: options.denialReasonCode,
+  });
+
+  if (source.json && typeof source.json === "object") {
+    const nativeParsed = parseNativeExtractionResponse(source.json, options.cptCodes);
+    if (nativeParsed && nativeParsed.clauses.length > 0) {
+      const alignment = isPolicyAlignedWithClaim(source.markdown, nativeParsed.policyTitle, options.cptCodes);
+      if (alignment.aligned && !isAccessDeniedDocument(nativeParsed.policyTitle)) {
+        return {
+          source,
+          extractedData: nativeParsed,
+          extractionEngine: "firecrawl_native",
+        };
+      }
+    }
+  }
+
+  return {
+    source,
+    extractedData: null,
+    extractionEngine: "openai_fallback",
+  };
+}
+
 
 const GENERIC_CLINICAL_STOPWORDS = new Set([
   "with",
@@ -1385,7 +1617,11 @@ export const crawlInsurerPolicy = action({
 
     let policySource: FirecrawlPolicySource | null = null;
     if (args.customPolicyUrl) {
-      const candidateSource = await scrapeFirecrawlPolicySource(ctx, args.customPolicyUrl);
+      const candidateSource = await scrapeFirecrawlPolicySource(ctx, args.customPolicyUrl, {
+        payer: args.payer,
+        cptCodes: args.cptCodes,
+        denialReasonCode: args.denialReasonCode,
+      });
       const relevance = await evaluatePolicySourceRelevance(
         candidateSource,
         args.payer,
@@ -1490,7 +1726,11 @@ export const crawlInsurerPolicy = action({
         // Evaluate candidate URLs sequentially (concurrency 1) to honor Firecrawl concurrency limits
         for (const sourceUrl of sourceUrls.slice(0, 5)) {
           try {
-            const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl);
+            const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl, {
+              payer: args.payer,
+              cptCodes: args.cptCodes,
+              denialReasonCode: args.denialReasonCode,
+            });
             const relevance = await evaluatePolicySourceRelevance(
               candidateSource,
               args.payer,
@@ -1524,7 +1764,11 @@ export const crawlInsurerPolicy = action({
                 seenSourceUrls.add(childUrl);
                 discoveredSourceCount += 1;
                 try {
-                  const childSource = await scrapeFirecrawlPolicySource(ctx, childUrl);
+                  const childSource = await scrapeFirecrawlPolicySource(ctx, childUrl, {
+                    payer: args.payer,
+                    cptCodes: args.cptCodes,
+                    denialReasonCode: args.denialReasonCode,
+                  });
                   const childRelevance = await evaluatePolicySourceRelevance(
                     childSource,
                     args.payer,
@@ -1586,11 +1830,27 @@ export const crawlInsurerPolicy = action({
       throw new Error("Scraped policy text is an access-denied or error page, not a clinical policy.");
     }
 
-    const windowedPolicyText = extractRelevantDocumentWindow(policyText, args.cptCodes, 50000);
+    let extractedData: PolicyExtractionResponse | null = null;
+    let extractionEngine: "firecrawl_native" | "openai_fallback" = "openai_fallback";
 
-    // Use gpt-5.4-nano to extract precise medical criteria and contradiction clauses.
-    const extractedData = await createStructuredCompletion<PolicyExtractionResponse>({
-      systemPrompt: `You are an expert Medical Legal Analyst and Clinical Auditor.
+    // Fast-path: Check if native Firecrawl structured extraction succeeded in the initial scrape
+    if (policySource.json && typeof policySource.json === "object") {
+      const nativeData = parseNativeExtractionResponse(policySource.json, args.cptCodes);
+      if (nativeData && nativeData.clauses.length > 0) {
+        const alignment = isPolicyAlignedWithClaim(policyText, nativeData.policyTitle, args.cptCodes);
+        if (alignment.aligned && !isAccessDeniedDocument(nativeData.policyTitle)) {
+          extractedData = nativeData;
+          extractionEngine = "firecrawl_native";
+        }
+      }
+    }
+
+    // Fallback: Use gpt-5.4-nano to extract precise medical criteria and contradiction clauses if native extraction was unavailable or unaligned
+    if (!extractedData) {
+      const windowedPolicyText = extractRelevantDocumentWindow(policyText, args.cptCodes, 50000);
+
+      extractedData = await createStructuredCompletion<PolicyExtractionResponse>({
+        systemPrompt: `You are an expert Medical Legal Analyst and Clinical Auditor.
 Analyze the provided insurer Clinical Policy Bulletin (CPB) or clinical guideline.
 Extract all key medical necessity qualifying criteria, specific clause identifiers (e.g. Section 1.A, Section 2.3), and contradiction rules that can be cited in an ERISA medical appeal against denial code ${args.denialReasonCode}.
 For each clause:
@@ -1598,11 +1858,13 @@ For each clause:
 - Extract clear, concise plain text summarizing the exact clinical requirements. Strictly do NOT use markdown bold asterisks (such as **bold**) or formatting tokens in extractedEvidenceMarkdown or title.
 - Assign relevanceScore between 80 and 99.
 - CRITICAL PROCEDURE FOCUS: Only extract criteria specifically applicable to the target procedure codes [${args.cptCodes.join(", ")}]. If this policy is an umbrella document covering multiple anatomical sites or different operations (e.g., Hip vs Knee, or Cervical vs Lumbar spine), strictly OMIT criteria for the other non-target body sites.`,
-      userPrompt: `Extract structured clinical evidence clauses from this policy text for CPT codes [${args.cptCodes.join(", ")}] and Payer ${args.payer}:\n\n${windowedPolicyText}`,
-      schemaName: "PolicyExtractionResponse",
-      schema: POLICY_EXTRACTION_SCHEMA,
-      temperature: 0.1,
-    });
+        userPrompt: `Extract structured clinical evidence clauses from this policy text for CPT codes [${args.cptCodes.join(", ")}] and Payer ${args.payer}:\n\n${windowedPolicyText}`,
+        schemaName: "PolicyExtractionResponse",
+        schema: POLICY_EXTRACTION_SCHEMA,
+        temperature: 0.1,
+      });
+      extractionEngine = "openai_fallback";
+    }
 
     // Post-extraction safety net: the model may have extracted clauses from a
     // document that is actually about a different service (e.g., foot bunionectomy
@@ -1655,14 +1917,17 @@ For each clause:
     await ctx.runMutation(internal.claims.updateStatusInternal, {
       claimId: args.claimId,
       status: "analyzing",
-      details: `Firecrawl indexed ${evidencesToInsert.length} clinical policy clauses for ${args.payer}.`,
+      actor: "Firecrawl & Policy Engine",
+      details: `Policy indexed (${extractionEngine === "firecrawl_native" ? "Firecrawl Native AI Extraction" : "OpenAI LLM"}): "${extractedData.policyTitle}". ${evidencesToInsert.length} clauses extracted.`,
     });
 
     return {
       policyTitle: extractedData.policyTitle,
       policyNumber: extractedData.policyNumber,
+      effectiveDate: extractedData.effectiveDate,
       clausesExtracted: evidencesToInsert.length,
       evidences: evidencesToInsert,
+      extractionEngine,
     };
   },
 });
@@ -2008,27 +2273,56 @@ export const crawlCustomResearchUrl = action({
     clinicalNotes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwnerAction(ctx, args.claimId);
+    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
 
     if (!isAcceptableSourceUrl(args.customUrl)) {
       throw new Error("Please provide a valid HTTP or HTTPS web URL.");
     }
 
-    const scraped = await scrapeFirecrawlPolicySource(ctx, args.customUrl);
-    const windowedText = scraped.markdown.slice(0, 45000);
+    const scraped = await scrapeFirecrawlPolicySource(ctx, args.customUrl, {
+      payer: claim?.insurancePayer,
+      cptCodes: claim?.cptCodes,
+      denialReasonCode: claim?.denialReasonCode,
+    });
     const category = args.sourceCategory || "payer_cpb";
 
-    const extracted = await createStructuredCompletion<CustomGuidelineExtractionResponse>({
-      systemPrompt: `You are an expert Clinical Policy Auditor and Health Insurance Appellate Counsel.
+    let extracted: CustomGuidelineExtractionResponse | null = null;
+    let extractionEngine: "firecrawl_native" | "openai_fallback" = "openai_fallback";
+
+    // Fast-path: Check if native Firecrawl structured extraction succeeded
+    if (scraped.json && typeof scraped.json === "object") {
+      const nativeParsed = parseNativeExtractionResponse(scraped.json, claim?.cptCodes || []);
+      if (nativeParsed && nativeParsed.clauses.length > 0) {
+        extracted = {
+          documentTitle: nativeParsed.policyTitle,
+          issuingAuthority: claim?.insurancePayer || "Clinical Authority",
+          effectiveDate: nativeParsed.effectiveDate,
+          clauses: nativeParsed.clauses.map((c) => ({
+            title: c.title,
+            citationClause: c.citationClause,
+            extractedEvidenceMarkdown: c.extractedEvidenceMarkdown,
+            relevanceScore: c.relevanceScore,
+          })),
+        };
+        extractionEngine = "firecrawl_native";
+      }
+    }
+
+    if (!extracted) {
+      const windowedText = scraped.markdown.slice(0, 45000);
+      extracted = await createStructuredCompletion<CustomGuidelineExtractionResponse>({
+        systemPrompt: `You are an expert Clinical Policy Auditor and Health Insurance Appellate Counsel.
 Analyze the scraped medical guideline, clinical policy, or research document.
 Extract all actionable medical necessity criteria, coverage rules, diagnostic standards, and qualifying exceptions.
 Strictly do NOT use markdown bold asterisks in titles or extracted evidence markdown.
 Assign relevanceScore between 80 and 99.`,
-      userPrompt: `Extract structured clinical criteria clauses from this document:${args.clinicalNotes ? `\nClinical Notes: ${args.clinicalNotes}` : ""}\n\n${windowedText}`,
-      schemaName: "CustomGuidelineExtractionResponse",
-      schema: CUSTOM_GUIDELINE_EXTRACTION_SCHEMA,
-      temperature: 0.1,
-    });
+        userPrompt: `Extract structured clinical criteria clauses from this document:${args.clinicalNotes ? `\nClinical Notes: ${args.clinicalNotes}` : ""}\n\n${windowedText}`,
+        schemaName: "CustomGuidelineExtractionResponse",
+        schema: CUSTOM_GUIDELINE_EXTRACTION_SCHEMA,
+        temperature: 0.1,
+      });
+      extractionEngine = "openai_fallback";
+    }
 
     const evidencesToInsert = extracted.clauses.map((clause) => ({
       sourceType: category,
@@ -2048,7 +2342,7 @@ Assign relevanceScore between 80 and 99.`,
       await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
-        details: `Firecrawl extracted ${evidencesToInsert.length} clauses from custom URL: ${extracted.documentTitle}.`,
+        details: `Firecrawl extracted ${evidencesToInsert.length} clauses (${extractionEngine === "firecrawl_native" ? "Native AI Extraction" : "OpenAI LLM"}) from custom URL: ${extracted.documentTitle}.`,
       });
     }
 
@@ -2058,6 +2352,7 @@ Assign relevanceScore between 80 and 99.`,
       effectiveDate: extracted.effectiveDate,
       clausesExtracted: evidencesToInsert.length,
       evidences: evidencesToInsert,
+      extractionEngine,
     };
   },
 });

@@ -10,7 +10,7 @@ import { api, components, internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import { rateLimiter } from "../lib/rateLimiter";
 import { getAuthUserId } from "../lib/auth";
-import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
+import { FirecrawlClient, type Format } from "@firecrawl/firecrawl-convex";
 import { isAccessDeniedDocument, sanitizePublicPolicyUrl } from "./policyCrawler";
 import { buildLeanSentinelPrompt } from "./sentinelChatbot";
 
@@ -255,8 +255,27 @@ export const firecrawlScrapeUrl = createTool({
     const firecrawl = new FirecrawlClient(components.firecrawl);
 
     try {
+      const formats: Format[] = [
+        "markdown",
+        {
+          type: "json",
+          prompt: "Extract structured clinical policy criteria, coverage guidelines, contraindications, and prior authorization requirements.",
+          schema: {
+            type: "object",
+            properties: {
+              policyTitle: { type: "string" },
+              effectiveDate: { type: "string" },
+              medicalNecessityCriteria: { type: "array", items: { type: "string" } },
+              contraindications: { type: "array", items: { type: "string" } },
+              priorAuthRequirements: { type: "array", items: { type: "string" } },
+            },
+            required: ["policyTitle"],
+          },
+        },
+      ];
+
       const doc = await firecrawl.scrape(ctx, cleanUrl, {
-        formats: ["markdown"],
+        formats,
         onlyMainContent: true,
         proxy: "auto",
         timeout: 12000,
@@ -278,6 +297,7 @@ export const firecrawlScrapeUrl = createTool({
             sourceUrl: cleanUrl,
             title,
             markdownSnippet: markdown.slice(0, 3500),
+            structuredCriteria: doc.json,
             success: true,
           },
           null,
