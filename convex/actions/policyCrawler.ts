@@ -7,7 +7,7 @@ import { createStructuredCompletion } from "../lib/openai";
 import { api, components, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
-import { FirecrawlClient, type Format } from "@firecrawl/firecrawl-convex";
+import { FirecrawlClient, type Format, type FirecrawlDocument } from "@firecrawl/firecrawl-convex";
 
 const firecrawl = new FirecrawlClient(components.firecrawl);
 
@@ -533,6 +533,32 @@ const DISALLOWED_MARKETING_DOMAINS = new Set([
   "wordpress.com",
   "worldebhcday.org",
   "www.worldebhcday.org",
+  // Social media domains that Firecrawl rejects with 403 or lack clinical guidelines
+  "linkedin.com",
+  "www.linkedin.com",
+  "facebook.com",
+  "www.facebook.com",
+  "twitter.com",
+  "www.twitter.com",
+  "x.com",
+  "www.x.com",
+  "instagram.com",
+  "www.instagram.com",
+  "youtube.com",
+  "www.youtube.com",
+  "tiktok.com",
+  "www.tiktok.com",
+  "pinterest.com",
+  "www.pinterest.com",
+  // Commercial billing / RCM marketing blogs
+  "verifiedrcm.com",
+  "www.verifiedrcm.com",
+  "aapc.com",
+  "www.aapc.com",
+  "medicalbillingandcoding.org",
+  "www.medicalbillingandcoding.org",
+  "findacode.com",
+  "www.findacode.com",
 ]);
 
 function isAcceptableSourceUrl(value: unknown): value is string {
@@ -552,6 +578,19 @@ function isAcceptableSourceUrl(value: unknown): value is string {
       "search.yahoo.com",
       "yahoo.com",
     ].some((searchHost) => hostname === searchHost || hostname.endsWith(`.${searchHost}`))) {
+      return false;
+    }
+
+    // Immediately reject social media and video sharing hosts
+    if (
+      hostname.includes("linkedin.com") ||
+      hostname.includes("facebook.com") ||
+      hostname.includes("twitter.com") ||
+      hostname.includes("instagram.com") ||
+      hostname.includes("youtube.com") ||
+      hostname.includes("tiktok.com") ||
+      hostname.includes("pinterest.com")
+    ) {
       return false;
     }
 
@@ -893,6 +932,8 @@ export function isPayerMismatchedSource(payer: string, sourceUrl: string): boole
       "bluecross",
       "blueshield",
       "mcgs",
+      "providence",
+      "horizon",
     ];
 
     const hostContainsPayerKeyword = knownPayerKeywords.find((kw) => host.includes(kw));
@@ -1193,12 +1234,14 @@ export async function scrapeFirecrawlPolicySource(
   const cleanSourceUrl = sanitizePublicPolicyUrl(sourceUrl);
   const isPdf = /\.(pdf|ashx)(\?|#|$)/i.test(cleanSourceUrl);
 
+  let doc: FirecrawlDocument;
+
   try {
     const formats: Format[] = [
       "markdown",
       {
         type: "screenshot",
-        fullPage: true,
+        fullPage: false,
       },
     ];
 
@@ -1210,11 +1253,11 @@ export async function scrapeFirecrawlPolicySource(
       });
     }
 
-    const doc = await firecrawl.scrape(ctx, cleanSourceUrl, {
+    doc = await firecrawl.scrape(ctx, cleanSourceUrl, {
       formats,
       onlyMainContent: true,
       proxy: "auto",
-      timeout: 12000,
+      timeout: 30000,
       waitFor: isPdf ? 0 : 300,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
@@ -1222,43 +1265,68 @@ export async function scrapeFirecrawlPolicySource(
       },
       blockAds: true,
     });
-
-    const markdown = doc.markdown?.trim() || "";
-    const statusCode = doc.metadata?.statusCode;
-    if (typeof statusCode === "number" && statusCode >= 400) {
-      throw new Error(`Firecrawl could not access the source URL (HTTP ${statusCode}).`);
+  } catch (primaryErr) {
+    const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+    // If rate limited, fail fast to avoid worsening the 429
+    if (primaryMsg.includes("429") || primaryMsg.includes("rate limit") || primaryMsg.includes("Rate limit")) {
+      throw new Error(`Firecrawl rate limit: ${primaryMsg}`);
     }
 
-    if (!markdown) {
-      throw new Error("Firecrawl scrape returned no Markdown policy document.");
-    }
+    // Resilient fallback: If rich scrape (with screenshot or native json) timed out (408),
+    // failed with unsupported format, or crashed on heavy JS, immediately fall back to lightweight markdown scrape.
+    console.warn(`Primary Firecrawl scrape failed for ${cleanSourceUrl} (${primaryMsg}); falling back to lightweight markdown scrape.`);
 
-    if (isAccessDeniedDocument(markdown) || isHtmlErrorBody(markdown) || isPdfUrlExposingHtml(cleanSourceUrl, markdown)) {
-      throw new Error("Firecrawl returned an access-denied or authentication page instead of the policy document.");
+    try {
+      doc = await firecrawl.scrape(ctx, cleanSourceUrl, {
+        formats: ["markdown"],
+        onlyMainContent: true,
+        proxy: "auto",
+        timeout: 25000,
+        waitFor: 0,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        blockAds: true,
+      });
+    } catch (fallbackErr) {
+      const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+      if (fallbackMsg.includes("concurrency") || fallbackMsg.includes("timed out") || fallbackMsg.includes("408") || fallbackMsg.includes("rate limit")) {
+        throw new Error(`Firecrawl concurrency/timeout: ${fallbackMsg}`);
+      }
+      throw fallbackErr;
     }
-
-    if (!isPolicyMarkdownSubstantive(markdown)) {
-      throw new Error("Firecrawl returned a document without substantive clinical policy content.");
-    }
-
-    const scrapedSourceUrl = getAcceptableResultUrl({
-      url: cleanSourceUrl,
-      metadata: doc.metadata as FirecrawlSearchResult["metadata"],
-    });
-
-    return {
-      markdown,
-      sourceUrl: sanitizePublicPolicyUrl(scrapedSourceUrl ?? cleanSourceUrl),
-      json: doc.json,
-      screenshot: doc.screenshot,
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("concurrency") || msg.includes("timed out") || msg.includes("408") || msg.includes("rate limit")) {
-      throw new Error(`Firecrawl concurrency/timeout: ${msg}`);
-    }
-    throw err;
   }
+
+  const markdown = doc.markdown?.trim() || "";
+  const statusCode = doc.metadata?.statusCode;
+  if (typeof statusCode === "number" && statusCode >= 400) {
+    throw new Error(`Firecrawl could not access the source URL (HTTP ${statusCode}).`);
+  }
+
+  if (!markdown) {
+    throw new Error("Firecrawl scrape returned no Markdown policy document.");
+  }
+
+  if (isAccessDeniedDocument(markdown) || isHtmlErrorBody(markdown) || isPdfUrlExposingHtml(cleanSourceUrl, markdown)) {
+    throw new Error("Firecrawl returned an access-denied or authentication page instead of the policy document.");
+  }
+
+  if (!isPolicyMarkdownSubstantive(markdown)) {
+    throw new Error("Firecrawl returned a document without substantive clinical policy content.");
+  }
+
+  const scrapedSourceUrl = getAcceptableResultUrl({
+    url: cleanSourceUrl,
+    metadata: doc.metadata as FirecrawlSearchResult["metadata"],
+  });
+
+  return {
+    markdown,
+    sourceUrl: sanitizePublicPolicyUrl(scrapedSourceUrl ?? cleanSourceUrl),
+    json: doc.json,
+    screenshot: doc.screenshot,
+  };
 }
 
 /**
@@ -1581,7 +1649,7 @@ Evaluate whether the supplied document is an authoritative, clinically relevant 
 
 Evaluation Directives:
 1. Provenance & Authority: The document must be an official policy from the claim's payer, their recognized clinical guidelines manager (e.g. Carelon, EviCore), or a neutral national medical authority (CMS LCD/NCD, AAOS, NASS, ACR, NCCN, PubMed, FDA, ECFR). Strictly reject policies issued by competing commercial health plans or unrelated regional programs.
-2. Clinical Specificity: The document must establish substantive medical necessity criteria, diagnostic standards, conservative therapy rules, or coverage indications for the procedure and anatomical site involved in the claim (e.g. Spine Surgery / Decompression for CPT 63047, Total Knee Arthroplasty for CPT 27447, Knee MRI for CPT 73721).
+2. Clinical Specificity: The document must establish substantive medical necessity criteria, diagnostic standards, conservative therapy rules, or coverage indications for the procedure and anatomical site involved in the claim (e.g. Spine Surgery / Decompression for CPT 63047, Joint Surgery / Knee Arthroscopy & Meniscectomy for CPT 29881, Total Knee Arthroplasty for CPT 27447, Knee MRI for CPT 73721). Note: Carelon Musculoskeletal Guidelines cover Knee Arthroscopy and Meniscectomy under their official guideline titled "Joint Surgery".
 3. Content Type: Reject commercial billing coding blogs, consumer marketing materials, provider enrollment forms, and private password-protected viewers.
 4. Guideline Recency & Active Effective Date:
    - In health insurance appeals, citations must reference the ACTIVE, CURRENTLY EFFECTIVE clinical guideline in effect on the claim's Date of Service (${serviceDate || targetYear}, Year ${targetYear}).
@@ -1658,12 +1726,12 @@ CRITICAL DIRECTIVE - RECENCY & ACTIVE VERSION RETRIEVAL:
 The claim Date of Service is in ${targetYear}. Insurance appeals require the ACTIVE, currently effective clinical coverage guideline in effect for ${targetYear}, NOT archived or superseded historical policies from prior years.
 - Major clinical guideline repositories (such as Carelon/AIM, EviCore, CMS LCD, Aetna CPBs) maintain historical archives with URLs or titles marked "ARCHIVED" or containing past year dates (e.g. 2024). Search engines often rank older historical pages higher due to domain age.
 - To ensure the search engine retrieves the latest active guideline rather than an archived page, queries MUST incorporate temporal keywords for the active policy window (e.g. "${targetYear}", "updated ${targetYear}", "current") and negative keywords (e.g. "-archived", "-superseded") where appropriate.
-- For Carelon Medical Benefits Management guidelines (used by GeoBlue, Anthem, BCBS, Elevance, etc.): active guidelines are published under guidelines.carelonmedicalbenefitsmanagement.com with date slugs representing the latest effective update window (such as updated ${targetYear}). Example: Carelon spine surgery clinical appropriateness guideline ${targetYear} -archived OR site:guidelines.carelonmedicalbenefitsmanagement.com spine surgery ${targetYear}
+- For Carelon Medical Benefits Management guidelines (used by GeoBlue, Anthem, BCBS, Elevance, etc.): active guidelines are published under guidelines.carelonmedicalbenefitsmanagement.com with date slugs representing the latest effective update window (such as updated ${targetYear}). Example: Carelon spine surgery clinical appropriateness guideline ${targetYear} -archived OR Carelon joint surgery clinical appropriateness guideline ${targetYear} -archived
 
 Query Strategy:
 1. Payer & Utilization Management Guideline Query:
    - Target currently active payer medical policies and recognized clinical guidelines managers for ${targetYear}:
-     * GeoBlue / Blue Cross Blue Shield / Anthem / Elevance utilize Carelon (formerly AIM Specialty Health) clinical appropriateness guidelines or Anthem clinical guidelines.
+     * GeoBlue / Blue Cross Blue Shield / Anthem / Elevance utilize Carelon (formerly AIM Specialty Health) clinical appropriateness guidelines or Anthem clinical guidelines. For Joint/Knee (CPT 29881, 27447), Carelon publishes under "Joint Surgery" (e.g. Carelon joint surgery clinical appropriateness guideline ${targetYear} -archived). For Spine/Lumbar (CPT 63047), Carelon publishes under "Spine Surgery".
      * Cigna, Molina, and regional plans utilize EviCore or Carelon clinical policies.
      * Aetna and UnitedHealthcare utilize direct Clinical Policy Bulletins (CPBs).
    - Target the active guideline in effect for ${targetYear} (e.g. ${primaryProcedureName} ${primaryCpt} Carelon clinical guideline ${targetYear} -archived OR coverage criteria ${searchPayer}).

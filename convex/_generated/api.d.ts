@@ -39,6 +39,7 @@ import type * as lib_appealEmail from "../lib/appealEmail.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_openai from "../lib/openai.js";
+import type * as lib_pdfGenerator from "../lib/pdfGenerator.js";
 import type * as lib_precedentCorpus from "../lib/precedentCorpus.js";
 import type * as lib_precedentValidators from "../lib/precedentValidators.js";
 import type * as lib_rateLimiter from "../lib/rateLimiter.js";
@@ -90,6 +91,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/embeddings": typeof lib_embeddings;
   "lib/openai": typeof lib_openai;
+  "lib/pdfGenerator": typeof lib_pdfGenerator;
   "lib/precedentCorpus": typeof lib_precedentCorpus;
   "lib/precedentValidators": typeof lib_precedentValidators;
   "lib/rateLimiter": typeof lib_rateLimiter;

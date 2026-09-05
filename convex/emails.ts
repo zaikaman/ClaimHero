@@ -60,9 +60,27 @@ export const getThreadWithMessages = query({
       ? await msgQueryWithTake.take(50)
       : await msgQueryWithTake.collect();
 
+    const messagesWithUrls = await Promise.all(
+      messages.map(async (msg) => {
+        if (!msg.attachments || msg.attachments.length === 0) {
+          return msg;
+        }
+        const attachmentsWithUrls = await Promise.all(
+          msg.attachments.map(async (att) => ({
+            ...att,
+            url: await ctx.storage.getUrl(att.storageId),
+          }))
+        );
+        return {
+          ...msg,
+          attachments: attachmentsWithUrls,
+        };
+      })
+    );
+
     return {
       thread,
-      messages,
+      messages: messagesWithUrls,
     };
   },
 });
@@ -142,6 +160,12 @@ interface InsertMessageArgs {
   bodyHtml: string;
   bodyText: string;
   hasAttachments: boolean;
+  attachments?: Array<{
+    storageId: Id<"_storage">;
+    filename: string;
+    contentType: string;
+    size: number;
+  }>;
   agentMailMessageId?: string;
   outboundId?: string;
   detectedDetermination?: string;
@@ -165,6 +189,7 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
     bodyHtml: args.bodyHtml,
     bodyText: args.bodyText,
     hasAttachments: args.hasAttachments,
+    attachments: args.attachments,
     agentMailMessageId: args.agentMailMessageId,
     outboundId: args.outboundId,
     detectedDetermination: args.detectedDetermination,
@@ -249,6 +274,16 @@ export const insertMessage = mutation({
     bodyHtml: v.string(),
     bodyText: v.string(),
     hasAttachments: v.boolean(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          storageId: v.id("_storage"),
+          filename: v.string(),
+          contentType: v.string(),
+          size: v.number(),
+        })
+      )
+    ),
     agentMailMessageId: v.optional(v.string()),
     outboundId: v.optional(v.string()),
     detectedDetermination: v.optional(v.string()),
@@ -278,6 +313,16 @@ export const insertMessageInternal = internalMutation({
     bodyHtml: v.string(),
     bodyText: v.string(),
     hasAttachments: v.boolean(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          storageId: v.id("_storage"),
+          filename: v.string(),
+          contentType: v.string(),
+          size: v.number(),
+        })
+      )
+    ),
     agentMailMessageId: v.optional(v.string()),
     outboundId: v.optional(v.string()),
     detectedDetermination: v.optional(v.string()),
@@ -305,6 +350,16 @@ export const updateMessageAnalysisInternal = internalMutation({
     settlementAmount: v.optional(v.number()),
     autoReplyDraft: v.optional(v.string()),
     autoReplyStatus: v.optional(v.string()),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          storageId: v.id("_storage"),
+          filename: v.string(),
+          contentType: v.string(),
+          size: v.number(),
+        })
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const { messageId, ...fields } = args;
@@ -325,6 +380,16 @@ export const insertInboundMessageInternal = internalMutation({
     bodyHtml: v.string(),
     bodyText: v.string(),
     hasAttachments: v.boolean(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          storageId: v.id("_storage"),
+          filename: v.string(),
+          contentType: v.string(),
+          size: v.number(),
+        })
+      )
+    ),
     agentMailMessageId: v.string(),
     detectedDetermination: v.optional(v.string()),
     clinicalRationale: v.optional(v.string()),
@@ -371,6 +436,7 @@ export const insertInboundMessageInternal = internalMutation({
       bodyHtml: args.bodyHtml,
       bodyText: args.bodyText,
       hasAttachments: args.hasAttachments,
+      attachments: args.attachments,
       agentMailMessageId: trimmedId,
       detectedDetermination: args.detectedDetermination,
       clinicalRationale: args.clinicalRationale,

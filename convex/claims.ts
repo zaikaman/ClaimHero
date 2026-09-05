@@ -1111,6 +1111,24 @@ export const updateClaimWorkflowStatusInternal = internalMutation({
 });
 
 /**
+ * Link an inbound denial document / EOB storage ID to a claim
+ */
+export const setDenialLetterStorageIdInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    denialLetterStorageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) return;
+    await ctx.db.patch(args.claimId, {
+      denialLetterStorageId: args.denialLetterStorageId,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
  * Generate Convex File Storage upload URL for denial document attachments
  */
 export const generateUploadUrl = mutation({

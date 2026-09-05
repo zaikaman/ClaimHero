@@ -5,6 +5,7 @@ import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
+  downloadAgentMailAttachment,
   getAgentMailMessage,
   getSharedAgentMailboxes,
   listAgentMailMessages,
@@ -371,6 +372,51 @@ async function handleInboundClaimReply(
       subject,
     });
 
+    // ⚡ Process and persist inbound email attachments (EOB, denial notices, settlement agreements)
+    const storedAttachments: Array<{
+      storageId: Id<"_storage">;
+      filename: string;
+      contentType: string;
+      size: number;
+    }> = [];
+    const fileInputs: Array<{ fileData: string; filename: string }> = [];
+
+    if (Array.isArray(normalized.attachments) && normalized.attachments.length > 0) {
+      for (const att of normalized.attachments) {
+        try {
+          const downloaded = await downloadAgentMailAttachment({
+            inboxId: args.inboxId,
+            messageId: args.messageId,
+            attachmentId: att.attachmentId,
+            filename: att.filename,
+            contentType: att.contentType,
+          });
+
+          const blob = new Blob([new Uint8Array(downloaded.buffer)], { type: downloaded.contentType });
+          const storageId = await ctx.storage.store(blob);
+
+          storedAttachments.push({
+            storageId,
+            filename: downloaded.filename,
+            contentType: downloaded.contentType,
+            size: downloaded.size,
+          });
+
+          // If the attachment is a PDF or document, prepare for multimodal structured evaluation
+          const lowerMime = downloaded.contentType.toLowerCase();
+          const lowerName = downloaded.filename.toLowerCase();
+          if (lowerMime.includes("pdf") || lowerName.endsWith(".pdf")) {
+            fileInputs.push({
+              fileData: `data:application/pdf;base64,${downloaded.buffer.toString("base64")}`,
+              filename: downloaded.filename,
+            });
+          }
+        } catch (attErr) {
+          console.warn(`Failed to process inbound attachment ${att.attachmentId}:`, attErr);
+        }
+      }
+    }
+
     // ⚡ ATOMIC REAL-TIME PERSISTENCE & LOCK: Atomically claim and insert message
     const insertResult = await ctx.runMutation(internal.emails.insertInboundMessageInternal, {
       threadId,
@@ -381,6 +427,7 @@ async function handleInboundClaimReply(
       bodyHtml: normalized.html || `<p>${normalized.text || ""}</p>`,
       bodyText: normalized.text || normalized.html || "",
       hasAttachments: normalized.attachments.length > 0,
+      attachments: storedAttachments.length > 0 ? storedAttachments : undefined,
       agentMailMessageId: normalized.messageId,
       detectedDetermination: fallbackDetermination,
       clinicalRationale: fallbackDetermination === "OVERTURNED_APPROVED"
@@ -439,7 +486,7 @@ Clinical Context:
 - Denied Amount: $${matchingClaim.deniedAmount}
 - Denial Reason: ${matchingClaim.denialReasonCode} - ${matchingClaim.denialReasonDescription}
 
-Evaluate the inbound correspondence text rigorously:
+Evaluate the inbound correspondence text AND any attached documents (Explanation of Benefits, formal adverse determination notices, or settlement agreements) rigorously:
 1. Classify the determination:
    - "OVERTURNED_APPROVED": The payer explicitly agrees to reverse the adverse determination, authorize coverage, overturn the denial, or release settlement funds.
    - "ADDITIONAL_RECORDS_REQUIRED": The payer requests additional clinical documentation, conservative therapy records, diagnostic imaging, prior authorization proof, or operative reports before they can complete review.
@@ -447,12 +494,14 @@ Evaluate the inbound correspondence text rigorously:
    - "ACKNOWLEDGMENT_ONLY": A routine automated or administrative receipt acknowledging file intake without substantive clinical determination.
    - "GENERAL_INQUIRY": General administrative question or status check.
 2. Extract specific missing clinical documentation or evidence demanded.
-3. If overturned, extract the authorized settlement dollar amount (default to denied amount $${matchingClaim.deniedAmount} if full approval).
-4. For ANY determination other than OVERTURNED_APPROVED (especially DENIAL_UPHELD, ADDITIONAL_RECORDS_REQUIRED, or GENERAL_INQUIRY), synthesize a professional, court-ready clinical rebuttal or escalation addendum response referencing the claim's clinical evidence (e.g., formally demanding Independent Review Organization (IRO) external review citing statutory ERISA 29 C.F.R. § 2560.503-1 rights if the denial is upheld, or supplying requested records if additional records are requested).
-5. CRITICAL RULE: If determination is "OVERTURNED_APPROVED" (claim won/approved), set shouldAutoReply to false and set suggestedAutoReplyAddendum to empty string "". For ALL other determinations, set shouldAutoReply to true and provide a non-empty suggestedAutoReplyAddendum.`,
+3. If overturned or settled, extract the authorized settlement dollar amount (default to denied amount $${matchingClaim.deniedAmount} if full approval).
+4. If an attached Explanation of Benefits or settlement agreement is present, incorporate its formal claim decisions into your evaluation.
+5. For ANY determination other than OVERTURNED_APPROVED (especially DENIAL_UPHELD, ADDITIONAL_RECORDS_REQUIRED, or GENERAL_INQUIRY), synthesize a professional, court-ready clinical rebuttal or escalation addendum response referencing the claim's clinical evidence (e.g., formally demanding Independent Review Organization (IRO) external review citing statutory ERISA 29 C.F.R. § 2560.503-1 rights if the denial is upheld, or supplying requested records if additional records are requested).
+6. CRITICAL RULE: If determination is "OVERTURNED_APPROVED" (claim won/approved), set shouldAutoReply to false and set suggestedAutoReplyAddendum to empty string "". For ALL other determinations, set shouldAutoReply to true and provide a non-empty suggestedAutoReplyAddendum.`,
         userPrompt: `Evaluate the following inbound email from ${sender}:\n\nSubject: ${subject}\n\n${bodyContent}`,
         schemaName: "InboundAnalysisResult",
         schema: INBOUND_ANALYSIS_SCHEMA,
+        fileInputs: fileInputs.length > 0 ? fileInputs : undefined,
         temperature: 0.1,
       });
     } catch (llmError) {
@@ -479,7 +528,7 @@ Evaluate the inbound correspondence text rigorously:
       suggestedAutoReply = `We acknowledge your correspondence regarding Claim #${matchingClaim.claimNumber}. Given your maintenance of the adverse determination despite documented emergency medical necessity for CPT [${(matchingClaim.cptCodes || []).join(", ")}], we formally request immediate escalation to Independent External Review (IRO) under 29 C.F.R. § 2560.503-1. Please provide the designated IRO contact details and statutory appellate documentation requirements.`;
     }
 
-    // Refine the stored message with deep clinical analysis & auto-reply draft
+    // Refine the stored message with deep clinical analysis, auto-reply draft, and attached files
     await ctx.runMutation(internal.emails.updateMessageAnalysisInternal, {
       messageId: messageDbId,
       detectedDetermination: determination,
@@ -488,7 +537,41 @@ Evaluate the inbound correspondence text rigorously:
       settlementAmount,
       autoReplyDraft: isOverturned ? undefined : (suggestedAutoReply || undefined),
       autoReplyStatus: isOverturned ? undefined : (suggestedAutoReply ? "pending" : undefined),
+      attachments: storedAttachments.length > 0 ? storedAttachments : undefined,
     });
+
+    // If claim lacks a denial letter storage reference, attach first PDF exhibit
+    if (!matchingClaim.denialLetterStorageId && storedAttachments.length > 0) {
+      const pdfAttachment =
+        storedAttachments.find(
+          (a) => a.contentType.toLowerCase().includes("pdf") || a.filename.toLowerCase().endsWith(".pdf")
+        ) || storedAttachments[0];
+
+      if (pdfAttachment) {
+        try {
+          await ctx.runMutation(internal.claims.setDenialLetterStorageIdInternal, {
+            claimId: matchingClaim._id,
+            denialLetterStorageId: pdfAttachment.storageId,
+          });
+        } catch (linkErr) {
+          console.warn("Failed to set denialLetterStorageId on claim:", linkErr);
+        }
+      }
+    }
+
+    // Log audit event for inbound attachments
+    if (storedAttachments.length > 0) {
+      try {
+        await ctx.runMutation(internal.auditLogs.logEventInternal, {
+          claimId: matchingClaim._id,
+          eventType: "inbound_attachment_processed",
+          actor: "Inbound Document Sentinel",
+          details: `Processed and stored ${storedAttachments.length} inbound attachment(s) (${storedAttachments.map((a) => a.filename).join(", ")}) into Convex File Storage. Determination: ${determination}.`,
+        });
+      } catch (auditErr) {
+        console.warn("Failed to log inbound attachment audit event:", auditErr);
+      }
+    }
 
     if (determination === "OVERTURNED_APPROVED") {
       await ctx.runMutation(internal.claims.updateStatusInternal, {

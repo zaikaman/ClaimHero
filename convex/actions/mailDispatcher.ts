@@ -23,6 +23,7 @@ import {
 } from "../lib/appealEmail";
 import { rateLimiter } from "../lib/rateLimiter";
 import { resolveClaimPatientName } from "../claims";
+import { ensureAppealPdfStored } from "../lib/pdfGenerator";
 
 export interface DispatchReceipt {
   transmissionId: string;
@@ -432,12 +433,31 @@ export const dispatchAppealPacket = action({
       providerName: claim.providerName,
     });
 
+    // Automatically pull compiled PDF brief from Convex Storage (or compile court-ready PDF if not yet stored)
+    let storedPdf: { storageId: Id<"_storage">; buffer: Buffer; filename: string } | null = null;
+    try {
+      storedPdf = await ensureAppealPdfStored(ctx, claim, appeal);
+    } catch (pdfErr) {
+      console.warn("Failed to pull or compile PDF brief for outbound transmission:", pdfErr);
+    }
+
+    const outgoingAttachments = storedPdf
+      ? [
+          {
+            filename: storedPdf.filename,
+            content: storedPdf.buffer.toString("base64"),
+            contentType: "application/pdf",
+          },
+        ]
+      : undefined;
+
     const liveTransmission = await sendAgentMailMessage({
       inboxId: mailboxes.claimInboxId,
       to: finalRecipient,
       subject,
       text: appealEmail.text,
       html: appealEmail.html,
+      attachments: outgoingAttachments,
       ctx,
     });
 
@@ -457,7 +477,18 @@ export const dispatchAppealPacket = action({
       subject,
     });
 
-    // 4. Record outbound message in database
+    const messageAttachments = storedPdf
+      ? [
+          {
+            storageId: storedPdf.storageId,
+            filename: storedPdf.filename,
+            contentType: "application/pdf",
+            size: storedPdf.buffer.byteLength,
+          },
+        ]
+      : undefined;
+
+    // 4. Record outbound message in database with attachment metadata
     await ctx.runMutation(internal.emails.insertMessageInternal, withAgentMailMessageId({
       threadId,
       claimId: args.claimId,
@@ -467,7 +498,8 @@ export const dispatchAppealPacket = action({
       subject,
       bodyHtml: appealEmail.html,
       bodyText: appealEmail.text,
-      hasAttachments: true,
+      hasAttachments: Boolean(storedPdf),
+      attachments: messageAttachments,
     }, liveTransmission.messageId, liveTransmission.outboundId));
 
     // 5. Update claim status to dispatched

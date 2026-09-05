@@ -343,6 +343,13 @@ export interface EmailMessage {
   bodyHtml: string;
   bodyText: string;
   hasAttachments: boolean;
+  attachments?: Array<{
+    storageId: string;
+    filename: string;
+    contentType: string;
+    size: number;
+    url?: string | null;
+  }>;
   agentMailMessageId?: string;
   detectedDetermination?: "OVERTURNED_APPROVED" | "ADDITIONAL_RECORDS_REQUIRED" | "DENIAL_UPHELD" | "ACKNOWLEDGMENT_ONLY" | "GENERAL_INQUIRY" | string;
   clinicalRationale?: string;

@@ -228,6 +228,96 @@ describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
       expect(urls).not.toContain("https://worldebhcday.org/blog/2024/advancing-spine-evidence-synthesis-north-american-spine-society-nass-guidelines");
     });
 
+    it("selectFirecrawlPolicyUrls: rejects LinkedIn, commercial RCM blogs, and mismatched regional payers for GeoBlue", () => {
+      const payload = {
+        data: {
+          web: [
+            {
+              url: "https://www.linkedin.com/posts/enovis-healthcare-solutions_great-news-for-knee-oa",
+              title: "LinkedIn post on Knee OA",
+              description: "Social media post",
+            },
+            {
+              url: "https://www.verifiedrcm.com/specialty-orthopedics.html",
+              title: "Verified RCM Orthopedics Billing Consultancy",
+              description: "Commercial RCM medical billing service guide.",
+            },
+            {
+              url: "https://www.providencehealthplan.com/policies/mp435.pdf",
+              title: "Providence Health Plan Knee Policy",
+              description: "Providence regional plan policy.",
+            },
+            {
+              url: "https://www.horizonblue.com/providers/news/medical-policy-update",
+              title: "Horizon BCBSNJ Policy Notice",
+              description: "Horizon Blue Cross notice.",
+            },
+            {
+              url: "https://guidelines.carelonmedicalbenefitsmanagement.com/joint-surgery-2025-11-15/",
+              title: "Joint Surgery 2025-11-15 | Carelon Clinical Guidelines",
+              description: "Official Carelon clinical appropriateness guideline for knee arthroscopy and joint surgery.",
+            },
+          ],
+        },
+      };
+
+      const urls = actionPolicyCrawler.selectFirecrawlPolicyUrls(
+        payload,
+        ["29881", "knee", "arthroscopy", "meniscectomy", "medical policy"],
+        0,
+        5,
+        "GeoBlue",
+        "2026",
+      );
+
+      // Carelon Joint Surgery is selected; LinkedIn, verifiedrcm, Providence, and Horizon are all rejected
+      expect(urls).toContain("https://guidelines.carelonmedicalbenefitsmanagement.com/joint-surgery-2025-11-15/");
+      expect(urls).not.toContain("https://www.linkedin.com/posts/enovis-healthcare-solutions_great-news-for-knee-oa");
+      expect(urls).not.toContain("https://www.verifiedrcm.com/specialty-orthopedics.html");
+      expect(urls).not.toContain("https://www.providencehealthplan.com/policies/mp435.pdf");
+      expect(urls).not.toContain("https://www.horizonblue.com/providers/news/medical-policy-update");
+    });
+
+    it("isPayerMismatchedSource: identifies Providence and Horizon as mismatched competitors for GeoBlue", () => {
+      expect(actionPolicyCrawler.isPayerMismatchedSource("GeoBlue", "https://www.providencehealthplan.com/policies/mp435.pdf")).toBe(true);
+      expect(actionPolicyCrawler.isPayerMismatchedSource("GeoBlue", "https://www.horizonblue.com/providers/notice.pdf")).toBe(true);
+      // Neutral clinical guideline hosts are never mismatched
+      expect(actionPolicyCrawler.isPayerMismatchedSource("GeoBlue", "https://guidelines.carelonmedicalbenefitsmanagement.com/joint-surgery-2025-11-15/")).toBe(false);
+      expect(actionPolicyCrawler.isPayerMismatchedSource("GeoBlue", "https://www.aaos.org/quality/cpg/")).toBe(false);
+    });
+
+    it("scrapeFirecrawlPolicySource: falls back to markdown scrape when primary scrape times out (408)", async () => {
+      const { FirecrawlClient } = await import("@firecrawl/firecrawl-convex");
+      const scrapeSpy = vi.spyOn(FirecrawlClient.prototype, "scrape")
+        .mockRejectedValueOnce(new Error("Firecrawl /v2/scrape failed (408): The scrape operation timed out before completing."))
+        .mockResolvedValueOnce({
+          markdown: "# Carelon Joint Surgery Clinical Appropriateness Guidelines\n\n" +
+            "Medical necessity criteria and clinical coverage indications for knee arthroscopy and meniscectomy (CPT 29881): " +
+            "Arthroscopic partial meniscectomy is considered medically necessary for patients presenting with persistent, " +
+            "symptomatic knee joint pain, mechanical symptoms including documented locking or catching, distinct joint line tenderness " +
+            "on objective physical examination, and failure of at least 6 weeks of structured conservative management including " +
+            "formal physical therapy and non-steroidal anti-inflammatory drugs. Clinical records must confirm compliance with " +
+            "diagnostic imaging criteria demonstrating meniscal tear without severe tri-compartmental osteoarthritis. " +
+            "These guidelines apply to commercial health plan members and govern clinical review determinations.",
+          metadata: { statusCode: 200 },
+        } as any);
+
+      const mockCtx: any = {};
+      const res = await actionPolicyCrawler.scrapeFirecrawlPolicySource(
+        mockCtx,
+        "https://guidelines.carelonmedicalbenefitsmanagement.com/joint-surgery-2025-11-15/",
+        { cptCodes: ["29881"], payer: "GeoBlue", denialReasonCode: "CO-50" }
+      );
+
+      expect(res.markdown).toContain("Carelon Joint Surgery");
+      expect(scrapeSpy).toHaveBeenCalledTimes(2);
+      // First call requested screenshot/json with 30s timeout
+      expect(scrapeSpy.mock.calls[0][2]?.timeout).toBe(30000);
+      // Fallback call requested lightweight markdown with 25s timeout
+      expect(scrapeSpy.mock.calls[1][2]?.formats).toEqual(["markdown"]);
+      expect(scrapeSpy.mock.calls[1][2]?.timeout).toBe(25000);
+    });
+
     it("selectFirecrawlPolicyUrls: prioritizes active updated guideline (2026) over archived prior-year version (2024)", async () => {
       const payload = {
         data: {

@@ -432,3 +432,24 @@ export const updatePdfStorageId = mutation({
     });
   },
 });
+
+/**
+ * Internal mutation for background actions to update PDF export storage ID without user session auth
+ */
+export const updatePdfStorageIdInternal = internalMutation({
+  args: {
+    appealId: v.id("appeals"),
+    pdfExportStorageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const appeal = await ctx.db.get(args.appealId);
+    if (!appeal) {
+      throw new Error(`Appeal ${args.appealId} not found`);
+    }
+
+    await ctx.db.patch(args.appealId, {
+      pdfExportStorageId: args.pdfExportStorageId,
+      updatedAt: Date.now(),
+    });
+  },
+});

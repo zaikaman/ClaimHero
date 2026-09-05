@@ -256,6 +256,16 @@ export default defineSchema({
     bodyHtml: v.string(),
     bodyText: v.string(),
     hasAttachments: v.boolean(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          storageId: v.id("_storage"),
+          filename: v.string(),
+          contentType: v.string(),
+          size: v.number(),
+        })
+      )
+    ),
     agentMailMessageId: v.optional(v.string()),
     outboundId: v.optional(v.string()),
     detectedDetermination: v.optional(v.string()), // OVERTURNED_APPROVED, ADDITIONAL_RECORDS_REQUIRED, DENIAL_UPHELD, ACKNOWLEDGMENT_ONLY, GENERAL_INQUIRY

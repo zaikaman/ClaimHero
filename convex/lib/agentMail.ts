@@ -131,6 +131,11 @@ export async function sendAgentMailMessage(options: {
   html: string;
   headers?: Record<string, string>;
   labels?: string[];
+  attachments?: Array<{
+    filename: string;
+    content: string;
+    contentType?: string;
+  }>;
   ctx: AgentMailContext;
 }): Promise<AgentMailSendResult> {
   const ctx = requireComponentContext(options.ctx, "send");
@@ -144,6 +149,7 @@ export async function sendAgentMailMessage(options: {
       html: options.html,
       headers: options.headers,
       labels: options.labels,
+      attachments: options.attachments,
     },
   );
 
@@ -159,6 +165,11 @@ export async function replyAgentMailMessage(options: {
   subject?: string;
   headers?: Record<string, string>;
   labels?: string[];
+  attachments?: Array<{
+    filename: string;
+    content: string;
+    contentType?: string;
+  }>;
   ctx: AgentMailContext;
 }): Promise<AgentMailSendResult> {
   const ctx = requireComponentContext(options.ctx, "reply");
@@ -173,6 +184,7 @@ export async function replyAgentMailMessage(options: {
       subject: options.subject,
       headers: options.headers,
       labels: options.labels,
+      attachments: options.attachments,
     },
   );
 
@@ -347,4 +359,115 @@ export async function getAgentMailMessage(
   throw new Error(
     `AgentMail message ${messageId} was not found in the component mirror or remote API.`,
   );
+}
+
+export interface DownloadedAgentMailAttachment {
+  buffer: Buffer;
+  contentType: string;
+  filename: string;
+  size: number;
+}
+
+/**
+ * Downloads an incoming email attachment from AgentMail.
+ * Queries the attachment endpoint, resolves pre-signed download URLs, and returns the raw file buffer.
+ */
+export async function downloadAgentMailAttachment(options: {
+  inboxId: string;
+  messageId: string;
+  attachmentId: string;
+  filename?: string;
+  contentType?: string;
+}): Promise<DownloadedAgentMailAttachment> {
+  const apiKey = configuredValue("AGENTMAIL_API_KEY");
+  if (!apiKey) {
+    throw new Error("AgentMail API key is not configured. Set AGENTMAIL_API_KEY.");
+  }
+
+  const baseUrl = (configuredValue("AGENTMAIL_BASE_URL") || "https://api.agentmail.to/v0").replace(/\/$/, "");
+  const cleanMessageId = options.messageId.replace(/^<|>$/g, "").trim();
+
+  // Try candidate message IDs (with and without brackets)
+  const candidateIds = [options.messageId];
+  if (cleanMessageId !== options.messageId) candidateIds.push(cleanMessageId);
+  if (!options.messageId.startsWith("<") && options.messageId.includes("@")) candidateIds.push(`<${options.messageId}>`);
+
+  let lastError: string = "Attachment not found";
+
+  for (const cid of candidateIds) {
+    const url = `${baseUrl}/inboxes/${encodeURIComponent(options.inboxId)}/messages/${encodeURIComponent(cid)}/attachments/${encodeURIComponent(options.attachmentId)}`;
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+
+      if (!res.ok) {
+        lastError = `HTTP ${res.status}: ${res.statusText}`;
+        continue;
+      }
+
+      const responseContentType = res.headers.get("content-type") || "";
+
+      // If response is JSON, it contains { download_url, content, filename, content_type, size }
+      if (responseContentType.includes("application/json")) {
+        const metadata = (await res.json()) as Record<string, unknown>;
+
+        const resolvedFilename =
+          (typeof metadata.filename === "string" ? metadata.filename : undefined) ||
+          options.filename ||
+          `attachment-${options.attachmentId}`;
+        const resolvedContentType =
+          (typeof metadata.content_type === "string" ? metadata.content_type : undefined) ||
+          (typeof metadata.contentType === "string" ? metadata.contentType : undefined) ||
+          options.contentType ||
+          "application/octet-stream";
+
+        // Check if inline base64 content was returned
+        if (typeof metadata.content === "string" && metadata.content.trim()) {
+          const buffer = Buffer.from(metadata.content.trim(), "base64");
+          return {
+            buffer,
+            contentType: resolvedContentType,
+            filename: resolvedFilename,
+            size: buffer.byteLength,
+          };
+        }
+
+        // Follow download_url if provided
+        const downloadUrl =
+          (typeof metadata.download_url === "string" ? metadata.download_url : undefined) ||
+          (typeof metadata.downloadUrl === "string" ? metadata.downloadUrl : undefined) ||
+          (typeof metadata.url === "string" ? metadata.url : undefined);
+
+        if (downloadUrl) {
+          const downloadRes = await fetch(downloadUrl);
+          if (downloadRes.ok) {
+            const arrayBuffer = await downloadRes.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            return {
+              buffer,
+              contentType: resolvedContentType,
+              filename: resolvedFilename,
+              size: buffer.byteLength,
+            };
+          }
+        }
+      } else {
+        // Direct binary stream response
+        const arrayBuffer = await res.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        return {
+          buffer,
+          contentType: options.contentType || responseContentType || "application/octet-stream",
+          filename: options.filename || `attachment-${options.attachmentId}`,
+          size: buffer.byteLength,
+        };
+      }
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  throw new Error(`Failed to download AgentMail attachment ${options.attachmentId}: ${lastError}`);
 }

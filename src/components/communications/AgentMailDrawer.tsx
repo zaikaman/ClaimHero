@@ -1132,9 +1132,58 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                     </div>
 
                     {msg.hasAttachments && (
-                      <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground pt-0.5">
-                        <Paperclip className="size-3" />
-                        <span>Attached: ERISA Appeal Packet & Clinical Policy Exhibits (PDF/MD)</span>
+                      <div className="space-y-1.5 pt-1">
+                        {msg.attachments && msg.attachments.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {msg.attachments.map((att, idx) => {
+                              const isPdf =
+                                att.contentType?.toLowerCase().includes("pdf") ||
+                                att.filename?.toLowerCase().endsWith(".pdf");
+                              const formattedSize = att.size > 0
+                                ? att.size < 1024
+                                  ? `${att.size} B`
+                                  : att.size < 1024 * 1024
+                                  ? `${Math.round(att.size / 1024)} KB`
+                                  : `${(att.size / (1024 * 1024)).toFixed(1)} MB`
+                                : "";
+
+                              return (
+                                <div
+                                  key={att.storageId || idx}
+                                  className="flex items-center gap-2 rounded-md border border-border/80 bg-muted/40 px-2.5 py-1.5 text-xs text-foreground/90 transition-colors hover:border-primary/50"
+                                >
+                                  <FileText className="size-3.5 text-primary shrink-0" />
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="font-medium truncate max-w-[200px]" title={att.filename}>
+                                      {att.filename}
+                                    </span>
+                                    {formattedSize && (
+                                      <span className="text-[10px] text-muted-foreground font-mono">
+                                        {formattedSize} {isPdf ? "- Formal PDF" : ""}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {att.url && (
+                                    <a
+                                      href={att.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="ml-1 inline-flex items-center gap-1 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                      title="Open / Download Attachment"
+                                    >
+                                      <ArrowSquareOut className="size-3.5" />
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground pt-0.5">
+                            <Paperclip className="size-3" />
+                            <span>Attached: ERISA Appeal Packet & Clinical Policy Exhibits (PDF/MD)</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
