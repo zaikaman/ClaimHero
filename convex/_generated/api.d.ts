@@ -31,6 +31,7 @@ import type * as clinicalEvidences from "../clinicalEvidences.js";
 import type * as crons from "../crons.js";
 import type * as emails from "../emails.js";
 import type * as http from "../http.js";
+import type * as lib_adversaryNegotiation from "../lib/adversaryNegotiation.js";
 import type * as lib_agentMail from "../lib/agentMail.js";
 import type * as lib_agentMailWebhook from "../lib/agentMailWebhook.js";
 import type * as lib_aggregates from "../lib/aggregates.js";
@@ -83,6 +84,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   emails: typeof emails;
   http: typeof http;
+  "lib/adversaryNegotiation": typeof lib_adversaryNegotiation;
   "lib/agentMail": typeof lib_agentMail;
   "lib/agentMailWebhook": typeof lib_agentMailWebhook;
   "lib/aggregates": typeof lib_aggregates;

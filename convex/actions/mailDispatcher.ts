@@ -11,6 +11,14 @@ import {
   isAiAdjudicatorAddress,
 } from "../lib/aiAdjudicator";
 import {
+  buildAdversaryStrategyHint,
+  buildCounterRebuttalFallback,
+  calculatePartialSettlementOffer,
+  getCountermoveClaimStatus,
+  getCountermoveLabel,
+  type AdversaryCountermove,
+} from "../lib/adversaryNegotiation";
+import {
   formatMessageIdHeader,
   getSharedAgentMailboxes,
   replyAgentMailMessage,
@@ -89,12 +97,24 @@ const ADJUDICATION_SCHEMA = {
   properties: {
     determination: {
       type: "string",
-      enum: ["OVERTURNED_APPROVED", "ADDITIONAL_RECORDS_REQUIRED", "DENIAL_UPHELD"],
+      enum: [
+        "OVERTURNED_APPROVED",
+        "PARTIAL_SETTLEMENT_OFFER",
+        "ADDITIONAL_RECORDS_REQUIRED",
+        "POLICY_CONFLICT_CITATION",
+        "DENIAL_UPHELD",
+      ],
     },
     determinationSummary: { type: "string" },
     clinicalRationale: { type: "string" },
     formalDeterminationLetter: { type: "string" },
     authorizedSettlementAmount: { type: "number" },
+    requestedRecords: {
+      type: "array",
+      items: { type: "string" },
+    },
+    citedPolicyClause: { type: "string" },
+    settlementOfferPct: { type: "number" },
     reviewerName: { type: "string" },
     reviewerTitle: { type: "string" },
   },
@@ -111,11 +131,14 @@ const ADJUDICATION_SCHEMA = {
 };
 
 interface AdjudicationResponse {
-  determination: "OVERTURNED_APPROVED" | "ADDITIONAL_RECORDS_REQUIRED" | "DENIAL_UPHELD";
+  determination: AdversaryCountermove;
   determinationSummary: string;
   clinicalRationale: string;
   formalDeterminationLetter: string;
   authorizedSettlementAmount: number;
+  requestedRecords?: string[];
+  citedPolicyClause?: string;
+  settlementOfferPct?: number;
   reviewerName: string;
   reviewerTitle: string;
 }
@@ -131,31 +154,47 @@ interface AdjudicationClaimContext {
   serviceDate?: string;
   providerName?: string;
   autoPilotEnabled?: boolean;
+  overturnProbabilityScore?: number;
 }
 
-function buildInitialAdjudicationPrompt(claim: AdjudicationClaimContext, payer: string): string {
-  return `You are Demo AI Reviewer, a simulated independent clinical reviewer evaluating an appeal against ${payer} for platform demonstration and technical evaluation purposes.
+function buildInitialAdjudicationPrompt(
+  claim: AdjudicationClaimContext,
+  payer: string,
+  strategyHint?: string
+): string {
+  const partialOffer = calculatePartialSettlementOffer(claim.deniedAmount);
+  return `You are Demo AI Reviewer, an autonomous Insurer Defense Adversary simulating a payer medical director evaluating an appeal against ${payer} for platform demonstration and technical evaluation purposes.
 You have just received a formal Level 1 ERISA Medical Appeal and cited Clinical Reconsideration Memorandum for Claim #${claim.claimNumber} (Patient: ${claim.patient?.name}).
-Evaluate the appeal objectively and impartially against published clinical policy guidelines and medical necessity requirements:
+Evaluate the appeal as a realistic insurer adversary defending the adverse determination, choosing exactly one countermove:
 - Review the clinical CPT codes: [${(claim.cptCodes || []).join(", ")}], ICD-10 diagnosis: [${(claim.icd10Codes || []).join(", ")}], denied amount: $${claim.deniedAmount}.
-- If the appeal demonstrates that conservative therapy, radiographic evidence, or emergency exceptions meet the clinical criteria, issue determination "OVERTURNED_APPROVED".
-- If the appeal lacks necessary clinical documentation (such as dated x-rays, physical therapy records, or operative notes) that could cure the deficiency, issue "ADDITIONAL_RECORDS_REQUIRED" and specify what is missing.
-- If the documentation confirms that coverage criteria cannot be met or the service represents an unbending contractual exclusion, issue determination "DENIAL_UPHELD".
+- "OVERTURNED_APPROVED": the brief proves conservative therapy, radiographic evidence, or emergency exceptions meet criteria. Authorize the full denied amount.
+- "ADDITIONAL_RECORDS_REQUIRED": the brief is curable but missing specific proof. Issue a formal Request for Information naming exact records (operative notes with indication/technique, dated imaging with radiologist interpretation, conservative therapy records with dates/response, prior authorization). Populate requestedRecords.
+- "POLICY_CONFLICT_CITATION": the brief collides with a specific payer Clinical Policy Bulletin clause. Cite the conflicting CPB section verbatim, explain why the facts fail it, and invite a distinguishing rebuttal. Populate citedPolicyClause.
+- "PARTIAL_SETTLEMENT_OFFER": the file has merit but residual risk. Offer a compromise 40% settlement of $${partialOffer.toLocaleString()} (set authorizedSettlementAmount to ${partialOffer} and settlementOfferPct to 0.4) while reserving the balance, and state what would unlock full payment.
+- "DENIAL_UPHELD": coverage criteria definitively cannot be met or an unbending contractual exclusion applies.
+${strategyHint ? `\nAdversary strategy guidance: ${strategyHint}` : ""}
   - Write a formal, professional determination letter addressed to the treating provider. Acknowledge the memorandum, cite the clinical coverage criteria, and clearly explain the decision.
   - Set reviewerName to "Demo AI Reviewer" and reviewerTitle to "Independent Clinical Reviewer (Simulated)".
   - Write the letter as natural business correspondence: use a salutation, short paragraphs, a clear decision, and a professional closing. Return letter content only. Do not use Markdown syntax, all-caps filler, AI meta-commentary, or generic phrases such as "as an AI".`;
 }
 
-function buildFollowUpAdjudicationPrompt(claim: AdjudicationClaimContext, payer: string): string {
-  return `You are Demo AI Reviewer, a simulated independent clinical reviewer evaluating ongoing appeal correspondence against ${payer} for demonstration and testing purposes.
+function buildFollowUpAdjudicationPrompt(
+  claim: AdjudicationClaimContext,
+  payer: string,
+  strategyHint?: string
+): string {
+  const partialOffer = calculatePartialSettlementOffer(claim.deniedAmount);
+  return `You are Demo AI Reviewer, an autonomous Insurer Defense Adversary in ongoing Level 1 ERISA appeal correspondence against ${payer} for demonstration and testing purposes.
 You are in ongoing Level 1 ERISA medical appeal correspondence for Claim #${claim.claimNumber} (Patient: ${claim.patient?.name}).
-The appellant has sent a follow-up addendum or reply after prior correspondence.
-Evaluate the complete correspondence objectively against published clinical policy guidelines and medical necessity requirements:
+The appellant has sent a follow-up addendum or rebuttal after your prior countermove. Rule on the full thread as a realistic adversary:
 - Review the clinical CPT codes: [${(claim.cptCodes || []).join(", ")}], ICD-10 diagnosis: [${(claim.icd10Codes || []).join(", ")}], denied amount: $${claim.deniedAmount}.
-- If the addendum supplies missing conservative-therapy documentation, radiographic evidence, or other records that now meet clinical criteria, issue determination "OVERTURNED_APPROVED".
-- If the clinical record remains incomplete but could be cured with further specific documents, issue "ADDITIONAL_RECORDS_REQUIRED" and specify exactly which records are still outstanding.
-- If the submitted record demonstrates that clinical criteria are definitively not met, issue "DENIAL_UPHELD".
+- If the addendum cures the deficiency (supplies operative notes, imaging, conservative-therapy proof, or distinguishes the cited CPB clause), concede with "OVERTURNED_APPROVED".
+- If the record remains curable, issue "ADDITIONAL_RECORDS_REQUIRED" naming exactly which records are still outstanding in requestedRecords.
+- If a specific CPB clause still controls, issue "POLICY_CONFLICT_CITATION" with citedPolicyClause quoted and a path to distinguish it.
+- If liability is now probable but you need a final compromise, issue "PARTIAL_SETTLEMENT_OFFER" at 40% ($${partialOffer.toLocaleString()}) with authorizedSettlementAmount ${partialOffer} and settlementOfferPct 0.4.
+- If criteria definitively fail, issue "DENIAL_UPHELD".
 - If you already overturned this claim and no new contrary facts emerged, reaffirm the approval.
+${strategyHint ? `\nAdversary strategy guidance: ${strategyHint}` : ""}
   - Write a formal, professional determination letter addressed to the treating provider that responds specifically to this addendum.
   - Set reviewerName to "Demo AI Reviewer" and reviewerTitle to "Independent Clinical Reviewer (Simulated)".
   - Write the letter as natural business correspondence: use a salutation, short paragraphs, a clear decision, and a professional closing. Return letter content only. Do not use Markdown syntax, all-caps filler, AI meta-commentary, or generic phrases such as "as an AI".`;
@@ -185,27 +224,33 @@ async function deliverAiAdjudication(
     isFollowUp,
   } = options;
 
+  const preThreadData = await ctx.runQuery(api.emails.getThreadWithMessages, {
+    threadId,
+  });
+  const negotiationRound = (preThreadData?.messages || []).filter(
+    (m: { direction?: string }) => m.direction === "inbound"
+  ).length;
+  const strategyHint = buildAdversaryStrategyHint({
+    claimNumber: claim.claimNumber,
+    deniedAmount: claim.deniedAmount,
+    overturnProbabilityScore: claim.overturnProbabilityScore,
+    negotiationRound,
+  });
+
   const adjudicationResult = await createStructuredCompletion<AdjudicationResponse>({
     systemPrompt: isFollowUp
-      ? buildFollowUpAdjudicationPrompt(claim, payer)
-      : buildInitialAdjudicationPrompt(claim, payer),
+      ? buildFollowUpAdjudicationPrompt(claim, payer, strategyHint)
+      : buildInitialAdjudicationPrompt(claim, payer, strategyHint),
     userPrompt,
     schemaName: "AdjudicationResponse",
     schema: ADJUDICATION_SCHEMA,
-    temperature: 0.1,
+    temperature: 0.4,
   });
 
-  const threadData = await ctx.runQuery(api.emails.getThreadWithMessages, {
-    threadId,
-  });
+  const threadData = preThreadData;
 
   const claimTag = `[ClaimHero #${claim.claimNumber}]`;
-  const determinationLabel =
-    adjudicationResult.determination === "OVERTURNED_APPROVED"
-      ? "Appeal Overturned"
-      : adjudicationResult.determination === "DENIAL_UPHELD"
-      ? "Denial Upheld"
-      : "Additional Records Requested";
+  const determinationLabel = getCountermoveLabel(adjudicationResult.determination);
 
   let determinationSubject: string;
   if (threadData?.thread?.subject?.trim()) {
@@ -271,6 +316,57 @@ async function deliverAiAdjudication(
     });
   }
 
+  const isOverturned = adjudicationResult.determination === "OVERTURNED_APPROVED";
+  const normalizedSettlement =
+    adjudicationResult.determination === "PARTIAL_SETTLEMENT_OFFER"
+      ? (Number.isFinite(adjudicationResult.authorizedSettlementAmount) &&
+        adjudicationResult.authorizedSettlementAmount > 0
+          ? adjudicationResult.authorizedSettlementAmount
+          : calculatePartialSettlementOffer(claim.deniedAmount))
+      : adjudicationResult.authorizedSettlementAmount;
+  const requestedRecords = Array.isArray(adjudicationResult.requestedRecords)
+    ? adjudicationResult.requestedRecords.filter((r) => typeof r === "string" && r.trim()).slice(0, 8)
+    : undefined;
+
+  // Auto-draft the advocate's counter-rebuttal immediately so the negotiation
+  // round is actionable the moment the adversary countermove lands.
+  let counterRebuttal = "";
+  if (!isOverturned) {
+    const fallbackDraft = buildCounterRebuttalFallback({
+      claimNumber: claim.claimNumber,
+      determination: adjudicationResult.determination,
+      deniedAmount: claim.deniedAmount,
+      settlementAmount: normalizedSettlement,
+      cptCodes: claim.cptCodes,
+    });
+    try {
+      const challengeContext = [
+        adjudicationResult.determinationSummary,
+        adjudicationResult.clinicalRationale,
+        adjudicationResult.citedPolicyClause
+          ? `Cited policy clause: ${adjudicationResult.citedPolicyClause}`
+          : "",
+        requestedRecords && requestedRecords.length > 0
+          ? `Records demanded: ${requestedRecords.join("; ")}`
+          : "",
+        adjudicationResult.determination === "PARTIAL_SETTLEMENT_OFFER"
+          ? `Settlement offered: $${normalizedSettlement.toLocaleString()} of $${claim.deniedAmount.toLocaleString()} disputed.`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      counterRebuttal = await createChatCompletion({
+        systemPrompt: `You are a Board-Certified Physician Appeal Specialist & ERISA Appellate Counsel for ClaimHero. Draft the advocate's immediate counter-rebuttal to an insurer defense countermove (${adjudicationResult.determination}) on Claim #${claim.claimNumber} against ${payer}. CPT [${(claim.cptCodes || []).join(", ")}], denied $${claim.deniedAmount}. Be authoritative, cite ERISA 29 C.F.R. section 2560.503-1, address the challenge point-by-point, and close with a clear demand (full payment, IRO escalation, or cure path). No Markdown headings, no AI meta-language.`,
+        userPrompt: `Insurer countermove summary:\n${challengeContext}\n\nPayer letter:\n${adjudicationResult.formalDeterminationLetter}\n\nDraft the complete counter-rebuttal addendum.`,
+        temperature: 0.2,
+      });
+      counterRebuttal = counterRebuttal.trim() || fallbackDraft;
+    } catch (draftErr) {
+      console.warn("Counter-rebuttal synthesis failed; using fallback draft:", draftErr);
+      counterRebuttal = fallbackDraft;
+    }
+  }
+
   const insertedMsgId = await ctx.runMutation(internal.emails.insertMessageInternal, withAgentMailMessageId({
     threadId,
     claimId: claim._id,
@@ -282,11 +378,16 @@ async function deliverAiAdjudication(
     bodyText: determinationEmail.text,
     hasAttachments: false,
     detectedDetermination: adjudicationResult.determination,
-    clinicalRationale: adjudicationResult.clinicalRationale,
-    autoReplyStatus: adjudicationResult.determination === "OVERTURNED_APPROVED" ? undefined : "pending",
+    clinicalRationale: adjudicationResult.citedPolicyClause
+      ? `${adjudicationResult.clinicalRationale} Cited clause: ${adjudicationResult.citedPolicyClause}`
+      : adjudicationResult.clinicalRationale,
+    missingRecordsRequested: requestedRecords,
+    settlementAmount: normalizedSettlement,
+    autoReplyDraft: isOverturned ? undefined : (counterRebuttal || undefined),
+    autoReplyStatus: isOverturned ? undefined : "pending",
   }, liveReply.messageId, liveReply.outboundId));
 
-  if (claim.autoPilotEnabled !== false && adjudicationResult.determination !== "OVERTURNED_APPROVED" && insertedMsgId && ctx.scheduler?.runAfter) {
+  if (claim.autoPilotEnabled !== false && !isOverturned && insertedMsgId && ctx.scheduler?.runAfter) {
     try {
       await ctx.scheduler.runAfter(
         60 * 60 * 1000,
@@ -302,6 +403,7 @@ async function deliverAiAdjudication(
     }
   }
 
+  const nextStatus = getCountermoveClaimStatus(adjudicationResult.determination);
   if (adjudicationResult.determination === "OVERTURNED_APPROVED") {
     await ctx.runMutation(internal.claims.updateStatusInternal, {
       claimId: claim._id,
@@ -309,16 +411,48 @@ async function deliverAiAdjudication(
       actor: `${payer} Demo Reviewer`,
       details: `VICTORY: Demo AI Reviewer overturned adverse determination. Authorized full recovery of $${(claim.deniedAmount || 0).toLocaleString()} released for payment. (Simulated evaluation)`,
     });
+  } else if (adjudicationResult.determination === "PARTIAL_SETTLEMENT_OFFER") {
+    await ctx.runMutation(internal.claims.updateStatusInternal, {
+      claimId: claim._id,
+      status: nextStatus,
+      actor: `${payer} Demo Reviewer`,
+      details: `NEGOTIATION: Insurer Defense Adversary extended a 40% partial settlement of $${normalizedSettlement.toLocaleString()} on $${claim.deniedAmount.toLocaleString()} disputed. Counter-rebuttal drafted for advocate review. (Simulated evaluation)`,
+    });
+  } else if (adjudicationResult.determination === "ADDITIONAL_RECORDS_REQUIRED") {
+    await ctx.runMutation(internal.claims.updateStatusInternal, {
+      claimId: claim._id,
+      status: nextStatus,
+      actor: `${payer} Demo Reviewer`,
+      details: `RFI: Insurer Defense Adversary requested ${requestedRecords && requestedRecords.length > 0 ? requestedRecords.join("; ") : "operative notes, imaging, and conservative-therapy records"}. Counter-rebuttal drafted. (Simulated evaluation)`,
+    });
+  } else if (adjudicationResult.determination === "POLICY_CONFLICT_CITATION") {
+    await ctx.runMutation(internal.claims.updateStatusInternal, {
+      claimId: claim._id,
+      status: nextStatus,
+      actor: `${payer} Demo Reviewer`,
+      details: `POLICY CHALLENGE: Insurer Defense Adversary cited conflicting CPB language${adjudicationResult.citedPolicyClause ? `: ${adjudicationResult.citedPolicyClause.slice(0, 220)}` : ""}. Distinguishing rebuttal drafted for IRO escalation path. (Simulated evaluation)`,
+    });
   } else if (adjudicationResult.determination === "DENIAL_UPHELD") {
     await ctx.runMutation(internal.claims.updateStatusInternal, {
       claimId: claim._id,
-      status: "lost",
+      status: "escalated",
       actor: `${payer} Demo Reviewer`,
-      details: `DENIAL UPHELD: Demo AI Reviewer confirmed adverse determination after clinical evaluation. Coverage criteria not satisfied. (Simulated evaluation)`,
+      details: `DENIAL UPHELD: Demo AI Reviewer confirmed adverse determination after clinical evaluation. File queued for Level 2 / IRO escalation with drafted rebuttal. (Simulated evaluation)`,
     });
   }
 
-  return adjudicationResult;
+  try {
+    await ctx.runMutation(internal.auditLogs.logEventInternal, {
+      claimId: claim._id,
+      eventType: "payer_response_received",
+      actor: "Insurer Defense Adversary",
+      details: `Round ${negotiationRound} countermove ${adjudicationResult.determination} on claim #${claim.claimNumber}: ${adjudicationResult.determinationSummary.slice(0, 280)}`,
+    });
+  } catch (auditErr) {
+    console.warn("Failed to log adversary countermove audit event:", auditErr);
+  }
+
+  return { ...adjudicationResult, authorizedSettlementAmount: normalizedSettlement };
 }
 
 /**
@@ -1066,6 +1200,59 @@ export const sweepPendingAutoPilotReplies = internalAction({
       dispatchedCount,
       skippedCount,
     };
+  },
+});
+
+/**
+ * Autonomous Adversary Negotiation Round (on-demand simulation):
+ * Reviews the latest brief + thread transcript from the adjudicator inbox
+ * and issues the next realistic insurer countermove (RFI, conflicting CPB
+ * citation, partial 40% settlement, uphold, or overturn). The inbound
+ * pipeline records the challenge, updates claim state, and arms the
+ * advocate's auto-drafted counter-rebuttal — a full multi-agent
+ * negotiation turn over email.
+ */
+export const runAdversaryNegotiationRound = internalAction({
+  args: {
+    claimId: v.id("claims"),
+    threadId: v.id("emailThreads"),
+  },
+  handler: async (ctx, args): Promise<{ determination: string; claimNumber: string }> => {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
+      claimId: args.claimId,
+    });
+    if (!claim) throw new Error(`Claim ${args.claimId} not found`);
+    if (claim.status === "won") {
+      return { determination: "OVERTURNED_APPROVED", claimNumber: claim.claimNumber };
+    }
+
+    const mailboxes = await ensureClaimMailboxes(ctx, claim);
+    if (!mailboxes.adjudicatorInboxId || !mailboxes.adjudicatorEmail) {
+      throw new Error("AgentMail did not return a payer adjudicator inbox for this claim.");
+    }
+
+    const threadData = await ctx.runQuery(api.emails.getThreadWithMessages, {
+      threadId: args.threadId,
+    });
+    const historyMessages = ((threadData?.messages || []) as Array<{
+      direction: string;
+      subject: string;
+      bodyText: string;
+    }>);
+    const transcript = formatCorrespondenceTranscript(historyMessages);
+    const payer = claim.patient?.insurancePayer || claim.insurancePayer || "Health Insurer";
+
+    const result = await deliverAiAdjudication(ctx, {
+      claim,
+      threadId: args.threadId,
+      sender: mailboxes.claimEmail,
+      recipient: mailboxes.adjudicatorEmail,
+      payer,
+      adjudicatorInboxId: mailboxes.adjudicatorInboxId,
+      userPrompt: `Ongoing appellate negotiation for Claim #${claim.claimNumber}. Full correspondence transcript:\n\n${transcript}\n\nIssue the next Insurer Defense Adversary countermove.`,
+      isFollowUp: true,
+    });
+    return { determination: result.determination, claimNumber: claim.claimNumber };
   },
 });
 

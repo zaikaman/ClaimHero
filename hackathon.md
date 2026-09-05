@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-05T12:15:30Z
+- **Last updated:** 2026-09-05T20:02:04Z
 
 ## Log
 
@@ -883,4 +883,10 @@ Engineered Formal PDF Appeal Packet Attachments and hardened Firecrawl policy sc
 - Joint Surgery Guideline Naming Alignment: Clarified prompt instructions in `generatePolicySearchQueries` and `evaluatePolicySourceRelevance` to reflect that Carelon publishes Knee Arthroscopy & Meniscectomy criteria (CPT 29881, 27447) under official "Joint Surgery" guidelines, while Lumbar Decompression (CPT 63047) is published under "Spine Surgery".
 - Verification: Added dedicated test suite in `tests/formalPdfAttachments.test.ts` (7 tests) and regression tests in `tests/actionsPolicyAndSynthesizer.test.ts` (16 tests). Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint errors/warnings, 504/504 passing unit tests across 36 suites, and production build in 6.10s. Convex features: schema, queries, internal queries, mutations, internal mutations, actions, internal actions, file storage (`_storage`), components (`@agentmail/convex`, `@firecrawl/firecrawl-convex`).
 
-
+### 2026-09-05 - working tree
+Built the Autonomous Insurer Defense Adversary so dispatched appeal briefs draw realistic multi-agent email negotiation instead of a single preset verdict:
+- Adversary countermove engine: Added pure strategy module (`convex/lib/adversaryNegotiation.ts`) with five determinations (overturn, 40% partial settlement, RFI for operative notes, conflicting CPB citation, uphold), deterministic round-aware move picker that concedes late rounds, 40% settlement pricer, inbound heuristic classifier, claim-status mapping, and tailored advocate counter-rebuttal fallbacks.
+- Adjudicator bot upgrade: Extended the adjudication schema and prompts in `convex/actions/mailDispatcher.ts` (`deliverAiAdjudication`) to issue RFI letters naming exact records, conflicting-CPB letters quoting the clause, and 40% partial settlement offers; every non-overturn countermove now persists requested records, settlement amount, and an LLM-synthesized counter-rebuttal draft with 1-hour Auto-Pilot SLA scheduling, round-aware claim status updates, and audit logging. Added on-demand `runAdversaryNegotiationRound` internal action for follow-up negotiation turns.
+- Inbound challenge detection: Upgraded `handleInboundClaimReply` in `convex/actions/agentMail.ts` to classify partial settlements and policy citations via fast heuristics plus structured LLM analysis, hold partials/RFIs in `under_review` negotiation, escalate policy conflicts, and arm tailored counter-rebuttals with advocate alerts.
+- Inbox UI: Extended `AgentMailDrawer.tsx` and `src/types/index.ts` with partial-settlement and conflicting-policy badges plus a settlement-offer callout.
+- Verification: Added `tests/adversarialAdjudicator.test.ts` (10 tests) covering pricing, move selection, classification, status mapping, rebuttals, and partial-settlement dispatch persistence. Verified with `npm run verify`: clean typecheck, lint, 515/515 passing tests across 37 suites, and production build. Convex features: actions, internal actions, internal mutations, internal queries, scheduled functions.

@@ -351,7 +351,7 @@ export interface EmailMessage {
     url?: string | null;
   }>;
   agentMailMessageId?: string;
-  detectedDetermination?: "OVERTURNED_APPROVED" | "ADDITIONAL_RECORDS_REQUIRED" | "DENIAL_UPHELD" | "ACKNOWLEDGMENT_ONLY" | "GENERAL_INQUIRY" | string;
+  detectedDetermination?: "OVERTURNED_APPROVED" | "PARTIAL_SETTLEMENT_OFFER" | "ADDITIONAL_RECORDS_REQUIRED" | "POLICY_CONFLICT_CITATION" | "DENIAL_UPHELD" | "ACKNOWLEDGMENT_ONLY" | "GENERAL_INQUIRY" | string;
   clinicalRationale?: string;
   missingRecordsRequested?: string[];
   settlementAmount?: number;

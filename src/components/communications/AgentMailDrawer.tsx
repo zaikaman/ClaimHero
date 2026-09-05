@@ -1011,24 +1011,26 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               messages.map((msg) => {
                 const isOutbound = msg.direction === "outbound";
                 const isOverturned = msg.detectedDetermination === "OVERTURNED_APPROVED";
+                const isPartialOffer = msg.detectedDetermination === "PARTIAL_SETTLEMENT_OFFER";
                 const isRecordsReq = msg.detectedDetermination === "ADDITIONAL_RECORDS_REQUIRED";
+                const isPolicyConflict = msg.detectedDetermination === "POLICY_CONFLICT_CITATION";
                 const isDenialUpheld = msg.detectedDetermination === "DENIAL_UPHELD";
 
                 return (
                   <div
                     key={msg._id}
-                    className={cn(
-                      "rounded-xl border p-3.5 space-y-2 transition-all",
-                      isOutbound
-                        ? "border-border bg-muted/30 ml-4"
-                        : isOverturned
-                        ? "border-emerald-500/40 bg-emerald-500/10 mr-4 shadow-xs"
-                        : isRecordsReq
-                        ? "border-amber-500/40 bg-amber-500/5 mr-4"
-                        : isDenialUpheld
-                        ? "border-rose-500/40 bg-rose-500/5 mr-4"
-                        : "border-primary/20 bg-primary/5 mr-4"
-                    )}
+                      className={cn(
+                        "rounded-xl border p-3.5 space-y-2 transition-all",
+                        isOutbound
+                          ? "border-border bg-muted/30 ml-4"
+                          : isOverturned
+                          ? "border-emerald-500/40 bg-emerald-500/10 mr-4 shadow-xs"
+                          : isRecordsReq || isPartialOffer
+                          ? "border-amber-500/40 bg-amber-500/5 mr-4"
+                          : isDenialUpheld || isPolicyConflict
+                          ? "border-rose-500/40 bg-rose-500/5 mr-4"
+                          : "border-primary/20 bg-primary/5 mr-4"
+                      )}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -1057,16 +1059,16 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                               "text-[10px] font-mono gap-1",
                               isOverturned
                                 ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/40 bg-emerald-500/10"
-                                : isRecordsReq
+                                : isRecordsReq || isPartialOffer
                                 ? "text-amber-600 dark:text-amber-400 border-amber-500/40 bg-amber-500/10"
-                                : isDenialUpheld
+                                : isDenialUpheld || isPolicyConflict
                                 ? "text-rose-600 dark:text-rose-400 border-rose-500/40 bg-rose-500/10"
                                 : "text-muted-foreground border-border"
                             )}
                           >
                             {isOverturned ? (
                               <CheckCircle className="size-3" />
-                            ) : isRecordsReq ? (
+                            ) : isRecordsReq || isPartialOffer ? (
                               <WarningCircle className="size-3" />
                             ) : (
                               <ShieldCheck className="size-3" />
@@ -1074,8 +1076,12 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                             <span>
                               {isOverturned
                                 ? "Determination: Overturned / Approved"
+                                : isPartialOffer
+                                ? "Partial Settlement Offered"
                                 : isRecordsReq
                                 ? "Additional Records Requested"
+                                : isPolicyConflict
+                                ? "Conflicting Policy Cited"
                                 : isDenialUpheld
                                 ? "Level 1 Denial Upheld"
                                 : "General Response"}
@@ -1124,6 +1130,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                             </Badge>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Partial Settlement Offer */}
+                    {!isOutbound && isPartialOffer && typeof msg.settlementAmount === "number" && (
+                      <div className="p-2 rounded bg-amber-500/10 border border-amber-500/30 text-[11px] font-mono text-amber-700 dark:text-amber-300">
+                        Settlement offered: ${msg.settlementAmount.toLocaleString()} — counter-rebuttal drafted demanding full payment or cure path.
                       </div>
                     )}
 
