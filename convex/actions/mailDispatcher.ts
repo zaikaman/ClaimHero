@@ -534,6 +534,17 @@ export const dispatchAppealPacket = action({
       throw new Error(`No email recipient is configured for claim ${claim.claimNumber}.`);
     }
     const finalRecipient = recipient;
+    // Never address appeal transmissions to ClaimHero's own sender inbox:
+    // self-mail re-enters the shared inbox and is re-ingested as a phantom
+    // payer response, amplifying alert/auto-pilot loops.
+    if (
+      finalRecipient.toLowerCase() === sender.toLowerCase() ||
+      finalRecipient.toLowerCase() === mailboxes.claimInboxId.toLowerCase()
+    ) {
+      throw new Error(
+        `Refusing to address appeal transmission for claim ${claim.claimNumber} to ClaimHero's own sender inbox (${finalRecipient}); check dispatch routing before retrying.`
+      );
+    }
     const claimTag = `[ClaimHero #${claim.claimNumber}]`;
     const rawSubject =
       args.customSubject ||
@@ -798,6 +809,17 @@ async function performSendOutboundMessage(
     : recipient;
   if (!resolvedRecipient) {
     throw new Error(`No email recipient is configured for claim ${claim.claimNumber}.`);
+  }
+  // Never address payer correspondence to ClaimHero's own sender inbox: such
+  // self-mail re-enters the shared inbox and is re-ingested as a phantom
+  // payer response, amplifying alert/auto-pilot loops.
+  if (
+    resolvedRecipient.toLowerCase() === sender.toLowerCase() ||
+    resolvedRecipient.toLowerCase() === mailboxes.claimInboxId.toLowerCase()
+  ) {
+    throw new Error(
+      `Refusing to address payer correspondence for claim ${claim.claimNumber} to ClaimHero's own sender inbox (${resolvedRecipient}); check thread routing before retrying.`
+    );
   }
   if (isAiAdjudicatorReply && !mailboxes.adjudicatorInboxId) {
     throw new Error("AgentMail did not return a payer adjudicator inbox for this claim.");

@@ -176,6 +176,41 @@ describe("Convex HTTP Router & Webhook Endpoints", () => {
     }));
   });
 
+  it("schedules processInboundClaimReply for authentic stale retries instead of 401", async () => {
+    process.env.AGENTMAIL_WEBHOOK_SECRET = "whsec_test123";
+    vi.spyOn(agentMailWebhook, "verifySvixWebhook").mockResolvedValue({
+      valid: true,
+      stale: true,
+      timestampAgeSec: 900,
+    });
+    vi.spyOn(agentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+      eventType: "message.received",
+      eventId: "evt_stale_retry",
+      messageId: "msg_stale_retry",
+      inboxId: "inbox_case_456",
+      from: "payer@example.com",
+      recipients: ["case-456@claimhero.com"],
+      subject: "Re: Appeal",
+      text: "We upheld the denial",
+      attachments: [],
+    });
+
+    const handler = getHandler();
+    const mockReq = new Request("http://localhost/agentmail-webhook", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    const mockCtx: any = { scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) } };
+
+    const response = await handler(mockCtx, mockReq);
+    expect(response.status).toBe(202);
+    expect(mockCtx.scheduler.runAfter).toHaveBeenCalledWith(0, expect.anything(), expect.objectContaining({
+      eventId: "evt_stale_retry",
+      messageId: "msg_stale_retry",
+      inboxId: "inbox_case_456",
+    }));
+  });
+
   it("returns 500 when an unexpected internal error occurs", async () => {
     process.env.AGENTMAIL_WEBHOOK_SECRET = "whsec_test123";
     vi.spyOn(agentMailWebhook, "verifySvixWebhook").mockRejectedValue(new Error("Fatal crypto fault"));

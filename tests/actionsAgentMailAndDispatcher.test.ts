@@ -341,6 +341,200 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       }));
     });
 
+    it("processInboundClaimReply: digests repeat non-victory alerts within the cooldown window", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_cooldown_1",
+        inbox_id: "in_send",
+        from: "reviewer@aetna.com",
+        recipients: ["send@claimhero.com"],
+        to: ["send@claimhero.com"],
+        subject: "Re: [ClaimHero #CLM-COOL-1] Denial Maintained",
+        text: "The denial is upheld after review.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_cooldown_1",
+        messageId: "msg_cooldown_1",
+        inboxId: "in_send",
+        from: "reviewer@aetna.com",
+        recipients: ["send@claimhero.com"],
+        subject: "Re: [ClaimHero #CLM-COOL-1] Denial Maintained",
+        text: "The denial is upheld after review.",
+        attachments: [],
+      });
+
+      const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+        messageId: "msg_alert_cooldown",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimNumber === "CLM-COOL-1") {
+            return Promise.resolve({
+              _id: "claim_cool_1",
+              claimNumber: "CLM-COOL-1",
+              userId: "user_cool_1",
+              insurancePayer: "Aetna",
+              lastPayerAlertAt: Date.now(),
+            });
+          }
+          if (args?.userId === "user_cool_1") {
+            return Promise.resolve({
+              _id: "user_cool_1",
+              email: "owner@clinic.com",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue("id_mut_cool"),
+      };
+
+      const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_cooldown_1",
+        messageId: "msg_cooldown_1",
+        inboxId: "in_send",
+      });
+
+      expect(res).toBeNull();
+      expect(sendMailSpy).not.toHaveBeenCalled();
+    });
+
+    it("processInboundClaimReply: victory alerts bypass the cooldown window", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_cooldown_win",
+        inbox_id: "in_send",
+        from: "reviewer@aetna.com",
+        recipients: ["send@claimhero.com"],
+        to: ["send@claimhero.com"],
+        subject: "Re: [ClaimHero #CLM-COOL-2] Approved",
+        text: "The adverse determination has been overturned and approved for full reimbursement.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_cooldown_win",
+        messageId: "msg_cooldown_win",
+        inboxId: "in_send",
+        from: "reviewer@aetna.com",
+        recipients: ["send@claimhero.com"],
+        subject: "Re: [ClaimHero #CLM-COOL-2] Approved",
+        text: "The adverse determination has been overturned and approved for full reimbursement.",
+        attachments: [],
+      });
+
+      const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+        messageId: "msg_alert_win",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimNumber === "CLM-COOL-2") {
+            return Promise.resolve({
+              _id: "claim_cool_2",
+              claimNumber: "CLM-COOL-2",
+              userId: "user_cool_2",
+              insurancePayer: "Aetna",
+              lastPayerAlertAt: Date.now(),
+            });
+          }
+          if (args?.userId === "user_cool_2") {
+            return Promise.resolve({
+              _id: "user_cool_2",
+              email: "owner@clinic.com",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue("id_mut_cool_win"),
+      };
+
+      const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_cooldown_win",
+        messageId: "msg_cooldown_win",
+        inboxId: "in_send",
+      });
+
+      expect(res).toBeNull();
+      expect(sendMailSpy).toHaveBeenCalledWith(expect.objectContaining({
+        to: "owner@clinic.com",
+        subject: expect.stringContaining("Overturned"),
+      }));
+    });
+
+    it("processInboundClaimReply: drops internal @agentmail.to mail even when mailboxes are unconfigured", async () => {
+      delete process.env.AGENTMAIL_SENDER_INBOX_ID;
+      delete process.env.AGENTMAIL_SENDER_EMAIL;
+      delete process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID;
+      delete process.env.AGENTMAIL_ADJUDICATOR_EMAIL;
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_self_domain_1",
+        inbox_id: "in_send",
+        from: "Adjudicator <claimhero-adjudicator@agentmail.to>",
+        recipients: ["send@claimhero.com"],
+        to: ["send@claimhero.com"],
+        subject: "Re: [ClaimHero #CLM-SELF-1] Appeal overturned",
+        text: "We overturned the denial and approved the claim.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_self_domain_1",
+        messageId: "msg_self_domain_1",
+        inboxId: "in_send",
+        from: "Adjudicator <claimhero-adjudicator@agentmail.to>",
+        recipients: ["send@claimhero.com"],
+        subject: "Re: [ClaimHero #CLM-SELF-1] Appeal overturned",
+        text: "We overturned the denial and approved the claim.",
+        attachments: [],
+      });
+
+      const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+        messageId: "msg_alert_self",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimNumber === "CLM-SELF-1") {
+            return Promise.resolve({
+              _id: "claim_self_1",
+              claimNumber: "CLM-SELF-1",
+              userId: "user_self_1",
+              insurancePayer: "GeoBlue",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn(),
+      };
+
+      const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_self_domain_1",
+        messageId: "msg_self_domain_1",
+        inboxId: "in_send",
+      });
+
+      expect(res).toBeNull();
+      expect(sendMailSpy).not.toHaveBeenCalled();
+      expect(mockCtx.runMutation).not.toHaveBeenCalled();
+    });
+
     it("processInboundClaimReply: resolves claim via in_reply_to referencing earlier outbound message", async () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
@@ -735,6 +929,47 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         claimId: "c1",
         agentMailThreadId: "live_msg_2",
       }));
+    });
+
+    it("sendOutboundMessageInternal: refuses to address payer correspondence to the own sender inbox", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
+
+      const mockClaim = {
+        _id: "c_self_route",
+        claimNumber: "CLM-SELF-ROUTE",
+        userId: "user_123",
+        deniedAmount: 5000,
+        patient: { name: "John Doe", insurancePayer: "Aetna" },
+      };
+      const mockThread = {
+        thread: { _id: "t_self", payerEmail: "send@claimhero.com", subject: "Appeal" },
+        messages: [],
+      };
+
+      const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage");
+
+      let queryCalls = 0;
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation(() => {
+          queryCalls++;
+          if (queryCalls === 1) return Promise.resolve(mockClaim);
+          return Promise.resolve(mockThread);
+        }),
+        runMutation: vi.fn().mockResolvedValue("t_self"),
+      };
+
+      await expect(
+        (actionMailDispatcher.sendOutboundMessageInternal as any)._handler(mockCtx, {
+          claimId: "c_self_route",
+          threadId: "t_self",
+          text: "Addendum body",
+        })
+      ).rejects.toThrow(/own sender inbox/);
+      expect(sendMailSpy).not.toHaveBeenCalled();
     });
 
     it("sendOutboundMessage: preserves canonical thread subject and attaches In-Reply-To/References headers", async () => {

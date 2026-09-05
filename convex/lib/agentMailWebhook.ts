@@ -199,6 +199,15 @@ export interface VerifySvixWebhookOptions {
 export interface SvixVerificationResult {
   valid: boolean;
   error?: string;
+  /**
+   * True when the signature is authentic but the timestamp is older than the
+   * allowed tolerance (a provider retry or late first delivery). Callers
+   * should accept and process these idempotently (returning 2xx) instead of
+   * responding 401, which would trigger an endless provider retry storm.
+   */
+  stale?: boolean;
+  /** Age of the webhook timestamp in seconds relative to now (if parseable). */
+  timestampAgeSec?: number;
 }
 
 /**
@@ -238,11 +247,8 @@ export async function verifySvixWebhook(
     return { valid: false, error: "Invalid timestamp header value" };
   }
 
-  const nowSec = Math.floor(Date.now() / 1000);
-  if (Math.abs(nowSec - timestampNum) > toleranceInSeconds) {
-    return { valid: false, error: `Webhook timestamp outside allowed tolerance of ${toleranceInSeconds} seconds` };
-  }
-
+  // Verify the cryptographic signature before evaluating freshness so that
+  // forged payloads always fail closed, even with a fresh timestamp.
   const expectedSignature = await computeSvixSignature(id, timestamp, payload, secret);
 
   const signatures = signatureHeader.trim().split(/\s+/);
@@ -262,5 +268,66 @@ export async function verifySvixWebhook(
     return { valid: false, error: "Signature verification failed" };
   }
 
+  const nowSec = Math.floor(Date.now() / 1000);
+  const ageSec = nowSec - timestampNum;
+  if (Math.abs(ageSec) > toleranceInSeconds) {
+    if (ageSec > 0) {
+      // Authentic signature with an old timestamp: this is a provider retry
+      // reusing the original timestamp, or a late first delivery after an
+      // outage. The inbound pipeline is idempotent on AgentMail message ID,
+      // so the caller should process it normally and acknowledge with 2xx.
+      // Returning 401 here would cause the provider to retry forever,
+      // producing a permanent 401 storm in the logs.
+      return { valid: true, stale: true, timestampAgeSec: ageSec };
+    }
+    return { valid: false, error: `Webhook timestamp outside allowed tolerance of ${toleranceInSeconds} seconds` };
+  }
+
   return { valid: true };
+}
+
+/**
+ * ClaimHero-owned AgentMail identities used to recognise internally generated
+ * mail (own sender/adjudicator inboxes). Any sender on the shared AgentMail
+ * infrastructure domain is internal: real insurance payers never send from
+ * `@agentmail.to` addresses.
+ */
+export interface AgentMailIdentities {
+  senderEmail?: string;
+  adjudicatorEmail?: string;
+  senderInboxId?: string;
+  adjudicatorInboxId?: string;
+}
+
+/**
+ * Returns true when an email address belongs to ClaimHero's own AgentMail
+ * infrastructure rather than an external payer. Compares against the
+ * configured sender/adjudicator emails and inbox IDs, and falls back to the
+ * shared infrastructure domain so loopback detection keeps working even when
+ * mailbox configuration is unavailable.
+ */
+export function isInternalAgentMailAddress(
+  value: string | undefined,
+  identities?: AgentMailIdentities
+): boolean {
+  if (!value) return false;
+  const lower = value.toLowerCase();
+  const addr = extractEmailAddress(lower) || lower.trim();
+
+  const candidates = [
+    identities?.senderEmail,
+    identities?.adjudicatorEmail,
+    identities?.senderInboxId,
+    identities?.adjudicatorInboxId,
+  ]
+    .filter((entry): entry is string => typeof entry === "string" && Boolean(entry.trim()))
+    .map((entry) => entry.toLowerCase().trim());
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (addr === candidate || lower.includes(candidate)) return true;
+  }
+
+  const domain = addr.split("@").pop() || "";
+  return domain === "agentmail.to";
 }

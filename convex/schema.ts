@@ -70,6 +70,7 @@ export default defineSchema({
     agentMailAdjudicatorEmail: v.optional(v.string()),
     agentMailThreadId: v.optional(v.string()),
     autoPilotEnabled: v.optional(v.boolean()),
+    lastPayerAlertAt: v.optional(v.number()),
     agentMailProvisioningStatus: v.optional(v.string()), // pending, shared, provisioned, not_configured, failed
     agentMailProvisioningError: v.optional(v.string()),
     denialLetterStorageId: v.optional(v.id("_storage")),

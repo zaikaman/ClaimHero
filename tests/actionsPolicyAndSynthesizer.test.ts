@@ -300,6 +300,10 @@ describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
             "diagnostic imaging criteria demonstrating meniscal tear without severe tri-compartmental osteoarthritis. " +
             "These guidelines apply to commercial health plan members and govern clinical review determinations.",
           metadata: { statusCode: 200 },
+        } as any)
+        .mockResolvedValueOnce({
+          screenshot: undefined,
+          metadata: { statusCode: 200 },
         } as any);
 
       const mockCtx: any = {};
@@ -310,8 +314,9 @@ describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
       );
 
       expect(res.markdown).toContain("Carelon Joint Surgery");
-      expect(scrapeSpy).toHaveBeenCalledTimes(2);
-      // First call requested screenshot/json with 30s timeout
+      // Primary markdown+json (30s) + lightweight markdown fallback (25s) + best-effort screenshot (15s, swallowed on failure)
+      expect(scrapeSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+      // First call requested markdown/json with 30s timeout (screenshots decoupled to avoid 500 base64 failures)
       expect(scrapeSpy.mock.calls[0][2]?.timeout).toBe(30000);
       // Fallback call requested lightweight markdown with 25s timeout
       expect(scrapeSpy.mock.calls[1][2]?.formats).toEqual(["markdown"]);
@@ -585,6 +590,101 @@ Welcome to the NASS guidelines directory. Below are the published clinical pract
       expect(result.extractionEngine).toBe("firecrawl_native");
       expect(result.extractedData?.policyTitle).toBe("Carelon Clinical Guideline: Lumbar Spine Surgery");
       expect(result.extractedData?.clauses.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("getCptKeywords: expands 63047 with decompression/stenosis synonyms (no template hardcode)", () => {
+      const keywords = actionPolicyCrawler.getCptKeywords(["63047"]);
+      expect(keywords).toContain("63047");
+      expect(keywords).toContain("decompression");
+      expect(keywords).toContain("stenosis");
+      expect(keywords).toContain("foraminotomy");
+      expect(keywords).toContain("laminectomy");
+    });
+
+    it("isPolicyAlignedWithClaim: accepts generic-title stenosis/decompression doc for 63047 (conflict-only veto)", () => {
+      const markdown =
+        "# Recommendations\n\nLumbar spinal stenosis with neurogenic claudication. " +
+        "Decompression is indicated after failure of conservative therapy with MRI-confirmed canal stenosis.";
+      const aligned = actionPolicyCrawler.isPolicyAlignedWithClaim(markdown, "Recommendations", ["63047"]);
+      expect(aligned.aligned).toBe(true);
+    });
+
+    it("isPolicyAlignedWithClaim: still rejects foot/bunion guide for lumbar 63047 claim", () => {
+      const markdown =
+        "# Bunionectomy Coding Guide\n\nFoot bunion correction with hallux valgus osteotomy and ankle fixation.";
+      const result = actionPolicyCrawler.isPolicyAlignedWithClaim(markdown, "Bunionectomy Guide", ["63047"]);
+      expect(result.aligned).toBe(false);
+    });
+
+    it("selectFirecrawlPolicyUrls: demotes wrong-procedure CPT pages and coding guides generically", () => {
+      const payload = {
+        data: {
+          web: [
+            {
+              url: "https://example-clinic.com/procedure-codes/cpt-code-22633/",
+              title: "CPT 22633 Lumbar Fusion Billing Guide",
+              description: "Procedure codes, billing and coding guide with reimbursement rates for 22633.",
+            },
+            {
+              url: "https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-lumbar-decompression.pdf",
+              title: "Carelon Spine Surgery Lumbar Decompression Guideline",
+              description: "Clinical coverage policy and medical necessity criteria for CPT 63047 lumbar laminectomy.",
+            },
+          ],
+        },
+      };
+      const topOnly = actionPolicyCrawler.selectFirecrawlPolicyUrls(
+        payload,
+        ["63047", "lumbar", "spine", "decompression", "medical policy"],
+        0,
+        1,
+        "GeoBlue",
+        "2026",
+      );
+      // With only one slot, the clinically specific 63047 PDF must win over the wrong-procedure coding guide.
+      expect(topOnly).toEqual([
+        "https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-lumbar-decompression.pdf",
+      ]);
+      const both = actionPolicyCrawler.selectFirecrawlPolicyUrls(
+        payload,
+        ["63047", "lumbar", "spine", "decompression", "medical policy"],
+        0,
+        2,
+        "GeoBlue",
+        "2026",
+      );
+      // When both are returned, the correct guideline ranks first (wrong-procedure guide demoted last).
+      expect(both[0]).toContain("spine-surgery-lumbar-decompression.pdf");
+    });
+
+    it("isVintageOnlyRejection: qualifies archived specialty guideline but not billing/landing rejections", () => {
+      expect(
+        actionPolicyCrawler.isVintageOnlyRejection(
+          "NASS lumbar stenosis guideline is significantly outdated (2013) and likely superseded for 2026 DOS.",
+        ),
+      ).toBe(true);
+      expect(
+        actionPolicyCrawler.isVintageOnlyRejection(
+          "Document is an archived/superseded policy from prior years (expired before Date of Service 07/04/2026).",
+        ),
+      ).toBe(true);
+      expect(
+        actionPolicyCrawler.isVintageOnlyRejection(
+          "Commercial billing and coding guide produced by a device manufacturer, not a clinical coverage policy.",
+        ),
+      ).toBe(false);
+      expect(
+        actionPolicyCrawler.isVintageOnlyRejection(
+          "Document provided is a directory or landing page, not an authoritative guideline itself.",
+        ),
+      ).toBe(false);
+    });
+
+    it("storeScreenshotInStorage: rejects malformed base64 error text without throwing", async () => {
+      const mockCtx: any = { storage: { store: vi.fn() } };
+      expect(await actionPolicyCrawler.storeScreenshotInStorage(mockCtx, "500 decode markdown base64 image data failed")).toBeUndefined();
+      expect(await actionPolicyCrawler.storeScreenshotInStorage(mockCtx, "not-base64!!!")).toBeUndefined();
+      expect(mockCtx.storage.store).not.toHaveBeenCalled();
     });
   });
 

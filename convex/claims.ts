@@ -950,6 +950,25 @@ export const setAgentMailThreadIdInternal = internalMutation({
   },
 });
 
+/**
+ * Internal mutation recording when the last payer-response alert email was
+ * dispatched to the claim owner. Used to digest rapid-fire inbound bursts
+ * into at most one non-victory alert per cooldown window.
+ */
+export const setLastPayerAlertAtInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    timestamp: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.claimId, {
+      lastPayerAlertAt: args.timestamp,
+    });
+    return null;
+  },
+});
+
 interface ScoringBreakdownItem {
   category: string;
   criterion: string;

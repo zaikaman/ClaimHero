@@ -391,7 +391,7 @@ Paragraph text with **bold** and *italic*.
       expect(result.error).toContain("Invalid timestamp header value");
     });
 
-    it("rejects expired timestamps exceeding tolerance window", async () => {
+    it("accepts authentic expired timestamps as stale for idempotent retry processing", async () => {
       const id = "msg_exp_1";
       const oldTimestamp = (Math.floor(Date.now() / 1000) - 400).toString(); // 400s old > 300s
       const signature = await computeSvixSignature(id, oldTimestamp, testPayload, testSecret);
@@ -407,8 +407,29 @@ Paragraph text with **bold** and *italic*.
         toleranceInSeconds: 300,
       });
 
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain("outside allowed tolerance");
+      expect(result.valid).toBe(true);
+      expect(result.stale).toBe(true);
+      expect(result.timestampAgeSec).toBeGreaterThan(300);
+    });
+
+    it("does not flag fresh timestamps as stale", async () => {
+      const id = "msg_fresh_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const signature = await computeSvixSignature(id, timestamp, testPayload, testSecret);
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,${signature}`,
+        },
+        secret: testSecret,
+        toleranceInSeconds: 300,
+      });
+
+      expect(result.valid).toBe(true);
+      expect(result.stale).toBeFalsy();
     });
 
     it("rejects future timestamps exceeding tolerance window", async () => {

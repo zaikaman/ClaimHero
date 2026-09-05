@@ -11,8 +11,15 @@ import {
   listAgentMailMessages,
   sendAgentMailMessage,
 } from "../lib/agentMail";
-import { extractEmailAddress, normalizeAgentMailWebhook } from "../lib/agentMailWebhook";
+import { extractEmailAddress, isInternalAgentMailAddress, normalizeAgentMailWebhook } from "../lib/agentMailWebhook";
 import { requireAuthUser } from "../lib/auth";
+
+/**
+ * Minimum interval between non-victory payer-response alert emails for the
+ * same claim. Rapid-fire inbound bursts (catch-up syncs, provider retries)
+ * are digested into a single alert; overturn victories always notify.
+ */
+const PAYER_ALERT_COOLDOWN_MS = 10 * 60 * 1000;
 
 /**
  * Binds a claim to the two real AgentMail identities provisioned for the app.
@@ -257,20 +264,30 @@ async function handleInboundClaimReply(
     const lowerSubject = subject.toLowerCase();
     const lowerBody = (normalized.text || normalized.html || "").toLowerCase();
 
-    // Detect system bounce / Delivery Status Notification / mailer-daemon / auto-responder or self-sent / alert loopback
+    // Detect system bounce / Delivery Status Notification / mailer-daemon / auto-responder or self-sent / alert loopback.
+    // isInternalAgentMailAddress additionally matches inbox IDs and any
+    // @agentmail.to sender, so internally generated mail can never be
+    // mistaken for a payer response even when mailbox env is unavailable.
     let sharedMailboxes;
     try {
       sharedMailboxes = getSharedAgentMailboxes();
     } catch {
       // Ignore if mailboxes not configured in test environment
     }
-    const ownSenderEmail = sharedMailboxes?.senderEmail?.toLowerCase();
-    const ownAdjudicatorEmail = sharedMailboxes?.adjudicatorEmail?.toLowerCase();
+    const ownIdentities = sharedMailboxes
+      ? {
+          senderEmail: sharedMailboxes.senderEmail,
+          adjudicatorEmail: sharedMailboxes.adjudicatorEmail,
+          senderInboxId: sharedMailboxes.senderInboxId,
+          adjudicatorInboxId: sharedMailboxes.adjudicatorInboxId,
+        }
+      : undefined;
     const senderClean = (extractEmailAddress(sender) || sender).toLowerCase();
 
     const isSelfSender =
-      (Boolean(ownSenderEmail) && (lowerFrom.includes(ownSenderEmail!) || senderClean === ownSenderEmail)) ||
-      (Boolean(ownAdjudicatorEmail) && (lowerFrom.includes(ownAdjudicatorEmail!) || senderClean === ownAdjudicatorEmail));
+      isInternalAgentMailAddress(lowerFrom, ownIdentities) ||
+      isInternalAgentMailAddress(senderClean, ownIdentities) ||
+      isInternalAgentMailAddress(normalized.from, ownIdentities);
 
     const isAlertMessage = lowerSubject.includes("[claimhero alert]") || isSelfSender;
 
@@ -725,7 +742,16 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
       userEmail = undefined;
     }
 
-    if (userEmail) {
+    // Digest rapid-fire inbound bursts into at most one non-victory alert per
+    // cooldown window per claim. Overturn victories always notify immediately.
+    const isVictoryAlert = determination === "OVERTURNED_APPROVED";
+    const lastAlertAt = matchingClaim.lastPayerAlertAt || 0;
+    const alertCooldownElapsed = Date.now() - lastAlertAt >= PAYER_ALERT_COOLDOWN_MS;
+    if (userEmail && !isVictoryAlert && !alertCooldownElapsed) {
+      console.log(
+        `Skipping payer alert for claim #${matchingClaim.claimNumber} (${determination}) within cooldown window`
+      );
+    } else if (userEmail) {
       try {
         const mailboxes = getSharedAgentMailboxes();
         const determinationHeadline =
@@ -762,6 +788,10 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
           text: alertText,
           html: alertHtml,
           ctx,
+        });
+        await ctx.runMutation(internal.claims.setLastPayerAlertAtInternal, {
+          claimId: matchingClaim._id,
+          timestamp: Date.now(),
         });
       } catch (notifyErr) {
         console.warn("User email notification dispatch bypassed (AgentMail not active or in test):", notifyErr);
@@ -841,7 +871,11 @@ async function performInboxSync(
         const isOwnInboxSender =
           (Boolean(ownSenderEmail) && (senderEmail === ownSenderEmail || fromStr.includes(ownSenderEmail!))) ||
           (Boolean(ownAdjudicatorEmail) && (senderEmail === ownAdjudicatorEmail || fromStr.includes(ownAdjudicatorEmail!))) ||
-          fromStr.includes(inboxId.toLowerCase());
+          fromStr.includes(inboxId.toLowerCase()) ||
+          isInternalAgentMailAddress(senderEmail, {
+            senderEmail: mailboxes.senderEmail,
+            adjudicatorEmail: mailboxes.adjudicatorEmail,
+          });
 
         const subjectStr = typeof msg.subject === "string" ? msg.subject.toLowerCase() : "";
         const isAlertSubject = subjectStr.includes("[claimhero alert]");

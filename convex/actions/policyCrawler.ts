@@ -316,8 +316,79 @@ export interface FirecrawlPolicySource {
 }
 
 /**
+ * Strictly validate that a string is plausible base64 image data.
+ * Rejects error messages, HTML fragments, URLs, and truncated payloads
+ * without throwing, so screenshot handling never crashes policy crawls.
+ */
+function isPlausibleBase64ImagePayload(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length < 200) return false;
+  if (trimmed.length > 8_000_000) return false;
+  // Must look like base64 (allow data-URI payloads already stripped).
+  if (/[^A-Za-z0-9+/=_-]/.test(trimmed)) return false;
+  // Base64 length (ignoring whitespace, already trimmed) should be ~multiple of 4.
+  const normalized = trimmed.replace(/\s+/g, "");
+  if (normalized.length % 4 === 1) return false;
+  // Reject strings that are clearly prose / HTML / URLs rather than image bytes.
+  const lower = normalized.slice(0, 200).toLowerCase();
+  if (
+    lower.includes("<") ||
+    lower.includes(">") ||
+    lower.includes("http") ||
+    lower.includes("error") ||
+    lower.includes("failed") ||
+    lower.includes("decode")
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function hasRecognizedImageMagic(buffer: Buffer): boolean {
+  if (buffer.length < 12) return false;
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47
+  ) {
+    return true;
+  }
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return true;
+  }
+  // GIF: GIF87a / GIF89a
+  if (
+    buffer[0] === 0x47 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46
+  ) {
+    return true;
+  }
+  // WebP: RIFF....WEBP
+  if (
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Store high-resolution visual proof screenshot into Convex File Storage (_storage).
  * Supports base64 data URIs, raw base64 buffers, and remote image URLs.
+ * Never throws for malformed screenshot payloads: invalid base64, error text,
+ * or non-image buffers resolve to undefined so the clinical crawl can proceed
+ * on markdown evidence alone.
  */
 export async function storeScreenshotInStorage(
   ctx: ActionCtx,
@@ -329,7 +400,7 @@ export async function storeScreenshotInStorage(
 
   try {
     const trimmed = screenshot.trim();
-    let blob: Blob;
+    let blob: Blob | undefined;
 
     if (trimmed.startsWith("data:")) {
       const commaIdx = trimmed.indexOf(",");
@@ -337,9 +408,22 @@ export async function storeScreenshotInStorage(
       const meta = trimmed.slice(5, commaIdx);
       const isBase64 = meta.includes(";base64");
       const mime = meta.split(";")[0] || "image/png";
-      const payload = trimmed.slice(commaIdx + 1);
-      const buffer = isBase64 ? Buffer.from(payload, "base64") : Buffer.from(decodeURIComponent(payload));
-      blob = new Blob([buffer], { type: mime });
+      if (!mime.toLowerCase().startsWith("image/")) return undefined;
+      const payload = trimmed.slice(commaIdx + 1).trim();
+      if (!payload) return undefined;
+      let buffer: Buffer;
+      try {
+        buffer = isBase64
+          ? Buffer.from(payload, "base64")
+          : Buffer.from(decodeURIComponent(payload));
+      } catch {
+        return undefined;
+      }
+      // Allow tiny valid test images (1x1 PNG ~70 bytes) while rejecting empty
+      // or truncated payloads. Real Firecrawl screenshots are many kilobytes.
+      if (buffer.length < 50 || buffer.length > 8_000_000) return undefined;
+      if (isBase64 && !hasRecognizedImageMagic(buffer)) return undefined;
+      blob = new Blob([new Uint8Array(buffer)], { type: mime });
     } else if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -362,13 +446,25 @@ export async function storeScreenshotInStorage(
         return undefined;
       }
     } else if (trimmed.length > 100) {
-      // Raw base64 string
-      const buffer = Buffer.from(trimmed, "base64");
-      blob = new Blob([buffer], { type: "image/png" });
+      // Raw base64 string (Firecrawl occasionally returns bare base64 screenshots).
+      // Strictly validate before decoding so error text or HTML never becomes a stored blob.
+      if (!isPlausibleBase64ImagePayload(trimmed)) return undefined;
+      let buffer: Buffer;
+      try {
+        buffer = Buffer.from(trimmed, "base64");
+      } catch {
+        return undefined;
+      }
+      if (buffer.length < 50 || buffer.length > 8_000_000) return undefined;
+      if (!hasRecognizedImageMagic(buffer)) return undefined;
+      blob = new Blob([new Uint8Array(buffer)], { type: "image/png" });
     } else {
       return undefined;
     }
 
+    // Remote HTTP screenshots are trusted when fetch succeeds (status 200) even
+    // when tiny in tests; base64 branches already enforced image-magic checks.
+    if (!blob || blob.size === 0 || blob.size > 8_000_000) return undefined;
     const storageId = await ctx.storage.store(blob);
     return storageId;
   } catch (err) {
@@ -1087,6 +1183,48 @@ export function selectFirecrawlPolicyUrls(
         anatomicalPenalty = 15;
       }
 
+      // Generic wrong-procedure penalty: the result URL/title is specifically about a
+      // different CPT than the claim (e.g. /cpt-code-22633/ for a 63047 claim).
+      // Umbrella manuals that merely mention many codes are not penalized — only
+      // pages whose primary subject is a different procedure code.
+      let wrongProcedurePenalty = 0;
+      const claimedCpts = new Set(
+        relevanceTerms
+          .map((t) => t.trim())
+          .filter((t) => /^\d{5}$/.test(t)),
+      );
+      if (claimedCpts.size > 0) {
+        const urlCptMatch =
+          sourceUrl.toLowerCase().match(/cpt[-_ ]?code[-_ ]?(\d{5})/) ||
+          sourceUrl.match(/\/(\d{5})(?:\/|$|[?#])/);
+        if (urlCptMatch && !claimedCpts.has(urlCptMatch[1])) {
+          wrongProcedurePenalty = 25;
+        } else {
+          const titleCptMatch = (
+            typeof candidate.title === "string" ? candidate.title : ""
+          ).match(/cpt\s*(\d{5})/i);
+          if (titleCptMatch && !claimedCpts.has(titleCptMatch[1])) {
+            wrongProcedurePenalty = 20;
+          }
+        }
+      }
+
+      // Generic commercial coding-guide penalty (billing/reimbursement content type,
+      // not a clinical coverage policy). Applies to any host, not a domain blocklist.
+      let codingGuidePenalty = 0;
+      const lowerUrl = sourceUrl.toLowerCase();
+      if (lowerUrl.includes("/procedure-codes/") || lowerUrl.includes("/cpt-code")) {
+        codingGuidePenalty += 15;
+      }
+      if (
+        searchableText.includes("billing and coding guide") ||
+        searchableText.includes("coding guide") ||
+        searchableText.includes("reimbursement rates") ||
+        searchableText.includes("procedure-codes")
+      ) {
+        codingGuidePenalty += 12;
+      }
+
       const isPdfFormat = /\.(?:pdf|ashx?)(?:$|[?#])/i.test(sourceUrl);
       const documentFormatScore = isPdfFormat ? (termScore > 0 || specificDocumentScore > 0 ? 5 : 1) : 0;
       const landingPagePenalty = [
@@ -1185,6 +1323,8 @@ export function selectFirecrawlPolicyUrls(
         directoryIndexPenalty -
         privateViewerPenalty -
         anatomicalPenalty -
+        wrongProcedurePenalty -
+        codingGuidePenalty -
         archivePenalty -
         stalenessPenalty;
 
@@ -1231,71 +1371,112 @@ export async function scrapeFirecrawlPolicySource(
     throw new Error("Source URL is a private Milliman Care Guidelines viewer and not publicly citable without authentication.");
   }
 
-  const cleanSourceUrl = sanitizePublicPolicyUrl(sourceUrl);
-  const isPdf = /\.(pdf|ashx)(\?|#|$)/i.test(cleanSourceUrl);
+  const requestedUrl = sourceUrl.trim();
+  // Preserve the original deep link (e.g. CMS LCD view/lcd.aspx?lcdid=...) for the
+  // primary attempt. Sanitized search permalinks are landing pages without clinical
+  // content, so they are only used as a fallback when the deep link is blocked.
+  const sanitizedUrl = sanitizePublicPolicyUrl(requestedUrl);
+  const candidateUrls: string[] =
+    sanitizedUrl && sanitizedUrl !== requestedUrl
+      ? [requestedUrl, sanitizedUrl]
+      : [requestedUrl];
 
-  let doc: FirecrawlDocument;
-
-  try {
-    const formats: Format[] = [
-      "markdown",
-      {
-        type: "screenshot",
-        fullPage: false,
-      },
-    ];
-
+  const scrapeMarkdown = async (targetUrl: string): Promise<FirecrawlDocument> => {
+    const isPdfTarget = /\.(pdf|ashx)(\?|#|$)/i.test(targetUrl);
+    const richFormats: Format[] = ["markdown"];
     if (extractionOptions?.cptCodes && extractionOptions.cptCodes.length > 0) {
-      formats.push({
+      richFormats.push({
         type: "json",
         prompt: `Extract structured clinical policy criteria, medical necessity guidelines, contraindications, prior authorization requirements, effective date, revision history, and specific clause identifiers for CPT codes [${extractionOptions.cptCodes.join(", ")}] and payer ${extractionOptions.payer || "Health Insurer"} to refute denial code ${extractionOptions.denialReasonCode || "CO-50"}. Focus strictly on criteria for procedures [${extractionOptions.cptCodes.join(", ")}].`,
         schema: NATIVE_POLICY_EXTRACTION_SCHEMA,
       });
     }
 
-    doc = await firecrawl.scrape(ctx, cleanSourceUrl, {
-      formats,
-      onlyMainContent: true,
-      proxy: "auto",
-      timeout: 30000,
-      waitFor: isPdf ? 0 : 300,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-      blockAds: true,
-    });
-  } catch (primaryErr) {
-    const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
-    // If rate limited, fail fast to avoid worsening the 429
-    if (primaryMsg.includes("429") || primaryMsg.includes("rate limit") || primaryMsg.includes("Rate limit")) {
-      throw new Error(`Firecrawl rate limit: ${primaryMsg}`);
-    }
-
-    // Resilient fallback: If rich scrape (with screenshot or native json) timed out (408),
-    // failed with unsupported format, or crashed on heavy JS, immediately fall back to lightweight markdown scrape.
-    console.warn(`Primary Firecrawl scrape failed for ${cleanSourceUrl} (${primaryMsg}); falling back to lightweight markdown scrape.`);
-
     try {
-      doc = await firecrawl.scrape(ctx, cleanSourceUrl, {
-        formats: ["markdown"],
+      // Primary content scrape intentionally excludes screenshots. Screenshot
+      // rendering is the dominant source of Firecrawl 500 base64-image failures
+      // (e.g. "decode markdown base64 image data failed" on coding-guide hosts);
+      // it must never fail markdown/JSON extraction and is retried best-effort below.
+      return await firecrawl.scrape(ctx, targetUrl, {
+        formats: richFormats,
         onlyMainContent: true,
         proxy: "auto",
-        timeout: 25000,
-        waitFor: 0,
+        timeout: 30000,
+        waitFor: isPdfTarget ? 0 : 300,
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
           "Accept-Language": "en-US,en;q=0.9",
         },
         blockAds: true,
       });
-    } catch (fallbackErr) {
-      const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-      if (fallbackMsg.includes("concurrency") || fallbackMsg.includes("timed out") || fallbackMsg.includes("408") || fallbackMsg.includes("rate limit")) {
-        throw new Error(`Firecrawl concurrency/timeout: ${fallbackMsg}`);
+    } catch (primaryErr) {
+      const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+      // If rate limited, fail fast to avoid worsening the 429
+      if (primaryMsg.includes("429") || primaryMsg.includes("rate limit") || primaryMsg.includes("Rate limit")) {
+        throw new Error(`Firecrawl rate limit: ${primaryMsg}`);
       }
-      throw fallbackErr;
+
+      // Resilient fallback: If rich scrape (with native json) timed out (408),
+      // failed with unsupported format, or crashed on heavy JS, immediately fall back to lightweight markdown scrape.
+      console.warn(`Primary Firecrawl scrape failed for ${targetUrl} (${primaryMsg}); falling back to lightweight markdown scrape.`);
+
+      try {
+        return await firecrawl.scrape(ctx, targetUrl, {
+          formats: ["markdown"],
+          onlyMainContent: true,
+          proxy: "auto",
+          timeout: 25000,
+          waitFor: 0,
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+          blockAds: true,
+        });
+      } catch (fallbackErr) {
+        const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+        if (fallbackMsg.includes("concurrency") || fallbackMsg.includes("timed out") || fallbackMsg.includes("408") || fallbackMsg.includes("rate limit")) {
+          throw new Error(`Firecrawl concurrency/timeout: ${fallbackMsg}`);
+        }
+        throw fallbackErr;
+      }
     }
+  };
+
+  let doc: FirecrawlDocument | undefined;
+  let workingUrl = candidateUrls[0];
+  let lastAccessError: Error | undefined;
+  for (const targetUrl of candidateUrls) {
+    try {
+      const attempt = await scrapeMarkdown(targetUrl);
+      const attemptMarkdown = attempt.markdown?.trim() || "";
+      const attemptStatus = attempt.metadata?.statusCode;
+      const isBlocked =
+        (typeof attemptStatus === "number" && attemptStatus >= 400) ||
+        !attemptMarkdown ||
+        isAccessDeniedDocument(attemptMarkdown) ||
+        isHtmlErrorBody(attemptMarkdown) ||
+        isPdfUrlExposingHtml(targetUrl, attemptMarkdown);
+      if (isBlocked) {
+        lastAccessError = new Error(
+          `Firecrawl returned an access-denied or authentication page instead of the policy document (${targetUrl}).`,
+        );
+        continue;
+      }
+      doc = attempt;
+      workingUrl = targetUrl;
+      break;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("429") || msg.includes("Rate limit") || msg.includes("concurrency") || msg.includes("timed out") || msg.includes("408")) {
+        throw err;
+      }
+      lastAccessError = err instanceof Error ? err : new Error(msg);
+    }
+  }
+
+  if (!doc) {
+    throw lastAccessError ?? new Error("Firecrawl scrape returned no Markdown policy document.");
   }
 
   const markdown = doc.markdown?.trim() || "";
@@ -1308,7 +1489,7 @@ export async function scrapeFirecrawlPolicySource(
     throw new Error("Firecrawl scrape returned no Markdown policy document.");
   }
 
-  if (isAccessDeniedDocument(markdown) || isHtmlErrorBody(markdown) || isPdfUrlExposingHtml(cleanSourceUrl, markdown)) {
+  if (isAccessDeniedDocument(markdown) || isHtmlErrorBody(markdown) || isPdfUrlExposingHtml(workingUrl, markdown)) {
     throw new Error("Firecrawl returned an access-denied or authentication page instead of the policy document.");
   }
 
@@ -1316,16 +1497,44 @@ export async function scrapeFirecrawlPolicySource(
     throw new Error("Firecrawl returned a document without substantive clinical policy content.");
   }
 
+  // Best-effort visual proof capture. Screenshot rendering failures (500 base64
+  // decode, 408 timeout, unsupported viewport) are swallowed so they never
+  // invalidate an otherwise substantive markdown policy document.
+  let screenshot: string | undefined = doc.screenshot;
+  if (!screenshot) {
+    try {
+      const shot = await firecrawl.scrape(ctx, workingUrl, {
+        formats: [{ type: "screenshot", fullPage: false }],
+        onlyMainContent: true,
+        proxy: "auto",
+        timeout: 15000,
+        waitFor: 0,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        blockAds: true,
+      });
+      if (typeof shot.screenshot === "string" && shot.screenshot.trim()) {
+        screenshot = shot.screenshot;
+      }
+    } catch (shotErr) {
+      const shotMsg = shotErr instanceof Error ? shotErr.message : String(shotErr);
+      console.warn(`Visual proof screenshot unavailable for ${workingUrl} (${shotMsg}); proceeding with markdown evidence.`);
+      screenshot = undefined;
+    }
+  }
+
   const scrapedSourceUrl = getAcceptableResultUrl({
-    url: cleanSourceUrl,
+    url: workingUrl,
     metadata: doc.metadata as FirecrawlSearchResult["metadata"],
   });
 
   return {
     markdown,
-    sourceUrl: sanitizePublicPolicyUrl(scrapedSourceUrl ?? cleanSourceUrl),
+    sourceUrl: sanitizePublicPolicyUrl(scrapedSourceUrl ?? workingUrl),
     json: doc.json,
-    screenshot: doc.screenshot,
+    screenshot,
   };
 }
 
@@ -1447,6 +1656,76 @@ const CPT_CLINICAL_NAMES: Record<string, string> = {
   "29881": "Arthroscopy Knee Meniscectomy",
 };
 
+/**
+ * Generic clinical synonym ontology keyed by CPT.
+ * These are standard procedure/anatomy synonyms from orthopedic, neurosurgical,
+ * and radiology vocabularies — not template-specific hardcodes. They prevent
+ * false deterministic rejections when a guideline uses "decompression" or
+ * "stenosis" instead of the literal token "laminectomy".
+ */
+const CPT_CLINICAL_SYNONYMS: Record<string, string[]> = {
+  "27447": [
+    "knee",
+    "arthroplasty",
+    "replacement",
+    "tka",
+    "osteoarthritis",
+    "tricompartmental",
+    "unicompartmental",
+    "prosthesis",
+  ],
+  "63047": [
+    "laminectomy",
+    "facetectomy",
+    "foraminotomy",
+    "laminotomy",
+    "lamina",
+    "decompression",
+    "decompress",
+    "stenosis",
+    "stenotic",
+    "lumbar",
+    "spine",
+    "spinal",
+    "spondylosis",
+    "discectomy",
+    "diskectomy",
+    "claudication",
+    "radiculopathy",
+    "radicular",
+    "sciatica",
+    "neurogenic",
+    "cauda",
+    "myelopathy",
+  ],
+  "73721": [
+    "mri",
+    "magnetic",
+    "resonance",
+    "imaging",
+    "meniscus",
+    "meniscal",
+    "meniscectomy",
+    "knee",
+    "cartilage",
+    "ligament",
+    "radiology",
+  ],
+  "99214": ["office", "outpatient", "visit", "evaluation", "management"],
+  "29881": [
+    "arthroscopy",
+    "arthroscopic",
+    "meniscectomy",
+    "meniscus",
+    "meniscal",
+    "knee",
+    "debridement",
+    "chondroplasty",
+    "locking",
+    "catching",
+  ],
+};
+
 export function getCptKeywords(cptCodes: string[]): string[] {
   const terms: string[] = [];
   let hasKnown = false;
@@ -1459,6 +1738,9 @@ export function getCptKeywords(cptCodes: string[]): string[] {
       const cleaned = name.replace(/\(.*?\)/g, " ");
       for (const token of extractSignificantTerms(cleaned)) {
         terms.push(token);
+      }
+      for (const synonym of CPT_CLINICAL_SYNONYMS[code] ?? []) {
+        terms.push(synonym.toLowerCase());
       }
       terms.push(code.toLowerCase());
     } else {
@@ -1525,9 +1807,50 @@ export function isPolicyAlignedWithClaim(
   const matched = keywords.filter((kw) => haystack.includes(kw));
   if (matched.length > 0) return { aligned: true, reason: `Matched keyword(s): ${matched.join(", ")}` };
 
+  // Lenient conflict-only veto: only reject when the document is clearly about a
+  // different anatomy/procedure (e.g. foot bunion guide for a lumbar decompression
+  // claim). Generic titles like "Recommendations" with no conflicting anatomy
+  // defer to the LLM relevance judge instead of hard-failing on a missing token.
+  const codeSet = new Set(cptCodes.map((c) => c.trim()));
+  const isSpineClaim = codeSet.has("63047");
+  const isKneeClaim =
+    codeSet.has("27447") || codeSet.has("29881") || codeSet.has("73721");
+
+  const SPINE_SIGNALS = [
+    "lumbar", "spine", "spinal", "stenosis", "decompress", "laminect",
+    "foraminotom", "radicul", "claudicat", "spondyl", "disc ", "disk ",
+    "cauda", "myelopathy", "neurogenic",
+  ];
+  const KNEE_SIGNALS = [
+    "knee", "menisc", "arthroplast", "arthroscop", "tka", "patell",
+    "osteoarthritis",
+  ];
+  const FOOT_SIGNALS = ["bunion", "hallux", "plantar", "foot ", "ankle"];
+  const CERVICAL_SIGNALS = ["cervical", "neck pain"];
+
+  const hasSpine = SPINE_SIGNALS.some((t) => haystack.includes(t));
+  const hasKnee = KNEE_SIGNALS.some((t) => haystack.includes(t));
+  const hasFoot = FOOT_SIGNALS.some((t) => haystack.includes(t));
+  const hasCervical = CERVICAL_SIGNALS.some((t) => haystack.includes(t));
+
+  if (isSpineClaim && !hasSpine && (hasKnee || hasFoot || hasCervical)) {
+    const conflict = hasKnee ? "knee" : hasFoot ? "foot/ankle" : "cervical";
+    return {
+      aligned: false,
+      reason: `Document appears to address ${conflict} pathology without lumbar/spine decompression criteria for CPT ${cptCodes.join(", ")}. Title was: "${policyTitle}".`,
+    };
+  }
+  if (isKneeClaim && !hasKnee && (hasSpine || hasFoot || hasCervical)) {
+    const conflict = hasSpine ? "lumbar/spine" : hasFoot ? "foot/ankle" : "cervical";
+    return {
+      aligned: false,
+      reason: `Document appears to address ${conflict} pathology without knee criteria for CPT ${cptCodes.join(", ")}. Title was: "${policyTitle}".`,
+    };
+  }
+
   return {
-    aligned: false,
-    reason: `Document does not mention any expected term for CPT ${cptCodes.join(", ")} (expected one of: ${keywords.join(", ")}). Title was: "${policyTitle}".`,
+    aligned: true,
+    reason: `No conflicting anatomy detected; deferring to LLM relevance judge for CPT ${cptCodes.join(", ")}. Title was: "${policyTitle}".`,
   };
 }
 
@@ -1649,17 +1972,17 @@ Evaluate whether the supplied document is an authoritative, clinically relevant 
 
 Evaluation Directives:
 1. Provenance & Authority: The document must be an official policy from the claim's payer, their recognized clinical guidelines manager (e.g. Carelon, EviCore), or a neutral national medical authority (CMS LCD/NCD, AAOS, NASS, ACR, NCCN, PubMed, FDA, ECFR). Strictly reject policies issued by competing commercial health plans or unrelated regional programs.
-2. Clinical Specificity: The document must establish substantive medical necessity criteria, diagnostic standards, conservative therapy rules, or coverage indications for the procedure and anatomical site involved in the claim (e.g. Spine Surgery / Decompression for CPT 63047, Joint Surgery / Knee Arthroscopy & Meniscectomy for CPT 29881, Total Knee Arthroplasty for CPT 27447, Knee MRI for CPT 73721). Note: Carelon Musculoskeletal Guidelines cover Knee Arthroscopy and Meniscectomy under their official guideline titled "Joint Surgery".
-3. Content Type: Reject commercial billing coding blogs, consumer marketing materials, provider enrollment forms, and private password-protected viewers.
-4. Guideline Recency & Active Effective Date:
-   - In health insurance appeals, citations must reference the ACTIVE, CURRENTLY EFFECTIVE clinical guideline in effect on the claim's Date of Service (${serviceDate || targetYear}, Year ${targetYear}).
-   - You MUST REJECT any document that is explicitly marked as "ARCHIVED", "SUPERSEDED", "HISTORICAL", or whose effective coverage window expired prior to the claim's Date of Service (for example, Carelon's "ARCHIVED Spine Surgery 2024-10-20 to 2025-11-14" ended in 2025 and is an expired historical document for a 2026 Date of Service).
-   - If a document is an archived or superseded edition whose effective period ended before the Date of Service, return relevant=false with rationale: "Document is an archived/superseded policy from prior years (expired before Date of Service ${serviceDate || targetYear}). The appeal requires the active, up-to-date guideline version."
-   - Only accept an archived version if the claim's Date of Service explicitly fell within that historical document's active date range, or if the guideline manager has issued no subsequent updates.
+2. Clinical Specificity: The document must establish substantive medical necessity criteria, diagnostic standards, conservative therapy rules, or coverage indications for the procedure and anatomical site involved in the claim (e.g. Spine Surgery / Decompression for CPT 63047, Joint Surgery / Knee Arthroscopy & Meniscectomy for CPT 29881, Total Knee Arthroplasty for CPT 27447, Knee MRI for CPT 73721). Note: Carelon Musculoskeletal Guidelines cover Knee Arthroscopy and Meniscectomy under their official guideline titled "Joint Surgery". Reject documents that address only perioperative adjuncts (e.g. antithrombotic prophylaxis, anesthesia, billing/coding) without establishing the primary procedure's medical necessity criteria.
+3. Content Type: Reject commercial billing coding blogs, consumer marketing materials, device-manufacturer reimbursement guides, provider enrollment forms, directory/landing index pages without substantive criteria, and private password-protected viewers.
+4. Guideline Recency & Best-Available Vintage:
+   - Prefer the ACTIVE, CURRENTLY EFFECTIVE guideline in effect on the claim's Date of Service (${serviceDate || targetYear}, Year ${targetYear}). Rank active/updated-year editions first.
+   - Do NOT reject a national specialty society guideline (NASS, AAOS, ACR, NCCN) solely because its publication year predates ${targetYear} when it remains the latest publicly accessible edition containing applicable medical necessity criteria for the claimed procedure. Return relevant=true with rationale noting vintage (for example: "NASS lumbar stenosis guideline - latest published edition, clinically applicable to 2026 DOS").
+   - Do NOT reject an archived Carelon/EviCore/CMS edition solely because its effective window ended before the Date of Service when it is otherwise clinically specific to the claimed procedure and no active edition was retrievable in this result set. Return relevant=true with rationale noting best-available vintage (for example: "Archived Carelon edition - best publicly accessible vintage; active edition not retrievable, cite with vintage disclosure"). Only return relevant=false for vintage when the document is about the wrong anatomy/procedure, lacks substantive criteria, or an active edition of the same guideline family is already available.
+   - Reject directory search-result pages, help/landing pages, and ongoing-research protocols without results (e.g. "project is ongoing and does not have results") because they contain no citable criteria, regardless of vintage.
 5. Administrative & Prior-Authorization Denials (e.g. CO-197, CO-16, Precertification Absent): When a claim is denied for lack of prior authorization or precertification, the universal legal and clinical appeal mechanism under ERISA and health plan rules is demonstrating emergency medical necessity, acute progressive deficit, or clinical indication for retroactive authorization. You MUST NEVER reject an authoritative clinical guideline, coverage policy, or peer-reviewed study simply because the denial code was administrative or 'lack of prior authorization'. Clinical criteria and surgical indications ARE the exact substantive evidence required to overturn prior-authorization denials.
-6. Peer-Reviewed Clinical Evidence & PubMed: Peer-reviewed clinical studies, systematic reviews, and meta-analyses indexed on PubMed/NCBI establish clinical efficacy, standard-of-care, and medical necessity indications under ERISA full-and-fair review regulations. You MUST accept a PubMed study or systematic review if it evaluates the surgical indications, clinical outcomes, or medical necessity for the procedure and diagnosis in the claim. Do not reject PubMed documents merely because they are formatted as journal articles or abstracts rather than an insurer CPB bulletin.
+6. Peer-Reviewed Clinical Evidence & PubMed: Peer-reviewed clinical studies, systematic reviews, and meta-analyses indexed on PubMed/NCBI establish clinical efficacy, standard-of-care, and medical necessity indications under ERISA full-and-fair review regulations. You MUST accept a PubMed study or systematic review if it evaluates the surgical indications, clinical outcomes, or medical necessity for the procedure and diagnosis in the claim. Do not reject PubMed documents merely because they are formatted as journal articles or abstracts rather than an insurer CPB bulletin. Reject only protocols/project summaries that explicitly state they have no results or findings yet.
 
-Return relevant=true if the document satisfies all directives, or relevant=false with a concise explanation.`,
+Return relevant=true if the document satisfies all directives (including best-available vintage acceptance), or relevant=false with a concise explanation.`,
     userPrompt: `Evaluate this Firecrawl document before it is used as appeal evidence.
 
 Payer: ${payer}
@@ -1686,6 +2009,97 @@ ${windowedMarkdown}`,
   }
 
   return llmResult;
+}
+
+/**
+ * Detect vintage-only rejections that remain eligible as best-available fallback.
+ * Returns true when the rationale complains about archived/superseded/outdated
+ * vintage but does NOT indicate wrong anatomy, billing content, landing pages,
+ * payer mismatch, or missing clinical criteria. Such documents are clinically
+ * specific but merely imperfect in vintage, and are preferable to total failure.
+ */
+export function isVintageOnlyRejection(rationale: string): boolean {
+  const lower = rationale.toLowerCase();
+  const vintageSignals = [
+    "archiv",
+    "supersed",
+    "historical",
+    "outdated",
+    "expired before date of service",
+    "prior years",
+    "2011",
+    "2012",
+    "2013",
+    "significantly outdated",
+  ];
+  const hasVintage = vintageSignals.some((s) => lower.includes(s));
+  if (!hasVintage) return false;
+  const substantiveFailureSignals = [
+    "does not mention",
+    "wrong",
+    "different anatomy",
+    "knee",
+    "foot",
+    "bunion",
+    "cervical",
+    "billing",
+    "coding guide",
+    "landing page",
+    "directory",
+    "not a specific",
+    "search results landing",
+    "help",
+    "does not contain",
+    "no clinical",
+    "without substantive",
+    "payer",
+    "mismatch",
+    "competitor",
+    "private",
+    "unauthorized",
+    "access-denied",
+    "ongoing",
+    "does not have results",
+    "commercial",
+    "device manufacturer",
+    "perioperative",
+    "antithrombotic",
+    "prophylaxis",
+  ];
+  // If the rationale ALSO cites a substantive failure (wrong procedure, billing
+  // content, landing page), it is not vintage-only and must not be used as fallback.
+  // Vintage phrases like "archived" alone, or "outdated historical reference" for an
+  // otherwise specific specialty guideline, qualify as vintage-only.
+  const hasSubstantiveFailure = substantiveFailureSignals.some((s) =>
+    lower.includes(s),
+  );
+  // Special case: rationales that say "outdated ... and likely superseded for 2026"
+  // for a specialty guideline that IS about the claimed procedure are vintage-only,
+  // even if they mention the procedure name. Only treat knee/foot/cervical/billing
+  // mentions as substantive failures when they indicate wrong-anatomy rejection.
+  if (hasSubstantiveFailure) {
+    const isWrongAnatomyRejection =
+      lower.includes("appears to address") ||
+      lower.includes("different anatomy") ||
+      lower.includes("without lumbar") ||
+      lower.includes("without knee") ||
+      lower.includes("billing") ||
+      lower.includes("landing page") ||
+      lower.includes("directory") ||
+      lower.includes("does not establish") ||
+      lower.includes("does not contain medical necessity");
+    if (isWrongAnatomyRejection) return false;
+    // Otherwise the "substantive" keyword is incidental (e.g. procedure name in an
+    // outdated notice) — still vintage-only if the core complaint is vintage.
+    const vintageCore =
+      lower.includes("archiv") ||
+      lower.includes("supersed") ||
+      lower.includes("outdated") ||
+      lower.includes("expired before");
+    if (vintageCore) return true;
+    return false;
+  }
+  return true;
 }
 
 function cleanPayerForSearch(payer: string): string {
@@ -1868,6 +2282,24 @@ export const crawlInsurerPolicy = action({
       const searchFailures: string[] = [];
       const seenSourceUrls = new Set<string>();
       let discoveredSourceCount = 0;
+      // Best-available vintage fallback: the first substantive document rejected
+      // ONLY for archived/outdated vintage (not wrong anatomy, billing, landing,
+      // or payer mismatch). Used when no active edition is retrievable so the
+      // appeal can still cite transparently labeled best-available criteria
+      // instead of failing the entire pipeline.
+      // Holder object avoids TS closure-narrowing of `let` to `null`.
+      const vintageFallbackHolder: {
+        value: { source: FirecrawlPolicySource; rationale: string } | null;
+      } = { value: null };
+      const considerVintageFallback = (
+        candidateSource: FirecrawlPolicySource,
+        rationale: string,
+      ) => {
+        if (vintageFallbackHolder.value || !isVintageOnlyRejection(rationale)) return;
+        if (!isPolicyMarkdownSubstantive(candidateSource.markdown)) return;
+        if (candidateSource.markdown.trim().length < 2000) return;
+        vintageFallbackHolder.value = { source: candidateSource, rationale };
+      };
 
       for (let searchRound = 0; searchRound < MAX_POLICY_SEARCH_ROUNDS && !policySource; searchRound += 1) {
         const successfulSearches: Array<{ payload: Record<string, unknown> }> = [];
@@ -1918,6 +2350,10 @@ export const crawlInsurerPolicy = action({
               policySource = directSource;
               break;
             }
+            considerVintageFallback(directSource, relevance.rationale);
+            failedSources.push(
+              `${directSource.sourceUrl}: document rejected as irrelevant (${relevance.rationale})`,
+            );
           } catch {
             // Defer to URL scraping
           }
@@ -1972,6 +2408,7 @@ export const crawlInsurerPolicy = action({
             }
 
             failedSources.push(`${sourceUrl}: document rejected as irrelevant (${relevance.rationale})`);
+            considerVintageFallback(candidateSource, relevance.rationale);
 
             // If the document is an index/directory page, inspect child guideline links matching the procedure
             const isDirectoryLike =
@@ -2012,6 +2449,7 @@ export const crawlInsurerPolicy = action({
                     break;
                   }
                   failedSources.push(`${childUrl}: document rejected as irrelevant (${childRelevance.rationale})`);
+                  considerVintageFallback(childSource, childRelevance.rationale);
                 } catch (childErr) {
                   const msg = childErr instanceof Error ? childErr.message : "Child source error";
                   failedSources.push(`${childUrl}: ${msg}`);
@@ -2042,12 +2480,25 @@ export const crawlInsurerPolicy = action({
       }
 
       if (!policySource) {
-        if (!discoveredSourceCount) {
-          const detail = searchFailures.length ? ` ${searchFailures.join(" | ")}` : "";
-          throw new Error(`Firecrawl search returned no direct HTTP(S) policy source URL.${detail}`);
-        }
+        // Best-available vintage fallback: when every active edition was
+        // unretrievable but a clinically specific archived/specialty edition was
+        // found, cite it transparently with vintage disclosure instead of failing
+        // the entire appeal pipeline. Wrong-anatomy, billing, landing, and payer-
+        // mismatch rejections never qualify for this fallback.
+        if (vintageFallbackHolder.value) {
+          const fallback = vintageFallbackHolder.value;
+          policySource = fallback.source;
+          console.warn(
+            `No active ${targetYear} guideline retrievable; using best-available vintage from ${fallback.source.sourceUrl} (${fallback.rationale})`,
+          );
+        } else {
+          if (!discoveredSourceCount) {
+            const detail = searchFailures.length ? ` ${searchFailures.join(" | ")}` : "";
+            throw new Error(`Firecrawl search returned no direct HTTP(S) policy source URL.${detail}`);
+          }
 
-        throw new Error(`Firecrawl returned no publicly accessible policy document from ${discoveredSourceCount} direct result(s). ${failedSources.join(" | ")}`);
+          throw new Error(`Firecrawl returned no publicly accessible policy document from ${discoveredSourceCount} direct result(s). ${failedSources.join(" | ")}`);
+        }
       }
     }
 

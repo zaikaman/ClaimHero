@@ -41,12 +41,38 @@ http.route({
       });
 
       if (!verification.valid) {
+        // Structured server-side diagnostics (never log secrets or signature
+        // material) so repeated 401s can be attributed from prod logs.
+        const svixId = request.headers.get("svix-id") || request.headers.get("webhook-id");
+        const svixTimestamp = request.headers.get("svix-timestamp") || request.headers.get("webhook-timestamp");
+        const svixSignature = request.headers.get("svix-signature") || request.headers.get("webhook-signature");
+        let timestampAgeSec: number | undefined;
+        const parsedTimestamp = svixTimestamp ? parseInt(svixTimestamp, 10) : NaN;
+        if (!isNaN(parsedTimestamp)) {
+          timestampAgeSec = Math.floor(Date.now() / 1000) - parsedTimestamp;
+        }
+        console.warn(
+          `AgentMail webhook rejected: ${verification.error || "Invalid webhook signature"}` +
+            ` hasId=${Boolean(svixId)} hasTimestamp=${Boolean(svixTimestamp)}` +
+            ` hasSignature=${Boolean(svixSignature)}` +
+            ` timestampAgeSec=${timestampAgeSec ?? "unknown"}` +
+            ` payloadBytes=${rawPayload.length}`
+        );
         return new Response(
           JSON.stringify({ error: verification.error || "Invalid webhook signature" }),
           {
             status: 401,
             headers: { "Content-Type": "application/json" },
           }
+        );
+      }
+
+      if (verification.stale) {
+        // Authentic provider retry (or late first delivery) reusing the
+        // original timestamp. The downstream pipeline is idempotent on
+        // AgentMail message ID, so process normally and acknowledge.
+        console.log(
+          `AgentMail webhook accepted stale retry timestampAgeSec=${verification.timestampAgeSec ?? "unknown"} payloadBytes=${rawPayload.length}`
         );
       }
 
