@@ -51,10 +51,13 @@ http.route({
         if (!isNaN(parsedTimestamp)) {
           timestampAgeSec = Math.floor(Date.now() / 1000) - parsedTimestamp;
         }
+        const sigCount = svixSignature
+          ? (svixSignature.match(/(?:^|[\s,;])v1,/g) || []).length
+          : 0;
         console.warn(
           `AgentMail webhook rejected: ${verification.error || "Invalid webhook signature"}` +
             ` hasId=${Boolean(svixId)} hasTimestamp=${Boolean(svixTimestamp)}` +
-            ` hasSignature=${Boolean(svixSignature)}` +
+            ` hasSignature=${Boolean(svixSignature)} sigCount=${sigCount}` +
             ` timestampAgeSec=${timestampAgeSec ?? "unknown"}` +
             ` payloadBytes=${rawPayload.length}`
         );

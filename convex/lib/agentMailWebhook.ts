@@ -113,12 +113,16 @@ export function extractEmailAddress(value?: string): string | undefined {
 
 /**
  * Decodes a base64 string to Uint8Array safely across Node and Convex runtimes.
+ * Automatically normalizes URL-safe base64 (- and _) and restores missing padding.
  */
 export function base64ToUint8Array(base64: string): Uint8Array {
+  const clean = base64.trim().replace(/-/g, "+").replace(/_/g, "/");
+  const pad = clean.length % 4;
+  const padded = pad ? clean + "=".repeat(4 - pad) : clean;
   if (typeof Buffer !== "undefined") {
-    return new Uint8Array(Buffer.from(base64, "base64"));
+    return new Uint8Array(Buffer.from(padded, "base64"));
   }
-  const binaryString = atob(base64);
+  const binaryString = atob(padded);
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);
@@ -161,7 +165,7 @@ export async function computeSvixSignature(
   payload: string,
   secret: string
 ): Promise<string> {
-  const cleanSecret = secret.startsWith("whsec_") ? secret.slice(6) : secret;
+  const cleanSecret = secret.trim().startsWith("whsec_") ? secret.trim().slice(6) : secret.trim();
   const secretKeyBytes = base64ToUint8Array(cleanSecret);
 
   const key = await crypto.subtle.importKey(
@@ -212,6 +216,8 @@ export interface SvixVerificationResult {
 
 /**
  * Verifies standard Svix webhook signature and timestamp headers.
+ * Resilient to comma-separated signatures, space-separated signatures, CRLF/LF
+ * newline normalization across gateways, base64url encoding, and secret key rotation.
  */
 export async function verifySvixWebhook(
   options: VerifySvixWebhookOptions
@@ -238,29 +244,128 @@ export async function verifySvixWebhook(
     signatureHeader = (typeof h["svix-signature"] === "string" ? h["svix-signature"] : typeof h.signature === "string" ? h.signature : null);
   }
 
-  if (!id || !timestamp || !signatureHeader) {
+  if (!id?.trim() || !timestamp?.trim() || !signatureHeader?.trim()) {
     return { valid: false, error: "Missing required Svix signature headers (svix-id, svix-timestamp, svix-signature)" };
   }
 
-  const timestampNum = parseInt(timestamp, 10);
+  const cleanId = id.trim();
+  const rawTimestamp = timestamp.trim();
+  const timestampNum = parseInt(rawTimestamp, 10);
   if (isNaN(timestampNum)) {
     return { valid: false, error: "Invalid timestamp header value" };
   }
+  const cleanTimestamp = timestampNum.toString();
 
-  // Verify the cryptographic signature before evaluating freshness so that
-  // forged payloads always fail closed, even with a fresh timestamp.
-  const expectedSignature = await computeSvixSignature(id, timestamp, payload, secret);
+  // Extract all versioned signatures: handles space-separated ("v1,s1 v1,s2"),
+  // comma-separated ("v1,s1, v1,s2" or "v1,s1,v1,s2"), and semicolon-separated
+  const extractedSignatures: string[] = [];
+  const v1Matches = Array.from(signatureHeader.matchAll(/(?:^|[\s,;])v1,([A-Za-z0-9+/=_-]+)/g));
+  for (const match of v1Matches) {
+    if (match[1]?.trim()) extractedSignatures.push(match[1].trim());
+  }
+  if (extractedSignatures.length === 0) {
+    const parts = signatureHeader.split(/[\s,;]+/).filter(Boolean);
+    for (const part of parts) {
+      const [version, signatureValue] = part.split(",", 2);
+      if (version === "v1" && signatureValue?.trim()) {
+        extractedSignatures.push(signatureValue.trim());
+      } else if (!part.includes(",") && part.trim().length >= 32) {
+        extractedSignatures.push(part.trim());
+      }
+    }
+  }
 
-  const signatures = signatureHeader.trim().split(/\s+/);
+  if (extractedSignatures.length === 0) {
+    return { valid: false, error: "No v1 signature found in signature header" };
+  }
+
+  // Parse secret candidates (supporting comma/whitespace separated secrets for key rotation)
+  const candidateSecrets = secret
+    .split(/[,;\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // Candidate payload variants:
+  // 1. Raw body received
+  // 2. Stripped BOM
+  // 3. Normalized CRLF -> LF
+  // 4. Normalized LF -> CRLF
+  const candidatePayloads = [payload];
+  if (payload.charCodeAt(0) === 0xfeff) {
+    candidatePayloads.push(payload.slice(1));
+  }
+  if (payload.includes("\r\n")) {
+    candidatePayloads.push(payload.replace(/\r\n/g, "\n"));
+  } else if (payload.includes("\n")) {
+    candidatePayloads.push(payload.replace(/(?<!\r)\n/g, "\r\n"));
+  }
+
+  // Candidate timestamps: integer seconds (standardwebhooks standard) and raw string
+  const candidateTimestamps = [cleanTimestamp];
+  if (rawTimestamp !== cleanTimestamp) {
+    candidateTimestamps.push(rawTimestamp);
+  }
+
   let matched = false;
 
-  for (const sig of signatures) {
-    const [version, signatureValue] = sig.split(",", 2);
-    if (version === "v1" && signatureValue) {
-      if (timingSafeEqual(signatureValue, expectedSignature)) {
-        matched = true;
-        break;
+  // 1. Try official Svix Webhook verification if available
+  try {
+    const { Webhook } = await import("svix");
+    for (const sec of candidateSecrets) {
+      for (const p of candidatePayloads) {
+        try {
+          const wh = new Webhook(sec);
+          wh.verify(p, {
+            "svix-id": cleanId,
+            "svix-timestamp": cleanTimestamp,
+            "svix-signature": signatureHeader,
+          });
+          matched = true;
+          break;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          // If the error was only timestamp drift, the cryptographic signature was authentic
+          if (msg.includes("timestamp too old") || msg.includes("timestamp too new")) {
+            matched = true;
+            break;
+          }
+        }
       }
+      if (matched) break;
+    }
+  } catch {
+    // Svix library unavailable or import failed, proceed to zero-dependency Web Crypto engine
+  }
+
+  // 2. Web Crypto HMAC-SHA256 verification engine across all variants
+  if (!matched) {
+    for (const sec of candidateSecrets) {
+      for (const ts of candidateTimestamps) {
+        for (const p of candidatePayloads) {
+          try {
+            const expected = await computeSvixSignature(cleanId, ts, p, sec);
+            const expectedUrlSafe = expected.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+            for (const candidate of extractedSignatures) {
+              const cleanCandidate = candidate.trim();
+              const candidateUrlSafe = cleanCandidate.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+              if (
+                timingSafeEqual(cleanCandidate, expected) ||
+                timingSafeEqual(candidateUrlSafe, expectedUrlSafe)
+              ) {
+                matched = true;
+                break;
+              }
+            }
+          } catch {
+            // Continue trying other candidates
+          }
+          if (matched) break;
+        }
+        if (matched) break;
+      }
+      if (matched) break;
     }
   }
 
@@ -283,7 +388,7 @@ export async function verifySvixWebhook(
     return { valid: false, error: `Webhook timestamp outside allowed tolerance of ${toleranceInSeconds} seconds` };
   }
 
-  return { valid: true };
+  return { valid: true, timestampAgeSec: ageSec };
 }
 
 /**

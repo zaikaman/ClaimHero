@@ -262,6 +262,29 @@ Paragraph text with **bold** and *italic*.
       expect(timingSafeEqual("short", "longer")).toBe(false);
     });
 
+    it("matches official Svix library signature generation", async () => {
+      const { Webhook } = await import("svix");
+      const id = "msg_svix_match_1";
+      const timestampSec = 1725547800;
+      const timestamp = new Date(timestampSec * 1000);
+      const testSecretVal = "whsec_zvG3NhT9Ab+65YeeFBB/g4oPTEEFNOPR";
+      const wh = new Webhook(testSecretVal);
+      const officialSig = wh.sign(id, timestamp, testPayload);
+
+      const ourSig = await computeSvixSignature(id, timestampSec.toString(), testPayload, testSecretVal);
+      expect(`v1,${ourSig}`).toBe(officialSig);
+
+      // Complex payload with unicode, quotes, newlines, HTML
+      const complexPayload = JSON.stringify({
+        text: "Middle dot: · and quotes: “hello” and emoji 🩺 and newlines:\r\nline2\nline3\t",
+        html: "<p>Special chars & < > \" ' / </p>",
+        longString: "a".repeat(15000),
+      });
+      const complexOfficialSig = wh.sign(id, timestamp, complexPayload);
+      const complexOurSig = await computeSvixSignature(id, timestampSec.toString(), complexPayload, testSecretVal);
+      expect(`v1,${complexOurSig}`).toBe(complexOfficialSig);
+    });
+
     it("verifies a valid Svix signature with whsec_ prefixed secret", async () => {
       const id = "msg_pld_1";
       const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -475,7 +498,129 @@ Paragraph text with **bold** and *italic*.
       expect(result.valid).toBe(false);
       expect(result.error).toBe("Signature verification failed");
     });
+
+    it("verifies comma-separated and mixed-delimiter multiple signatures", async () => {
+      const id = "msg_comma_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const signature = await computeSvixSignature(id, timestamp, testPayload, testSecret);
+
+      // Comma-space separated: "v1,old_sig, v1,<valid>"
+      const resultCommaSpace = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,dGVzdF9pbnZhbGlkX3NpZ25hdHVyZV8xMjM=, v1,${signature}`,
+        },
+        secret: testSecret,
+      });
+      expect(resultCommaSpace.valid).toBe(true);
+
+      // Comma-only separated: "v1,old_sig,v1,<valid>"
+      const resultCommaOnly = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,dGVzdF9pbnZhbGlkX3NpZ25hdHVyZV8xMjM=,v1,${signature}`,
+        },
+        secret: testSecret,
+      });
+      expect(resultCommaOnly.valid).toBe(true);
+    });
+
+    it("verifies payloads normalized across CRLF and LF gateway transformations", async () => {
+      const id = "msg_crlf_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+
+      // Original signer signed CRLF text
+      const signedPayload = '{\r\n  "event": "message.received",\r\n  "bytes": 13118\r\n}';
+      const signature = await computeSvixSignature(id, timestamp, signedPayload, testSecret);
+
+      // Gateway/proxy converted CRLF to LF
+      const receivedPayload = '{\n  "event": "message.received",\n  "bytes": 13118\n}';
+
+      const result = await verifySvixWebhook({
+        payload: receivedPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,${signature}`,
+        },
+        secret: testSecret,
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it("verifies base64url and unpadded signatures", async () => {
+      const id = "msg_b64url_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const rawSig = await computeSvixSignature(id, timestamp, testPayload, testSecret);
+      const b64urlSig = rawSig.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,${b64urlSig}`,
+        },
+        secret: testSecret,
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it("verifies signatures during secret key rotation with comma-separated secrets", async () => {
+      const id = "msg_rotate_sec_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const oldSecret = "whsec_Mf8392Hf938HFN39fj398FJN398f==";
+      const currentSecret = testSecret;
+      const combinedSecret = `${oldSecret}, ${currentSecret}`;
+
+      const sigWithCurrent = await computeSvixSignature(id, timestamp, testPayload, currentSecret);
+      const resultCurrent = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,${sigWithCurrent}`,
+        },
+        secret: combinedSecret,
+      });
+      expect(resultCurrent.valid).toBe(true);
+
+      const sigWithOld = await computeSvixSignature(id, timestamp, testPayload, oldSecret);
+      const resultOld = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,${sigWithOld}`,
+        },
+        secret: combinedSecret,
+      });
+      expect(resultOld.valid).toBe(true);
+    });
+
+    it("normalizes decimal timestamp headers", async () => {
+      const id = "msg_dec_ts_1";
+      const timestampSec = Math.floor(Date.now() / 1000);
+      const decimalTimestamp = `${timestampSec}.842`;
+      const signature = await computeSvixSignature(id, timestampSec.toString(), testPayload, testSecret);
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": decimalTimestamp,
+          "svix-signature": `v1,${signature}`,
+        },
+        secret: testSecret,
+      });
+      expect(result.valid).toBe(true);
+    });
   });
+
 
   describe("Inbound Claim Matching & Free-Tier Intake Inbox Routing", () => {
     it("correctly matches free-tier intake claims (userId: undefined) by claimNumber in subject or body", () => {
