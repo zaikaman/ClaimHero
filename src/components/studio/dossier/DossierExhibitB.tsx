@@ -40,6 +40,81 @@ export const DossierExhibitB: React.FC<DossierExhibitBProps> = ({
         Cross-examination of {dossier.payerName}&apos;s published Clinical Policy Bulletins (CPBs) and coverage guidelines against the claimant&apos;s substantiated clinical record. Highlighted sections demonstrate explicit compliance with coverage criteria and establish payer criteria misapplication.
       </p>
 
+      {/* Visual Proof & Audit Archive Exhibit (Rendered once per bulletin) */}
+      {(() => {
+        const primaryProof = items.find(
+          (item) => item.screenshotUrl || item.screenshotStorageId
+        );
+        if (!primaryProof) return null;
+
+        return (
+          <div className="p-3.5 rounded bg-blue-50/70 border border-blue-200 text-slate-900 space-y-2 [page-break-inside:avoid] [break-inside:avoid]">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-[11.5px] font-bold text-blue-950">
+                <span className="inline-flex size-2 rounded-full bg-blue-600 animate-pulse" />
+                <span>Visual Proof Exhibit: Payer Clinical Policy Bulletin Verification</span>
+              </div>
+              <span className="font-mono text-[10px] text-blue-900 bg-blue-100 px-1.5 py-0.5 rounded font-semibold">
+                Verified Policy Capture
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-700 leading-normal">
+              Immutable visual archive of the official coverage bulletin captured at the time of clinical verification. Preserves published policy metadata (Document ID, effective date, and review history) against retrospective administrative alteration or deprecation.
+            </p>
+
+            {primaryProof.screenshotUrl && (
+              <div className="pt-1 space-y-2">
+                <div className="relative rounded-lg overflow-hidden border border-blue-200 bg-slate-900 group max-h-60 sm:max-h-72">
+                  <img
+                    src={primaryProof.screenshotUrl}
+                    alt={`Visual Policy Exhibit: ${primaryProof.title}`}
+                    className="w-full h-auto object-cover object-top hover:scale-[1.01] transition-transform duration-200"
+                    loading="lazy"
+                  />
+                  {!isPrintMode && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-3">
+                      <span className="text-[11px] text-white/90 font-medium">
+                        Policy Bulletin Capture
+                      </span>
+                      <a
+                        href={primaryProof.screenshotUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-md shadow-md transition-colors"
+                      >
+                        <ArrowSquareOut className="size-3.5" />
+                        <span>Inspect Full Resolution</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {!isPrintMode && (
+                  <div className="flex items-center justify-between pt-0.5">
+                    <a
+                      href={primaryProof.screenshotUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-blue-700 hover:text-blue-900 transition-colors"
+                    >
+                      <ArrowSquareOut className="size-3.5" />
+                      <span>Open Full Image in New Tab</span>
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {primaryProof.screenshotStorageId && (
+              <div className="text-[10px] font-mono text-slate-500">
+                Convex Storage Reference: {primaryProof.screenshotStorageId}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* List of CPB Items */}
       <div className="space-y-4">
         {items.map((item, idx) => (
@@ -108,74 +183,6 @@ export const DossierExhibitB: React.FC<DossierExhibitBProps> = ({
                     </li>
                   ))}
                 </ul>
-              </div>
-            )}
-
-            {/* Visual Proof & Audit Archive Exhibit (Full-Page Scraped Screenshot) */}
-            {(item.screenshotUrl || item.screenshotStorageId) && (
-              <div className="p-3 rounded bg-blue-50/70 border border-blue-200 text-slate-900 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 text-[11.5px] font-bold text-blue-950">
-                    <span className="inline-flex size-2 rounded-full bg-blue-600 animate-pulse" />
-                    <span>Visual Proof Exhibit: Proof of Policy on Date of Service</span>
-                  </div>
-                  <span className="font-mono text-[10px] text-blue-900 bg-blue-100 px-1.5 py-0.5 rounded font-semibold">
-                    Verified Full-Page Capture
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-slate-700 leading-normal">
-                  Immutable visual archive captured at the time of clinical verification to preserve the insurer&apos;s active coverage bulletin against retrospective alterations or administrative deprecation.
-                </p>
-
-                {item.screenshotUrl && (
-                  <div className="pt-2 space-y-2">
-                    <div className="relative rounded-lg overflow-hidden border border-blue-200 bg-slate-900 group max-h-60 sm:max-h-72">
-                      <img
-                        src={item.screenshotUrl}
-                        alt={`Visual Policy Exhibit: ${item.title}`}
-                        className="w-full h-auto object-cover object-top hover:scale-[1.01] transition-transform duration-200"
-                        loading="lazy"
-                      />
-                      {!isPrintMode && (
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-3">
-                          <span className="text-[11px] text-white/90 font-medium">
-                            Full-Page Visual Capture
-                          </span>
-                          <a
-                            href={item.screenshotUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-md shadow-md transition-colors"
-                          >
-                            <ArrowSquareOut className="size-3.5" />
-                            <span>Inspect Full Resolution</span>
-                          </a>
-                        </div>
-                      )}
-                    </div>
-
-                    {!isPrintMode && (
-                      <div className="flex items-center justify-between pt-0.5">
-                        <a
-                          href={item.screenshotUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-blue-700 hover:text-blue-900 transition-colors"
-                        >
-                          <ArrowSquareOut className="size-3.5" />
-                          <span>Open Full Image in New Tab</span>
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {item.screenshotStorageId && (
-                  <div className="text-[10px] font-mono text-slate-500">
-                    Convex Storage Reference: {item.screenshotStorageId}
-                  </div>
-                )}
               </div>
             )}
           </div>

@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { storeScreenshotInStorage } from "../convex/actions/policyCrawler";
+import {
+  storeScreenshotInStorage,
+  isCarelonGuidelineUrl,
+  extractScreenshotFromDoc,
+  scrapeFirecrawlPolicySource,
+} from "../convex/actions/policyCrawler";
 import * as clinicalEvidences from "../convex/clinicalEvidences";
 import { buildDossierData, generatePlainTextDossier } from "../src/lib/dossierBuilder";
 import { assembleProfessionalMemorandum } from "../convex/actions/appealSynthesizer";
@@ -229,7 +234,7 @@ describe("Visual Proof & Audit Archive: Full-Page Screenshots & Policy Exhibits"
       const dossier = buildDossierData(mockClaim, null, mockEvidences, false);
       const plainText = generatePlainTextDossier(dossier);
 
-      expect(plainText).toContain("Visual Proof Archive: Verified full-page capture recorded on");
+      expect(plainText).toContain("Visual Proof Archive: Verified policy bulletin capture recorded on");
       expect(plainText).toContain("Visual Proof Exhibit URL: https://convex.site/storage/proof_cpb_0016.png");
       expect(plainText).toContain("Visual Proof Archive Reference: Convex Storage Exhibit ID [storage_cpb_visual_proof_1]");
     });
@@ -263,8 +268,153 @@ describe("Visual Proof & Audit Archive: Full-Page Screenshots & Policy Exhibits"
 
       expect(briefMarkdown).toContain("## Evidentiary Exhibits & Proof of Policy on Date of Service");
       expect(briefMarkdown).toContain("Exhibit A: Proof of Policy on Date of Service — UHC CPB 0016: Total Knee Arthroplasty Criteria");
-      expect(briefMarkdown).toContain("Verified full-page visual capture recorded on 2024-04-10");
+      expect(briefMarkdown).toContain("Verified policy bulletin visual capture recorded on 2024-04-10");
       expect(briefMarkdown).toContain("Visual Proof Archive URL: https://convex.site/storage/proof_cpb_0016.png");
+    });
+  });
+
+  describe("Carelon guideline modal dismissal & screenshot timing", () => {
+    it("isCarelonGuidelineUrl: accurately identifies Carelon & AIM guideline domains", () => {
+      expect(
+        isCarelonGuidelineUrl("https://guidelines.carelonmedicalbenefitsmanagement.com/joint-surgery-2025-11-15/")
+      ).toBe(true);
+      expect(
+        isCarelonGuidelineUrl("https://carelonmedicalbenefitsmanagement.com/clinical-guidelines")
+      ).toBe(true);
+      expect(
+        isCarelonGuidelineUrl("https://aimspecialtyhealth.com/clinical-guidelines/joint-surgery/")
+      ).toBe(true);
+      expect(
+        isCarelonGuidelineUrl("https://www.carelon.com/guidelines")
+      ).toBe(true);
+
+      // Non-Carelon URLs return false
+      expect(isCarelonGuidelineUrl("https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=35008")).toBe(false);
+      expect(isCarelonGuidelineUrl("https://www.aetna.com/cpb/medical/data/1_99/0016.html")).toBe(false);
+      expect(isCarelonGuidelineUrl("https://pubmed.ncbi.nlm.nih.gov/38291012/")).toBe(false);
+      expect(isCarelonGuidelineUrl(undefined)).toBe(false);
+      expect(isCarelonGuidelineUrl("")).toBe(false);
+    });
+
+    describe("extractScreenshotFromDoc", () => {
+      it("extracts top-level screenshot string from format capture", () => {
+        const doc = {
+          screenshot: "https://api.firecrawl.dev/storage/v1/object/public/shot.png",
+        };
+        expect(extractScreenshotFromDoc(doc as any)).toBe("https://api.firecrawl.dev/storage/v1/object/public/shot.png");
+      });
+
+      it("extracts from actions.screenshots array if top-level screenshot is absent", () => {
+        const doc = {
+          screenshot: undefined,
+          actions: {
+            screenshots: ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="],
+          },
+        };
+        expect(extractScreenshotFromDoc(doc as any)).toBe(
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        );
+      });
+
+      it("returns undefined for empty documents or documents without screenshot payload", () => {
+        expect(extractScreenshotFromDoc(undefined)).toBeUndefined();
+        expect(extractScreenshotFromDoc({} as any)).toBeUndefined();
+        expect(extractScreenshotFromDoc({ screenshot: "  " } as any)).toBeUndefined();
+        expect(extractScreenshotFromDoc({ actions: { screenshots: [] } } as any)).toBeUndefined();
+      });
+    });
+
+    it("scrapeFirecrawlPolicySource: executes modal dismissal actions and waits before screenshot on Carelon URLs", async () => {
+      const { FirecrawlClient } = await import("@firecrawl/firecrawl-convex");
+      const scrapeSpy = vi.spyOn(FirecrawlClient.prototype, "scrape");
+
+      const substantiveCarelonMarkdown =
+        "# Carelon Joint Surgery Clinical Appropriateness Guidelines\n\n" +
+        "Medical necessity criteria and clinical coverage indications for knee arthroscopy and meniscectomy (CPT 29881): " +
+        "Arthroscopic partial meniscectomy is considered medically necessary for patients presenting with persistent, " +
+        "symptomatic knee joint pain, mechanical symptoms including documented locking or catching, distinct joint line tenderness " +
+        "on objective physical examination, and failure of at least 6 weeks of structured conservative management including " +
+        "formal physical therapy and non-steroidal anti-inflammatory drugs. Clinical records must confirm compliance with " +
+        "diagnostic imaging criteria demonstrating meniscal tear without severe tri-compartmental osteoarthritis. " +
+        "These guidelines apply to commercial health plan members and govern clinical review determinations under ERISA plans.";
+
+      // 1. Primary markdown scrape
+      scrapeSpy.mockResolvedValueOnce({
+        markdown: substantiveCarelonMarkdown,
+        metadata: { statusCode: 200 },
+      } as any);
+
+      // 2. Screenshot scrape with Carelon modal dismissal actions
+      scrapeSpy.mockResolvedValueOnce({
+        screenshot: "https://api.firecrawl.dev/storage/v1/object/public/carelon-dismissed.png",
+        metadata: { statusCode: 200 },
+      } as any);
+
+      const mockCtx: any = {};
+      const res = await scrapeFirecrawlPolicySource(
+        mockCtx,
+        "https://guidelines.carelonmedicalbenefitsmanagement.com/joint-surgery-2025-11-15/",
+        { cptCodes: ["29881"], payer: "GeoBlue", denialReasonCode: "CO-50" }
+      );
+
+      expect(res.screenshot).toBe("https://api.firecrawl.dev/storage/v1/object/public/carelon-dismissed.png");
+      expect(scrapeSpy).toHaveBeenCalledTimes(2);
+
+      // Inspect second call (screenshot capture call)
+      const screenshotCall = scrapeSpy.mock.calls[1];
+      const scrapeOptions = screenshotCall[2];
+
+      expect(scrapeOptions?.timeout).toBe(30000);
+      expect(scrapeOptions?.actions).toEqual([
+        { type: "wait", milliseconds: 2000 },
+        {
+          type: "click",
+          selector:
+            "input.termsagree, input[name='wptp_agree'], input[value='I ACCEPT'], .tthebutton .termsagree",
+        },
+        { type: "wait", milliseconds: 3500 },
+        { type: "screenshot" },
+      ]);
+    });
+
+    it("scrapeFirecrawlPolicySource: falls back gracefully if Carelon action scrape errors", async () => {
+      const { FirecrawlClient } = await import("@firecrawl/firecrawl-convex");
+      const scrapeSpy = vi.spyOn(FirecrawlClient.prototype, "scrape");
+
+      const substantiveCarelonMarkdown =
+        "# Carelon Joint Surgery Clinical Appropriateness Guidelines\n\n" +
+        "Medical necessity criteria and clinical coverage indications for knee arthroscopy and meniscectomy (CPT 29881): " +
+        "Arthroscopic partial meniscectomy is considered medically necessary for patients presenting with persistent, " +
+        "symptomatic knee joint pain, mechanical symptoms including documented locking or catching, distinct joint line tenderness " +
+        "on objective physical examination, and failure of at least 6 weeks of structured conservative management including " +
+        "formal physical therapy and non-steroidal anti-inflammatory drugs. Clinical records must confirm compliance with " +
+        "diagnostic imaging criteria demonstrating meniscal tear without severe tri-compartmental osteoarthritis. " +
+        "These guidelines apply to commercial health plan members and govern clinical review determinations under ERISA plans.";
+
+      // 1. Primary markdown scrape
+      scrapeSpy.mockResolvedValueOnce({
+        markdown: substantiveCarelonMarkdown,
+        metadata: { statusCode: 200 },
+      } as any);
+
+      // 2. Carelon modal scrape fails (e.g. action execution error)
+      scrapeSpy.mockRejectedValueOnce(new Error("Action execution failed: selector not found"));
+
+      // 3. Fallback screenshot scrape succeeds
+      scrapeSpy.mockResolvedValueOnce({
+        screenshot: "https://api.firecrawl.dev/storage/v1/object/public/fallback-shot.png",
+        metadata: { statusCode: 200 },
+      } as any);
+
+      const mockCtx: any = {};
+      const res = await scrapeFirecrawlPolicySource(
+        mockCtx,
+        "https://guidelines.carelonmedicalbenefitsmanagement.com/joint-surgery-2025-11-15/",
+        { cptCodes: ["29881"], payer: "GeoBlue", denialReasonCode: "CO-50" }
+      );
+
+      expect(res.screenshot).toBe("https://api.firecrawl.dev/storage/v1/object/public/fallback-shot.png");
+      expect(scrapeSpy).toHaveBeenCalledTimes(3);
     });
   });
 });

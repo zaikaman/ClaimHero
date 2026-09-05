@@ -1362,6 +1362,36 @@ export interface ScrapeExtractionOptions {
   denialReasonCode?: string;
 }
 
+/**
+ * Detect Carelon Medical Benefits Management & AIM Specialty Health guideline URLs.
+ * These portals display an asynchronous clinical guidelines terms-of-access modal
+ * (wp-terms-popup plugin) that obscures clinical criteria unless accepted.
+ */
+export function isCarelonGuidelineUrl(url: string | undefined): boolean {
+  if (!url || typeof url !== "string") return false;
+  return /carelon|aimspecialty/i.test(url);
+}
+
+/**
+ * Extract screenshot payload from a Firecrawl document.
+ * Checks both top-level doc.screenshot (from formats) and actions.screenshots array
+ * (from interactive action sequences).
+ */
+export function extractScreenshotFromDoc(doc: FirecrawlDocument | undefined): string | undefined {
+  if (!doc) return undefined;
+  if (typeof doc.screenshot === "string" && doc.screenshot.trim()) {
+    return doc.screenshot.trim();
+  }
+  const rawActions = (doc as Record<string, unknown>).actions;
+  if (rawActions && typeof rawActions === "object") {
+    const screenshots = (rawActions as { screenshots?: unknown[] }).screenshots;
+    if (Array.isArray(screenshots) && typeof screenshots[0] === "string" && screenshots[0].trim()) {
+      return screenshots[0].trim();
+    }
+  }
+  return undefined;
+}
+
 export async function scrapeFirecrawlPolicySource(
   ctx: ActionCtx,
   sourceUrl: string,
@@ -1502,26 +1532,83 @@ export async function scrapeFirecrawlPolicySource(
   // invalidate an otherwise substantive markdown policy document.
   let screenshot: string | undefined = doc.screenshot;
   if (!screenshot) {
-    try {
-      const shot = await firecrawl.scrape(ctx, workingUrl, {
-        formats: [{ type: "screenshot", fullPage: false }],
-        onlyMainContent: true,
-        proxy: "auto",
-        timeout: 15000,
-        waitFor: 0,
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-        blockAds: true,
-      });
-      if (typeof shot.screenshot === "string" && shot.screenshot.trim()) {
-        screenshot = shot.screenshot;
+    const isCarelon = isCarelonGuidelineUrl(workingUrl);
+    if (isCarelon) {
+      // Carelon / AIM Clinical Guidelines display an asynchronous terms modal (wp-terms-popup).
+      // Firecrawl must wait for the modal DOM to load, click "I ACCEPT", and wait for the modal
+      // and backdrop to fully dismiss before capturing the visual proof screenshot.
+      try {
+        const carelonShot = await firecrawl.scrape(ctx, workingUrl, {
+          formats: [{ type: "screenshot", fullPage: false }],
+          actions: [
+            { type: "wait", milliseconds: 2000 },
+            {
+              type: "click",
+              selector:
+                "input.termsagree, input[name='wptp_agree'], input[value='I ACCEPT'], .tthebutton .termsagree",
+            },
+            { type: "wait", milliseconds: 3500 },
+            { type: "screenshot" },
+          ],
+          onlyMainContent: true,
+          proxy: "auto",
+          timeout: 30000,
+          waitFor: 0,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+          blockAds: true,
+        });
+        screenshot = extractScreenshotFromDoc(carelonShot);
+      } catch (carelonErr) {
+        const carelonMsg = carelonErr instanceof Error ? carelonErr.message : String(carelonErr);
+        console.warn(
+          `Carelon modal dismissal screenshot capture failed for ${workingUrl} (${carelonMsg}); falling back to default capture.`
+        );
+        try {
+          const fallbackShot = await firecrawl.scrape(ctx, workingUrl, {
+            formats: [{ type: "screenshot", fullPage: false }],
+            onlyMainContent: true,
+            proxy: "auto",
+            timeout: 15000,
+            waitFor: 0,
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+              "Accept-Language": "en-US,en;q=0.9",
+            },
+            blockAds: true,
+          });
+          screenshot = extractScreenshotFromDoc(fallbackShot);
+        } catch (shotErr) {
+          const shotMsg = shotErr instanceof Error ? shotErr.message : String(shotErr);
+          console.warn(`Visual proof screenshot unavailable for ${workingUrl} (${shotMsg}); proceeding with markdown evidence.`);
+          screenshot = undefined;
+        }
       }
-    } catch (shotErr) {
-      const shotMsg = shotErr instanceof Error ? shotErr.message : String(shotErr);
-      console.warn(`Visual proof screenshot unavailable for ${workingUrl} (${shotMsg}); proceeding with markdown evidence.`);
-      screenshot = undefined;
+    } else {
+      try {
+        const shot = await firecrawl.scrape(ctx, workingUrl, {
+          formats: [{ type: "screenshot", fullPage: false }],
+          onlyMainContent: true,
+          proxy: "auto",
+          timeout: 15000,
+          waitFor: 0,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+          blockAds: true,
+        });
+        screenshot = extractScreenshotFromDoc(shot);
+      } catch (shotErr) {
+        const shotMsg = shotErr instanceof Error ? shotErr.message : String(shotErr);
+        console.warn(`Visual proof screenshot unavailable for ${workingUrl} (${shotMsg}); proceeding with markdown evidence.`);
+        screenshot = undefined;
+      }
     }
   }
 

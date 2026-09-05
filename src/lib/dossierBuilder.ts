@@ -464,17 +464,25 @@ export function generatePlainTextDossier(dossier: DossierData): string {
 
   out += `EXHIBIT B: PAYER CLINICAL POLICY BULLETIN & CRITERIA VIOLATIONS\n`;
   out += `${subHr}\n`;
+
+  // Output primary visual proof archive once at the bulletin level (prevent repeating the same screenshot for every clause)
+  const primaryBulletinProof = dossier.exhibitB_PolicyBulletins.find(
+    (item) => item.screenshotStorageId || item.screenshotUrl
+  );
+  if (primaryBulletinProof) {
+    const captureStr = primaryBulletinProof.capturedAt ? formatDossierDate(primaryBulletinProof.capturedAt) : "Date of Service";
+    out += `Visual Proof Archive: Verified policy bulletin capture recorded on ${captureStr}\n`;
+    out += `Document Provenance: Active policy bulletin metadata preserved against retrospective administrative alterations\n`;
+    if (primaryBulletinProof.screenshotUrl) out += `Visual Proof Exhibit URL: ${primaryBulletinProof.screenshotUrl}\n`;
+    if (primaryBulletinProof.screenshotStorageId) out += `Visual Proof Archive Reference: Convex Storage Exhibit ID [${primaryBulletinProof.screenshotStorageId}]\n`;
+    out += `\n`;
+  }
+
   dossier.exhibitB_PolicyBulletins.forEach((item, idx) => {
     out += `[B.${idx + 1}] ${item.title}\n`;
     out += `Citation Clause: ${item.citationClause}\n`;
     if (item.sourceUrl) out += `Source URL: ${item.sourceUrl}\n`;
     out += `Policy Excerpt:\n${item.content}\n`;
-    if (item.screenshotStorageId || item.screenshotUrl) {
-      const captureStr = item.capturedAt ? formatDossierDate(item.capturedAt) : "Date of Service";
-      out += `Visual Proof Archive: Verified full-page capture recorded on ${captureStr}\n`;
-      if (item.screenshotUrl) out += `Visual Proof Exhibit URL: ${item.screenshotUrl}\n`;
-      if (item.screenshotStorageId) out += `Visual Proof Archive Reference: Convex Storage Exhibit ID [${item.screenshotStorageId}]\n`;
-    }
     if (item.highlightedViolations && item.highlightedViolations.length > 0) {
       out += `Criteria Contradictions & Violations:\n`;
       item.highlightedViolations.forEach((v) => out += `  * ${v}\n`);

@@ -106,6 +106,16 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
     return true;
   });
 
+  const visualProofs = useMemo(() => {
+    return Array.from(
+      new Map(
+        filtered
+          .filter((item) => !!item.screenshotUrl)
+          .map((item) => [item.screenshotUrl, item])
+      ).values()
+    );
+  }, [filtered]);
+
   const categoryTabs = [
     { id: "all", label: "All Evidence", icon: BookOpen, count: sourceCounts.all },
     { id: "payer_cpb", label: "Insurer CPB", icon: BookOpen, count: sourceCounts.payer_cpb },
@@ -199,6 +209,80 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
         </Card>
       ) : (
         <div className="space-y-2.5">
+          {/* Visual Proof Archive - Rendered once per unique policy bulletin */}
+          {visualProofs.length > 0 && (
+            <div className="space-y-2.5">
+              {visualProofs.map((proof) => (
+                <div
+                  key={proof.screenshotUrl}
+                  className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3.5 space-y-2.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex size-2 rounded-full bg-blue-500 animate-pulse" />
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-400">
+                        <Camera className="size-3.5 text-blue-400" />
+                        <span>Payer Clinical Policy Bulletin Verification</span>
+                        {proof.capturedAt && (
+                          <span className="text-[10px] text-muted-foreground font-normal">
+                            ({new Date(proof.capturedAt).toLocaleDateString()})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() =>
+                        setActiveScreenshot({
+                          url: proof.screenshotUrl!,
+                          title: proof.title,
+                          date: proof.capturedAt
+                            ? new Date(proof.capturedAt).toLocaleDateString()
+                            : undefined,
+                        })
+                      }
+                      className="h-6 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 gap-1"
+                    >
+                      <Eye className="size-3.5" />
+                      <span>Inspect Capture</span>
+                    </Button>
+                  </div>
+
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Visual archive of the published coverage policy captured on date of clinical verification. Preserves policy metadata, effective dates, and published criteria headers against administrative alterations.
+                  </p>
+
+                  <div
+                    onClick={() =>
+                      setActiveScreenshot({
+                        url: proof.screenshotUrl!,
+                        title: proof.title,
+                        date: proof.capturedAt
+                          ? new Date(proof.capturedAt).toLocaleDateString()
+                          : undefined,
+                      })
+                    }
+                    className="relative rounded-md border border-border/80 bg-background/80 overflow-hidden cursor-pointer group max-h-52 flex items-start justify-center"
+                  >
+                    <img
+                      src={proof.screenshotUrl}
+                      alt={`Policy screenshot: ${proof.title}`}
+                      className="w-full object-cover object-top group-hover:scale-[1.01] transition-transform duration-200"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="bg-background/95 text-foreground text-xs font-medium px-3 py-1.5 rounded-md shadow-md border border-border flex items-center gap-1.5">
+                        <Eye className="size-3.5 text-primary" />
+                        <span>Click to Expand Visual Proof Screenshot</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {filtered.map((item) => {
             const config =
               SOURCE_TYPE_LABELS[item.sourceType] ||
@@ -233,7 +317,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
                               date: item.capturedAt ? new Date(item.capturedAt).toLocaleDateString() : undefined,
                             })
                           }
-                          title="Inspect full-page visual proof screenshot"
+                          title="Inspect visual proof screenshot"
                         >
                           <Camera className="size-3 text-blue-400" />
                           <span>Proof of Policy</span>
@@ -301,68 +385,13 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
                     {stripMarkdownFormatting(item.extractedEvidenceMarkdown)}
                   </p>
                 </div>
-
-                {item.screenshotUrl && (
-                  <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-400">
-                        <Camera className="size-3.5 text-blue-400" />
-                        <span>Visual Proof on Date of Scraping</span>
-                        {item.capturedAt && (
-                          <span className="text-[10px] text-muted-foreground font-normal">
-                            ({new Date(item.capturedAt).toLocaleDateString()})
-                          </span>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() =>
-                          setActiveScreenshot({
-                            url: item.screenshotUrl!,
-                            title: item.title,
-                            date: item.capturedAt ? new Date(item.capturedAt).toLocaleDateString() : undefined,
-                          })
-                        }
-                        className="h-6 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 gap-1"
-                      >
-                        <Eye className="size-3.5" />
-                        <span>Inspect Full Page</span>
-                      </Button>
-                    </div>
-
-                    <div
-                      onClick={() =>
-                        setActiveScreenshot({
-                          url: item.screenshotUrl!,
-                          title: item.title,
-                          date: item.capturedAt ? new Date(item.capturedAt).toLocaleDateString() : undefined,
-                        })
-                      }
-                      className="relative rounded-md border border-border/80 bg-background/80 overflow-hidden cursor-pointer group max-h-48 flex items-start justify-center"
-                    >
-                      <img
-                        src={item.screenshotUrl}
-                        alt={`Policy screenshot: ${item.title}`}
-                        className="w-full object-cover object-top group-hover:scale-[1.01] transition-transform duration-200"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="bg-background/95 text-foreground text-xs font-medium px-3 py-1.5 rounded-md shadow-md border border-border flex items-center gap-1.5">
-                          <Eye className="size-3.5 text-primary" />
-                          <span>Click to Expand Full-Page Screenshot</span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </Card>
             );
           })}
         </div>
       )}
 
-      {/* Full-Page Visual Proof Exhibit Modal */}
+      {/* Visual Proof Exhibit Modal */}
       <Dialog
         open={Boolean(activeScreenshot)}
         onOpenChange={(open) => {

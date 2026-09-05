@@ -653,13 +653,20 @@ export function assembleProfessionalAppealEmail(
     });
     email += `\n`;
 
-    const visualProofEvidences = supportingEvidences.filter(
-      (e) => Boolean((e as unknown as Record<string, unknown>).screenshotStorageId || (e as unknown as Record<string, unknown>).screenshotUrl)
-    );
-    if (visualProofEvidences.length > 0) {
+    // De-duplicate visual proof exhibits by distinct screenshot (prevent repeating the same bulletin image for every clause)
+    const seenScreenshots = new Set<string>();
+    const distinctVisualProofEvidences = supportingEvidences.filter((e) => {
+      const rawEv = e as unknown as Record<string, unknown>;
+      const key = (rawEv.screenshotStorageId as string) || (rawEv.screenshotUrl as string);
+      if (!key || seenScreenshots.has(key)) return false;
+      seenScreenshots.add(key);
+      return true;
+    });
+
+    if (distinctVisualProofEvidences.length > 0) {
       email += `## Evidentiary Exhibits & Proof of Policy on Date of Service\n\n`;
-      email += `Pursuant to ERISA 29 C.F.R. § 2560.503-1(h)(2)(iii), claimant incorporates full-page visual archive exhibits captured at the time of clinical verification to preserve the active clinical policy bulletin against retrospective modifications:\n\n`;
-      visualProofEvidences.slice(0, 5).forEach((evidence, idx) => {
+      email += `Pursuant to ERISA 29 C.F.R. § 2560.503-1(h)(2)(iii), claimant incorporates visual archive exhibits captured at the time of clinical verification to preserve active clinical policy bulletin metadata and document provenance against retrospective modifications:\n\n`;
+      distinctVisualProofEvidences.slice(0, 3).forEach((evidence, idx) => {
         const exhibitLetter = String.fromCharCode(65 + idx);
         const rawEv = evidence as unknown as Record<string, unknown>;
         const captureDate = rawEv.capturedAt
@@ -668,8 +675,8 @@ export function assembleProfessionalAppealEmail(
         const cleanUrl = evidence.sourceUrl ? sanitizePublicPolicyUrl(evidence.sourceUrl) : "";
         const sourceInfo = cleanUrl ? ` (Source: ${cleanUrl})` : "";
         email += `### Exhibit ${exhibitLetter}: Proof of Policy on Date of Service — ${evidence.title}\n\n`;
-        email += `- Verified full-page visual capture recorded on ${captureDate}${sourceInfo}\n`;
-        email += `- Clinical coverage clause: ${evidence.citationClause}\n`;
+        email += `- Verified policy bulletin visual capture recorded on ${captureDate}${sourceInfo}\n`;
+        email += `- Document provenance: Preserves active clinical policy bulletin metadata (Document ID, effective date, and review history) on Date of Service against retrospective alterations\n`;
         if (rawEv.screenshotUrl) {
           email += `- Visual Proof Archive URL: ${rawEv.screenshotUrl}\n`;
         } else if (rawEv.screenshotStorageId) {

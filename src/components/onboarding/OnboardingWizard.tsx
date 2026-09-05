@@ -337,6 +337,45 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     }
   };
 
+  const handleProcessPreset = async (preset: DemoCaseFixture) => {
+    setSelectedCaseId(preset.id);
+    setCustomFile(null);
+    setErrorMessage(null);
+    setIsProcessing(true);
+    setProcessingMessage("Step 1/3: Optical document analysis & clinical entity extraction...");
+
+    try {
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      const uniqueContent = preset.content.replace(
+        /(CLM-[A-Za-z0-9-]+)/g,
+        `$1-${randomSuffix}`
+      );
+      const result = await onParseText(uniqueContent, selectedJurisdiction);
+      setExtractedResult({ ...result, pipelineResult: null });
+      setContextSubmitted(false);
+      setActivePreset(preset);
+      setIntakeQuestions(preset.questions);
+      setClinicalFacts({ ...preset.clinicalFacts });
+      setPhysicianNotes(preset.physicianNotes || "");
+      setSenderName(advocateName || preset.sender.name);
+      setSenderCredentials(advocateCredentials || preset.sender.credentials);
+      setSenderEmail(preset.sender.email || "advocate@claimhero.internal");
+      setSenderPhone(advocatePhone || preset.sender.phone);
+      setContextAcknowledged(true);
+      setPrivacyRedactionState({
+        isRedacted: false,
+        mode: "BALANCED_APPELLATE",
+        count: 0,
+        categories: [],
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleStartExtraction = async () => {
     if (!selectedCaseId) {
       await saveProfileSettings();
@@ -405,37 +444,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       return;
     }
 
-    setProcessingMessage("Step 1/3: Optical document analysis & clinical entity extraction...");
-    try {
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      const uniqueContent = preset.content.replace(
-        /(CLM-[A-Za-z0-9-]+)/g,
-        `$1-${randomSuffix}`
-      );
-      const result = await onParseText(uniqueContent, selectedJurisdiction);
-      setExtractedResult({ ...result, pipelineResult: null });
-      setContextSubmitted(false);
-      setActivePreset(preset);
-      setIntakeQuestions(preset.questions);
-      setClinicalFacts({ ...preset.clinicalFacts });
-      setPhysicianNotes(preset.physicianNotes || "");
-      setSenderName(advocateName || preset.sender.name);
-      setSenderCredentials(advocateCredentials || preset.sender.credentials);
-      setSenderEmail(preset.sender.email || "advocate@claimhero.internal");
-      setSenderPhone(advocatePhone || preset.sender.phone);
-      setContextAcknowledged(true);
-      setPrivacyRedactionState({
-        isRedacted: false,
-        mode: "BALANCED_APPELLATE",
-        count: 0,
-        categories: [],
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErrorMessage(msg);
-    } finally {
-      setIsProcessing(false);
-    }
+    await handleProcessPreset(preset);
   };
 
   const handleConfirmContext = async () => {
@@ -795,60 +804,52 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               </div>
 
               <div className="space-y-2.5">
-                {STARTER_CASES.map((c) => {
-                  const isSelected = selectedCaseId === c.id;
-                  return (
-                    <Card
-                      key={c.id}
-                      onClick={() => {
-                        setSelectedCaseId((prev) => (prev === c.id ? null : c.id));
-                        setCustomFile(null);
-                      }}
-                      className={cn(
-                        "p-3.5 transition-all cursor-pointer flex items-start gap-3 border",
-                        isSelected
-                          ? "bg-primary/10 border-primary shadow-xs ring-1 ring-primary/20"
-                          : "bg-muted/30 border-border hover:bg-muted/60 hover:border-border/80"
-                      )}
-                    >
-                      <div
+                <div className="grid grid-cols-1 gap-2.5">
+                  {STARTER_CASES.map((c) => {
+                    const isSelected = selectedCaseId === c.id;
+                    return (
+                      <Card
+                        key={c.id}
+                        onClick={() => !isProcessing && handleProcessPreset(c)}
                         className={cn(
-                          "size-9 rounded-lg flex items-center justify-center shrink-0 border",
-                          isSelected
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-muted text-muted-foreground border-border"
+                          "p-3.5 hover:bg-muted/40 transition-all cursor-pointer space-y-2",
+                          isSelected && "bg-primary/10 border-primary shadow-xs ring-1 ring-primary/20"
                         )}
                       >
-                        <Lightning className="size-4.5" />
-                      </div>
-                      <div className="flex-1 space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs sm:text-sm font-medium text-foreground">
+                          <span className="font-semibold text-xs text-foreground">
                             {c.title}
                           </span>
-                          <div className="flex items-center gap-1.5">
-                            <Badge variant="secondary" className="font-mono text-[9px] text-amber-500 bg-amber-500/10 border-amber-500/20">
-                              Synthetic demo — not real PHI
-                            </Badge>
-                            <Badge variant="outline" className="font-mono text-[10px]">
-                              {c.badge}
-                            </Badge>
-                            {isSelected && (
-                              <CheckCircle className="size-4 text-primary shrink-0" />
-                            )}
-                          </div>
+                          <span className="font-mono font-bold text-destructive text-xs">
+                            {c.amount}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
-                          <span className="text-emerald-500 font-semibold">{c.amount}</span>
-                          <span>•</span>
-                          <span>{c.cpt}</span>
-                          <span>•</span>
-                          <span className="text-rose-500">{c.carc}</span>
+
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+                          <Badge variant="secondary" className="font-mono text-[9px] text-amber-500 bg-amber-500/10 border-amber-500/20">
+                            Synthetic demo — not real PHI
+                          </Badge>
+                          <Badge variant="secondary">CPT {c.cpt}</Badge>
+                          <Badge variant="outline" className="text-muted-foreground">
+                            {c.carc}
+                          </Badge>
                         </div>
-                      </div>
-                    </Card>
-                  );
-                })}
+
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/50">
+                          <span>Click to load & analyze case</span>
+                          <span className="text-primary font-medium">1-Click &rarr;</span>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {isProcessing && selectedCaseId && selectedCaseId !== "custom" && (
+                  <div className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground animate-pulse">
+                    <CircleNotch className="size-4 animate-spin text-primary" />
+                    <span>{processingMessage}</span>
+                  </div>
+                )}
 
                 {/* Option to Upload Custom PDF / Image */}
                 <input
