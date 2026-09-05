@@ -76,6 +76,7 @@ export interface Claim {
   createdAt: number;
   updatedAt: number;
   patient?: Patient;
+  patientName?: string;
   latestAppeal?: Appeal | null;
   evidenceCount?: number;
   payerContact?: PayerContact;

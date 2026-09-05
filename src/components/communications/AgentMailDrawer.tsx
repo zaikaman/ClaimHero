@@ -291,12 +291,26 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     effectiveRecipient;
   const isAiAdjudicatorThread = isAiAdjudicatorAddress(recipientEmail);
 
+  const rawPatientName = claim.patient?.name || claim.patientName;
+  const isPatientUnspecified =
+    !rawPatientName ||
+    rawPatientName === "Not specified in denial notice" ||
+    rawPatientName.startsWith("[PATIENT") ||
+    rawPatientName === "Patient" ||
+    rawPatientName === "Patient Record";
+
+  const hasSender = Boolean(
+    claim.appealContext?.sender?.name?.trim() &&
+    (claim.appealContext?.sender?.email?.trim() || claim.appealContext?.sender?.phone?.trim())
+  );
+
   const canDispatch =
-    dispatchMode === "ai_adjudicator"
+    (!isPatientUnspecified || hasSender) &&
+    (dispatchMode === "ai_adjudicator"
       ? Boolean(aiAdjudicatorEmail)
       : dispatchMode === "custom_email"
       ? Boolean(customEmail.trim() && customEmail.includes("@"))
-      : Boolean(officialEmail);
+      : Boolean(officialEmail));
 
   const handleCopyEmail = () => {
     if (!assignedEmail) return;
@@ -559,6 +573,18 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             </div>
           </div>
 
+          {isPatientUnspecified && !hasSender && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-500 flex items-start gap-2.5">
+              <Info className="size-4 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Sender Details Required Before Dispatch</p>
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
+                  The original denial notice did not specify the patient name. Under healthcare appeal standards, you must provide sender information in Appeal Studio before this packet can be dispatched.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Dedicated Transmission Launchpad Action Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl border border-primary/30 bg-primary/10">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -588,6 +614,11 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               size="sm"
               onClick={handleRunDispatch}
               disabled={isDispatching || !canDispatch || !effectiveAppeal}
+              title={
+                isPatientUnspecified && !hasSender
+                  ? "Patient name not specified in denial notice. Please supply sender details in Appeal Studio before dispatching."
+                  : undefined
+              }
               className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9 px-4 cursor-pointer"
             >
               {isDispatching ? (

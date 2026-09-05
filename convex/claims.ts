@@ -11,8 +11,8 @@ import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner, getAuthUserId
  */
 export function resolveClaimPatientName(
   rawName: string | undefined,
-  claimNumber?: string,
-  memberId?: string
+  _claimNumber?: string,
+  _memberId?: string
 ): string {
   const trimmed = (rawName || "").trim();
   if (
@@ -23,16 +23,7 @@ export function resolveClaimPatientName(
     trimmed.startsWith("[PATIENT") ||
     trimmed === "Patient"
   ) {
-    if (claimNumber?.includes("CLM-6104-GEO") || memberId === "GEO-554210-99") {
-      return "Marcus Sterling";
-    }
-    if (claimNumber?.includes("CLM-8942-GEO") || memberId === "GEO-982341-01") {
-      return "Eleanor Vance";
-    }
-    if (claimNumber?.includes("CLM-3912-BCG") || memberId === "BCG-773419-02") {
-      return "Michael Patel";
-    }
-    return trimmed.startsWith("[PATIENT") ? "Patient Record" : (trimmed || "Patient");
+    return "Not specified in denial notice";
   }
   return trimmed;
 }
@@ -510,6 +501,9 @@ export const create = mutation({
     const statutoryDeadline = now + deadlineDays * 86400000;
 
     const patient = (await ctx.db.get(args.patientId)) as Doc<"patients"> | null;
+    if (!patient || patient.userId !== userId) {
+      throw new Error("Forbidden: Access denied to specified patient");
+    }
 
     let claimNumber = args.claimNumber.trim();
     if (!claimNumber) {

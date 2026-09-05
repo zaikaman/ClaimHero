@@ -471,6 +471,14 @@ export const dispatchAppealPacket = action({
     customSubject: v.optional(v.string()),
     dispatchMode: v.optional(v.string()), // "ai_adjudicator" | "custom_email" | "official_payer"
     waiveRedaction: v.optional(v.boolean()),
+    sender: v.optional(
+      v.object({
+        name: v.string(),
+        credentials: v.optional(v.string()),
+        email: v.optional(v.string()),
+        phone: v.optional(v.string()),
+      })
+    ),
   },
   handler: async (
     ctx,
@@ -478,6 +486,26 @@ export const dispatchAppealPacket = action({
   ): Promise<DispatchReceipt> => {
     // 1. Authorize claim ownership
     const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+
+    const rawPatientName = claim.patient?.name || claim.patientName;
+    const patientName = resolveClaimPatientName(rawPatientName, claim.claimNumber, claim.patient?.memberId);
+    const isPatientUnspecified =
+      !patientName ||
+      patientName === "Not specified in denial notice" ||
+      patientName.startsWith("[PATIENT") ||
+      patientName === "Patient" ||
+      patientName === "Patient Record";
+
+    const senderDetails = args.sender || claim.appealContext?.sender;
+    const hasValidSender = Boolean(
+      senderDetails?.name?.trim() && (senderDetails.email?.trim() || senderDetails.phone?.trim())
+    );
+
+    if (isPatientUnspecified && !hasValidSender) {
+      throw new Error(
+        "Cannot dispatch appeal: patient name was not specified in denial notice. Please supply sender details before dispatching."
+      );
+    }
 
     // Enforce rate limiting per user
     const limitStatus = await rateLimiter.limit(ctx, "mailDispatcher", {
@@ -564,8 +592,6 @@ export const dispatchAppealPacket = action({
     }
 
     const briefMarkdown = appeal.fullAppealMarkdown;
-    const rawPatientName = claim.patient?.name || claim.patientName;
-    const patientName = resolveClaimPatientName(rawPatientName, claim.claimNumber, claim.patient?.memberId);
 
     const appealEmail = formatAppealEmail(briefMarkdown, {
       claimNumber: claim.claimNumber,

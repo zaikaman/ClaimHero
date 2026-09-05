@@ -60,10 +60,24 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
   });
 
 
-  describe("Optical Denial Parser: Unbounded Text Hardening", () => {
+  describe("Optical Denial Parser: Unbounded Text Hardening & Auth", () => {
+    it("rejects unauthenticated caller", async () => {
+      vi.spyOn(auth, "requireAuthUser").mockRejectedValueOnce(new Error("Unauthorized: Authentication required"));
+      const mockCtx: any = {
+        auth: { getUserIdentity: vi.fn().mockResolvedValue(null) },
+      };
+      await expect(
+        (parseDenialDocument as any)._handler(mockCtx, {
+          rawDocumentText: "Valid text",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+    });
+
     it("rejects rawDocumentText exceeding MAX_RAW_DOCUMENT_CHARS (100,000 characters)", async () => {
+      vi.spyOn(auth, "requireAuthUser").mockResolvedValueOnce("user_test" as any);
       const oversizedText = "A".repeat(MAX_RAW_DOCUMENT_CHARS + 50);
       const mockCtx: any = {
+        auth: { getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_test" }) },
         runMutation: vi.fn(),
         storage: { getUrl: vi.fn() },
       };
@@ -220,6 +234,194 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
           actor: "User Consent Gate",
         })
       );
+    });
+  });
+
+  describe("P0-6: Claim Creation IDOR Guard (convex/claims.ts:create)", () => {
+    it("rejects claim creation when patientId does not exist", async () => {
+      vi.spyOn(auth, "requireAuthUser").mockResolvedValue("user_attacker" as any);
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(null),
+        },
+      };
+
+      await expect(
+        (claims.create as any)._handler(mockCtx, {
+          patientId: "patient_nonexistent",
+          claimNumber: "CLM-TEST-001",
+          serviceDate: "2026-01-01",
+          providerName: "Dr. Smith",
+          deniedAmount: 5000,
+          patientOwedAmount: 5000,
+          cptCodes: ["27447"],
+          icd10Codes: ["M17.11"],
+          denialReasonCode: "CO-50",
+          denialReasonDescription: "Not medically necessary",
+        })
+      ).rejects.toThrow(/Forbidden: Access denied to specified patient/i);
+    });
+
+    it("rejects claim creation when patientId belongs to a different user (IDOR attempt)", async () => {
+      vi.spyOn(auth, "requireAuthUser").mockResolvedValue("user_attacker" as any);
+      const victimPatient = {
+        _id: "patient_victim_123",
+        userId: "user_victim",
+        name: "Victim Patient",
+        insurancePayer: "Confidential Insurer",
+      };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(victimPatient),
+        },
+      };
+
+      await expect(
+        (claims.create as any)._handler(mockCtx, {
+          patientId: "patient_victim_123",
+          claimNumber: "CLM-TEST-002",
+          serviceDate: "2026-01-01",
+          providerName: "Dr. Smith",
+          deniedAmount: 5000,
+          patientOwedAmount: 5000,
+          cptCodes: ["27447"],
+          icd10Codes: ["M17.11"],
+          denialReasonCode: "CO-50",
+          denialReasonDescription: "Not medically necessary",
+        })
+      ).rejects.toThrow(/Forbidden: Access denied to specified patient/i);
+    });
+
+    it("allows claim creation when patient belongs to authenticated user", async () => {
+      vi.spyOn(auth, "requireAuthUser").mockResolvedValue("user_legit" as any);
+      const legitPatient = {
+        _id: "patient_legit_123",
+        userId: "user_legit",
+        name: "Legit Patient",
+        insurancePayer: "Legit Insurer",
+      };
+      const mockDb: any = {
+        get: vi.fn().mockResolvedValue(legitPatient),
+        query: vi.fn().mockReturnValue({
+          withIndex: vi.fn().mockReturnValue({
+            first: vi.fn().mockResolvedValue(null),
+          }),
+        }),
+        insert: vi.fn().mockImplementation((table) => {
+          if (table === "claims") return Promise.resolve("claim_created_123");
+          return Promise.resolve("audit_123");
+        }),
+      };
+      const mockCtx: any = {
+        db: mockDb,
+        scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) },
+      };
+
+      const claimId = await (claims.create as any)._handler(mockCtx, {
+        patientId: "patient_legit_123",
+        claimNumber: "CLM-TEST-003",
+        serviceDate: "2026-01-01",
+        providerName: "Dr. Smith",
+        deniedAmount: 5000,
+        patientOwedAmount: 5000,
+        cptCodes: ["27447"],
+        icd10Codes: ["M17.11"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+      });
+
+      expect(claimId).toBe("claim_created_123");
+      expect(mockDb.insert).toHaveBeenCalledWith("claims", expect.objectContaining({
+        userId: "user_legit",
+        patientId: "patient_legit_123",
+        patientName: "Legit Patient",
+        insurancePayer: "Legit Insurer",
+      }));
+    });
+  });
+
+  describe("P0-3: Honest Patient Name Resolution & Dispatch Sender Enforcement", () => {
+    it("resolveClaimPatientName: returns 'Not specified in denial notice' and never invents mock names", () => {
+      expect(claims.resolveClaimPatientName("", "CLM-6104-GEO-1234", "GEO-554210-99")).toBe("Not specified in denial notice");
+      expect(claims.resolveClaimPatientName(undefined, "CLM-8942-GEO-5678", "GEO-982341-01")).toBe("Not specified in denial notice");
+      expect(claims.resolveClaimPatientName("[PATIENT REDACTED]", "CLM-3912-BCG-9012", "BCG-773419-02")).toBe("Not specified in denial notice");
+      expect(claims.resolveClaimPatientName("Patient", "CLM-6104-GEO", "GEO-554210-99")).toBe("Not specified in denial notice");
+      expect(claims.resolveClaimPatientName("[PATIENT NAME REDACTED]")).toBe("Not specified in denial notice");
+
+      // Genuine names are preserved
+      expect(claims.resolveClaimPatientName("Sarah Connor")).toBe("Sarah Connor");
+    });
+
+    it("dispatchAppealPacket: blocks dispatch when patient name is unspecified and sender details are missing", async () => {
+      vi.spyOn(auth, "requireClaimOwnerAction").mockResolvedValue({
+        claim: {
+          _id: "claim_unspecified" as any,
+          claimNumber: "CLM-6104-GEO-9999",
+          patientName: "",
+          patient: { insurancePayer: "Aetna", name: "" },
+          deniedAmount: 15000,
+        } as any,
+        userId: "user_123" as any,
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          _id: "appeal_1",
+          fullAppealMarkdown: "# Brief",
+        }),
+      };
+
+      await expect(
+        (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
+          claimId: "claim_unspecified",
+          dispatchMode: "ai_adjudicator",
+        })
+      ).rejects.toThrow(/sender details before dispatching/i);
+    });
+
+    it("dispatchAppealPacket: allows dispatch when sender details are supplied", async () => {
+      vi.spyOn(auth, "requireClaimOwnerAction").mockResolvedValue({
+        claim: {
+          _id: "claim_unspecified" as any,
+          claimNumber: "CLM-6104-GEO-9999",
+          patientName: "",
+          patient: { insurancePayer: "Aetna", name: "" },
+          deniedAmount: 15000,
+          appealContext: {
+            sender: {
+              name: "Dr. Gregory House, MD",
+              email: "ghouse@princetonplainsboro.org",
+            },
+          },
+        } as any,
+        userId: "user_123" as any,
+      });
+
+      vi.spyOn(rateLimiterModule.rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      vi.spyOn(agentmail, "sendMessage").mockResolvedValue("msg_sent_1" as any);
+      vi.spyOn(agentmail, "status").mockResolvedValue({ status: "pending" } as any);
+
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "inbox_sender";
+      process.env.AGENTMAIL_SENDER_EMAIL = "claimhero-sender@agentmail.to";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "inbox_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "claimhero-adjudicator@agentmail.to";
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          _id: "appeal_1",
+          fullAppealMarkdown: "# Brief",
+        }),
+        runMutation: vi.fn().mockResolvedValue("thread_1"),
+      };
+
+      const receipt = await (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
+        claimId: "claim_unspecified",
+        dispatchMode: "official_payer",
+        recipientEmail: "appeals@aetna.com",
+      });
+
+      expect(receipt.status).toBe("delivered");
     });
   });
 });

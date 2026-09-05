@@ -6,6 +6,7 @@ import type { Id } from "../_generated/dataModel";
 import { createStructuredCompletion } from "../lib/openai";
 import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
+import { requireAuthUser } from "../lib/auth";
 
 const DENIAL_EXTRACTION_SCHEMA = {
   type: "object",
@@ -165,14 +166,16 @@ export const parseDenialDocument = action({
     autoRunPipeline: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<DenialExtractionResult & { claimId: string; pipelineResult?: Record<string, unknown> }> => {
+    const userId = await requireAuthUser(ctx);
+
     if (args.rawDocumentText && args.rawDocumentText.length > MAX_RAW_DOCUMENT_CHARS) {
       throw new Error(`Submitted raw document text exceeds the ${MAX_RAW_DOCUMENT_CHARS.toLocaleString()} character limit.`);
     }
 
-    // Enforce rate limiting
+    // Enforce rate limiting per authenticated user
     try {
       const limitStatus = await rateLimiter.limit(ctx, "opticalParser", {
-        key: args.patientEmail || "global",
+        key: userId,
       });
       if (!limitStatus.ok) {
         throw new Error(
@@ -302,6 +305,7 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
 
       // Save patient and claim into Convex database with denialLetterStorageId linked
       claimId = await ctx.runMutation(internal.claims.createWithPatientInternal, {
+        userId,
         patientName: extraction.patientName?.trim() || "",
         patientEmail: args.patientEmail?.trim() || "",
         memberId: extraction.memberId?.trim() || "",

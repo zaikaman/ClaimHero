@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-05T17:47:00Z
+- **Last updated:** 2026-09-05T17:58:30Z
 
 ## Log
 
@@ -912,8 +912,15 @@ Hardened AgentMail webhook verification with raw byte HMAC hashing, fresh endpoi
 - Telemetry & Diagnostic Transparency: Enhanced rejection logging in `convex/http.ts` with `expectedPrefix`, `secretPrefix`, and `secretCount` metrics to attribute any cryptographic mismatch instantly from logs without leaking sensitive key material.
 - Automated Test Suite & Full Gate Validation: Added test coverage in `tests/agentMail.test.ts` for byte-array HMAC signatures and pretty/compact JSON variations. Verified full quality gate with `npm run verify`: 100% clean TypeScript check (`tsc --noEmit`), 0 ESLint warnings or errors, 542/542 passing tests across 37 test suites, and successful production Vite bundle build. Convex features: HTTP actions, actions.
 
-### 2026-09-05 - working tree
+### 2026-09-05 - b4bd740
 Eliminated cross-tenant IDOR vulnerability and auth result discarding in communications API:
 - IDOR Remediation in Email Queries: Hardened `listThreadsByClaim` and `getThreadWithMessages` in `convex/emails.ts` to inspect the authorization tuple returned by `getClaimIfAuthorized(ctx, claimId)`. If unauthenticated or caller is not the verified claim owner, the queries immediately return empty lists (`[]`) or `null` without reading threads, messages, MIME bodies, or signed storage attachment URLs from the database.
 - Internal Action-Scoped Query Variants: Added `listThreadsByClaimInternal` and `getThreadWithMessagesInternal` private queries to `convex/emails.ts` with shared query helpers (`fetchThreadsForClaim`, `fetchThreadWithMessages`). Migrated unauthenticated action callers in `convex/actions/mailDispatcher.ts` (lines 227, 722, 727, 731, 1256) to internal variants to ensure automated outbound appeal dispatches and adversarial follow-up negotiations proceed reliably without session context.
 - Full Quality Gate Validation: Added unit and security test suites in `tests/convexEmails.test.ts` and `tests/authorization.test.ts` asserting cross-tenant IDOR denial and internal query functionality. Verified full gate with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 550/550 passing tests across 37 test suites, and clean production Vite bundle build. Convex features: queries, internal queries, actions.
+
+### 2026-09-05 - working tree
+Resolved critical security, authorization, and data integrity vulnerabilities across intake, claim creation, and appellate dispatch (P0-3, P0-5, P0-6):
+- Elimination of Mock Patient Identifiers & Dispatch Sender Enforcement (P0-3): Removed hardcoded patient fallbacks (`Marcus Sterling`, `Eleanor Vance`, `Michael Patel`) in `resolveClaimPatientName` (`convex/claims.ts`) and `assembleProfessionalAppealEmail` (`convex/actions/appealSynthesizer.ts`), defaulting truthfully to `"Not specified in denial notice"` to adhere strictly to the `NEVER invent identifiers` policy. Hardened `dispatchAppealPacket` (`convex/actions/mailDispatcher.ts`) to block dispatch if patient identity is unspecified unless verified sender details are supplied in arguments or `claim.appealContext.sender`. Updated `AgentMailDrawer.tsx` to disable dispatch and display clear guidance when sender details are required.
+- Authenticated Expensive AI Intake & Server-Keyed Rate Limiting (P0-5): Secured `parseDenialDocument` (`convex/actions/opticalParser.ts`) with `requireAuthUser(ctx)`, eliminating anonymous exploitation of vision and crawler resources. Re-keyed rate limiting to authenticated `userId` instead of client-controlled email inputs, and passed `userId` to `createWithPatientInternal` to eliminate unassigned orphan records under `sentinel@claimhero.internal`.
+- Claim Creation IDOR Prevention (P0-6): Patched `claims.create` (`convex/claims.ts`) to verify `patient.userId === userId`, throwing a forbidden error if the patient record does not belong to the authenticated caller, preventing cross-tenant patient linking and data leakage.
+- Full Quality Gate Verification: Added unit tests in `tests/securityComplianceHardening.test.ts` covering unauthenticated optical parsing denial, IDOR patient isolation, honest name resolution, and dispatch blocking. Verified full gate with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 557/557 passing tests across 37 test suites, and production build in 6.03s. Convex features: queries, mutations, actions, authentication, rate limiting.
