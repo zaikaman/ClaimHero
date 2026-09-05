@@ -2,7 +2,7 @@
 
 import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { createChatCompletion, createStructuredCompletion } from "../lib/openai";
@@ -224,7 +224,7 @@ async function deliverAiAdjudication(
     isFollowUp,
   } = options;
 
-  const preThreadData = await ctx.runQuery(api.emails.getThreadWithMessages, {
+  const preThreadData = await ctx.runQuery(internal.emails.getThreadWithMessagesInternal, {
     threadId,
   });
   const negotiationRound = (preThreadData?.messages || []).filter(
@@ -719,16 +719,16 @@ async function performSendOutboundMessage(
   } | null = null;
 
   if (args.threadId) {
-    threadData = await ctx.runQuery(api.emails.getThreadWithMessages, {
+    threadData = await ctx.runQuery(internal.emails.getThreadWithMessagesInternal, {
       threadId: args.threadId,
     });
   }
   if (!threadData) {
-    const threads = await ctx.runQuery(api.emails.listThreadsByClaim, {
+    const threads = await ctx.runQuery(internal.emails.listThreadsByClaimInternal, {
       claimId: args.claimId,
     });
     if (threads && threads.length > 0 && threads[0]?._id) {
-      threadData = await ctx.runQuery(api.emails.getThreadWithMessages, {
+      threadData = await ctx.runQuery(internal.emails.getThreadWithMessagesInternal, {
         threadId: threads[0]._id,
       });
     }
@@ -1253,7 +1253,7 @@ export const runAdversaryNegotiationRound = internalAction({
       throw new Error("AgentMail did not return a payer adjudicator inbox for this claim.");
     }
 
-    const threadData = await ctx.runQuery(api.emails.getThreadWithMessages, {
+    const threadData = await ctx.runQuery(internal.emails.getThreadWithMessagesInternal, {
       threadId: args.threadId,
     });
     const historyMessages = ((threadData?.messages || []) as Array<{

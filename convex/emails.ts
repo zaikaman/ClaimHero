@@ -1,9 +1,72 @@
-import { internalMutation, internalQuery, mutation, query, MutationCtx } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { OutboundId } from "@agentmail/convex";
 import type { Doc, Id } from "./_generated/dataModel";
 import { components, internal } from "./_generated/api";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
+
+/**
+ * Internal helper to query threads for a claim
+ */
+async function fetchThreadsForClaim(ctx: QueryCtx, claimId: Id<"claims">): Promise<Doc<"emailThreads">[]> {
+  const q = ctx.db
+    .query("emailThreads")
+    .withIndex("by_claim", (q) => q.eq("claimId", claimId))
+    .order("desc");
+
+  const qWithTake = q as unknown as {
+    take?: (count: number) => Promise<Doc<"emailThreads">[]>;
+    collect: () => Promise<Doc<"emailThreads">[]>;
+  };
+
+  const threads = typeof qWithTake.take === "function"
+    ? await qWithTake.take(50)
+    : await qWithTake.collect();
+
+  return threads;
+}
+
+/**
+ * Internal helper to query thread with messages and resolved attachment URLs
+ */
+async function fetchThreadWithMessages(ctx: QueryCtx, thread: Doc<"emailThreads">) {
+  const msgQuery = ctx.db
+    .query("emailMessages")
+    .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+    .order("asc");
+
+  const msgQueryWithTake = msgQuery as unknown as {
+    take?: (count: number) => Promise<Doc<"emailMessages">[]>;
+    collect: () => Promise<Doc<"emailMessages">[]>;
+  };
+
+  const messages = typeof msgQueryWithTake.take === "function"
+    ? await msgQueryWithTake.take(50)
+    : await msgQueryWithTake.collect();
+
+  const messagesWithUrls = await Promise.all(
+    messages.map(async (msg) => {
+      if (!msg.attachments || msg.attachments.length === 0) {
+        return msg;
+      }
+      const attachmentsWithUrls = await Promise.all(
+        msg.attachments.map(async (att) => ({
+          ...att,
+          url: await ctx.storage.getUrl(att.storageId),
+        }))
+      );
+      return {
+        ...msg,
+        attachments: attachmentsWithUrls,
+      };
+    })
+  );
+
+  return {
+    thread,
+    messages: messagesWithUrls,
+  };
+}
 
 /**
  * List all email threads for a given claim, scoped to authorized owner
@@ -13,28 +76,27 @@ export const listThreadsByClaim = query({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
-    await getClaimIfAuthorized(ctx, args.claimId);
+    const auth = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!auth) return [];
 
-    const q = ctx.db
-      .query("emailThreads")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .order("desc");
-
-    const qWithTake = q as unknown as {
-      take?: (count: number) => Promise<Doc<"emailThreads">[]>;
-      collect: () => Promise<Doc<"emailThreads">[]>;
-    };
-
-    const threads = typeof qWithTake.take === "function"
-      ? await qWithTake.take(50)
-      : await qWithTake.collect();
-
-    return threads;
+    return await fetchThreadsForClaim(ctx, args.claimId);
   },
 });
 
 /**
- * Get a specific thread along with all its chronological messages
+ * Internal query to list all email threads for a claim without user auth context (for internal actions/crons)
+ */
+export const listThreadsByClaimInternal = internalQuery({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    return await fetchThreadsForClaim(ctx, args.claimId);
+  },
+});
+
+/**
+ * Get a specific thread along with all its chronological messages, scoped to authorized owner
  */
 export const getThreadWithMessages = query({
   args: {
@@ -44,44 +106,25 @@ export const getThreadWithMessages = query({
     const thread = await ctx.db.get(args.threadId);
     if (!thread) return null;
 
-    await getClaimIfAuthorized(ctx, thread.claimId);
+    const auth = await getClaimIfAuthorized(ctx, thread.claimId);
+    if (!auth) return null;
 
-    const msgQuery = ctx.db
-      .query("emailMessages")
-      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-      .order("asc");
+    return await fetchThreadWithMessages(ctx, thread);
+  },
+});
 
-    const msgQueryWithTake = msgQuery as unknown as {
-      take?: (count: number) => Promise<Doc<"emailMessages">[]>;
-      collect: () => Promise<Doc<"emailMessages">[]>;
-    };
+/**
+ * Internal query to get a specific thread along with all its chronological messages (for internal actions/crons)
+ */
+export const getThreadWithMessagesInternal = internalQuery({
+  args: {
+    threadId: v.id("emailThreads"),
+  },
+  handler: async (ctx, args) => {
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread) return null;
 
-    const messages = typeof msgQueryWithTake.take === "function"
-      ? await msgQueryWithTake.take(50)
-      : await msgQueryWithTake.collect();
-
-    const messagesWithUrls = await Promise.all(
-      messages.map(async (msg) => {
-        if (!msg.attachments || msg.attachments.length === 0) {
-          return msg;
-        }
-        const attachmentsWithUrls = await Promise.all(
-          msg.attachments.map(async (att) => ({
-            ...att,
-            url: await ctx.storage.getUrl(att.storageId),
-          }))
-        );
-        return {
-          ...msg,
-          attachments: attachmentsWithUrls,
-        };
-      })
-    );
-
-    return {
-      thread,
-      messages: messagesWithUrls,
-    };
+    return await fetchThreadWithMessages(ctx, thread);
   },
 });
 

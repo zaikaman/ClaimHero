@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-05T16:43:00Z
+- **Last updated:** 2026-09-05T17:47:00Z
 
 ## Log
 
@@ -904,10 +904,16 @@ Resolved dynamic import runtime fault in Convex isolate and normalized multi-sig
 - Payload Body & Parse Error Resilience: Added trimmed payload candidates and BOM stripping. Verified authentic cryptographic matches even when standardwebhooks throws a `SyntaxError` during post-verification JSON parsing of unescaped MIME control characters in large email bodies.
 - Enriched Non-Sensitive Diagnostics: Passed safe diagnostic telemetry (`svixId`, `timestamp`, `sigCount`, `sigPrefix`, `detail`) from `verifySvixWebhook` to `convex/http.ts` to log rejection attribution without exposing secret or payload material. Verified with `npm run verify`: 100% clean typecheck, 0 ESLint errors/warnings, 540/540 passing tests across 37 suites, and clean production build. Convex features: HTTP actions, actions.
 
-### 2026-09-05 - working tree
+### 2026-09-05 - 9cac131
 Hardened AgentMail webhook verification with raw byte HMAC hashing, fresh endpoint provisioning, and canonical JSON normalization:
 - Provisioned Fresh Webhook Endpoint & Secret Synchronization: Replaced legacy desynchronized webhook endpoint with newly provisioned AgentMail endpoint, synchronized its signing secret into both production and development Convex environments with key rotation preservation, and cleanly decommissioned the stale endpoint.
 - Exact Wire-Byte HMAC Verification: Replaced lossy string-only body parsing in `convex/http.ts` with `request.arrayBuffer()`, passing exact `rawBytes` into `verifySvixWebhook` and `computeSvixSignatureFromBytes` (`convex/lib/agentMailWebhook.ts`) to calculate HMAC-SHA256 digests directly over incoming wire bytes, preventing signature drift caused by UTF-8 to UTF-16 character decoding replacements.
 - Canonical JSON Formatting & Key Representation Fallbacks: Added automatic canonical JSON re-stringification candidates to match payloads formatted differently across HTTP proxies, and supported raw string secret key representations alongside base64 decoding.
 - Telemetry & Diagnostic Transparency: Enhanced rejection logging in `convex/http.ts` with `expectedPrefix`, `secretPrefix`, and `secretCount` metrics to attribute any cryptographic mismatch instantly from logs without leaking sensitive key material.
 - Automated Test Suite & Full Gate Validation: Added test coverage in `tests/agentMail.test.ts` for byte-array HMAC signatures and pretty/compact JSON variations. Verified full quality gate with `npm run verify`: 100% clean TypeScript check (`tsc --noEmit`), 0 ESLint warnings or errors, 542/542 passing tests across 37 test suites, and successful production Vite bundle build. Convex features: HTTP actions, actions.
+
+### 2026-09-05 - working tree
+Eliminated cross-tenant IDOR vulnerability and auth result discarding in communications API:
+- IDOR Remediation in Email Queries: Hardened `listThreadsByClaim` and `getThreadWithMessages` in `convex/emails.ts` to inspect the authorization tuple returned by `getClaimIfAuthorized(ctx, claimId)`. If unauthenticated or caller is not the verified claim owner, the queries immediately return empty lists (`[]`) or `null` without reading threads, messages, MIME bodies, or signed storage attachment URLs from the database.
+- Internal Action-Scoped Query Variants: Added `listThreadsByClaimInternal` and `getThreadWithMessagesInternal` private queries to `convex/emails.ts` with shared query helpers (`fetchThreadsForClaim`, `fetchThreadWithMessages`). Migrated unauthenticated action callers in `convex/actions/mailDispatcher.ts` (lines 227, 722, 727, 731, 1256) to internal variants to ensure automated outbound appeal dispatches and adversarial follow-up negotiations proceed reliably without session context.
+- Full Quality Gate Validation: Added unit and security test suites in `tests/convexEmails.test.ts` and `tests/authorization.test.ts` asserting cross-tenant IDOR denial and internal query functionality. Verified full gate with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 550/550 passing tests across 37 test suites, and clean production Vite bundle build. Convex features: queries, internal queries, actions.

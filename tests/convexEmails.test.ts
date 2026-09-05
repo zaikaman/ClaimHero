@@ -13,7 +13,7 @@ describe("Convex Emails & Communications API", () => {
   });
 
   describe("listThreadsByClaim & getThreadWithMessages", () => {
-    it("listThreadsByClaim: fetches threads by claimId", async () => {
+    it("listThreadsByClaim: fetches threads by claimId when authorized", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const mockClaim = { _id: "c1", userId: "user_123" };
       const threads = [{ _id: "t1", claimId: "c1", subject: "Appeal" }];
@@ -31,6 +31,54 @@ describe("Convex Emails & Communications API", () => {
       };
 
       const res = await (emails.listThreadsByClaim as any)._handler(mockCtx, { claimId: "c1" });
+      expect(res).toEqual(threads);
+    });
+
+    it("listThreadsByClaim: returns empty array when unauthenticated (prevents IDOR)", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const mockClaim = { _id: "c1", userId: "user_123" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+          query: vi.fn(),
+        },
+      };
+
+      const res = await (emails.listThreadsByClaim as any)._handler(mockCtx, { claimId: "c1" });
+      expect(res).toEqual([]);
+      expect(mockCtx.db.query).not.toHaveBeenCalled();
+    });
+
+    it("listThreadsByClaim: returns empty array when user belongs to different tenant", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("attacker_999" as any);
+      const mockClaim = { _id: "c1", userId: "victim_123" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+          query: vi.fn(),
+        },
+      };
+
+      const res = await (emails.listThreadsByClaim as any)._handler(mockCtx, { claimId: "c1" });
+      expect(res).toEqual([]);
+      expect(mockCtx.db.query).not.toHaveBeenCalled();
+    });
+
+    it("listThreadsByClaimInternal: fetches threads without requiring auth session", async () => {
+      const threads = [{ _id: "t1", claimId: "c1", subject: "Appeal Internal" }];
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              order: vi.fn().mockReturnValue({
+                collect: vi.fn().mockResolvedValue(threads),
+              }),
+            }),
+          }),
+        },
+      };
+
+      const res = await (emails.listThreadsByClaimInternal as any)._handler(mockCtx, { claimId: "c1" });
       expect(res).toEqual(threads);
     });
 
@@ -56,6 +104,65 @@ describe("Convex Emails & Communications API", () => {
       };
 
       const res = await (emails.getThreadWithMessages as any)._handler(mockCtx, { threadId: "t1" });
+      expect(res?.thread._id).toBe("t1");
+      expect(res?.messages).toHaveLength(1);
+    });
+
+    it("getThreadWithMessages: returns null when unauthenticated (prevents IDOR MIME leak)", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const mockThread = { _id: "t1", claimId: "c1", subject: "Confidential Thread" };
+      const mockClaim = { _id: "c1", userId: "user_123" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockImplementation((id) => (id === "t1" ? Promise.resolve(mockThread) : Promise.resolve(mockClaim))),
+          query: vi.fn(),
+        },
+      };
+
+      const res = await (emails.getThreadWithMessages as any)._handler(mockCtx, { threadId: "t1" });
+      expect(res).toBeNull();
+      expect(mockCtx.db.query).not.toHaveBeenCalled();
+    });
+
+    it("getThreadWithMessages: returns null when user does not own the claim", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("attacker_999" as any);
+      const mockThread = { _id: "t1", claimId: "c1", subject: "Victim Thread" };
+      const mockClaim = { _id: "c1", userId: "victim_123" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockImplementation((id) => (id === "t1" ? Promise.resolve(mockThread) : Promise.resolve(mockClaim))),
+          query: vi.fn(),
+        },
+      };
+
+      const res = await (emails.getThreadWithMessages as any)._handler(mockCtx, { threadId: "t1" });
+      expect(res).toBeNull();
+      expect(mockCtx.db.query).not.toHaveBeenCalled();
+    });
+
+    it("getThreadWithMessagesInternal: returns null if thread not found", async () => {
+      const mockCtx: any = { db: { get: vi.fn().mockResolvedValue(null) } };
+      const res = await (emails.getThreadWithMessagesInternal as any)._handler(mockCtx, { threadId: "t_missing" });
+      expect(res).toBeNull();
+    });
+
+    it("getThreadWithMessagesInternal: returns thread and messages without session auth", async () => {
+      const mockThread = { _id: "t1", claimId: "c1", subject: "Dispatcher Thread" };
+      const mockMsgs = [{ _id: "m1", threadId: "t1", attachments: [] }];
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockThread),
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              order: vi.fn().mockReturnValue({
+                collect: vi.fn().mockResolvedValue(mockMsgs),
+              }),
+            }),
+          }),
+        },
+      };
+
+      const res = await (emails.getThreadWithMessagesInternal as any)._handler(mockCtx, { threadId: "t1" });
       expect(res?.thread._id).toBe("t1");
       expect(res?.messages).toHaveLength(1);
     });

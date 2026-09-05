@@ -792,5 +792,45 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
         (syncInboxes as any)._handler(unauthCtx, { limit: 5 })
       ).rejects.toThrow(/Unauthorized/i);
     });
+
+    it("emails: listThreadsByClaim and getThreadWithMessages prevent cross-tenant IDOR leaks", async () => {
+      const { listThreadsByClaim, getThreadWithMessages } = await import("../convex/emails");
+
+      const victimClaim = { _id: "claim_victim", userId: "user_victim_1" };
+      const victimThread = { _id: "thread_victim", claimId: "claim_victim" };
+
+      const unauthCtx: any = {
+        db: {
+          get: vi.fn().mockImplementation((id: string) => {
+            if (id === "thread_victim") return Promise.resolve(victimThread);
+            if (id === "claim_victim") return Promise.resolve(victimClaim);
+            return Promise.resolve(null);
+          }),
+          query: vi.fn(),
+        },
+      };
+
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const unauthThreads = await (listThreadsByClaim as any)._handler(unauthCtx, {
+        claimId: "claim_victim" as any,
+      });
+      expect(unauthThreads).toEqual([]);
+
+      const unauthMessages = await (getThreadWithMessages as any)._handler(unauthCtx, {
+        threadId: "thread_victim" as any,
+      });
+      expect(unauthMessages).toBeNull();
+
+      vi.mocked(getAuthUserId).mockResolvedValue("user_attacker_99" as any);
+      const attackerThreads = await (listThreadsByClaim as any)._handler(unauthCtx, {
+        claimId: "claim_victim" as any,
+      });
+      expect(attackerThreads).toEqual([]);
+
+      const attackerMessages = await (getThreadWithMessages as any)._handler(unauthCtx, {
+        threadId: "thread_victim" as any,
+      });
+      expect(attackerMessages).toBeNull();
+    });
   });
 });
