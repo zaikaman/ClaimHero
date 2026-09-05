@@ -228,11 +228,45 @@ describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
       expect(urls).not.toContain("https://worldebhcday.org/blog/2024/advancing-spine-evidence-synthesis-north-american-spine-society-nass-guidelines");
     });
 
-    it("extractGuidelineLinksFromMarkdown: extracts matching clinical guideline PDFs from directory pages", () => {
+    it("selectFirecrawlPolicyUrls: prioritizes active updated guideline (2026) over archived prior-year version (2024)", async () => {
+      const payload = {
+        data: {
+          web: [
+            {
+              url: "https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-2024-10-20/",
+              title: "ARCHIVED Spine Surgery 2024-10-20 to 2025-11-14 | Carelon Clinical Guidelines and Pathways",
+              description: "Archived historical clinical appropriateness guidelines for spine surgery.",
+            },
+            {
+              url: "https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-2025-11-15-updated-2026-01-01",
+              title: "Spine Surgery 2025-11-15 updated 2026-01-01 | Carelon Clinical Guidelines and Pathways",
+              description: "Current active clinical appropriateness guidelines for spine surgery and lumbar decompression.",
+            },
+          ],
+        },
+      };
+
+      const urls = actionPolicyCrawler.selectFirecrawlPolicyUrls(
+        payload,
+        ["63047", "spine", "surgery", "decompression", "medical policy"],
+        0,
+        2,
+        "GeoBlue",
+        "2026",
+      );
+
+      // Active updated 2026 guideline MUST be ranked first over the archived 2024 edition
+      expect(urls[0]).toBe("https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-2025-11-15-updated-2026-01-01");
+      expect(urls[1]).toBe("https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-2024-10-20/");
+    });
+
+    it("extractGuidelineLinksFromMarkdown: extracts matching clinical guideline PDFs and ranks active links ahead of archived links", () => {
       const directoryMarkdown = `# North American Spine Society Clinical Guidelines
 Welcome to the NASS guidelines directory. Below are the published clinical practice guidelines:
 - [Lumbar Spinal Stenosis Guidelines (PDF)](https://www.spine.org/Portals/0/assets/downloads/ResearchClinicalCare/Guidelines/LumbarStenosis.pdf)
 - [Cervical Radiculopathy Guidelines](https://www.spine.org/Portals/0/assets/downloads/ResearchClinicalCare/Guidelines/CervicalRadiculopathy.pdf)
+- [Archived Spine Surgery Guideline 2024](https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-2024-10-20/)
+- [Current Spine Surgery Guideline updated 2026](https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-2025-11-15-updated-2026-01-01)
 - [Unrelated Member Benefits Form](https://www.spine.org/benefits/form.pdf)
 `;
 
@@ -240,10 +274,15 @@ Welcome to the NASS guidelines directory. Below are the published clinical pract
         directoryMarkdown,
         "https://www.spine.org/Research/Clinical-Guidelines",
         ["63047"],
+        "2026",
       );
 
       expect(links.length).toBeGreaterThanOrEqual(1);
-      expect(links[0]).toBe("https://www.spine.org/Portals/0/assets/downloads/ResearchClinicalCare/Guidelines/LumbarStenosis.pdf");
+      // Both PDF and current 2026 guideline rank ahead of the archived 2024 version
+      expect(links).toContain("https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-2025-11-15-updated-2026-01-01");
+      const activeIdx = links.indexOf("https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-2025-11-15-updated-2026-01-01");
+      const archiveIdx = links.indexOf("https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-2024-10-20/");
+      expect(activeIdx).toBeLessThan(archiveIdx);
     });
 
     it("crawlInsurerPolicy: executes single-hop native Firecrawl extraction without OpenAI LLM hop", async () => {

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-05T10:15:00Z
+- **Last updated:** 2026-09-05T10:30:00Z
 
 ## Log
 
@@ -842,5 +842,13 @@ Production-Grade Convex Database I/O Optimization & Free-Tier Spend Hardening:
 - Background Cron Pacing: Paced `sync-agentmail-inboxes` and `sentinel-autopilot-sla-sweep` intervals from 5 minutes to 15 minutes in `convex/crons.ts`, slashing background cron invocations by 66% while relying on real-time event webhooks (`onMessageReceived`) for immediate message processing.
 - Quality Assurance & Regression Verification: Added unit test suites in `tests/convexEmails.test.ts` and updated `tests/autopilotSLA.test.ts` and `tests/convexAuditLogsAndUsers.test.ts`. Verified with `npm run verify`: 100% clean TypeScript strict check (`tsc --noEmit`), 0 ESLint errors/warnings, 485/485 passing tests across 34 suites, and successful production Vite build. Convex features: schema compound indexes, internal queries, internal mutations, crons, actions, audit logs.
 
-### 2026-09-05 - working tree
+### 2026-09-05 - 21bde8d
 Refined landing hero typography and polished P2P Live Call Copilot UI: split showcase slide titles into two-line structures (`src/components/landing/CinematicHero.tsx`) to prevent irregular wrapping on responsive viewports; replaced the truncated empty-state icon with an enclosed tele-conference `Headset` badge and resolved duplicate lightning icons in Fast Answers Generated using `ChatCenteredDots` (`src/components/p2p/P2PLiveCopilot.tsx`). Verified with clean typecheck and zero lint errors.
+
+### 2026-09-05 - working tree
+Hardened Firecrawl Policy Crawler & Relevance Classifier to enforce temporal recency and prevent returning superseded/archived guideline editions:
+- Root-Cause Elimination of Archived Guideline Ingestion: Identified that `evaluatePolicySourceRelevance` previously contained an explicit historical exemption directive instructing the LLM never to reject documents bearing "ARCHIVED" disclaimers, causing early termination on legacy pages (e.g. Carelon 2024 editions) while bypassing current editions. Re-engineered Directive 4 to mandate that clinical coverage guidelines must be active and effective on the claim's Date of Service / target year, explicitly rejecting expired historical archives.
+- Date-Aware Policy Search Query Strategy: Upgraded `generatePolicySearchQueries` in `convex/actions/policyCrawler.ts` to derive the active policy target year from `claim.serviceDate` (e.g., 2026) and inject temporal directives into LLM query generation (`${targetYear}`, `updated ${targetYear}`, `-archived`), ensuring Firecrawl queries target active policies rather than high-pagerank historical archives.
+- Recency Scoring & Archive Penalty: Hardened candidate URL selection in `selectFirecrawlPolicyUrls` (`convex/actions/policyCrawler.ts`) by introducing a +15 recency bonus for active/updated year matches, a -15 staleness penalty for historical year slugs, a -30 penalty for explicitly archived titles/paths, and eliminating the over-broad date regex that previously penalized valid dated Carelon guideline slugs.
+- Active Link Prioritization in Directory Scrapes: Enhanced `extractGuidelineLinksFromMarkdown` (`convex/actions/policyCrawler.ts`) with recency bonus and archive penalties, adding keyword coverage for "spine" and "surgery" to ensure active child guidelines sort ahead of legacy archives.
+- Pipeline Propagation & Verification: Passed `serviceDate` through `convex/workflows.ts`, `convex/actions/sentinelPipeline.ts`, and `crawlInsurerPolicy`. Added regression unit tests in `tests/actionsPolicyAndSynthesizer.test.ts` and verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint errors/warnings, 486/486 passing unit tests across 34 suites, and production build in 6.16s. Convex features: actions, queries, mutations, components (`@firecrawl/firecrawl-convex`).

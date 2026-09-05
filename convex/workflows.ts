@@ -124,6 +124,7 @@ export async function executeDurableClaimPipeline(
           denialReasonCode: claim.denialReasonCode || "CO-50",
           denialReasonDescription: claim.denialReasonDescription || "",
           customPolicyUrl: args.customPolicyUrl,
+          serviceDate: claim.serviceDate,
         },
         {
           retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 },

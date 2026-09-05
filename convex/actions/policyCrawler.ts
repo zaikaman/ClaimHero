@@ -903,6 +903,7 @@ export function selectFirecrawlPolicyUrls(
   minimumRelevanceScore = 0,
   maximumCandidates = 0,
   payer?: string,
+  targetYear?: string,
 ): string[] {
   const candidates: Array<{ sourceUrl: string; score: number; position: number }> = [];
   const seenUrls = new Set<string>();
@@ -1027,26 +1028,60 @@ export function selectFirecrawlPolicyUrls(
         sourceUrl.toLowerCase().endsWith("/guidelines/")
       ) && !/\.(?:pdf|ashx?)(?:$|[?#])/i.test(sourceUrl) ? 10 : 0;
       const privateViewerPenalty = isPrivateMcgViewerUrl(sourceUrl) ? 10 : 0;
-      const archivePenalty = (
+
+      // Heavy penalty for explicitly archived documents or disclaimers
+      const isArchived = (
         sourceUrl.toLowerCase().includes("/archive") ||
         sourceUrl.toLowerCase().includes("archived-") ||
+        sourceUrl.toLowerCase().includes("archive-") ||
         searchableText.includes("archived") ||
         searchableText.includes("archive date:") ||
         searchableText.includes("historical information only") ||
-        /-\d{4}-\d{2}-\d{2}/.test(sourceUrl)
-      ) ? 12 : 0;
+        Boolean(typeof candidate.title === "string" && candidate.title.toLowerCase().startsWith("archived"))
+      );
+      const archivePenalty = isArchived ? 30 : 0;
+
+      // Recency bonus: reward active/current year or recent update tags
+      const activeYear = targetYear || "2026";
+      const previousYear = String(parseInt(activeYear, 10) - 1);
+      let recencyBonus = 0;
+      if (
+        searchableText.includes(`updated ${activeYear}`) ||
+        searchableText.includes(`updated-${activeYear}`) ||
+        sourceUrl.includes(`updated-${activeYear}`)
+      ) {
+        recencyBonus += 15;
+      } else if (searchableText.includes(activeYear) || sourceUrl.includes(activeYear)) {
+        recencyBonus += 10;
+      } else if (searchableText.includes(previousYear) || sourceUrl.includes(previousYear)) {
+        recencyBonus += 4;
+      }
+      if (searchableText.includes("current") || searchableText.includes("active")) {
+        recencyBonus += 3;
+      }
+
+      // Staleness penalty: mentions old years (e.g. 2024, 2023, 2022) without mentioning the active year
+      let stalenessPenalty = 0;
+      const hasOldYear = /20(?:1\d|2[0-4])\b/.test(searchableText) || /20(?:1\d|2[0-4])\b/.test(sourceUrl);
+      const hasCurrentYear = searchableText.includes(activeYear) || sourceUrl.includes(activeYear);
+      if (hasOldYear && !hasCurrentYear) {
+        stalenessPenalty = 15;
+      }
+
       const score =
         termScore +
         specificDocumentScore +
         authorityHostScore +
         payerBonus +
-        documentFormatScore -
+        documentFormatScore +
+        recencyBonus -
         landingPagePenalty -
         blogPenalty -
         directoryIndexPenalty -
         privateViewerPenalty -
         anatomicalPenalty -
-        archivePenalty;
+        archivePenalty -
+        stalenessPenalty;
 
       if (minimumRelevanceScore <= 0 || score >= minimumRelevanceScore) {
         candidates.push({ sourceUrl, score, position });
@@ -1361,6 +1396,7 @@ export function extractGuidelineLinksFromMarkdown(
   markdown: string,
   baseUrl: string,
   cptCodes: string[],
+  targetYear?: string,
 ): string[] {
   if (!markdown) return [];
   const cptKeywords = getCptKeywords(cptCodes);
@@ -1372,17 +1408,22 @@ export function extractGuidelineLinksFromMarkdown(
     "medical necessity",
     "lumbar",
     "spinal",
+    "spine",
     "stenosis",
     "decompression",
     "laminectomy",
     "knee",
     "meniscus",
     "arthroplasty",
+    "surgery",
   ].map((k) => k.toLowerCase());
 
   const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)/g;
   const matches: Array<{ url: string; score: number }> = [];
   let match: RegExpExecArray | null;
+
+  const activeYear = targetYear || "2026";
+  const previousYear = String(parseInt(activeYear, 10) - 1);
 
   while ((match = linkRegex.exec(markdown)) !== null) {
     const text = match[1].toLowerCase();
@@ -1391,6 +1432,24 @@ export function extractGuidelineLinksFromMarkdown(
     const textScore = relevantKeywords.reduce((sum, kw) => sum + (text.includes(kw) ? 2 : 0), 0);
     const hrefScore = relevantKeywords.reduce((sum, kw) => sum + (href.toLowerCase().includes(kw) ? 1 : 0), 0);
     const isPdf = /\.(?:pdf|ashx)(?:$|[?#])/i.test(href);
+
+    const isLinkArchived =
+      text.includes("archived") ||
+      href.toLowerCase().includes("archived") ||
+      href.toLowerCase().includes("/archive");
+    const linkArchivePenalty = isLinkArchived ? 25 : 0;
+
+    let linkRecencyBonus = 0;
+    if (
+      text.includes(activeYear) ||
+      href.includes(activeYear) ||
+      text.includes(`updated ${activeYear}`) ||
+      href.includes(`updated-${activeYear}`)
+    ) {
+      linkRecencyBonus += 12;
+    } else if (text.includes(previousYear) || href.includes(previousYear)) {
+      linkRecencyBonus += 4;
+    }
 
     if (textScore > 0 || hrefScore > 0 || (isPdf && (textScore > 0 || hrefScore > 0))) {
       let resolvedUrl = href;
@@ -1402,7 +1461,7 @@ export function extractGuidelineLinksFromMarkdown(
       if (isAcceptableSourceUrl(resolvedUrl) && !isPrivateMcgViewerUrl(resolvedUrl)) {
         matches.push({
           url: resolvedUrl,
-          score: textScore + hrefScore + (isPdf ? 4 : 0),
+          score: textScore + hrefScore + (isPdf ? 4 : 0) + linkRecencyBonus - linkArchivePenalty,
         });
       }
     }
@@ -1420,6 +1479,8 @@ async function evaluatePolicySourceRelevance(
   icd10Codes: string[],
   denialReasonCode: string,
   denialReasonDescription: string,
+  targetYear = "2026",
+  serviceDate = "",
 ): Promise<PolicyRelevanceResponse> {
   if (isPrivateMcgViewerUrl(policySource.sourceUrl)) {
     return {
@@ -1451,7 +1512,11 @@ Evaluation Directives:
 1. Provenance & Authority: The document must be an official policy from the claim's payer, their recognized clinical guidelines manager (e.g. Carelon, EviCore), or a neutral national medical authority (CMS LCD/NCD, AAOS, NASS, ACR, NCCN, PubMed, FDA, ECFR). Strictly reject policies issued by competing commercial health plans or unrelated regional programs.
 2. Clinical Specificity: The document must establish substantive medical necessity criteria, diagnostic standards, conservative therapy rules, or coverage indications for the procedure and anatomical site involved in the claim (e.g. Spine Surgery / Decompression for CPT 63047, Total Knee Arthroplasty for CPT 27447, Knee MRI for CPT 73721).
 3. Content Type: Reject commercial billing coding blogs, consumer marketing materials, provider enrollment forms, and private password-protected viewers.
-4. Historical & Archive Rule: Major clinical guideline repositories (such as Carelon, EviCore, CMS, Aetna CPBs) index past editions with banners stating 'ARCHIVED' or 'for historical information only'. In insurance claim appeals, prior and historical guideline versions are fully valid and citable evidence. You MUST NOT reject an authoritative guideline merely because of an 'ARCHIVED', 'Superseded', 'Historical', or 'Past Review Date' disclaimer if it contains substantive clinical criteria for the procedure.
+4. Guideline Recency & Active Effective Date:
+   - In health insurance appeals, citations must reference the ACTIVE, CURRENTLY EFFECTIVE clinical guideline in effect on the claim's Date of Service (${serviceDate || targetYear}, Year ${targetYear}).
+   - You MUST REJECT any document that is explicitly marked as "ARCHIVED", "SUPERSEDED", "HISTORICAL", or whose effective coverage window expired prior to the claim's Date of Service (for example, Carelon's "ARCHIVED Spine Surgery 2024-10-20 to 2025-11-14" ended in 2025 and is an expired historical document for a 2026 Date of Service).
+   - If a document is an archived or superseded edition whose effective period ended before the Date of Service, return relevant=false with rationale: "Document is an archived/superseded policy from prior years (expired before Date of Service ${serviceDate || targetYear}). The appeal requires the active, up-to-date guideline version."
+   - Only accept an archived version if the claim's Date of Service explicitly fell within that historical document's active date range, or if the guideline manager has issued no subsequent updates.
 5. Administrative & Prior-Authorization Denials (e.g. CO-197, CO-16, Precertification Absent): When a claim is denied for lack of prior authorization or precertification, the universal legal and clinical appeal mechanism under ERISA and health plan rules is demonstrating emergency medical necessity, acute progressive deficit, or clinical indication for retroactive authorization. You MUST NEVER reject an authoritative clinical guideline, coverage policy, or peer-reviewed study simply because the denial code was administrative or 'lack of prior authorization'. Clinical criteria and surgical indications ARE the exact substantive evidence required to overturn prior-authorization denials.
 6. Peer-Reviewed Clinical Evidence & PubMed: Peer-reviewed clinical studies, systematic reviews, and meta-analyses indexed on PubMed/NCBI establish clinical efficacy, standard-of-care, and medical necessity indications under ERISA full-and-fair review regulations. You MUST accept a PubMed study or systematic review if it evaluates the surgical indications, clinical outcomes, or medical necessity for the procedure and diagnosis in the claim. Do not reject PubMed documents merely because they are formatted as journal articles or abstracts rather than an insurer CPB bulletin.
 
@@ -1463,6 +1528,7 @@ Procedure code(s): ${cptDescriptions}
 Diagnosis code(s): ${icd10Codes.join(", ") || "Not provided"}
 Denial reason code: ${denialReasonCode || "Not provided"}
 Denial description: ${denialReasonDescription || "Not provided"}
+Date of Service: ${serviceDate || targetYear} (Target Active Year: ${targetYear})
 Source URL: ${policySource.sourceUrl}
 
 Document excerpt (title may be first line):
@@ -1498,6 +1564,8 @@ async function generatePolicySearchQueries(
   denialReasonCode: string,
   denialReasonDescription: string,
   rejectedSearchFeedback = "",
+  serviceDate = "",
+  targetYear = "2026",
 ): Promise<string[]> {
   const searchPayer = cleanPayerForSearch(payer);
   const cptDescriptions = cptCodes
@@ -1515,27 +1583,30 @@ async function generatePolicySearchQueries(
     systemPrompt: `You are an expert Clinical Policy Retrieval Strategist for health insurance appeals.
 Generate 3 distinct, high-precision web search queries to locate official, currently active clinical coverage policies, medical necessity guidelines, or national specialty society standards for this claim.
 
+CRITICAL DIRECTIVE - RECENCY & ACTIVE VERSION RETRIEVAL:
+The claim Date of Service is in ${targetYear}. Insurance appeals require the ACTIVE, currently effective clinical coverage guideline in effect for ${targetYear}, NOT archived or superseded historical policies from prior years.
+- Major clinical guideline repositories (such as Carelon/AIM, EviCore, CMS LCD, Aetna CPBs) maintain historical archives with URLs or titles marked "ARCHIVED" or containing past year dates (e.g. 2024). Search engines often rank older historical pages higher due to domain age.
+- To ensure the search engine retrieves the latest active guideline rather than an archived page, queries MUST incorporate temporal keywords for the active policy window (e.g. "${targetYear}", "updated ${targetYear}", "current") and negative keywords (e.g. "-archived", "-superseded") where appropriate.
+- For Carelon Medical Benefits Management guidelines (used by GeoBlue, Anthem, BCBS, Elevance, etc.): active guidelines are published under guidelines.carelonmedicalbenefitsmanagement.com with date slugs representing the latest effective update window (such as updated ${targetYear}). Example: Carelon spine surgery clinical appropriateness guideline ${targetYear} -archived OR site:guidelines.carelonmedicalbenefitsmanagement.com spine surgery ${targetYear}
+
 Query Strategy:
 1. Payer & Utilization Management Guideline Query:
-   - Target currently effective payer medical policies and recognized clinical guidelines managers:
+   - Target currently active payer medical policies and recognized clinical guidelines managers for ${targetYear}:
      * GeoBlue / Blue Cross Blue Shield / Anthem / Elevance utilize Carelon (formerly AIM Specialty Health) clinical appropriateness guidelines or Anthem clinical guidelines.
      * Cigna, Molina, and regional plans utilize EviCore or Carelon clinical policies.
      * Aetna and UnitedHealthcare utilize direct Clinical Policy Bulletins (CPBs).
-   - Target substantive policy documents and PDFs (e.g. Carelon spine surgery clinical appropriateness guideline pdf, Carelon musculoskeletal guideline).
-   - Example: ${primaryProcedureName} ${primaryCpt} Carelon current clinical guideline pdf OR coverage criteria ${searchPayer}
+   - Target the active guideline in effect for ${targetYear} (e.g. ${primaryProcedureName} ${primaryCpt} Carelon clinical guideline ${targetYear} -archived OR coverage criteria ${searchPayer}).
 2. Clinical Specialty Society Standard-of-Care Guideline Query:
    - Target authoritative national medical specialty guidelines (NASS for spine/lumbar, AAOS for orthopedics/joint, ACR for imaging/radiology, NCCN for oncology) that establish active clinical necessity and conservative therapy criteria.
-   - Include direct document keywords like "clinical guideline pdf" or "coverage recommendations criteria" to target substantive clinical guidelines rather than directory index pages or blog posts.
-   - Example: ${primaryProcedureName} ${primaryCpt} NASS clinical practice guideline pdf OR indications
+   - Example: ${primaryProcedureName} ${primaryCpt} NASS clinical practice guideline ${targetYear} pdf OR indications
 3. National Statutory & CMS Coverage Query:
-   - Target CMS Local Coverage Determinations (LCD) or standard medical necessity criteria.
-   - Example: ${primaryProcedureName} ${primaryCpt} CMS LCD medical necessity criteria indications
+   - Target CMS Local Coverage Determinations (LCD) or standard medical necessity criteria for ${targetYear}.
+   - Example: ${primaryProcedureName} ${primaryCpt} CMS LCD medical necessity criteria indications ${targetYear}
 
 Rules:
 - Always include the clinical procedure title (e.g. "lumbar laminectomy decompression", "knee arthroscopy meniscectomy", "total knee arthroplasty", "knee MRI").
 - Combine procedure names with primary CPT codes and authoritative keywords (Carelon, NASS, AAOS, ACR, CMS LCD, coverage criteria).
-- Do NOT use rigid exact-match double quotes around every word; use natural search engine keyword combinations.
-- Do NOT include 'archive' or past years in queries; target active and currently effective guidelines.
+- Do NOT search for past years older than ${targetYear}; explicitly seek active guidelines for ${targetYear} and exclude archived versions.
 - Do NOT target university student health portals, travel insurance marketing brochures, state Medicaid forms, or billing blogs.
 - Keep each query concise (under 90 characters) and focused.${rejectedSearchFeedback ? `
 Previous search attempts returned these rejected/stale results:
@@ -1546,7 +1617,8 @@ Refine queries to avoid archived/student/marketing domains and target active Car
 Payer: ${searchPayer} (Original: ${payer})
 Procedure: ${cptDescriptions || "Medical Procedure"}
 Diagnosis: ${icd10Codes.join(", ") || "Clinical Diagnosis"}
-Denial: ${denialReasonCode} - ${denialReasonDescription || "Medical necessity"}`,
+Denial: ${denialReasonCode} - ${denialReasonDescription || "Medical necessity"}
+Date of Service: ${serviceDate || targetYear} (Target Active Year: ${targetYear})`,
     schemaName: "PolicySearchIntentResponse",
     schema: POLICY_SEARCH_INTENT_SCHEMA,
     temperature: 0.1,
@@ -1590,9 +1662,15 @@ export const crawlInsurerPolicy = action({
     denialReasonCode: v.string(),
     denialReasonDescription: v.optional(v.string()),
     customPolicyUrl: v.optional(v.string()),
+    serviceDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireClaimOwnerAction(ctx, args.claimId);
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+
+    // Determine target clinical policy year based on date of service or active calendar year
+    const effectiveDate = args.serviceDate || claim?.serviceDate || "";
+    const yearMatch = effectiveDate.match(/\b(20\d{2})\b/);
+    const targetYear = yearMatch ? yearMatch[1] : `${new Date().getFullYear()}`;
 
     // Enforce rate limiting
     const limitStatus = await rateLimiter.limit(ctx, "policyCrawler", {
@@ -1629,6 +1707,8 @@ export const crawlInsurerPolicy = action({
         args.icd10Codes,
         args.denialReasonCode,
         args.denialReasonDescription || "",
+        targetYear,
+        effectiveDate,
       );
       if (!relevance.relevant) {
         throw new Error(`The supplied policy URL was rejected as irrelevant: ${relevance.rationale}`);
@@ -1641,6 +1721,9 @@ export const crawlInsurerPolicy = action({
         args.icd10Codes,
         args.denialReasonCode,
         args.denialReasonDescription || "",
+        "",
+        effectiveDate,
+        targetYear,
       );
       const failedSources: string[] = [];
       const searchFailures: string[] = [];
@@ -1689,6 +1772,8 @@ export const crawlInsurerPolicy = action({
               args.icd10Codes,
               args.denialReasonCode,
               args.denialReasonDescription || "",
+              targetYear,
+              effectiveDate,
             );
             if (relevance.relevant) {
               policySource = directSource;
@@ -1716,6 +1801,7 @@ export const crawlInsurerPolicy = action({
           0,
           MAX_POLICY_SOURCE_CANDIDATES,
           args.payer,
+          targetYear,
         ).filter((sourceUrl) => {
           if (seenSourceUrls.has(sourceUrl)) return false;
           seenSourceUrls.add(sourceUrl);
@@ -1738,6 +1824,8 @@ export const crawlInsurerPolicy = action({
               args.icd10Codes,
               args.denialReasonCode,
               args.denialReasonDescription || "",
+              targetYear,
+              effectiveDate,
             );
             if (relevance.relevant) {
               policySource = candidateSource;
@@ -1758,6 +1846,7 @@ export const crawlInsurerPolicy = action({
                 candidateSource.markdown,
                 candidateSource.sourceUrl,
                 args.cptCodes,
+                targetYear,
               );
               for (const childUrl of childLinks.slice(0, 2)) {
                 if (seenSourceUrls.has(childUrl)) continue;
@@ -1776,6 +1865,8 @@ export const crawlInsurerPolicy = action({
                     args.icd10Codes,
                     args.denialReasonCode,
                     args.denialReasonDescription || "",
+                    targetYear,
+                    effectiveDate,
                   );
                   if (childRelevance.relevant) {
                     policySource = childSource;
@@ -1805,6 +1896,8 @@ export const crawlInsurerPolicy = action({
             args.denialReasonCode,
             args.denialReasonDescription || "",
             feedback,
+            effectiveDate,
+            targetYear,
           );
         }
       }

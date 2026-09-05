@@ -126,6 +126,7 @@ export const runAutonomousPipeline = action({
           denialReasonCode: claim.denialReasonCode || "CO-50",
           denialReasonDescription: claim.denialReasonDescription || "",
           customPolicyUrl: args.customPolicyUrl,
+          serviceDate: claim.serviceDate,
         }
       );
     } catch (crawlError) {
