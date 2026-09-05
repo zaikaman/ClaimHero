@@ -1,5 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Claim } from "../../types";
+import {
+  Claim,
+  CallTranscriptItem,
+  LiveCallChecklistItem,
+  LiveFastAnswer,
+} from "../../types";
 import { useLiveCallCopilot } from "../../hooks/useLiveCallCopilot";
 import {
   PhoneCall,
@@ -478,7 +483,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               </div>
             )}
 
-            {transcripts.map((t, idx) => {
+            {transcripts.map((t: CallTranscriptItem, idx: number) => {
               const isInsurer = t.speaker === "insurer";
               return (
                 <div
@@ -763,12 +768,12 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   </h4>
                 </div>
                 <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/40 text-emerald-400">
-                  {checklist.filter((c) => c.isCompleted).length} / {checklist.length || 6} Verified
+                  {checklist.filter((c: LiveCallChecklistItem) => c.isCompleted).length} / {checklist.length || 6} Verified
                 </Badge>
               </div>
 
               <div className="space-y-1.5 text-xs font-sans flex-1">
-                {checklist.map((item) => (
+                {checklist.map((item: LiveCallChecklistItem) => (
                   <div
                     key={item.id}
                     className={cn(
@@ -836,7 +841,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                     No objection cards generated yet.
                   </p>
                 ) : (
-                  fastAnswers.map((ans) => (
+                  fastAnswers.map((ans: LiveFastAnswer) => (
                     <button
                       key={ans.id}
                       onClick={() => setActiveFastAnswer(ans)}

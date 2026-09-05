@@ -211,7 +211,7 @@ export function useLiveCallCopilot(claim: Claim) {
   const toggleTranscriptSpeaker = useCallback(
     async (transcriptId: string) => {
       if (!session || !currentSessionIdRef.current) return;
-      const target = session.transcripts?.find((t) => t.id === transcriptId);
+      const target = (session.transcripts as CallTranscriptItem[])?.find((t: CallTranscriptItem) => t.id === transcriptId);
       if (!target) return;
 
       const newSpeaker: CallSpeaker = target.speaker === "insurer" ? "physician" : "insurer";
@@ -520,11 +520,11 @@ export function useLiveCallCopilot(claim: Claim) {
       let doctorSpeech = (doctorSpeechOverride || "").trim();
 
       if (!doctorSpeech && session?.transcripts) {
-        const recentDoctorItems = session.transcripts
-          .filter((t) => t.speaker === "physician")
+        const recentDoctorItems = (session.transcripts as CallTranscriptItem[])
+          .filter((t: CallTranscriptItem) => t.speaker === "physician")
           .slice(-3);
         if (recentDoctorItems.length > 0) {
-          doctorSpeech = recentDoctorItems.map((t) => t.text).join(" ");
+          doctorSpeech = recentDoctorItems.map((t: CallTranscriptItem) => t.text).join(" ");
         }
       }
 
@@ -542,7 +542,7 @@ export function useLiveCallCopilot(claim: Claim) {
           await startLiveCall();
         }
 
-        const history = (session?.transcripts || []).slice(-6).map((t) => ({
+        const history = ((session?.transcripts as CallTranscriptItem[]) || []).slice(-6).map((t: CallTranscriptItem) => ({
           speaker: t.speaker,
           text: t.text,
         }));

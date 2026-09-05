@@ -47,6 +47,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
     isOpen,
     setIsOpen,
     isSending,
+    isStreaming,
     messages,
     sendMessage,
     clearHistory,
@@ -379,27 +380,24 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
           className="fixed z-50 bg-card/95 border-border shadow-2xl backdrop-blur-2xl flex flex-col rounded-2xl overflow-hidden p-0 animate-blur-fade-up border no-print"
         >
           {/* Header Bar (also acts as secondary drag handle) */}
-          <div className="p-3.5 pb-3 border-b border-border/80 flex items-center justify-between bg-muted/40 select-none">
+          <div className="px-3.5 py-2.5 border-b border-border/80 flex items-center justify-between bg-card/90 backdrop-blur-md select-none">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="size-7 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
                 <BrandIcon size="xs" className="text-primary" />
               </div>
               <div className="flex flex-col min-w-0">
-
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-foreground truncate">
-                    Sentinel AI Copilot
-                  </span>
-                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
-                  <Cpu className="size-2.5 text-primary shrink-0" />
-                  <span className="truncate">
-                    {selectedClaim
-                      ? `Active: ${selectedClaim.claimNumber} (${selectedClaim.patient?.insurancePayer || "Payer"})`
-                      : "Workspace Context Active"}
-                  </span>
-                </div>
+                <span className="text-xs font-semibold text-foreground tracking-tight truncate">
+                  Sentinel Copilot
+                </span>
+                <span className="text-[11px] text-muted-foreground truncate">
+                  {isStreaming ? (
+                    <span className="text-primary font-medium">Synthesizing response...</span>
+                  ) : selectedClaim ? (
+                    `Case #${selectedClaim.claimNumber} (${selectedClaim.patient?.insurancePayer || "Payer"})`
+                  ) : (
+                    "Clinical Evidence & Precedent Sentinel"
+                  )}
+                </span>
               </div>
             </div>
 
@@ -537,35 +535,49 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                       >
                         {isAssistant ? (
                           <div className="prose prose-invert prose-xs max-w-none text-foreground space-y-2">
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              rehypePlugins={[rehypeSanitize]}
-                              components={{
-                                a: ({ href, children }) => {
-                                  const safeHref = safeExternalHref(href);
-                                  if (!safeHref) return <span>{children}</span>;
-                                  return (
-                                    <a
-                                      href={safeHref}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary underline decoration-1 underline-offset-2 hover:text-primary/80"
-                                    >
-                                      {children}
-                                    </a>
-                                  );
-                                },
-                              }}
-                            >
-                              {msg.content}
-                            </ReactMarkdown>
+                            {msg.content ? (
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeSanitize]}
+                                components={{
+                                  a: ({ href, children }) => {
+                                    const safeHref = safeExternalHref(href);
+                                    if (!safeHref) return <span>{children}</span>;
+                                    return (
+                                      <a
+                                        href={safeHref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary underline decoration-1 underline-offset-2 hover:text-primary/80"
+                                      >
+                                        {children}
+                                      </a>
+                                    );
+                                  },
+                                }}
+                              >
+                                {msg.content}
+                              </ReactMarkdown>
+                            ) : msg.isStreaming ? (
+                              <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-mono py-0.5">
+                                <CircleNotch className="size-3.5 animate-spin text-primary shrink-0" />
+                                <span className="text-primary/90">
+                                  {msg.toolCalls && msg.toolCalls.length > 0
+                                    ? `Executing ${formatToolName(msg.toolCalls[msg.toolCalls.length - 1].name)}...`
+                                    : "Analyzing clinical guidelines & precedents..."}
+                                </span>
+                              </div>
+                            ) : null}
+                            {msg.isStreaming && msg.content && (
+                              <span className="inline-block w-1.5 h-3 ml-0.5 bg-primary align-middle animate-pulse rounded-xs" />
+                            )}
                           </div>
                         ) : (
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                         )}
 
                         {/* Copy Button on Assistant Message */}
-                        {isAssistant && (
+                        {isAssistant && msg.content && (
                           <button
                             onClick={() => handleCopy(msg.content, index)}
                             className="absolute -bottom-2.5 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-card border border-border rounded px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 shadow-sm cursor-pointer"
@@ -589,13 +601,15 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                   );
                 })}
 
-                {/* Thinking / Tool Calling State */}
-                {isSending && (
-                  <div className="flex items-center gap-2 p-2.5 rounded-lg border border-primary/20 bg-primary/5 text-primary text-xs font-mono">
-                    <CircleNotch className="size-3.5 animate-spin shrink-0" />
-                    <span className="animate-pulse text-[11px]">
-                      Sentinel Copilot is inspecting evidence & statutes...
-                    </span>
+                {/* Single Thinking State - only shown if backend action is in flight before streaming message appears */}
+                {isSending && !messages.some((m) => m.role === "assistant" && m.isStreaming) && (
+                  <div className="flex flex-col items-start space-y-1">
+                    <div className="bg-muted/30 text-foreground border border-border/80 rounded-xl rounded-bl-xs p-3 max-w-[92%] shadow-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-mono py-0.5">
+                        <CircleNotch className="size-3.5 animate-spin text-primary shrink-0" />
+                        <span className="text-primary/90">Analyzing clinical guidelines & precedents...</span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </>

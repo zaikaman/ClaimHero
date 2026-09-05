@@ -336,11 +336,11 @@ export const hybridSearchPrecedents = action({
     let lexicalCandidates: Array<HydratedPrecedent & { textScore: number }> = [];
     try {
       const lexicalQuery = userQuery || buildClaimLexicalTerms(queryFields);
-      const docs = await ctx.runQuery(internal.precedents.searchLexicalPrecedentsInternal, {
+      const docs: HydratedPrecedent[] = await ctx.runQuery(internal.precedents.searchLexicalPrecedentsInternal, {
         query: lexicalQuery,
         limit: 16,
       });
-      lexicalCandidates = docs.map((doc, idx) => ({
+      lexicalCandidates = docs.map((doc: HydratedPrecedent, idx: number) => ({
         ...doc,
         textScore: Math.max(0.1, 1 / (idx + 1)),
       }));

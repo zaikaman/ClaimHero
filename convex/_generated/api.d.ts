@@ -19,6 +19,7 @@ import type * as actions_payerContactResolver from "../actions/payerContactResol
 import type * as actions_policyCrawler from "../actions/policyCrawler.js";
 import type * as actions_precedentArchive from "../actions/precedentArchive.js";
 import type * as actions_precedentMatcher from "../actions/precedentMatcher.js";
+import type * as actions_sentinelAgent from "../actions/sentinelAgent.js";
 import type * as actions_sentinelChatbot from "../actions/sentinelChatbot.js";
 import type * as actions_sentinelPipeline from "../actions/sentinelPipeline.js";
 import type * as appeals from "../appeals.js";
@@ -46,6 +47,7 @@ import type * as model_auth from "../model/auth.js";
 import type * as p2pCallSessions from "../p2pCallSessions.js";
 import type * as p2pScripts from "../p2pScripts.js";
 import type * as precedents from "../precedents.js";
+import type * as sentinelAgentQueries from "../sentinelAgentQueries.js";
 import type * as settings from "../settings.js";
 import type * as users from "../users.js";
 import type * as workflows from "../workflows.js";
@@ -68,6 +70,7 @@ declare const fullApi: ApiFromModules<{
   "actions/policyCrawler": typeof actions_policyCrawler;
   "actions/precedentArchive": typeof actions_precedentArchive;
   "actions/precedentMatcher": typeof actions_precedentMatcher;
+  "actions/sentinelAgent": typeof actions_sentinelAgent;
   "actions/sentinelChatbot": typeof actions_sentinelChatbot;
   "actions/sentinelPipeline": typeof actions_sentinelPipeline;
   appeals: typeof appeals;
@@ -95,6 +98,7 @@ declare const fullApi: ApiFromModules<{
   p2pCallSessions: typeof p2pCallSessions;
   p2pScripts: typeof p2pScripts;
   precedents: typeof precedents;
+  sentinelAgentQueries: typeof sentinelAgentQueries;
   settings: typeof settings;
   users: typeof users;
   workflows: typeof workflows;
@@ -137,4 +141,5 @@ export declare const components: {
   oauthGoogle: import("@convex-dev/auth/providers/oauth/_generated/component.js").ComponentApi<"oauthGoogle">;
   agentmail: import("@agentmail/convex/_generated/component.js").ComponentApi<"agentmail">;
   workflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"workflow">;
+  agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
 };

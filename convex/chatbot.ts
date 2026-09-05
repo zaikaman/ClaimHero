@@ -246,11 +246,29 @@ export const clearSession = mutation({
     await ctx.db.patch(args.sessionId, {
       messageCount: 0,
       summary: undefined,
+      agentThreadId: undefined,
       title: "Clinical & Appellate Inquiry",
       updatedAt: Date.now(),
     });
 
     return { success: true };
+  },
+});
+
+/**
+ * Increment message count for a session
+ */
+export const incrementSessionMessageCount = internalMutation({
+  args: {
+    sessionId: v.id("chatbotSessions"),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) return;
+    await ctx.db.patch(args.sessionId, {
+      messageCount: (session.messageCount || 0) + 1,
+      updatedAt: Date.now(),
+    });
   },
 });
 

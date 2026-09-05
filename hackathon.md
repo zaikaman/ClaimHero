@@ -7,12 +7,12 @@
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://kindhearted-elephant-992.convex.cloud
-- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/workflow
-- **Convex features:** schema, tables, indexes, vector search, full-text search, queries, mutations, actions, HTTP actions, crons, scheduled functions, file storage, realtime queries, durable workflows
+- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/workflow, @convex-dev/agent
+- **Convex features:** schema, tables, indexes, vector search, full-text search, queries, mutations, actions, HTTP actions, crons, scheduled functions, file storage, realtime queries, durable workflows, AI agent streaming
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-04T17:19:00Z
+- **Last updated:** 2026-09-05T04:12:00Z
 
 ## Log
 
@@ -805,11 +805,21 @@ Hardened AgentMail message retrieval, angle-bracketed ID matching, and component
 - Streamlined Defense Suite Information Architecture and UI Duplication: Preserved Doctor P2P Copilot and ERISA & Liability Audit as specialized clinical/statutory companion assets while decluttering the primary appeal workflow (Ingest -> Evidence Matrix -> Appeal Brief -> Dispatch). Removed duplicate Doctor P2P Script and ERISA Penalties navigation buttons from the Collaborative Appeal Studio card header in `src/components/studio/AppealStudio.tsx`, keeping primary focus on Preview Email and AI Synthesis. Reframed defense vector sub-tabs as "Defense Suite Deliverables: Brief & Companion Collateral" in `src/components/common/SentinelFlowStepper.tsx` and simplified sidebar badges. Integrated companion collateral quick-links directly into `src/components/studio/ExportDrawer.tsx`, allowing users to open the P2P Tele-Script or ERISA Audit directly from the appeal packet view.
 - Redesigned ERISA & Liability Audit Header Bar: Fixed cramped truncation and layout overflow in `src/components/calculator/FinancialLiabilityCalculator.tsx` to match the exact design language of `AppealStudio` and `P2PDefenseStudio`. Standardized title to "ERISA & Liability Audit", badge to "29 U.S.C. § 1132(c)", and replaced wordy cut-off paragraph with clean metadata pills (`Patient` • `Payer` • `Disputed: $X,XXX.XX`). Shortened button labels ("Embed in Brief") and updated responsive flex layout (`lg:flex-row`). Verified with 100% clean typecheck and production Vite build.
 
-### 2026-09-04 - working tree
+### 2026-09-04 - 40a759f
 Implemented Hybrid Precedent Search combining 1536-dimensional Convex semantic vector search (`by_embedding`) with native Convex BM25 full-text lexical search (`search_precedents`) using Reciprocal Rank Fusion (RRF):
 - Mathematical RRF Engine: Implemented Cormack et al. (SIGIR 2009) reciprocal rank fusion formula ($k=60$) in `convex/lib/embeddings.ts` (`reciprocalRankFusion`, `calculateCodeOverlap`, `buildClaimLexicalTerms`), combining dense vector similarity ranks with BM25 keyword rankings and domain-specific clinical code overlap (ICD-10 exact and 3-character disease family matching, CPT numeric matching, and CARC denial code matching).
 - Convex Backend Functions: Added `searchLexicalPrecedentsInternal` query in `convex/precedents.ts` executing native `.withSearchIndex("search_precedents")` with field filters and stripped embeddings. Upgraded `retrieveTopPrecedents` action in `convex/actions/precedentArchive.ts` to perform dual-path vector and lexical retrieval in parallel with RRF fusion, attaching controlling authorities with composite RRF metadata to `clinicalEvidences` and recording telemetry in `appealAuditLogs`. Exposed `hybridSearchPrecedents` public action for arbitrary query and code searches.
 - AI Chatbot & Tele-Script Integration: Updated `search_precedents` tool in `convex/actions/sentinelChatbot.ts` to invoke `hybridSearchPrecedents` with seamless fallback, empowering the conversational agent with dual semantic-lexical precision.
 - Frontend Indicators: Enhanced `PrecedentFeed` (`src/components/evidence/PrecedentFeed.tsx`) and `CitationSidebar` (`src/components/studio/CitationSidebar.tsx`) with hybrid badges ("Hybrid RRF Fusion", "Dense Vector", "BM25 Lexical"), RRF scores, and rank breakdowns (Vector Rank #X, BM25 Rank #Y, Code Overlap %).
 - Testing & Verification: Added automated test suite `tests/hybridSearchRRF.test.ts` (14 unit tests) covering mathematical RRF formulation, dual-model rank fusion, domain clinical code overlap, lexical term parsing, and action fallbacks. Expanded total test suite to 476 passing tests across 33 test files. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 476/476 passing tests, and successful production Vite build. Convex features: vector search (`by_embedding`), full-text search (`search_precedents`), actions, internal queries, internal mutations, schema validators, audit logs.
+
+### 2026-09-05 - working tree
+Implemented Real-Time Token Streaming with Convex AI Agent (@convex-dev/agent):
+- Convex AI Agent Integration: Configured `@convex-dev/agent` with native OpenAI LLM support and streaming deltas stored directly in Convex tables.
+- Sentinel Agent & Native Tooling: Implemented `convex/actions/sentinelAgent.ts` with 10 native clinical and regulatory tools (`lookup_clinical_guidelines`, `search_precedents`, `calculate_erisa_deadlines`, `calculate_erisa_penalties`, `fetch_audit_trail`, `firecrawl_web_search`, `analyze_payer_compliance`, `suggest_rebuttal_strategy`, `draft_appeal_letter_section`, `evaluate_denial_evidence`) with `@convex-dev/rate-limiter` protection and typed Zod schemas.
+- Reactive Streaming Endpoints: Built `convex/sentinelAgentQueries.ts` (`listThreadMessages`, `getOrCreateAgentThread`) pairing `listUIMessages` and `syncStreams` for token-by-token streaming and live tool call state progression.
+- Frontend Streaming Hook: Implemented `useSentinelChat.ts` React hook integrating `useUIMessages` for seamless streaming message reconstruction, live tool execution states, and fallback support for legacy sessions.
+- Streaming UI & Micro-interactions: Upgraded `src/components/chat/SentinelChatbot.tsx` with real-time streaming status badges, blinking terminal cursor animation (`animate-pulse`), live tool execution callouts, unified single-bubble loading state, and minimalist typography-first header bar without extraneous status pills or dots.
+- Testing & Quality Verification: Created `tests/sentinelAgent.test.ts` to validate tool schemas, execution guards, and thread initialization. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 483/483 passing tests, and successful production Vite build. Convex features: components (`@convex-dev/agent`, `@convex-dev/rate-limiter`), queries, mutations, actions, streaming sync (`listUIMessages`, `syncStreams`).
+
 

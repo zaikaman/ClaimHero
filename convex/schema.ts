@@ -431,6 +431,7 @@ export default defineSchema({
     userId: v.id("users"),
     title: v.string(),
     activeClaimId: v.optional(v.id("claims")),
+    agentThreadId: v.optional(v.string()), // Convex AI Agent component thread ID for streaming
     summary: v.optional(v.string()), // Compressed summary of older conversation turns
     messageCount: v.number(),
     createdAt: v.number(),
@@ -438,6 +439,7 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_updated", ["userId", "updatedAt"])
+    .index("by_agent_thread", ["agentThreadId"])
     .index("by_updated", ["updatedAt"]),
 
   // Sentinel Chatbot Messages
