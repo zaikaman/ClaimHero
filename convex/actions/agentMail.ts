@@ -667,9 +667,28 @@ async function performInboxSync(
           (typeof msg.message_id === "string" ? msg.message_id : undefined) ||
           (typeof msg.messageId === "string" ? msg.messageId : undefined) ||
           (typeof msg.id === "string" ? msg.id : undefined);
-        if (rawMessageId) {
-          candidateIds.push(rawMessageId);
-        }
+        if (!rawMessageId) continue;
+
+        const labels = Array.isArray(msg.labels) ? (msg.labels as string[]) : [];
+        const fromStr = typeof msg.from === "string" ? msg.from.toLowerCase() : "";
+        const senderEmail = (extractEmailAddress(fromStr) || fromStr).toLowerCase();
+        const ownSenderEmail = mailboxes.senderEmail?.toLowerCase();
+        const ownAdjudicatorEmail = mailboxes.adjudicatorEmail?.toLowerCase();
+
+        const isOwnInboxSender =
+          (Boolean(ownSenderEmail) && (senderEmail === ownSenderEmail || fromStr.includes(ownSenderEmail!))) ||
+          (Boolean(ownAdjudicatorEmail) && (senderEmail === ownAdjudicatorEmail || fromStr.includes(ownAdjudicatorEmail!))) ||
+          fromStr.includes(inboxId.toLowerCase());
+
+        const subjectStr = typeof msg.subject === "string" ? msg.subject.toLowerCase() : "";
+        const isAlertSubject = subjectStr.includes("[claimhero alert]");
+        const isSent = labels.includes("sent");
+
+        // Only check DB existence for genuine inbound candidates (eliminates querying DB for sent/alert/self-sent emails)
+        const isReceived = (labels.includes("received") || !isOwnInboxSender) && !isSent && !isOwnInboxSender && !isAlertSubject;
+        if (!isReceived) continue;
+
+        candidateIds.push(rawMessageId);
       }
     } catch (inboxErr) {
       console.warn(`Failed to list messages for inbox ${inboxId}:`, inboxErr);

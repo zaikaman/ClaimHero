@@ -138,6 +138,14 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
     it("skips dispatch if message is no longer pending", async () => {
       const mockCtx: any = {
         runQuery: vi.fn().mockImplementation(async (fn: any, args: any) => {
+          if (args?.messageId && args?.threadId) {
+            return {
+              messageId: args.messageId,
+              autoReplyStatus: "dispatched",
+              autoReplyDraft: "Draft",
+              hasSubsequentOutbound: false,
+            };
+          }
           if (args?.threadId) {
             return {
               thread: { _id: "th_1" },
@@ -161,6 +169,14 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
     it("skips dispatch if autoPilotEnabled is false on the claim", async () => {
       const mockCtx: any = {
         runQuery: vi.fn().mockImplementation(async (fn: any, args: any) => {
+          if (args?.messageId && args?.threadId) {
+            return {
+              messageId: args.messageId,
+              autoReplyStatus: "pending",
+              autoReplyDraft: "Draft",
+              hasSubsequentOutbound: false,
+            };
+          }
           if (args?.threadId) {
             return {
               thread: { _id: "th_1" },
@@ -177,6 +193,7 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
           }
           return null;
         }),
+        runMutation: vi.fn().mockResolvedValue(undefined),
       };
 
       const res = await (actionMailDispatcher.dispatchScheduledAutoPilotReply as any)._handler(mockCtx, {
@@ -187,11 +204,26 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
 
       expect(res.executed).toBe(false);
       expect(res.reason).toBe("autopilot_disabled");
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          messageId: "msg_1",
+          autoReplyStatus: "disabled",
+        })
+      );
     });
 
     it("skips and marks dispatched if manual outbound reply was already sent after inbound message", async () => {
       const mockCtx: any = {
         runQuery: vi.fn().mockImplementation(async (fn: any, args: any) => {
+          if (args?.messageId && args?.threadId) {
+            return {
+              messageId: args.messageId,
+              autoReplyStatus: "pending",
+              autoReplyDraft: "Draft",
+              hasSubsequentOutbound: true,
+            };
+          }
           if (args?.threadId) {
             return {
               thread: { _id: "th_1" },
@@ -250,6 +282,14 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
 
       const mockCtx: any = {
         runQuery: vi.fn().mockImplementation(async (fn: any, args: any) => {
+          if (args?.messageId && args?.threadId) {
+            return {
+              messageId: args.messageId,
+              autoReplyStatus: "pending",
+              autoReplyDraft: "We formally maintain that CPT 29881 is medically necessary under ERISA.",
+              hasSubsequentOutbound: false,
+            };
+          }
           if (args?.threadId) {
             return {
               thread: { _id: "th_1", payerEmail: "appeals@payer.com" },
@@ -312,6 +352,14 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
                 receivedAt: 500,
               },
             ];
+          }
+          if (args?.messageId && args?.threadId) {
+            return {
+              messageId: args.messageId,
+              autoReplyStatus: "pending",
+              autoReplyDraft: "Rebuttal draft 1",
+              hasSubsequentOutbound: false,
+            };
           }
           if (args?.threadId === "thread_sweep_1") {
             return {

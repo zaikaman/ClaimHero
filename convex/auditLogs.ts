@@ -96,24 +96,30 @@ export const listRecent = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    const limit = Math.min(Math.max(1, args.limit ?? 20), 20);
+    const limit = Math.min(Math.max(1, args.limit ?? 15), 20);
 
+    // Primary fast path: single index scan via by_user_and_timestamp (~15 docs vs 210 docs)
+    const userLogs = await ctx.db
+      .query("appealAuditLogs")
+      .withIndex("by_user_and_timestamp", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(limit);
+
+    if (userLogs.length > 0) {
+      return userLogs;
+    }
+
+    // Graceful fallback for legacy logs created prior to userId index denormalization
     const userClaims = await ctx.db
       .query("claims")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
-      .take(10);
+      .take(5);
 
     if (userClaims.length === 0) return [];
 
-    // Focus on active/recent claims if user has many
-    const activeClaims = userClaims
-      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-      .slice(0, 10);
-
-    // Fetch indexed recent logs for each claim in parallel, strictly capped at 20
     const logsPerClaim = await Promise.all(
-      activeClaims.map((claim) =>
+      userClaims.map((claim) =>
         ctx.db
           .query("appealAuditLogs")
           .withIndex("by_claim_and_timestamp", (q) => q.eq("claimId", claim._id))
@@ -122,9 +128,8 @@ export const listRecent = query({
       )
     );
 
-    const mergedLogs = logsPerClaim.flat();
-
-    return mergedLogs
+    return logsPerClaim
+      .flat()
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
   },

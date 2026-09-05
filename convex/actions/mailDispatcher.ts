@@ -887,31 +887,26 @@ async function performDispatchScheduledAutoPilotReply(
     threadId: Id<"emailThreads">;
   }
 ): Promise<{ executed: boolean; reason?: string; claimNumber?: string }> {
-  const threadData = await ctx.runQuery(api.emails.getThreadWithMessages, {
+  const messageState = await ctx.runQuery(internal.emails.getAutoPilotMessageStateInternal, {
+    messageId: args.messageId,
     threadId: args.threadId,
   });
-  if (!threadData) return { executed: false, reason: "thread_not_found" };
+  if (!messageState) return { executed: false, reason: "message_not_found" };
 
-  const messagesList = (threadData.messages || []) as Array<{
-    _id: string;
-    direction: string;
-    receivedAt?: number;
-    _creationTime?: number;
-    autoReplyStatus?: string;
-    autoReplyDraft?: string;
-  }>;
-
-  const targetMsg = messagesList.find((m) => m._id === args.messageId);
-  if (!targetMsg) return { executed: false, reason: "message_not_found" };
-
-  if (targetMsg.autoReplyStatus !== "pending") {
-    return { executed: false, reason: `status_not_pending_${targetMsg.autoReplyStatus}` };
+  if (messageState.autoReplyStatus !== "pending") {
+    return { executed: false, reason: `status_not_pending_${messageState.autoReplyStatus}` };
   }
 
   const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
     claimId: args.claimId,
   });
-  if (!claim) return { executed: false, reason: "claim_not_found" };
+  if (!claim) {
+    await ctx.runMutation(internal.emails.updateMessageAnalysisInternal, {
+      messageId: args.messageId,
+      autoReplyStatus: "skipped",
+    });
+    return { executed: false, reason: "claim_not_found" };
+  }
   if (claim.status === "won") {
     await ctx.runMutation(internal.emails.markAutoReplyDispatchedInternal, {
       messageId: args.messageId,
@@ -919,22 +914,23 @@ async function performDispatchScheduledAutoPilotReply(
     return { executed: false, reason: "claim_already_won" };
   }
   if (claim.autoPilotEnabled === false) {
+    // Crucial: Mark as disabled so background cron does not endlessly re-sweep this message every 5 minutes
+    await ctx.runMutation(internal.emails.updateMessageAnalysisInternal, {
+      messageId: args.messageId,
+      autoReplyStatus: "disabled",
+    });
     return { executed: false, reason: "autopilot_disabled" };
   }
 
   // Check if an outbound reply was already sent on this thread AFTER this message
-  const msgReceivedAt = targetMsg.receivedAt || targetMsg._creationTime || 0;
-  const hasSubsequentOutbound = messagesList.some(
-    (m) => m.direction === "outbound" && (m.receivedAt || m._creationTime || 0) > msgReceivedAt
-  );
-  if (hasSubsequentOutbound) {
+  if (messageState.hasSubsequentOutbound) {
     await ctx.runMutation(internal.emails.markAutoReplyDispatchedInternal, {
       messageId: args.messageId,
     });
     return { executed: false, reason: "already_replied" };
   }
 
-  let rebuttalText = targetMsg.autoReplyDraft?.trim();
+  let rebuttalText = messageState.autoReplyDraft?.trim();
   if (!rebuttalText) {
     rebuttalText = `We acknowledge your correspondence regarding Claim #${claim.claimNumber}. In accordance with statutory ERISA protections under 29 C.F.R. § 2560.503-1, we formally maintain our demand for full claim reimbursement based on documented medical necessity and request immediate escalation to Independent External Review (IRO).`;
   }
@@ -1028,6 +1024,14 @@ export const sweepPendingAutoPilotReplies = internalAction({
         }
       } catch (err) {
         console.warn(`Sentinel Auto-Pilot sweep error for message ${pending.messageId}:`, err);
+        try {
+          await ctx.runMutation(internal.emails.updateMessageAnalysisInternal, {
+            messageId: pending.messageId,
+            autoReplyStatus: "failed",
+          });
+        } catch {
+          // Graceful fallback
+        }
         skippedCount++;
       }
     }

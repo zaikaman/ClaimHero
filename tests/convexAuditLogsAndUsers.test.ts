@@ -198,13 +198,16 @@ describe("Convex Audit Logs, Users, Auth & Crons", () => {
             }
             if (table === "appealAuditLogs") {
               return {
-                withIndex: vi.fn().mockImplementation((_name, fn) => {
+                withIndex: vi.fn().mockImplementation((name, fn) => {
                   const queryObj: any = {};
                   queryObj.eq = vi.fn().mockReturnValue(queryObj);
                   fn(queryObj);
                   return {
                     order: vi.fn().mockReturnValue({
                       take: vi.fn().mockImplementation(() => {
+                        if (name === "by_user_and_timestamp") {
+                          return Promise.resolve([c2Logs[0], c1Logs[0]]);
+                        }
                         // Return based on call
                         if (mockCtx.db.query.mock.calls.length === 2) return Promise.resolve(c1Logs);
                         return Promise.resolve(c2Logs);

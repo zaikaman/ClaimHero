@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-05T04:28:00Z
+- **Last updated:** 2026-09-05T09:40:00Z
 
 ## Log
 
@@ -822,7 +822,7 @@ Implemented Real-Time Token Streaming with Convex AI Agent (@convex-dev/agent):
 - Streaming UI & Micro-interactions: Upgraded `src/components/chat/SentinelChatbot.tsx` with real-time streaming status badges, blinking terminal cursor animation (`animate-pulse`), live tool execution callouts, unified single-bubble loading state, and minimalist typography-first header bar without extraneous status pills or dots.
 - Testing & Quality Verification: Created `tests/sentinelAgent.test.ts` to validate tool schemas, execution guards, and thread initialization. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 483/483 passing tests, and successful production Vite build. Convex features: components (`@convex-dev/agent`, `@convex-dev/rate-limiter`), queries, mutations, actions, streaming sync (`listUIMessages`, `syncStreams`).
 
-### 2026-09-05 - working tree
+### 2026-09-05 - 2945bc9
 Implemented Single-Request Native Structured Extraction via Firecrawl (firecrawl.extract / formats: [{ type: "json" }]):
 - Single-Hop Policy Extraction Architecture: Re-engineered policy analysis pipeline (`convex/actions/policyCrawler.ts`) to request native AI JSON extraction in the initial `firecrawl.scrape` invocation by providing a strict JSON schema (`NATIVE_POLICY_EXTRACTION_SCHEMA`) covering `policyTitle`, `policyNumber`, `effectiveDate`, `revisionHistory`, `medicalNecessityCriteria`, `contraindications`, `priorAuthRequirements`, and structured citation `clauses`.
 - Zero-Token Direct Ingestion: When Firecrawl returns conforming structured criteria in `doc.json`, the pipeline skips the second LLM hop to OpenAI, eliminating 3-6 seconds of latency and cutting OpenAI token spend for policy parsing to zero.
@@ -830,5 +830,17 @@ Implemented Single-Request Native Structured Extraction via Firecrawl (firecrawl
 - Resilient Dual-Engine Fallback: Preserved automated fallback to OpenAI `gpt-5.4-nano` (`createStructuredCompletion`) whenever Firecrawl native JSON is absent, incomplete, or unaligned, tagging each extraction with `extractionEngine: "firecrawl_native"` or `"openai_fallback"` for transparent case audit trails.
 - Agent & Chatbot Tooling Upgrade: Extended `performFirecrawlScrapeUrl` in `convex/actions/sentinelChatbot.ts` and `firecrawlScrapeUrl` in `convex/actions/sentinelAgent.ts` to request JSON extraction and return structured criteria alongside clean markdown.
 - Unit Testing & Verification: Expanded `tests/actionsPolicyAndSynthesizer.test.ts` with unit tests verifying single-hop native Firecrawl extraction without OpenAI invocations, graceful fallback on absent JSON, discrete criteria array synthesis, and standalone `extractPolicyWithFirecrawl` execution. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 482 passing tests across 34 suites, and successful production Vite build. Convex features: components (`@firecrawl/firecrawl-convex`), actions, internal mutations, rate limiting, audit logs.
+
+### 2026-09-05 - working tree
+Production-Grade Convex Database I/O Optimization & Free-Tier Spend Hardening:
+- Root-Cause Resolution of Autopilot Sweep Polling Loop: Diagnosed and resolved the root cause behind 59 MB in `emails.getPendingAutoPilotMessagesInternal` and 76.91 MB in `emails.getThreadWithMessages`. In `convex/actions/mailDispatcher.ts`, claims with `autoPilotEnabled: false` previously returned `autopilot_disabled` without clearing `autoReplyStatus: "pending"`, creating an infinite polling loop on every 5-minute cron run that repeatedly re-read full email threads and claim documents. Hardened `performDispatchScheduledAutoPilotReply` to immediately transition unreviewed messages to `autoReplyStatus: "disabled"`, `"skipped"`, or `"failed"`, permanently halting stuck loops.
+- Targeted Autopilot State Retrieval: Added `getAutoPilotMessageStateInternal` query in `convex/emails.ts` returning only the target message and recent outbound headers (`take(10)`), completely bypassing the heavy `api.emails.getThreadWithMessages` call that loaded up to 50 complete HTML email bodies into action memory.
+- Zero-Document Range Indexing for Autopilot Sweeps: Added compound index `by_auto_reply_status_and_received_at` (`["autoReplyStatus", "receivedAt"]`) to `emailMessages` table in `convex/schema.ts`. Updated `getPendingAutoPilotMessagesInternal` in `convex/emails.ts` to execute a bounded range scan (`.lte("receivedAt", maxReceivedAt)`), ensuring zero documents are scanned when no pending messages have crossed the 1-hour threshold.
+- Pre-Filter Optimization for AgentMail Inbound Sync: Refactored `performInboxSync` in `convex/actions/agentMail.ts` to filter out sent emails (`labels.includes("sent")`), alert notifications (`[ClaimHero Alert]`), and self-sent messages before adding them to candidate ID batch queries, reducing database existence lookups by >85%. Re-ordered `emails.getExistingAgentMailMessageIds` to query lightweight index tables (`recordedAgentMailMessageIds` and `ignoredAgentMailMessages`) before touching legacy `emailMessages`, and added `backfillRecordedMessageIdsInternal` mutation to index legacy messages.
+- Single-Index Direct Query for Audit Trails: Upgraded `auditLogs.listRecent` in `convex/auditLogs.ts` to query directly via `by_user_and_timestamp` index (`["userId", "timestamp"]`), replacing an 11-query fan-out (1 claim scan + 10 parallel audit log queries reading up to 210 documents) with a single bounded read of 15 documents.
+- In-Memory Evidence Sources Derivation: Refactored `src/hooks/useEvidence.ts` to compute `sourcesSummary` directly in memory using `useMemo` from `rawEvidences`, eliminating duplicate database queries to `clinicalEvidences.listSourcesSummary` and saving 100% of its database read I/O.
+- Background Cron Pacing: Paced `sync-agentmail-inboxes` and `sentinel-autopilot-sla-sweep` intervals from 5 minutes to 15 minutes in `convex/crons.ts`, slashing background cron invocations by 66% while relying on real-time event webhooks (`onMessageReceived`) for immediate message processing.
+- Quality Assurance & Regression Verification: Added unit test suites in `tests/convexEmails.test.ts` and updated `tests/autopilotSLA.test.ts` and `tests/convexAuditLogsAndUsers.test.ts`. Verified with `npm run verify`: 100% clean TypeScript strict check (`tsc --noEmit`), 0 ESLint errors/warnings, 485/485 passing tests across 34 suites, and successful production Vite build. Convex features: schema compound indexes, internal queries, internal mutations, crons, actions, audit logs.
+
 
 

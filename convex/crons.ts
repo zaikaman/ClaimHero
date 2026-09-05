@@ -16,22 +16,24 @@ crons.cron(
 
 /**
  * AgentMail Inbound Sync Cron:
- * Synchronizes recent messages from AgentMail inboxes every 5 minutes to ingest payer replies.
+ * Periodic catch-up synchronizing recent messages from AgentMail inboxes every 15 minutes
+ * for any messages delayed when webhooks were temporarily unreachable.
  */
 crons.interval(
   "sync-agentmail-inboxes",
-  { minutes: 5 },
+  { minutes: 15 },
   internal.actions.agentMail.syncInboundMessagesInternal,
   {}
 );
 
 /**
  * Sentinel Auto-Pilot 1-Hour SLA Sweep Cron:
- * Periodically sweeps pending inbound clinical rebuttals and autonomously dispatches any whose 1-hour review SLA has elapsed.
+ * Sweeps pending inbound clinical rebuttals every 15 minutes and autonomously dispatches
+ * any whose 1-hour review SLA has elapsed.
  */
 crons.interval(
   "sentinel-autopilot-sla-sweep",
-  { minutes: 5 },
+  { minutes: 15 },
   internal.actions.mailDispatcher.sweepPendingAutoPilotReplies,
   {}
 );

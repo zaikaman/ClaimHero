@@ -521,26 +521,66 @@ export const getExistingAgentMailMessageIds = internalQuery({
         continue;
       }
 
-      // 2. Fallback check for messages ingested prior to compact index introduction
-      const existing = await ctx.db
-        .query("emailMessages")
-        .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmed))
-        .first();
-      if (existing !== null) {
-        existingIds.push(trimmed);
-        continue;
-      }
-
-      // 3. Fallback check for ignored / unmatched messages
+      // 2. Check ignored / unmatched messages (~50 bytes read)
       const ignored = await ctx.db
         .query("ignoredAgentMailMessages")
         .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmed))
         .first();
       if (ignored !== null) {
         existingIds.push(trimmed);
+        continue;
+      }
+
+      // 3. Fallback check for messages ingested prior to compact index introduction
+      const existing = await ctx.db
+        .query("emailMessages")
+        .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmed))
+        .first();
+      if (existing !== null) {
+        existingIds.push(trimmed);
       }
     }
     return existingIds;
+  },
+});
+
+/**
+ * One-time / background backfill to ensure all existing emailMessages with an agentMailMessageId
+ * are indexed in recordedAgentMailMessageIds, preventing legacy document full-scans in getExistingAgentMailMessageIds.
+ */
+export const backfillRecordedMessageIdsInternal = internalMutation({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = Math.min(args.limit ?? 100, 200);
+    const messages = await ctx.db
+      .query("emailMessages")
+      .order("desc")
+      .take(limit);
+
+    let backfilledCount = 0;
+    for (const msg of messages) {
+      if (msg.agentMailMessageId) {
+        const trimmed = msg.agentMailMessageId.trim();
+        if (trimmed) {
+          const recorded = await ctx.db
+            .query("recordedAgentMailMessageIds")
+            .withIndex("by_agent_mail_message_id", (q) => q.eq("agentMailMessageId", trimmed))
+            .first();
+          if (!recorded) {
+            await ctx.db.insert("recordedAgentMailMessageIds", {
+              agentMailMessageId: trimmed,
+              claimId: msg.claimId,
+              status: "processed",
+              recordedAt: msg.receivedAt || msg._creationTime || Date.now(),
+            });
+            backfilledCount++;
+          }
+        }
+      }
+    }
+    return { backfilledCount };
   },
 });
 
@@ -687,7 +727,9 @@ export const setClaimAutoPilot = mutation({
 });
 
 /**
- * Query inbound messages with pending auto-reply drafts whose SLA delay has elapsed
+ * Query inbound messages with pending auto-reply drafts whose SLA delay has elapsed.
+ * Uses compound index `by_auto_reply_status_and_received_at` to perform a bounded range scan
+ * strictly on messages that have reached maxReceivedAt. Scans 0 documents when no messages qualify.
  */
 export const getPendingAutoPilotMessagesInternal = internalQuery({
   args: {
@@ -696,8 +738,10 @@ export const getPendingAutoPilotMessagesInternal = internalQuery({
   handler: async (ctx, args) => {
     const pendingMessages = await ctx.db
       .query("emailMessages")
-      .withIndex("by_auto_reply_status", (q) => q.eq("autoReplyStatus", "pending"))
-      .take(50);
+      .withIndex("by_auto_reply_status_and_received_at", (q) =>
+        q.eq("autoReplyStatus", "pending").lte("receivedAt", args.maxReceivedAt)
+      )
+      .take(20);
 
     const readyMessages = [];
     for (const msg of pendingMessages) {
@@ -718,6 +762,40 @@ export const getPendingAutoPilotMessagesInternal = internalQuery({
       }
     }
     return readyMessages;
+  },
+});
+
+/**
+ * Lightweight internal query to check an individual message's eligibility for autonomous dispatch.
+ * Replaces loading the entire 50-message thread with heavy MIME HTML bodies via getThreadWithMessages.
+ */
+export const getAutoPilotMessageStateInternal = internalQuery({
+  args: {
+    messageId: v.id("emailMessages"),
+    threadId: v.id("emailThreads"),
+  },
+  handler: async (ctx, args) => {
+    const message = await ctx.db.get(args.messageId);
+    if (!message) return null;
+
+    // Check if any subsequent outbound message was already sent on this thread
+    const msgReceivedAt = message.receivedAt || message._creationTime || 0;
+    const recentMessages = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+      .order("desc")
+      .take(10);
+
+    const hasSubsequentOutbound = recentMessages.some(
+      (m) => m.direction === "outbound" && (m.receivedAt || m._creationTime || 0) > msgReceivedAt
+    );
+
+    return {
+      messageId: message._id,
+      autoReplyStatus: message.autoReplyStatus,
+      autoReplyDraft: message.autoReplyDraft,
+      hasSubsequentOutbound,
+    };
   },
 });
 

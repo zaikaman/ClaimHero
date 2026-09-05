@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Claim, ClinicalEvidence, OverturnScoringResult } from "../types";
@@ -14,11 +14,27 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
     isEnabled && claimId ? { claimId } : "skip"
   ) as ClinicalEvidence[] | undefined;
 
-  // Query summary breakdown of evidence sources
-  const sourcesSummary = useQuery(
-    api.clinicalEvidences.listSourcesSummary,
-    isEnabled && claimId ? { claimId } : "skip"
-  );
+  // Derive summary breakdown of evidence sources directly from loaded evidences in memory.
+  // Eliminates duplicate database full-table query, saving 100% of listSourcesSummary database I/O.
+  const sourcesSummary = useMemo(() => {
+    if (!rawEvidences) return undefined;
+    const summary: Record<string, number> = {
+      payer_cpb: 0,
+      pubmed_study: 0,
+      fda_package_insert: 0,
+      nccn_guideline: 0,
+      legal_precedent: 0,
+    };
+    for (const item of rawEvidences) {
+      if (item.sourceType) {
+        summary[item.sourceType] = (summary[item.sourceType] || 0) + 1;
+      }
+    }
+    return {
+      total: rawEvidences.length,
+      bySource: summary,
+    };
+  }, [rawEvidences]);
 
   const crawlPolicyAction = useAction(api.actions.policyCrawler.crawlInsurerPolicy);
   const crawlPubMedAction = useAction(api.actions.policyCrawler.crawlPubMedAndTrials);
