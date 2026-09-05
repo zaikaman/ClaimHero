@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-05T09:40:00Z
+- **Last updated:** 2026-09-05T10:15:00Z
 
 ## Log
 
@@ -831,7 +831,7 @@ Implemented Single-Request Native Structured Extraction via Firecrawl (firecrawl
 - Agent & Chatbot Tooling Upgrade: Extended `performFirecrawlScrapeUrl` in `convex/actions/sentinelChatbot.ts` and `firecrawlScrapeUrl` in `convex/actions/sentinelAgent.ts` to request JSON extraction and return structured criteria alongside clean markdown.
 - Unit Testing & Verification: Expanded `tests/actionsPolicyAndSynthesizer.test.ts` with unit tests verifying single-hop native Firecrawl extraction without OpenAI invocations, graceful fallback on absent JSON, discrete criteria array synthesis, and standalone `extractPolicyWithFirecrawl` execution. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 482 passing tests across 34 suites, and successful production Vite build. Convex features: components (`@firecrawl/firecrawl-convex`), actions, internal mutations, rate limiting, audit logs.
 
-### 2026-09-05 - working tree
+### 2026-09-05 - 01df7f4
 Production-Grade Convex Database I/O Optimization & Free-Tier Spend Hardening:
 - Root-Cause Resolution of Autopilot Sweep Polling Loop: Diagnosed and resolved the root cause behind 59 MB in `emails.getPendingAutoPilotMessagesInternal` and 76.91 MB in `emails.getThreadWithMessages`. In `convex/actions/mailDispatcher.ts`, claims with `autoPilotEnabled: false` previously returned `autopilot_disabled` without clearing `autoReplyStatus: "pending"`, creating an infinite polling loop on every 5-minute cron run that repeatedly re-read full email threads and claim documents. Hardened `performDispatchScheduledAutoPilotReply` to immediately transition unreviewed messages to `autoReplyStatus: "disabled"`, `"skipped"`, or `"failed"`, permanently halting stuck loops.
 - Targeted Autopilot State Retrieval: Added `getAutoPilotMessageStateInternal` query in `convex/emails.ts` returning only the target message and recent outbound headers (`take(10)`), completely bypassing the heavy `api.emails.getThreadWithMessages` call that loaded up to 50 complete HTML email bodies into action memory.
@@ -842,5 +842,5 @@ Production-Grade Convex Database I/O Optimization & Free-Tier Spend Hardening:
 - Background Cron Pacing: Paced `sync-agentmail-inboxes` and `sentinel-autopilot-sla-sweep` intervals from 5 minutes to 15 minutes in `convex/crons.ts`, slashing background cron invocations by 66% while relying on real-time event webhooks (`onMessageReceived`) for immediate message processing.
 - Quality Assurance & Regression Verification: Added unit test suites in `tests/convexEmails.test.ts` and updated `tests/autopilotSLA.test.ts` and `tests/convexAuditLogsAndUsers.test.ts`. Verified with `npm run verify`: 100% clean TypeScript strict check (`tsc --noEmit`), 0 ESLint errors/warnings, 485/485 passing tests across 34 suites, and successful production Vite build. Convex features: schema compound indexes, internal queries, internal mutations, crons, actions, audit logs.
 
-
-
+### 2026-09-05 - working tree
+Refined landing hero typography and polished P2P Live Call Copilot UI: split showcase slide titles into two-line structures (`src/components/landing/CinematicHero.tsx`) to prevent irregular wrapping on responsive viewports; replaced the truncated empty-state icon with an enclosed tele-conference `Headset` badge and resolved duplicate lightning icons in Fast Answers Generated using `ChatCenteredDots` (`src/components/p2p/P2PLiveCopilot.tsx`). Verified with clean typecheck and zero lint errors.

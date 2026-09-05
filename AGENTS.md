@@ -28,7 +28,8 @@ specs/001-appeal-sentinel/plan.md
 
 ## 4. Coding Rules
 - Use the find-docs skill when you need up-to-date documentation.
-- When coding, always use the convex-hackathon-skill.
+- When coding, always run the convex-hackathon-skill after you're done, and make sure your entry is concise, for example: ### 2026-09-04 - f113773
+Hardened structured model response handling in `convex/lib/openai.ts` with two semantic retries, corrective JSON-only instructions, balanced JSON extraction, required-field checks, and PHI-safe errors. Appeal synthesis now stops after three failed attempts and tells the user to try again without persisting or displaying synthetic content (`convex/actions/appealSynthesizer.ts`). Added regression coverage and verified 458 tests, typecheck, lint, coverage, and production build..
 - Do not write mock or fake code, or hardcode anything, everything must be production-ready and real.
 - Use the impeccable skill when you're working with UI tasks, and make sure your UI work stays consistent with the rest of the app's design.
 - All relevant docs should be available in the docs folder, use the find-docs skill if you need anything else.

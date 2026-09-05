@@ -27,7 +27,8 @@ interface ShowcaseSlide {
   badge1: { icon: React.ElementType; label: string };
   badge2: { icon: React.ElementType; label: string };
   badge3: { icon: React.ElementType; label: string };
-  title: string;
+  titleLine1: string;
+  titleLine2: string;
   description: string;
   primaryCtaText: string;
   secondaryCtaText: string;
@@ -39,7 +40,8 @@ const HERO_SLIDES: ShowcaseSlide[] = [
     badge1: { icon: ShieldCheck, label: "ERISA § 502(c) Sentinel" },
     badge2: { icon: Clock, label: "30-Day Alarms" },
     badge3: { icon: CheckCircle, label: "94.8% Overturn Yield" },
-    title: "Overturn Denials. Defend Coverage.",
+    titleLine1: "Overturn Denials.",
+    titleLine2: "Defend Coverage.",
     description:
       "Autonomous clinical intelligence cross-referencing Aetna, UHC, Cigna, and Anthem clinical bulletins with PubMed and FDA evidence to overturn wrongful medical claim denials.",
     primaryCtaText: "Ingest Denial Notice",
@@ -50,7 +52,8 @@ const HERO_SLIDES: ShowcaseSlide[] = [
     badge1: { icon: Buildings, label: "Clinical Policy Engine" },
     badge2: { icon: Star, label: "FDA & NCCN Guidelines" },
     badge3: { icon: CheckCircle, label: "Citations Verified" },
-    title: "Bulletproof Citations. Real-time Crawls.",
+    titleLine1: "Bulletproof Citations.",
+    titleLine2: "Real-time Crawls.",
     description:
       "Deeply crawl medical policy bulletins in seconds. Synthesize peer-reviewed clinical evidence directly cited into legal appeal briefs.",
     primaryCtaText: "Inspect Evidence Matrix",
@@ -61,7 +64,8 @@ const HERO_SLIDES: ShowcaseSlide[] = [
     badge1: { icon: Envelope, label: "Two-Way AgentMail Gateway" },
     badge2: { icon: Clock, label: "Statutory SLA Clocks" },
     badge3: { icon: CheckCircle, label: "$1.4M+ Recovered" },
-    title: "Autonomous Dispatch. Rapid Settlement.",
+    titleLine1: "Autonomous Dispatch.",
+    titleLine2: "Rapid Settlement.",
     description:
       "Dedicated case inboxes automatically transmit cited briefs to grievance portals and record incoming payer determinations in real time.",
     primaryCtaText: "Open Payer Inbox",
@@ -332,7 +336,8 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
               className="animate-blur-fade-up text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-normal tracking-[-0.04em] mb-4 md:mb-6 text-white leading-[1.08] max-w-4xl"
               style={{ animationDelay: "400ms" }}
             >
-              {slide.title}
+              <span className="block">{slide.titleLine1}</span>
+              <span className="block">{slide.titleLine2}</span>
             </h1>
 
             {/* Description Subtitle */}

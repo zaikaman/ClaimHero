@@ -29,6 +29,8 @@ import {
   ArrowCounterClockwise,
   ArrowsLeftRight,
   FileText,
+  Headset,
+  ChatCenteredDots,
 } from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -745,8 +747,10 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               </div>
             ) : (
               <div className="p-8 text-center space-y-2 border border-dashed border-border/80 rounded-lg text-muted-foreground">
-                <Stethoscope className="size-8 mx-auto text-primary opacity-50" />
-                <p className="text-xs font-sans text-foreground">
+                <div className="size-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto text-primary/80 mb-1">
+                  <Headset className="size-5" />
+                </div>
+                <p className="text-xs font-sans text-foreground font-medium">
                   Awaiting insurer objection or question on the live call.
                 </p>
                 <p className="text-[11px] font-sans opacity-75">
@@ -824,7 +828,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
             <div className="rounded-xl border border-border/80 bg-card/60 backdrop-blur-xl p-3.5 space-y-2 flex flex-col justify-between shadow-xs">
               <div className="flex items-center justify-between border-b border-border/60 pb-2">
                 <div className="flex items-center gap-1.5">
-                  <Lightning className="size-4 text-primary" weight="fill" />
+                  <ChatCenteredDots className="size-4 text-primary" weight="fill" />
                   <h4 className="text-xs font-bold text-foreground font-sans">
                     Fast Answers Generated
                   </h4>
