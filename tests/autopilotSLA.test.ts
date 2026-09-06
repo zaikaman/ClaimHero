@@ -5,6 +5,7 @@ import * as actionAgentMail from "../convex/actions/agentMail";
 import * as emailsModule from "../convex/emails";
 import * as libAgentMail from "../convex/lib/agentMail";
 import * as libAgentMailWebhook from "../convex/lib/agentMailWebhook";
+import * as libOpenAI from "../convex/lib/openai";
 // @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
 import { getAuthUserId } from "@convex-dev/auth/server";
 
@@ -478,6 +479,16 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
         text: "The prior denial has been reversed and approved for reimbursement in full.",
         attachments: [],
       });
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        determination: "OVERTURNED_APPROVED",
+        clinicalRationale: "Overturned and approved in full.",
+        missingRecordsRequested: [],
+        authorizedSettlementAmount: 5000,
+        reviewerName: "Aetna Appellate Reviewer",
+        shouldAutoReply: false,
+        suggestedAutoReplyAddendum: "",
+      } as any);
 
       const mockScheduler = {
         runAfter: vi.fn(),

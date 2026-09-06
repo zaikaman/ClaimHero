@@ -403,7 +403,7 @@ async function handleInboundClaimReply(
       lowerText.includes("denied");
 
     const fallbackDetermination = isApprovalFallback
-      ? "OVERTURNED_APPROVED"
+      ? "PENDING_LLM"
       : isPartialFallback
       ? "PARTIAL_SETTLEMENT_OFFER"
       : isRecordsFallback
@@ -479,8 +479,8 @@ async function handleInboundClaimReply(
       attachments: storedAttachments.length > 0 ? storedAttachments : undefined,
       agentMailMessageId: normalized.messageId,
       detectedDetermination: fallbackDetermination,
-      clinicalRationale: fallbackDetermination === "OVERTURNED_APPROVED"
-        ? "Determination overturned and approved."
+      clinicalRationale: fallbackDetermination === "PENDING_LLM"
+        ? "Potential approval detected; awaiting clinical LLM adjudication."
         : fallbackDetermination === "PARTIAL_SETTLEMENT_OFFER"
         ? "Payer extended a partial settlement offer below the disputed amount."
         : fallbackDetermination === "ADDITIONAL_RECORDS_REQUIRED"
@@ -490,7 +490,7 @@ async function handleInboundClaimReply(
         : fallbackDetermination === "DENIAL_UPHELD"
         ? "Adverse determination upheld by reviewer."
         : "Inbound correspondence received and recorded.",
-      autoReplyStatus: fallbackDetermination === "OVERTURNED_APPROVED" ? undefined : "generating",
+      autoReplyStatus: "generating",
     });
 
     if (insertResult && typeof insertResult === "object" && "isNew" in insertResult && !insertResult.isNew) {
@@ -502,37 +502,41 @@ async function handleInboundClaimReply(
         ? insertResult.messageId
         : (insertResult as Id<"emailMessages">);
 
-    // Update claim status based on initial instant assessment
-    if (fallbackDetermination === "OVERTURNED_APPROVED") {
-      await ctx.runMutation(internal.claims.updateStatusInternal, {
-        claimId: matchingClaim._id,
-        status: "won",
-        actor: `${payer} Appellate Review Board`,
-        details: `VICTORY: Adverse determination overturned. Authorized recovery of $${(matchingClaim.deniedAmount || 0).toLocaleString()} approved.`,
-      });
-    } else if (
-      fallbackDetermination === "ADDITIONAL_RECORDS_REQUIRED" ||
-      fallbackDetermination === "PARTIAL_SETTLEMENT_OFFER"
-    ) {
-      await ctx.runMutation(internal.claims.updateStatusInternal, {
-        claimId: matchingClaim._id,
-        status: "under_review",
-        actor: `${payer} Review Board`,
-        details:
-          fallbackDetermination === "PARTIAL_SETTLEMENT_OFFER"
-            ? "Partial settlement offered by payer. File held in active negotiation."
-            : "Additional clinical records requested by reviewer.",
-      });
-    } else if (
-      fallbackDetermination === "DENIAL_UPHELD" ||
-      fallbackDetermination === "POLICY_CONFLICT_CITATION"
-    ) {
-      await ctx.runMutation(internal.claims.updateStatusInternal, {
-        claimId: matchingClaim._id,
-        status: "escalated",
-        actor: `${payer} Appeals Department`,
-        details: "Initial determination upheld by payer. File queued for Level 2 review.",
-      });
+    // Update claim status based on initial instant assessment.
+    // Keyword fallback must NEVER set claim status to "won".
+    // Only deep LLM adjudication confirming OVERTURNED_APPROVED transitions to "won".
+    if (matchingClaim.status !== "won") {
+      if (fallbackDetermination === "PENDING_LLM") {
+        await ctx.runMutation(internal.claims.updateStatusInternal, {
+          claimId: matchingClaim._id,
+          status: "under_review",
+          actor: `${payer} Review Board`,
+          details: "Potential determination received. Clinical LLM adjudication in progress.",
+        });
+      } else if (
+        fallbackDetermination === "ADDITIONAL_RECORDS_REQUIRED" ||
+        fallbackDetermination === "PARTIAL_SETTLEMENT_OFFER"
+      ) {
+        await ctx.runMutation(internal.claims.updateStatusInternal, {
+          claimId: matchingClaim._id,
+          status: "under_review",
+          actor: `${payer} Review Board`,
+          details:
+            fallbackDetermination === "PARTIAL_SETTLEMENT_OFFER"
+              ? "Partial settlement offered by payer. File held in active negotiation."
+              : "Additional clinical records requested by reviewer.",
+        });
+      } else if (
+        fallbackDetermination === "DENIAL_UPHELD" ||
+        fallbackDetermination === "POLICY_CONFLICT_CITATION"
+      ) {
+        await ctx.runMutation(internal.claims.updateStatusInternal, {
+          claimId: matchingClaim._id,
+          status: "escalated",
+          actor: `${payer} Appeals Department`,
+          details: "Initial determination upheld by payer. File queued for Level 2 review.",
+        });
+      }
     }
 
     // Perform deep structured LLM evaluation to refine rationale, extract settlement numbers & draft rebuttal
@@ -572,7 +576,9 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
       console.warn("LLM evaluation of inbound message failed; falling back to conservative parsing:", llmError);
     }
 
-    const determination = analysis?.determination || fallbackDetermination;
+    const determination =
+      analysis?.determination ||
+      (fallbackDetermination === "PENDING_LLM" ? "GENERAL_INQUIRY" : fallbackDetermination);
     const isOverturned = determination === "OVERTURNED_APPROVED" || matchingClaim.status === "won";
     const citedClause = analysis?.citedPolicyClause?.trim() || undefined;
     const clinicalRationale =
@@ -687,7 +693,7 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
             ? `POLICY CHALLENGE: Conflicting CPB language cited${citedClause ? `: ${citedClause.slice(0, 220)}` : ""}. Distinguishing counter-rebuttal drafted for IRO path.`
             : `Level 1 determination upheld by payer. File prepared for Level 2 External Review / IRO escalation.`,
       });
-    } else {
+    } else if (matchingClaim.status !== "won") {
       await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: matchingClaim._id,
         status: "dispatched",

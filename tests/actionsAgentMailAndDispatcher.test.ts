@@ -61,7 +61,7 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       }));
     });
 
-    it("processInboundClaimReply: processes approval and updates claim to won", async () => {
+    it("processInboundClaimReply: processes approval and updates claim to won only when LLM confirms OVERTURNED_APPROVED", async () => {
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_reply_1",
         inbox_id: "inbox_case_1",
@@ -85,6 +85,16 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         attachments: [],
       });
 
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        determination: "OVERTURNED_APPROVED",
+        clinicalRationale: "The adverse determination has been overturned and approved for reimbursement.",
+        missingRecordsRequested: [],
+        authorizedSettlementAmount: 1500,
+        reviewerName: "Aetna Appellate Reviewer",
+        shouldAutoReply: false,
+        suggestedAutoReplyAddendum: "",
+      } as any);
+
       const mockCtx: any = {
         runQuery: vi.fn().mockResolvedValue({ _id: "claim_1", claimNumber: "CLM-100" }),
         runMutation: vi.fn().mockResolvedValue("id_1"),
@@ -97,9 +107,122 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       });
 
       expect(res).toBeNull();
-      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-        status: "won",
-      }));
+      // Verify initial message insertion used PENDING_LLM (not premature OVERTURNED_APPROVED)
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          detectedDetermination: "PENDING_LLM",
+        })
+      );
+      // Verify claim status transitions to won only after LLM confirmation
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          status: "won",
+        })
+      );
+    });
+
+    it("processInboundClaimReply: keyword match on 'approved' sets PENDING_LLM and does NOT transition to won if LLM determines DENIAL_UPHELD", async () => {
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_reply_denial_with_keyword",
+        inbox_id: "inbox_case_1",
+        from: "reviewer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        to: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Review",
+        text: "We reviewed your approved prior authorizations from last year, but the current service remains denied.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_reply_denial_with_keyword",
+        messageId: "msg_reply_denial_with_keyword",
+        inboxId: "inbox_case_1",
+        from: "reviewer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Review",
+        text: "We reviewed your approved prior authorizations from last year, but the current service remains denied.",
+        attachments: [],
+      });
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        determination: "DENIAL_UPHELD",
+        clinicalRationale: "Current service remains not covered despite historical approved authorizations.",
+        missingRecordsRequested: [],
+        authorizedSettlementAmount: 0,
+        reviewerName: "Aetna Reviewer",
+        shouldAutoReply: true,
+        suggestedAutoReplyAddendum: "Demand IRO review.",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "claim_1", claimNumber: "CLM-100", status: "dispatched" }),
+        runMutation: vi.fn().mockResolvedValue("id_1"),
+      };
+
+      await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_reply_denial_with_keyword",
+        messageId: "msg_reply_denial_with_keyword",
+        inboxId: "inbox_case_1",
+      });
+
+      // Assert that status: 'won' was NEVER set
+      const mutationCalls = mockCtx.runMutation.mock.calls;
+      const wonCalls = mutationCalls.filter((call: any[]) => call[1]?.status === "won");
+      expect(wonCalls).toHaveLength(0);
+
+      // Assert that claim transitioned to escalated per LLM DENIAL_UPHELD determination
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          status: "escalated",
+        })
+      );
+    });
+
+    it("processInboundClaimReply: if LLM fails on 'approved' keyword match, claim does NOT transition to won", async () => {
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_reply_llm_fail",
+        inbox_id: "inbox_case_1",
+        from: "reviewer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        to: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Approved status update",
+        text: "Your appeal referencing approved guidelines was received.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_reply_llm_fail",
+        messageId: "msg_reply_llm_fail",
+        inboxId: "inbox_case_1",
+        from: "reviewer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Approved status update",
+        text: "Your appeal referencing approved guidelines was received.",
+        attachments: [],
+      });
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockRejectedValue(new Error("LLM Rate Limit"));
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "claim_1", claimNumber: "CLM-100", status: "dispatched" }),
+        runMutation: vi.fn().mockResolvedValue("id_1"),
+      };
+
+      await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_reply_llm_fail",
+        messageId: "msg_reply_llm_fail",
+        inboxId: "inbox_case_1",
+      });
+
+      // Assert that status: 'won' was NEVER set
+      const mutationCalls = mockCtx.runMutation.mock.calls;
+      const wonCalls = mutationCalls.filter((call: any[]) => call[1]?.status === "won");
+      expect(wonCalls).toHaveLength(0);
     });
 
     it("processInboundClaimReply: routes correctly via threadId match when claimNumber is missing from subject", async () => {
@@ -436,6 +559,16 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         text: "The adverse determination has been overturned and approved for full reimbursement.",
         attachments: [],
       });
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        determination: "OVERTURNED_APPROVED",
+        clinicalRationale: "The adverse determination has been overturned and approved for full reimbursement.",
+        missingRecordsRequested: [],
+        authorizedSettlementAmount: 2500,
+        reviewerName: "Aetna Appellate Reviewer",
+        shouldAutoReply: false,
+        suggestedAutoReplyAddendum: "",
+      } as any);
 
       const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
         messageId: "msg_alert_win",
