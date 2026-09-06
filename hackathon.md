@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-06T05:40:00Z
+- **Last updated:** 2026-09-06T06:12:00Z
 
 ## Log
 
@@ -958,7 +958,7 @@ Hardened backend actions against unlimited AI calls, closed validation gaps, eli
 - Markdown Fence Stripping & Network Fault Tolerance: Added markdown code fence (` ```json ... ``` `) stripping in `parseStructuredContent`. Broadened `isStructuredOutputProtocolError` to catch transient reachability, connection, timeout, and proxy status errors (`unreachable`, `connection`, `timeout`, `429`, `502`, `503`, `504`), and increased client timeout to 60,000ms with 3 retries to prevent "The model is currently unreachable" failures.
 - Full Verification Gate: Added unit tests in `tests/openai.test.ts` and verified 569/569 passing tests across 39 test suites, 100% clean TypeScript check (`tsc --noEmit`), 0 ESLint warnings/errors, and successful production bundle build (`npm run verify`). Convex features: mutations, actions, schema.
 
-### 2026-09-06 - working tree
+### 2026-09-06 - 9fef64c
 Resolved security vulnerabilities, API contract inconsistencies, dead arguments, fragile casts, accessibility gaps, and media preferences:
 - SSRF & Cloud Metadata Protection: Implemented `isPrivateOrLinkLocalHost` and exported `isAcceptableSourceUrl` in `convex/actions/policyCrawler.ts` blocking link-local addresses (`169.254.0.0/16`, `fe80::`), private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`), `localhost`, `.local`, `.internal`, `.lan`, cloud metadata endpoints (`metadata.google.internal`), and numeric IP representations. Enforced strict validation across custom research crawler (`crawlCustomResearchUrl`) and chatbot web scraper (`performFirecrawlScrapeUrl` in `convex/actions/sentinelChatbot.ts`).
 - Agent Thread Authorization: Secured `listThreadMessages` in `convex/sentinelAgentQueries.ts` with authenticated session ownership verification (`by_agent_thread` index lookup and `session.userId === userId`), returning an empty stream structure if unauthenticated or unauthorized to prevent cross-tenant message interception.
@@ -968,3 +968,9 @@ Resolved security vulnerabilities, API contract inconsistencies, dead arguments,
 - Accessible UX in CaseRadar: Added `id` and `aria-label` to the search input, `aria-pressed` and status descriptions to status tab filter strips and demo toggles, and descriptive `aria-label`s to row context menu icon buttons and table pagination controls in `src/components/radar/CaseRadar.tsx`.
 - Reduced-Motion Video Playback: Attached `prefers-reduced-motion: reduce` media query listeners in `src/components/landing/CinematicHero.tsx` and `src/components/auth/AuthPage.tsx` to automatically pause background ambient videos for users with motion sensitivity.
 - Verification Gate: Added unit tests across `tests/actionsPolicyAndSynthesizer.test.ts`, `tests/sentinelAgent.test.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`, and `tests/convexSettings.test.ts`. Verified 575/575 passing tests across 38 suites, clean typecheck, clean ESLint, 79.93% coverage, and production build with `npm run verify`.
+
+### 2026-09-06 - working tree
+Hardened P2P defense copilot validator contracts and resolved test suite typing issues:
+- Live Fast Answer Validator Reconciliation: Added `generatedBy: v.optional(v.union(v.literal("openai"), v.literal("fallback")))` to `fastAnswers` in `convex/schema.ts` and mutations `addFastAnswer` and `addFastAnswerInternal` in `convex/p2pCallSessions.ts`, eliminating the `ArgumentValidationError` when persisting AI-generated rebuttal cards.
+- Frontend Type & Hook Alignment: Updated `LiveFastAnswer` in `src/types/index.ts` and `src/hooks/useLiveCallCopilot.ts` to include `generatedBy`.
+- IDE & Test Suite Hardening: Added `@ts-ignore` annotation for `@convex-dev/auth/server` mock export in `tests/convexP2P.test.ts` and added regression tests for fast-answer persistence with `generatedBy` and `sessionId`. Verified 575 passing tests, typecheck, lint, and production build via `npm run verify`. Convex features: schema, mutations, actions.

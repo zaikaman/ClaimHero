@@ -424,6 +424,7 @@ export default defineSchema({
         regulatoryLeverage: v.optional(v.string()),
         confidenceScore: v.number(),
         timestamp: v.number(),
+        generatedBy: v.optional(v.union(v.literal("openai"), v.literal("fallback"))),
       })
     ),
     checklistProgress: v.array(

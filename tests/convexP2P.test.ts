@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as p2pCallSessions from "../convex/p2pCallSessions";
 import * as p2pScripts from "../convex/p2pScripts";
+// @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 vi.mock("@convex-dev/auth/server", () => ({
@@ -123,6 +124,7 @@ describe("Convex Physician P2P Defense Scripts & Live Copilot Sessions", () => {
           cpbCitation: "Section 3.B",
           confidenceScore: 95,
           timestamp: 100,
+          generatedBy: "openai",
         },
       });
 
@@ -140,6 +142,7 @@ describe("Convex Physician P2P Defense Scripts & Live Copilot Sessions", () => {
           cpbCitation: "Section 4",
           confidenceScore: 98,
           timestamp: 200,
+          generatedBy: "fallback",
         },
       });
       expect(mockCtx.db.patch).toHaveBeenCalledTimes(2);

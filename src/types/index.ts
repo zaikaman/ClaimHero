@@ -566,6 +566,7 @@ export interface LiveFastAnswer {
   regulatoryLeverage?: string;
   confidenceScore: number;
   timestamp: number;
+  generatedBy?: "openai" | "fallback";
 }
 
 export interface LiveCallChecklistItem {

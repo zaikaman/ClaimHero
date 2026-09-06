@@ -160,6 +160,7 @@ interface AddFastAnswerArgs {
     regulatoryLeverage?: string;
     confidenceScore: number;
     timestamp: number;
+    generatedBy?: "openai" | "fallback";
   };
 }
 
@@ -196,6 +197,7 @@ export const addFastAnswer = mutation({
       regulatoryLeverage: v.optional(v.string()),
       confidenceScore: v.number(),
       timestamp: v.number(),
+      generatedBy: v.optional(v.union(v.literal("openai"), v.literal("fallback"))),
     }),
   },
   handler: async (ctx, args) => {
@@ -219,6 +221,7 @@ export const addFastAnswerInternal = internalMutation({
       regulatoryLeverage: v.optional(v.string()),
       confidenceScore: v.number(),
       timestamp: v.number(),
+      generatedBy: v.optional(v.union(v.literal("openai"), v.literal("fallback"))),
     }),
   },
   handler: async (ctx, args) => {

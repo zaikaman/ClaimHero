@@ -591,6 +591,7 @@ export function useLiveCallCopilot(claim: Claim) {
           regulatoryLeverage: pushback.regulatoryLeverage,
           confidenceScore: pushback.isOverturned ? 99 : 96,
           timestamp: Date.now(),
+          generatedBy: pushback.generatedBy || "openai",
         };
         setActiveFastAnswer(newFastAnswer);
 

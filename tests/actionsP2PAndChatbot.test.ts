@@ -129,11 +129,23 @@ describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot
 
       const res = await (actionP2PLiveCopilot.generateLiveFastAnswer as any)._handler(mockCtx, {
         claimId: "c1",
+        sessionId: "sess_1",
         recentTranscript: "Why did you not try another round of physical therapy?",
       });
 
       expect(res.suggestedQuote).toContain("MRI confirmed severe");
       expect(res.confidenceScore).toBe(98);
+      expect(res.generatedBy).toBe("openai");
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          sessionId: "sess_1",
+          fastAnswer: expect.objectContaining({
+            generatedBy: "openai",
+            confidenceScore: 98,
+          }),
+        })
+      );
     });
 
     it("generateInteractiveReviewerPushback: simulates dynamic medical director pushback & concession", async () => {
