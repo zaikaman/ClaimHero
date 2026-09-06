@@ -15,6 +15,15 @@ export const createPasswordUser = internalMutation({
   handler: async (ctx, args) => {
     const rawUsername = args.profile.username;
     const email = rawUsername.includes("@") ? rawUsername : `${rawUsername}@claimhero.ai`;
+
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .first();
+    if (existing) {
+      return existing._id;
+    }
+
     return await ctx.db.insert("users", {
       name: rawUsername.split("@")[0],
       email: email,

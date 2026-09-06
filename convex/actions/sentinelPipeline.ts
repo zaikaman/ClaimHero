@@ -17,6 +17,7 @@ export interface PipelineResult {
   overturnProbabilityScore?: number;
   riskLevel?: string;
   appealId?: string;
+  precedentsUnavailable?: boolean;
   error?: string;
 }
 
@@ -200,6 +201,7 @@ export const runAutonomousPipeline = action({
       combinedScore: number;
       codeOverlap: number;
     }> = [];
+    let precedentsUnavailable = false;
     try {
       vectorPrecedents = await ctx.runAction(
         api.actions.precedentArchive.retrieveTopPrecedents,
@@ -207,6 +209,13 @@ export const runAutonomousPipeline = action({
       );
     } catch (precedentErr) {
       console.warn("Pipeline vector archive note:", precedentErr);
+      precedentsUnavailable = true;
+      await ctx.runMutation(internal.auditLogs.logEventInternal, {
+        claimId: args.claimId,
+        eventType: "pipeline_precedents_unavailable_warning",
+        actor: "Autonomous Sentinel Pipeline",
+        details: "Warning: Precedent vector retrieval was unavailable during autonomous pipeline execution.",
+      });
     }
 
     // Step 3: Formal ERISA Appeal Brief Synthesis
@@ -251,6 +260,7 @@ export const runAutonomousPipeline = action({
       overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
       riskLevel: scoreResult?.riskLevel,
       appealId: synthesisResult?.appealId,
+      precedentsUnavailable,
     };
   },
 });

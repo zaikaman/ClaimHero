@@ -670,27 +670,8 @@ export async function ensureAppealPdfStored(
     }
   }
 
-  // Fallback if storage is not available in mock/test contexts
   if (!ctx.storage || typeof ctx.storage.store !== "function") {
-    const rawPatientName = claim.patientName || "Insured Policyholder";
-    const pdfBuffer = generateFormalAppealPdf({
-      claimNumber: claim.claimNumber,
-      patientName: rawPatientName,
-      memberId: claim.patientId ? undefined : undefined,
-      insurancePayer: claim.insurancePayer || "Health Insurer",
-      serviceDate: claim.serviceDate,
-      deniedAmount: claim.deniedAmount,
-      denialReason: [claim.denialReasonCode, claim.denialReasonDescription].filter(Boolean).join(" - "),
-      appealMarkdown: appeal.fullAppealMarkdown,
-      providerName: claim.providerName,
-      cptCodes: claim.cptCodes,
-      icd10Codes: claim.icd10Codes,
-    });
-    return {
-      storageId: (appeal.pdfExportStorageId || "mock_storage_id") as Id<"_storage">,
-      buffer: pdfBuffer,
-      filename,
-    };
+    throw new Error("Convex File Storage service is not available in ActionCtx");
   }
 
   // 2. Dynamically compile formal court-ready PDF dossier

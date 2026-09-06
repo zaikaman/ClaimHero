@@ -3,6 +3,8 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
+import { requireAuthUser } from "../lib/auth";
+import { rateLimiter } from "../lib/rateLimiter";
 
 const CLINICAL_INTAKE_SCHEMA = {
   type: "object",
@@ -99,7 +101,25 @@ export const generateClinicalIntakeQuestions = action({
     cptCodes: v.array(v.string()),
     icd10Codes: v.array(v.string()),
   },
-  handler: async (_ctx, args): Promise<{ questions: ClinicalIntakeQuestion[]; generatedBy: string }> => {
+  handler: async (ctx, args): Promise<{ questions: ClinicalIntakeQuestion[]; generatedBy: string }> => {
+    const userId = await requireAuthUser(ctx);
+
+    // Enforce rate limiting per authenticated user
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "clinicalIntake", {
+        key: `clinical_intake_${userId}`,
+      });
+      if (!limitStatus.ok) {
+        throw new Error(
+          `Rate limit reached for clinical intake question generation. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+        );
+      }
+    } catch (rateErr) {
+      if (rateErr instanceof Error && rateErr.message.includes("Rate limit reached")) {
+        throw rateErr;
+      }
+    }
+
     try {
       const result = await createStructuredCompletion<{ questions: ClinicalIntakeQuestion[] }>({
         systemPrompt: `You design neutral intake questions for a medical insurance appeal workflow.

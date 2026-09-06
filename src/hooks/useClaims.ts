@@ -50,6 +50,7 @@ export function useClaims(options?: {
       ? {
           status: statusArg,
           payer: payerArg,
+          limit: 100,
           includeDemo,
         }
       : "skip"

@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { precedentMatchValidator } from "./lib/precedentValidators";
 import { getClaimIfAuthorized, getAuthUserId } from "./lib/auth";
+import { fitDimensions, EMBEDDING_DIMENSIONS } from "./lib/embeddings";
 
 export { precedentMatchValidator };
 
@@ -81,7 +82,11 @@ export const updateEmbedding = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    await ctx.db.patch(args.precedentId, { embedding: args.embedding });
+    const normalized = fitDimensions(args.embedding, EMBEDDING_DIMENSIONS);
+    if (normalized.length !== EMBEDDING_DIMENSIONS) {
+      throw new Error(`Invalid embedding vector dimension: expected ${EMBEDDING_DIMENSIONS}, got ${normalized.length}`);
+    }
+    await ctx.db.patch(args.precedentId, { embedding: normalized });
     return null;
   },
 });
@@ -108,6 +113,11 @@ export const insertPrecedent = internalMutation({
   },
   returns: v.id("precedents"),
   handler: async (ctx, args): Promise<Id<"precedents">> => {
+    const normalized = fitDimensions(args.embedding, EMBEDDING_DIMENSIONS);
+    if (normalized.length !== EMBEDDING_DIMENSIONS) {
+      throw new Error(`Invalid embedding vector dimension: expected ${EMBEDDING_DIMENSIONS}, got ${normalized.length}`);
+    }
+
     const existing = await ctx.db
       .query("precedents")
       .withIndex("by_corpus_key", (q) => q.eq("corpusKey", args.corpusKey))
@@ -115,10 +125,11 @@ export const insertPrecedent = internalMutation({
 
     if (existing) {
       await ctx.db.patch(existing._id, {
-        sourceKind: args.sourceKind,
         title: args.title,
         citation: args.citation,
-        jurisdiction: args.jurisdiction,
+        winningArgument: args.winningArgument,
+        statutoryLanguage: args.statutoryLanguage,
+        outcome: args.outcome,
         sourceUrl: args.sourceUrl,
         icd10Codes: args.icd10Codes,
         cptCodes: args.cptCodes,
@@ -126,17 +137,30 @@ export const insertPrecedent = internalMutation({
         primaryIcd10: args.primaryIcd10,
         primaryCpt: args.primaryCpt,
         carcCode: args.carcCode,
-        winningArgument: args.winningArgument,
-        statutoryLanguage: args.statutoryLanguage,
-        outcome: args.outcome,
-        embedding: args.embedding,
-        sourceClaimId: args.sourceClaimId,
+        sourceKind: args.sourceKind,
+        embedding: normalized,
       });
       return existing._id;
     }
 
     return await ctx.db.insert("precedents", {
-      ...args,
+      sourceKind: args.sourceKind,
+      title: args.title,
+      citation: args.citation,
+      jurisdiction: args.jurisdiction,
+      sourceUrl: args.sourceUrl,
+      icd10Codes: args.icd10Codes,
+      cptCodes: args.cptCodes,
+      carcCodes: args.carcCodes,
+      primaryIcd10: args.primaryIcd10,
+      primaryCpt: args.primaryCpt,
+      carcCode: args.carcCode,
+      winningArgument: args.winningArgument,
+      statutoryLanguage: args.statutoryLanguage,
+      outcome: args.outcome,
+      embedding: normalized,
+      sourceClaimId: args.sourceClaimId,
+      corpusKey: args.corpusKey,
       createdAt: Date.now(),
     });
   },
@@ -346,7 +370,7 @@ export const searchTextPrecedents = query({
         }
         return builder;
       })
-      .take(args.limit || 10);
+      .take(Math.max(1, Math.min(args.limit ?? 10, 100)));
 
     return results.map((row) => ({
       _id: row._id,

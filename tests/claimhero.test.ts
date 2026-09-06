@@ -1170,6 +1170,24 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
     }
   });
 
+  it("guarantees explicit proper patient names and member IDs across all 3 template presets", () => {
+    const expected = {
+      geoblue_meniscus: { patientName: "Eleanor Vance", memberId: "GEO-982341-01" },
+      geoblue_spine: { patientName: "Marcus Sterling", memberId: "GEO-554210-99" },
+      bcbsglobal_mri: { patientName: "Michael Patel", memberId: "BCG-773419-02" },
+    };
+
+    for (const preset of SAMPLE_CASE_PRESETS) {
+      const match = expected[preset.id as keyof typeof expected];
+      expect(match).toBeDefined();
+      expect(preset.patientName).toBe(match.patientName);
+      expect(preset.memberId).toBe(match.memberId);
+      expect(preset.content).toContain(`Patient Name: ${match.patientName}`);
+      expect(preset.content).toContain(`Member ID: ${match.memberId}`);
+      expect(preset.physicianNotes).toContain(`PATIENT: ${match.patientName}`);
+    }
+  });
+
   it("verifies tailored clinical questions for all 5 fields across all presets", () => {
     const requiredFields = [
       "symptomsAndFunctionalImpact",

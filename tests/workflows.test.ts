@@ -342,7 +342,7 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
     it("returns hasWorkflow: false when no workflow exists", async () => {
       const mockCtx: any = {
         db: {
-          get: vi.fn().mockResolvedValue({ _id: "c1" }),
+          get: vi.fn().mockResolvedValue({ _id: "c1", userId: "user_123" }),
         },
       };
 
@@ -357,6 +357,7 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
     it("queries status and returns live workflow state when attached to claim", async () => {
       const mockClaim = {
         _id: "c1",
+        userId: "user_123",
         workflowId: "wf_live_999",
       };
 

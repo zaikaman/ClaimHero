@@ -95,8 +95,11 @@ function hasRequiredStructuredFields(value: unknown, schema: Record<string, unkn
 }
 
 function parseStructuredContent<T>(content: string, model: string, schemaName: string, schema: Record<string, unknown>): T {
-  const trimmed = content.trim();
-  const candidates = [trimmed, ...extractBalancedJsonCandidates(trimmed)];
+  let trimmed = content.trim();
+  if (trimmed.startsWith("```")) {
+    trimmed = trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  }
+  const candidates = [trimmed, content.trim(), ...extractBalancedJsonCandidates(content.trim())];
   let lastError = "No valid JSON value was found";
 
   for (const candidate of candidates) {
@@ -120,7 +123,27 @@ function parseStructuredContent<T>(content: string, model: string, schemaName: s
 }
 
 function isStructuredOutputProtocolError(error: unknown): boolean {
-  return error instanceof Error && /Failed to parse structured JSON response|response empty for schema/i.test(error.message);
+  if (!(error instanceof Error)) return false;
+  return (
+    /Failed to parse structured JSON response|response empty for schema/i.test(error.message) ||
+    /unreachable|connection|timeout|rate limit|429|500|502|503|504|econnreset|fetch failed/i.test(error.message)
+  );
+}
+
+function buildStructuredSystemPrompt(systemPrompt: string, schemaName: string, schema: Record<string, unknown>): string {
+  if (systemPrompt.includes("JSON SCHEMA") && systemPrompt.includes(schemaName)) {
+    return systemPrompt;
+  }
+  return `${systemPrompt}
+
+CRITICAL RESPONSE REQUIREMENT:
+You must respond ONLY with a single valid JSON object strictly adhering to the JSON schema below.
+Do NOT include markdown formatting (no \`\`\`json or \`\`\` code fences), no conversational text, no explanations, no preambles, and no postscripts.
+The entire response must be a single raw JSON object beginning with "{" and ending with "}".
+All required schema properties MUST be present and properly typed.
+
+JSON SCHEMA (${schemaName}):
+${JSON.stringify(schema, null, 2)}`;
 }
 
 async function createStructuredCompletionAttempt<T>(options: {
@@ -134,6 +157,12 @@ async function createStructuredCompletionAttempt<T>(options: {
   fileInputs?: Array<{ fileData: string; filename: string }>;
   temperature?: number;
 }): Promise<T> {
+  const effectiveSystemPrompt = buildStructuredSystemPrompt(
+    options.systemPrompt,
+    options.schemaName,
+    options.schema
+  );
+
   if (options.fileInputs && options.fileInputs.length > 0) {
     const content = [
       { type: "input_text" as const, text: options.userPrompt },
@@ -145,7 +174,7 @@ async function createStructuredCompletionAttempt<T>(options: {
     ];
     const response = await options.client.responses.create({
       model: options.model as OpenAI.Responses.ResponseCreateParams["model"],
-      instructions: options.systemPrompt,
+      instructions: effectiveSystemPrompt,
       input: [{ role: "user", content }],
       text: {
         format: {
@@ -162,7 +191,7 @@ async function createStructuredCompletionAttempt<T>(options: {
   }
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: "system", content: options.systemPrompt },
+    { role: "system", content: effectiveSystemPrompt },
   ];
 
   if (options.imageUrls && options.imageUrls.length > 0) {
@@ -216,7 +245,7 @@ export async function createStructuredCompletion<T>(options: {
   structuredRetries?: number;
 }): Promise<T> {
   const { model } = getOpenAIConfig();
-  const client = getOpenAIClient({ timeout: 30_000, maxRetries: 2 });
+  const client = getOpenAIClient({ timeout: 60_000, maxRetries: 3 });
   const safeUserPrompt = redactBeforeLLM(options.userPrompt);
 
   const retries = Math.max(0, Math.min(options.structuredRetries ?? DEFAULT_STRUCTURED_RETRIES, 4));
@@ -261,7 +290,7 @@ export async function createChatCompletion(options: {
   temperature?: number;
 }): Promise<string> {
   const { model } = getOpenAIConfig();
-  const client = getOpenAIClient({ timeout: 30_000, maxRetries: 2 });
+  const client = getOpenAIClient({ timeout: 60_000, maxRetries: 3 });
   const safeUserPrompt = redactBeforeLLM(options.userPrompt);
 
   const response = await client.chat.completions.create({

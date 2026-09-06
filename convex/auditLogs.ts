@@ -14,7 +14,7 @@ export const listByClaim = query({
     const authorized = await getClaimIfAuthorized(ctx, args.claimId);
     if (!authorized) return [];
 
-    const limit = args.limit ?? 100;
+    const limit = Math.max(1, Math.min(args.limit ?? 100, 100));
 
     return await ctx.db
       .query("appealAuditLogs")
@@ -37,14 +37,27 @@ export const logEvent = mutation({
   handler: async (ctx, args) => {
     const { userId } = await requireClaimOwner(ctx, args.claimId);
 
+    const eventType = args.eventType.trim();
+    if (!eventType || eventType.length > 64) {
+      throw new Error("Invalid eventType: must be a non-empty string under 64 characters");
+    }
+    const actor = args.actor.trim();
+    if (!actor || actor.length > 128) {
+      throw new Error("Invalid actor: must be a non-empty string under 128 characters");
+    }
+    const details = args.details.trim();
+    if (details.length > 4000) {
+      throw new Error("Invalid details: exceeds 4,000 character limit");
+    }
+
     const timestamp = Date.now();
 
     const logId = await ctx.db.insert("appealAuditLogs", {
       claimId: args.claimId,
       userId,
-      eventType: args.eventType,
-      actor: args.actor,
-      details: args.details,
+      eventType,
+      actor,
+      details,
       timestamp,
     });
 

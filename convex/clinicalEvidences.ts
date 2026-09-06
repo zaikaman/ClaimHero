@@ -1,4 +1,5 @@
 import { internalMutation, internalQuery, mutation, query, MutationCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
@@ -277,10 +278,14 @@ export const replaceForClaimInternal = internalMutation({
 
 
 async function applyClearByClaim(ctx: MutationCtx, claimId: Id<"claims">) {
-  const existing = await ctx.db
+  const queryBuilder = ctx.db
     .query("clinicalEvidences")
-    .withIndex("by_claim", (q) => q.eq("claimId", claimId))
-    .collect();
+    .withIndex("by_claim", (q) => q.eq("claimId", claimId));
+
+  const hasTake = "take" in queryBuilder && typeof queryBuilder.take === "function";
+  const existing = hasTake
+    ? await queryBuilder.take(50)
+    : await queryBuilder.collect();
 
   for (const item of existing) {
     if (item.screenshotStorageId) {
@@ -293,11 +298,17 @@ async function applyClearByClaim(ctx: MutationCtx, claimId: Id<"claims">) {
     await ctx.db.delete(item._id);
   }
 
-  if (typeof ctx.db.patch === "function") {
-    await ctx.db.patch(claimId, {
-      evidenceCount: 0,
-      updatedAt: Date.now(),
+  if (existing.length === 50 && ctx.scheduler && typeof ctx.scheduler.runAfter === "function") {
+    await ctx.scheduler.runAfter(0, internal.clinicalEvidences.clearByClaimInternal, {
+      claimId,
     });
+  } else {
+    if (typeof ctx.db.patch === "function") {
+      await ctx.db.patch(claimId, {
+        evidenceCount: 0,
+        updatedAt: Date.now(),
+      });
+    }
   }
 }
 

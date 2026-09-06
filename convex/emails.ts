@@ -220,6 +220,56 @@ interface InsertMessageArgs {
 }
 
 async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Promise<Id<"emailMessages">> {
+  if (args.subject && args.subject.length > 500) {
+    throw new Error("Email subject exceeds 500 character limit");
+  }
+  if (args.sender && args.sender.length > 320) {
+    throw new Error("Email sender exceeds 320 character limit");
+  }
+  if (args.recipient && args.recipient.length > 320) {
+    throw new Error("Email recipient exceeds 320 character limit");
+  }
+  if (args.bodyHtml && args.bodyHtml.length > 200000) {
+    throw new Error("Email bodyHtml exceeds 200,000 character limit");
+  }
+  if (args.bodyText && args.bodyText.length > 200000) {
+    throw new Error("Email bodyText exceeds 200,000 character limit");
+  }
+
+  if (args.settlementAmount !== undefined && (!Number.isFinite(args.settlementAmount) || args.settlementAmount < 0)) {
+    throw new Error("settlementAmount must be a non-negative finite number");
+  }
+
+  const ALLOWED_DETERMINATIONS = new Set([
+    "OVERTURNED_APPROVED",
+    "ADDITIONAL_RECORDS_REQUIRED",
+    "DENIAL_UPHELD",
+    "ACKNOWLEDGMENT_ONLY",
+    "GENERAL_INQUIRY",
+  ]);
+  if (args.detectedDetermination && !ALLOWED_DETERMINATIONS.has(args.detectedDetermination)) {
+    throw new Error(`Invalid detectedDetermination: "${args.detectedDetermination}"`);
+  }
+
+  const ALLOWED_AUTOREPLY_STATUSES = new Set(["pending", "dispatched", "dismissed"]);
+  if (args.autoReplyStatus && !ALLOWED_AUTOREPLY_STATUSES.has(args.autoReplyStatus)) {
+    throw new Error(`Invalid autoReplyStatus: "${args.autoReplyStatus}"`);
+  }
+
+  if (args.attachments && args.attachments.length > 0) {
+    if (args.attachments.length > 20) {
+      throw new Error("Maximum 20 email attachments allowed per message");
+    }
+    for (const att of args.attachments) {
+      if (typeof ctx.db.system?.get === "function") {
+        const meta = await ctx.db.system.get(att.storageId);
+        if (!meta) {
+          throw new Error(`Invalid attachment storage ID: file ${att.filename} does not exist in storage`);
+        }
+      }
+    }
+  }
+
   const now = Date.now();
 
   const messageId = await ctx.db.insert("emailMessages", {

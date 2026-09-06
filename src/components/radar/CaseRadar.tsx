@@ -27,8 +27,9 @@ import {
   CaretLeft,
   CaretRight,
   Flask,
+  ShieldCheck,
 } from "@phosphor-icons/react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import { Claim } from "../../types";
@@ -124,9 +125,36 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     }
   };
 
-  const activeClaims = claims;
+  const statusArg =
+    statusFilter !== "all" && statusFilter !== "critical_deadline"
+      ? statusFilter
+      : undefined;
+  const payerArg = payerFilter !== "all" ? payerFilter : undefined;
+
+  // Server-side filtered query for active cases up to 100
+  const serverClaims = useQuery(api.claims.list, {
+    status: statusArg,
+    payer: payerArg,
+    limit: 100,
+    includeDemo,
+  }) as Claim[] | undefined;
+
+  // True aggregate stats across the full portfolio (avoids truncation on badge counts)
+  const portfolioStats = useQuery(api.claims.getPortfolioStats, { includeDemo });
+
+  const activeClaims = serverClaims ?? claims;
 
   const { totalDisputed, totalWon, avgScore, highRiskCount, criticalCount } = useMemo(() => {
+    if (portfolioStats) {
+      return {
+        totalDisputed: portfolioStats.totalDisputedAmount,
+        totalWon: portfolioStats.overturnedWonAmount,
+        avgScore: portfolioStats.averageWinScore,
+        highRiskCount: portfolioStats.claimsByRisk?.high_confidence ?? 0,
+        criticalCount: portfolioStats.criticalDeadlinesCount,
+      };
+    }
+
     const totalDisputed = activeClaims.reduce((acc, c) => acc + c.deniedAmount, 0);
     const wonClaims = activeClaims.filter((c) => c.status === "won");
     const totalWon = wonClaims.reduce((acc, c) => acc + c.deniedAmount, 0);
@@ -146,13 +174,26 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     ).length;
 
     return { totalDisputed, totalWon, avgScore, highRiskCount, criticalCount };
-  }, [activeClaims]);
+  }, [portfolioStats, activeClaims]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  // Compute status breakdown counts for filter tabs
+  // Compute status breakdown counts for filter tabs using portfolio aggregates
   const statusCounts = useMemo(() => {
+    if (portfolioStats) {
+      return {
+        all: portfolioStats.totalClaims,
+        critical_deadline: portfolioStats.criticalDeadlinesCount,
+        ingested: portfolioStats.claimsByStatus?.ingested ?? 0,
+        parsing: portfolioStats.claimsByStatus?.parsing ?? 0,
+        analyzing: portfolioStats.claimsByStatus?.analyzing ?? 0,
+        ready_for_review: portfolioStats.claimsByStatus?.ready_for_review ?? 0,
+        dispatched: portfolioStats.claimsByStatus?.dispatched ?? 0,
+        won: portfolioStats.claimsByStatus?.won ?? 0,
+      };
+    }
+
     const counts: Record<string, number> = {
       all: activeClaims.length,
       critical_deadline: 0,
@@ -173,10 +214,10 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     }
 
     return counts;
-  }, [activeClaims]);
+  }, [portfolioStats, activeClaims]);
 
   const filtered = useMemo(() => {
-    return claims.filter((c) => {
+    return activeClaims.filter((c) => {
       // 1. Status / Alarm filter
       if (statusFilter === "critical_deadline") {
         if (c.daysRemaining > 14 || c.status === "won") return false;
@@ -184,7 +225,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
         return false;
       }
 
-      // 2. Payer filter
+      // 2. Payer filter (in-memory safeguard while query synchronizes)
       if (payerFilter !== "all") {
         const p = c.patient?.insurancePayer || "";
         if (!p.toLowerCase().includes(payerFilter.toLowerCase())) {
@@ -198,8 +239,10 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
         const matchClaim = c.claimNumber.toLowerCase().includes(q);
         const matchPatient = c.patient?.name?.toLowerCase().includes(q);
         const matchCpt = c.cptCodes.some((code) => code.toLowerCase().includes(q));
-        const matchReason = c.denialReasonCode.toLowerCase().includes(q);
-        const matchPayer = c.patient?.insurancePayer?.toLowerCase().includes(q);
+        const matchReason =
+          c.denialReasonCode.toLowerCase().includes(q) ||
+          c.denialReasonDescription?.toLowerCase().includes(q);
+        const matchPayer = (c.patient?.insurancePayer || "").toLowerCase().includes(q);
         const matchProvider = c.providerName.toLowerCase().includes(q);
 
         if (
@@ -216,7 +259,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
 
       return true;
     });
-  }, [claims, statusFilter, payerFilter, searchQuery]);
+  }, [activeClaims, statusFilter, payerFilter, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
@@ -257,6 +300,125 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     { id: "dispatched", label: "Transmitted", count: statusCounts.dispatched },
     { id: "won", label: "Won / Overturned", count: statusCounts.won, isWon: true },
   ];
+
+  const handleExportCsv = (redactMode: boolean) => {
+    const escapeCsv = (val: unknown) => {
+      if (val === undefined || val === null) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const headers = [
+      "Claim Number",
+      "Patient Name",
+      "Member ID",
+      "Insurer / Payer",
+      "CPT Codes",
+      "CARC Denial Code",
+      "Denial Reason Description",
+      "Denied Amount ($)",
+      "Patient Share ($)",
+      "Service Date",
+      "Statutory Deadline",
+      "Days Remaining",
+      "Overturn Probability (%)",
+      "Status",
+      "Redaction Applied",
+    ];
+
+    const rows = filtered.map((c) => {
+      const isClaimRedacted = redactMode || Boolean(c.redactionMetadata?.isRedacted);
+
+      // Redaction gate: mask Patient Name and Member ID per HIPAA Safe Harbor standard
+      const name = isClaimRedacted
+        ? (c.patient?.name ? `[REDACTED - ${c.patient.name.charAt(0)}***]` : "[REDACTED]")
+        : (c.patient?.name || "");
+
+      const memberId = isClaimRedacted
+        ? (c.patient?.memberId ? c.patient.memberId.replace(/^([A-Za-z0-9]{3}).*/, "$1*****") : "[REDACTED]")
+        : (c.patient?.memberId || "");
+
+      // Redaction gate: mask CPT codes and CARC codes if custom category masked or public exhibit mode
+      const maskCpt = isClaimRedacted && (
+        c.redactionMetadata?.maskedCategories?.includes("cpt") ||
+        c.redactionMetadata?.mode === "PUBLIC_EXHIBIT"
+      );
+      const cptStr = maskCpt ? "[REDACTED-CPT]" : (c.cptCodes?.join("; ") || "");
+
+      const maskCarc = isClaimRedacted && (
+        c.redactionMetadata?.maskedCategories?.includes("carc") ||
+        c.redactionMetadata?.mode === "PUBLIC_EXHIBIT"
+      );
+      const carcStr = maskCarc ? "[REDACTED-CARC]" : (c.denialReasonCode || "");
+
+      return [
+        escapeCsv(c.claimNumber),
+        escapeCsv(name),
+        escapeCsv(memberId),
+        escapeCsv(c.patient?.insurancePayer || ""),
+        escapeCsv(cptStr),
+        escapeCsv(carcStr),
+        escapeCsv(c.denialReasonDescription || ""),
+        escapeCsv(c.deniedAmount || 0),
+        escapeCsv(c.patientOwedAmount || 0),
+        escapeCsv(c.serviceDate || ""),
+        escapeCsv(c.statutoryDeadline ? new Date(c.statutoryDeadline).toISOString().split("T")[0] : ""),
+        escapeCsv(c.daysRemaining),
+        escapeCsv(c.overturnProbabilityScore ?? "N/A"),
+        escapeCsv(c.status),
+        escapeCsv(isClaimRedacted ? "YES (HIPAA Safe Harbor)" : "NO (Full Audit)"),
+      ];
+    });
+
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const prefix = redactMode ? "claimhero-cases-redacted" : "claimhero-cases-audit";
+    a.download = `${prefix}-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(redactMode ? "Exported HIPAA-redacted CSV" : "Exported advocate audit CSV");
+  };
+
+  const handleExportJson = (redactMode: boolean) => {
+    const exportData = filtered.map((c) => {
+      const isClaimRedacted = redactMode || Boolean(c.redactionMetadata?.isRedacted);
+      if (!isClaimRedacted) return c;
+
+      return {
+        ...c,
+        patientName: c.patientName ? `[REDACTED - ${c.patientName.charAt(0)}***]` : "[REDACTED]",
+        patient: c.patient
+          ? {
+              ...c.patient,
+              name: `[REDACTED - ${c.patient.name.charAt(0)}***]`,
+              memberId: c.patient.memberId.replace(/^([A-Za-z0-9]{3}).*/, "$1*****"),
+              email: "[REDACTED]",
+            }
+          : undefined,
+        cptCodes: c.redactionMetadata?.maskedCategories?.includes("cpt") || c.redactionMetadata?.mode === "PUBLIC_EXHIBIT"
+          ? ["[REDACTED-CPT]"]
+          : c.cptCodes,
+        denialReasonCode: c.redactionMetadata?.maskedCategories?.includes("carc") || c.redactionMetadata?.mode === "PUBLIC_EXHIBIT"
+          ? "[REDACTED-CARC]"
+          : c.denialReasonCode,
+        redactionApplied: "HIPAA Safe Harbor 45 CFR § 164.514",
+      };
+    });
+
+    const jsonContent = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonContent], { type: "application/json;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const prefix = redactMode ? "claimhero-cases-redacted" : "claimhero-cases-audit";
+    a.download = `${prefix}-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(redactMode ? "Exported HIPAA-redacted JSON" : "Exported advocate audit JSON");
+  };
 
   return (
     <div className="space-y-4 animate-fadeIn font-sans">
@@ -403,81 +565,55 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                     <CaretDown className="size-3 text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel className="text-[11px] text-muted-foreground">Portfolio Export ({filtered.length} cases)</DropdownMenuLabel>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const escapeCsv = (val: unknown) => {
-                        if (val === undefined || val === null) return '""';
-                        const str = String(val).replace(/"/g, '""');
-                        return `"${str}"`;
-                      };
-
-                      const headers = [
-                        "Claim Number",
-                        "Patient Name",
-                        "Member ID",
-                        "Insurer / Payer",
-                        "CPT Codes",
-                        "CARC Denial Code",
-                        "Denial Reason Description",
-                        "Denied Amount ($)",
-                        "Patient Share ($)",
-                        "Service Date",
-                        "Statutory Deadline",
-                        "Days Remaining",
-                        "Overturn Probability (%)",
-                        "Status",
-                      ];
-
-                      const rows = filtered.map((c) => [
-                        escapeCsv(c.claimNumber),
-                        escapeCsv(c.patient?.name || ""),
-                        escapeCsv(c.patient?.memberId || ""),
-                        escapeCsv(c.patient?.insurancePayer || ""),
-                        escapeCsv(c.cptCodes?.join("; ") || ""),
-                        escapeCsv(c.denialReasonCode || ""),
-                        escapeCsv(c.denialReasonDescription || ""),
-                        escapeCsv(c.deniedAmount || 0),
-                        escapeCsv(c.patientOwedAmount || 0),
-                        escapeCsv(c.serviceDate || ""),
-                        escapeCsv(c.statutoryDeadline ? new Date(c.statutoryDeadline).toISOString().split("T")[0] : ""),
-                        escapeCsv(c.daysRemaining),
-                        escapeCsv(c.overturnProbabilityScore ?? "N/A"),
-                        escapeCsv(c.status),
-                      ]);
-
-                      const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
-                      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `claimhero-cases-${new Date().toISOString().split("T")[0]}.csv`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }}
-                    className="gap-2 text-xs cursor-pointer"
-                  >
-                    <FileText className="size-3.5 text-primary" />
-                    <span>Export as CSV (.csv)</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const jsonContent = JSON.stringify(filtered, null, 2);
-                      const blob = new Blob([jsonContent], { type: "application/json;charset=utf-8;" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `claimhero-cases-${new Date().toISOString().split("T")[0]}.json`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }}
-                    className="gap-2 text-xs cursor-pointer"
-                  >
-                    <FileCode className="size-3.5 text-cyan-400" />
-                    <span>Export as JSON (.json)</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-2 py-1">
+                    HIPAA Redacted Exports
+                  </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={() => handleExportCsv(true)}
+                      className="gap-2 text-xs cursor-pointer"
+                    >
+                      <ShieldCheck className="size-3.5 text-emerald-500" />
+                      <div className="flex flex-col">
+                        <span className="font-medium">Export Redacted CSV (Safe Harbor)</span>
+                        <span className="text-[10px] text-muted-foreground">Masks PHI, Member ID & Sensitive Codes</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleExportJson(true)}
+                      className="gap-2 text-xs cursor-pointer"
+                    >
+                      <FileCode className="size-3.5 text-emerald-500" />
+                      <div className="flex flex-col">
+                        <span className="font-medium">Export Redacted JSON</span>
+                        <span className="text-[10px] text-muted-foreground">De-identified schema dataset</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-2 py-1">
+                      Full Advocate Exports
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={() => handleExportCsv(false)}
+                      className="gap-2 text-xs cursor-pointer"
+                    >
+                      <FileText className="size-3.5 text-primary" />
+                      <div className="flex flex-col">
+                        <span>Export Unredacted CSV (.csv)</span>
+                        <span className="text-[10px] text-muted-foreground">Audit copy (Redacted cases stay masked)</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleExportJson(false)}
+                      className="gap-2 text-xs cursor-pointer"
+                    >
+                      <FileCode className="size-3.5 text-cyan-400" />
+                      <div className="flex flex-col">
+                        <span>Export Unredacted JSON (.json)</span>
+                        <span className="text-[10px] text-muted-foreground">Full technical audit payload</span>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
               </DropdownMenu>
 
               <Button
@@ -1055,8 +1191,9 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
         {filtered.length > pageSize && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 border-t border-border bg-muted/10 text-xs">
             <div className="text-muted-foreground font-mono text-[11px]">
-              Showing {Math.min(filtered.length, (currentPage - 1) * pageSize + 1)}–
+              Showing {filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–
               {Math.min(filtered.length, currentPage * pageSize)} of {filtered.length} claims
+              {filtered.length >= 100 && " (top 100)"}
             </div>
             <div className="flex items-center gap-1.5">
               <Button

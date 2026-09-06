@@ -6,6 +6,7 @@ import { api, internal } from "../_generated/api";
 import { createStructuredCompletion } from "../lib/openai";
 import type { Doc, Id } from "../_generated/dataModel";
 import { requireClaimOwnerAction } from "../lib/auth";
+import { rateLimiter } from "../lib/rateLimiter";
 
 export interface P2PLiveClaimContext {
   _id: Id<"claims">;
@@ -49,7 +50,23 @@ export const generateLiveFastAnswer = action({
     speakerContext: v.optional(v.string()), // e.g. "insurer"
   },
   handler: async (ctx, args): Promise<LiveFastAnswerResult> => {
-    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+
+    // Rate limiting check per authenticated user
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "p2pGenerator", {
+        key: `p2p_copilot_${userId}`,
+      });
+      if (!limitStatus.ok) {
+        throw new Error(
+          `Rate limit reached for live peer-to-peer copilot. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+        );
+      }
+    } catch (rateErr) {
+      if (rateErr instanceof Error && rateErr.message.includes("Rate limit reached")) {
+        throw rateErr;
+      }
+    }
 
     const evidences: Doc<"clinicalEvidences">[] = (await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
@@ -222,7 +239,23 @@ export const generateInteractiveReviewerPushback = action({
     ),
   },
   handler: async (ctx, args): Promise<InteractiveReviewerPushbackResult> => {
-    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+
+    // Rate limiting check per authenticated user
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "p2pGenerator", {
+        key: `p2p_copilot_${userId}`,
+      });
+      if (!limitStatus.ok) {
+        throw new Error(
+          `Rate limit reached for live peer-to-peer copilot. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+        );
+      }
+    } catch (rateErr) {
+      if (rateErr instanceof Error && rateErr.message.includes("Rate limit reached")) {
+        throw rateErr;
+      }
+    }
 
     const evidences: Doc<"clinicalEvidences">[] = (await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,

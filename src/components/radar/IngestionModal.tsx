@@ -18,6 +18,7 @@ import {
   Scales,
   TrendUp,
   Trash,
+  ArrowCounterClockwise,
 } from "@phosphor-icons/react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -439,6 +440,25 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       setErrorMessage(err instanceof Error ? err.message : "Could not save the case context. Please try again.");
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleRunPipelineNow = async () => {
+    if (!extractedResult?.claimId) return;
+    setIsProcessing(true);
+    setErrorMessage(null);
+    try {
+      const pipelineResult = await executePostExtractionPipeline(extractedResult.claimId);
+      setExtractedResult((current) => (current ? { ...current, pipelineResult } : current));
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error
+          ? err.message
+          : "Autonomous pipeline encountered an issue. You can retry or proceed directly to the workspace."
+      );
+    } finally {
+      setIsProcessing(false);
+      setProcessingMessage("");
     }
   };
 
@@ -1060,7 +1080,11 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
             <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <div className="flex items-center gap-2 font-semibold text-xs text-emerald-600 dark:text-emerald-400">
                 <CheckCircle className="size-4.5" />
-                <span className="text-sm font-semibold">Case Indexed & 3 Defense Vectors Armed</span>
+                <span className="text-sm font-semibold">
+                  {extractedResult.pipelineResult
+                    ? "Case Indexed & 3 Defense Vectors Armed"
+                    : "Case Indexed — Autonomous Pipeline Ready"}
+                </span>
               </div>
               <Badge variant="outline" className="font-mono text-xs">
                 Claim #{extractedResult.claimNumber}
@@ -1094,6 +1118,66 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <span className="text-foreground font-medium text-[11px] block font-mono">Denial Rationale:</span>
               <p className="mt-0.5 leading-relaxed">{extractedResult.denialReasonDescription}</p>
             </div>
+
+            {/* Pipeline Execution Banner when Auto-Pilot Was Off or Pending */}
+            {!extractedResult.pipelineResult && (
+              <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3.5 space-y-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Lightning className="size-3.5 text-sky-400" />
+                      Auto-Pilot Was Disabled During Intake
+                    </span>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Case #{extractedResult.claimNumber} is indexed in the database with clinical facts confirmed. You can trigger the autonomous pipeline now to crawl insurer policy bulletins, calculate the overturn probability score, and draft the cited legal brief.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button
+                    size="xs"
+                    onClick={handleRunPipelineNow}
+                    disabled={isProcessing}
+                    className="h-7 px-3 text-xs gap-1.5 bg-primary text-primary-foreground font-semibold shadow-xs"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <CircleNotch className="size-3 animate-spin" />
+                        <span>{processingMessage || "Executing pipeline..."}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lightning className="size-3.5" />
+                        <span>Run Autonomous Sentinel Pipeline</span>
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={() => setContextSubmitted(false)}
+                    disabled={isProcessing}
+                    className="h-7 px-2.5 text-xs gap-1"
+                  >
+                    <ArrowLeft className="size-3" />
+                    <span>Edit Clinical Context</span>
+                  </Button>
+                  {errorMessage && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={handleRunPipelineNow}
+                      disabled={isProcessing}
+                      className="h-7 px-2 text-xs text-destructive hover:text-destructive gap-1"
+                    >
+                      <ArrowCounterClockwise className="size-3" />
+                      <span>Retry Analysis</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Smart Multi-Vector Armaments HUD */}
             <div className="space-y-2 pt-1">

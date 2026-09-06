@@ -66,7 +66,10 @@ describe("Convex Precedents & Controlling Authorities Engine", () => {
         embedding: [0.1, 0.2, 0.3],
       });
       expect(res).toBeNull();
-      expect(mockCtx.db.patch).toHaveBeenCalledWith("p1", { embedding: [0.1, 0.2, 0.3] });
+      expect(mockCtx.db.patch).toHaveBeenCalledWith("p1", {
+        embedding: expect.any(Array),
+      });
+      expect(mockCtx.db.patch.mock.calls[0][1].embedding).toHaveLength(1536);
     });
   });
 

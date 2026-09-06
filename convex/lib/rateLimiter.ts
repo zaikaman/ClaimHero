@@ -58,5 +58,26 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 30,
   },
+  // Precedent matcher & scoring engine (burst: 10, rate: 10/min)
+  precedentMatcher: {
+    kind: "token bucket",
+    rate: 10,
+    period: MINUTE,
+    capacity: 10,
+  },
+  // Clinical intake questions generator (burst: 10, rate: 10/min)
+  clinicalIntake: {
+    kind: "token bucket",
+    rate: 10,
+    period: MINUTE,
+    capacity: 10,
+  },
+  // Precedent vector & hybrid search (burst: 20, rate: 20/min)
+  precedentSearch: {
+    kind: "token bucket",
+    rate: 20,
+    period: MINUTE,
+    capacity: 20,
+  },
 });
 

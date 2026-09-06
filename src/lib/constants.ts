@@ -434,6 +434,8 @@ export interface SampleCasePreset {
   id: string;
   title: string;
   payer: string;
+  patientName: string;
+  memberId: string;
   amount: string;
   cpt: string;
   carc: string;
@@ -471,6 +473,8 @@ export const DEMO_CASE_FIXTURES: DemoCaseFixture[] = [
     id: "geoblue_meniscus",
     title: "GeoBlue Worldwide — Knee Arthroscopy & Meniscectomy (Carelon)",
     payer: "GeoBlue",
+    patientName: "Eleanor Vance",
+    memberId: "GEO-982341-01",
     amount: "$6,400",
     cpt: "29881",
     carc: "CO-50 (Not Medically Necessary)",
@@ -565,6 +569,8 @@ Attending Orthopedic Surgeon: Dr. Robert Langston, MD, FAAOS (Metropolitan Surgi
     id: "geoblue_spine",
     title: "GeoBlue Worldwide — Lumbar Spine Decompression (Carelon)",
     payer: "GeoBlue",
+    patientName: "Marcus Sterling",
+    memberId: "GEO-554210-99",
     amount: "$18,200",
     cpt: "63047",
     carc: "CO-197 (Prior Auth Lacking)",
@@ -580,18 +586,18 @@ Patient Name: Marcus Sterling
 Date of Service: 07/04/2026
 Provider: Dr. Sarah Chen, MD (Spine & Neurosurgery Associates)
 Facility: International Spine Institute
-
+ 
 Procedure & Clinical Codes:
 - CPT 63047: Laminectomy, facetectomy and foraminotomy with decompression of spinal cord, single segment lumbar
 - ICD-10 M51.26: Other intervertebral disc displacement, lumbar region
 - Total Billed: $18,200.00
 - Amount Denied: $18,200.00
 - Patient Responsibility: $18,200.00
-
+ 
 Denial Adjudication Reason:
 Code CO-197: Precertification / prior authorization / notification absent or lacking.
 Description: Surgical treatment for lumbar spinal stenosis was performed without securing prior authorization from GeoBlue Medical Review Department prior to the date of service. Under Carelon Musculoskeletal Clinical Appropriateness Guidelines for Spine Surgery (Lumbar Decompression / Laminectomy), non-emergent surgical intervention requires prospective authorization or clinical documentation of acute progressive neurological motor deficit establishing emergency medical necessity.
-
+ 
 Appeals Procedure & Filing Instructions:
 In accordance with federal regulations under 29 CFR § 2560.503-1, you or your authorized representative have 180 days from receipt of this notice to file a Level 1 appeal demonstrating emergency medical necessity or retroactive pre-authorization criteria under Carelon Clinical Appropriateness Guidelines for Spine Surgery (Lumbar Decompression / Laminectomy) / Policy SURG.00011.
 Submit complete appeal dossier and clinical records to:
@@ -657,6 +663,8 @@ Attending Neurosurgeon: Dr. Sarah Chen, MD, FAANS (Spine & Neurosurgery Associat
     id: "bcbsglobal_mri",
     title: "BCBS Global Core — Knee MRI Scan",
     payer: "Blue Cross Blue Shield Global Core",
+    patientName: "Michael Patel",
+    memberId: "BCG-773419-02",
     amount: "$2,850",
     cpt: "73721",
     carc: "CO-16 (Missing Plain Radiographs)",
@@ -667,7 +675,8 @@ Attending Neurosurgeon: Dr. Sarah Chen, MD, FAANS (Spine & Neurosurgery Associat
     content: `BLUE CROSS BLUE SHIELD GLOBAL CORE
 ADVERSE CLAIM ADJUDICATION NOTICE
 Claim Number: CLM-3912-BCG
-Member: Michael Patel (ID: BCG-773419-02)
+Member ID: BCG-773419-02
+Patient Name: Michael Patel
 Date of Service: 07/18/2026
 Provider: Global Diagnostic Imaging Group
 

@@ -418,9 +418,9 @@ export const streamSentinelMessage = action({
       throw new Error("Unauthorized: You must be logged in to communicate with Sentinel Copilot");
     }
 
-    // Rate limiter: 30 queries / minute per user
+    // Rate limiter: 30 queries / minute per user (keyed by authenticated server userId)
     const { ok } = await rateLimiter.limit(ctx, "sentinelChatbot", {
-      key: `sentinel_chat_${args.sessionId || userId}`,
+      key: `sentinel_chat_${userId}`,
     });
     if (!ok) {
       throw new Error("Sentinel Copilot rate limit reached (30 queries/minute). Please wait a moment.");

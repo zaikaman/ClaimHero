@@ -3,7 +3,7 @@ import { components, api, internal } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id, Doc } from "./_generated/dataModel";
-import { requireClaimOwner } from "./lib/auth";
+import { requireClaimOwner, getAuthUserId } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
 import { ERISA_STATUTORY_EVIDENCE } from "./actions/policyCrawler";
 
@@ -27,6 +27,7 @@ export interface DurablePipelineResult {
   riskLevel?: string;
   appealId?: string;
   dispatched?: boolean;
+  precedentsUnavailable?: boolean;
   error?: string;
 }
 
@@ -206,6 +207,7 @@ export async function executeDurableClaimPipeline(
       combinedScore: number;
       codeOverlap: number;
     }> = [];
+    let precedentsUnavailable = false;
     try {
       vectorPrecedents = await step.runAction(
         api.actions.precedentArchive.retrieveTopPrecedents,
@@ -214,6 +216,13 @@ export async function executeDurableClaimPipeline(
       );
     } catch (precErr) {
       console.warn("Durable workflow vector precedent retrieval note:", precErr);
+      precedentsUnavailable = true;
+      await step.runMutation(internal.auditLogs.logEventInternal, {
+        claimId: args.claimId,
+        eventType: "workflow_precedents_unavailable_warning",
+        actor: "Durable Sentinel Workflow",
+        details: "Warning: Precedent vector retrieval was unavailable during durable workflow execution.",
+      });
     }
 
     // Step 4: Formal ERISA Appeal Brief Synthesis
@@ -280,8 +289,8 @@ export async function executeDurableClaimPipeline(
         );
         wasDispatched = true;
 
-        // Durable ERISA statutory follow-up cadence countdown
-        const cadenceDays = args.followUpCadenceDays ?? 14;
+        // Durable ERISA statutory follow-up cadence countdown (clamped 1..90 days)
+        const cadenceDays = Math.max(1, Math.min(args.followUpCadenceDays ?? 14, 90));
         if (cadenceDays > 0) {
           const sleepDurationMs = cadenceDays * 24 * 60 * 60 * 1000;
           await step.runMutation(internal.claims.updateStatusInternal, {
@@ -320,6 +329,7 @@ export async function executeDurableClaimPipeline(
       riskLevel: scoreResult?.riskLevel,
       appealId: synthesisResult?.appealId,
       dispatched: wasDispatched,
+      precedentsUnavailable,
     };
 }
 
@@ -365,6 +375,7 @@ export const durableClaimPipeline = workflow
       riskLevel: v.optional(v.string()),
       appealId: v.optional(v.string()),
       dispatched: v.optional(v.boolean()),
+      precedentsUnavailable: v.optional(v.boolean()),
       error: v.optional(v.string()),
     }),
   })
@@ -389,13 +400,14 @@ export async function executeErisaStatutoryCountdown(
   step: WorkflowCtx,
   args: ErisaStatutoryCountdownArgs
 ): Promise<ErisaStatutoryCountdownResult> {
-  const sleepDurationMs = Math.max(1, args.cadenceDays) * 24 * 60 * 60 * 1000;
+  const cadenceDays = Math.max(1, Math.min(args.cadenceDays, 90));
+  const sleepDurationMs = cadenceDays * 24 * 60 * 60 * 1000;
 
   await step.runMutation(internal.claims.updateStatusInternal, {
     claimId: args.claimId,
     status: "dispatched",
     actor: "ERISA Statutory Sentinel",
-    details: `Initialized ${args.cadenceDays}-day statutory follow-up cadence via durable workflow suspension.`,
+    details: `Initialized ${cadenceDays}-day statutory follow-up cadence via durable workflow suspension.`,
   });
 
   // Durable sleep without serverless resource consumption
@@ -535,10 +547,31 @@ export const getWorkflowExecutionStatus = query({
   handler: async (ctx, args) => {
     let workflowId = args.workflowId;
 
-    if (!workflowId && args.claimId) {
-      const claim = await ctx.db.get(args.claimId);
-      if (claim?.workflowId) {
+    if (args.claimId) {
+      const { claim } = await requireClaimOwner(ctx, args.claimId);
+      if (claim.workflowId) {
         workflowId = claim.workflowId;
+      }
+    } else if (workflowId) {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) {
+        return {
+          hasWorkflow: false,
+          workflowId: null,
+          status: null,
+        };
+      }
+      const claim = await ctx.db
+        .query("claims")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .filter((q) => q.eq(q.field("workflowId"), workflowId))
+        .first();
+      if (!claim) {
+        return {
+          hasWorkflow: false,
+          workflowId: null,
+          status: null,
+        };
       }
     }
 
@@ -619,7 +652,7 @@ export const startStatutoryCountdown = mutation({
   },
   handler: async (ctx, args): Promise<{ workflowId: string }> => {
     const { claim, userId } = await requireClaimOwner(ctx, args.claimId);
-    const cadenceDays = args.cadenceDays ?? Math.max(claim.daysRemaining || 14, 1);
+    const cadenceDays = Math.max(1, Math.min(args.cadenceDays ?? Math.max(claim.daysRemaining || 14, 1), 90));
 
     const workflowId = await workflow.start(
       ctx,

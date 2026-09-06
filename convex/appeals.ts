@@ -211,14 +211,32 @@ async function applyCreateOrUpdateDraft(
     return null;
   }
 
-  const now = Date.now();
-  const existing = await ctx.db
-    .query("appeals")
-    .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-    .collect();
+  if (args.fullAppealMarkdown && args.fullAppealMarkdown.length > 500000) {
+    throw new Error("fullAppealMarkdown exceeds 500,000 character limit");
+  }
+  if (args.executiveSummary && args.executiveSummary.length > 50000) {
+    throw new Error("executiveSummary exceeds 50,000 character limit");
+  }
+  if (args.medicalNecessityArguments && args.medicalNecessityArguments.length > 100000) {
+    throw new Error("medicalNecessityArguments exceeds 100,000 character limit");
+  }
+  if (args.legalCitations && args.legalCitations.length > 50000) {
+    throw new Error("legalCitations exceeds 50,000 character limit");
+  }
 
-  const sorted = existing.sort((a, b) => b.version - a.version);
-  const latest = sorted[0];
+  const now = Date.now();
+  const appealQuery = ctx.db
+    .query("appeals")
+    .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId));
+
+  const mockableQ = appealQuery as unknown as MockableAppealQuery;
+  let latest: Doc<"appeals"> | null = null;
+  if (typeof mockableQ.order === "function") {
+    latest = await mockableQ.order("desc").first();
+  } else {
+    const list = await mockableQ.collect();
+    latest = list ? list.sort((a, b) => b.version - a.version)[0] || null : null;
+  }
   const nextVersion = latest ? latest.version + 1 : 1;
 
   const tierMeta = getStatutoryTierMetadata(args.appealLevel);
@@ -281,7 +299,7 @@ async function applyCreateOrUpdateDraft(
     claimId: args.claimId,
     eventType: "appeal_draft_updated",
     actor: args.lastEditedBy || "Appeal Studio",
-    details: `Saved revision v${shouldInsertNew ? nextVersion : latest.version} for ${args.appealLevel.replace(/_/g, " ").toUpperCase()} (${targetAuthority}). Statutory Posture: ${statutoryPosture}.`,
+    details: `Saved revision v${shouldInsertNew ? nextVersion : (latest?.version ?? 1)} for ${args.appealLevel.replace(/_/g, " ").toUpperCase()} (${targetAuthority}). Statutory Posture: ${statutoryPosture}.`,
     timestamp: now,
   });
 

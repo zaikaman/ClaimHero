@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { internal } from "../_generated/api";
 import { requireClaimOwnerAction } from "../lib/auth";
+import { rateLimiter } from "../lib/rateLimiter";
 import type { Doc } from "../_generated/dataModel";
 
 const OVERTURN_ANALYSIS_SCHEMA = {
@@ -239,7 +240,23 @@ export const computeOverturnScore = action({
   },
   handler: async (ctx, args): Promise<OverturnScoringResult> => {
     // 1. Authorize claim ownership
-    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+
+    // Rate limiting check per authenticated user
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "precedentMatcher", {
+        key: `precedent_matcher_${userId}`,
+      });
+      if (!limitStatus.ok) {
+        throw new Error(
+          `Rate limit reached for precedent matching. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+        );
+      }
+    } catch (rateErr) {
+      if (rateErr instanceof Error && rateErr.message.includes("Rate limit reached")) {
+        throw rateErr;
+      }
+    }
 
     // 2. Fetch indexed clinical evidence clauses
     const evidences: Doc<"clinicalEvidences">[] =

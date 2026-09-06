@@ -16,7 +16,8 @@ import {
   weightedTokensForCodes,
 } from "../lib/embeddings";
 import { precedentMatchValidator } from "../lib/precedentValidators";
-import { requireClaimOwnerAction } from "../lib/auth";
+import { requireClaimOwnerAction, requireAuthUser } from "../lib/auth";
+import { rateLimiter } from "../lib/rateLimiter";
 
 const matchListValidator = v.array(precedentMatchValidator);
 
@@ -155,17 +156,26 @@ export const retrieveTopPrecedents = action({
     const primaryCpt = cptCodes[0]?.trim();
     const cleanCarc = denialReasonCode?.trim();
 
-    let hits = await ctx.vectorSearch("precedents", "by_embedding", {
-      vector: embedding,
-      limit: 16,
-      ...(cleanCarc && primaryCpt
-        ? { filter: (q) => q.or(q.eq("carcCode", cleanCarc), q.eq("primaryCpt", primaryCpt)) }
-        : cleanCarc
-        ? { filter: (q) => q.eq("carcCode", cleanCarc) }
-        : primaryCpt
-        ? { filter: (q) => q.eq("primaryCpt", primaryCpt) }
-        : {}),
-    });
+    let hits: Array<{ _id: Id<"precedents">; _score: number }> = [];
+    try {
+      hits = await ctx.vectorSearch("precedents", "by_embedding", {
+        vector: embedding,
+        limit: 16,
+        ...(cleanCarc && primaryCpt
+          ? { filter: (q) => q.or(q.eq("carcCode", cleanCarc), q.eq("primaryCpt", primaryCpt)) }
+          : cleanCarc
+          ? { filter: (q) => q.eq("carcCode", cleanCarc) }
+          : primaryCpt
+          ? { filter: (q) => q.eq("primaryCpt", primaryCpt) }
+          : {}),
+      });
+    } catch (filterErr) {
+      console.warn("Vector search with filter expression failed, falling back to unfiltered vector search:", filterErr);
+      hits = await ctx.vectorSearch("precedents", "by_embedding", {
+        vector: embedding,
+        limit: 16,
+      });
+    }
 
     if (hits.length === 0 && (cleanCarc || primaryCpt)) {
       hits = await ctx.vectorSearch("precedents", "by_embedding", {
@@ -293,6 +303,24 @@ export const hybridSearchPrecedents = action({
   },
   returns: matchListValidator,
   handler: async (ctx, args) => {
+    const userId = await requireAuthUser(ctx);
+
+    // Enforce rate limiting per authenticated user
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "precedentSearch", {
+        key: `precedent_search_${userId}`,
+      });
+      if (!limitStatus.ok) {
+        throw new Error(
+          `Rate limit reached for precedent search. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+        );
+      }
+    } catch (rateErr) {
+      if (rateErr instanceof Error && rateErr.message.includes("Rate limit reached")) {
+        throw rateErr;
+      }
+    }
+
     const cptCodes = args.cptCodes || [];
     const icd10Codes = args.icd10Codes || [];
     const carcCode = args.carcCode || "CO-50";
@@ -301,6 +329,8 @@ export const hybridSearchPrecedents = action({
     if (!userQuery && cptCodes.length === 0 && icd10Codes.length === 0) {
       return [];
     }
+
+    const effectiveLimit = Math.max(1, Math.min(args.limit ?? 5, 100));
 
     const queryFields = {
       cptCodes,
@@ -353,7 +383,7 @@ export const hybridSearchPrecedents = action({
       vectorCandidates,
       lexicalCandidates,
       queryFields,
-      { limit: args.limit || 5, k: 60 }
+      { limit: effectiveLimit, k: 60 }
     );
 
     return fused.map((row) => ({

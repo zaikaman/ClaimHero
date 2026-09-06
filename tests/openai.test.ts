@@ -129,6 +129,42 @@ describe("convex/lib/openai Unit Tests", () => {
     expect(mockChatCreate.mock.calls[1][0].messages[1].content).toContain("previous response did not satisfy");
   });
 
+  it("rejects structured output when model response is missing required schema fields", async () => {
+    mockChatCreate.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              claimNumber: "CLM-1234",
+              deniedAmount: 5000,
+            }),
+          },
+        },
+      ],
+    });
+
+    await expect(
+      createStructuredCompletion<{
+        claimNumber: string;
+        deniedAmount: number;
+        patientName: string;
+      }>({
+        systemPrompt: "test",
+        userPrompt: "test",
+        schemaName: "PartialResult",
+        schema: {
+          type: "object",
+          properties: {
+            claimNumber: { type: "string" },
+            deniedAmount: { type: "number" },
+            patientName: { type: "string" },
+          },
+          required: ["claimNumber", "deniedAmount", "patientName"],
+        },
+      })
+    ).rejects.toThrow(/missing one or more required schema fields/);
+  });
+
   it("creates structured completions with file inputs", async () => {
     const mockOutput = {
       parsedSummary: "Document parsed",

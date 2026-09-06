@@ -222,6 +222,8 @@ describe("Hybrid Precedent Search: Reciprocal Rank Fusion (RRF) Engine", () => {
     beforeEach(() => {
       vi.clearAllMocks();
       vi.spyOn(openai, "createEmbedding").mockResolvedValue(new Array(1536).fill(0.1));
+      vi.spyOn(auth, "requireAuthUser").mockResolvedValue("user_mock_123" as any);
+      vi.spyOn(auth, "getAuthUserId").mockResolvedValue("user_mock_123" as any);
     });
 
 

@@ -788,10 +788,13 @@ export const sendMessageWithTools = action({
     currentView: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // 1. Rate limiting check
+    const userId = await getAuthUserId(ctx);
+
+    // 1. Rate limiting check (prefer stable server userId over client-rotatable sessionId)
     try {
+      const rateLimitKey = userId ? `sentinel_chat_${userId}` : `sentinel_chat_${args.sessionId}`;
       const { ok } = await rateLimiter.limit(ctx, "sentinelChatbot", {
-        key: `sentinel_chat_${args.sessionId}`,
+        key: rateLimitKey,
       });
       if (!ok) {
         const rateLimitReply =

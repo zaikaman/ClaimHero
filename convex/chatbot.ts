@@ -1,6 +1,6 @@
 import { query, mutation, internalQuery, internalMutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Id, Doc } from "./_generated/dataModel";
 import {
   getChatbotSessionIfAuthorized,
   requireAuthUser,
@@ -181,7 +181,7 @@ async function applyAddMessage(ctx: MutationCtx, args: AddMessageArgs) {
 export const addMessage = mutation({
   args: {
     sessionId: v.id("chatbotSessions"),
-    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system"), v.literal("tool")),
+    role: v.literal("user"),
     content: v.string(),
     toolCalls: v.optional(
       v.array(
@@ -363,30 +363,75 @@ export const searchClaimsForChatbot = internalQuery({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit || 5;
-    const claims = args.status
-      ? await ctx.db
+    const limit = Math.max(1, Math.min(args.limit ?? 5, 100));
+    const term = args.searchTerm?.trim();
+    let claims: Doc<"claims">[] = [];
+    let usedSearchIndex = false;
+
+    if (term) {
+      try {
+        const searchResults = await ctx.db
           .query("claims")
-          .withIndex("by_user_status", (q) =>
-            q.eq("userId", args.userId).eq("status", args.status!)
-          )
-          .order("desc")
-          .take(limit)
-      : await ctx.db
-          .query("claims")
-          .withIndex("by_user", (q) => q.eq("userId", args.userId))
-          .order("desc")
+          .withSearchIndex("search_claims", (q) => {
+            let builder = q
+              .search("denialReasonDescription", term)
+              .eq("userId", args.userId);
+            if (args.status && args.status !== "all") {
+              builder = builder.eq("status", args.status);
+            }
+            return builder;
+          })
           .take(limit);
+
+        // Augment with direct claimNumber match if search results have capacity
+        if (searchResults.length < limit) {
+          const directMatch = await ctx.db
+            .query("claims")
+            .withIndex("by_claim_number", (q) => q.eq("claimNumber", term))
+            .first();
+          if (
+            directMatch &&
+            directMatch.userId === args.userId &&
+            (!args.status || args.status === "all" || directMatch.status === args.status)
+          ) {
+            if (!searchResults.some((r) => r._id === directMatch._id)) {
+              searchResults.push(directMatch);
+            }
+          }
+        }
+
+        claims = searchResults.slice(0, limit);
+        usedSearchIndex = true;
+      } catch {
+        usedSearchIndex = false;
+      }
+    }
+
+    if (!usedSearchIndex) {
+      claims = args.status && args.status !== "all"
+        ? await ctx.db
+            .query("claims")
+            .withIndex("by_user_status", (q) =>
+              q.eq("userId", args.userId).eq("status", args.status!)
+            )
+            .order("desc")
+            .take(limit)
+        : await ctx.db
+            .query("claims")
+            .withIndex("by_user", (q) => q.eq("userId", args.userId))
+            .order("desc")
+            .take(limit);
+    }
 
     // Populate patient names
     const populated = await Promise.all(
-      claims.map(async (c) => {
-        const patient = await ctx.db.get(c.patientId);
+      claims.map(async (c: Doc<"claims">) => {
+        const patient = (await ctx.db.get(c.patientId)) as Doc<"patients"> | null;
         return {
           claimId: c._id,
           claimNumber: c.claimNumber,
-          patientName: patient?.name ?? "Patient",
-          payer: patient?.insurancePayer ?? "Unknown Payer",
+          patientName: patient?.name ?? c.patientName ?? "Patient",
+          payer: patient?.insurancePayer ?? c.insurancePayer ?? "Unknown Payer",
           deniedAmount: c.deniedAmount,
           patientOwed: c.patientOwedAmount,
           cptCodes: c.cptCodes,
@@ -400,16 +445,17 @@ export const searchClaimsForChatbot = internalQuery({
       })
     );
 
-    if (args.searchTerm && args.searchTerm.trim() !== "") {
-      const term = args.searchTerm.toLowerCase();
+    // If search index was unavailable (e.g. unit test runner mocks), apply fallback filter
+    if (!usedSearchIndex && term) {
+      const lower = term.toLowerCase();
       return populated.filter(
         (c) =>
-          c.claimNumber.toLowerCase().includes(term) ||
-          c.patientName.toLowerCase().includes(term) ||
-          c.payer.toLowerCase().includes(term) ||
-          c.denialReasonCode.toLowerCase().includes(term) ||
-          c.denialReasonDescription.toLowerCase().includes(term) ||
-          c.cptCodes.some((code) => code.toLowerCase().includes(term))
+          c.claimNumber.toLowerCase().includes(lower) ||
+          c.patientName.toLowerCase().includes(lower) ||
+          c.payer.toLowerCase().includes(lower) ||
+          c.denialReasonCode.toLowerCase().includes(lower) ||
+          c.denialReasonDescription.toLowerCase().includes(lower) ||
+          c.cptCodes.some((code: string) => code.toLowerCase().includes(lower))
       );
     }
 

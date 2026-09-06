@@ -42,6 +42,7 @@ export interface DispatchReceipt {
   dispatchedAt: number;
   status: "delivered" | "queued";
   adjudicationDetermination?: string;
+  pdfMissing?: boolean;
 }
 
 interface ClaimMailboxes {
@@ -606,10 +607,24 @@ export const dispatchAppealPacket = action({
 
     // Automatically pull compiled PDF brief from Convex Storage (or compile court-ready PDF if not yet stored)
     let storedPdf: { storageId: Id<"_storage">; buffer: Buffer; filename: string } | null = null;
+    let pdfMissing = false;
     try {
       storedPdf = await ensureAppealPdfStored(ctx, claim, appeal);
     } catch (pdfErr) {
       console.warn("Failed to pull or compile PDF brief for outbound transmission:", pdfErr);
+      pdfMissing = true;
+    }
+    if (!storedPdf) {
+      pdfMissing = true;
+    }
+
+    if (pdfMissing) {
+      await ctx.runMutation(internal.auditLogs.logEventInternal, {
+        claimId: args.claimId,
+        eventType: "appeal_dispatch_pdf_missing_warning",
+        actor: "AgentMail Dispatcher",
+        details: "Warning: Appeal email was transmitted without compiled PDF brief attachment because PDF compilation/storage could not be completed.",
+      });
     }
 
     const outgoingAttachments = storedPdf
@@ -713,6 +728,7 @@ export const dispatchAppealPacket = action({
       subject,
       dispatchedAt: Date.now(),
       status: "delivered",
+      pdfMissing,
       adjudicationDetermination: adjudicationResult?.determination,
     };
   },
@@ -1188,8 +1204,8 @@ export const dispatchScheduledAutoPilotReply = internalAction({
 
 /**
  * Sentinel Auto-Pilot SLA Cron Sweep:
- * Runs periodically (every 5 minutes) to detect any inbound messages with pending auto-reply drafts
- * older than 1 hour (3,600,000 ms) and dispatches them autonomously.
+ * Runs periodically every 15 minutes (via crons.ts sentinel-autopilot-sla-sweep) to detect any inbound messages
+ * with pending auto-reply drafts older than the 1-hour review SLA (3,600,000 ms) and dispatches them autonomously.
  */
 export const sweepPendingAutoPilotReplies = internalAction({
   args: {

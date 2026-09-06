@@ -423,5 +423,90 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
 
       expect(receipt.status).toBe("delivered");
     });
+
+    it("healRedactedPatientNames: reconciles patient name from physicianNotes when unstated in denial notice", async () => {
+      const mockDb = {
+        query: vi.fn().mockReturnValue({
+          collect: vi.fn().mockResolvedValue([
+            {
+              _id: "claim_1",
+              claimNumber: "CLM-6104-GEO-7830",
+              patientId: "patient_1",
+              patientName: "Not specified in denial notice",
+              appealContext: {
+                physicianNotes: "PATIENT: Marcus Sterling | DOB: 11/22/1974 | DOS: 07/04/2026\nATTENDING CLINICAL ATTESTATION...",
+              },
+            },
+          ]),
+          withIndex: vi.fn().mockReturnValue({
+            collect: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+        get: vi.fn().mockImplementation(async (id) => {
+          if (id === "patient_1") {
+            return {
+              _id: "patient_1",
+              name: "Not specified in denial notice",
+              memberId: "GEO-554210-99",
+            };
+          }
+          return null;
+        }),
+        patch: vi.fn().mockResolvedValue(true),
+      };
+
+      const mockCtx: any = { db: mockDb };
+      const res = await (claims.healRedactedPatientNames as any)._handler(mockCtx, {});
+
+      expect(res.healedClaims).toBe(1);
+      expect(res.healedPatients).toBe(1);
+      expect(mockDb.patch).toHaveBeenCalledWith("claim_1", expect.objectContaining({ patientName: "Marcus Sterling" }));
+      expect(mockDb.patch).toHaveBeenCalledWith("patient_1", expect.objectContaining({ name: "Marcus Sterling" }));
+    });
+
+    it("updateAppealContext: auto-reconciles patient name from physicianNotes when unstated in denial notice", async () => {
+      vi.spyOn(auth, "requireClaimOwner").mockResolvedValue(true as any);
+
+      const mockDb = {
+        get: vi.fn().mockImplementation(async (id) => {
+          if (id === "claim_unspecified") {
+            return {
+              _id: "claim_unspecified",
+              patientId: "patient_unspecified",
+              patientName: "Not specified in denial notice",
+            };
+          }
+          if (id === "patient_unspecified") {
+            return {
+              _id: "patient_unspecified",
+              name: "Not specified in denial notice",
+            };
+          }
+          return null;
+        }),
+        patch: vi.fn().mockResolvedValue(true),
+        insert: vi.fn().mockResolvedValue("log_1"),
+      };
+
+      const mockCtx: any = { db: mockDb };
+      await (claims.updateAppealContext as any)._handler(mockCtx, {
+        claimId: "claim_unspecified",
+        sender: {
+          name: "Alex Morgan",
+          email: "alex@example.com",
+        },
+        clinicalFacts: {
+          recordsAreIncomplete: false,
+        },
+        physicianNotes: "PATIENT: Marcus Sterling | Attending neurosurgeon note...",
+      });
+
+      expect(mockDb.patch).toHaveBeenCalledWith("claim_unspecified", expect.objectContaining({
+        patientName: "Marcus Sterling",
+      }));
+      expect(mockDb.patch).toHaveBeenCalledWith("patient_unspecified", {
+        name: "Marcus Sterling",
+      });
+    });
   });
 });

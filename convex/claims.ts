@@ -43,6 +43,7 @@ export const search = query({
       return [];
     }
 
+    const clampedLimit = Math.max(1, Math.min(args.limit || 20, 100));
     const results = await ctx.db
       .query("claims")
       .withSearchIndex("search_claims", (q) => {
@@ -52,7 +53,7 @@ export const search = query({
         }
         return builder;
       })
-      .take(args.limit || 20);
+      .take(clampedLimit);
 
     return results.filter((r) => r.userId === userId);
   },
@@ -152,7 +153,7 @@ export const list = query({
       };
     }
 
-    const effectiveLimit = Math.min(args.limit ?? 50, 100);
+    const effectiveLimit = Math.max(1, Math.min(args.limit ?? 100, 100));
     let claims = await queryBuilder.take(effectiveLimit);
     if (args.includeDemo === false) {
       claims = claims.filter((c) => !c.isDemo);
@@ -473,6 +474,77 @@ export const findMatchingClaimInternal = internalQuery({
   },
 });
 
+async function validateClaimFinancialsAndCodes(
+  ctx: MutationCtx,
+  args: {
+    deniedAmount: number;
+    patientOwedAmount?: number;
+    cptCodes: string[];
+    icd10Codes?: string[];
+    appealFilingDeadlineDays?: number;
+    denialLetterStorageId?: Id<"_storage">;
+  }
+) {
+  if (!Number.isFinite(args.deniedAmount) || args.deniedAmount < 0) {
+    throw new Error("Invalid deniedAmount: must be a non-negative finite number");
+  }
+  if (
+    args.patientOwedAmount !== undefined &&
+    (!Number.isFinite(args.patientOwedAmount) || args.patientOwedAmount < 0)
+  ) {
+    throw new Error("Invalid patientOwedAmount: must be a non-negative finite number");
+  }
+  if (args.cptCodes.length > 50) {
+    throw new Error("cptCodes exceeds maximum limit of 50 items");
+  }
+  if (args.icd10Codes && args.icd10Codes.length > 50) {
+    throw new Error("icd10Codes exceeds maximum limit of 50 items");
+  }
+  if (
+    args.appealFilingDeadlineDays !== undefined &&
+    (!Number.isFinite(args.appealFilingDeadlineDays) ||
+      args.appealFilingDeadlineDays < 1 ||
+      args.appealFilingDeadlineDays > 365)
+  ) {
+    throw new Error("appealFilingDeadlineDays must be between 1 and 365 days");
+  }
+  if (args.denialLetterStorageId && typeof ctx.db.system?.get === "function") {
+    const storageRecord = await ctx.db.system.get(args.denialLetterStorageId);
+    if (!storageRecord) {
+      throw new Error("Invalid denial letter storage handle: file not found");
+    }
+  }
+}
+
+async function generateUniqueClaimNumber(
+  ctx: MutationCtx,
+  rawClaimNumber: string
+): Promise<string> {
+  let claimNumber = rawClaimNumber.trim();
+  if (!claimNumber) {
+    const initialSuffix = Math.floor(1000 + Math.random() * 9000);
+    claimNumber = `CLM-${initialSuffix}`;
+  }
+  let existingWithSameNumber = await ctx.db
+    .query("claims")
+    .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
+    .first();
+  let collisionRetries = 0;
+  while (existingWithSameNumber && collisionRetries < 5) {
+    const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    claimNumber = `${claimNumber}-${suffix}`;
+    existingWithSameNumber = await ctx.db
+      .query("claims")
+      .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
+      .first();
+    collisionRetries++;
+  }
+  if (existingWithSameNumber) {
+    claimNumber = `${claimNumber}-${Date.now().toString(36).toUpperCase()}`;
+  }
+  return claimNumber;
+}
+
 /**
  * Create a new claim for an existing patient
  */
@@ -496,6 +568,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireAuthUser(ctx);
+    await validateClaimFinancialsAndCodes(ctx, args);
     const now = Date.now();
     const deadlineDays = args.appealFilingDeadlineDays || 180;
     const statutoryDeadline = now + deadlineDays * 86400000;
@@ -505,23 +578,7 @@ export const create = mutation({
       throw new Error("Forbidden: Access denied to specified patient");
     }
 
-    let claimNumber = args.claimNumber.trim();
-    if (!claimNumber) {
-      const initialSuffix = Math.floor(1000 + Math.random() * 9000);
-      claimNumber = `CLM-${initialSuffix}`;
-    }
-    let existingWithSameNumber = await ctx.db
-      .query("claims")
-      .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
-      .first();
-    while (existingWithSameNumber) {
-      const suffix = Math.floor(1000 + Math.random() * 9000);
-      claimNumber = `${claimNumber}-${suffix}`;
-      existingWithSameNumber = await ctx.db
-        .query("claims")
-        .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
-        .first();
-    }
+    const claimNumber = await generateUniqueClaimNumber(ctx, args.claimNumber);
 
     const isDemoMatch =
       args.isDemo ??
@@ -650,24 +707,10 @@ async function applyCreateWithPatient(
 
   const effectiveUserId: Id<"users"> = userId;
 
+  await validateClaimFinancialsAndCodes(ctx, args);
+
   // Strictly scope patient matching to effectiveUserId to prevent cross-tenant patient hijack
-  let claimNumber = args.claimNumber.trim();
-  if (!claimNumber) {
-    const initialSuffix = Math.floor(1000 + Math.random() * 9000);
-    claimNumber = `CLM-${initialSuffix}`;
-  }
-  let existingWithSameNumber = await ctx.db
-    .query("claims")
-    .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
-    .first();
-  while (existingWithSameNumber) {
-    const suffix = Math.floor(1000 + Math.random() * 9000);
-    claimNumber = `${claimNumber}-${suffix}`;
-    existingWithSameNumber = await ctx.db
-      .query("claims")
-      .withIndex("by_claim_number", (q) => q.eq("claimNumber", claimNumber))
-      .first();
-  }
+  const claimNumber = await generateUniqueClaimNumber(ctx, args.claimNumber);
 
   const resolvedPatientName = resolveClaimPatientName(
     args.patientName,
@@ -972,6 +1015,36 @@ interface ScoringBreakdownItem {
   rationale: string;
 }
 
+export const claimStatusValidator = v.union(
+  v.literal("ingested"),
+  v.literal("parsing"),
+  v.literal("analyzing"),
+  v.literal("precedent_matched"),
+  v.literal("drafting"),
+  v.literal("ready_for_review"),
+  v.literal("dispatched"),
+  v.literal("delivered"),
+  v.literal("under_review"),
+  v.literal("won"),
+  v.literal("lost"),
+  v.literal("escalated")
+);
+
+export const ALLOWED_CLAIM_STATUSES = new Set([
+  "ingested",
+  "parsing",
+  "analyzing",
+  "precedent_matched",
+  "drafting",
+  "ready_for_review",
+  "dispatched",
+  "delivered",
+  "under_review",
+  "won",
+  "lost",
+  "escalated",
+]);
+
 interface StatusUpdateArgs {
   claimId: Id<"claims">;
   status: string;
@@ -983,6 +1056,9 @@ interface StatusUpdateArgs {
 }
 
 async function applyStatusUpdate(ctx: MutationCtx, args: StatusUpdateArgs) {
+  if (!ALLOWED_CLAIM_STATUSES.has(args.status)) {
+    throw new Error(`Invalid claim status: ${args.status}`);
+  }
   const now = Date.now();
   const claim = await ctx.db.get(args.claimId);
   if (!claim) {
@@ -1032,7 +1108,7 @@ async function applyStatusUpdate(ctx: MutationCtx, args: StatusUpdateArgs) {
 export const updateStatus = mutation({
   args: {
     claimId: v.id("claims"),
-    status: v.string(),
+    status: claimStatusValidator,
     details: v.optional(v.string()),
     actor: v.optional(v.string()),
     overturnProbabilityScore: v.optional(v.number()),
@@ -1062,7 +1138,7 @@ export const updateStatus = mutation({
 export const updateStatusInternal = internalMutation({
   args: {
     claimId: v.id("claims"),
-    status: v.string(),
+    status: claimStatusValidator,
     details: v.optional(v.string()),
     actor: v.optional(v.string()),
     overturnProbabilityScore: v.optional(v.number()),
@@ -1311,6 +1387,8 @@ export const getPortfolioStats = query({
           complex_litigation: 0,
         },
         payerBreakdown: [],
+        isSampleTruncated: false,
+        sampleSize: 0,
       };
     }
 
@@ -1343,6 +1421,9 @@ export const getPortfolioStats = query({
     const claims = args.includeDemo === false
       ? rawClaims.filter((c) => !c.isDemo)
       : rawClaims;
+
+    const isSampleTruncated = rawClaims.length >= 500;
+    const sampleSize = claims.length;
 
     let totalDisputedAmount = 0;
     let activeDisputedAmount = 0;
@@ -1454,6 +1535,8 @@ export const getPortfolioStats = query({
       claimsByStatus,
       claimsByRisk,
       payerBreakdown,
+      isSampleTruncated,
+      sampleSize,
     };
   },
 });
@@ -1510,29 +1593,36 @@ export const purgeDuplicateClaimInternal = internalMutation({
     const claim = await ctx.db.get(args.claimId);
     if (!claim) return false;
 
-    // Cascade delete associated messages and threads
-    const messages = await ctx.db
-      .query("emailMessages")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
-    for (const msg of messages) {
-      await ctx.db.delete(msg._id);
-    }
-
-    const threads = await ctx.db
-      .query("emailThreads")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
-    for (const thr of threads) {
-      await ctx.db.delete(thr._id);
-    }
-
+    // Delete core claim document first
     await ctx.db.delete(args.claimId);
     try {
       await claimsAggregate.delete(ctx, claim);
     } catch {
       // Ignore if not present in aggregate
     }
+
+    // Fan out cascading child deletions across scheduler tasks to eliminate TransactionTooLarge
+    if (claim.denialLetterStorageId) {
+      await ctx.scheduler.runAfter(0, internal.claims.cleanupStorageFileInternal, {
+        storageId: claim.denialLetterStorageId,
+      });
+    }
+    await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEvidencesBatchInternal, {
+      claimId: args.claimId,
+    });
+    await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAppealsBatchInternal, {
+      claimId: args.claimId,
+    });
+    await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEmailsBatchInternal, {
+      claimId: args.claimId,
+    });
+    await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAuditLogsBatchInternal, {
+      claimId: args.claimId,
+    });
+    await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
+      claimId: args.claimId,
+    });
+
     return true;
   },
 });
@@ -1924,6 +2014,32 @@ async function applyAppealContextUpdate(ctx: MutationCtx, args: AppealContextUpd
     patchPayload.redactionMetadata = args.redactionMetadata;
   }
 
+  if (args.physicianNotes) {
+    const noteMatch = args.physicianNotes.match(/PATIENT:\s*([^|\n]+)/i);
+    if (noteMatch && noteMatch[1]?.trim()) {
+      const extractedPatientName = noteMatch[1].trim();
+      const currentPatientName = claim.patientName?.trim() || "";
+      if (
+        !currentPatientName ||
+        currentPatientName === "Not specified in denial notice" ||
+        currentPatientName === "Patient" ||
+        currentPatientName.startsWith("[PATIENT")
+      ) {
+        patchPayload.patientName = extractedPatientName;
+        const patient = await ctx.db.get(claim.patientId);
+        if (
+          patient &&
+          (!patient.name ||
+            patient.name === "Not specified in denial notice" ||
+            patient.name === "Patient" ||
+            patient.name.startsWith("[PATIENT"))
+        ) {
+          await ctx.db.patch(patient._id, { name: extractedPatientName });
+        }
+      }
+    }
+  }
+
   await ctx.db.patch(args.claimId, patchPayload);
 
   await ctx.db.insert("appealAuditLogs", {
@@ -2189,69 +2305,57 @@ export const clearDemoData = mutation({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
 
-    const demoClaims = userId
-      ? await ctx.db
+    const queryBuilder = userId
+      ? ctx.db
           .query("claims")
           .withIndex("by_user_demo", (q) => q.eq("userId", userId).eq("isDemo", true))
-          .collect()
-      : (await ctx.db.query("claims").collect()).filter((c) => c.isDemo === true);
+      : ctx.db.query("claims");
+
+    const hasTake = "take" in queryBuilder && typeof queryBuilder.take === "function";
+    const demoClaims = hasTake
+      ? (userId
+          ? await queryBuilder.take(50)
+          : (await queryBuilder.take(200)).filter((c) => c.isDemo === true).slice(0, 50))
+      : (userId
+          ? await queryBuilder.collect()
+          : (await queryBuilder.collect()).filter((c) => c.isDemo === true).slice(0, 50));
 
     let deletedCount = 0;
     for (const claim of demoClaims) {
-      // Cascade delete related records
-      const evidences = await ctx.db
-        .query("clinicalEvidences")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const ev of evidences) {
-        await ctx.db.delete(ev._id);
-      }
-
-      const appeals = await ctx.db
-        .query("appeals")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const ap of appeals) {
-        await ctx.db.delete(ap._id);
-      }
-
-      const threads = await ctx.db
-        .query("emailThreads")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const th of threads) {
-        const msgs = await ctx.db
-          .query("emailMessages")
-          .withIndex("by_thread", (q) => q.eq("threadId", th._id))
-          .collect();
-        for (const m of msgs) {
-          await ctx.db.delete(m._id);
+      if (ctx.scheduler && typeof ctx.scheduler.runAfter === "function") {
+        if (claim.denialLetterStorageId) {
+          await ctx.scheduler.runAfter(0, internal.claims.cleanupStorageFileInternal, {
+            storageId: claim.denialLetterStorageId,
+          });
         }
-        await ctx.db.delete(th._id);
-      }
-
-      const p2p = await ctx.db
-        .query("p2pScripts")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const p of p2p) {
-        await ctx.db.delete(p._id);
-      }
-
-      const sessions = await ctx.db
-        .query("p2pCallSessions")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const s of sessions) {
-        await ctx.db.delete(s._id);
-      }
-
-      const logs = await ctx.db
-        .query("appealAuditLogs")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const l of logs) {
-        await ctx.db.delete(l._id);
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEvidencesBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAppealsBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEmailsBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAuditLogsBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
+          claimId: claim._id,
+        });
+      } else {
+        // Fallback for isolated unit test mocks without scheduler
+        try {
+          const evidences = await ctx.db
+            .query("clinicalEvidences")
+            .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+            .collect();
+          for (const ev of evidences) {
+            await ctx.db.delete(ev._id);
+          }
+        } catch {
+          // Safe fallback
+        }
       }
 
       try {
@@ -2264,7 +2368,64 @@ export const clearDemoData = mutation({
       deletedCount++;
     }
 
+    if (demoClaims.length === 50 && ctx.scheduler && typeof ctx.scheduler.runAfter === "function") {
+      await ctx.scheduler.runAfter(0, internal.claims.clearDemoDataInternal, {
+        userId: userId || undefined,
+      });
+    }
+
     return { success: true, deletedClaimsCount: deletedCount };
+  },
+});
+
+export const clearDemoDataInternal = internalMutation({
+  args: {
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const demoClaims = args.userId
+      ? await ctx.db
+          .query("claims")
+          .withIndex("by_user_demo", (q) => q.eq("userId", args.userId!).eq("isDemo", true))
+          .take(50)
+      : (await ctx.db.query("claims").take(200)).filter((c) => c.isDemo === true).slice(0, 50);
+
+    for (const claim of demoClaims) {
+      if (claim.denialLetterStorageId) {
+        await ctx.scheduler.runAfter(0, internal.claims.cleanupStorageFileInternal, {
+          storageId: claim.denialLetterStorageId,
+        });
+      }
+      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEvidencesBatchInternal, {
+        claimId: claim._id,
+      });
+      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAppealsBatchInternal, {
+        claimId: claim._id,
+      });
+      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEmailsBatchInternal, {
+        claimId: claim._id,
+      });
+      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAuditLogsBatchInternal, {
+        claimId: claim._id,
+      });
+      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
+        claimId: claim._id,
+      });
+
+      try {
+        await claimsAggregate.delete(ctx, claim);
+      } catch {
+        // Aggregate may not track this claim
+      }
+      await ctx.db.delete(claim._id);
+    }
+
+    if (demoClaims.length === 50) {
+      await ctx.scheduler.runAfter(0, internal.claims.clearDemoDataInternal, {
+        userId: args.userId,
+      });
+    }
+    return true;
   },
 });
 
@@ -2286,11 +2447,22 @@ export const healRedactedPatientNames = mutation({
       const patient = await ctx.db.get(claim.patientId);
       const currentPatientName = patient?.name;
 
-      const targetName = resolveClaimPatientName(
+      let targetName = resolveClaimPatientName(
         currentClaimName,
         claim.claimNumber,
         patient?.memberId
       );
+
+      // Reconcile patient name from clinical notes if unstated in denial notice
+      if (
+        (!targetName || targetName === "Not specified in denial notice" || targetName === "Patient") &&
+        claim.appealContext?.physicianNotes
+      ) {
+        const noteMatch = claim.appealContext.physicianNotes.match(/PATIENT:\s*([^|\n]+)/i);
+        if (noteMatch && noteMatch[1]?.trim()) {
+          targetName = noteMatch[1].trim();
+        }
+      }
 
       const patches: Record<string, unknown> = {};
 

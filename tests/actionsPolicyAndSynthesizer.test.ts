@@ -749,7 +749,7 @@ Welcome to the NASS guidelines directory. Below are the published clinical pract
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
       vi.spyOn(libOpenAI, "createStructuredCompletion").mockRejectedValue(
-        new Error("Failed to parse structured JSON response from model gemini-3.1-flash-lite")
+        new Error("Failed to parse structured JSON response from model gpt-5.4-nano")
       );
 
       const mockClaim = {

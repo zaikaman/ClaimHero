@@ -317,6 +317,36 @@ describe("Convex Sentinel Chatbot Server Functions", () => {
       expect(res[0].claimNumber).toBe("CLM-100");
     });
 
+    it("searchClaimsForChatbot: leverages search_claims search index directly when available", async () => {
+      const claims = [
+        { _id: "c1", patientId: "p1", claimNumber: "CLM-100", cptCodes: ["27447"], denialReasonCode: "CO-50", denialReasonDescription: "Experimental knee arthroplasty", status: "won" },
+      ];
+      const mockTake = vi.fn().mockResolvedValue(claims);
+      const mockWithSearchIndex = vi.fn().mockReturnValue({ take: mockTake });
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            withSearchIndex: mockWithSearchIndex,
+            withIndex: vi.fn().mockReturnValue({
+              first: vi.fn().mockResolvedValue(null),
+            }),
+          }),
+          get: vi.fn().mockResolvedValue({ name: "Jane Doe", insurancePayer: "Aetna" }),
+        },
+      };
+
+      const res = await (chatbot.searchClaimsForChatbot as any)._handler(mockCtx, {
+        searchTerm: "arthroplasty",
+        status: "won",
+        userId: "user_1",
+      });
+
+      expect(mockWithSearchIndex).toHaveBeenCalledWith("search_claims", expect.any(Function));
+      expect(res.length).toBe(1);
+      expect(res[0].claimNumber).toBe("CLM-100");
+      expect(res[0].patientName).toBe("Jane Doe");
+    });
+
     it("getEvidencesForChatbot, getAppealBriefForChatbot, getP2PScriptForChatbot & getAuditLogsForChatbot", async () => {
       const mockEvs = [{ _id: "ev1", sourceType: "payer_cpb", title: "CPB 1", citationClause: "Sec 2", extractedEvidenceMarkdown: "markdown text", relevanceScore: 90 }];
       const mockAppeal = {

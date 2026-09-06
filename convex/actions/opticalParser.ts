@@ -22,8 +22,16 @@ const DENIAL_EXTRACTION_SCHEMA = {
         "Brief explanation describing what the document is and why it is or is not a genuine healthcare insurance claim denial document.",
     },
     claimNumber: { type: "string" },
-    patientName: { type: "string" },
-    memberId: { type: "string" },
+    patientName: {
+      type: "string",
+      description:
+        "Full legal name of the patient as stated in the denial document, EOB, or notice (e.g. 'Marcus Sterling', 'Eleanor Vance'). If not explicitly stated, return empty string.",
+    },
+    memberId: {
+      type: "string",
+      description:
+        "The patient or member insurance policy ID as stated in the document (e.g. 'GEO-554210-99'). If not explicitly stated, return empty string.",
+    },
     insurancePayer: { type: "string" },
     serviceDate: { type: "string" },
     providerName: { type: "string" },
@@ -262,12 +270,13 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
    - Set all string fields to "", numbers to 0, and arrays to [].
 3. If the document IS a valid medical claim denial:
    - Set "isMedicalClaimDenial" to TRUE.
-   - Extract all financial amounts, clinical CPT procedure codes, ICD-10 diagnosis codes, denial reason codes (e.g. CO-50, CO-197, CO-16), insurer payer names, and statutory appeal filing deadlines.
+   - Extract patient legal name, member ID, treating provider name, insurer payer name, all financial amounts, clinical CPT procedure codes, ICD-10 diagnosis codes, denial reason codes (e.g. CO-50, CO-197, CO-16), and statutory appeal filing deadlines.
    - Extract dollar amounts as pure numbers without currency symbols (e.g. 24500 instead of "$24,500.00"). If missing, return 0.
    - If identifiers (patient name, member ID, provider, claim number, service date) are not explicitly mentioned, return "". NEVER invent or fabricate identifiers.
    - If CPT or ICD-10 codes are missing, return [].
    - If statutory appeal deadline is not explicitly mentioned, default appealFilingDeadlineDays to 180.
-4. Always extract and output all textual metadata, denial reasons, descriptions, and classification reasons exclusively in English.`,
+4. Always extract and output all textual metadata, denial reasons, descriptions, and classification reasons exclusively in English.
+5. You must output all schema properties in the JSON response. If an attribute or identifier is not mentioned in the document, populate it with "" (empty string) for strings, 0 for numbers, and [] for arrays. Do not omit any properties.`,
         userPrompt: `Extract structured medical claim metadata from the following denial document:\n\n${documentContent}`,
         schemaName: "DenialExtractionResult",
         schema: DENIAL_EXTRACTION_SCHEMA,

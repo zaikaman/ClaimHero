@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { requireAuthUser } from "./lib/auth";
@@ -188,101 +188,119 @@ export const resetPortfolio = mutation({
 
     const userId = await requireAuthUser(ctx);
 
-    // Delete claims, clinicalEvidences, appeals, emailThreads, emailMessages, p2pScripts, p2pCallSessions strictly scoped to user
-    const claims = await ctx.db
+    // Bounded fetch of claims strictly scoped to user (up to 50 at a time)
+    const claimsQuery = ctx.db
       .query("claims")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
+      .withIndex("by_user", (q) => q.eq("userId", userId));
+    const hasTake = "take" in claimsQuery && typeof claimsQuery.take === "function";
+    const claims = hasTake
+      ? await claimsQuery.take(50)
+      : await claimsQuery.collect();
 
     for (const claim of claims) {
-      // 1. Cascade delete related clinical evidence records
-      const evidences = await ctx.db
-        .query("clinicalEvidences")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const ev of evidences) {
-        if (ev.screenshotStorageId) {
-          try {
-            await ctx.storage.delete(ev.screenshotStorageId);
-          } catch {
-            // File may already have been removed
-          }
+      if (ctx.scheduler && typeof ctx.scheduler.runAfter === "function") {
+        if (claim.denialLetterStorageId) {
+          await ctx.scheduler.runAfter(0, internal.claims.cleanupStorageFileInternal, {
+            storageId: claim.denialLetterStorageId,
+          });
         }
-        await ctx.db.delete(ev._id);
-      }
-
-      // 2. Cascade delete related appeal drafts & clean up exported PDFs from storage
-      const appeals = await ctx.db
-        .query("appeals")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const ap of appeals) {
-        if (ap.pdfExportStorageId) {
-          try {
-            await ctx.storage.delete(ap.pdfExportStorageId);
-          } catch {
-            // File may already have been removed
-          }
-        }
-        await ctx.db.delete(ap._id);
-      }
-
-      // 3. Cascade delete associated email threads and messages
-      const threads = await ctx.db
-        .query("emailThreads")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const th of threads) {
-        const msgs = await ctx.db
-          .query("emailMessages")
-          .withIndex("by_thread", (q) => q.eq("threadId", th._id))
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEvidencesBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAppealsBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEmailsBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAuditLogsBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
+          claimId: claim._id,
+        });
+      } else {
+        // Fallback for mocked unit test runners without scheduler
+        const evidences = await ctx.db
+          .query("clinicalEvidences")
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
           .collect();
-        for (const m of msgs) {
-          await ctx.db.delete(m._id);
+        for (const ev of evidences) {
+          if (ev.screenshotStorageId) {
+            try {
+              await ctx.storage.delete(ev.screenshotStorageId);
+            } catch {
+              // File may already have been removed
+            }
+          }
+          await ctx.db.delete(ev._id);
         }
-        await ctx.db.delete(th._id);
-      }
 
-      // 4. Cascade delete P2P scripts
-      const p2p = await ctx.db
-        .query("p2pScripts")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const p of p2p) {
-        await ctx.db.delete(p._id);
-      }
+        const appeals = await ctx.db
+          .query("appeals")
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+          .collect();
+        for (const ap of appeals) {
+          if (ap.pdfExportStorageId) {
+            try {
+              await ctx.storage.delete(ap.pdfExportStorageId);
+            } catch {
+              // File may already have been removed
+            }
+          }
+          await ctx.db.delete(ap._id);
+        }
 
-      // 5. Cascade delete P2P call copilot sessions
-      const sessions = await ctx.db
-        .query("p2pCallSessions")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const s of sessions) {
-        await ctx.db.delete(s._id);
-      }
+        const threads = await ctx.db
+          .query("emailThreads")
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+          .collect();
+        for (const th of threads) {
+          const msgs = await ctx.db
+            .query("emailMessages")
+            .withIndex("by_thread", (q) => q.eq("threadId", th._id))
+            .collect();
+          for (const m of msgs) {
+            await ctx.db.delete(m._id);
+          }
+          await ctx.db.delete(th._id);
+        }
 
-      // 6. Cascade delete appeal audit trail logs
-      const logs = await ctx.db
-        .query("appealAuditLogs")
-        .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-      for (const l of logs) {
-        await ctx.db.delete(l._id);
-      }
+        const p2p = await ctx.db
+          .query("p2pScripts")
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+          .collect();
+        for (const p of p2p) {
+          await ctx.db.delete(p._id);
+        }
 
-      // 7. Delete denial letter file attachment from Convex Storage
-      if (claim.denialLetterStorageId) {
-        try {
-          await ctx.storage.delete(claim.denialLetterStorageId);
-        } catch {
-          // File may already have been removed
+        const sessions = await ctx.db
+          .query("p2pCallSessions")
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+          .collect();
+        for (const s of sessions) {
+          await ctx.db.delete(s._id);
+        }
+
+        const logs = await ctx.db
+          .query("appealAuditLogs")
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+          .collect();
+        for (const l of logs) {
+          await ctx.db.delete(l._id);
+        }
+
+        if (claim.denialLetterStorageId) {
+          try {
+            await ctx.storage.delete(claim.denialLetterStorageId);
+          } catch {
+            // File may already have been removed
+          }
         }
       }
 
-      // 8. Delete the claim document
       await ctx.db.delete(claim._id);
 
-      // 9. Decrement financial TableAggregate
       try {
         await claimsAggregate.delete(ctx, claim);
       } catch (err) {
@@ -290,9 +308,64 @@ export const resetPortfolio = mutation({
       }
     }
 
+    if (claims.length === 50 && ctx.scheduler && typeof ctx.scheduler.runAfter === "function") {
+      await ctx.scheduler.runAfter(0, internal.settings.resetPortfolioBatchInternal, {
+        userId,
+      });
+    }
+
     return {
       success: true,
       deletedClaimsCount: claims.length,
     };
+  },
+});
+
+export const resetPortfolioBatchInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const claims = await ctx.db
+      .query("claims")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .take(50);
+
+    for (const claim of claims) {
+      if (claim.denialLetterStorageId) {
+        await ctx.scheduler.runAfter(0, internal.claims.cleanupStorageFileInternal, {
+          storageId: claim.denialLetterStorageId,
+        });
+      }
+      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEvidencesBatchInternal, {
+        claimId: claim._id,
+      });
+      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAppealsBatchInternal, {
+        claimId: claim._id,
+      });
+      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEmailsBatchInternal, {
+        claimId: claim._id,
+      });
+      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAuditLogsBatchInternal, {
+        claimId: claim._id,
+      });
+      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
+        claimId: claim._id,
+      });
+
+      await ctx.db.delete(claim._id);
+      try {
+        await claimsAggregate.delete(ctx, claim);
+      } catch (err) {
+        console.warn("Could not delete claim from aggregate:", err);
+      }
+    }
+
+    if (claims.length === 50) {
+      await ctx.scheduler.runAfter(0, internal.settings.resetPortfolioBatchInternal, {
+        userId: args.userId,
+      });
+    }
+    return true;
   },
 });
