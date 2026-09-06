@@ -25,6 +25,21 @@ export const listThreadMessages = query({
       };
     }
 
+    // Verify caller owns the chatbot session associated with this agent thread
+    const session = await ctx.db
+      .query("chatbotSessions")
+      .withIndex("by_agent_thread", (q) => q.eq("agentThreadId", args.threadId))
+      .first();
+
+    if (!session || session.userId !== userId) {
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: "",
+        streams: undefined,
+      };
+    }
+
     const paginated = await listUIMessages(ctx, components.agent, args);
     const streams = await syncStreams(ctx, components.agent, args);
     return { ...paginated, streams };

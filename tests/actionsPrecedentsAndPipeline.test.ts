@@ -71,6 +71,58 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
       expect(res.upserted).toBeGreaterThan(0);
       expect(mockCtx.runMutation).toHaveBeenCalled();
     });
+
+    it("hybridSearchPrecedents: filters search results by sourceKind when provided", async () => {
+      vi.spyOn(libOpenAI, "createEmbedding").mockResolvedValue(new Array(1536).fill(0.1));
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+
+      const courtDoc = {
+        _id: "p_court",
+        sourceKind: "court_overturn",
+        title: "Wit v. United Behavioral Health",
+        citation: "2019 WL 1033730",
+        winningArgument: "Breached fiduciary duty by adopting excessively restrictive guidelines",
+        outcome: "Overturned",
+        icd10Codes: ["F32.9"],
+        cptCodes: ["90837"],
+        carcCodes: ["CO-50"],
+      };
+      const statutoryDoc = {
+        _id: "p_statute",
+        sourceKind: "statutory_authority",
+        title: "29 U.S.C. 1133",
+        citation: "ERISA § 503",
+        winningArgument: "Full and fair review requirement violated",
+        outcome: "Mandate",
+        icd10Codes: ["M51.16"],
+        cptCodes: ["63047"],
+        carcCodes: ["CO-50"],
+      };
+
+      const mockCtx: any = {
+        vectorSearch: vi.fn().mockResolvedValue([
+          { _id: "p_court", _score: 0.9 },
+        ]),
+        runQuery: vi.fn().mockImplementation((_queryRef, args) => {
+          if (args?.ids) return Promise.resolve([courtDoc]);
+          if (args?.sourceKind === "court_overturn") return Promise.resolve([courtDoc]);
+          return Promise.resolve([courtDoc, statutoryDoc]);
+        }),
+      };
+
+      const res = await (actionPrecedentArchive.hybridSearchPrecedents as any)._handler(mockCtx, {
+        query: "fiduciary duty guidelines",
+        sourceKind: "court_overturn",
+      });
+
+      expect(mockCtx.vectorSearch).toHaveBeenCalledWith("precedents", "by_embedding", expect.objectContaining({
+        filter: expect.any(Function),
+      }));
+      expect(mockCtx.runQuery).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        sourceKind: "court_overturn",
+      }));
+      expect(res.every((r: any) => r.sourceKind === "court_overturn")).toBe(true);
+    });
   });
 
   describe("convex/actions/precedentMatcher", () => {

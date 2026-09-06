@@ -64,6 +64,38 @@ describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
       }));
     });
 
+    it("isAcceptableSourceUrl: rejects link-local, private, localhost, and metadata addresses to prevent SSRF", async () => {
+      const { isAcceptableSourceUrl } = actionPolicyCrawler;
+
+      expect(isAcceptableSourceUrl("http://169.254.169.254/latest/meta-data")).toBe(false);
+      expect(isAcceptableSourceUrl("http://127.0.0.1:8080/admin")).toBe(false);
+      expect(isAcceptableSourceUrl("http://localhost:3000/internal")).toBe(false);
+      expect(isAcceptableSourceUrl("http://10.0.0.1/secrets")).toBe(false);
+      expect(isAcceptableSourceUrl("http://172.16.5.10/api")).toBe(false);
+      expect(isAcceptableSourceUrl("http://192.168.1.1/router")).toBe(false);
+      expect(isAcceptableSourceUrl("http://[fe80::1]/linklocal")).toBe(false);
+      expect(isAcceptableSourceUrl("http://metadata.google.internal/computeMetadata/v1")).toBe(false);
+      expect(isAcceptableSourceUrl("http://0.0.0.0/")).toBe(false);
+
+      // Allows legitimate public guidelines
+      expect(isAcceptableSourceUrl("https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33394")).toBe(true);
+      expect(isAcceptableSourceUrl("https://www.nccn.org/guidelines/category_1")).toBe(true);
+    });
+
+    it("crawlCustomResearchUrl: throws when provided link-local or private URL", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "c1", userId: "user_123" }),
+      };
+
+      await expect(
+        (actionPolicyCrawler.crawlCustomResearchUrl as any)._handler(mockCtx, {
+          claimId: "c1",
+          customUrl: "http://169.254.169.254/latest/meta-data",
+        })
+      ).rejects.toThrow("Please provide a valid HTTP or HTTPS web URL.");
+    });
+
     it("crawlPubMedAndTrials: extracts study evidence from clinical trials / pubmed", async () => {
       process.env.FIRECRAWL_API_KEY = "fc-test-key";
       vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({

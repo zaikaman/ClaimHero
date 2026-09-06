@@ -280,7 +280,7 @@ async function performFirecrawlWebSearch(
   }
 }
 
-import { isAccessDeniedDocument, sanitizePublicPolicyUrl } from "./policyCrawler";
+import { isAccessDeniedDocument, sanitizePublicPolicyUrl, isAcceptableSourceUrl } from "./policyCrawler";
 
 /**
  * Scrape Clinical Policy Document or Article via Firecrawl Component
@@ -289,16 +289,24 @@ async function performFirecrawlScrapeUrl(
   ctx: ActionCtx,
   url: string
 ): Promise<{ sourceUrl: string; title?: string; markdownSnippet: string; structuredCriteria?: unknown; success: boolean; error?: string }> {
-  if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) {
+  if (!url || !isAcceptableSourceUrl(url)) {
     return {
       sourceUrl: url,
-      markdownSnippet: "Invalid URL provided. Please supply a valid HTTP or HTTPS address.",
+      markdownSnippet: "Invalid or blocked URL provided. Only public HTTP or HTTPS clinical guidelines and articles are permitted.",
       success: false,
-      error: "Invalid URL protocol",
+      error: "Invalid or blocked URL protocol/target",
     };
   }
 
   const cleanUrl = sanitizePublicPolicyUrl(url);
+  if (!isAcceptableSourceUrl(cleanUrl)) {
+    return {
+      sourceUrl: url,
+      markdownSnippet: "Sanitized URL violates public source policy. Only public HTTP or HTTPS web guidelines and articles are permitted.",
+      success: false,
+      error: "Blocked URL",
+    };
+  }
 
   try {
     const formats: Format[] = [

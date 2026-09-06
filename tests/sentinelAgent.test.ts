@@ -54,4 +54,76 @@ describe("Convex AI Agent Component Integration (@convex-dev/agent)", () => {
     expect(agent.options.tools).toBeDefined();
     expect(agent.options.stopWhen).toBeDefined();
   });
+
+  describe("sentinelAgentQueries: listThreadMessages thread-ownership checks", () => {
+    it("listThreadMessages: returns empty stream response when unauthenticated", async () => {
+      const sentinelAgentQueries = await import("../convex/sentinelAgentQueries");
+      const mockCtx: any = {
+        auth: { getUserIdentity: vi.fn().mockResolvedValue(null) },
+      };
+      const res = await (sentinelAgentQueries.listThreadMessages as any)._handler(mockCtx, {
+        threadId: "thread_123",
+        paginationOpts: { cursor: null, numItems: 10 },
+        streamArgs: {},
+      });
+      expect(res).toEqual({
+        page: [],
+        isDone: true,
+        continueCursor: "",
+        streams: undefined,
+      });
+    });
+
+    it("listThreadMessages: returns empty response when thread belongs to another user", async () => {
+      const sentinelAgentQueries = await import("../convex/sentinelAgentQueries");
+      const mockCtx: any = {
+        auth: { getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_owner" }) },
+        db: {
+          normalizeId: (_table: string, id: string) => id,
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              first: vi.fn().mockResolvedValue({ _id: "sess_1", userId: "user_other", agentThreadId: "thread_123" }),
+            }),
+          }),
+        },
+      };
+      const res = await (sentinelAgentQueries.listThreadMessages as any)._handler(mockCtx, {
+        threadId: "thread_123",
+        paginationOpts: { cursor: null, numItems: 10 },
+        streamArgs: {},
+      });
+      expect(res).toEqual({
+        page: [],
+        isDone: true,
+        continueCursor: "",
+        streams: undefined,
+      });
+    });
+
+    it("listThreadMessages: returns empty response when no session matches thread", async () => {
+      const sentinelAgentQueries = await import("../convex/sentinelAgentQueries");
+      const mockCtx: any = {
+        auth: { getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_owner" }) },
+        db: {
+          normalizeId: (_table: string, id: string) => id,
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              first: vi.fn().mockResolvedValue(null),
+            }),
+          }),
+        },
+      };
+      const res = await (sentinelAgentQueries.listThreadMessages as any)._handler(mockCtx, {
+        threadId: "thread_123",
+        paginationOpts: { cursor: null, numItems: 10 },
+        streamArgs: {},
+      });
+      expect(res).toEqual({
+        page: [],
+        isDone: true,
+        continueCursor: "",
+        streams: undefined,
+      });
+    });
+  });
 });

@@ -20,13 +20,12 @@ describe("Convex Settings API (convex/settings.ts)", () => {
   });
 
   describe("getSettings", () => {
-    it("throws unauthorized error if user is unauthenticated", async () => {
+    it("returns null if user is unauthenticated to match sibling query contracts", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue(null);
       const mockCtx: any = { db: {} };
 
-      await expect(
-        (settings.getSettings as any)._handler(mockCtx, {})
-      ).rejects.toThrow("Unauthorized: Authentication required");
+      const result = await (settings.getSettings as any)._handler(mockCtx, {});
+      expect(result).toBeNull();
     });
 
     it("returns default settings for authenticated user if no record exists", async () => {

@@ -640,12 +640,15 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
           </div>
 
           {/* Integrated Status Tabs Filter Strip */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1" role="group" aria-label="Filter claims by status">
             {statusTabs.map((tab) => {
               const isSelected = statusFilter === tab.id;
               return (
                 <button
                   key={tab.id}
+                  type="button"
+                  aria-pressed={isSelected}
+                  aria-label={`Filter by ${tab.label}, ${tab.count} cases`}
                   onClick={() => setStatusFilter(tab.id)}
                   className={cn(
                     "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all cursor-pointer border",
@@ -683,6 +686,8 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
               <div className="relative w-full sm:w-64">
                 <MagnifyingGlass className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
+                  id="claim-search-input"
+                  aria-label="Search claims by patient, CPT code, or insurer"
                   className="h-8 pl-8 text-xs bg-background"
                   placeholder="Search claim, patient, CPT, insurer..."
                   value={searchQuery}
@@ -694,6 +699,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
               <div className="flex items-center gap-1.5">
                 <Buildings className="size-3.5 text-muted-foreground hidden sm:inline" />
                 <Select
+                  aria-label="Filter by insurance payer"
                   value={payerFilter}
                   onChange={(e) => setPayerFilter(e.target.value)}
                   className="h-8 text-xs font-sans"
@@ -711,6 +717,8 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
               <button
                 type="button"
                 onClick={onToggleIncludeDemo}
+                aria-pressed={includeDemo}
+                aria-label="Toggle visibility of synthetic evaluation demo cases in portfolio"
                 className={cn(
                   "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer",
                   includeDemo
@@ -1082,6 +1090,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 size="icon-xs"
                                 className="size-7 text-muted-foreground hover:text-foreground"
                                 title="Case actions"
+                                aria-label={`Case actions for #${claim.claimNumber}`}
                               >
                                 <DotsThreeVertical className="size-3.5" />
                               </Button>
@@ -1202,6 +1211,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 disabled={currentPage <= 1}
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 className="h-7 px-2.5 gap-1 text-xs"
+                aria-label="Previous page"
               >
                 <CaretLeft className="size-3.5" />
                 <span>Previous</span>
@@ -1215,6 +1225,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 className="h-7 px-2.5 gap-1 text-xs"
+                aria-label="Next page"
               >
                 <span>Next</span>
                 <CaretRight className="size-3.5" />

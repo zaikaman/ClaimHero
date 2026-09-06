@@ -1,7 +1,7 @@
 import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { requireAuthUser } from "./lib/auth";
+import { getAuthUserId, requireAuthUser } from "./lib/auth";
 import { claimsAggregate } from "./lib/aggregates";
 import { Id } from "./_generated/dataModel";
 
@@ -26,11 +26,15 @@ export const DEFAULT_USER_SETTINGS = {
 
 /**
  * Returns the authenticated user's settings or standard defaults.
+ * Returns null when unauthenticated to match sibling query contracts.
  */
 export const getSettings = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireAuthUser(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return null;
+    }
 
     const userSettings = await ctx.db
       .query("userSettings")

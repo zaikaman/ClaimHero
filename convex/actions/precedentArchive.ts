@@ -15,6 +15,7 @@ import {
   reciprocalRankFusion,
   weightedTokensForCodes,
 } from "../lib/embeddings";
+import type { PrecedentSourceKind } from "../lib/embeddings";
 import { precedentMatchValidator } from "../lib/precedentValidators";
 import { requireClaimOwnerAction, requireAuthUser } from "../lib/auth";
 import { rateLimiter } from "../lib/rateLimiter";
@@ -344,11 +345,24 @@ export const hybridSearchPrecedents = action({
     try {
       const queryText = buildClaimQueryText(queryFields);
       const extraTokens = weightedTokensForCodes(icd10Codes, cptCodes, [carcCode]);
+      if (args.sourceKind) {
+        extraTokens.push(`kind:${args.sourceKind}`);
+      }
       const embedding = await createEmbedding(queryText, extraTokens);
-      const hits = await ctx.vectorSearch("precedents", "by_embedding", {
-        vector: embedding,
-        limit: 16,
-      });
+      let hits: Array<{ _id: Id<"precedents">; _score: number }> = [];
+      try {
+        hits = await ctx.vectorSearch("precedents", "by_embedding", {
+          vector: embedding,
+          limit: 16,
+          ...(args.sourceKind ? { filter: (q) => q.eq("sourceKind", args.sourceKind as PrecedentSourceKind) } : {}),
+        });
+      } catch (vectorFilterErr) {
+        console.warn("Hybrid search vector branch with filter failed, retrying unfiltered:", vectorFilterErr);
+        hits = await ctx.vectorSearch("precedents", "by_embedding", {
+          vector: embedding,
+          limit: 16,
+        });
+      }
       const ids = hits.map((h) => h._id);
       const docs: HydratedPrecedent[] = (await ctx.runQuery(internal.precedents.hydrateByIds, { ids })) || [];
       const docsById = new Map(docs.map((d) => [d._id, d]));
@@ -358,6 +372,9 @@ export const hybridSearchPrecedents = action({
           return doc ? { ...doc, vectorScore: h._score } : null;
         })
         .filter((r): r is NonNullable<typeof r> => r !== null);
+      if (args.sourceKind) {
+        vectorCandidates = vectorCandidates.filter((r) => r.sourceKind === args.sourceKind);
+      }
     } catch (err) {
       console.warn("Hybrid search vector branch failed:", err);
     }
@@ -369,8 +386,10 @@ export const hybridSearchPrecedents = action({
       const docs: HydratedPrecedent[] = await ctx.runQuery(internal.precedents.searchLexicalPrecedentsInternal, {
         query: lexicalQuery,
         limit: 16,
+        ...(args.sourceKind ? { sourceKind: args.sourceKind as PrecedentSourceKind } : {}),
       });
-      lexicalCandidates = docs.map((doc: HydratedPrecedent, idx: number) => ({
+      const filteredDocs = args.sourceKind ? docs.filter((d) => d.sourceKind === args.sourceKind) : docs;
+      lexicalCandidates = filteredDocs.map((doc: HydratedPrecedent, idx: number) => ({
         ...doc,
         textScore: Math.max(0.1, 1 / (idx + 1)),
       }));
@@ -386,7 +405,9 @@ export const hybridSearchPrecedents = action({
       { limit: effectiveLimit, k: 60 }
     );
 
-    return fused.map((row) => ({
+    const filteredFused = args.sourceKind ? fused.filter((r) => r.sourceKind === args.sourceKind) : fused;
+
+    return filteredFused.map((row) => ({
       _id: row._id,
       sourceKind: row.sourceKind,
       title: row.title,

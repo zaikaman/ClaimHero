@@ -657,7 +657,94 @@ const DISALLOWED_MARKETING_DOMAINS = new Set([
   "www.findacode.com",
 ]);
 
-function isAcceptableSourceUrl(value: unknown): value is string {
+/**
+ * Detects private, loopback, link-local, and cloud metadata hosts to prevent SSRF vulnerabilities.
+ */
+export function isPrivateOrLinkLocalHost(rawHostname: string): boolean {
+  const host = rawHostname.replace(/^\[|\]$/g, "").toLowerCase().trim();
+  if (!host) return true;
+
+  // Localhost, local domains, cloud metadata domains
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    host.endsWith(".lan") ||
+    host === "metadata" ||
+    host.includes("metadata.google")
+  ) {
+    return true;
+  }
+
+  // Pure numeric hostname (e.g. decimal IP 2130706433 or 2852039166)
+  if (/^\d+$/.test(host) || host.startsWith("0x") || host.startsWith("0o")) {
+    return true;
+  }
+
+  // IPv4 dotted-decimal
+  const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    const [_, aStr, bStr, cStr, dStr] = ipv4Match;
+    const a = parseInt(aStr, 10);
+    const b = parseInt(bStr, 10);
+    const c = parseInt(cStr, 10);
+    const d = parseInt(dStr, 10);
+
+    if (a > 255 || b > 255 || c > 255 || d > 255) return true;
+
+    // 0.0.0.0/8 (Current network)
+    if (a === 0) return true;
+
+    // 127.0.0.0/8 (Loopback)
+    if (a === 127) return true;
+
+    // 10.0.0.0/8 (Private)
+    if (a === 10) return true;
+
+    // 172.16.0.0/12 (Private: 172.16.x.x - 172.31.x.x)
+    if (a === 172 && b >= 16 && b <= 31) return true;
+
+    // 192.168.0.0/16 (Private)
+    if (a === 192 && b === 168) return true;
+
+    // 169.254.0.0/16 (Link-local / Cloud metadata: e.g. 169.254.169.254)
+    if (a === 169 && b === 254) return true;
+
+    // 100.64.0.0/10 (Carrier-grade NAT)
+    if (a === 100 && b >= 64 && b <= 127) return true;
+
+    // 192.0.0.0/24, 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24 (Test nets & protocol assignments)
+    if (a === 192 && b === 0 && (c === 0 || c === 2)) return true;
+    if (a === 198 && b === 51 && c === 100) return true;
+    if (a === 203 && b === 0 && c === 113) return true;
+
+    // 224.0.0.0/4 (Multicast) & 240.0.0.0/4 (Reserved)
+    if (a >= 224) return true;
+  }
+
+  // IPv6 checks (loopback, unique local, link-local, IPv4-mapped)
+  if (
+    host === "::1" ||
+    host === "::" ||
+    host.startsWith("fe80:") ||
+    host.startsWith("fe8") ||
+    host.startsWith("fe9") ||
+    host.startsWith("fea") ||
+    host.startsWith("feb") ||
+    host.startsWith("fc00:") ||
+    host.startsWith("fd00:") ||
+    host.startsWith("fc") ||
+    host.startsWith("fd") ||
+    host.startsWith("::ffff:")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function isAcceptableSourceUrl(value: unknown): value is string {
   if (typeof value !== "string" || !value.trim()) return false;
 
   try {
@@ -666,6 +753,14 @@ function isAcceptableSourceUrl(value: unknown): value is string {
     if (url.username || url.password) return false;
 
     const hostname = url.hostname.toLowerCase();
+    if (isPrivateOrLinkLocalHost(hostname)) {
+      return false;
+    }
+
+    if (url.port && !["80", "443", ""].includes(url.port)) {
+      return false;
+    }
+
     if ([
       "google.com",
       "www.google.com",

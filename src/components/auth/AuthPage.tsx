@@ -37,6 +37,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncMotionPreference = (matches: boolean) => {
+      if (videoRef.current) {
+        if (matches) {
+          videoRef.current.pause();
+        } else {
+          videoRef.current.play().catch(() => {});
+        }
+      }
+    };
+
+    syncMotionPreference(mediaQuery.matches);
+
+    const listener = (e: MediaQueryListEvent) => syncMotionPreference(e.matches);
+    mediaQuery.addEventListener("change", listener);
+    return () => mediaQuery.removeEventListener("change", listener);
+  }, []);
+
   const handlePasswordAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -134,6 +156,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
       {/* 1. Fullscreen Ambient Video Background */}
       <div className="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none bg-radial from-slate-900 to-black">
         <video
+          ref={videoRef}
           src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260406_094145_4a271a6c-3869-4f1c-8aa7-aeb0cb227994.mp4"
           autoPlay
           loop

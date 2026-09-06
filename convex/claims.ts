@@ -69,7 +69,6 @@ export const list = query({
     status: v.optional(v.string()),
     payer: v.optional(v.string()),
     limit: v.optional(v.number()),
-    cursor: v.optional(v.union(v.string(), v.null())),
     paginationOpts: v.optional(paginationOptsValidator),
     includeDemo: v.optional(v.boolean()),
   },
@@ -1245,17 +1244,11 @@ async function executeSweepDeadlinesBatch(
   const now = Date.now();
   const batchSize = Math.min(Math.max(1, args.batchSize ?? 50), 50);
 
-  const q = ctx.db.query("claims");
-  const queryWithIndex = q as unknown as {
-    withIndex?: (name: string) => {
-      paginate: typeof q.paginate;
-    };
-    paginate: typeof q.paginate;
-  };
-  const indexedQuery = typeof queryWithIndex.withIndex === "function"
-    ? queryWithIndex.withIndex("by_deadline")
-    : queryWithIndex;
-  const pageResult = await indexedQuery.paginate({ cursor: args.cursor, numItems: batchSize });
+  const pageResult = await (
+    typeof ctx.db.query("claims").withIndex === "function"
+      ? ctx.db.query("claims").withIndex("by_deadline").paginate({ cursor: args.cursor, numItems: batchSize })
+      : ctx.db.query("claims").paginate({ cursor: args.cursor, numItems: batchSize })
+  );
 
   let batchUpdated = 0;
   let batchCritical = 0;
