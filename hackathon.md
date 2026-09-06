@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-06T02:27:39Z
+- **Last updated:** 2026-09-06T02:38:50Z
 
 ## Log
 
@@ -925,8 +925,14 @@ Resolved critical security, authorization, and data integrity vulnerabilities ac
 - Claim Creation IDOR Prevention (P0-6): Patched `claims.create` (`convex/claims.ts`) to verify `patient.userId === userId`, throwing a forbidden error if the patient record does not belong to the authenticated caller, preventing cross-tenant patient linking and data leakage.
 - Full Quality Gate Verification: Added unit tests in `tests/securityComplianceHardening.test.ts` covering unauthenticated optical parsing denial, IDOR patient isolation, honest name resolution, and dispatch blocking. Verified full gate with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint warnings/errors, 557/557 passing tests across 37 test suites, and production build in 6.03s. Convex features: queries, mutations, actions, authentication, rate limiting.
 
-### 2026-09-06 - working tree
+### 2026-09-06 - e58e35d
 Eliminated premature keyword victory bug in inbound communication pipeline (`convex/actions/agentMail.ts`):
 - Keyword Approval Decoupling: Inbound emails matching approval keywords ("approved", "overturned", "reimbursed") previously set `fallbackDetermination = "OVERTURNED_APPROVED"` and immediately transitioned claim status to `won` prior to LLM clinical evaluation. Replaced the initial heuristic determination with `PENDING_LLM` and transitioned initial claim state to `under_review`, ensuring only structured LLM adjudication returning `OVERTURNED_APPROVED` can transition a claim to `won`.
 - Adjudication Fallback & State Guarding: Guarded post-LLM determination fallback to resolve to `GENERAL_INQUIRY` if deep clinical completion fails or times out, preventing unverified approvals from ever marking claims as won while preserving existing `won` claim statuses against regression.
 - Regression Coverage: Added unit tests in `tests/actionsAgentMailAndDispatcher.test.ts` and `tests/autopilotSLA.test.ts` verifying that keyword matches remain `PENDING_LLM` / `under_review`, denial determinations from LLM escalate rather than win despite approval keywords, and only verified LLM `OVERTURNED_APPROVED` completions trigger victory transitions and alerts. Verified full gate with `npm run verify` (typecheck, lint, 559 passing tests, and production build). Convex features: actions, internal mutations.
+
+### 2026-09-06 - working tree
+Enhanced global Command Palette (`src/components/common/CommandDialog.tsx`) with full action indexing, fuzzy searching, and unified keyboard navigation:
+- Multi-Domain Action Indexing & Search: Indexed all platform commands (Case Radar Feed, Portfolio Analytics, Audit Timeline, Sentinel Settings, Cinematic Landing Hero), case workspace tools (Evidence Matrix, Appeal Studio Legal Brief, Doctor P2P Tele-Script, Financial & ERISA Calculator, Payer Communications), and quick sentinel actions (Ingest Denial Document, Restart Sentinel Setup Guide) with rich searchable metadata, descriptions, category badges, and clinical keywords.
+- Dynamic Query Filtering & Elimination of Dead-Ends: The search query now concurrently filters claims (by claim number, patient name, provider, CPT/ICD-10 codes, denial codes, description) and actionable workflows. Empty searches preserve the original compact multi-grid layout, while filtered searches present matching actions with clear category badges and descriptions, eliminating false "No matching claims found" dead-ends when searching for action tools.
+- Unified Keyboard Navigation: Implemented ArrowUp/ArrowDown selection and Enter execution across all matched claims and actions, paired with interactive hover sync, a clear search button, and keyboard navigation hints in the statutory footer. Verified with `npm run verify` (clean typecheck, lint, 559/559 passing tests, and production build).
