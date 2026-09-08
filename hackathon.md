@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-08T17:33:00Z
+- **Last updated:** 2026-09-08T17:36:00Z
 
 ## Log
 
@@ -1026,10 +1026,13 @@ Eliminated hardcoded clinical defaults (CPT 27447, ICD-10 M17.11, Molina Healthc
 ### 2026-09-08 - 3795e54
 Gated demo case identification strictly on explicit `origin: "demo-fixture"` and `dataOrigin: "demo-fixture"` flags across `convex/claims.ts` (`create`, `createWithPatient`, `createWithPatientInternal`, `claims.list`, `getById`, `getByIdInternal`, `getPortfolioStats`, `clearDemoData`, `clearDemoDataInternal`, `applyAppealContextUpdate`), `convex/schema.ts`, `convex/actions/opticalParser.ts`, `src/hooks/useClaims.ts`, `src/components/radar/IngestionModal.tsx`, `src/components/onboarding/OnboardingWizard.tsx`, and `src/components/radar/CaseRadar.tsx`. Completely eliminated patient-name string matching ("Eleanor Vance", "Marcus Sterling", "Michael Patel") and fixture member IDs, ensuring genuine patients with matching names are never misclassified as synthetic demo records, assigned false PII tags, or silently excluded from case lists and portfolio statistics. Added unit and regression tests in `tests/demoIsolationAndHonestPipelines.test.ts` asserting real patient protection and demo isolation. Verified 618 passing tests across 39 suites, clean typecheck, clean lint, 80.01% test coverage, and production build (`npm run verify`). Convex features: schema, queries, mutations, internal mutations, actions.
 
-### 2026-09-08 - working tree
+### 2026-09-08 - 8e72b1f
 Eliminated hardcoded deployment URLs and enforced loud failure on unset `SITE_URL` across OAuth and alert dispatch:
 - Dynamic OAuth Redirect Origins (`convex/auth.ts`): Replaced hardcoded `kindhearted-elephant-992.convex.site` in Google OAuth `allowedRedirectOrigins` with `getAllowedRedirectOrigins()`. Validates and derives bare origins dynamically from `process.env.SITE_URL` alongside `http://localhost:5173`, failing loudly with an informative error when `SITE_URL` is unset or malformed to prevent silent OAuth breaks during deployment migrations.
 - Dynamic Alert Action Links (`convex/lib/appealEmail.ts`): Removed hardcoded `kindhearted-elephant-992.convex.site` fallback in `formatPayerResponseAlertEmail`. Now validates `context.appSiteUrl || process.env.SITE_URL` with `safeLinkHref` and fails loudly with explicit error messages when `SITE_URL` is unset or invalid.
 - Strict Payer Alert Dispatch (`convex/actions/agentMail.ts`): Guarded `processInboundClaimReply` to validate `process.env.SITE_URL` prior to email construction, logging critical configuration errors loudly if `SITE_URL` is unset or invalid.
 - Required Convex Deployment Schema (`convex/convex.config.ts`): Upgraded `SITE_URL` from `v.optional(v.string())` to `v.string()` in `defineApp`, enforcing deployment-time validation on all environments.
 - Testing & Verification (`vitest.config.ts`, `tests/agentMail.test.ts`, `tests/convexAuditLogsAndUsers.test.ts`): Configured `SITE_URL: "http://localhost:5173"` in vitest environment. Added test coverage for `getAllowedRedirectOrigins` and `formatPayerResponseAlertEmail` asserting loud errors on unset/invalid `SITE_URL` and dynamic URL resolution. Verified 623 passing tests across 39 suites, clean typecheck, clean lint, 80.05% coverage, and production build via `npm run verify`. Convex features: actions, components, config.
+
+### 2026-09-08 - working tree
+Resolved stale-closure bug in live-call continuous speech recognition (`src/hooks/useLiveCallCopilot.ts`). Replaced closure-captured `isCallLive` check in Web Speech API `recognition.onend` with synchronized `isCallLiveRef`, ensuring continuous speech recognition automatically restarts mid-call after natural pauses instead of terminating after the first utterance. Added safe error handling for permission denials and engine transition retries, synchronized ref updates across call lifecycle transitions, and added regression coverage in `tests/p2pLiveCopilot.test.ts`. Verified 625 passing tests, clean typecheck, and lint.

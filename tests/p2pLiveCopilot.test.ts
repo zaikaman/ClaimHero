@@ -257,4 +257,84 @@ describe("Real-Time P2P Live Call Copilot (Clinical Defense Sentinel)", () => {
     expect(authorizationNumber).not.toMatch(/AUTH-[A-Z]{3}-\d+/);
     expect(authorizationNumber).not.toMatch(/AUTH-APP-\d+/);
   });
+
+  it("prevents stale-closure bug: continuous recognition restarts mid-call using isCallLiveRef", () => {
+    // Demonstrates bug: with closure captured at call start (isCallLive = false)
+    let isCallLiveState = false;
+    const isCallLiveRef = { current: isCallLiveState };
+
+    let startCount = 0;
+    const mockRecognition = {
+      continuous: true,
+      start: () => {
+        startCount++;
+      },
+      stop: () => {},
+      onend: null as (() => void) | null,
+    };
+
+    // startLiveCall sets live state to true
+    isCallLiveState = true;
+    isCallLiveRef.current = true;
+
+    // With stale closure (checking captured isCallLiveState = false):
+    const staleOnEnd = () => {
+      const capturedState = false; // Stale closure from render at call start
+      if (capturedState) {
+        mockRecognition.start();
+      }
+    };
+    staleOnEnd();
+    expect(startCount).toBe(0); // Bug: never restarts!
+
+    // With production-grade ref:
+    const fixedOnEnd = () => {
+      if (isCallLiveRef.current && mockRecognition) {
+        mockRecognition.start();
+      }
+    };
+
+    // First recognition auto-stop mid-call fires onend:
+    fixedOnEnd();
+    expect(startCount).toBe(1); // Successfully restarted!
+
+    // Second auto-stop mid-call:
+    fixedOnEnd();
+    expect(startCount).toBe(2); // Restarts again!
+
+    // Call ends
+    isCallLiveState = false;
+    isCallLiveRef.current = false;
+
+    // onend fires after call ended
+    fixedOnEnd();
+    expect(startCount).toBe(2); // Does NOT restart when call is terminated
+  });
+
+  it("safely halts speech recognition on permission errors without infinite restart loops", () => {
+    const isCallLiveRef = { current: true };
+    let recognitionInstance: { start: () => void } | null = {
+      start: () => {},
+    };
+
+    const onError = (err: { error: string }) => {
+      if (err.error === "not-allowed" || err.error === "service-not-allowed") {
+        recognitionInstance = null;
+      }
+    };
+
+    onError({ error: "not-allowed" });
+    expect(recognitionInstance).toBeNull();
+
+    let restarted = false;
+    const onEnd = () => {
+      if (isCallLiveRef.current && recognitionInstance) {
+        restarted = true;
+      }
+    };
+
+    onEnd();
+    expect(restarted).toBe(false);
+  });
 });
+

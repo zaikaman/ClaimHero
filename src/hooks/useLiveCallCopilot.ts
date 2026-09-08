@@ -75,6 +75,7 @@ export function useLiveCallCopilot(claim: Claim) {
 
   const currentSessionIdRef = useRef<Id<"p2pCallSessions"> | null>(null);
   const activeSpeakerRef = useRef<CallSpeaker>(activeSpeaker);
+  const isCallLiveRef = useRef<boolean>(isCallLive);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -88,6 +89,10 @@ export function useLiveCallCopilot(claim: Claim) {
   useEffect(() => {
     activeSpeakerRef.current = activeSpeaker;
   }, [activeSpeaker]);
+
+  useEffect(() => {
+    isCallLiveRef.current = isCallLive;
+  }, [isCallLive]);
 
   // Sync session ID ref
   useEffect(() => {
@@ -240,6 +245,15 @@ export function useLiveCallCopilot(claim: Claim) {
       return;
     }
 
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+      recognitionRef.current = null;
+    }
+
     try {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -287,17 +301,31 @@ export function useLiveCallCopilot(claim: Claim) {
       };
 
       recognition.onerror = (err: SpeechRecognitionErrorEvent) => {
+        if (err.error === "not-allowed" || err.error === "service-not-allowed") {
+          console.warn("Speech recognition permission denied:", err.error);
+          recognitionRef.current = null;
+          return;
+        }
         if (err.error !== "no-speech") {
           console.warn("Speech recognition error:", err.error);
         }
       };
 
       recognition.onend = () => {
-        if (isCallLive && recognitionRef.current) {
+        if (isCallLiveRef.current && recognitionRef.current) {
           try {
             recognition.start();
           } catch {
-            // ignore start error
+            // If the browser engine is still transitioning state, retry shortly
+            setTimeout(() => {
+              if (isCallLiveRef.current && recognitionRef.current) {
+                try {
+                  recognition.start();
+                } catch {
+                  // ignore start error
+                }
+              }
+            }, 100);
           }
         }
       };
@@ -307,7 +335,7 @@ export function useLiveCallCopilot(claim: Claim) {
     } catch (err) {
       console.warn("Failed to initialize speech recognition:", err);
     }
-  }, [activeSpeaker, isCallLive, appendTranscriptItem]);
+  }, [appendTranscriptItem]);
 
   // Audio Waveform Analyser
   const startAudioAnalyser = useCallback(async () => {
@@ -370,6 +398,7 @@ export function useLiveCallCopilot(claim: Claim) {
   // Start Live Call
   const startLiveCall = useCallback(async () => {
     setIsCallLive(true);
+    isCallLiveRef.current = true;
     setActiveSpeaker("physician");
     setCallDuration(0);
 
@@ -393,6 +422,7 @@ export function useLiveCallCopilot(claim: Claim) {
   // End Live Call
   const endLiveCall = useCallback(async () => {
     setIsCallLive(false);
+    isCallLiveRef.current = false;
     setIsSimulating(false);
     setIsWaitingForDoctor(false);
 
@@ -476,7 +506,7 @@ export function useLiveCallCopilot(claim: Claim) {
       setIsWaitingForDoctor(false);
       setInterimText("");
 
-      if (!isCallLive) {
+      if (!isCallLiveRef.current) {
         await startLiveCall();
       }
 
@@ -510,7 +540,7 @@ export function useLiveCallCopilot(claim: Claim) {
         setIsWaitingForDoctor(true);
       }
     },
-    [getReviewerChallenges, isCallLive, isReviewerVoiceMuted, startLiveCall, appendTranscriptItem]
+    [getReviewerChallenges, isReviewerVoiceMuted, startLiveCall, appendTranscriptItem]
   );
 
   // Play dynamic AI Medical Director response based on what the doctor actually said
@@ -538,7 +568,7 @@ export function useLiveCallCopilot(claim: Claim) {
       setIsWaitingForDoctor(false);
 
       try {
-        if (!isCallLive) {
+        if (!isCallLiveRef.current) {
           await startLiveCall();
         }
 
@@ -659,7 +689,6 @@ export function useLiveCallCopilot(claim: Claim) {
     },
     [
       session?.transcripts,
-      isCallLive,
       claim._id,
       generateInteractiveReviewerPushbackAction,
       isReviewerVoiceMuted,
@@ -688,12 +717,14 @@ export function useLiveCallCopilot(claim: Claim) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      isCallLiveRef.current = false;
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch {
           // ignore
         }
+        recognitionRef.current = null;
       }
       stopAudioAnalyser();
       if (callTimerRef.current) clearInterval(callTimerRef.current);
@@ -706,6 +737,7 @@ export function useLiveCallCopilot(claim: Claim) {
   return {
     session,
     isCallLive,
+    isCallLiveRef,
     activeSpeaker,
     setActiveSpeaker,
     callDuration,
