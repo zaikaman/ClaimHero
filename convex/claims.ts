@@ -47,6 +47,36 @@ export function isSyntheticDemoClaimIdentifier(params: {
 }
 
 /**
+ * Test whether a claim matches a search query across all common search dimensions
+ * (claimNumber, patientName, insurancePayer, providerName, cptCodes, icd10Codes, denialReasonCode, denialReasonDescription).
+ */
+export function matchesClaimSearch(
+  claim: {
+    claimNumber: string;
+    patientName?: string;
+    insurancePayer?: string;
+    providerName: string;
+    denialReasonCode: string;
+    denialReasonDescription?: string;
+    cptCodes?: string[];
+    icd10Codes?: string[];
+  },
+  searchQuery: string
+): boolean {
+  const q = searchQuery.toLowerCase().trim();
+  if (!q) return true;
+  if (claim.claimNumber.toLowerCase().includes(q)) return true;
+  if (claim.patientName && claim.patientName.toLowerCase().includes(q)) return true;
+  if (claim.insurancePayer && claim.insurancePayer.toLowerCase().includes(q)) return true;
+  if (claim.providerName && claim.providerName.toLowerCase().includes(q)) return true;
+  if (claim.denialReasonCode && claim.denialReasonCode.toLowerCase().includes(q)) return true;
+  if (claim.denialReasonDescription && claim.denialReasonDescription.toLowerCase().includes(q)) return true;
+  if (claim.cptCodes && claim.cptCodes.some((code) => code.toLowerCase().includes(q))) return true;
+  if (claim.icd10Codes && claim.icd10Codes.some((code) => code.toLowerCase().includes(q))) return true;
+  return false;
+}
+
+/**
  * Full-text search across claims using Convex native searchIndex
  */
 export const search = query({
@@ -78,14 +108,15 @@ export const search = query({
 });
 
 /**
- * List all claims for the authenticated user with optional status and payer filtering.
- * Uses bounded reads and indexed queries (by_user_payer, by_user_status, by_user)
- * with denormalized patient data to eliminate N+1 overhead and unbounded document scans.
+ * List all claims for the authenticated user with optional status, payer, and text search filtering.
+ * Uses bounded reads and indexed queries (by_user_payer_status, by_user_payer, by_user_status, by_user)
+ * with denormalized patient data to eliminate N+1 overhead and client-side search truncation.
  */
 export const list = query({
   args: {
     status: v.optional(v.string()),
     payer: v.optional(v.string()),
+    search: v.optional(v.string()),
     limit: v.optional(v.number()),
     paginationOpts: v.optional(paginationOptsValidator),
     includeDemo: v.optional(v.boolean()),
@@ -99,8 +130,11 @@ export const list = query({
       return [];
     }
 
-    const hasStatus = Boolean(args.status && args.status !== "all");
+    const isCriticalDeadline = args.status === "critical_deadline";
+    const hasStatus = Boolean(args.status && args.status !== "all" && !isCriticalDeadline);
     const hasPayer = Boolean(args.payer && args.payer !== "all");
+    const trimmedSearch = args.search?.trim().toLowerCase() || "";
+    const hasSearch = trimmedSearch.length > 0;
 
     let queryBuilder;
     if (hasPayer && hasStatus) {
@@ -140,7 +174,7 @@ export const list = query({
     // Support reactive pagination if paginationOpts is provided
     if (args.paginationOpts) {
       const paginatedResult = await queryBuilder.paginate(args.paginationOpts);
-      const page = args.includeDemo === false
+      let page = args.includeDemo === false
         ? paginatedResult.page.filter(
             (c) =>
               !c.isDemo &&
@@ -148,6 +182,13 @@ export const list = query({
               c.origin !== "demo-fixture"
           )
         : paginatedResult.page;
+
+      if (isCriticalDeadline) {
+        page = page.filter((c) => c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost");
+      }
+      if (hasSearch) {
+        page = page.filter((c) => matchesClaimSearch(c, trimmedSearch));
+      }
 
       const mappedPage = page.map((claim) => {
         const patientName = resolveClaimPatientName(claim.patientName, claim.claimNumber);
@@ -185,14 +226,40 @@ export const list = query({
     }
 
     const effectiveLimit = Math.max(1, Math.min(args.limit ?? 100, 100));
-    let claims = await queryBuilder.take(effectiveLimit);
-    if (args.includeDemo === false) {
-      claims = claims.filter(
-        (c) =>
-          !c.isDemo &&
-          c.dataOrigin !== "demo-fixture" &&
-          c.origin !== "demo-fixture"
-      );
+    let claims: Doc<"claims">[];
+
+    if (hasSearch || isCriticalDeadline) {
+      // Bounded scan of candidate claims (up to 500) to find all matches across user's history
+      const scanLimit = Math.max(500, effectiveLimit);
+      const candidates = (await queryBuilder.take(scanLimit)) as Doc<"claims">[];
+      let filtered = candidates;
+      if (args.includeDemo === false) {
+        filtered = filtered.filter(
+          (c) =>
+            !c.isDemo &&
+            c.dataOrigin !== "demo-fixture" &&
+            c.origin !== "demo-fixture"
+        );
+      }
+      if (isCriticalDeadline) {
+        filtered = filtered.filter(
+          (c) => c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost"
+        );
+      }
+      if (hasSearch) {
+        filtered = filtered.filter((c) => matchesClaimSearch(c, trimmedSearch));
+      }
+      claims = filtered.slice(0, effectiveLimit);
+    } else {
+      claims = (await queryBuilder.take(effectiveLimit)) as Doc<"claims">[];
+      if (args.includeDemo === false) {
+        claims = claims.filter(
+          (c) =>
+            !c.isDemo &&
+            c.dataOrigin !== "demo-fixture" &&
+            c.origin !== "demo-fixture"
+        );
+      }
     }
 
     // Map denormalized patient data into the expected Claim shape without N+1 joins
@@ -1400,10 +1467,14 @@ export const sweepDeadlinesBatch = internalMutation({
  * Retrieve comprehensive portfolio analytics and financial metrics strictly computed across the authenticated user's claims.
  * Leverages O(log N) claimsAggregate for portfolio count and sum, combined with a bounded scan
  * using denormalized payer fields to eliminate cross-table patient joins.
+ * Supports optional status, payer, and text search filtering without client-side truncation.
  */
 export const getPortfolioStats = query({
   args: {
     includeDemo: v.optional(v.boolean()),
+    status: v.optional(v.string()),
+    payer: v.optional(v.string()),
+    search: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -1436,6 +1507,8 @@ export const getPortfolioStats = query({
         payerBreakdown: [],
         isSampleTruncated: false,
         sampleSize: 0,
+        portfolioTotalClaims: 0,
+        portfolioTotalDisputedAmount: 0,
       };
     }
 
@@ -1451,10 +1524,30 @@ export const getPortfolioStats = query({
       // Graceful fallback to in-memory reduction if aggregate tree is synchronizing
     }
 
-    // Bounded fetch of recent claims for status, risk, and payer breakdown (max 500)
-    let claimsQuery = ctx.db
-      .query("claims")
-      .withIndex("by_user", (q) => q.eq("userId", userId));
+    const isCriticalDeadline = args.status === "critical_deadline";
+    const hasStatus = Boolean(args.status && args.status !== "all" && !isCriticalDeadline);
+    const hasPayer = Boolean(args.payer && args.payer !== "all");
+    const trimmedSearch = args.search?.trim().toLowerCase() || "";
+    const hasSearch = trimmedSearch.length > 0;
+    const isFiltered = hasStatus || isCriticalDeadline || hasPayer || hasSearch;
+
+    // Bounded fetch of recent claims (max 500) using the most targeted index
+    let claimsQuery;
+    if (hasPayer) {
+      claimsQuery = ctx.db
+        .query("claims")
+        .withIndex("by_user_payer", (q) => q.eq("userId", userId).eq("insurancePayer", args.payer!));
+    } else if (hasStatus && !hasSearch) {
+      // If filtering only by status without search, we can use by_user_status directly
+      claimsQuery = ctx.db
+        .query("claims")
+        .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", args.status!));
+    } else {
+      claimsQuery = ctx.db
+        .query("claims")
+        .withIndex("by_user", (q) => q.eq("userId", userId));
+    }
+
     if (args.includeDemo === false) {
       try {
         claimsQuery = claimsQuery.filter((q) => q.neq(q.field("isDemo"), true));
@@ -1465,7 +1558,8 @@ export const getPortfolioStats = query({
     const rawClaims = (await claimsQuery
       .order("desc")
       .take(500)) as Doc<"claims">[];
-    const claims = args.includeDemo === false
+
+    const baseCandidates = args.includeDemo === false
       ? rawClaims.filter(
           (c) =>
             !c.isDemo &&
@@ -1474,17 +1568,12 @@ export const getPortfolioStats = query({
         )
       : rawClaims;
 
-    const isSampleTruncated = rawClaims.length >= 500;
-    const sampleSize = claims.length;
+    // Search filter across candidate pool
+    const searchMatching = hasSearch
+      ? baseCandidates.filter((c) => matchesClaimSearch(c, trimmedSearch))
+      : baseCandidates;
 
-    let totalDisputedAmount = 0;
-    let activeDisputedAmount = 0;
-    let overturnedWonAmount = 0;
-    let totalScoreSum = 0;
-    let scoredCount = 0;
-    let criticalDeadlinesCount = 0;
-    let urgentDeadlinesCount = 0;
-
+    // Status breakdown computed across searchMatching claims so filter tabs stay accurate
     const claimsByStatus: Record<string, number> = {
       ingested: 0,
       parsing: 0,
@@ -1496,6 +1585,39 @@ export const getPortfolioStats = query({
       won: 0,
       lost: 0,
     };
+    let criticalDeadlinesCountInScope = 0;
+
+    for (const c of searchMatching) {
+      if (claimsByStatus[c.status] !== undefined) {
+        claimsByStatus[c.status]++;
+      }
+      if (c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost") {
+        criticalDeadlinesCountInScope++;
+      }
+    }
+
+    // Now apply status filter for the active metrics summary
+    let activeClaims: Doc<"claims">[];
+    if (isCriticalDeadline) {
+      activeClaims = searchMatching.filter(
+        (c) => c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost"
+      );
+    } else if (hasStatus) {
+      activeClaims = searchMatching.filter((c) => c.status === args.status);
+    } else {
+      activeClaims = searchMatching;
+    }
+
+    const isSampleTruncated = rawClaims.length >= 500;
+    const sampleSize = activeClaims.length;
+
+    let totalDisputedAmount = 0;
+    let activeDisputedAmount = 0;
+    let overturnedWonAmount = 0;
+    let totalScoreSum = 0;
+    let scoredCount = 0;
+    let criticalDeadlinesCount = 0;
+    let urgentDeadlinesCount = 0;
 
     const claimsByRisk: Record<string, number> = {
       high_confidence: 0,
@@ -1508,7 +1630,7 @@ export const getPortfolioStats = query({
       { payer: string; totalClaims: number; totalDisputed: number; wonCount: number; wonAmount: number; scoreSum: number; scoredCount: number }
     > = {};
 
-    for (const claim of claims) {
+    for (const claim of activeClaims) {
       const payer = claim.insurancePayer || "Health Insurer";
 
       totalDisputedAmount += claim.deniedAmount;
@@ -1528,10 +1650,6 @@ export const getPortfolioStats = query({
         criticalDeadlinesCount++;
       } else if (claim.daysRemaining <= 45 && claim.status !== "won" && claim.status !== "lost") {
         urgentDeadlinesCount++;
-      }
-
-      if (claimsByStatus[claim.status] !== undefined) {
-        claimsByStatus[claim.status]++;
       }
 
       if (claim.riskLevel && claimsByRisk[claim.riskLevel] !== undefined) {
@@ -1575,20 +1693,33 @@ export const getPortfolioStats = query({
       averageScore: p.scoredCount > 0 ? Math.round(p.scoreSum / p.scoredCount) : 0,
     }));
 
+    const portfolioTotalClaims = aggregateCount !== null && aggregateCount >= baseCandidates.length
+      ? aggregateCount
+      : baseCandidates.length;
+    const portfolioTotalDisputedAmount = aggregateSum !== null && aggregateSum > 0
+      ? aggregateSum
+      : totalDisputedAmount;
+
     return {
-      totalClaims: aggregateCount !== null && aggregateCount >= claims.length ? aggregateCount : claims.length,
-      totalDisputedAmount: aggregateSum !== null && aggregateSum > 0 ? aggregateSum : totalDisputedAmount,
+      totalClaims: !isFiltered && aggregateCount !== null && aggregateCount >= activeClaims.length
+        ? aggregateCount
+        : activeClaims.length,
+      totalDisputedAmount: !isFiltered && aggregateSum !== null && aggregateSum > 0
+        ? aggregateSum
+        : totalDisputedAmount,
       activeDisputedAmount,
       overturnedWonAmount,
       averageWinScore,
       recoveryRatePercent,
-      criticalDeadlinesCount,
+      criticalDeadlinesCount: isCriticalDeadline ? criticalDeadlinesCount : criticalDeadlinesCountInScope,
       urgentDeadlinesCount,
       claimsByStatus,
       claimsByRisk,
       payerBreakdown,
       isSampleTruncated,
       sampleSize,
+      portfolioTotalClaims,
+      portfolioTotalDisputedAmount,
     };
   },
 });

@@ -35,7 +35,7 @@ export function useClaims(options?: {
     });
   }, []);
 
-  const statusArg = options?.statusFilter && options.statusFilter !== "all" && options.statusFilter !== "critical_deadline"
+  const statusArg = options?.statusFilter && options.statusFilter !== "all"
     ? options.statusFilter
     : undefined;
 
@@ -43,67 +43,60 @@ export function useClaims(options?: {
     ? options.payerFilter
     : undefined;
 
-  // Real Convex query to fetch claims
+  const searchQuery = options?.searchQuery?.trim() || "";
+  const searchArg = searchQuery.length > 0 ? searchQuery : undefined;
+  const isFiltered = Boolean(statusArg || payerArg || searchArg);
+
+  // Real Convex query to fetch claims with server-side status, payer, and text search filtering
   const rawClaims = useQuery(
     api.claims.list,
     isEnabled
       ? {
           status: statusArg,
           payer: payerArg,
+          search: searchArg,
           limit: 100,
           includeDemo,
         }
       : "skip"
   ) as Claim[] | undefined;
 
+  // Authoritative global portfolio stats backed by O(log N) TableAggregate
   const rawPortfolioStats = useQuery(
     api.claims.getPortfolioStats,
     isEnabled ? { includeDemo } : "skip"
   );
 
-  const searchQuery = options?.searchQuery?.toLowerCase().trim() || "";
+  // Filtered portfolio stats computed strictly on the server across all matching records
+  const filteredPortfolioStats = useQuery(
+    api.claims.getPortfolioStats,
+    isEnabled && isFiltered
+      ? {
+          status: statusArg,
+          payer: payerArg,
+          search: searchArg,
+          includeDemo,
+        }
+      : "skip"
+  );
 
-  // Filter claims (search and critical deadline logic)
+  // Return claims with defensive client-side safeguards
   const claims = useMemo(() => {
     if (!rawClaims) return [];
-
-    return rawClaims.filter((claim) => {
-      // Critical deadline filter
-      if (options?.statusFilter === "critical_deadline") {
-        if (claim.daysRemaining > 14 || claim.status === "won") return false;
-      }
-
-      // Text search
-      if (searchQuery) {
-        const matchesClaimNum = claim.claimNumber.toLowerCase().includes(searchQuery);
-        const matchesPatient = claim.patient?.name.toLowerCase().includes(searchQuery);
-        const matchesCpt = claim.cptCodes?.some((code) => code.includes(searchQuery));
-        const matchesProvider = claim.providerName.toLowerCase().includes(searchQuery);
-        const matchesReason = claim.denialReasonCode.toLowerCase().includes(searchQuery);
-
-        if (!matchesClaimNum && !matchesPatient && !matchesCpt && !matchesProvider && !matchesReason) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [rawClaims, options?.statusFilter, searchQuery]);
+    return rawClaims;
+  }, [rawClaims]);
 
   // Aggregate Dashboard Statistics backed by server-side TableAggregate / getPortfolioStats
   const stats: DashboardStats = useMemo(() => {
-    if (
-      rawPortfolioStats &&
-      (!options?.statusFilter || options.statusFilter === "all") &&
-      (!options?.payerFilter || options.payerFilter === "all") &&
-      !searchQuery
-    ) {
+    const source = isFiltered ? (filteredPortfolioStats ?? rawPortfolioStats) : rawPortfolioStats;
+
+    if (source) {
       return {
-        totalClaims: rawPortfolioStats.totalClaims,
-        activeDisputedAmount: rawPortfolioStats.activeDisputedAmount,
-        overturnedWonAmount: rawPortfolioStats.overturnedWonAmount,
-        averageWinScore: rawPortfolioStats.averageWinScore,
-        criticalDeadlinesCount: rawPortfolioStats.criticalDeadlinesCount,
+        totalClaims: source.totalClaims,
+        activeDisputedAmount: source.activeDisputedAmount,
+        overturnedWonAmount: source.overturnedWonAmount,
+        averageWinScore: source.averageWinScore,
+        criticalDeadlinesCount: source.criticalDeadlinesCount,
       };
     }
 
@@ -139,26 +132,26 @@ export function useClaims(options?: {
       averageWinScore: scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0,
       criticalDeadlinesCount,
     };
-  }, [rawClaims, rawPortfolioStats, options?.statusFilter, options?.payerFilter, searchQuery]);
+  }, [isFiltered, filteredPortfolioStats, rawPortfolioStats, rawClaims]);
 
   // Status breakdown counts backed by server-side aggregations
   const claimCountsByStatus = useMemo(() => {
-    if (
-      rawPortfolioStats &&
-      (!options?.payerFilter || options.payerFilter === "all") &&
-      !searchQuery
-    ) {
+    const source = (payerArg || searchArg)
+      ? (filteredPortfolioStats?.claimsByStatus ? filteredPortfolioStats : rawPortfolioStats)
+      : rawPortfolioStats;
+
+    if (source?.claimsByStatus) {
       return {
-        all: rawPortfolioStats.totalClaims,
-        ingested: rawPortfolioStats.claimsByStatus?.ingested ?? 0,
-        parsing: rawPortfolioStats.claimsByStatus?.parsing ?? 0,
-        analyzing: rawPortfolioStats.claimsByStatus?.analyzing ?? 0,
-        precedent_matched: rawPortfolioStats.claimsByStatus?.precedent_matched ?? 0,
-        drafting: rawPortfolioStats.claimsByStatus?.drafting ?? 0,
-        ready_for_review: rawPortfolioStats.claimsByStatus?.ready_for_review ?? 0,
-        dispatched: rawPortfolioStats.claimsByStatus?.dispatched ?? 0,
-        won: rawPortfolioStats.claimsByStatus?.won ?? 0,
-        critical_deadline: rawPortfolioStats.criticalDeadlinesCount,
+        all: source.totalClaims,
+        ingested: source.claimsByStatus?.ingested ?? 0,
+        parsing: source.claimsByStatus?.parsing ?? 0,
+        analyzing: source.claimsByStatus?.analyzing ?? 0,
+        precedent_matched: source.claimsByStatus?.precedent_matched ?? 0,
+        drafting: source.claimsByStatus?.drafting ?? 0,
+        ready_for_review: source.claimsByStatus?.ready_for_review ?? 0,
+        dispatched: source.claimsByStatus?.dispatched ?? 0,
+        won: source.claimsByStatus?.won ?? 0,
+        critical_deadline: source.criticalDeadlinesCount,
       };
     }
 
@@ -186,7 +179,7 @@ export function useClaims(options?: {
     }
 
     return counts;
-  }, [rawClaims, rawPortfolioStats, options?.payerFilter, searchQuery]);
+  }, [payerArg, searchArg, filteredPortfolioStats, rawPortfolioStats, rawClaims]);
 
   // Active selected claim with deep resolution of latestAppeal and evidenceCount
   const effectiveClaimId = (selectedClaimId ? selectedClaimId : options?.defaultClaimId) as Id<"claims"> | undefined;

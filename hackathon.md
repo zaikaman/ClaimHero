@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-08T17:36:00Z
+- **Last updated:** 2026-09-08T17:45:00Z
 
 ## Log
 
@@ -1034,5 +1034,12 @@ Eliminated hardcoded deployment URLs and enforced loud failure on unset `SITE_UR
 - Required Convex Deployment Schema (`convex/convex.config.ts`): Upgraded `SITE_URL` from `v.optional(v.string())` to `v.string()` in `defineApp`, enforcing deployment-time validation on all environments.
 - Testing & Verification (`vitest.config.ts`, `tests/agentMail.test.ts`, `tests/convexAuditLogsAndUsers.test.ts`): Configured `SITE_URL: "http://localhost:5173"` in vitest environment. Added test coverage for `getAllowedRedirectOrigins` and `formatPayerResponseAlertEmail` asserting loud errors on unset/invalid `SITE_URL` and dynamic URL resolution. Verified 623 passing tests across 39 suites, clean typecheck, clean lint, 80.05% coverage, and production build via `npm run verify`. Convex features: actions, components, config.
 
-### 2026-09-08 - working tree
+### 2026-09-08 - 52a7af3
 Resolved stale-closure bug in live-call continuous speech recognition (`src/hooks/useLiveCallCopilot.ts`). Replaced closure-captured `isCallLive` check in Web Speech API `recognition.onend` with synchronized `isCallLiveRef`, ensuring continuous speech recognition automatically restarts mid-call after natural pauses instead of terminating after the first utterance. Added safe error handling for permission denials and engine transition retries, synchronized ref updates across call lifecycle transitions, and added regression coverage in `tests/p2pLiveCopilot.test.ts`. Verified 625 passing tests, clean typecheck, and lint.
+
+### 2026-09-08 - working tree
+Eliminated client-side stats drift and 100-claim text search truncation across claims queries and UI feeds:
+- Server-Side Claims Search (`convex/claims.ts`): Added `search` argument and `matchesClaimSearch` to `api.claims.list` matching across claim numbers, patient names, insurance payers, provider names, denial reason codes/descriptions, CPT codes, and ICD-10 codes. Replaced 100-item client-side truncation with server-side candidate scanning (up to 500 records), enabling text search to locate any matching claim in the user's history. Added native server-side evaluation for `status: "critical_deadline"`.
+- Server-Side Filtered Aggregates (`convex/claims.ts`): Upgraded `api.claims.getPortfolioStats` to accept `status`, `payer`, and `search` arguments. When unfiltered, maintains O(log N) `claimsAggregate` (`TableAggregate.count` and `TableAggregate.sum`) as authoritative baseline; when filters are active, calculates exact counts, active/won disputed sums, average win scores, and status breakdowns across all matching database records on the server without capping to 100 items. Returns `portfolioTotalClaims` and `portfolioTotalDisputedAmount` alongside scoped metrics.
+- Synchronized Reactive Hooks & Feeds (`src/hooks/useClaims.ts`, `src/components/radar/CaseRadar.tsx`, `src/lib/utils.ts`): Updated `useClaims` and `CaseRadar` to pass active `search`, `status`, and `payer` filters to `claims.list` and `getPortfolioStats`. Bound `stats` and `claimCountsByStatus` directly to server-side aggregation, eliminating fallback 100-claim array reductions and client/server metric drift.
+- Testing & Verification (`tests/clientStatsAndSearch.test.ts`): Added 12 unit and regression tests covering server search across all fields, `critical_deadline` filtering, multi-filter aggregation, and `matchesClaimSearch`. Verified 637 passing tests across 40 suites, clean typecheck, clean lint, 80.08% coverage, and production build (`npm run verify`). Convex features: queries, components, TableAggregate.

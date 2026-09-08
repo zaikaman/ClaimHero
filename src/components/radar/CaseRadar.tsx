@@ -33,7 +33,7 @@ import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import { Claim } from "../../types";
-import { formatCurrency } from "../../lib/utils";
+import { formatCurrency, matchesClaimSearch } from "../../lib/utils";
 import { CPT_CODES, DENIAL_REASON_CODES } from "../../lib/constants";
 import { DeadlineCountdown } from "./DeadlineCountdown";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -127,33 +127,47 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     }
   };
 
-  const statusArg =
-    statusFilter !== "all" && statusFilter !== "critical_deadline"
-      ? statusFilter
-      : undefined;
+  const statusArg = statusFilter !== "all" ? statusFilter : undefined;
   const payerArg = payerFilter !== "all" ? payerFilter : undefined;
+  const searchArg = searchQuery.trim() ? searchQuery.trim() : undefined;
+  const isFiltered = Boolean(statusArg || payerArg || searchArg);
 
-  // Server-side filtered query for active cases up to 100
+  // Server-side filtered query for active cases
   const serverClaims = useQuery(api.claims.list, {
     status: statusArg,
     payer: payerArg,
+    search: searchArg,
     limit: 100,
     includeDemo,
   }) as Claim[] | undefined;
 
-  // True aggregate stats across the full portfolio (avoids truncation on badge counts)
+  // Authoritative global portfolio stats backed by O(log N) TableAggregate
   const portfolioStats = useQuery(api.claims.getPortfolioStats, { includeDemo });
 
+  // Filtered aggregate stats matching the active filters
+  const filteredStats = useQuery(
+    api.claims.getPortfolioStats,
+    isFiltered
+      ? {
+          status: statusArg,
+          payer: payerArg,
+          search: searchArg,
+          includeDemo,
+        }
+      : "skip"
+  );
+
   const activeClaims = serverClaims ?? claims;
+  const activeStats = isFiltered ? (filteredStats ?? portfolioStats) : portfolioStats;
 
   const { totalDisputed, totalWon, avgScore, highRiskCount, criticalCount } = useMemo(() => {
-    if (portfolioStats) {
+    if (activeStats) {
       return {
-        totalDisputed: portfolioStats.totalDisputedAmount,
-        totalWon: portfolioStats.overturnedWonAmount,
-        avgScore: portfolioStats.averageWinScore,
-        highRiskCount: portfolioStats.claimsByRisk?.high_confidence ?? 0,
-        criticalCount: portfolioStats.criticalDeadlinesCount,
+        totalDisputed: activeStats.totalDisputedAmount,
+        totalWon: activeStats.overturnedWonAmount,
+        avgScore: activeStats.averageWinScore,
+        highRiskCount: activeStats.claimsByRisk?.high_confidence ?? 0,
+        criticalCount: activeStats.criticalDeadlinesCount,
       };
     }
 
@@ -176,23 +190,27 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     ).length;
 
     return { totalDisputed, totalWon, avgScore, highRiskCount, criticalCount };
-  }, [portfolioStats, activeClaims]);
+  }, [activeStats, activeClaims]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
   // Compute status breakdown counts for filter tabs using portfolio aggregates
   const statusCounts = useMemo(() => {
-    if (portfolioStats) {
+    const source = (payerArg || searchArg)
+      ? (filteredStats?.claimsByStatus ? filteredStats : portfolioStats)
+      : portfolioStats;
+
+    if (source) {
       return {
-        all: portfolioStats.totalClaims,
-        critical_deadline: portfolioStats.criticalDeadlinesCount,
-        ingested: portfolioStats.claimsByStatus?.ingested ?? 0,
-        parsing: portfolioStats.claimsByStatus?.parsing ?? 0,
-        analyzing: portfolioStats.claimsByStatus?.analyzing ?? 0,
-        ready_for_review: portfolioStats.claimsByStatus?.ready_for_review ?? 0,
-        dispatched: portfolioStats.claimsByStatus?.dispatched ?? 0,
-        won: portfolioStats.claimsByStatus?.won ?? 0,
+        all: source.totalClaims,
+        critical_deadline: source.criticalDeadlinesCount,
+        ingested: source.claimsByStatus?.ingested ?? 0,
+        parsing: source.claimsByStatus?.parsing ?? 0,
+        analyzing: source.claimsByStatus?.analyzing ?? 0,
+        ready_for_review: source.claimsByStatus?.ready_for_review ?? 0,
+        dispatched: source.claimsByStatus?.dispatched ?? 0,
+        won: source.claimsByStatus?.won ?? 0,
       };
     }
 
@@ -216,7 +234,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     }
 
     return counts;
-  }, [portfolioStats, activeClaims]);
+  }, [payerArg, searchArg, filteredStats, portfolioStats, activeClaims]);
 
   const filtered = useMemo(() => {
     return activeClaims.filter((c) => {
@@ -237,26 +255,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
 
       // 3. Search query filter
       if (searchQuery) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchClaim = c.claimNumber.toLowerCase().includes(q);
-        const matchPatient = c.patient?.name?.toLowerCase().includes(q);
-        const matchCpt = c.cptCodes.some((code) => code.toLowerCase().includes(q));
-        const matchReason =
-          c.denialReasonCode.toLowerCase().includes(q) ||
-          c.denialReasonDescription?.toLowerCase().includes(q);
-        const matchPayer = (c.patient?.insurancePayer || "").toLowerCase().includes(q);
-        const matchProvider = c.providerName.toLowerCase().includes(q);
-
-        if (
-          !matchClaim &&
-          !matchPatient &&
-          !matchCpt &&
-          !matchReason &&
-          !matchPayer &&
-          !matchProvider
-        ) {
-          return false;
-        }
+        return matchesClaimSearch(c, searchQuery);
       }
 
       return true;

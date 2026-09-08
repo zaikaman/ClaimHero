@@ -223,3 +223,39 @@ export function stripMarkdownFormatting(text?: string): string {
     .replace(/`([^`]+)`/g, "$1")
     .trim();
 }
+
+/**
+ * Test whether a claim matches a search query across all common search dimensions
+ */
+export function matchesClaimSearch(
+  claim: {
+    claimNumber?: string;
+    patientName?: string;
+    insurancePayer?: string;
+    providerName?: string;
+    denialReasonCode?: string;
+    denialReasonDescription?: string;
+    cptCodes?: string[];
+    icd10Codes?: string[];
+    patient?: {
+      name?: string;
+      insurancePayer?: string;
+    };
+  },
+  searchQuery: string
+): boolean {
+  const q = searchQuery.toLowerCase().trim();
+  if (!q) return true;
+  if (claim.claimNumber?.toLowerCase().includes(q)) return true;
+  if (claim.patientName?.toLowerCase().includes(q)) return true;
+  if (claim.patient?.name?.toLowerCase().includes(q)) return true;
+  const payer = claim.insurancePayer || claim.patient?.insurancePayer;
+  if (payer?.toLowerCase().includes(q)) return true;
+  if (claim.providerName?.toLowerCase().includes(q)) return true;
+  if (claim.denialReasonCode?.toLowerCase().includes(q)) return true;
+  if (claim.denialReasonDescription?.toLowerCase().includes(q)) return true;
+  if (claim.cptCodes?.some((code) => code.toLowerCase().includes(q))) return true;
+  if (claim.icd10Codes?.some((code) => code.toLowerCase().includes(q))) return true;
+  return false;
+}
+
