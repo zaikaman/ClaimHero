@@ -549,6 +549,88 @@ Paragraph text with **bold** and *italic*.
       expect(result.error).toBe("Signature verification failed");
     });
 
+    it("rejects fraudulent signatures with expired timestamps without auto-accepting on timestamp error", async () => {
+      const id = "msg_forgery_old_ts";
+      const oldTimestamp = (Math.floor(Date.now() / 1000) - 400).toString(); // > 300s old
+      const fraudulentSignature = "v1,dG90YWxseV9mYWtlX3NpZ25hdHVyZV8xMjM0NTY3ODk=";
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": oldTimestamp,
+          "svix-signature": fraudulentSignature,
+        },
+        secret: testSecret,
+        toleranceInSeconds: 300,
+      });
+
+      // Must NEVER accept fraudulent signature even when timestamp is old
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe("Signature verification failed");
+    });
+
+    it("rejects fraudulent signatures with future timestamps without auto-accepting in catch", async () => {
+      const id = "msg_forgery_future_ts";
+      const futureTimestamp = (Math.floor(Date.now() / 1000) + 500).toString();
+      const fraudulentSignature = "v1,dG90YWxseV9mYWtlX3NpZ25hdHVyZV8xMjM0NTY3ODk=";
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": futureTimestamp,
+          "svix-signature": fraudulentSignature,
+        },
+        secret: testSecret,
+        toleranceInSeconds: 300,
+      });
+
+      // Must fail signature verification, not merely timestamp tolerance
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe("Signature verification failed");
+    });
+
+    it("rejects fraudulent signatures with invalid JSON payloads without auto-accepting on SyntaxError", async () => {
+      const id = "msg_forgery_bad_json";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const fraudulentSignature = "v1,dG90YWxseV9mYWtlX3NpZ25hdHVyZV8xMjM0NTY3ODk=";
+      const invalidJsonPayload = "this is not JSON at all {{<syntax error>}}";
+
+      const result = await verifySvixWebhook({
+        payload: invalidJsonPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": fraudulentSignature,
+        },
+        secret: testSecret,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe("Signature verification failed");
+    });
+
+    it("verifies authentic signatures on non-JSON payloads where svix verify throws SyntaxError", async () => {
+      const id = "msg_authentic_text_payload";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const textPayload = "Hello, this is plain text medical correspondence, not a JSON document.";
+      const signature = await computeSvixSignature(id, timestamp, textPayload, testSecret);
+
+      const result = await verifySvixWebhook({
+        payload: textPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": `v1,${signature}`,
+        },
+        secret: testSecret,
+      });
+
+      expect(result.valid).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
     it("verifies comma-separated and mixed-delimiter multiple signatures", async () => {
       const id = "msg_comma_1";
       const timestamp = Math.floor(Date.now() / 1000).toString();

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-08T10:36:28Z
+- **Last updated:** 2026-09-08T11:38:23Z
 
 ## Log
 
@@ -975,9 +975,15 @@ Hardened P2P defense copilot validator contracts and resolved test suite typing 
 - Frontend Type & Hook Alignment: Updated `LiveFastAnswer` in `src/types/index.ts` and `src/hooks/useLiveCallCopilot.ts` to include `generatedBy`.
 - IDE & Test Suite Hardening: Added `@ts-ignore` annotation for `@convex-dev/auth/server` mock export in `tests/convexP2P.test.ts` and added regression tests for fast-answer persistence with `generatedBy` and `sessionId`. Verified 575 passing tests, typecheck, lint, and production build via `npm run verify`. Convex features: schema, mutations, actions.
 
-### 2026-09-08 - working tree
+### 2026-09-08 - d12312b
 Decoupled Physician Peer-to-Peer (P2P) Defense and ERISA & Liability Audit from Step 2 of the primary appeal workflow into dedicated first-class clinical and legal companion modules:
 - Streamlined 3-Step Appeal Stepper: Reverted Step 2 in `SentinelFlowStepper.tsx` from "Defense Suite" to pure "Appeal Brief", removed the embedded multi-tab deliverables sub-bar, and simplified step state tracking to keep user attention focused strictly on brief drafting, citation inspection, and AI synthesis.
 - Reorganized Sidebar Workspace: Segmented sidebar navigation (`Sidebar.tsx`) into a clean 3-step Case Workspace (`Evidence Matrix`, `Appeal Brief`, `Payer Communications`) and a separate Companion Tools group (`Doctor P2P Copilot`, `ERISA & Liability Audit`), removing the nested sub-item accordion and decluttering trailing pill badges for a sleek, minimal sidebar layout.
 - Case Companion Context Headers: Replaced the sequential flow stepper in `P2PDefenseStudio.tsx` and `FinancialLiabilityCalculator.tsx` with a unified glassmorphic Case Companion Context Header featuring 1-click `← Appeal Brief` return navigation, active case metadata chips (patient name, payer, claim number, disputed amount), companion categorization badges, and fast switcher links.
 - Synchronized Command Palette: Updated action indexing in `CommandDialog.tsx` to reflect Appeal Brief (Step 2) under Case Workspace and Doctor P2P Copilot & ERISA Audit under Companion Tooling. Verified with `npm run verify`: 100% clean typecheck, lint, 575/575 passing tests, and production build.
+
+### 2026-09-08 - working tree
+Hardened Svix webhook signature verification in `convex/lib/agentMailWebhook.ts`:
+- Eliminated Insecure Error-Catch Auto-Accept: Removed dangerous logic that set `matched = true` inside the catch block when error messages contained `"timestamp too old"`, `"timestamp too new"`, was a `SyntaxError`, or contained `"JSON"`. A thrown error inside Svix or parsing routines no longer silently accepts unauthenticated webhooks.
+- Explicit Signature & Tolerance Validation: Standardized on official `svix.verify` followed by explicit `svix.sign` computation and constant-time HMAC comparison (`timingSafeEqual`) across extracted signatures and payload variants, ensuring only genuine cryptographic signature matches proceed to timestamp tolerance checks.
+- Comprehensive Security Regression Tests: Added unit tests in `tests/agentMail.test.ts` verifying fraudulent signatures with expired timestamps, future timestamps, and invalid JSON payloads are strictly rejected with `Signature verification failed`, while authentic stale retries and non-JSON payloads remain properly supported. Verified with `npm run verify` (579/579 passing tests across 38 suites, clean typecheck, clean lint, and production build). Convex features: HTTP actions.

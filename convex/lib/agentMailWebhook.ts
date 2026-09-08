@@ -369,6 +369,7 @@ export async function verifySvixWebhook(
   // Build a strictly space-delimited signature header for the official Svix/standardwebhooks library
   const normalizedSignatureHeader = extractedSignatures.map((s) => `v1,${s}`).join(" ");
 
+  const norm = (s: string) => s.trim().replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
   let matched = false;
   let lastErrorDetail = "";
   let firstExpectedSig: string | undefined;
@@ -376,28 +377,57 @@ export async function verifySvixWebhook(
   // 1. Try official Svix Webhook verification engine across string payload candidates
   for (const sec of candidateSecrets) {
     for (const ts of candidateTimestamps) {
+      const tsNum = parseInt(ts, 10);
+      const tsDate = !isNaN(tsNum) ? new Date(tsNum * 1000) : undefined;
+
       for (const p of candidatePayloads) {
         try {
           const wh = new Webhook(sec);
-          wh.verify(p, {
-            "svix-id": cleanId,
-            "svix-timestamp": ts,
-            "svix-signature": normalizedSignatureHeader,
-          });
-          matched = true;
-          break;
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          lastErrorDetail = msg;
-          if (
-            msg.includes("timestamp too old") ||
-            msg.includes("timestamp too new") ||
-            err instanceof SyntaxError ||
-            msg.includes("JSON")
-          ) {
+
+          // Attempt official svix verify first (succeeds only when HMAC matches, payload is JSON,
+          // and timestamp is within Svix's built-in 300s window)
+          try {
+            wh.verify(p, {
+              "svix-id": cleanId,
+              "svix-timestamp": ts,
+              "svix-signature": normalizedSignatureHeader,
+            });
             matched = true;
             break;
+          } catch (verifyErr: unknown) {
+            lastErrorDetail = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+            // CRITICAL: NEVER set matched = true inside a catch block.
+            // svix.verify throws on invalid HMAC ("No matching signature found"),
+            // timestamp out of tolerance ("Message timestamp too old / too new"),
+            // or if the payload is not valid JSON (SyntaxError).
+            // Swallowing or inferring success from error messages permits unauthenticated requests.
           }
+
+          // If verify threw (e.g. timestamp is an authentic retry older than 300s, or payload
+          // is non-JSON text), compute the expected HMAC signature explicitly using wh.sign
+          // and verify against extracted signatures in constant time.
+          if (tsDate) {
+            const computed = wh.sign(cleanId, tsDate, p);
+            const expectedSig = computed.startsWith("v1,") ? computed.slice(3) : computed;
+            if (!firstExpectedSig) {
+              firstExpectedSig = expectedSig;
+            }
+            const normExpected = norm(expectedSig);
+
+            for (const candidate of extractedSignatures) {
+              const normCandidate = norm(candidate);
+              if (
+                timingSafeEqual(candidate.trim(), expectedSig) ||
+                timingSafeEqual(normCandidate, normExpected)
+              ) {
+                matched = true;
+                break;
+              }
+            }
+            if (matched) break;
+          }
+        } catch (err: unknown) {
+          lastErrorDetail = err instanceof Error ? err.message : String(err);
         }
       }
       if (matched) break;
@@ -407,7 +437,6 @@ export async function verifySvixWebhook(
 
   // 2. Web Crypto HMAC-SHA256 verification engine across byte payloads and key encodings
   if (!matched) {
-    const norm = (s: string) => s.trim().replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
     for (const sec of candidateSecrets) {
       const cleanSecret = sec.startsWith("whsec_") ? sec.slice(6) : sec;
 
