@@ -1140,7 +1140,8 @@ Paragraph text with **bold** and *italic*.
       expect(email.text).not.toContain("https://phish.attacker.com");
 
       // Verify legitimate internal app CTA button is intact
-      expect(email.html).toContain('href="https://kindhearted-elephant-992.convex.site/app/inbox"');
+      const expectedSiteUrl = process.env.SITE_URL || "http://localhost:5173";
+      expect(email.html).toContain(`href="${expectedSiteUrl}/app/inbox"`);
 
       // Verify no emojis are in the HTML or text
       expect(email.html).not.toMatch(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]/u);
@@ -1179,6 +1180,42 @@ Paragraph text with **bold** and *italic*.
       expect(email.text).toContain("eGFR < 30 mL/min and troponin > 0.04 ng/mL");
       expect(email.html).toContain("Please log in to your ClaimHero console to review this communication.");
       expect(email.text).toContain("Sentinel Auto-Pilot is currently OFF");
+    });
+
+    it("formatPayerResponseAlertEmail fails loudly when SITE_URL is unset", () => {
+      const originalSiteUrl = process.env.SITE_URL;
+      try {
+        delete process.env.SITE_URL;
+        expect(() =>
+          formatPayerResponseAlertEmail({
+            claimNumber: "CLM-FAIL-1",
+            payer: "Aetna",
+          })
+        ).toThrow("SITE_URL environment variable is unset");
+      } finally {
+        process.env.SITE_URL = originalSiteUrl;
+      }
+    });
+
+    it("formatPayerResponseAlertEmail fails loudly when SITE_URL is invalid", () => {
+      expect(() =>
+        formatPayerResponseAlertEmail({
+          claimNumber: "CLM-FAIL-2",
+          payer: "Aetna",
+          appSiteUrl: "javascript:evil()",
+        })
+      ).toThrow("Invalid SITE_URL");
+    });
+
+    it("formatPayerResponseAlertEmail dynamically uses custom appSiteUrl with trailing slash stripped", () => {
+      const email = formatPayerResponseAlertEmail({
+        claimNumber: "CLM-CUSTOM",
+        payer: "Cigna",
+        appSiteUrl: "https://custom-portal.claimhero.ai/",
+      });
+      expect(email.html).toContain('href="https://custom-portal.claimhero.ai/app/inbox"');
+      expect(email.text).toContain("https://custom-portal.claimhero.ai/app/inbox");
+      expect(email.html).not.toContain("kindhearted-elephant-992");
     });
   });
 });

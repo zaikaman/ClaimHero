@@ -241,5 +241,39 @@ describe("Convex Audit Logs, Users, Auth & Crons", () => {
       const authSource = fs.readFileSync("convex/auth.ts", "utf-8");
       expect(authSource).toContain("accessTokenTtlSeconds: 86400");
     });
+
+    it("convex/auth: getAllowedRedirectOrigins resolves bare origins and fails loudly when SITE_URL is unset or invalid", () => {
+      expect(convexAuthModule.getAllowedRedirectOrigins).toBeDefined();
+
+      const originalSiteUrl = process.env.SITE_URL;
+      try {
+        // Valid custom site URL with path and trailing slash
+        process.env.SITE_URL = "https://appeal-sentinel.convex.site/app/";
+        const origins = convexAuthModule.getAllowedRedirectOrigins();
+        expect(origins).toContain("http://localhost:5173");
+        expect(origins).toContain("https://appeal-sentinel.convex.site");
+        expect(origins).not.toContain("https://kindhearted-elephant-992.convex.site");
+
+        // Unset SITE_URL fails loudly
+        delete process.env.SITE_URL;
+        expect(() => convexAuthModule.getAllowedRedirectOrigins()).toThrow(
+          "SITE_URL environment variable is unset"
+        );
+
+        // Invalid URL fails loudly
+        process.env.SITE_URL = "not-a-valid-url";
+        expect(() => convexAuthModule.getAllowedRedirectOrigins()).toThrow(
+          "SITE_URL environment variable is not a valid http(s) URL"
+        );
+
+        // Non-http(s) scheme fails loudly
+        process.env.SITE_URL = "ftp://files.example.com";
+        expect(() => convexAuthModule.getAllowedRedirectOrigins()).toThrow(
+          "SITE_URL environment variable is not a valid http(s) URL"
+        );
+      } finally {
+        process.env.SITE_URL = originalSiteUrl;
+      }
+    });
   });
 });

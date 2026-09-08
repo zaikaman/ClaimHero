@@ -5,6 +5,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    env: {
+      SITE_URL: "http://localhost:5173",
+    },
     include: ["tests/**/*.test.ts"],
     exclude: ["node_modules", "dist", "docs", "convex/_generated"],
     coverage: {

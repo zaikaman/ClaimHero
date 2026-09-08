@@ -412,8 +412,20 @@ export function formatPayerResponseAlertEmail(
   const safeRationaleText = stripHtmlTags(context.clinicalRationale || "");
   const safeRationaleHtml = sanitizeAndEscapeHtml(context.clinicalRationale || "", { preserveNewlines: true });
 
-  const rawUrl = (context.appSiteUrl || process.env.SITE_URL || "https://kindhearted-elephant-992.convex.site").replace(/\/$/, "");
-  const safeUrl = (safeLinkHref(rawUrl) || "https://kindhearted-elephant-992.convex.site").replace(/\/$/, "");
+  const rawUrl = (context.appSiteUrl || process.env.SITE_URL || "").trim();
+  if (!rawUrl) {
+    throw new Error(
+      "SITE_URL environment variable is unset. Please configure SITE_URL (e.g. https://<deployment>.convex.site or http://localhost:5173) to generate alert email action links."
+    );
+  }
+  const cleanRawUrl = rawUrl.replace(/\/$/, "");
+  const safeUrl = safeLinkHref(cleanRawUrl);
+  if (!safeUrl) {
+    throw new Error(
+      `Invalid SITE_URL: "${rawUrl}". Expected a valid http(s) URL.`
+    );
+  }
+  const normalizedSafeUrl = safeUrl.replace(/\/$/, "");
 
   const isAutoPilot = context.autoPilotEnabled !== false;
 
@@ -423,13 +435,13 @@ export function formatPayerResponseAlertEmail(
     isAutoPilot
       ? "Sentinel Auto-Pilot is ACTIVE for this claim. If no manual action is taken within 1 hour, Auto-Pilot will autonomously synthesize and dispatch the cited clinical rebuttal addendum."
       : "Sentinel Auto-Pilot is currently OFF. Please log in to ClaimHero to review this response."
-  }\n\nReview Claim Docket: ${safeUrl}/app/inbox\n\nClaimHero Sentinel System`;
+  }\n\nReview Claim Docket: ${normalizedSafeUrl}/app/inbox\n\nClaimHero Sentinel System`;
 
   const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:24px;background-color:#0b0f17;color:#f8fafc;border-radius:8px;border:1px solid #1e293b;"><div style="font-size:18px;font-weight:700;color:#00e5ff;margin-bottom:16px;">ClaimHero Sentinel Alert</div><p style="font-size:14px;line-height:1.6;color:#cbd5e1;">A new inbound response was received from <strong>${safePayerHtml}</strong> for <strong>Claim #${safeClaimNumberHtml}</strong>.</p><div style="background-color:#141c2c;border:1px solid #1e293b;padding:16px;border-radius:6px;margin:16px 0;"><div style="font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:4px;">Payer Determination</div><div style="font-size:15px;font-weight:600;color:#f8fafc;margin-bottom:8px;">${safeHeadlineHtml}</div><div style="font-size:13px;color:#94a3b8;line-height:1.5;">${safeRationaleHtml}</div></div><p style="font-size:13px;color:#94a3b8;line-height:1.6;">${
     isAutoPilot
       ? "<strong style='color:#00e5ff;'>Sentinel Auto-Pilot is ACTIVE.</strong> If no manual action is taken within 1 hour, ClaimHero will autonomously synthesize and dispatch the cited rebuttal addendum."
       : "Please log in to your ClaimHero console to review this communication."
-  }</p><div style="margin-top:24px;"><a href="${escapeHtml(safeUrl)}/app/inbox" style="display:inline-block;background-color:#0ea5e9;color:#ffffff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Open Claim Inbox</a></div></div>`;
+  }</p><div style="margin-top:24px;"><a href="${escapeHtml(normalizedSafeUrl)}/app/inbox" style="display:inline-block;background-color:#0ea5e9;color:#ffffff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Open Claim Inbox</a></div></div>`;
 
   return {
     subject,

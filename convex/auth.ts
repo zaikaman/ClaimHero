@@ -18,14 +18,44 @@ export const { signUpWithPassword, signInWithPassword } = setupUsernamePassword(
   }
 ).attachUserCallbacks({ createUser: internal.users.createPasswordUser });
 
+/**
+ * Resolves allowed redirect origins for OAuth providers.
+ * Enforces that SITE_URL is explicitly configured to prevent silent OAuth redirection failures
+ * across staging, production, or custom domain migrations.
+ */
+export function getAllowedRedirectOrigins(): string[] {
+  const rawSiteUrl = process.env.SITE_URL;
+  if (!rawSiteUrl || !rawSiteUrl.trim()) {
+    throw new Error(
+      "SITE_URL environment variable is unset. Please configure SITE_URL (e.g. https://<deployment>.convex.site or http://localhost:5173) to authorize OAuth redirect origins."
+    );
+  }
+
+  const origins = new Set<string>();
+
+  // Always authorize standard local Vite development server
+  origins.add("http://localhost:5173");
+
+  try {
+    const parsed = new URL(rawSiteUrl.trim());
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error(`Invalid protocol "${parsed.protocol}"`);
+    }
+    origins.add(parsed.origin);
+  } catch (err) {
+    throw new Error(
+      `SITE_URL environment variable is not a valid http(s) URL: "${rawSiteUrl}". Details: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+
+  return Array.from(origins);
+}
+
 export const { startSignInGoogle, completeSignInGoogle } = setupGoogle(
   core,
   {
     component: components.oauthGoogle,
-    allowedRedirectOrigins: [
-      "http://localhost:5173",
-      "https://kindhearted-elephant-992.convex.site",
-    ],
+    allowedRedirectOrigins: getAllowedRedirectOrigins(),
   }
 ).attachUserCallbacks({ createUser: internal.users.createGoogleUser });
 

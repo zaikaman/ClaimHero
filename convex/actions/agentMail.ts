@@ -774,6 +774,13 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
             ? "Payer Upheld Initial Denial"
             : "New Inbound Correspondence Received";
 
+        const siteUrl = process.env.SITE_URL;
+        if (!siteUrl || !siteUrl.trim()) {
+          throw new Error(
+            "SITE_URL environment variable is unset. Cannot construct payer alert email without a valid deployment site URL."
+          );
+        }
+
         const alertEmail = formatPayerResponseAlertEmail({
           claimNumber: matchingClaim.claimNumber,
           payer,
@@ -781,7 +788,7 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
           determinationHeadline,
           clinicalRationale,
           autoPilotEnabled: matchingClaim.autoPilotEnabled,
-          appSiteUrl: process.env.SITE_URL,
+          appSiteUrl: siteUrl,
         });
 
         await sendAgentMailMessage({
@@ -797,7 +804,12 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
           timestamp: Date.now(),
         });
       } catch (notifyErr) {
-        console.warn("User email notification dispatch bypassed (AgentMail not active or in test):", notifyErr);
+        const isSiteUrlError = notifyErr instanceof Error && notifyErr.message.includes("SITE_URL");
+        if (isSiteUrlError) {
+          console.error("Critical configuration failure in payer alert email dispatch: SITE_URL is unset or invalid:", notifyErr);
+        } else {
+          console.warn("User email notification dispatch bypassed (AgentMail not active or in test):", notifyErr);
+        }
       }
     }
 
