@@ -332,8 +332,10 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
           <div
             className={cn(
               "mt-3 p-2.5 rounded-lg border text-xs font-sans flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-all",
-              isOverturned
+              isOverturned && authorizationNumber && !authorizationNumber.toLowerCase().includes("simulation only")
                 ? "bg-emerald-950/60 border-emerald-500 text-emerald-100 ring-1 ring-emerald-500/40"
+                : authorizationNumber === "Simulation only — no authorization granted"
+                ? "bg-amber-950/60 border-amber-500/70 text-amber-100 ring-1 ring-amber-500/30"
                 : isGeneratingPushback
                 ? "bg-primary/10 border-primary/40 text-primary"
                 : isWaitingForDoctor
@@ -342,8 +344,10 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
             )}
           >
             <div className="flex items-center gap-2">
-              {isOverturned ? (
+              {isOverturned && authorizationNumber && !authorizationNumber.toLowerCase().includes("simulation only") ? (
                 <ShieldCheck className="size-4 text-emerald-400 shrink-0" weight="fill" />
+              ) : authorizationNumber === "Simulation only — no authorization granted" ? (
+                <WarningCircle className="size-4 text-amber-400 shrink-0" weight="fill" />
               ) : isGeneratingPushback ? (
                 <CircleNotch className="size-3.5 text-primary animate-spin shrink-0" />
               ) : isWaitingForDoctor ? (
@@ -352,12 +356,19 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                 <CircleNotch className="size-3.5 text-primary animate-spin shrink-0" />
               )}
               <span>
-                {isOverturned ? (
+                {isOverturned && authorizationNumber && !authorizationNumber.toLowerCase().includes("simulation only") ? (
                   <>
                     <strong className="text-emerald-300 font-bold uppercase tracking-wider">
                       Denial Overturned • Verbal Authorization Granted:
                     </strong>{" "}
                     <span className="font-mono font-semibold text-white">{authorizationNumber}</span>. Criteria fully satisfied under clinical policy bulletin.
+                  </>
+                ) : authorizationNumber === "Simulation only — no authorization granted" ? (
+                  <>
+                    <strong className="text-amber-300 font-bold uppercase tracking-wider">
+                      Simulation Only — No Authorization Granted:
+                    </strong>{" "}
+                    Clinical criteria acknowledged in practice mode. In a live payer call, obtain written verification.
                   </>
                 ) : isGeneratingPushback ? (
                   <>
@@ -382,14 +393,19 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              {isOverturned ? (
+              {isOverturned || authorizationNumber === "Simulation only — no authorization granted" ? (
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setIsSummaryModalOpen(true)}
-                  className="h-6 text-[11px] px-2.5 border-emerald-400 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 gap-1 font-semibold cursor-pointer"
+                  className={cn(
+                    "h-6 text-[11px] px-2.5 gap-1 font-semibold cursor-pointer",
+                    isOverturned
+                      ? "border-emerald-400 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
+                      : "border-amber-400/60 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30"
+                  )}
                 >
-                  <FileText className="size-3 text-emerald-300" />
+                  <FileText className={cn("size-3", isOverturned ? "text-emerald-300" : "text-amber-300")} />
                   <span>View Encounter EHR Addendum</span>
                 </Button>
               ) : isWaitingForDoctor ? (
@@ -576,6 +592,8 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               "rounded-xl border p-4 space-y-3.5 transition-all shadow-md",
               isOverturned
                 ? "bg-emerald-950/40 border-emerald-500/80 ring-1 ring-emerald-500/40"
+                : authorizationNumber === "Simulation only — no authorization granted"
+                ? "bg-amber-950/30 border-amber-500/60 ring-1 ring-amber-500/30"
                 : activeFastAnswer
                 ? "bg-card/90 border-primary/60 ring-1 ring-primary/30"
                 : "bg-card/60 border-border/80"
@@ -588,11 +606,15 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                     "size-7 rounded-md flex items-center justify-center font-bold text-xs shadow-xs",
                     isOverturned
                       ? "bg-emerald-500 text-white"
+                      : authorizationNumber === "Simulation only — no authorization granted"
+                      ? "bg-amber-500 text-white"
                       : "bg-primary text-primary-foreground"
                   )}
                 >
                   {isOverturned ? (
                     <ShieldCheck className="size-4 text-white" weight="fill" />
+                  ) : authorizationNumber === "Simulation only — no authorization granted" ? (
+                    <WarningCircle className="size-4 text-white" weight="fill" />
                   ) : (
                     <Lightning className="size-4 text-primary-foreground" weight="fill" />
                   )}
@@ -602,6 +624,8 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                     <span>
                       {isOverturned
                         ? "Denial Overturned • Prior Authorization Issued"
+                        : authorizationNumber === "Simulation only — no authorization granted"
+                        ? "Simulation Only — No Authorization Granted"
                         : "Instant Verbal Counter-Strike"}
                     </span>
                     {isGeneratingAnswer && (
@@ -614,6 +638,8 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   <p className="text-[11px] text-muted-foreground font-sans">
                     {isOverturned
                       ? "Verbal authorization granted on the record. Read aloud final closing confirmation statement."
+                      : authorizationNumber === "Simulation only — no authorization granted"
+                      ? "Practice simulation only. No legal prior authorization granted. Read aloud closing notice."
                       : "Read aloud into your microphone the instant the medical director asks this question"}
                   </p>
                 </div>
@@ -627,10 +653,16 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                       "text-[10px] font-mono",
                       isOverturned
                         ? "border-emerald-500/40 text-emerald-400 font-bold"
+                        : authorizationNumber === "Simulation only — no authorization granted"
+                        ? "border-amber-500/40 text-amber-300 font-bold"
                         : "border-primary/40 text-primary"
                     )}
                   >
-                    {isOverturned ? "100% Won" : `${activeFastAnswer.confidenceScore}% Grounded`}
+                    {isOverturned
+                      ? "100% Won"
+                      : authorizationNumber === "Simulation only — no authorization granted"
+                      ? "Simulation Only"
+                      : `${activeFastAnswer.confidenceScore}% Grounded`}
                   </Badge>
                   <Button
                     variant="outline"
@@ -657,11 +689,15 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                     "p-2.5 rounded-md text-xs text-foreground/90 font-sans flex items-start gap-2 border",
                     isOverturned
                       ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
+                      : authorizationNumber === "Simulation only — no authorization granted"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-200"
                       : "bg-destructive/10 border-destructive/25"
                   )}
                 >
                   {isOverturned ? (
                     <ShieldCheck className="size-4 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : authorizationNumber === "Simulation only — no authorization granted" ? (
+                    <WarningCircle className="size-4 text-amber-400 shrink-0 mt-0.5" />
                   ) : (
                     <WarningCircle className="size-4 text-destructive shrink-0 mt-0.5" />
                   )}
@@ -669,10 +705,18 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                     <span
                       className={cn(
                         "font-bold",
-                        isOverturned ? "text-emerald-300" : "text-destructive"
+                        isOverturned
+                          ? "text-emerald-300"
+                          : authorizationNumber === "Simulation only — no authorization granted"
+                          ? "text-amber-300"
+                          : "text-destructive"
                       )}
                     >
-                      {isOverturned ? "Reviewer Status: " : "Insurer Objection: "}
+                      {isOverturned
+                        ? "Reviewer Status: "
+                        : authorizationNumber === "Simulation only — no authorization granted"
+                        ? "Simulation Status: "
+                        : "Insurer Objection: "}
                     </span>
                     <span className="italic">&ldquo;{activeFastAnswer.trapQuestion}&rdquo;</span>
                   </div>

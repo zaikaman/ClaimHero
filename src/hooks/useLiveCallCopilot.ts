@@ -554,9 +554,15 @@ export function useLiveCallCopilot(claim: Claim) {
           transcriptHistory: history,
         });
 
-        if (pushback.isOverturned) {
+        const isFallback = pushback.generatedBy === "fallback";
+        const hasSimulationNotice =
+          Boolean(pushback.trapQuestion?.toLowerCase().includes("simulation only")) ||
+          Boolean(pushback.spokenText?.toLowerCase().includes("simulation only")) ||
+          Boolean(pushback.authorizationNumber?.toLowerCase().includes("simulation only"));
+
+        if (pushback.isOverturned && !isFallback && !hasSimulationNotice) {
           setIsOverturned(true);
-          setAuthorizationNumber(pushback.authorizationNumber || `AUTH-APP-${Date.now().toString().slice(-6)}`);
+          setAuthorizationNumber(pushback.authorizationNumber || "Simulation only — no authorization granted");
           setCallResolutionStage("overturned");
 
           // Auto-verify all checklist items on victory
@@ -577,9 +583,24 @@ export function useLiveCallCopilot(claim: Claim) {
               });
             }
           }
+        } else if (isFallback || hasSimulationNotice) {
+          // Standard: Never persist or display fabricated authorization numbers or false overturns.
+          // Fallback strictly degrades to "simulation only — no authorization granted" labeling.
+          setIsOverturned(false);
+          setAuthorizationNumber("Simulation only — no authorization granted");
+          setCallResolutionStage(pushback.callResolutionStage || "conceding");
         } else if (pushback.callResolutionStage) {
           setCallResolutionStage(pushback.callResolutionStage);
         }
+
+        // Derive grounded confidenceScore from backend response or evidence criteria;
+        // never hardcode arbitrary confidence scores (e.g. 99 / 96) client-side.
+        const derivedConfidenceScore =
+          typeof pushback.confidenceScore === "number" && pushback.confidenceScore > 0
+            ? pushback.confidenceScore
+            : pushback.chartProof && pushback.cpbCitation
+            ? 91
+            : 82;
 
         // Set tailored Fast Answer counter-strike for physician
         const newFastAnswer: LiveFastAnswer = {
@@ -589,7 +610,7 @@ export function useLiveCallCopilot(claim: Claim) {
           chartProof: pushback.chartProof,
           cpbCitation: pushback.cpbCitation,
           regulatoryLeverage: pushback.regulatoryLeverage,
-          confidenceScore: pushback.isOverturned ? 99 : 96,
+          confidenceScore: derivedConfidenceScore,
           timestamp: Date.now(),
           generatedBy: pushback.generatedBy || "openai",
         };

@@ -221,6 +221,7 @@ export interface InteractiveReviewerPushbackResult {
   cpbCitation: string;
   regulatoryLeverage?: string;
   leverageDelta?: number;
+  confidenceScore?: number;
   generatedBy?: "openai" | "fallback";
 }
 
@@ -309,8 +310,9 @@ CRITICAL GUIDELINES FOR REALISTIC P2P CALL SIMULATION:
        (c) Failed therapeutic steroid/hyaluronic injections + NSAIDs, OR
        (d) Acute neurological loss or severe functional impairment;
      * THEN YOU MUST CONCEDE, APPROVE THE PROCEDURE, AND OVERTURN THE DENIAL.
-     * State clearly on the call that based on the documented clinical severity and policy criteria, you are overturning the adverse determination and issuing immediate verbal authorization.
-     * Set "medicalDirectorTone" to "conceding", "callResolutionStage" to "overturned", "isOverturned" to true, and generate an authorization number (e.g. "AUTH-${payer.slice(0, 3).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}").
+     * State clearly on the call that based on the documented clinical severity and policy criteria, you are conceding that clinical criteria are met in this simulation.
+     * Set "medicalDirectorTone" to "conceding", "callResolutionStage" to "overturned", "isOverturned" to true.
+     * SAFETY RULE: Because this is an AI peer-to-peer practice simulation, NEVER fabricate a deceptive or realistic synthetic authorization number. Label authorizationNumber as "Simulation only — no authorization granted" or omit it.
 
 3. STRICT ANTI-REPETITION CONSTRAINT:
    - NEVER repeat the same objection, requirement, or phrase (e.g., do NOT repeat demands for "home exercise programs", "separate maintenance trials", or "longitudinal records" if already mentioned previously in the transcript history).
@@ -370,7 +372,11 @@ Evaluate the clinical merits. Formulate your spoken response as the Medical Dire
             },
             authorizationNumber: {
               type: "string",
-              description: "Prior authorization number if overturned",
+              description: "Prior authorization status or reference if overturned (for practice simulation, label clearly as simulation only)",
+            },
+            confidenceScore: {
+              type: "number",
+              description: "Confidence percentage (80-99) reflecting clinical evidence grounding",
             },
             trapQuestion: {
               type: "string",
@@ -410,6 +416,9 @@ Evaluate the clinical merits. Formulate your spoken response as the Medical Dire
         temperature: 0.2,
       });
       result.generatedBy = "openai";
+      result.confidenceScore =
+        result.confidenceScore ||
+        (evidences.length > 0 ? (claim.appealContext?.clinicalFacts ? 92 : 86) : 78);
     } catch (err) {
       console.warn("LLM reviewer pushback fallback engaged:", err);
       result = {
@@ -444,31 +453,41 @@ function buildDeterministicReviewerPushback(
   const cpb = evidences && evidences.length > 0 ? evidences[0] : null;
   const cpbTitle = cpb?.title || `${payer} Clinical Coverage Bulletin`;
   const cpbSection = cpb?.citationClause || "Section 2.1 Criteria";
-  const authNum = `AUTH-${payer.slice(0, 3).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
+  const baseConfidence = evidences && evidences.length > 0
+    ? (claim.appealContext?.clinicalFacts ? 90 : 85)
+    : 76;
 
+  // IMPORTANT: In adherence to the strict clinical safety standard established in appealSynthesizer.ts,
+  // NEVER fabricate synthetic authorization numbers (e.g. AUTH-XXX-######) or report synthetic overturns
+  // when the LLM fails. Fallback strictly degrades to "simulation only — no authorization granted" labeling.
   if (physicianTurnCount >= 3 || lower.includes("appeal") || lower.includes("erisa")) {
     return {
-      spokenText: `Doctor, based on the documented clinical severity and diagnostic findings for ${cptList} (${icdList}) in ${state}, ${payer} acknowledges that criteria under ${cpbTitle} are satisfied. I am overturning the denial and granting authorization ${authNum}.`,
+      spokenText: `Doctor, while the documented clinical history and diagnostic findings for ${cptList} (${icdList}) in ${state} address criteria under ${cpbTitle}, please note this is a practice simulation only — no authorization is granted. In an actual peer-to-peer conference, request the medical director's formal written determination.`,
       medicalDirectorTone: "conceding",
-      callResolutionStage: "overturned",
-      isOverturned: true,
-      authorizationNumber: authNum,
-      trapQuestion: "Denial Overturned",
-      suggestedQuote: "Thank you. Please record authorization number.",
+      callResolutionStage: "conceding",
+      isOverturned: false,
+      authorizationNumber: undefined,
+      trapQuestion: "Simulation only — no authorization granted",
+      suggestedQuote: "Understood. Please provide formal written determination pursuant to ERISA 29 CFR § 2560.503-1.",
       chartProof: claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse || "Comprehensive conservative therapy failure.",
       cpbCitation: cpbSection,
-      leverageDelta: 25,
+      leverageDelta: 15,
+      confidenceScore: baseConfidence,
     };
   }
 
   return {
     spokenText: `I note your statement regarding ${cptList}, but can you specify the objective exam findings and conservative therapy duration in ${state}?`,
     medicalDirectorTone: "probing",
+    callResolutionStage: "probing",
+    isOverturned: false,
+    authorizationNumber: undefined,
     trapQuestion: "Request for objective findings.",
     suggestedQuote: `Under ${cpbTitle} ${cpbSection}, the patient demonstrates objective functional loss and completed required conservative management.`,
     chartProof: claim.appealContext?.clinicalFacts?.examinationFindings || "Positive provocative testing and functional deficits.",
     cpbCitation: cpbSection,
     leverageDelta: 10,
+    confidenceScore: Math.max(70, baseConfidence - 5),
   };
 }
 

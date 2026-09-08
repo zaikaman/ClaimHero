@@ -191,6 +191,57 @@ describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot
       expect(res.isOverturned).toBe(true);
       expect(res.authorizationNumber).toBe("AUTH-UHC-992182");
     });
+
+    it("generateInteractiveReviewerPushback: falls back to simulation only without fabricated authorization numbers when LLM fails", async () => {
+      const mockClaim = {
+        _id: "c1",
+        claimNumber: "CLM-100",
+        userId: "user_123",
+        patient: { name: "Marcus", insurancePayer: "UHC", state: "Texas" },
+        cptCodes: ["63047"],
+        icd10Codes: ["M51.16"],
+        appealContext: {
+          clinicalFacts: {
+            treatmentHistoryAndResponse: "Documented 12 weeks of PT failure",
+          },
+        },
+      };
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockRejectedValue(new Error("OpenAI network timeout"));
+
+      let qCount = 0;
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation(() => {
+          qCount++;
+          if (qCount === 1) return Promise.resolve(mockClaim);
+          return Promise.resolve([
+            { title: "UHC CPB 0016", citationClause: "Section 3.B", extractedEvidenceMarkdown: "PT required" },
+          ]);
+        }),
+      };
+
+      const res = await (actionP2PLiveCopilot.generateInteractiveReviewerPushback as any)._handler(mockCtx, {
+        claimId: "c1",
+        doctorSpeech: "Under ERISA and UHC policy, the patient failed 12 weeks of structured PT.",
+        transcriptHistory: [
+          { speaker: "physician", text: "Turn 1" },
+          { speaker: "reviewer", text: "Objection 1" },
+          { speaker: "physician", text: "Turn 2" },
+          { speaker: "reviewer", text: "Objection 2" },
+          { speaker: "physician", text: "Turn 3 with ERISA notice" },
+        ],
+      });
+
+      expect(res.generatedBy).toBe("fallback");
+      expect(res.isOverturned).toBe(false);
+      expect(res.authorizationNumber).toBeUndefined();
+      expect(res.callResolutionStage).toBe("conceding");
+      expect(res.trapQuestion).toContain("Simulation only — no authorization granted");
+      expect(res.spokenText).toContain("practice simulation only — no authorization is granted");
+      expect(res.spokenText).not.toMatch(/AUTH-[A-Z]{3}-\d+/);
+      expect(res.confidenceScore).toBeGreaterThanOrEqual(80);
+      expect(res.confidenceScore).toBeLessThanOrEqual(95);
+    });
   });
 
   describe("convex/actions/sentinelChatbot", () => {

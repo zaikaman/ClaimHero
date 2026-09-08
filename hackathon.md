@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-08T11:38:23Z
+- **Last updated:** 2026-09-08T11:45:00Z
 
 ## Log
 
@@ -982,8 +982,15 @@ Decoupled Physician Peer-to-Peer (P2P) Defense and ERISA & Liability Audit from 
 - Case Companion Context Headers: Replaced the sequential flow stepper in `P2PDefenseStudio.tsx` and `FinancialLiabilityCalculator.tsx` with a unified glassmorphic Case Companion Context Header featuring 1-click `← Appeal Brief` return navigation, active case metadata chips (patient name, payer, claim number, disputed amount), companion categorization badges, and fast switcher links.
 - Synchronized Command Palette: Updated action indexing in `CommandDialog.tsx` to reflect Appeal Brief (Step 2) under Case Workspace and Doctor P2P Copilot & ERISA Audit under Companion Tooling. Verified with `npm run verify`: 100% clean typecheck, lint, 575/575 passing tests, and production build.
 
-### 2026-09-08 - working tree
+### 2026-09-08 - 76690eb
 Hardened Svix webhook signature verification in `convex/lib/agentMailWebhook.ts`:
 - Eliminated Insecure Error-Catch Auto-Accept: Removed dangerous logic that set `matched = true` inside the catch block when error messages contained `"timestamp too old"`, `"timestamp too new"`, was a `SyntaxError`, or contained `"JSON"`. A thrown error inside Svix or parsing routines no longer silently accepts unauthenticated webhooks.
 - Explicit Signature & Tolerance Validation: Standardized on official `svix.verify` followed by explicit `svix.sign` computation and constant-time HMAC comparison (`timingSafeEqual`) across extracted signatures and payload variants, ensuring only genuine cryptographic signature matches proceed to timestamp tolerance checks.
 - Comprehensive Security Regression Tests: Added unit tests in `tests/agentMail.test.ts` verifying fraudulent signatures with expired timestamps, future timestamps, and invalid JSON payloads are strictly rejected with `Signature verification failed`, while authentic stale retries and non-JSON payloads remain properly supported. Verified with `npm run verify` (579/579 passing tests across 38 suites, clean typecheck, clean lint, and production build). Convex features: HTTP actions.
+
+### 2026-09-08 - working tree
+Eliminated fabricated authorization numbers and synthetic overturn reporting in P2P Live Copilot fallback and client hooks in adherence to the clinical safety standard established in `appealSynthesizer.ts`:
+- Deterministic Fallback Degradation: Updated `buildDeterministicReviewerPushback` (`convex/actions/p2pLiveCopilot.ts`) to strictly degrade to "simulation only — no authorization granted" labeling upon LLM call failure. Removed synthetic `AUTH-XXX-######` generator and false `isOverturned: true` status, reporting `isOverturned: false`, omitting fake authorization numbers, setting `callResolutionStage: "conceding"`, and issuing an explicit verbal notice that no authorization is granted in practice simulation mode.
+- Client Hook & Confidence Score Hardening: In `src/hooks/useLiveCallCopilot.ts`, removed client-side hardcoded fallback `AUTH-APP-${Date.now()}` and hardcoded `confidenceScore: 99/96`. Wired grounded `confidenceScore` directly from backend action response and enforced simulation-only degradation when fallback is engaged.
+- Simulation-Safe UI Notice: Enhanced `src/components/p2p/P2PLiveCopilot.tsx` with dedicated amber simulation-only guide and hero card banners explicitly warning that criteria are acknowledged in practice mode only and no legal authorization is granted.
+- Unit Testing: Added regression tests in `tests/actionsP2PAndChatbot.test.ts` and `tests/p2pLiveCopilot.test.ts` verifying fallback behavior, absence of fabricated authorization numbers, and evidence-grounded confidence scoring. Verified with `npm run verify` (100% clean typecheck, lint, 580/580 passing tests, and production build). Convex features: actions.

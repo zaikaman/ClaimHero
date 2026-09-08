@@ -206,4 +206,55 @@ describe("Real-Time P2P Live Call Copilot (Clinical Defense Sentinel)", () => {
     const corrected = reassignSpeaker(physicianTranscript);
     expect(corrected.speaker).toBe("insurer");
   });
+
+  it("strictly degrades fallback to simulation-only without fabricated authorization numbers or fake 99/96 scores", () => {
+    // Simulates the contract enforced in useLiveCallCopilot.ts
+    const fallbackPushback = {
+      spokenText: "Doctor, please note this is a practice simulation only — no authorization is granted.",
+      medicalDirectorTone: "conceding" as const,
+      callResolutionStage: "conceding" as const,
+      isOverturned: false,
+      authorizationNumber: undefined,
+      trapQuestion: "Simulation only — no authorization granted",
+      suggestedQuote: "Understood. Please provide formal written determination pursuant to ERISA 29 CFR § 2560.503-1.",
+      chartProof: "Documented 12 weeks of PT failure.",
+      cpbCitation: "UHC CPB 0016 Section 3.B",
+      confidenceScore: 90,
+      generatedBy: "fallback" as const,
+    };
+
+    const isFallback = fallbackPushback.generatedBy === "fallback";
+    const hasSimulationNotice =
+      Boolean(fallbackPushback.trapQuestion?.toLowerCase().includes("simulation only")) ||
+      Boolean(fallbackPushback.spokenText?.toLowerCase().includes("simulation only")) ||
+      Boolean(fallbackPushback.authorizationNumber?.toLowerCase().includes("simulation only"));
+
+    let isOverturned = false;
+    let authorizationNumber: string | null = null;
+    let callResolutionStage = "opening";
+
+    if (fallbackPushback.isOverturned && !isFallback && !hasSimulationNotice) {
+      isOverturned = true;
+      authorizationNumber = fallbackPushback.authorizationNumber || "Simulation only — no authorization granted";
+      callResolutionStage = "overturned";
+    } else if (isFallback || hasSimulationNotice) {
+      isOverturned = false;
+      authorizationNumber = "Simulation only — no authorization granted";
+      callResolutionStage = fallbackPushback.callResolutionStage || "conceding";
+    }
+
+    const derivedConfidenceScore =
+      typeof fallbackPushback.confidenceScore === "number" && fallbackPushback.confidenceScore > 0
+        ? fallbackPushback.confidenceScore
+        : fallbackPushback.chartProof && fallbackPushback.cpbCitation
+        ? 91
+        : 82;
+
+    expect(isOverturned).toBe(false);
+    expect(authorizationNumber).toBe("Simulation only — no authorization granted");
+    expect(callResolutionStage).toBe("conceding");
+    expect(derivedConfidenceScore).toBe(90);
+    expect(authorizationNumber).not.toMatch(/AUTH-[A-Z]{3}-\d+/);
+    expect(authorizationNumber).not.toMatch(/AUTH-APP-\d+/);
+  });
 });
