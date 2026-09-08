@@ -12,6 +12,7 @@ import {
   sendAgentMailMessage,
 } from "../lib/agentMail";
 import { extractEmailAddress, isInternalAgentMailAddress, normalizeAgentMailWebhook } from "../lib/agentMailWebhook";
+import { formatPayerResponseAlertEmail, escapeHtml } from "../lib/appealEmail";
 import { requireAuthUser } from "../lib/auth";
 
 /**
@@ -336,7 +337,7 @@ async function handleInboundClaimReply(
         sender,
         recipient: normalized.recipients[0] || "",
         subject,
-        bodyHtml: normalized.html || `<p>${normalized.text || ""}</p>`,
+        bodyHtml: normalized.html || `<p>${escapeHtml(normalized.text || "")}</p>`,
         bodyText: normalized.text || normalized.html || "",
         hasAttachments: normalized.attachments.length > 0,
         agentMailMessageId: normalized.messageId,
@@ -473,7 +474,7 @@ async function handleInboundClaimReply(
       sender,
       recipient: normalized.recipients[0] || "",
       subject,
-      bodyHtml: normalized.html || `<p>${normalized.text || ""}</p>`,
+      bodyHtml: normalized.html || `<p>${escapeHtml(normalized.text || "")}</p>`,
       bodyText: normalized.text || normalized.html || "",
       hasAttachments: normalized.attachments.length > 0,
       attachments: storedAttachments.length > 0 ? storedAttachments : undefined,
@@ -773,26 +774,22 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
             ? "Payer Upheld Initial Denial"
             : "New Inbound Correspondence Received";
 
-        const appSiteUrl = (process.env.SITE_URL || "https://kindhearted-elephant-992.convex.site").replace(/\/$/, "");
-        const alertSubject = `[ClaimHero Alert] Payer Response: Claim #${matchingClaim.claimNumber} (${determinationHeadline})`;
-        const alertText = `Hello,\n\nA new response has been received from ${payer} regarding Claim #${matchingClaim.claimNumber} (${matchingClaim.patientName || "Patient"}).\n\nDetermination: ${determinationHeadline}\nSummary: ${clinicalRationale}\n\n${
-          matchingClaim.autoPilotEnabled !== false
-            ? "Sentinel Auto-Pilot is ACTIVE for this claim. If no manual action is taken within 1 hour, Auto-Pilot will autonomously synthesize and dispatch the cited clinical rebuttal addendum."
-            : "Sentinel Auto-Pilot is currently OFF. Please log in to ClaimHero to review this response."
-        }\n\nReview Claim Docket: ${appSiteUrl}/app/inbox\n\nClaimHero Sentinel System`;
-
-        const alertHtml = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:24px;background-color:#0b0f17;color:#f8fafc;border-radius:8px;border:1px solid #1e293b;"><div style="font-size:18px;font-weight:700;color:#00e5ff;margin-bottom:16px;">ClaimHero Sentinel Alert</div><p style="font-size:14px;line-height:1.6;color:#cbd5e1;">A new inbound response was received from <strong>${payer}</strong> for <strong>Claim #${matchingClaim.claimNumber}</strong>.</p><div style="background-color:#141c2c;border:1px solid #1e293b;padding:16px;border-radius:6px;margin:16px 0;"><div style="font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:4px;">Payer Determination</div><div style="font-size:15px;font-weight:600;color:#f8fafc;margin-bottom:8px;">${determinationHeadline}</div><div style="font-size:13px;color:#94a3b8;line-height:1.5;">${clinicalRationale}</div></div><p style="font-size:13px;color:#94a3b8;line-height:1.6;">${
-          matchingClaim.autoPilotEnabled !== false
-            ? "<strong style='color:#00e5ff;'>⚡ Sentinel Auto-Pilot is ACTIVE.</strong> If no manual action is taken within 1 hour, ClaimHero will autonomously synthesize and dispatch the cited rebuttal addendum."
-            : "Please log in to your ClaimHero console to review this communication."
-        }</p><div style="margin-top:24px;"><a href="${appSiteUrl}/app/inbox" style="display:inline-block;background-color:#0ea5e9;color:#ffffff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Open Claim Inbox</a></div></div>`;
+        const alertEmail = formatPayerResponseAlertEmail({
+          claimNumber: matchingClaim.claimNumber,
+          payer,
+          patientName: matchingClaim.patientName,
+          determinationHeadline,
+          clinicalRationale,
+          autoPilotEnabled: matchingClaim.autoPilotEnabled,
+          appSiteUrl: process.env.SITE_URL,
+        });
 
         await sendAgentMailMessage({
           inboxId: mailboxes.senderInboxId,
           to: userEmail,
-          subject: alertSubject,
-          text: alertText,
-          html: alertHtml,
+          subject: alertEmail.subject,
+          text: alertEmail.text,
+          html: alertEmail.html,
           ctx,
         });
         await ctx.runMutation(internal.claims.setLastPayerAlertAtInternal, {

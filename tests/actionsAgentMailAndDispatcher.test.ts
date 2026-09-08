@@ -464,6 +464,100 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       }));
     });
 
+    it("processInboundClaimReply: sanitizes and escapes malicious HTML and phishing payloads in outbound alert emails", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
+      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
+
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_inbound_phish_1",
+        inbox_id: "in_send",
+        from: "adversary@badpayer.com",
+        recipients: ["send@claimhero.com"],
+        to: ["send@claimhero.com"],
+        subject: "Re: Claim #CLM-SECURITY-999 Review",
+        text: "Please visit phishing portal.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_phish_1",
+        messageId: "msg_inbound_phish_1",
+        inboxId: "in_send",
+        from: "adversary@badpayer.com",
+        recipients: ["send@claimhero.com"],
+        subject: "Re: Claim #CLM-SECURITY-999 Review",
+        text: "Please visit phishing portal.",
+        attachments: [],
+      });
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        determination: "DENIAL_UPHELD",
+        clinicalRationale: 'Denial affirmed. Verify account at <a href="https://evil-phish.com/harvest">Payer Identity Portal</a> immediately. <script>stealToken()</script>',
+        missingRecordsRequested: [],
+        authorizedSettlementAmount: 0,
+        reviewerName: "Adversary Reviewer",
+        shouldAutoReply: true,
+        suggestedAutoReplyAddendum: "Appeal contested.",
+      } as any);
+
+      const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+        messageId: "msg_alert_sent_phish",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimNumber === "CLM-SECURITY-999") {
+            return Promise.resolve({
+              _id: "claim_sec_999",
+              claimNumber: "CLM-SECURITY-999",
+              userId: "user_sec_999",
+              insurancePayer: 'Evil Insurance <script>alert("payer")</script>',
+              patientName: 'John Patient <img src=x onerror="alert(2)">',
+              autoPilotEnabled: true,
+            });
+          }
+          if (args?.userId === "user_sec_999") {
+            return Promise.resolve({
+              _id: "user_sec_999",
+              email: "victim_user@clinic.org",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue("id_mut_sec"),
+      };
+
+      const res = await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_phish_1",
+        messageId: "msg_inbound_phish_1",
+        inboxId: "in_send",
+      });
+
+      expect(res).toBeNull();
+      expect(sendMailSpy).toHaveBeenCalledWith(expect.objectContaining({
+        to: "victim_user@clinic.org",
+        subject: expect.stringContaining("[ClaimHero Alert]"),
+        html: expect.not.stringContaining("<script>"),
+      }));
+
+      const alertCall = sendMailSpy.mock.calls.find(call => (call[0] as any)?.to === "victim_user@clinic.org");
+      expect(alertCall).toBeDefined();
+      const sentHtml = (alertCall![0] as any).html;
+      const sentText = (alertCall![0] as any).text;
+
+      expect(sentHtml).not.toContain("<script>");
+      expect(sentHtml).not.toContain("stealToken()");
+      expect(sentHtml).not.toContain("<a href=\"https://evil-phish.com");
+      expect(sentHtml).not.toContain("onerror");
+      expect(sentHtml).toContain("Payer Identity Portal immediately.");
+      expect(sentText).not.toContain("https://evil-phish.com");
+      expect(sentText).toContain("Payer Identity Portal immediately.");
+    });
+
     it("processInboundClaimReply: digests repeat non-victory alerts within the cooldown window", async () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";

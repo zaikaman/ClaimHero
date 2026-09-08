@@ -21,6 +21,11 @@ import {
 import {
   formatAppealEmail,
   formatCorrespondenceEmail,
+  formatPayerResponseAlertEmail,
+  escapeHtml,
+  stripHtmlTags,
+  sanitizeAlertText,
+  sanitizeAndEscapeHtml,
 } from "../convex/lib/appealEmail";
 import {
   isAiAdjudicatorAddress,
@@ -1072,6 +1077,108 @@ Paragraph text with **bold** and *italic*.
         { outboundId: "outbound_100" }
       );
       expect(result.status).toBe("delivered");
+    });
+  });
+
+  describe("Payer Response Alert Email Security & Sanitization", () => {
+    it("stripHtmlTags strips dangerous script, style, and iframe blocks completely", () => {
+      const payload = 'Notice: <script>alert("xss")</script><style>body{color:red;}</style><iframe src="https://evil.com"></iframe>Clean content';
+      expect(stripHtmlTags(payload)).toBe("Notice: Clean content");
+    });
+
+    it("stripHtmlTags neutralizes phishing links by removing HTML anchors and defanging markdown links", () => {
+      const htmlAnchor = 'Claim denied. <a href="https://attacker-phishing.com/login" target="_blank">Verify Identity Now</a> immediately.';
+      expect(stripHtmlTags(htmlAnchor)).toBe("Claim denied. Verify Identity Now immediately.");
+
+      const markdownLink = "Please sign in at [Aetna Patient Portal](https://attacker-phishing.com/oauth).";
+      expect(stripHtmlTags(markdownLink)).toBe("Please sign in at Aetna Patient Portal.");
+    });
+
+    it("stripHtmlTags preserves legitimate clinical comparators without mangling", () => {
+      const clinical = "CPB criteria unmet: Platelet count < 50,000/uL and ALT > 45 IU/L required.";
+      expect(stripHtmlTags(clinical)).toBe("CPB criteria unmet: Platelet count < 50,000/uL and ALT > 45 IU/L required.");
+    });
+
+    it("escapeHtml converts special characters to safe HTML entities", () => {
+      expect(escapeHtml('<script>alert("XSS & Phish\'s")</script>')).toBe(
+        "&lt;script&gt;alert(&quot;XSS &amp; Phish&#39;s&quot;)&lt;/script&gt;"
+      );
+      expect(escapeHtml("")).toBe("");
+    });
+
+    it("sanitizeAndEscapeHtml strips tags, escapes entities, and converts newlines to <br />", () => {
+      const raw = "Line 1: <b>Bold denial</b>\nLine 2: Platelet < 30\nLine 3: <script>steal()</script>";
+      const sanitized = sanitizeAndEscapeHtml(raw, { preserveNewlines: true });
+      expect(sanitized).toBe("Line 1: Bold denial<br />Line 2: Platelet &lt; 30<br />Line 3:");
+      expect(sanitized).not.toContain("<script>");
+      expect(sanitized).not.toContain("<b>");
+    });
+
+    it("formatPayerResponseAlertEmail immunizes outbound alert emails against HTML and phishing link injection", () => {
+      const maliciousContext = {
+        claimNumber: "CLM-9999",
+        payer: 'Aetna <script>alert("payer")</script>',
+        patientName: 'Jane Doe <img src=x onerror="alert(1)">',
+        determinationHeadline: 'DENIAL_UPHELD <a href="https://evil.com">Click</a>',
+        clinicalRationale: 'Adverse determination upheld. Please confirm PHI at <a href="https://phish.attacker.com/steal?user=123">Secure Portal</a> immediately. <iframe src="javascript:evil()"></iframe>',
+        autoPilotEnabled: true,
+      };
+
+      const email = formatPayerResponseAlertEmail(maliciousContext);
+
+      // Verify HTML alert is free from injected elements and attacker links
+      expect(email.html).not.toContain("<script>");
+      expect(email.html).not.toContain("</script>");
+      expect(email.html).not.toContain("<iframe");
+      expect(email.html).not.toContain("onerror");
+      expect(email.html).not.toContain("<a href=\"https://phish.attacker.com");
+      expect(email.html).not.toContain("https://evil.com");
+
+      // Verify anchor text is preserved as safe text while stripping the phishing link
+      expect(email.html).toContain("Secure Portal immediately.");
+      expect(email.text).toContain("Secure Portal immediately.");
+      expect(email.text).not.toContain("https://phish.attacker.com");
+
+      // Verify legitimate internal app CTA button is intact
+      expect(email.html).toContain('href="https://kindhearted-elephant-992.convex.site/app/inbox"');
+
+      // Verify no emojis are in the HTML or text
+      expect(email.html).not.toMatch(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]/u);
+      expect(email.text).not.toMatch(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]/u);
+    });
+
+    it("formatPayerResponseAlertEmail prevents CRLF header injection in email subjects", () => {
+      const crlfContext = {
+        claimNumber: "CLM-100\r\nBcc: victim@target.com",
+        payer: "UnitedHealthcare",
+        determinationHeadline: "Denial Upheld\r\nSubject: Injected Subject",
+        clinicalRationale: "Standard denial rationale.",
+      };
+
+      const email = formatPayerResponseAlertEmail(crlfContext);
+
+      expect(email.subject).not.toContain("\r");
+      expect(email.subject).not.toContain("\n");
+      expect(email.subject).toBe(
+        "[ClaimHero Alert] Payer Response: Claim #CLM-100 Bcc: victim@target.com (Denial Upheld Subject: Injected Subject)"
+      );
+    });
+
+    it("formatPayerResponseAlertEmail safely displays clinical comparisons with < and >", () => {
+      const clinicalContext = {
+        claimNumber: "CLM-2044",
+        payer: "Cigna Healthcare",
+        determinationHeadline: "Conflicting Clinical Policy Cited",
+        clinicalRationale: "Policy CPB-0144 requires eGFR < 30 mL/min and troponin > 0.04 ng/mL for acute authorization.",
+        autoPilotEnabled: false,
+      };
+
+      const email = formatPayerResponseAlertEmail(clinicalContext);
+
+      expect(email.html).toContain("eGFR &lt; 30 mL/min and troponin &gt; 0.04 ng/mL");
+      expect(email.text).toContain("eGFR < 30 mL/min and troponin > 0.04 ng/mL");
+      expect(email.html).toContain("Please log in to your ClaimHero console to review this communication.");
+      expect(email.text).toContain("Sentinel Auto-Pilot is currently OFF");
     });
   });
 });

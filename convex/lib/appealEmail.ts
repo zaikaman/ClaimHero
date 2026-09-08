@@ -14,7 +14,8 @@ export interface FormattedEmail {
   text: string;
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
+  if (!value) return "";
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -22,6 +23,44 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+export function stripHtmlTags(value: string): string {
+  if (!value) return "";
+  return value
+    // Remove script and style blocks and their contents completely
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+    // Remove iframe, object, embed blocks and their contents completely
+    .replace(/<(?:iframe|object|embed)\b[^<]*(?:(?!<\/(?:iframe|object|embed)>)<[^<]*)*<\/(?:iframe|object|embed)>/gi, "")
+    // Remove HTML comments
+    .replace(/<!--[\s\S]*?-->/g, "")
+    // Remove DOCTYPE / XML processing instructions
+    .replace(/<![^>]*>/g, "")
+    .replace(/<\?[^>]*\?>/g, "")
+    // Strip HTML tags (<tag ...> or </tag>)
+    .replace(/<(?:\/|\s+)?[a-zA-Z][^>]*>/g, "")
+    // Defang markdown links [label](url) -> label to eliminate injected phishing destinations
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .trim();
+}
+
+export function sanitizeAlertText(value: string): string {
+  return stripHtmlTags(value);
+}
+
+export function sanitizeAndEscapeHtml(
+  value: string,
+  options?: { preserveNewlines?: boolean }
+): string {
+  if (!value) return "";
+  const stripped = stripHtmlTags(value);
+  const escaped = escapeHtml(stripped);
+  if (options?.preserveNewlines) {
+    return escaped.replace(/\r\n|\n|\r/g, "<br />");
+  }
+  return escaped;
+}
+
 
 function cleanInlineText(value: string): string {
   return value
@@ -338,3 +377,64 @@ export function formatCorrespondenceEmail(
     `[ClaimHero #${context.claimNumber}] Please reference the claim number above in any reply or additional submission.`
   );
 }
+
+export interface PayerResponseAlertContext {
+  claimNumber: string;
+  payer: string;
+  patientName?: string;
+  determinationHeadline: string;
+  clinicalRationale: string;
+  autoPilotEnabled?: boolean;
+  appSiteUrl?: string;
+}
+
+/**
+ * Formats a secure, production-grade inbound payer response alert email.
+ * Strips all HTML tags and script/style/iframe payloads from untrusted inputs
+ * (such as LLM clinicalRationale and payer headlines) and strictly HTML-escapes
+ * all interpolated variables to guarantee immunity against HTML injection,
+ * malicious link phishing, and CRLF subject injection.
+ */
+export function formatPayerResponseAlertEmail(
+  context: PayerResponseAlertContext
+): FormattedEmail & { subject: string } {
+  const safePayerText = stripHtmlTags(context.payer || "Health Insurer").replace(/[\r\n]+/g, " ").trim();
+  const safePayerHtml = escapeHtml(safePayerText);
+
+  const safeClaimNumberText = stripHtmlTags(context.claimNumber || "").replace(/[\r\n]+/g, " ").trim();
+  const safeClaimNumberHtml = escapeHtml(safeClaimNumberText);
+
+  const safePatientText = stripHtmlTags(context.patientName || "Patient").replace(/[\r\n]+/g, " ").trim();
+
+  const safeHeadlineText = stripHtmlTags(context.determinationHeadline || "New Inbound Correspondence Received").replace(/[\r\n]+/g, " ").trim();
+  const safeHeadlineHtml = escapeHtml(safeHeadlineText);
+
+  const safeRationaleText = stripHtmlTags(context.clinicalRationale || "");
+  const safeRationaleHtml = sanitizeAndEscapeHtml(context.clinicalRationale || "", { preserveNewlines: true });
+
+  const rawUrl = (context.appSiteUrl || process.env.SITE_URL || "https://kindhearted-elephant-992.convex.site").replace(/\/$/, "");
+  const safeUrl = (safeLinkHref(rawUrl) || "https://kindhearted-elephant-992.convex.site").replace(/\/$/, "");
+
+  const isAutoPilot = context.autoPilotEnabled !== false;
+
+  const subject = `[ClaimHero Alert] Payer Response: Claim #${safeClaimNumberText} (${safeHeadlineText})`;
+
+  const text = `Hello,\n\nA new response has been received from ${safePayerText} regarding Claim #${safeClaimNumberText} (${safePatientText}).\n\nDetermination: ${safeHeadlineText}\nSummary: ${safeRationaleText}\n\n${
+    isAutoPilot
+      ? "Sentinel Auto-Pilot is ACTIVE for this claim. If no manual action is taken within 1 hour, Auto-Pilot will autonomously synthesize and dispatch the cited clinical rebuttal addendum."
+      : "Sentinel Auto-Pilot is currently OFF. Please log in to ClaimHero to review this response."
+  }\n\nReview Claim Docket: ${safeUrl}/app/inbox\n\nClaimHero Sentinel System`;
+
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:24px;background-color:#0b0f17;color:#f8fafc;border-radius:8px;border:1px solid #1e293b;"><div style="font-size:18px;font-weight:700;color:#00e5ff;margin-bottom:16px;">ClaimHero Sentinel Alert</div><p style="font-size:14px;line-height:1.6;color:#cbd5e1;">A new inbound response was received from <strong>${safePayerHtml}</strong> for <strong>Claim #${safeClaimNumberHtml}</strong>.</p><div style="background-color:#141c2c;border:1px solid #1e293b;padding:16px;border-radius:6px;margin:16px 0;"><div style="font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:4px;">Payer Determination</div><div style="font-size:15px;font-weight:600;color:#f8fafc;margin-bottom:8px;">${safeHeadlineHtml}</div><div style="font-size:13px;color:#94a3b8;line-height:1.5;">${safeRationaleHtml}</div></div><p style="font-size:13px;color:#94a3b8;line-height:1.6;">${
+    isAutoPilot
+      ? "<strong style='color:#00e5ff;'>Sentinel Auto-Pilot is ACTIVE.</strong> If no manual action is taken within 1 hour, ClaimHero will autonomously synthesize and dispatch the cited rebuttal addendum."
+      : "Please log in to your ClaimHero console to review this communication."
+  }</p><div style="margin-top:24px;"><a href="${escapeHtml(safeUrl)}/app/inbox" style="display:inline-block;background-color:#0ea5e9;color:#ffffff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Open Claim Inbox</a></div></div>`;
+
+  return {
+    subject,
+    text,
+    html,
+  };
+}
+
