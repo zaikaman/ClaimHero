@@ -214,6 +214,10 @@ describe("Convex Physician P2P Defense Scripts & Live Copilot Sessions", () => {
           query: vi.fn().mockReturnValue({
             withIndex: vi.fn().mockReturnValue({
               collect: vi.fn().mockResolvedValue([mockScript]),
+              order: vi.fn().mockReturnValue({
+                first: vi.fn().mockResolvedValue(mockScript),
+                take: vi.fn().mockResolvedValue([mockScript]),
+              }),
             }),
           }),
         },
@@ -234,6 +238,10 @@ describe("Convex Physician P2P Defense Scripts & Live Copilot Sessions", () => {
           query: vi.fn().mockReturnValue({
             withIndex: vi.fn().mockReturnValue({
               collect: vi.fn().mockResolvedValue([]),
+              order: vi.fn().mockReturnValue({
+                first: vi.fn().mockResolvedValue(null),
+                take: vi.fn().mockResolvedValue([]),
+              }),
             }),
           }),
           insert: vi.fn().mockImplementation((table) => (table === "p2pScripts" ? Promise.resolve("sc_new_1") : Promise.resolve("log_1"))),

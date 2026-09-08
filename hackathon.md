@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-08T17:45:00Z
+- **Last updated:** 2026-09-08T17:55:00Z
 
 ## Log
 
@@ -1037,9 +1037,19 @@ Eliminated hardcoded deployment URLs and enforced loud failure on unset `SITE_UR
 ### 2026-09-08 - 52a7af3
 Resolved stale-closure bug in live-call continuous speech recognition (`src/hooks/useLiveCallCopilot.ts`). Replaced closure-captured `isCallLive` check in Web Speech API `recognition.onend` with synchronized `isCallLiveRef`, ensuring continuous speech recognition automatically restarts mid-call after natural pauses instead of terminating after the first utterance. Added safe error handling for permission denials and engine transition retries, synchronized ref updates across call lifecycle transitions, and added regression coverage in `tests/p2pLiveCopilot.test.ts`. Verified 625 passing tests, clean typecheck, and lint.
 
-### 2026-09-08 - working tree
+### 2026-09-08 - 4977c3f
 Eliminated client-side stats drift and 100-claim text search truncation across claims queries and UI feeds:
 - Server-Side Claims Search (`convex/claims.ts`): Added `search` argument and `matchesClaimSearch` to `api.claims.list` matching across claim numbers, patient names, insurance payers, provider names, denial reason codes/descriptions, CPT codes, and ICD-10 codes. Replaced 100-item client-side truncation with server-side candidate scanning (up to 500 records), enabling text search to locate any matching claim in the user's history. Added native server-side evaluation for `status: "critical_deadline"`.
 - Server-Side Filtered Aggregates (`convex/claims.ts`): Upgraded `api.claims.getPortfolioStats` to accept `status`, `payer`, and `search` arguments. When unfiltered, maintains O(log N) `claimsAggregate` (`TableAggregate.count` and `TableAggregate.sum`) as authoritative baseline; when filters are active, calculates exact counts, active/won disputed sums, average win scores, and status breakdowns across all matching database records on the server without capping to 100 items. Returns `portfolioTotalClaims` and `portfolioTotalDisputedAmount` alongside scoped metrics.
 - Synchronized Reactive Hooks & Feeds (`src/hooks/useClaims.ts`, `src/components/radar/CaseRadar.tsx`, `src/lib/utils.ts`): Updated `useClaims` and `CaseRadar` to pass active `search`, `status`, and `payer` filters to `claims.list` and `getPortfolioStats`. Bound `stats` and `claimCountsByStatus` directly to server-side aggregation, eliminating fallback 100-claim array reductions and client/server metric drift.
 - Testing & Verification (`tests/clientStatsAndSearch.test.ts`): Added 12 unit and regression tests covering server search across all fields, `critical_deadline` filtering, multi-filter aggregation, and `matchesClaimSearch`. Verified 637 passing tests across 40 suites, clean typecheck, clean lint, 80.08% coverage, and production build (`npm run verify`). Convex features: queries, components, TableAggregate.
+
+### 2026-09-08 - working tree
+Hardened production error boundaries, rate limits, query standards, and UI lifecycle safety across backend and frontend:
+- Sanitized Unauthenticated Webhook Errors (`convex/http.ts`): Replaced raw `error.message` response on 500 errors in `/agentmail-webhook` and `/agentmail/webhook` with generic `{ error: "Internal server error" }` while logging server-side diagnostic traces, preventing internal stack and database details from leaking to unauthenticated external callers. Updated `tests/convexHttp.test.ts`.
+- File Upload Rate Limiting & Storage Quotas (`convex/claims.ts`, `convex/lib/rateLimiter.ts`): Added `fileUpload` token-bucket rate limiter (10 operations/min) and enforced cumulative user storage quotas (50 files / 100MB) on `generateUploadUrl`, guarding Convex storage from runaway cost exposure.
+- Native Convex Query Ordering Cleanup (`convex/appeals.ts`, `convex/p2pScripts.ts`): Eliminated duplicated `MockableQuery` type casting workarounds (`as unknown as MockableAppealQuery / MockableP2PQuery`), standardizing all appeal revision and tele-script queries directly on native Convex `.order("desc").first()` and `.take()`. Updated test harness mocks across `tests/convexAppeals.test.ts`, `tests/convexP2P.test.ts`, and `tests/authorization.test.ts`.
+- Safe Communications Dispatch (`src/hooks/useCommunications.ts`): Deleted dead fallback branch in `sendMessage` that locally persisted message documents without transmitting them over the wire; all messages now dispatch authentically through `sendOutboundAction`.
+- Landing Page Shortcut Scoping (`src/hooks/useSentinelChat.ts`): Scoped the Cmd+J / Ctrl+J chatbot keyboard shortcut to active application views, preventing global keybinding interference on landing and login pages. Added immediate drawer closure when navigating to unauthenticated views.
+- Unmount Timer Cleanup (`src/hooks/useAppealStudio.ts`): Added `saveStatusTimeoutRef` to track debounced save-status transitions (`"saved"` -> `"idle"`), clearing pending timers on unmount and claim switch to prevent harmless React unmounted state update warnings.
+- Comprehensive Testing & Verification: Added `tests/productionReadinessFixes.test.ts` with 10 dedicated regression tests covering upload rate limits, storage quotas, shortcut scoping, timer cleanups, and outbound transmission. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 647 passing unit tests across 41 suites, 80.12% test coverage, and successful production build). Convex features: queries, mutations, httpRouter, rate-limiter, file storage.

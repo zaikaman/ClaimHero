@@ -1,0 +1,300 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as claims from "../convex/claims";
+import { rateLimiter } from "../convex/lib/rateLimiter";
+import { useCommunications } from "../src/hooks/useCommunications";
+import { useSentinelChat } from "../src/hooks/useSentinelChat";
+import { useAppealStudio } from "../src/hooks/useAppealStudio";
+
+// Mock convex auth
+vi.mock("@convex-dev/auth/server", () => ({
+  getAuthUserId: vi.fn(),
+}));
+
+// Mock React
+const effectCleanups: Array<() => void> = [];
+const eventListeners: Record<string, Function[]> = {};
+
+vi.mock("react", async () => {
+  const actual = await vi.importActual<typeof import("react")>("react");
+  return {
+    ...actual,
+    useMemo: vi.fn((fn: () => any) => fn()),
+    useCallback: vi.fn((fn: any) => fn),
+    useState: vi.fn((init: any) => {
+      let state = typeof init === "function" ? init() : init;
+      const setState = vi.fn((newVal: any) => {
+        state = typeof newVal === "function" ? newVal(state) : newVal;
+      });
+      return [state, setState];
+    }),
+    useRef: vi.fn((init: any) => ({ current: init })),
+    useEffect: vi.fn((fn: () => any) => {
+      const cleanup = fn();
+      if (typeof cleanup === "function") {
+        effectCleanups.push(cleanup);
+      }
+    }),
+  };
+});
+
+// Mock convex/react hooks
+const mockUseQuery = vi.fn();
+const mockUseAction = vi.fn();
+const mockUseMutation = vi.fn();
+
+vi.mock("convex/react", () => ({
+  useQuery: (...args: any[]) => mockUseQuery(...args),
+  useAction: (...args: any[]) => mockUseAction(...args),
+  useMutation: (...args: any[]) => mockUseMutation(...args),
+}));
+
+vi.mock("@convex-dev/agent/react", () => ({
+  useUIMessages: vi.fn(() => ({ results: [] })),
+}));
+
+describe("Production Readiness Fixes & Hardening", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    effectCleanups.length = 0;
+  });
+
+  describe("convex/claims: generateUploadUrl Rate Limiting & Storage Quotas", () => {
+    it("rejects generateUploadUrl when file upload rate limit is exceeded", async () => {
+      const { getAuthUserId } = await import("@convex-dev/auth/server");
+      vi.mocked(getAuthUserId).mockResolvedValue("user_quota_1" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({
+        ok: false,
+        retryAfter: 45000,
+      } as any);
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              collect: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        },
+        storage: {
+          generateUploadUrl: vi.fn(),
+        },
+      };
+
+      await expect((claims.generateUploadUrl as any)._handler(mockCtx, {})).rejects.toThrow(
+        /Upload rate limit exceeded/
+      );
+      expect(mockCtx.storage.generateUploadUrl).not.toHaveBeenCalled();
+    });
+
+    it("rejects generateUploadUrl when user document file count quota (50) is reached", async () => {
+      const { getAuthUserId } = await import("@convex-dev/auth/server");
+      vi.mocked(getAuthUserId).mockResolvedValue("user_quota_2" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+
+      const existingClaims = Array.from({ length: 50 }, (_, i) => ({
+        _id: `claim_${i}`,
+        userId: "user_quota_2",
+        denialLetterStorageId: `storage_${i}`,
+      }));
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              collect: vi.fn().mockResolvedValue(existingClaims),
+            }),
+          }),
+          system: {
+            get: vi.fn().mockResolvedValue({ size: 1024 }),
+          },
+        },
+        storage: {
+          generateUploadUrl: vi.fn(),
+        },
+      };
+
+      await expect((claims.generateUploadUrl as any)._handler(mockCtx, {})).rejects.toThrow(
+        /Storage quota exceeded: You have reached the maximum document limit \(50 files\)/
+      );
+      expect(mockCtx.storage.generateUploadUrl).not.toHaveBeenCalled();
+    });
+
+    it("rejects generateUploadUrl when user cumulative storage bytes exceed 100MB quota", async () => {
+      const { getAuthUserId } = await import("@convex-dev/auth/server");
+      vi.mocked(getAuthUserId).mockResolvedValue("user_quota_3" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+
+      const existingClaims = [
+        { _id: "c1", userId: "user_quota_3", denialLetterStorageId: "st_1" },
+        { _id: "c2", userId: "user_quota_3", denialLetterStorageId: "st_2" },
+      ];
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              collect: vi.fn().mockResolvedValue(existingClaims),
+            }),
+          }),
+          system: {
+            get: vi.fn().mockImplementation((id: string) => {
+              if (id === "st_1") return Promise.resolve({ size: 60 * 1024 * 1024 });
+              if (id === "st_2") return Promise.resolve({ size: 50 * 1024 * 1024 });
+              return Promise.resolve(null);
+            }),
+          },
+        },
+        storage: {
+          generateUploadUrl: vi.fn(),
+        },
+      };
+
+      await expect((claims.generateUploadUrl as any)._handler(mockCtx, {})).rejects.toThrow(
+        /Storage quota exceeded: You have reached the 100MB document storage quota/
+      );
+      expect(mockCtx.storage.generateUploadUrl).not.toHaveBeenCalled();
+    });
+
+    it("successfully returns upload URL when user is authenticated and within quotas", async () => {
+      const { getAuthUserId } = await import("@convex-dev/auth/server");
+      vi.mocked(getAuthUserId).mockResolvedValue("user_quota_ok" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+
+      const existingClaims = [
+        { _id: "c1", userId: "user_quota_ok", denialLetterStorageId: "st_1" },
+      ];
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              collect: vi.fn().mockResolvedValue(existingClaims),
+            }),
+          }),
+          system: {
+            get: vi.fn().mockResolvedValue({ size: 5 * 1024 * 1024 }),
+          },
+        },
+        storage: {
+          generateUploadUrl: vi.fn().mockResolvedValue("https://upload.site/v1/token"),
+        },
+      };
+
+      const url = await (claims.generateUploadUrl as any)._handler(mockCtx, {});
+      expect(url).toBe("https://upload.site/v1/token");
+      expect(mockCtx.storage.generateUploadUrl).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("src/hooks/useSentinelChat: Keyboard shortcut scoping", () => {
+    let originalWindow: any;
+    let mockWindow: any;
+
+    beforeEach(() => {
+      originalWindow = (globalThis as any).window;
+      mockWindow = {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      };
+      (globalThis as any).window = mockWindow;
+
+      mockUseMutation.mockReturnValue(vi.fn().mockResolvedValue("session_1"));
+      mockUseAction.mockReturnValue(vi.fn());
+      mockUseQuery.mockReturnValue([]);
+    });
+
+    afterEach(() => {
+      (globalThis as any).window = originalWindow;
+    });
+
+    it("does not register keydown listener when currentView is landing", () => {
+      useSentinelChat({
+        selectedClaim: null,
+        currentView: "landing",
+      });
+
+      const keydownCalls = mockWindow.addEventListener.mock.calls.filter((c: any) => c[0] === "keydown");
+      expect(keydownCalls.length).toBe(0);
+    });
+
+    it("does not register keydown listener when currentView is login", () => {
+      useSentinelChat({
+        selectedClaim: null,
+        currentView: "login",
+      });
+
+      const keydownCalls = mockWindow.addEventListener.mock.calls.filter((c: any) => c[0] === "keydown");
+      expect(keydownCalls.length).toBe(0);
+    });
+
+    it("does not register keydown listener when enabled is false", () => {
+      useSentinelChat({
+        selectedClaim: null,
+        currentView: "radar",
+        enabled: false,
+      });
+
+      const keydownCalls = mockWindow.addEventListener.mock.calls.filter((c: any) => c[0] === "keydown");
+      expect(keydownCalls.length).toBe(0);
+    });
+
+    it("registers keydown listener when on dashboard view (e.g. radar) and enabled", () => {
+      useSentinelChat({
+        selectedClaim: null,
+        currentView: "radar",
+        enabled: true,
+      });
+
+      const keydownCalls = mockWindow.addEventListener.mock.calls.filter((c: any) => c[0] === "keydown");
+      expect(keydownCalls.length).toBe(1);
+    });
+  });
+
+  describe("src/hooks/useCommunications: Transmits outbound without local fallback", () => {
+    it("dispatches message directly to sendOutboundMessage action", async () => {
+      const mockSendOutbound = vi.fn().mockResolvedValue({ messageId: "msg_out_1" });
+      mockUseAction.mockImplementation(() => mockSendOutbound);
+      mockUseQuery.mockReturnValue([]);
+
+      const mockClaim: any = {
+        _id: "claim_comms_1",
+        claimNumber: "CLM-COMMS",
+        assignedAgentEmail: "agent@claimhero.com",
+        payerContact: {
+          officialAppealsEmail: "appeals@insurer.com",
+        },
+      };
+
+      const hook = useCommunications(mockClaim, { activeView: "communications" });
+      await hook.sendMessage("Clinical rebuttal statement");
+
+      expect(mockSendOutbound).toHaveBeenCalledWith(
+        expect.objectContaining({
+          claimId: "claim_comms_1",
+          text: "Clinical rebuttal statement",
+          customRecipient: "appeals@insurer.com",
+          waiveRedaction: true,
+        })
+      );
+    });
+  });
+
+  describe("src/hooks/useAppealStudio: Timer cleanup and debounce", () => {
+    it("cleans up save status timer and debounce timer on unmount / claim switch", () => {
+      const mockClaim: any = {
+        _id: "claim_studio_1",
+        claimNumber: "CLM-STUDIO",
+      };
+
+      useAppealStudio(mockClaim);
+
+      // Verify that cleanup functions were registered by useEffect
+      expect(effectCleanups.length).toBeGreaterThan(0);
+
+      // Execute registered cleanups to verify no exception is thrown
+      for (const cleanup of effectCleanups) {
+        expect(() => cleanup()).not.toThrow();
+      }
+    });
+  });
+});

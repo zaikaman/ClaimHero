@@ -462,6 +462,10 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
           query: vi.fn().mockReturnValue({
             withIndex: vi.fn().mockReturnValue({
               collect: vi.fn().mockResolvedValue(mockAppeals),
+              order: vi.fn().mockReturnValue({
+                first: vi.fn().mockResolvedValue(mockAppeals[1]),
+                take: vi.fn().mockResolvedValue(mockAppeals),
+              }),
             }),
           }),
         },

@@ -85,13 +85,18 @@ export function useAppealStudio(claim?: Claim | null) {
 
   // Debounced auto-save markdown changes
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveStatusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Clear pending debounce timer on claim switch or unmount
+  // Clear pending debounce and save-status timers on claim switch or unmount
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
+      }
+      if (saveStatusTimeoutRef.current) {
+        clearTimeout(saveStatusTimeoutRef.current);
+        saveStatusTimeoutRef.current = null;
       }
     };
   }, [claim?._id]);
@@ -116,7 +121,13 @@ export function useAppealStudio(claim?: Claim | null) {
               lastEditedBy: "Collaborative Advocate Studio",
             });
             setSaveStatus("saved");
-            setTimeout(() => setSaveStatus("idle"), 2500);
+            if (saveStatusTimeoutRef.current) {
+              clearTimeout(saveStatusTimeoutRef.current);
+            }
+            saveStatusTimeoutRef.current = setTimeout(() => {
+              setSaveStatus("idle");
+              saveStatusTimeoutRef.current = null;
+            }, 2500);
           } catch (err) {
             console.error("Failed to auto-save appeal:", err);
             setSaveStatus("idle");
@@ -156,6 +167,13 @@ export function useAppealStudio(claim?: Claim | null) {
         if (result?.fullAppealMarkdown) {
           setMarkdownContent(result.fullAppealMarkdown);
           setSaveStatus("saved");
+          if (saveStatusTimeoutRef.current) {
+            clearTimeout(saveStatusTimeoutRef.current);
+          }
+          saveStatusTimeoutRef.current = setTimeout(() => {
+            setSaveStatus("idle");
+            saveStatusTimeoutRef.current = null;
+          }, 2500);
           if (result.appealId) {
             setSelectedAppealId(result.appealId);
           }

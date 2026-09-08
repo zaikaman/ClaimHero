@@ -23,11 +23,14 @@ export interface ChatMessage {
   isStreaming?: boolean;
 }
 
-export function useSentinelChat(options: {
+export interface UseSentinelChatOptions {
   selectedClaim: Claim | null;
   currentView: NavigationView;
-}) {
-  const { selectedClaim, currentView } = options;
+  enabled?: boolean;
+}
+
+export function useSentinelChat(options: UseSentinelChatOptions) {
+  const { selectedClaim, currentView, enabled = true } = options;
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<Id<"chatbotSessions"> | null>(null);
@@ -38,6 +41,13 @@ export function useSentinelChat(options: {
   const clearSessionMutation = useMutation(api.chatbot.clearSession);
   const streamSentinelMessageAction = useAction(api.actions.sentinelAgent.streamSentinelMessage);
   const fallbackSendMessageAction = useAction(api.actions.sentinelChatbot.sendMessageWithTools);
+
+  // Close chat drawer immediately if navigating back to landing or login view
+  useEffect(() => {
+    if (isOpen && (currentView === "landing" || currentView === "login" || !enabled)) {
+      setIsOpen(false);
+    }
+  }, [currentView, enabled, isOpen]);
 
   // Initialize or synchronize session
   useEffect(() => {
@@ -136,6 +146,11 @@ export function useSentinelChat(options: {
 
   // Keyboard shortcut (⌘J / Ctrl+J) to toggle chatbot
   useEffect(() => {
+    // Never bind or trigger chatbot shortcut on landing or login pages, or if explicitly disabled
+    if (!enabled || currentView === "landing" || currentView === "login" || typeof window === "undefined") {
+      return;
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
         e.preventDefault();
@@ -145,7 +160,7 @@ export function useSentinelChat(options: {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [currentView, enabled]);
 
   const sendMessage = useCallback(
     async (text: string) => {

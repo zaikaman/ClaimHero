@@ -79,5 +79,12 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 20,
   },
+  // Denial document attachment upload URL generation (burst: 10, rate: 10/min)
+  fileUpload: {
+    kind: "token bucket",
+    rate: 10,
+    period: MINUTE,
+    capacity: 10,
+  },
 });
 

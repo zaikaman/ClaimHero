@@ -21,14 +21,6 @@ export const getById = query({
   },
 });
 
-interface MockableP2PQuery {
-  order?: (dir: "asc" | "desc") => {
-    first: () => Promise<Doc<"p2pScripts"> | null>;
-    take: (count: number) => Promise<Doc<"p2pScripts">[]>;
-  };
-  collect: () => Promise<Doc<"p2pScripts">[]>;
-}
-
 /**
  * Get the latest active P2P defense script for a given claim
  */
@@ -40,17 +32,11 @@ export const getLatestByClaim = query({
     const authorized = await getClaimIfAuthorized(ctx, args.claimId);
     if (!authorized) return null;
 
-    const q = ctx.db
+    return await ctx.db
       .query("p2pScripts")
-      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId));
-
-    const mockableQ = q as unknown as MockableP2PQuery;
-    if (typeof mockableQ.order === "function") {
-      return await mockableQ.order("desc").first();
-    }
-    const list = await mockableQ.collect();
-    if (!list || list.length === 0) return null;
-    return list.sort((a: Doc<"p2pScripts">, b: Doc<"p2pScripts">) => b.version - a.version)[0] || null;
+      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId))
+      .order("desc")
+      .first();
   },
 });
 
@@ -62,17 +48,11 @@ export const getLatestByClaimInternal = internalQuery({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args): Promise<Doc<"p2pScripts"> | null> => {
-    const q = ctx.db
+    return await ctx.db
       .query("p2pScripts")
-      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId));
-
-    const mockableQ = q as unknown as MockableP2PQuery;
-    if (typeof mockableQ.order === "function") {
-      return await mockableQ.order("desc").first();
-    }
-    const list = await mockableQ.collect();
-    if (!list || list.length === 0) return null;
-    return list.sort((a: Doc<"p2pScripts">, b: Doc<"p2pScripts">) => b.version - a.version)[0] || null;
+      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId))
+      .order("desc")
+      .first();
   },
 });
 
@@ -87,16 +67,11 @@ export const listVersions = query({
     const authorized = await getClaimIfAuthorized(ctx, args.claimId);
     if (!authorized) return [];
 
-    const q = ctx.db
+    return await ctx.db
       .query("p2pScripts")
-      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId));
-
-    const mockableQ = q as unknown as MockableP2PQuery;
-    if (typeof mockableQ.order === "function") {
-      return await mockableQ.order("desc").take(50);
-    }
-    const list = await mockableQ.collect();
-    return list.sort((a: Doc<"p2pScripts">, b: Doc<"p2pScripts">) => b.version - a.version);
+      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId))
+      .order("desc")
+      .take(50);
   },
 });
 

@@ -33,14 +33,6 @@ export const getByIdInternal = internalQuery({
   },
 });
 
-interface MockableAppealQuery {
-  order?: (dir: "asc" | "desc") => {
-    first: () => Promise<Doc<"appeals"> | null>;
-    take: (count: number) => Promise<Doc<"appeals">[]>;
-  };
-  collect: () => Promise<Doc<"appeals">[]>;
-}
-
 /**
  * Get the latest active appeal brief for a given claim across all tiers
  */
@@ -52,17 +44,11 @@ export const getLatestByClaim = query({
     const authorized = await getClaimIfAuthorized(ctx, args.claimId);
     if (!authorized) return null;
 
-    const q = ctx.db
+    return await ctx.db
       .query("appeals")
-      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId));
-
-    const mockableQ = q as unknown as MockableAppealQuery;
-    if (typeof mockableQ.order === "function") {
-      return await mockableQ.order("desc").first();
-    }
-    const list = await mockableQ.collect();
-    if (!list || list.length === 0) return null;
-    return list.sort((a: Doc<"appeals">, b: Doc<"appeals">) => b.version - a.version)[0] || null;
+      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId))
+      .order("desc")
+      .first();
   },
 });
 
@@ -74,17 +60,11 @@ export const getLatestByClaimInternal = internalQuery({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args): Promise<Doc<"appeals"> | null> => {
-    const q = ctx.db
+    return await ctx.db
       .query("appeals")
-      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId));
-
-    const mockableQ = q as unknown as MockableAppealQuery;
-    if (typeof mockableQ.order === "function") {
-      return await mockableQ.order("desc").first();
-    }
-    const list = await mockableQ.collect();
-    if (!list || list.length === 0) return null;
-    return list.sort((a: Doc<"appeals">, b: Doc<"appeals">) => b.version - a.version)[0] || null;
+      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId))
+      .order("desc")
+      .first();
   },
 });
 
@@ -100,20 +80,13 @@ export const getByClaimAndLevel = query({
     const authorized = await getClaimIfAuthorized(ctx, args.claimId);
     if (!authorized) return null;
 
-    const q = ctx.db
+    return await ctx.db
       .query("appeals")
       .withIndex("by_claimId_and_appealLevel", (q) =>
         q.eq("claimId", args.claimId).eq("appealLevel", args.appealLevel)
-      );
-
-    const mockableQ = q as unknown as MockableAppealQuery;
-    if (typeof mockableQ.order === "function") {
-      const items = await mockableQ.order("desc").take(10);
-      return items[0] || null;
-    }
-    const list = await mockableQ.collect();
-    if (!list || list.length === 0) return null;
-    return list.sort((a: Doc<"appeals">, b: Doc<"appeals">) => b.version - a.version)[0] || null;
+      )
+      .order("desc")
+      .first();
   },
 });
 
@@ -128,16 +101,11 @@ export const listVersions = query({
     const authorized = await getClaimIfAuthorized(ctx, args.claimId);
     if (!authorized) return [];
 
-    const q = ctx.db
+    return await ctx.db
       .query("appeals")
-      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId));
-
-    const mockableQ = q as unknown as MockableAppealQuery;
-    if (typeof mockableQ.order === "function") {
-      return await mockableQ.order("desc").take(50);
-    }
-    const list = await mockableQ.collect();
-    return list.sort((a: Doc<"appeals">, b: Doc<"appeals">) => b.version - a.version);
+      .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId))
+      .order("desc")
+      .take(50);
   },
 });
 
@@ -225,18 +193,11 @@ async function applyCreateOrUpdateDraft(
   }
 
   const now = Date.now();
-  const appealQuery = ctx.db
+  const latest = await ctx.db
     .query("appeals")
-    .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId));
-
-  const mockableQ = appealQuery as unknown as MockableAppealQuery;
-  let latest: Doc<"appeals"> | null = null;
-  if (typeof mockableQ.order === "function") {
-    latest = await mockableQ.order("desc").first();
-  } else {
-    const list = await mockableQ.collect();
-    latest = list ? list.sort((a, b) => b.version - a.version)[0] || null : null;
-  }
+    .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId))
+    .order("desc")
+    .first();
   const nextVersion = latest ? latest.version + 1 : 1;
 
   const tierMeta = getStatutoryTierMetadata(args.appealLevel);

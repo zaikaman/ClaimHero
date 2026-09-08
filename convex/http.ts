@@ -149,7 +149,8 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" }), {
+      console.error("AgentMail webhook processing error:", error);
+      return new Response(JSON.stringify({ error: "Internal server error" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
       });
@@ -186,10 +187,18 @@ http.route({
       // Continue if rate limiter is not configured
     }
 
-    return await agentmail.handleWebhook(
-      ctx as unknown as Parameters<typeof agentmail.handleWebhook>[0],
-      request
-    );
+    try {
+      return await agentmail.handleWebhook(
+        ctx as unknown as Parameters<typeof agentmail.handleWebhook>[0],
+        request
+      );
+    } catch (error) {
+      console.error("AgentMail component webhook processing error:", error);
+      return new Response(JSON.stringify({ error: "Internal server error" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
   }),
 });
 

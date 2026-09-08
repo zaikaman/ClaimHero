@@ -225,6 +225,6 @@ describe("Convex HTTP Router & Webhook Endpoints", () => {
     const response = await handler(mockCtx, mockReq);
     expect(response.status).toBe(500);
     const body = await response.json();
-    expect(body.error).toBe("Fatal crypto fault");
+    expect(body.error).toBe("Internal server error");
   });
 });

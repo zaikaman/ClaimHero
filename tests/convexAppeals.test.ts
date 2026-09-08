@@ -58,6 +58,23 @@ describe("Convex Appeals API & Escalation Engine", () => {
     });
   });
 
+  const createMockQuery = (items: any[] = []) => {
+    const sortedDesc = [...items].sort((a, b) => (b.version ?? 0) - (a.version ?? 0));
+    return {
+      withIndex: vi.fn().mockReturnValue({
+        collect: vi.fn().mockResolvedValue(items),
+        order: vi.fn().mockImplementation((dir: "asc" | "desc") => {
+          const list = dir === "desc" ? sortedDesc : items;
+          return {
+            first: vi.fn().mockResolvedValue(list[0] || null),
+            take: vi.fn().mockImplementation((n: number) => Promise.resolve(list.slice(0, n))),
+            collect: vi.fn().mockResolvedValue(list),
+          };
+        }),
+      }),
+    };
+  };
+
   describe("getLatestByClaim & getLatestByClaimInternal", () => {
     it("getLatestByClaim: returns null when unauthorized", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue(null);
@@ -72,11 +89,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
       const mockCtx: any = {
         db: {
           get: vi.fn().mockResolvedValue(mockClaim),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([])),
         },
       };
       const res = await (appeals.getLatestByClaim as any)._handler(mockCtx, { claimId: "claim_1" });
@@ -91,11 +104,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
       const mockCtx: any = {
         db: {
           get: vi.fn().mockResolvedValue(mockClaim),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([appealV1, appealV2]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([appealV1, appealV2])),
         },
       };
       const res = await (appeals.getLatestByClaim as any)._handler(mockCtx, { claimId: "claim_1" });
@@ -105,11 +114,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
     it("getLatestByClaimInternal: returns null if list empty, else latest version", async () => {
       const mockCtxEmpty: any = {
         db: {
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([])),
         },
       };
       const resEmpty = await (appeals.getLatestByClaimInternal as any)._handler(mockCtxEmpty, { claimId: "claim_1" });
@@ -119,11 +124,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
       const appealV3 = { _id: "a3", version: 3 };
       const mockCtx: any = {
         db: {
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([appealV1, appealV3]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([appealV1, appealV3])),
         },
       };
       const res = await (appeals.getLatestByClaimInternal as any)._handler(mockCtx, { claimId: "claim_1" });
@@ -142,11 +143,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
       const mockCtx2: any = {
         db: {
           get: vi.fn().mockResolvedValue({ _id: "c1", userId: "user_123" }),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([])),
         },
       };
       const res2 = await (appeals.getByClaimAndLevel as any)._handler(mockCtx2, { claimId: "c1", appealLevel: "level_1_internal" });
@@ -160,11 +157,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
       const mockCtx: any = {
         db: {
           get: vi.fn().mockResolvedValue({ _id: "c1", userId: "user_123" }),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([a1, a2]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([a1, a2])),
         },
       };
       const res = await (appeals.getByClaimAndLevel as any)._handler(mockCtx, { claimId: "c1", appealLevel: "level_1_internal" });
@@ -185,11 +178,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
       const mockCtx: any = {
         db: {
           get: vi.fn().mockResolvedValue({ _id: "c1", userId: "user_123" }),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([a1, a2]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([a1, a2])),
         },
       };
       const res = await (appeals.listVersions as any)._handler(mockCtx, { claimId: "c1" });
@@ -222,11 +211,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
       const mockCtx: any = {
         db: {
           get: vi.fn().mockResolvedValue(mockClaim),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([])),
           insert: vi.fn().mockResolvedValue("appeal_new_1"),
           patch: vi.fn().mockResolvedValue(undefined),
         },
@@ -253,11 +238,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
       const mockCtx: any = {
         db: {
           get: vi.fn().mockResolvedValue(mockClaim),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([existingAppeal]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([existingAppeal])),
           patch: vi.fn().mockResolvedValue(undefined),
           insert: vi.fn().mockResolvedValue("log_1"),
         },
@@ -284,11 +265,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
       const mockCtx: any = {
         db: {
           get: vi.fn().mockResolvedValue(mockClaim),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([existingAppeal]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([existingAppeal])),
           insert: vi.fn().mockResolvedValue("appeal_v2"),
           patch: vi.fn().mockResolvedValue(undefined),
         },
@@ -392,11 +369,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
       const mockCtx: any = {
         db: {
           get: vi.fn().mockImplementation((id) => (id === "claim_1" ? Promise.resolve(mockClaim) : Promise.resolve(null))),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([mockAppeal]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([mockAppeal])),
         },
       };
 
@@ -414,11 +387,7 @@ describe("Convex Appeals API & Escalation Engine", () => {
       const mockCtx: any = {
         db: {
           get: vi.fn().mockImplementation((id) => (id === "claim_1" ? Promise.resolve(mockClaim) : Promise.resolve(null))),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              collect: vi.fn().mockResolvedValue([mockPrevAppeal]),
-            }),
-          }),
+          query: vi.fn().mockReturnValue(createMockQuery([mockPrevAppeal])),
           insert: vi.fn().mockResolvedValue("appeal_new_2"),
           patch: vi.fn().mockResolvedValue(undefined),
         },

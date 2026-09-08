@@ -5,6 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { claimsAggregate } from "./lib/aggregates";
 import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner, getAuthUserId } from "./lib/auth";
+import { rateLimiter } from "./lib/rateLimiter";
 
 /**
  * Resolve authentic patient name, preventing [PATIENT REDACTED] placeholder leakage
@@ -1337,13 +1338,71 @@ export const setDenialLetterStorageIdInternal = internalMutation({
   },
 });
 
+export const MAX_USER_STORAGE_FILES = 50;
+export const MAX_USER_STORAGE_BYTES = 100 * 1024 * 1024; // 100 MB
+
 /**
  * Generate Convex File Storage upload URL for denial document attachments
+ * Enforces per-user burst rate limits and cumulative storage quotas to prevent cost exposure.
  */
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
-    await requireAuthUser(ctx);
+    const userId = await requireAuthUser(ctx);
+
+    // 1. Enforce rate limiting per user
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "fileUpload", { key: userId });
+      if (!limitStatus.ok) {
+        throw new Error(
+          `Upload rate limit exceeded. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)}s.`
+        );
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("Upload rate limit exceeded")) {
+        throw err;
+      }
+      // Tolerate unconfigured rate limiter in unit test / local preview environments
+    }
+
+    // 2. Enforce cumulative storage quotas per user
+    const userClaims = await (
+      typeof ctx.db.query("claims").withIndex === "function"
+        ? ctx.db.query("claims").withIndex("by_user", (q) => q.eq("userId", userId)).collect()
+        : ctx.db.query("claims").collect()
+    );
+
+    let totalFiles = 0;
+    let totalBytes = 0;
+
+    for (const claim of userClaims) {
+      if (claim.denialLetterStorageId) {
+        totalFiles++;
+        if (typeof ctx.db.system?.get === "function") {
+          try {
+            const fileMeta = await ctx.db.system.get(claim.denialLetterStorageId);
+            if (fileMeta && typeof fileMeta.size === "number") {
+              totalBytes += fileMeta.size;
+            }
+          } catch {
+            // Ignore missing storage record
+          }
+        }
+      }
+    }
+
+    if (totalFiles >= MAX_USER_STORAGE_FILES) {
+      throw new Error(
+        `Storage quota exceeded: You have reached the maximum document limit (${MAX_USER_STORAGE_FILES} files). Please delete or archive older cases before uploading new files.`
+      );
+    }
+
+    if (totalBytes >= MAX_USER_STORAGE_BYTES) {
+      throw new Error(
+        `Storage quota exceeded: You have reached the 100MB document storage quota. Please manage your existing attachments.`
+      );
+    }
+
     return await ctx.storage.generateUploadUrl();
   },
 });

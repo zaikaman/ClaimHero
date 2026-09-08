@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Claim, EmailThread, EmailMessage, AuditLog } from "../types";
 import { Id } from "../../convex/_generated/dataModel";
@@ -52,8 +52,6 @@ export function useCommunications(claim?: Claim | null, options?: UseCommunicati
     isAuditActive && !claimId ? { limit: 15 } : "skip"
   ) as AuditLog[] | undefined;
 
-  const insertMessageMutation = useMutation(api.emails.insertMessage);
-  const getOrCreateThreadMutation = useMutation(api.emails.getOrCreateThread);
   const dispatchAction = useAction(api.actions.mailDispatcher.dispatchAppealPacket);
   const sendOutboundAction = useAction(api.actions.mailDispatcher.sendOutboundMessage);
   const resolvePayerGatewayAction = useAction(api.actions.payerContactResolver.resolvePayerGateway);
@@ -94,6 +92,8 @@ export function useCommunications(claim?: Claim | null, options?: UseCommunicati
       }
     };
 
+    if (typeof window === "undefined") return;
+
     window.addEventListener("focus", onFocus);
     return () => {
       window.removeEventListener("focus", onFocus);
@@ -109,40 +109,15 @@ export function useCommunications(claim?: Claim | null, options?: UseCommunicati
         threads?.[0]?.payerEmail ||
         claim.payerContact?.officialAppealsEmail;
 
-      if (sendOutboundAction) {
-        await sendOutboundAction({
-          claimId: claim._id as Id<"claims">,
-          threadId: activeThreadId,
-          text,
-          customRecipient: recipient,
-          waiveRedaction: true,
-        });
-      } else {
-        const sender = claim.assignedAgentEmail;
-        let threadId = activeThreadId;
-        if (!threadId) {
-          threadId = await getOrCreateThreadMutation({
-            claimId: claim._id as Id<"claims">,
-            agentEmail: sender,
-            payerEmail: recipient || "appeals@payer.com",
-            subject: `Claim #${claim.claimNumber} Appeal Addendum`,
-          });
-        }
-
-        await insertMessageMutation({
-          threadId: threadId as Id<"emailThreads">,
-          claimId: claim._id as Id<"claims">,
-          direction: "outbound",
-          sender,
-          recipient: recipient || "appeals@payer.com",
-          subject: `Addendum: Claim #${claim.claimNumber}`,
-          bodyHtml: `<p>${text}</p>`,
-          bodyText: text,
-          hasAttachments: false,
-        });
-      }
+      await sendOutboundAction({
+        claimId: claim._id as Id<"claims">,
+        threadId: activeThreadId,
+        text,
+        customRecipient: recipient,
+        waiveRedaction: true,
+      });
     },
-    [claim, threads, activeThreadId, sendOutboundAction, getOrCreateThreadMutation, insertMessageMutation]
+    [claim, threads, activeThreadId, sendOutboundAction]
   );
 
   // Dispatch full appeal packet
