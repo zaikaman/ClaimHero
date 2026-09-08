@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Claim, StatutoryComplianceStatus } from "../../types";
 import { useLiabilityCalculator } from "../../hooks/useLiabilityCalculator";
 import { NavigationView } from "../layout/Sidebar";
-import { SentinelFlowStepper } from "../common/SentinelFlowStepper";
 import { FinancialStatementModal } from "./FinancialStatementModal";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
@@ -37,6 +36,9 @@ import {
   Printer,
   CircleNotch,
   ArrowRight,
+  ArrowLeft,
+  Envelope,
+  PhoneCall,
 } from "@phosphor-icons/react";
 
 
@@ -122,12 +124,70 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
 
   return (
     <div className="space-y-4 animate-fadeIn font-sans pb-12">
-      {/* Sentinel Flow Stepper Navigation */}
-      <SentinelFlowStepper
-        currentView="calculator"
-        claim={claim}
-        onNavigateView={(view) => onNavigateView?.(view as NavigationView)}
-      />
+      {/* Case Companion Context Header */}
+      <div className="rounded-xl border border-border bg-card/70 backdrop-blur-sm p-3 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 no-print">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => onNavigateView?.("studio")}
+            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground h-7 px-2.5 cursor-pointer"
+            title="Return to Appeal Brief (Step 2)"
+          >
+            <ArrowLeft className="size-3" />
+            <span>Appeal Brief</span>
+          </Button>
+
+          <div className="h-4 w-px bg-border shrink-0" />
+
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold text-xs text-foreground truncate">
+              {claim.patient?.name || "Patient Record"}
+            </span>
+            <Badge variant="outline" className="font-mono text-[10px] shrink-0">
+              {claim.patient?.insurancePayer || "Insurer"}
+            </Badge>
+            <span className="text-[11px] font-mono text-muted-foreground hidden md:inline">
+              #{claim.claimNumber}
+            </span>
+            <span className="text-[11px] font-mono text-primary font-medium">
+              ${formatCurrency(claim.deniedAmount)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <Badge
+            variant="outline"
+            className="text-[10px] font-mono border-amber-500/30 text-amber-400 bg-amber-500/10 gap-1 h-6 px-2"
+          >
+            <Scales className="size-3" />
+            <span>Statutory Companion • ERISA § 1132(c)</span>
+          </Badge>
+
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => onNavigateView?.("p2p")}
+            className="text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 h-7 px-2 gap-1 cursor-pointer"
+            title="Switch to Doctor P2P Copilot"
+          >
+            <PhoneCall className="size-3" />
+            <span className="hidden sm:inline">P2P Copilot</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => onNavigateView?.("communications")}
+            className="text-xs text-muted-foreground hover:text-foreground h-7 px-2 gap-1 cursor-pointer"
+            title="Jump to Payer Dispatch"
+          >
+            <Envelope className="size-3" />
+            <span className="hidden sm:inline">Dispatch</span>
+          </Button>
+        </div>
+      </div>
 
       {/* Top Header Card */}
       <Card className="p-3.5 shrink-0 overflow-visible no-print">

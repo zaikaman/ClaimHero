@@ -29,7 +29,7 @@ To evaluate the end-to-end pipeline without uploading personal health records:
    - **GeoBlue Worldwide — Lumbar Decompression**: $18,200 | CPT 63047 | CARC CO-197 (Pre-Authorization)
    - **BCBS Global Core — Diagnostic Knee MRI**: $2,850 | CPT 73721 | CARC CO-16 (Prior Records Required)
 4. Select **Run Autonomous Pipeline** and track the real-time stepper:
-   `Evidence & CPB` -> `Defense Suite` -> `Payer Dispatch`
+   `Evidence & CPB` -> `Appeal Brief` -> `Payer Dispatch`
 5. Inspect the output: indexed insurer clauses, visual screenshot archives, deterministic four-pillar overturn score, cited appeal brief, physician peer-to-peer call script, and two-way AgentMail thread.
 
 *Synthetic cases are strictly isolated from real portfolio analytics and can be purged at any time via the "Clear demo data" button.*
@@ -124,7 +124,7 @@ ClaimHero leverages 8 first-party and partner Convex components configured in [`
 
 ---
 
-## Defense Suite & Advanced Capabilities
+## Companion Capabilities & Advanced Tooling
 
 | Surface | Technical Implementation | Purpose |
 | :--- | :--- | :--- |
@@ -135,7 +135,7 @@ ClaimHero leverages 8 first-party and partner Convex components configured in [`
 | **Formal PDF Dossier** | `src/lib/pdfService.ts` | Court-ready PDF dossier compiler with indexed clinical exhibits, statutory cover sheets, and print layouts. |
 | **P2P Defense Studio** | `src/components/p2p/P2PDefenseStudio.tsx` | Tele-scripts and tactical counter-argument cards tailored for physician-to-medical-director phone calls. |
 | **P2P Live Copilot** | `src/components/p2p/P2PLiveCopilot.tsx` | Live call assistant with real-time speech transcription, dynamic objection counters, and call recap generation. |
-| **ERISA Calculator** | `src/lib/erisaCalculator.ts` | Calculates 29 U.S.C. § 1132(c) statutory penalties ($110/day) for payer failure to disclose plan documents. |
+| **ERISA Calculator** | `src/components/calculator/FinancialLiabilityCalculator.tsx` | Calculates 29 U.S.C. § 1132(c) statutory penalties ($110/day) for payer failure to disclose plan documents. |
 | **Adversary Engine** | `convex/actions/adversaryNegotiator.ts` | Analyzes partial settlement offers and drafts counter-demands based on prevailing clinical standards. |
 
 ---
@@ -178,12 +178,12 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
  
-ClaimHero is backed by **540 automated tests** across 37 test suites:
+ClaimHero is backed by **575 automated tests** across 38 test suites:
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking
 npm run lint            # ESLint static code analysis
-npm run test            # Comprehensive Vitest test suite (540 tests)
+npm run test            # Comprehensive Vitest test suite (575 tests)
 npm run test:coverage   # Code coverage report
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate

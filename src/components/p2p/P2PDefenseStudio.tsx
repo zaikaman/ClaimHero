@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { Claim } from "../../types";
 import { useP2PDefense } from "../../hooks/useP2PDefense";
 import { NavigationView } from "../layout/Sidebar";
-import { SentinelFlowStepper } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
 import { P2PLiveCopilot } from "./P2PLiveCopilot";
 import {
@@ -15,6 +14,8 @@ import {
   Check,
   ShieldWarning,
   ShieldCheck,
+  ArrowLeft,
+  Envelope,
 
   Scales,
   WarningCircle,
@@ -287,18 +288,70 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
 
   return (
     <div className="space-y-4 animate-fadeIn pb-16 flex flex-col">
-      {/* 4-Step Guided Sentinel Stepper */}
-      <SentinelFlowStepper
-        claim={claim}
-        currentView="p2p"
-        onNavigateView={(v) => {
-          if (onNavigateView) onNavigateView(v as NavigationView);
-        }}
-        evidencesCount={script?.clinicalPolicyCitations?.length || 0}
-        hasDraftedBrief={Boolean(script)}
-        isProcessing={isSynthesizing}
-        processingLabel="Synthesizing P2P Verbal Defense..."
-      />
+      {/* Case Companion Context Header */}
+      <div className="rounded-xl border border-border bg-card/70 backdrop-blur-sm p-3 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 no-print">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => onNavigateView?.("studio")}
+            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground h-7 px-2.5 cursor-pointer"
+            title="Return to Appeal Brief (Step 2)"
+          >
+            <ArrowLeft className="size-3" />
+            <span>Appeal Brief</span>
+          </Button>
+
+          <div className="h-4 w-px bg-border shrink-0" />
+
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold text-xs text-foreground truncate">
+              {claim.patient?.name || "Patient Record"}
+            </span>
+            <Badge variant="outline" className="font-mono text-[10px] shrink-0">
+              {claim.patient?.insurancePayer || "Insurer"}
+            </Badge>
+            <span className="text-[11px] font-mono text-muted-foreground hidden md:inline">
+              #{claim.claimNumber}
+            </span>
+            <span className="text-[11px] font-mono text-primary font-medium">
+              ${formatCurrency(claim.deniedAmount)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <Badge
+            variant="outline"
+            className="text-[10px] font-mono border-emerald-500/30 text-emerald-400 bg-emerald-500/10 gap-1 h-6 px-2"
+          >
+            <PhoneCall className="size-3" />
+            <span>Clinical Companion • Oral Defense</span>
+          </Badge>
+
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => onNavigateView?.("calculator")}
+            className="text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 h-7 px-2 gap-1 cursor-pointer"
+            title="Switch to ERISA & Liability Audit"
+          >
+            <Scales className="size-3" />
+            <span className="hidden sm:inline">ERISA Audit</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => onNavigateView?.("communications")}
+            className="text-xs text-muted-foreground hover:text-foreground h-7 px-2 gap-1 cursor-pointer"
+            title="Jump to Payer Dispatch"
+          >
+            <Envelope className="size-3" />
+            <span className="hidden sm:inline">Dispatch</span>
+          </Button>
+        </div>
+      </div>
 
       {/* Studio Header Toolbar Card */}
       <Card className="p-3.5 shrink-0 overflow-visible no-print">

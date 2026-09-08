@@ -5,14 +5,10 @@ import {
   Lightning,
   FileMagnifyingGlass,
   FileText,
-
   Envelope,
   PaperPlaneTilt,
   ArrowLeft,
   TrendUp,
-  PhoneCall,
-  Shield,
-  Scales,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
@@ -59,39 +55,6 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
       (claim.appealContext.sender.email || claim.appealContext.sender.phone)
   );
 
-  const isDefenseSuiteActive =
-    currentView === "studio" || currentView === "p2p" || currentView === "calculator";
-
-  const defenseVectors = [
-    {
-      id: "studio" as FlowView,
-      label: "Written Legal Brief",
-      shortLabel: "Legal Brief",
-      badge: hasBrief ? `v${claim.latestAppeal?.version || 1}` : "Ready",
-      icon: FileText,
-      isActive: currentView === "studio",
-      description: "Tier 1/2/3 Legal Brief & Citations",
-    },
-    {
-      id: "p2p" as FlowView,
-      label: "Doctor P2P Copilot",
-      shortLabel: "P2P Copilot",
-      badge: "3-Min Script",
-      icon: PhoneCall,
-      isActive: currentView === "p2p",
-      description: "Physician Verbal Rebuttal & Cheat Sheet",
-    },
-    {
-      id: "calculator" as FlowView,
-      label: "ERISA & Liability Audit",
-      shortLabel: "ERISA Penalties",
-      badge: "$110/Day",
-      icon: Scales,
-      isActive: currentView === "calculator",
-      description: "Statutory Default & OOP Exposure",
-    },
-  ];
-
   const steps = [
     {
       id: "evidence",
@@ -108,14 +71,14 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     {
       id: "studio",
       number: 2,
-      title: "Defense Suite",
+      title: "Appeal Brief",
       subtitle: hasBrief
-        ? `Brief v${claim.latestAppeal?.version || 1} • P2P • ERISA`
-        : "3 Defense Vectors Ready",
+        ? `Brief v${claim.latestAppeal?.version || 1} Ready`
+        : "AI synthesis ready",
       view: "studio" as FlowView,
-      icon: Shield,
+      icon: FileText,
       isCompleted: hasBrief,
-      isActive: isDefenseSuiteActive,
+      isActive: currentView === "studio",
     },
     {
       id: "communications",
@@ -267,59 +230,6 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
           );
         })}
       </div>
-
-      {/* Embedded Defense Vector Sub-Bar (Active when on Step 2 / Defense Suite) */}
-      {isDefenseSuiteActive && (
-        <div className="pt-2 border-t border-border/50">
-          <div className="flex items-center justify-between gap-2 mb-1.5 px-0.5">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-              <Shield className="size-3 text-primary" />
-              Defense Suite Deliverables
-            </span>
-            <span className="text-[10px] text-muted-foreground font-mono">
-              Brief & Companion Collateral
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-            {defenseVectors.map((vec) => {
-              const VecIcon = vec.icon;
-              return (
-                <button
-                  key={vec.id}
-                  onClick={() => onNavigateView(vec.id)}
-                  className={cn(
-                    "flex items-center justify-between p-2 rounded-md border text-xs text-left transition-all cursor-pointer",
-                    vec.isActive
-                      ? "bg-primary/15 border-primary/50 text-foreground font-semibold ring-1 ring-primary/30 shadow-xs"
-                      : "bg-muted/20 border-border/60 hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <VecIcon
-                      className={cn(
-                        "size-3.5 shrink-0",
-                        vec.isActive ? "text-primary" : "text-muted-foreground"
-                      )}
-                    />
-                    <div className="min-w-0">
-                      <span className="truncate block font-medium">
-                        {vec.label}
-                      </span>
-                    </div>
-                  </div>
-                  <Badge
-                    variant={vec.isActive ? "default" : "outline"}
-                    className="text-[9px] font-mono px-1.5 py-0 h-4 shrink-0"
-                  >
-                    {vec.badge}
-                  </Badge>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -17,7 +17,6 @@ import {
   CaretUpDown,
   Trash,
   PhoneCall,
-  Shield,
   Scales,
   GearSix,
 } from "@phosphor-icons/react";
@@ -63,20 +62,12 @@ interface SidebarProps {
   onDeleteCase?: (claimId: string) => Promise<unknown>;
 }
 
-interface CaseWorkspaceSubItem {
-  id: NavigationView;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
 interface CaseWorkspaceItem {
   id: NavigationView;
   label: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
-  isDefenseSuite?: boolean;
-  subItems?: CaseWorkspaceSubItem[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -116,10 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
-  // Group 2: Contextual Case Workspace Tools
-  const isDefenseSuiteView =
-    currentView === "studio" || currentView === "p2p" || currentView === "calculator";
-
+  // Group 2: Contextual Case Workflow (Core 3-Step Appeal Flow)
   const caseWorkspaceItems: CaseWorkspaceItem[] = [
     {
       id: "evidence",
@@ -129,34 +117,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: "studio",
-      label: "Defense Suite",
-      badge: "Suite",
-      description: "Legal Brief & Companion Collateral",
-      icon: Shield,
-      isDefenseSuite: true,
-      subItems: [
-        {
-          id: "studio",
-          label: "Legal Appeal Brief",
-          icon: FileText,
-        },
-        {
-          id: "p2p",
-          label: "Doctor P2P Copilot",
-          icon: PhoneCall,
-        },
-        {
-          id: "calculator",
-          label: "ERISA Penalties",
-          icon: Scales,
-        },
-      ],
+      label: "Appeal Brief",
+      description: "Cited Legal Appeal & Synthesis",
+      icon: FileText,
     },
     {
       id: "communications",
       label: "Payer Communications",
       description: "Two-way Payer Transmissions",
       icon: Envelope,
+    },
+  ];
+
+  // Group 3: Clinical & Legal Escalation Tooling (Specialized Companion Modules)
+  const companionToolItems: CaseWorkspaceItem[] = [
+    {
+      id: "p2p",
+      label: "Doctor P2P Copilot",
+      description: "Physician Verbal Rebuttal & STT Simulator",
+      icon: PhoneCall,
+    },
+    {
+      id: "calculator",
+      label: "ERISA & Liability Audit",
+      description: "Statutory Penalties & Financial Balance Sheet",
+      icon: Scales,
     },
   ];
 
@@ -383,74 +368,79 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {/* Contextual Action Tools */}
+          {/* Contextual Action Tools (Core 3-Step Appeal Flow) */}
           <nav className="space-y-1">
             {caseWorkspaceItems.map((item) => {
               const Icon = item.icon;
-              const isSuite = Boolean(item.isDefenseSuite);
-              const isActive = isSuite ? isDefenseSuiteView : currentView === item.id;
+              const isActive = currentView === item.id;
 
               return (
-                <div key={item.id} className="space-y-0.5">
-                  <button
-                    onClick={() => onSelectView(item.id)}
-                    title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
-                    className={cn(
-                      "w-full flex items-center rounded-md text-xs font-medium transition-colors text-left group cursor-pointer",
-                      isCollapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-1.5",
-                      isActive
-                        ? "bg-secondary/90 text-foreground font-semibold shadow-xs backdrop-blur-sm"
-                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-                    )}
-                  >
-                    <Icon
-                      className={cn(
-                        "size-4 shrink-0",
-                        isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
-                      )}
-                    />
-                    {!isCollapsed && (
-                      <div className="flex items-center justify-between flex-1 truncate">
-                        <span className="truncate">{item.label}</span>
-                        {item.badge && (
-                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 font-medium">
-                            {item.badge}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </button>
-
-                  {/* Sub-items for Defense Suite (Expanded & Active) */}
-                  {!isCollapsed && isSuite && isDefenseSuiteView && item.subItems && (
-                    <div className="ml-4 pl-2 border-l border-border/60 space-y-0.5 pt-0.5">
-                      {item.subItems.map((sub) => {
-                        const SubIcon = sub.icon;
-                        const isSubActive = currentView === sub.id;
-                        return (
-                          <button
-                            key={sub.id}
-                            onClick={() => onSelectView(sub.id)}
-                            className={cn(
-                              "w-full flex items-center gap-2 px-2 py-1 rounded-md text-[11px] font-medium transition-colors text-left cursor-pointer",
-                              isSubActive
-                                ? "bg-primary/15 text-primary font-semibold border border-primary/30 shadow-2xs"
-                                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                            )}
-                          >
-                            <SubIcon
-                              className={cn(
-                                "size-3 shrink-0",
-                                isSubActive ? "text-primary" : "text-muted-foreground"
-                              )}
-                            />
-                            <span className="truncate">{sub.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                <button
+                  key={item.id}
+                  onClick={() => onSelectView(item.id)}
+                  title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
+                  className={cn(
+                    "w-full flex items-center rounded-md text-xs font-medium transition-colors text-left group cursor-pointer",
+                    isCollapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-1.5",
+                    isActive
+                      ? "bg-secondary/90 text-foreground font-semibold shadow-xs backdrop-blur-sm"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                   )}
-                </div>
+                >
+                  <Icon
+                    className={cn(
+                      "size-4 shrink-0",
+                      isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )}
+                  />
+                  {!isCollapsed && (
+                    <span className="truncate flex-1">{item.label}</span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Group 3: Clinical & Legal Escalations (Specialized Companion Tools) */}
+        <div className="space-y-1 pt-1">
+          {!isCollapsed && (
+            <div className="px-2 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+              Companion Tools
+            </div>
+          )}
+          <nav className="space-y-1">
+            {companionToolItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentView === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectView(item.id)}
+                  title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
+                  className={cn(
+                    "w-full flex items-center rounded-md text-xs font-medium transition-colors text-left group cursor-pointer",
+                    isCollapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-1.5",
+                    isActive
+                      ? "bg-secondary/90 text-foreground font-semibold shadow-xs backdrop-blur-sm"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "size-4 shrink-0",
+                      isActive
+                        ? "text-primary"
+                        : item.id === "p2p"
+                        ? "text-emerald-400 group-hover:text-emerald-300"
+                        : "text-amber-400 group-hover:text-amber-300"
+                    )}
+                  />
+                  {!isCollapsed && (
+                    <span className="truncate flex-1">{item.label}</span>
+                  )}
+                </button>
               );
             })}
           </nav>
