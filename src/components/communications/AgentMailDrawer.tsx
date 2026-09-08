@@ -801,15 +801,19 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                     ? "text-cyan-600 dark:text-cyan-400 border-cyan-500/30"
                     : claim.payerContact?.source === "firecrawl_live"
                     ? "text-indigo-600 dark:text-indigo-400 border-indigo-500/30"
-                    : "text-amber-600 dark:text-amber-400 border-amber-500/30"
+                    : claim.payerContact?.source === "registry_fallback"
+                    ? "text-amber-600 dark:text-amber-400 border-amber-500/30"
+                    : "text-rose-600 dark:text-rose-400 border-rose-500/30"
                 )}
               >
                 {payerContact.isVerified
-                  ? "Verified Gateway"
+                  ? "Live-Verified Gateway"
                   : claim.payerContact?.source === "document_ocr"
                   ? "Extracted from Document"
                   : claim.payerContact?.source === "firecrawl_live"
                   ? "Firecrawl Discovered"
+                  : claim.payerContact?.source === "registry_fallback"
+                  ? `Registry Baseline (${claim.payerContact.registryDate || "Unverified"})`
                   : "Unresolved Gateway"}
               </Badge>
             </div>
@@ -995,11 +999,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <span>Gateway Source:</span>
                   <span className="text-foreground font-medium">
                     {claim.payerContact?.source === "firecrawl_live"
-                      ? "Firecrawl Web Discovery"
+                      ? "Firecrawl Live Discovery"
                       : claim.payerContact?.source === "document_ocr"
                       ? "Extracted from Document"
+                      : claim.payerContact?.source === "registry_fallback"
+                      ? `Statutory Registry Baseline (${claim.payerContact.registryDate || "Offline"})`
                       : payerContact.isVerified
-                      ? "Verified Statutory Directory"
+                      ? "Live-Verified Gateway"
                       : "Unresolved / Manual Verification"}
                   </span>
                 </div>

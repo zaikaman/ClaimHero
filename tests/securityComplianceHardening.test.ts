@@ -424,6 +424,129 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       expect(receipt.status).toBe("delivered");
     });
 
+    it("dispatchAppealPacket: blocks official_payer dispatch when contact is an unverified registry fallback", async () => {
+      vi.spyOn(auth, "requireClaimOwnerAction").mockResolvedValue({
+        claim: {
+          _id: "claim_unverified_payer" as any,
+          claimNumber: "CLM-9999-UHC-1111",
+          patientName: "Jane Doe",
+          patient: { insurancePayer: "UnitedHealthcare", name: "Jane Doe" },
+          deniedAmount: 8500,
+          appealContext: {
+            sender: { name: "Dr. Gregory House, MD", email: "ghouse@princetonplainsboro.org" },
+          },
+          payerContact: {
+            intakePortalUrl: "https://www.uhcprovider.com/appeals",
+            appealsFax: "1-855-899-7400",
+            isVerified: false,
+            source: "registry_fallback",
+            registryDate: "2026-08-28",
+          },
+        } as any,
+        userId: "user_123" as any,
+      });
+
+      vi.spyOn(rateLimiterModule.rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          _id: "appeal_1",
+          fullAppealMarkdown: "# Brief",
+        }),
+        runAction: vi.fn().mockResolvedValue({
+          isVerified: false,
+          source: "registry_fallback",
+          intakePortalUrl: "https://www.uhcprovider.com/appeals",
+          appealsFax: "1-855-899-7400",
+        }),
+      };
+
+      await expect(
+        (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
+          claimId: "claim_unverified_payer",
+          dispatchMode: "official_payer",
+        })
+      ).rejects.toThrow(/Automated dispatch to unverified registry fallbacks is prohibited under HIPAA safeguards/i);
+    });
+
+    it("dispatchAppealPacket: succeeds in official_payer mode when live re-verification returns verified appeals email", async () => {
+      vi.spyOn(auth, "requireClaimOwnerAction").mockResolvedValue({
+        claim: {
+          _id: "claim_live_verified" as any,
+          claimNumber: "CLM-8888-MOL-2222",
+          patientName: "Jane Doe",
+          patient: { insurancePayer: "Molina Healthcare", name: "Jane Doe" },
+          deniedAmount: 4200,
+          appealContext: {
+            sender: { name: "Dr. Gregory House, MD", email: "ghouse@princetonplainsboro.org" },
+          },
+        } as any,
+        userId: "user_123" as any,
+      });
+
+      vi.spyOn(rateLimiterModule.rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      vi.spyOn(agentmail, "sendMessage").mockResolvedValue("msg_live_sent_1" as any);
+      vi.spyOn(agentmail, "status").mockResolvedValue({ status: "pending" } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          _id: "appeal_1",
+          fullAppealMarkdown: "# Brief",
+        }),
+        runAction: vi.fn().mockResolvedValue({
+          isVerified: true,
+          source: "firecrawl_live",
+          officialAppealsEmail: "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com",
+          liveVerifiedAt: Date.now(),
+        }),
+        runMutation: vi.fn().mockResolvedValue("thread_live_1"),
+      };
+
+      const receipt = await (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
+        claimId: "claim_live_verified",
+        dispatchMode: "official_payer",
+      });
+
+      expect(receipt.status).toBe("delivered");
+      expect(agentmail.sendMessage).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({
+          to: "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com",
+        })
+      );
+    });
+
+    it("sendOutboundMessage: blocks transmission when payerContact is an unverified registry fallback", async () => {
+      vi.spyOn(auth, "requireClaimOwnerAction").mockResolvedValue({
+        claim: {
+          _id: "claim_outbound_fallback" as any,
+          claimNumber: "CLM-7777-AET-3333",
+          patientName: "John Smith",
+          patient: { insurancePayer: "Aetna", name: "John Smith" },
+          deniedAmount: 12000,
+          payerContact: {
+            officialAppealsEmail: "stale_appeals@aetna.com",
+            isVerified: false,
+            source: "registry_fallback",
+            registryDate: "2026-08-28",
+          },
+        } as any,
+        userId: "user_123" as any,
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(null),
+      };
+
+      await expect(
+        (mailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+          claimId: "claim_outbound_fallback",
+          text: "Here is our clinical addendum.",
+        })
+      ).rejects.toThrow(/unverified registry fallback/i);
+    });
+
     it("healRedactedPatientNames: reconciles patient name from physicianNotes when unstated in denial notice", async () => {
       const mockDb = {
         query: vi.fn().mockReturnValue({

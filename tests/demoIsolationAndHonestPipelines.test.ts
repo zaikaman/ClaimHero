@@ -253,4 +253,37 @@ describe("Demo Isolation, Provenance Attribution & Honest Evaluation Pipeline", 
       expect(result.openingStatutoryStatement).toBeDefined();
     });
   });
+
+  describe("Unified Synthetic Demo Recognition Across All 3 Presets", () => {
+    it("recognizes all 3 template presets by patient name, claim number, or member ID", async () => {
+      const { isSyntheticDemoClaimIdentifier } = await import("../convex/claims");
+
+      // Preset 1: Eleanor Vance / Cigna Global
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "Eleanor Vance" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "eleanor vance" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ claimNumber: "CLM-8942-CIG-2388" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ memberId: "CIG-982341-01" })).toBe(true);
+
+      // Preset 2: Marcus Sterling / GeoBlue
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "Marcus Sterling" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "marcus sterling" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ claimNumber: "CLM-6104-GEO-7260" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ memberId: "GEO-554210-99" })).toBe(true);
+
+      // Preset 3: Michael Patel / Aetna International
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "Michael Patel" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "michael patel" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ claimNumber: "CLM-3912-AET-2952" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ memberId: "AET-773419-02" })).toBe(true);
+
+      // Non-demo genuine claims must evaluate to false
+      expect(isSyntheticDemoClaimIdentifier({
+        patientName: "John Doe",
+        claimNumber: "CLM-9912-UHC-1234",
+        memberId: "UHC-123456-00",
+      })).toBe(false);
+      expect(isSyntheticDemoClaimIdentifier({})).toBe(false);
+    });
+  });
 });
+

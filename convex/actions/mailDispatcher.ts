@@ -2,7 +2,7 @@
 
 import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { createChatCompletion, createStructuredCompletion } from "../lib/openai";
@@ -32,6 +32,7 @@ import {
 import { rateLimiter } from "../lib/rateLimiter";
 import { resolveClaimPatientName } from "../claims";
 import { ensureAppealPdfStored } from "../lib/pdfGenerator";
+import type { ResolvedPayerContact } from "./payerContactResolver";
 
 export interface DispatchReceipt {
   transmissionId: string;
@@ -539,7 +540,43 @@ export const dispatchAppealPacket = action({
 
     let recipient = (args.recipientEmail || args.customRecipient)?.trim();
     if (mode === "official_payer") {
-      recipient = claim.payerContact?.officialAppealsEmail || recipient;
+      let reverifiedContact: ResolvedPayerContact | null = null;
+      if (typeof ctx.runAction === "function") {
+        try {
+          reverifiedContact = await ctx.runAction(
+            api.actions.payerContactResolver.reverifyPayerContactForDispatch,
+            {
+              claimId: args.claimId,
+              intendedChannel: "email",
+            }
+          );
+        } catch (reverifyErr) {
+          console.warn("Live pre-dispatch re-verification warning:", reverifyErr);
+        }
+      }
+
+      if (reverifiedContact?.isVerified && reverifiedContact.officialAppealsEmail) {
+        recipient = reverifiedContact.officialAppealsEmail;
+      } else if (
+        claim.payerContact?.isVerified &&
+        claim.payerContact.source === "document_ocr" &&
+        claim.payerContact.officialAppealsEmail
+      ) {
+        recipient = claim.payerContact.officialAppealsEmail;
+      } else if (args.recipientEmail || args.customRecipient) {
+        recipient = (args.recipientEmail || args.customRecipient)?.trim();
+      } else {
+        const portal = (reverifiedContact?.intakePortalUrl || claim.payerContact?.intakePortalUrl)
+          ? `Official Online Portal (${reverifiedContact?.portalName || claim.payerContact?.portalName || "Online Portal"})`
+          : "";
+        const fax = (reverifiedContact?.appealsFax || claim.payerContact?.appealsFax)
+          ? `Appellate Fax (${reverifiedContact?.appealsFax || claim.payerContact?.appealsFax})`
+          : "";
+        const channels = [portal, fax].filter(Boolean).join(" or ") || "Certified Mail";
+        throw new Error(
+          `Insurer ${payer} does not accept formal appeals via direct email under HIPAA regulations, or the electronic appeals gateway could not be independently verified via live crawl. To prevent PHI misrouting, submit through their ${channels}. Automated dispatch to unverified registry fallbacks is prohibited under HIPAA safeguards.`
+        );
+      }
     }
 
     if (mode !== "ai_adjudicator" && !recipient) {
@@ -780,8 +817,22 @@ async function performSendOutboundMessage(
     args.customRecipient ||
     threadData?.thread?.payerEmail ||
     claim.payerContact?.officialAppealsEmail;
-  const claimTag = `[ClaimHero #${claim.claimNumber}]`;
+
   const payer = claim.patient?.insurancePayer || "Health Insurer";
+
+  if (
+    !args.customRecipient &&
+    !threadData?.thread?.payerEmail &&
+    claim.payerContact?.officialAppealsEmail
+  ) {
+    if (!claim.payerContact.isVerified || claim.payerContact.source === "registry_fallback") {
+      throw new Error(
+        `Refusing to transmit outbound message: payer contact for ${payer} is an unverified registry fallback (${claim.payerContact.registryDate || "historical baseline"}) and has not been confirmed via live crawl. Transmitting PHI to unverified endpoints is prohibited under HIPAA regulations.`
+      );
+    }
+  }
+
+  const claimTag = `[ClaimHero #${claim.claimNumber}]`;
 
   let subject: string;
   if (args.customSubject?.trim()) {

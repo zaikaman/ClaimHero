@@ -18,6 +18,8 @@ import {
   Lock,
   TrendUp,
   PhoneCall,
+  FileMagnifyingGlass,
+  Envelope,
 } from "@phosphor-icons/react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -138,8 +140,10 @@ const JURISDICTIONS = [
 ];
 
 const TARGET_PAYERS = [
-  "Molina Healthcare",
+  "Cigna Global",
   "GeoBlue",
+  "Aetna International",
+  "Molina Healthcare",
   "Blue Cross Blue Shield",
   "UnitedHealthcare",
   "Aetna",
@@ -170,9 +174,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
   const [selectedJurisdiction, setSelectedJurisdiction] = useState<string>("CA");
   const [selectedPayers, setSelectedPayers] = useState<string[]>([
-    "Molina Healthcare",
+    "Cigna Global",
     "GeoBlue",
-    "Blue Cross Blue Shield",
+    "Aetna International",
   ]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [customFile, setCustomFile] = useState<File | null>(null);
@@ -1257,7 +1261,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <div className="flex items-center justify-between border-b border-border/60 pb-3">
                 <div className="flex items-center gap-2 font-semibold text-xs text-emerald-600 dark:text-emerald-400">
                   <CheckCircle className="size-4.5" />
-                  <span className="text-sm font-semibold">Case Indexed & 3 Defense Vectors Armed</span>
+                  <span className="text-sm font-semibold">Case Indexed & Appeal Pipeline Initialized</span>
                 </div>
                 <Badge variant="outline" className="font-mono text-xs">
                   Claim #{extractedResult.claimNumber}
@@ -1292,12 +1296,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 <p className="mt-0.5 leading-relaxed">{extractedResult.denialReasonDescription}</p>
               </div>
 
-              {/* Defense Vectors HUD */}
-              <div className="space-y-2 pt-1">
+              {/* Core 3-Step Appeal Pipeline HUD */}
+              <div className="space-y-2.5 pt-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
                     <Shield className="size-3.5 text-primary" />
-                    Triaged Defense Vectors Ready for Deployment:
+                    Core Appeal Pipeline:
                   </span>
                   {typeof extractedResult.pipelineResult === "object" &&
                     extractedResult.pipelineResult !== null &&
@@ -1311,93 +1315,121 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {/* Vector 1: Written Legal Brief */}
+                  {/* Step 1: Evidence & CPB */}
+                  <div className="p-2.5 rounded-lg border border-border/80 bg-muted/20 flex flex-col justify-between space-y-2">
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[10px] font-mono uppercase text-muted-foreground flex items-center gap-1">
+                          <FileMagnifyingGlass className="size-3 text-cyan-400" />
+                          Step 1
+                        </span>
+                        <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4 border-cyan-500/40 text-cyan-400">
+                          Evidence
+                        </Badge>
+                      </div>
+                      <span className="text-xs font-semibold text-foreground block">
+                        Evidence & CPB Matrix
+                      </span>
+                      <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
+                        Clinical Policy Bulletins matched against denial reason codes.
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDone("evidence")}
+                      className="w-full text-[11px] h-6 justify-between text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 px-1.5 cursor-pointer"
+                    >
+                      <span>View Evidence</span>
+                      <ArrowRight className="size-3" />
+                    </Button>
+                  </div>
+
+                  {/* Step 2: Appeal Brief */}
                   <div className="p-2.5 rounded-lg border border-border/80 bg-muted/20 flex flex-col justify-between space-y-2">
                     <div>
                       <div className="flex items-center justify-between gap-1 mb-1">
                         <span className="text-[10px] font-mono uppercase text-muted-foreground flex items-center gap-1">
                           <FileText className="size-3 text-sky-400" />
-                          Vector 1
+                          Step 2
                         </span>
                         <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4 border-sky-500/40 text-sky-400">
-                          Tier 1 Brief
+                          Legal Brief
                         </Badge>
                       </div>
                       <span className="text-xs font-semibold text-foreground block">
-                        Written Appeal Brief
+                        Appeal Brief
                       </span>
                       <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
-                        ERISA 29 CFR § 2560.503-1 cited legal brief with CPB evidence.
+                        ERISA 29 CFR § 2560.503-1 cited appeal brief with CPB evidence.
                       </span>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDone("studio")}
-                      className="w-full text-[11px] h-6 justify-between text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 px-1.5"
+                      className="w-full text-[11px] h-6 justify-between text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 px-1.5 cursor-pointer"
                     >
                       <span>Open Brief</span>
                       <ArrowRight className="size-3" />
                     </Button>
                   </div>
 
-                  {/* Vector 2: Doctor P2P Copilot */}
+                  {/* Step 3: Payer Dispatch */}
                   <div className="p-2.5 rounded-lg border border-border/80 bg-muted/20 flex flex-col justify-between space-y-2">
                     <div>
                       <div className="flex items-center justify-between gap-1 mb-1">
                         <span className="text-[10px] font-mono uppercase text-muted-foreground flex items-center gap-1">
-                          <PhoneCall className="size-3 text-emerald-400" />
-                          Vector 2
+                          <Envelope className="size-3 text-indigo-400" />
+                          Step 3
                         </span>
-                        <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4 border-emerald-500/40 text-emerald-400">
-                          14-Day Window
+                        <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4 border-indigo-500/40 text-indigo-400">
+                          Dispatch
                         </Badge>
                       </div>
                       <span className="text-xs font-semibold text-foreground block">
-                        Doctor P2P Tele-Script
+                        Payer Dispatch
                       </span>
                       <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
-                        3-minute verbal rebuttal & live medical director copilot.
+                        AgentMail autonomous delivery, tracking, and reply sentinel.
                       </span>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDone("communications")}
+                      className="w-full text-[11px] h-6 justify-between text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 px-1.5 cursor-pointer"
+                    >
+                      <span>Dispatch Gateway</span>
+                      <ArrowRight className="size-3" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Companion Tools Strip */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-lg border border-border/60 bg-muted/10 text-xs">
+                  <span className="text-[10px] font-mono uppercase text-muted-foreground font-semibold">
+                    Companion Tools Available:
+                  </span>
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDone("p2p")}
-                      className="w-full text-[11px] h-6 justify-between text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 px-1.5"
+                      className="h-6 px-2 text-[11px] gap-1 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 cursor-pointer"
                     >
-                      <span>Launch P2P Script</span>
-                      <ArrowRight className="size-3" />
+                      <PhoneCall className="size-3" />
+                      <span>Doctor P2P Copilot</span>
                     </Button>
-                  </div>
-
-                  {/* Vector 3: Statutory ERISA Penalties */}
-                  <div className="p-2.5 rounded-lg border border-border/80 bg-muted/20 flex flex-col justify-between space-y-2">
-                    <div>
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className="text-[10px] font-mono uppercase text-muted-foreground flex items-center gap-1">
-                          <Scales className="size-3 text-amber-400" />
-                          Vector 3
-                        </span>
-                        <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4 border-amber-500/40 text-amber-400">
-                          $110/Day
-                        </Badge>
-                      </div>
-                      <span className="text-xs font-semibold text-foreground block">
-                        ERISA & Liability Audit
-                      </span>
-                      <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
-                        29 U.S.C. § 1132(c) statutory default demand & OOP exposure.
-                      </span>
-                    </div>
+                    <div className="h-3 w-px bg-border shrink-0" />
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDone("calculator")}
-                      className="w-full text-[11px] h-6 justify-between text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 px-1.5"
+                      className="h-6 px-2 text-[11px] gap-1 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 cursor-pointer"
                     >
-                      <span>Audit Penalties</span>
-                      <ArrowRight className="size-3" />
+                      <Scales className="size-3" />
+                      <span>ERISA Audit</span>
                     </Button>
                   </div>
                 </div>

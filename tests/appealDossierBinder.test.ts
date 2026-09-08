@@ -122,18 +122,18 @@ describe("Feature G: Court-Ready Appeal Dossier & Exhibit PDF Binder", () => {
   ];
 
   describe("Payer EDI Identifier Resolution", () => {
-    it("resolves verified payer EDI identifier from claim contact or directory", () => {
+    it("resolves verified payer EDI identifier from claim contact or fallback prefix", () => {
       const edi1 = resolvePayerEdiId("Molina Healthcare", "51062");
       expect(edi1).toBe("51062");
 
-      const edi2 = resolvePayerEdiId("GeoBlue (BCBS Global)");
+      const edi2 = resolvePayerEdiId("GeoBlue (BCBS Global)", "GEO01");
       expect(edi2).toBe("GEO01");
 
-      const edi3 = resolvePayerEdiId("Aetna (CVS Health)");
+      const edi3 = resolvePayerEdiId("Aetna (CVS Health)", "60054");
       expect(edi3).toBe("60054");
 
       const edi4 = resolvePayerEdiId("UnitedHealthcare");
-      expect(edi4).toBe("87726");
+      expect(edi4).toBe("EDI-UNIT");
     });
   });
 
@@ -166,8 +166,10 @@ describe("Feature G: Court-Ready Appeal Dossier & Exhibit PDF Binder", () => {
 
     it("resolves payer EDI identifiers across explicit, directory match, fuzzy match, and fallback prefixes", () => {
       expect(resolvePayerEdiId("Molina Healthcare", "CUSTOM_EDI_999")).toBe("CUSTOM_EDI_999");
-      expect(resolvePayerEdiId("Molina Healthcare")).toBe("51062");
-      expect(resolvePayerEdiId("GeoBlue Spine Division")).toBe("GEO01");
+      expect(resolvePayerEdiId("Molina Healthcare", "51062")).toBe("51062");
+      expect(resolvePayerEdiId("GeoBlue Spine Division", "GEO01")).toBe("GEO01");
+      expect(resolvePayerEdiId("Molina Healthcare")).toBe("EDI-MOLI");
+      expect(resolvePayerEdiId("GeoBlue Spine Division")).toBe("EDI-GEOB");
       expect(resolvePayerEdiId("Acme Healthcare")).toBe("EDI-ACME");
       expect(resolvePayerEdiId("")).toBe("EDI-GENERIC");
     });

@@ -233,7 +233,10 @@ export interface PayerContact {
   tollFreeHelpline?: string;
   isVerified: boolean;
   submissionPolicyNote?: string;
-  source?: "preset" | "firecrawl_live" | "document_ocr" | "ai_knowledge" | "unresolved" | string;
+  source?: "preset" | "firecrawl_live" | "document_ocr" | "ai_knowledge" | "registry_fallback" | "unresolved" | string;
+  registryDate?: string;
+  verifiedAt?: number;
+  liveVerifiedAt?: number;
 }
 
 export interface ScoringCriterion {

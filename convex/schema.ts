@@ -106,6 +106,9 @@ export default defineSchema({
         isVerified: v.boolean(),
         submissionPolicyNote: v.optional(v.string()),
         source: v.optional(v.string()),
+        registryDate: v.optional(v.string()),
+        verifiedAt: v.optional(v.number()),
+        liveVerifiedAt: v.optional(v.number()),
       })
     ),
     redactionMetadata: v.optional(

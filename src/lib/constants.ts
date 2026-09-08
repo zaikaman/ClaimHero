@@ -18,151 +18,6 @@ export interface PayerAppellateContact {
   submissionPolicyNote?: string;
 }
 
-/**
- * STATUTORY PAYER REGISTRY (Baseline Seeds & Optimistic Fallback)
- * 
- * Serves as an initial optimistic baseline and offline resilience anchor for the UI
- * before the autonomous Live-First Firecrawl Payer Discovery action (`resolvePayerGateway`)
- * executes live web crawling and AI extraction.
- */
-export const VERIFIED_PAYER_DIRECTORY: Record<string, PayerAppellateContact> = {
-  molina: {
-    id: "molina",
-    name: "Molina Healthcare",
-    domain: "molinahealthcare.com",
-    officialAppealsEmail: "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com",
-    intakePortalUrl: "https://member.molinahealthcare.com",
-    portalName: "MyMolina Grievance & Appeals Gateway",
-    appealsFax: "1-877-508-5748",
-    statutoryPoBox: "Molina Healthcare of Florida, Grievance and Appeals Dept., P.O. Box 521838, Longwood, FL 32752",
-    ediPayerId: "51062",
-    tollFreeHelpline: "1-888-560-5716",
-    isVerified: true,
-    submissionPolicyNote: "Molina Healthcare accepts formal written appeals and grievance submissions directly via its dedicated state appeals email (MFLGrievanceandAppealsDepartment@MolinaHealthcare.com), MyMolina portal, or appellate fax.",
-  },
-  geoblue: {
-    id: "geoblue",
-    name: "GeoBlue (BCBS Global)",
-    domain: "geo-blue.com",
-    officialAppealsEmail: "claims@geo-blue.com",
-    intakePortalUrl: "https://www.geo-blue.com",
-    portalName: "GeoBlue Member & Claims Portal",
-    appealsFax: "1-610-482-9623",
-    statutoryPoBox: "GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087",
-    ediPayerId: "GEO01",
-    tollFreeHelpline: "1-855-282-3517",
-    isVerified: true,
-    submissionPolicyNote: "GeoBlue (Blue Cross Blue Shield Global licensee) accepts direct claim disputes, appeal packets, and clinical records via its official appeals email (claims@geo-blue.com) or portal.",
-  },
-  bcbsglobal: {
-    id: "bcbsglobal",
-    name: "Blue Cross Blue Shield Global Core",
-    domain: "bcbsglobalcore.com",
-    officialAppealsEmail: "claims@bcbsglobalcore.com",
-    intakePortalUrl: "https://www.bcbsglobalcore.com",
-    portalName: "BCBS Global Core Service Center Portal",
-    appealsFax: "1-804-673-1179",
-    statutoryPoBox: "BCBS Global Core Service Center, P.O. Box 2048, Richmond, VA 23218-2048",
-    ediPayerId: "BCBSG",
-    tollFreeHelpline: "1-800-810-2583",
-    isVerified: true,
-    submissionPolicyNote: "BCBS Global Core explicitly accepts itemized international medical claim disputes and formal appeal submissions via its dedicated claims email (claims@bcbsglobalcore.com).",
-  },
-  unitedhealthcare: {
-    id: "uhc",
-    name: "UnitedHealthcare",
-    domain: "uhc.com",
-    intakePortalUrl: "https://www.uhcprovider.com/en/claims-payments-billing/appeals.html",
-    portalName: "UHC Provider Appeals & Grievance Portal",
-    appealsFax: "1-855-899-7400",
-    statutoryPoBox: "P.O. Box 30432, Salt Lake City, UT 84130-0432",
-    ediPayerId: "87726",
-    tollFreeHelpline: "1-800-842-1609",
-    isVerified: true,
-    submissionPolicyNote: "UHC mandates formal appeals via UHCprovider.com portal, fax, or certified mail. Unencrypted emails are rejected by payer filters.",
-  },
-  aetna: {
-    id: "aetna",
-    name: "Aetna (CVS Health)",
-    domain: "aetna.com",
-    officialAppealsEmail: "aisappeals@aetna.com",
-    intakePortalUrl: "https://www.aetna.com",
-    portalName: "Aetna International & Global Appeals Gateway",
-    appealsFax: "1-859-455-8650",
-    statutoryPoBox: "Aetna Provider Resolution Team, P.O. Box 14020, Lexington, KY 40512",
-    ediPayerId: "60054",
-    tollFreeHelpline: "1-800-624-0756",
-    isVerified: true,
-    submissionPolicyNote: "Aetna International accepts direct appellate submissions via its dedicated email (aisappeals@aetna.com), appellate fax (1-859-455-8650), or P.O. Box in Lexington, KY.",
-  },
-  cignaglobal: {
-    id: "cignaglobal",
-    name: "Cigna Global (International)",
-    domain: "cignaglobal.com",
-    officialAppealsEmail: "cignaglobal_customer.care@cigna.com",
-    intakePortalUrl: "https://www.cignaglobal.com",
-    portalName: "Cigna Global Customer Care & Appeals Gateway",
-    appealsFax: "1-877-804-1679",
-    statutoryPoBox: "Cigna Global Claims, P.O. Box 15050, Wilmington, DE 19850",
-    ediPayerId: "CIG01",
-    tollFreeHelpline: "1-800-835-7677",
-    isVerified: true,
-    submissionPolicyNote: "Cigna Global accepts direct medical claim disputes, formal appeal packets, and clinical documentation via its dedicated international intake email (cignaglobal_customer.care@cigna.com) or global portal.",
-  },
-  cigna: {
-    id: "cigna",
-    name: "Cigna Healthcare",
-    domain: "cigna.com",
-    intakePortalUrl: "https://www.cigna.com/health-care-providers/coverage-and-claims/appeals-disputes",
-    portalName: "CignaforHCP / myCigna Appeals Portal",
-    appealsFax: "1-877-804-1679",
-    statutoryPoBox: "Cigna National Appeals, P.O. Box 188062, Chattanooga, TN 37422",
-    ediPayerId: "62308",
-    tollFreeHelpline: "1-800-882-4462",
-    isVerified: true,
-    submissionPolicyNote: "Cigna accepts appeals via CignaforHCP / myCigna portal, appellate fax (1-877-804-1679), or P.O. Box in Chattanooga, TN. Standard medical emails are strictly rejected.",
-  },
-  bcbs: {
-    id: "bcbs",
-    name: "Blue Cross Blue Shield",
-    domain: "bcbs.com",
-    intakePortalUrl: "https://providers.anthem.com/california-provider/contact-us",
-    portalName: "Anthem Provider Portal (Availity Essentials)",
-    appealsFax: "1-866-587-3316",
-    statutoryPoBox: "Anthem Grievances and Appeals, P.O. Box 1407, Church Street Station, New York, NY 10008",
-    ediPayerId: "47198",
-    tollFreeHelpline: "1-800-676-2583",
-    isVerified: true,
-    submissionPolicyNote: "Anthem/Elevance requires appeals through the Availity portal or appellate fax (1-866-587-3316). Standard commercial plans reject email.",
-  },
-  humana: {
-    id: "humana",
-    name: "Humana",
-    domain: "humana.com",
-    intakePortalUrl: "https://resolutions.humana.com/",
-    portalName: "Humana Resolutions Portal",
-    appealsFax: "1-800-949-2961",
-    statutoryPoBox: "Humana Grievances and Appeals, P.O. Box 14165, Lexington, KY 40512",
-    ediPayerId: "61101",
-    tollFreeHelpline: "1-800-448-6262",
-    isVerified: true,
-    submissionPolicyNote: "Upload documentation directly through the Humana Resolutions Portal (resolutions.humana.com) or submit via Medical Appeals Fax (1-800-949-2961).",
-  },
-  kaiser: {
-    id: "kaiser",
-    name: "Kaiser Permanente",
-    domain: "kp.org",
-    intakePortalUrl: "https://healthy.kaiserpermanente.org/community-providers/permanente-advantage/contact-us",
-    portalName: "Kaiser Community Provider Portal",
-    appealsFax: "1-626-405-3039",
-    statutoryPoBox: "Kaiser Permanente Appeals Department, P.O. Box 30766, Salt Lake City, UT 84130",
-    ediPayerId: "94144",
-    tollFreeHelpline: "1-800-464-4000",
-    isVerified: true,
-    submissionPolicyNote: "Kaiser central intake accepts submissions through the Community Provider Portal, Fax (1-626-405-3039), or Salt Lake City PO Box.",
-  },
-};
-
 export const getPayerAppellateContact = (payerName?: string): PayerAppellateContact => {
   if (!payerName) {
     return {
@@ -175,48 +30,14 @@ export const getPayerAppellateContact = (payerName?: string): PayerAppellateCont
   }
 
   const clean = payerName.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-  if (clean.includes("molina")) {
-    return VERIFIED_PAYER_DIRECTORY.molina;
-  }
-  if (clean.includes("geoblue") || clean.includes("geo-blue")) {
-    return VERIFIED_PAYER_DIRECTORY.geoblue;
-  }
-  if (clean.includes("bcbsglobal") || clean.includes("globalcore") || clean.includes("bcbsglobalcore")) {
-    return VERIFIED_PAYER_DIRECTORY.bcbsglobal;
-  }
-  if (clean.includes("united") || clean.includes("uhc") || clean.includes("optum")) {
-    return VERIFIED_PAYER_DIRECTORY.unitedhealthcare;
-  }
-  if (clean.includes("aetna") || clean.includes("cvs")) {
-    return VERIFIED_PAYER_DIRECTORY.aetna;
-  }
-  if (clean.includes("cignaglobal") || (clean.includes("cigna") && clean.includes("global"))) {
-    return VERIFIED_PAYER_DIRECTORY.cignaglobal;
-  }
-  if (clean.includes("cigna") || clean.includes("evernorth")) {
-    return VERIFIED_PAYER_DIRECTORY.cigna;
-  }
-  if (clean.includes("blue") || clean.includes("bcbs") || clean.includes("anthem") || clean.includes("elevance")) {
-    return VERIFIED_PAYER_DIRECTORY.bcbs;
-  }
-  if (clean.includes("humana")) {
-    return VERIFIED_PAYER_DIRECTORY.humana;
-  }
-  if (clean.includes("kaiser")) {
-    return VERIFIED_PAYER_DIRECTORY.kaiser;
-  }
-
   return {
-    id: clean,
+    id: clean || "unknown",
     name: payerName,
     domain: "",
     isVerified: false,
-    submissionPolicyNote: "Payer contact details not in preset directory. Awaiting Firecrawl discovery or denial letter OCR.",
+    submissionPolicyNote: "Awaiting live Firecrawl discovery or denial letter OCR.",
   };
 };
-
-export const INSURERS = Object.values(VERIFIED_PAYER_DIRECTORY);
 
 // Common CARC (Claim Adjustment Reason Codes) & Descriptions
 export const DENIAL_REASON_CODES: Record<string, { code: string; title: string; description: string; overturnCategory: string }> = {
@@ -470,11 +291,11 @@ export type DemoCaseFixture = SampleCasePreset;
 
 export const DEMO_CASE_FIXTURES: DemoCaseFixture[] = [
   {
-    id: "geoblue_meniscus",
-    title: "GeoBlue Worldwide — Knee Arthroscopy & Meniscectomy (Carelon)",
-    payer: "GeoBlue",
+    id: "cignaglobal_meniscus",
+    title: "Cigna Global — Knee Arthroscopy & Meniscectomy",
+    payer: "Cigna Global",
     patientName: "Eleanor Vance",
-    memberId: "GEO-982341-01",
+    memberId: "CIG-982341-01",
     amount: "$6,400",
     cpt: "29881",
     carc: "CO-50 (Not Medically Necessary)",
@@ -482,10 +303,10 @@ export const DEMO_CASE_FIXTURES: DemoCaseFixture[] = [
     origin: "demo-fixture",
     isSyntheticPII: true,
     isDemo: true,
-    content: `GEOBLUE WORLDWIDE MEDICAL INSURANCE
+    content: `CIGNA GLOBAL HEALTH BENEFITS
 EXPLANATION OF BENEFITS / ADVERSE BENEFIT DETERMINATION
-Claim Reference: CLM-8942-GEO
-Member ID: GEO-982341-01
+Claim Reference: CLM-8942-CIG
+Member ID: CIG-982341-01
 Patient Name: Eleanor Vance
 Date of Birth: 1968-04-14
 Date of Service: 06/12/2026
@@ -502,14 +323,14 @@ Services Rendered:
 
 Adjudication & Claim Denial Reason:
 Code CO-50: These are non-covered services because this is not deemed a medical necessity by the payer.
-Clinical Rationale: Under Carelon Joint Surgery Clinical Guidelines (Knee Arthroscopy and Open Procedures), arthroscopic partial meniscectomy requires documented mechanical symptoms (locking, catching, or joint line tenderness) and failure of at least 6 weeks of conservative management (including physical therapy and NSAIDs) for degenerative meniscus tears. Clinical records submitted fail to establish consecutive supervised physical therapy.
+Clinical Rationale: Under Cigna Medical Coverage Policy 0066 (Knee Arthroscopy and Open Procedures), arthroscopic partial meniscectomy requires documented mechanical symptoms (locking, catching, or joint line tenderness) and failure of at least 6 weeks of conservative management (including physical therapy and NSAIDs) for degenerative meniscus tears. Clinical records submitted fail to establish consecutive supervised physical therapy.
 
 Statutory Notice of Appeal Rights:
 You have the right to an internal appeal pursuant to ERISA 29 CFR § 2560.503-1 and ACA 45 CFR § 147.136. You must submit your written appeal within 180 calendar days from the date of this determination notice.
 Appeals Intake Destination:
-Email: claims@geo-blue.com
-Mailing Address: GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087
-Appeals Fax: 1-610-482-9623`,
+Email: cignaglobal_customer.care@cigna.com
+Mailing Address: Cigna Global Appeals Unit, P.O. Box 15050, Wilmington, DE 19850-5050
+Appeals Fax: 1-800-340-3728`,
     sender: {
       name: "Jordan Lee",
       credentials: "Appeals Coordinator",
@@ -530,7 +351,7 @@ Appeals Fax: 1-610-482-9623`,
       {
         field: "imagingAndDiagnostics",
         question: "What are the date and findings of the MRI of the right knee documented in the record? Leave blank if not documented.",
-        whyItMatters: "Directly addresses the diagnostic imaging requirements cited in Carelon Joint Surgery Guidelines.",
+        whyItMatters: "Directly addresses the diagnostic imaging requirements cited in Cigna Medical Coverage Policies.",
       },
       {
         field: "treatmentHistoryAndResponse",
@@ -548,7 +369,7 @@ Appeals Fax: 1-610-482-9623`,
       examinationFindings: "Distinct right medial joint line tenderness, positive McMurray test reproducing painful medial clicking, mild reactive effusion, and painful extension block at 5 degrees.",
       imagingAndDiagnostics: "High-resolution MRI of the right knee (05/10/2026) confirms a complex posterior horn medial meniscus tear extending to the inferior articular surface with localized parameniscal cyst formation.",
       treatmentHistoryAndResponse: "Completed 8 consecutive weeks of formal outpatient physical therapy (2x/weekly, Feb-Apr 2026) with zero symptomatic relief, 3-month trial of oral meloxicam 15mg daily, and one image-guided intra-articular steroid injection (03/20/2026) yielding only 4 days of transient relief.",
-      otherDocumentedFacts: "Dr. Robert Langston, MD certified that non-operative modalities have failed and arthroscopic partial medial meniscectomy (CPT 29881) is medically necessary under Carelon Joint Surgery Guidelines to resolve mechanical locking and prevent chondral degradation.",
+      otherDocumentedFacts: "Dr. Robert Langston, MD certified that non-operative modalities have failed and arthroscopic partial medial meniscectomy (CPT 29881) is medically necessary under Cigna Medical Coverage Policy 0066 to resolve mechanical locking and prevent chondral degradation.",
       recordsAreIncomplete: false,
     },
     physicianNotes: `PATIENT: Eleanor Vance | DOB: 04/14/1968 | DOS: 06/12/2026
@@ -561,7 +382,7 @@ CONSERVATIVE THERAPY MODALITIES COMPLETED & FAILED:
 3. Intra-articular Injections: Image-guided right knee corticosteroid injection (Triamcinolone 40 mg on 03/20/2026) yielding only 4 days of transient partial relief.
 
 CLINICAL NECESSITY DETERMINATION:
-Under Carelon Clinical Guidelines for Joint Surgery (Knee Arthroscopy and Open Procedures), the patient has completed and failed all non-operative conservative management. Arthroscopic partial meniscectomy (CPT 29881) is medically necessary to resolve mechanical joint locking and prevent secondary articular cartilage damage.
+Under Cigna Medical Coverage Policy 0066 (Knee Arthroscopy and Open Procedures), the patient has completed and failed all non-operative conservative management. Arthroscopic partial meniscectomy (CPT 29881) is medically necessary to resolve mechanical joint locking and prevent secondary articular cartilage damage.
 
 Attending Orthopedic Surgeon: Dr. Robert Langston, MD, FAAOS (Metropolitan Surgical Hospital)`,
   },
@@ -660,11 +481,11 @@ In accordance with Carelon Clinical Appropriateness Guidelines for Spine Surgery
 Attending Neurosurgeon: Dr. Sarah Chen, MD, FAANS (Spine & Neurosurgery Associates)`,
   },
   {
-    id: "bcbsglobal_mri",
-    title: "BCBS Global Core — Knee MRI Scan",
-    payer: "Blue Cross Blue Shield Global Core",
+    id: "aetnaintl_mri",
+    title: "Aetna International — Knee MRI Scan",
+    payer: "Aetna International",
     patientName: "Michael Patel",
-    memberId: "BCG-773419-02",
+    memberId: "AET-773419-02",
     amount: "$2,850",
     cpt: "73721",
     carc: "CO-16 (Missing Plain Radiographs)",
@@ -672,10 +493,10 @@ Attending Neurosurgeon: Dr. Sarah Chen, MD, FAANS (Spine & Neurosurgery Associat
     origin: "demo-fixture",
     isSyntheticPII: true,
     isDemo: true,
-    content: `BLUE CROSS BLUE SHIELD GLOBAL CORE
+    content: `AETNA INTERNATIONAL
 ADVERSE CLAIM ADJUDICATION NOTICE
-Claim Number: CLM-3912-BCG
-Member ID: BCG-773419-02
+Claim Number: CLM-3912-AET
+Member ID: AET-773419-02
 Patient Name: Michael Patel
 Date of Service: 07/18/2026
 Provider: Global Diagnostic Imaging Group
@@ -690,14 +511,14 @@ Services:
 
 Denial Rationale:
 Code CO-16: Claim lacks information or has submission error.
-Coverage Policy RAD.00002 requires documented weight-bearing plain radiographs performed within the preceding 6 months prior to approval of magnetic resonance imaging for non-acute knee pain.
+Aetna Clinical Policy Bulletin (CPB) 0171 (Magnetic Resonance Imaging of the Extremities) requires documented weight-bearing plain radiographs performed within the preceding 6 months prior to approval of magnetic resonance imaging for non-acute knee pain.
 
 Statutory Rights & Appeal Submission:
 You have 180 days to request an administrative ERISA reconsideration under 29 CFR § 2560.503-1.
 Submit formal appeal memorandum and physician attestation to:
-Appeals Intake Email: claims@bcbsglobalcore.com
-Service Center Address: BCBS Global Core Service Center, P.O. Box 2048, Richmond, VA 23218-2048
-Appeals Fax: 1-804-673-1179`,
+Appeals Intake Email: aiservice@aetna.com
+Service Center Address: Aetna International Appeals, P.O. Box 981543, El Paso, TX 79998-1543
+Appeals Fax: 1-859-455-8650`,
     sender: {
       name: "Taylor Reed",
       credentials: "Appeals Specialist",
@@ -734,9 +555,9 @@ Appeals Fax: 1-804-673-1179`,
     clinicalFacts: {
       symptomsAndFunctionalImpact: "Patient reports 8 weeks of persistent right knee pain, joint line tenderness, clicking sensations, and intermittent giving way following a twisting sports injury. Unable to run, squat, or climb stairs without sharp pain.",
       examinationFindings: "Physical exam reveals positive McMurray test on medial joint line, localized medial joint line tenderness, mild joint effusion, and terminal flexion discomfort at 115 degrees.",
-      imagingAndDiagnostics: "Weight-bearing plain radiographs (AP/Lateral) completed on 05/20/2026 demonstrated no acute fracture, preserved joint spaces, and minimal degenerative changes, confirming compliance with RAD.00002 x-ray requirements prior to MRI.",
+      imagingAndDiagnostics: "Weight-bearing plain radiographs (AP/Lateral) completed on 05/20/2026 demonstrated no acute fracture, preserved joint spaces, and minimal degenerative changes, confirming compliance with Aetna CPB 0171 x-ray requirements prior to MRI.",
       treatmentHistoryAndResponse: "Completed 6 weeks of conservative management consisting of oral NSAIDs (naproxen 500mg BID), activity modification, and home physical therapy exercises without symptom resolution.",
-      otherDocumentedFacts: "Enclosed prior weight-bearing radiograph report dated 05/20/2026 cures the documentation deficiency cited in denial code CO-16.",
+      otherDocumentedFacts: "Enclosed prior weight-bearing radiograph report dated 05/20/2026 cures the documentation deficiency cited in denial code CO-16 under Aetna CPB 0171.",
       recordsAreIncomplete: false,
     },
     physicianNotes: `PATIENT: Michael Patel | DOB: 09/03/1982 | DOS: 07/18/2026
@@ -745,11 +566,11 @@ Patient Michael Patel is a 43-year-old male presenting for advanced diagnostic e
 
 OBJECTIVE CLINICAL FINDINGS:
 1. Physical Examination: Localized tenderness along the medial joint line, positive McMurray sign with palpable pop/click, mild joint effusion, and terminal flexion limited to 115 degrees due to mechanical impingement.
-2. Prior Plain Radiographs (Policy RAD.00002 Compliance): Weight-bearing bilateral AP and lateral radiographs of the right knee were completed on 05/20/2026 at Global Diagnostic Imaging. X-rays confirmed absence of fracture or dislocation with preserved joint spacing, satisfying the prerequisite 6-month radiograph mandate under BCBS Coverage Policy RAD.00002.
+2. Prior Plain Radiographs (Aetna CPB 0171 Compliance): Weight-bearing bilateral AP and lateral radiographs of the right knee were completed on 05/20/2026 at Global Diagnostic Imaging. X-rays confirmed absence of fracture or dislocation with preserved joint spacing, satisfying the prerequisite 6-month radiograph mandate under Aetna Clinical Policy Bulletin 0171.
 3. Conservative Management: Underwent 6 weeks of structured conservative therapy consisting of oral Naproxen (500 mg BID), cryotherapy, and home exercise regimen without symptomatic relief.
 
 ADVANCED IMAGING MEDICAL NECESSITY:
-Magnetic Resonance Imaging of the knee without contrast (CPT 73721) is medically necessary to assess internal meniscal derangement and evaluate for surgical arthroscopy. Denial code CO-16 is refuted as qualifying plain radiographs (05/20/2026) were performed and are submitted herewith.
+Magnetic Resonance Imaging of the knee without contrast (CPT 73721) is medically necessary to assess internal meniscal derangement and evaluate for surgical arthroscopy. Denial code CO-16 is refuted as qualifying plain radiographs (05/20/2026) were performed and are submitted herewith under Aetna CPB 0171 criteria.
 
 Attending Physician: Dr. Angela Martinez, MD (Global Diagnostic Imaging Group)`,
   },

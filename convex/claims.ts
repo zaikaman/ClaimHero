@@ -29,6 +29,54 @@ export function resolveClaimPatientName(
 }
 
 /**
+ * Detect whether claim identifiers match one of the standard synthetic evaluation demo fixtures
+ * (Cigna Global - Eleanor Vance, GeoBlue - Marcus Sterling, Aetna International - Michael Patel).
+ */
+export function isSyntheticDemoClaimIdentifier(params: {
+  claimNumber?: string;
+  memberId?: string;
+  patientName?: string;
+  payer?: string;
+}): boolean {
+  const norm = (s?: string) => (s || "").trim().toLowerCase();
+  const cNum = norm(params.claimNumber);
+  const mId = norm(params.memberId);
+  const pName = norm(params.patientName);
+
+  if (
+    pName === "eleanor vance" ||
+    pName === "marcus sterling" ||
+    pName === "michael patel"
+  ) {
+    return true;
+  }
+
+  if (
+    cNum.startsWith("clm-8942-cig") ||
+    cNum.startsWith("clm-8942-geo") ||
+    cNum.startsWith("clm-6104-geo") ||
+    cNum.startsWith("clm-3912-aet") ||
+    cNum.startsWith("clm-3912-bcg") ||
+    cNum.includes("-demo-") ||
+    cNum.startsWith("clm-demo")
+  ) {
+    return true;
+  }
+
+  if (
+    mId === "cig-982341-01" ||
+    mId === "geo-982341-01" ||
+    mId === "geo-554210-99" ||
+    mId === "aet-773419-02" ||
+    mId === "bcg-773419-02"
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Full-text search across claims using Convex native searchIndex
  */
 export const search = query({
@@ -123,17 +171,37 @@ export const list = query({
     if (args.paginationOpts) {
       const paginatedResult = await queryBuilder.paginate(args.paginationOpts);
       const page = args.includeDemo === false
-        ? paginatedResult.page.filter((c) => !c.isDemo)
+        ? paginatedResult.page.filter(
+            (c) =>
+              !c.isDemo &&
+              !isSyntheticDemoClaimIdentifier({
+                claimNumber: c.claimNumber,
+                patientName: c.patientName,
+                payer: c.insurancePayer,
+              })
+          )
         : paginatedResult.page;
 
       const mappedPage = page.map((claim) => {
         const patientName = resolveClaimPatientName(claim.patientName, claim.claimNumber);
         const insurancePayer = claim.insurancePayer || "Health Insurer";
+        const isDemo = Boolean(
+          claim.isDemo ||
+          claim.dataOrigin === "demo-fixture" ||
+          isSyntheticDemoClaimIdentifier({
+            claimNumber: claim.claimNumber,
+            patientName,
+            payer: insurancePayer,
+          })
+        );
 
         return {
           ...claim,
           patientName,
           insurancePayer,
+          isDemo,
+          isSyntheticPII: isDemo || claim.isSyntheticPII,
+          dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
           patient: {
             _id: claim.patientId,
             name: patientName,
@@ -155,18 +223,38 @@ export const list = query({
     const effectiveLimit = Math.max(1, Math.min(args.limit ?? 100, 100));
     let claims = await queryBuilder.take(effectiveLimit);
     if (args.includeDemo === false) {
-      claims = claims.filter((c) => !c.isDemo);
+      claims = claims.filter(
+        (c) =>
+          !c.isDemo &&
+          !isSyntheticDemoClaimIdentifier({
+            claimNumber: c.claimNumber,
+            patientName: c.patientName,
+            payer: c.insurancePayer,
+          })
+      );
     }
 
     // Map denormalized patient data into the expected Claim shape without N+1 joins
     return claims.map((claim) => {
       const patientName = resolveClaimPatientName(claim.patientName, claim.claimNumber);
       const insurancePayer = claim.insurancePayer || "Health Insurer";
+      const isDemo = Boolean(
+        claim.isDemo ||
+        claim.dataOrigin === "demo-fixture" ||
+        isSyntheticDemoClaimIdentifier({
+          claimNumber: claim.claimNumber,
+          patientName,
+          payer: insurancePayer,
+        })
+      );
 
       return {
         ...claim,
         patientName,
         insurancePayer,
+        isDemo,
+        isSyntheticPII: isDemo || claim.isSyntheticPII,
+        dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
         patient: {
           _id: claim.patientId,
           name: patientName,
@@ -218,8 +306,22 @@ export const getById = query({
       ? { ...patient, name: resolvedName }
       : undefined;
 
+    const isDemo = Boolean(
+      claim.isDemo ||
+      claim.dataOrigin === "demo-fixture" ||
+      isSyntheticDemoClaimIdentifier({
+        claimNumber: claim.claimNumber,
+        patientName: resolvedName,
+        payer: claim.insurancePayer,
+        memberId: patient?.memberId,
+      })
+    );
+
     return {
       ...claim,
+      isDemo,
+      isSyntheticPII: isDemo || claim.isSyntheticPII,
+      dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
       patientName: resolvedName,
       patient: resolvedPatient,
       evidenceCount,
@@ -264,8 +366,22 @@ export const getByIdInternal = internalQuery({
       ? { ...patient, name: resolvedName }
       : undefined;
 
+    const isDemo = Boolean(
+      claim.isDemo ||
+      claim.dataOrigin === "demo-fixture" ||
+      isSyntheticDemoClaimIdentifier({
+        claimNumber: claim.claimNumber,
+        patientName: resolvedName,
+        payer: claim.insurancePayer,
+        memberId: patient?.memberId,
+      })
+    );
+
     return {
       ...claim,
+      isDemo,
+      isSyntheticPII: isDemo || claim.isSyntheticPII,
+      dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
       patientName: resolvedName,
       patient: resolvedPatient,
       evidenceCount,
@@ -581,15 +697,12 @@ export const create = mutation({
 
     const isDemoMatch =
       args.isDemo ??
-      (patient?.name === "Eleanor Vance" ||
-        patient?.name === "Marcus Sterling" ||
-        patient?.name === "Michael Patel" ||
-        claimNumber.startsWith("CLM-8942-GEO") ||
-        claimNumber.startsWith("CLM-6104-GEO") ||
-        claimNumber.startsWith("CLM-3912-BCG") ||
-        patient?.memberId === "GEO-982341-01" ||
-        patient?.memberId === "GEO-554210-99" ||
-        patient?.memberId === "BCG-773419-02");
+      isSyntheticDemoClaimIdentifier({
+        claimNumber,
+        memberId: patient?.memberId,
+        patientName: patient?.name,
+        payer: patient?.insurancePayer,
+      });
     const isDemo = Boolean(isDemoMatch);
     const dataOrigin = args.dataOrigin || (isDemo ? "demo-fixture" : "live-pipeline");
     const isSyntheticPII = args.isSyntheticPII ?? isDemo;
@@ -773,15 +886,12 @@ async function applyCreateWithPatient(
 
   const isDemoMatch =
     args.isDemo ??
-    (resolvedPatientName === "Eleanor Vance" ||
-      resolvedPatientName === "Marcus Sterling" ||
-      resolvedPatientName === "Michael Patel" ||
-      claimNumber.startsWith("CLM-8942-GEO") ||
-      claimNumber.startsWith("CLM-6104-GEO") ||
-      claimNumber.startsWith("CLM-3912-BCG") ||
-      args.memberId === "GEO-982341-01" ||
-      args.memberId === "GEO-554210-99" ||
-      args.memberId === "BCG-773419-02");
+    isSyntheticDemoClaimIdentifier({
+      claimNumber,
+      memberId: args.memberId,
+      patientName: resolvedPatientName,
+      payer: args.insurancePayer,
+    });
   const isDemo = Boolean(isDemoMatch);
   const dataOrigin = args.dataOrigin || (isDemo ? "demo-fixture" : "live-pipeline");
   const isSyntheticPII = args.isSyntheticPII ?? isDemo;
@@ -1412,7 +1522,15 @@ export const getPortfolioStats = query({
       .order("desc")
       .take(500)) as Doc<"claims">[];
     const claims = args.includeDemo === false
-      ? rawClaims.filter((c) => !c.isDemo)
+      ? rawClaims.filter(
+          (c) =>
+            !c.isDemo &&
+            !isSyntheticDemoClaimIdentifier({
+              claimNumber: c.claimNumber,
+              patientName: c.patientName,
+              payer: c.insurancePayer,
+            })
+        )
       : rawClaims;
 
     const isSampleTruncated = rawClaims.length >= 500;
@@ -1860,6 +1978,9 @@ interface PayerContactUpdateArgs {
     isVerified: boolean;
     submissionPolicyNote?: string;
     source?: string;
+    registryDate?: string;
+    verifiedAt?: number;
+    liveVerifiedAt?: number;
   };
 }
 
@@ -1900,6 +2021,9 @@ export const updatePayerContact = mutation({
       isVerified: v.boolean(),
       submissionPolicyNote: v.optional(v.string()),
       source: v.optional(v.string()),
+      registryDate: v.optional(v.string()),
+      verifiedAt: v.optional(v.number()),
+      liveVerifiedAt: v.optional(v.number()),
     }),
   },
   handler: async (ctx, args) => {
@@ -1925,6 +2049,9 @@ export const updatePayerContactInternal = internalMutation({
       isVerified: v.boolean(),
       submissionPolicyNote: v.optional(v.string()),
       source: v.optional(v.string()),
+      registryDate: v.optional(v.string()),
+      verifiedAt: v.optional(v.number()),
+      liveVerifiedAt: v.optional(v.number()),
     }),
   },
   handler: async (ctx, args) => {
@@ -2031,6 +2158,18 @@ async function applyAppealContextUpdate(ctx: MutationCtx, args: AppealContextUpd
         }
       }
     }
+  }
+
+  const effectivePatientName = (patchPayload.patientName as string) || claim.patientName;
+  const isDemoIdent = isSyntheticDemoClaimIdentifier({
+    claimNumber: claim.claimNumber,
+    patientName: effectivePatientName,
+    payer: claim.insurancePayer,
+  });
+  if (isDemoIdent && claim.isDemo !== true) {
+    patchPayload.isDemo = true;
+    patchPayload.isSyntheticPII = true;
+    patchPayload.dataOrigin = "demo-fixture";
   }
 
   await ctx.db.patch(args.claimId, patchPayload);
@@ -2301,17 +2440,29 @@ export const clearDemoData = mutation({
     const queryBuilder = userId
       ? ctx.db
           .query("claims")
-          .withIndex("by_user_demo", (q) => q.eq("userId", userId).eq("isDemo", true))
+          .withIndex("by_user", (q) => q.eq("userId", userId))
       : ctx.db.query("claims");
 
     const hasTake = "take" in queryBuilder && typeof queryBuilder.take === "function";
-    const demoClaims = hasTake
+    const allUserClaims = hasTake
       ? (userId
-          ? await queryBuilder.take(50)
-          : (await queryBuilder.take(200)).filter((c) => c.isDemo === true).slice(0, 50))
+          ? await queryBuilder.take(100)
+          : await queryBuilder.take(200))
       : (userId
           ? await queryBuilder.collect()
-          : (await queryBuilder.collect()).filter((c) => c.isDemo === true).slice(0, 50));
+          : await queryBuilder.collect());
+
+    const demoClaims = allUserClaims
+      .filter(
+        (c) =>
+          c.isDemo === true ||
+          isSyntheticDemoClaimIdentifier({
+            claimNumber: c.claimNumber,
+            patientName: c.patientName,
+            payer: c.insurancePayer,
+          })
+      )
+      .slice(0, 50);
 
     let deletedCount = 0;
     for (const claim of demoClaims) {
@@ -2376,12 +2527,24 @@ export const clearDemoDataInternal = internalMutation({
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const demoClaims = args.userId
+    const userClaims = args.userId
       ? await ctx.db
           .query("claims")
-          .withIndex("by_user_demo", (q) => q.eq("userId", args.userId!).eq("isDemo", true))
-          .take(50)
-      : (await ctx.db.query("claims").take(200)).filter((c) => c.isDemo === true).slice(0, 50);
+          .withIndex("by_user", (q) => q.eq("userId", args.userId!))
+          .take(100)
+      : await ctx.db.query("claims").take(200);
+
+    const demoClaims = userClaims
+      .filter(
+        (c) =>
+          c.isDemo === true ||
+          isSyntheticDemoClaimIdentifier({
+            claimNumber: c.claimNumber,
+            patientName: c.patientName,
+            payer: c.insurancePayer,
+          })
+      )
+      .slice(0, 50);
 
     for (const claim of demoClaims) {
       if (claim.denialLetterStorageId) {
@@ -2477,6 +2640,19 @@ export const healRedactedPatientNames = mutation({
           ...claim.appealContext,
           physicianNotes: claim.appealContext.physicianNotes.replace(/\[PATIENT (?:NAME )?REDACTED\]/g, targetName),
         };
+      }
+
+      const isDemoIdent = isSyntheticDemoClaimIdentifier({
+        claimNumber: claim.claimNumber,
+        patientName: targetName || currentClaimName,
+        payer: claim.insurancePayer,
+        memberId: patient?.memberId,
+      });
+
+      if (isDemoIdent && (claim.isDemo !== true || claim.dataOrigin !== "demo-fixture" || claim.isSyntheticPII !== true)) {
+        patches.isDemo = true;
+        patches.isSyntheticPII = true;
+        patches.dataOrigin = "demo-fixture";
       }
 
       if (Object.keys(patches).length > 0) {

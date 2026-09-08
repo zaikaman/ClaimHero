@@ -12,7 +12,6 @@ import {
   CPT_CODES,
   DENIAL_REASON_CODES,
   STATUTORY_REGULATIONS,
-  INSURERS,
   getPayerAppellateContact,
   SAMPLE_CASE_PRESETS,
 } from "../src/lib/constants";
@@ -82,28 +81,22 @@ describe("ClaimHero Regulatory & Clinical Dictionary", () => {
     expect(DENIAL_REASON_CODES["CO-197"]?.title).toContain("Precertification");
   });
 
-  it("contains major US commercial health insurance payers and verified email-capable payers", () => {
-    const insurerNames = INSURERS.map((i) => i.name);
-    expect(insurerNames).toContain("UnitedHealthcare");
-    expect(insurerNames).toContain("Blue Cross Blue Shield");
-    expect(insurerNames).toContain("Humana");
-    expect(insurerNames).toContain("Molina Healthcare");
-    expect(insurerNames).toContain("GeoBlue (BCBS Global)");
-    expect(insurerNames).toContain("Blue Cross Blue Shield Global Core");
-  });
-
-  it("resolves verified appeals email addresses for supported payers", () => {
+  it("returns unverified contact status prior to live dynamic discovery", () => {
     const molina = getPayerAppellateContact("Molina Healthcare");
-    expect(molina.officialAppealsEmail).toBe("MFLGrievanceandAppealsDepartment@MolinaHealthcare.com");
-    expect(molina.isVerified).toBe(true);
+    expect(molina.officialAppealsEmail).toBeUndefined();
+    expect(molina.isVerified).toBe(false);
 
     const geoblue = getPayerAppellateContact("GeoBlue");
-    expect(geoblue.officialAppealsEmail).toBe("claims@geo-blue.com");
-    expect(geoblue.isVerified).toBe(true);
+    expect(geoblue.officialAppealsEmail).toBeUndefined();
+    expect(geoblue.isVerified).toBe(false);
 
-    const bcbsGlobal = getPayerAppellateContact("BCBS Global Core");
-    expect(bcbsGlobal.officialAppealsEmail).toBe("claims@bcbsglobalcore.com");
-    expect(bcbsGlobal.isVerified).toBe(true);
+    const cignaGlobal = getPayerAppellateContact("Cigna Global");
+    expect(cignaGlobal.officialAppealsEmail).toBeUndefined();
+    expect(cignaGlobal.isVerified).toBe(false);
+
+    const aetnaIntl = getPayerAppellateContact("Aetna International");
+    expect(aetnaIntl.officialAppealsEmail).toBeUndefined();
+    expect(aetnaIntl.isVerified).toBe(false);
   });
 });
 
@@ -490,7 +483,7 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
   });
 
   it("accepts only scraped Firecrawl documents with direct source URLs", async () => {
-    const { isAccessDeniedDocument, sanitizePublicPolicyUrl, selectFirecrawlPolicySource, selectFirecrawlPolicyUrl, selectFirecrawlPolicyUrls } = await import("../convex/actions/policyCrawler");
+    const { cleanPayerForSearch, isAcceptableSourceUrl, isAccessDeniedDocument, sanitizePublicPolicyUrl, selectFirecrawlPolicySource, selectFirecrawlPolicySources, selectFirecrawlPolicyUrl, selectFirecrawlPolicyUrls } = await import("../convex/actions/policyCrawler");
     const { isEvidenceSiteMismatched } = await import("../convex/actions/appealSynthesizer");
 
     expect(isAccessDeniedDocument("<html><title>Access Denied</title>You don't have permission to access this resource. Reference #18.e507fab.1788066210</html>")).toBe(true);
@@ -601,6 +594,50 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
     }, ["Molina", "knee", "arthroplasty", "medical policy"], 0, 1)).toEqual([
       "https://provider.example.org/knee-arthroplasty.pdf",
     ]);
+
+    // Strips international/subsidiary tokens for clinical policy retrieval
+    expect(cleanPayerForSearch("Cigna Global")).toBe("Cigna");
+    expect(cleanPayerForSearch("Aetna International")).toBe("Aetna");
+    expect(cleanPayerForSearch("BCBS Global Core")).toBe("BCBS");
+    expect(cleanPayerForSearch("UnitedHealthcare Global")).toBe("UnitedHealthcare");
+    expect(cleanPayerForSearch("GeoBlue")).toBe("GeoBlue");
+    expect(cleanPayerForSearch("Molina Healthcare of Florida, Inc.")).toBe("Molina");
+
+    // Fast-path multi-source extraction
+    expect(selectFirecrawlPolicySources({
+      data: {
+        web: [
+          { url: "https://static.cigna.com/policy-0066.pdf", markdown: "Cigna 0066 criteria" },
+          { url: "https://cigna.com/policy-joint.pdf", markdown: "Cigna joint criteria" },
+        ],
+      },
+    }, 2)).toEqual([
+      { sourceUrl: "https://static.cigna.com/policy-0066.pdf", markdown: "Cigna 0066 criteria" },
+      { sourceUrl: "https://cigna.com/policy-joint.pdf", markdown: "Cigna joint criteria" },
+    ]);
+
+    // Drops consumer marketing expat sites in favor of clinical policy authorities
+    expect(selectFirecrawlPolicyUrls({
+      data: {
+        web: [
+          { url: "https://www.cignaglobal.com/expat-quote" },
+          { url: "https://static.cigna.com/policy-0066.pdf" },
+        ],
+      },
+    })).toEqual(["https://static.cigna.com/policy-0066.pdf"]);
+
+    // Drops third-party administrative precert lists and outdated WordPress uploads
+    expect(isAcceptableSourceUrl("http://www.mercyoptions.net/wp-content/uploads/2019/11/Cigna-Master-Precert-List-October-25-2019.pdf")).toBe(false);
+    expect(isAcceptableSourceUrl("https://static.cigna.com/assets/chcp/pdf/coveragePolicies/medical/mm_0066_coveragepositioncriteria_knee_arthroscopy.pdf")).toBe(true);
+
+    expect(selectFirecrawlPolicyUrls({
+      data: {
+        web: [
+          { url: "http://www.mercyoptions.net/wp-content/uploads/2019/11/Cigna-Master-Precert-List-October-25-2019.pdf" },
+          { url: "https://static.cigna.com/policy-0066.pdf" },
+        ],
+      },
+    })).toEqual(["https://static.cigna.com/policy-0066.pdf"]);
   });
 
   it("recognizes neutral clinical authorities and payer affiliate network domains", async () => {
@@ -1157,9 +1194,9 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
   it("provides 3 complete preset template denials with distinct clinical criteria", () => {
     expect(SAMPLE_CASE_PRESETS.length).toBe(3);
     const presetIds = SAMPLE_CASE_PRESETS.map((p) => p.id);
-    expect(presetIds).toContain("geoblue_meniscus");
+    expect(presetIds).toContain("cignaglobal_meniscus");
     expect(presetIds).toContain("geoblue_spine");
-    expect(presetIds).toContain("bcbsglobal_mri");
+    expect(presetIds).toContain("aetnaintl_mri");
   });
 
   it("includes valid sender contact information across all 3 template presets", () => {
@@ -1172,9 +1209,9 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
 
   it("guarantees explicit proper patient names and member IDs across all 3 template presets", () => {
     const expected = {
-      geoblue_meniscus: { patientName: "Eleanor Vance", memberId: "GEO-982341-01" },
+      cignaglobal_meniscus: { patientName: "Eleanor Vance", memberId: "CIG-982341-01" },
       geoblue_spine: { patientName: "Marcus Sterling", memberId: "GEO-554210-99" },
-      bcbsglobal_mri: { patientName: "Michael Patel", memberId: "BCG-773419-02" },
+      aetnaintl_mri: { patientName: "Michael Patel", memberId: "AET-773419-02" },
     };
 
     for (const preset of SAMPLE_CASE_PRESETS) {
@@ -1210,12 +1247,12 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
     }
   });
 
-  it("validates exact tailored knee imaging questions for BCBS Global Core Knee MRI", () => {
-    const bcbs = SAMPLE_CASE_PRESETS.find((p) => p.id === "bcbsglobal_mri");
-    expect(bcbs).toBeDefined();
-    if (!bcbs) return;
+  it("validates exact tailored knee imaging questions for Aetna International Knee MRI", () => {
+    const aetna = SAMPLE_CASE_PRESETS.find((p) => p.id === "aetnaintl_mri");
+    expect(aetna).toBeDefined();
+    if (!aetna) return;
 
-    const qMap = new Map(bcbs.questions.map((q) => [q.field, q]));
+    const qMap = new Map(aetna.questions.map((q) => [q.field, q]));
 
     const symptomsQ = qMap.get("symptomsAndFunctionalImpact");
     expect(symptomsQ?.question).toContain("What specific symptoms and functional limitations are documented in the clinical record regarding the patient's knee?");
@@ -1257,20 +1294,20 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
       expect(preset.physicianNotes).toContain("Attending");
     }
 
-    const meniscus = SAMPLE_CASE_PRESETS.find((p) => p.id === "geoblue_meniscus");
+    const meniscus = SAMPLE_CASE_PRESETS.find((p) => p.id === "cignaglobal_meniscus");
     expect(meniscus?.physicianNotes).toContain("Dr. Robert Langston");
     expect(meniscus?.physicianNotes).toContain("8 consecutive weeks");
-    expect(meniscus?.physicianNotes).toContain("Carelon");
+    expect(meniscus?.physicianNotes).toContain("Cigna Medical Coverage Policy");
 
     const geoblue = SAMPLE_CASE_PRESETS.find((p) => p.id === "geoblue_spine");
     expect(geoblue?.physicianNotes).toContain("Dr. Sarah Chen");
     expect(geoblue?.physicianNotes).toContain("SURG.00011");
     expect(geoblue?.physicianNotes).toContain("foot drop");
 
-    const bcbs = SAMPLE_CASE_PRESETS.find((p) => p.id === "bcbsglobal_mri");
-    expect(bcbs?.physicianNotes).toContain("Dr. Angela Martinez");
-    expect(bcbs?.physicianNotes).toContain("RAD.00002");
-    expect(bcbs?.physicianNotes).toContain("05/20/2026");
+    const aetna = SAMPLE_CASE_PRESETS.find((p) => p.id === "aetnaintl_mri");
+    expect(aetna?.physicianNotes).toContain("Dr. Angela Martinez");
+    expect(aetna?.physicianNotes).toContain("CPB 0171");
+    expect(aetna?.physicianNotes).toContain("05/20/2026");
   });
 
   it("incorporates physicianNotes into synthesized appeal brief email", async () => {

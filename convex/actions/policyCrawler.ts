@@ -614,6 +614,14 @@ const DISALLOWED_MARKETING_DOMAINS = new Set([
   "www.curemd.com",
   "internationalinsurance.com",
   "www.internationalinsurance.com",
+  "cignaglobal.com",
+  "www.cignaglobal.com",
+  "aetnainternational.com",
+  "www.aetnainternational.com",
+  "bcbsglobalcore.com",
+  "www.bcbsglobalcore.com",
+  "mercyoptions.net",
+  "www.mercyoptions.net",
   "insubuy.com",
   "www.insubuy.com",
   "visitorscoverage.com",
@@ -807,6 +815,16 @@ export function isAcceptableSourceUrl(value: unknown): value is string {
 
     // Exclude student travel / study-abroad / exchange insurance / non-clinical educational pages
     if (/\/(?:global-safety-security|study-abroad|travel-health|student-insurance|for-students|student-health|international-travel|academic-programs|admissions)\//i.test(url.pathname)) {
+      return false;
+    }
+
+    // Exclude administrative prior-authorization/precertification code lists (not clinical guidelines)
+    if (/(?:master[-_ ]?precert|precert[-_ ]?list|prior[-_ ]?auth(?:orization)?[-_ ]?list|precertification[-_ ]?list|code[-_ ]?list)/i.test(url.pathname)) {
+      return false;
+    }
+
+    // Exclude outdated third-party WordPress upload directories from prior years (e.g. /wp-content/uploads/2019/...)
+    if (/\/wp-content\/uploads\/(?:201\d|202[0-3])\//i.test(url.pathname)) {
       return false;
     }
 
@@ -1241,6 +1259,8 @@ export function selectFirecrawlPolicyUrls(
         "acr.org",
         "carelon",
         "evicore",
+        "cigna.com",
+        "aetna.com",
         "nccn.org",
         "nih.gov",
         "ncbi.nlm.nih.gov",
@@ -1259,7 +1279,8 @@ export function selectFirecrawlPolicyUrls(
         if (payerKw) {
           try {
             const parsedHost = new URL(sourceUrl).hostname.toLowerCase();
-            if (parsedHost.includes(payerKw)) {
+            const isConsumerMarketingHost = /cignaglobal|aetnainternational|bcbsglobalcore|travel|expat|student/i.test(parsedHost);
+            if (parsedHost.includes(payerKw) && !isConsumerMarketingHost) {
               payerBonus = 8;
             }
           } catch {
@@ -1304,12 +1325,24 @@ export function selectFirecrawlPolicyUrls(
         }
       }
 
-      // Generic commercial coding-guide penalty (billing/reimbursement content type,
+      // Generic commercial coding-guide and administrative precert list penalty (billing/reimbursement content type,
       // not a clinical coverage policy). Applies to any host, not a domain blocklist.
       let codingGuidePenalty = 0;
       const lowerUrl = sourceUrl.toLowerCase();
       if (lowerUrl.includes("/procedure-codes/") || lowerUrl.includes("/cpt-code")) {
         codingGuidePenalty += 15;
+      }
+      if (
+        lowerUrl.includes("precert") ||
+        lowerUrl.includes("prior-auth-list") ||
+        lowerUrl.includes("master-precert") ||
+        searchableText.includes("master precert") ||
+        searchableText.includes("precert list") ||
+        searchableText.includes("precertification list") ||
+        searchableText.includes("prior authorization list") ||
+        searchableText.includes("prior authorization code list")
+      ) {
+        codingGuidePenalty += 35;
       }
       if (
         searchableText.includes("billing and coding guide") ||
@@ -1338,6 +1371,15 @@ export function selectFirecrawlPolicyUrls(
         "study-abroad",
         "travel-health",
         "travel-insurance",
+        "plans-for-individuals",
+        "plans-for-employers",
+        "expat",
+        "expatriate",
+        "quote",
+        "quote-request",
+        "get-a-quote",
+        "buy-online",
+        "travel",
         "rebranding",
         "international-coverage",
         "products-programs",
@@ -1366,6 +1408,13 @@ export function selectFirecrawlPolicyUrls(
         sourceUrl.toLowerCase().endsWith("/guidelines/")
       ) && !/\.(?:pdf|ashx?)(?:$|[?#])/i.test(sourceUrl) ? 10 : 0;
       const privateViewerPenalty = isPrivateMcgViewerUrl(sourceUrl) ? 10 : 0;
+
+      // Heavy penalty for expat / consumer marketing / sales portal landing pages
+      const isConsumerMarketingUrl =
+        /cignaglobal\.com|aetnainternational\.com|bcbsglobalcore\.com|\/individuals-families\/|\/buy-insurance\//i.test(
+          sourceUrl,
+        );
+      const consumerMarketingPenalty = isConsumerMarketingUrl ? 25 : 0;
 
       // Heavy penalty for explicitly archived documents or disclaimers
       const isArchived = (
@@ -1398,12 +1447,15 @@ export function selectFirecrawlPolicyUrls(
         recencyBonus += 3;
       }
 
-      // Staleness penalty: mentions old years (e.g. 2024, 2023, 2022) without mentioning the active year
+      // Staleness penalty: mentions old years (e.g. 2024, 2023, 2022, 2019) without mentioning the active year
       let stalenessPenalty = 0;
+      const isAncient = /20(?:1\d|2[0-2])\b/.test(sourceUrl) || /\/20(?:1\d|2[0-2])\//.test(sourceUrl);
       const hasOldYear = /20(?:1\d|2[0-4])\b/.test(searchableText) || /20(?:1\d|2[0-4])\b/.test(sourceUrl);
       const hasCurrentYear = searchableText.includes(activeYear) || sourceUrl.includes(activeYear);
-      if (hasOldYear && !hasCurrentYear) {
-        stalenessPenalty = 15;
+      if (isAncient && !hasCurrentYear) {
+        stalenessPenalty = 40;
+      } else if (hasOldYear && !hasCurrentYear) {
+        stalenessPenalty = 20;
       }
 
       const score =
@@ -1421,7 +1473,8 @@ export function selectFirecrawlPolicyUrls(
         wrongProcedurePenalty -
         codingGuidePenalty -
         archivePenalty -
-        stalenessPenalty;
+        stalenessPenalty -
+        consumerMarketingPenalty;
 
       if (minimumRelevanceScore <= 0 || score >= minimumRelevanceScore) {
         candidates.push({ sourceUrl, score, position });
@@ -1435,7 +1488,13 @@ export function selectFirecrawlPolicyUrls(
   return maximumCandidates > 0 ? urls.slice(0, maximumCandidates) : urls;
 }
 
-export function selectFirecrawlPolicySource(payload: unknown): FirecrawlPolicySource | null {
+export function selectFirecrawlPolicySources(
+  payload: unknown,
+  maxSources = 3,
+): FirecrawlPolicySource[] {
+  const sources: FirecrawlPolicySource[] = [];
+  const seen = new Set<string>();
+
   for (const result of getFirecrawlSearchResults(payload)) {
     if (!result || typeof result !== "object") continue;
 
@@ -1443,12 +1502,19 @@ export function selectFirecrawlPolicySource(payload: unknown): FirecrawlPolicySo
     const markdown = typeof candidate.markdown === "string" ? candidate.markdown.trim() : "";
     const sourceUrl = getAcceptableResultUrl(result);
 
-    if (markdown && sourceUrl) {
-      return { markdown, sourceUrl };
+    if (markdown && sourceUrl && !seen.has(sourceUrl)) {
+      seen.add(sourceUrl);
+      sources.push({ markdown, sourceUrl });
+      if (sources.length >= maxSources) break;
     }
   }
 
-  return null;
+  return sources;
+}
+
+export function selectFirecrawlPolicySource(payload: unknown): FirecrawlPolicySource | null {
+  const sources = selectFirecrawlPolicySources(payload, 1);
+  return sources.length > 0 ? sources[0] : null;
 }
 
 export interface ScrapeExtractionOptions {
@@ -2146,10 +2212,12 @@ async function evaluatePolicySourceRelevance(
     })
     .join(", ");
 
-  const windowedMarkdown = extractRelevantDocumentWindow(policySource.markdown, cptCodes, 50000);
+  const windowedMarkdown = extractRelevantDocumentWindow(policySource.markdown, cptCodes, 12000);
 
-  const llmResult = await createStructuredCompletion<PolicyRelevanceResponse>({
-    systemPrompt: `You are an expert clinical document auditor for health insurance claim appeals.
+  let llmResult: PolicyRelevanceResponse;
+  try {
+    llmResult = await createStructuredCompletion<PolicyRelevanceResponse>({
+      systemPrompt: `You are an expert clinical document auditor for health insurance claim appeals.
 Evaluate whether the supplied document is an authoritative, clinically relevant coverage policy, medical necessity guideline, or specialty society standard that directly applies to this claim.
 
 Evaluation Directives:
@@ -2165,7 +2233,7 @@ Evaluation Directives:
 6. Peer-Reviewed Clinical Evidence & PubMed: Peer-reviewed clinical studies, systematic reviews, and meta-analyses indexed on PubMed/NCBI establish clinical efficacy, standard-of-care, and medical necessity indications under ERISA full-and-fair review regulations. You MUST accept a PubMed study or systematic review if it evaluates the surgical indications, clinical outcomes, or medical necessity for the procedure and diagnosis in the claim. Do not reject PubMed documents merely because they are formatted as journal articles or abstracts rather than an insurer CPB bulletin. Reject only protocols/project summaries that explicitly state they have no results or findings yet.
 
 Return relevant=true if the document satisfies all directives (including best-available vintage acceptance), or relevant=false with a concise explanation.`,
-    userPrompt: `Evaluate this Firecrawl document before it is used as appeal evidence.
+      userPrompt: `Evaluate this Firecrawl document before it is used as appeal evidence.
 
 Payer: ${payer}
 Procedure code(s): ${cptDescriptions}
@@ -2177,10 +2245,18 @@ Source URL: ${policySource.sourceUrl}
 
 Document excerpt (title may be first line):
 ${windowedMarkdown}`,
-    schemaName: "PolicyRelevanceResponse",
-    schema: POLICY_RELEVANCE_SCHEMA,
-    temperature: 0,
-  });
+      schemaName: "PolicyRelevanceResponse",
+      schema: POLICY_RELEVANCE_SCHEMA,
+      temperature: 0.1,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`Policy relevance evaluation failed for ${policySource.sourceUrl}: ${msg}`);
+    return {
+      relevant: false,
+      rationale: `Relevance evaluation failed to parse document structure: ${msg}`,
+    };
+  }
 
   if (llmResult.relevant) {
     const titleGuess = policySource.markdown.split("\n")[0]?.slice(0, 300) || "";
@@ -2284,9 +2360,13 @@ export function isVintageOnlyRejection(rationale: string): boolean {
   return true;
 }
 
-function cleanPayerForSearch(payer: string): string {
+export function cleanPayerForSearch(payer: string): string {
   const clean = payer
-    .replace(/\b(of|inc|llc|corp|corporation|insurance company|plan|health plan|services|fl|florida|ca|california|tx|texas|ny|new york)\b/gi, "")
+    .replace(
+      /\b(of|inc|llc|corp|corporation|insurance company|plan|health plan|healthcare|health care|services|fl|florida|ca|california|tx|texas|ny|new york|global|worldwide|international|core|health benefits|options|expat|travel)\b/gi,
+      "",
+    )
+    .replace(/[,.]/g, "")
     .replace(/\s+/g, " ")
     .trim();
   return clean.length >= 3 ? clean : payer;
@@ -2328,8 +2408,8 @@ Query Strategy:
 1. Payer & Utilization Management Guideline Query:
    - Target currently active payer medical policies and recognized clinical guidelines managers for ${targetYear}:
      * GeoBlue / Blue Cross Blue Shield / Anthem / Elevance utilize Carelon (formerly AIM Specialty Health) clinical appropriateness guidelines or Anthem clinical guidelines. For Joint/Knee (CPT 29881, 27447), Carelon publishes under "Joint Surgery" (e.g. Carelon joint surgery clinical appropriateness guideline ${targetYear} -archived). For Spine/Lumbar (CPT 63047), Carelon publishes under "Spine Surgery".
-     * Cigna, Molina, and regional plans utilize EviCore or Carelon clinical policies.
-     * Aetna and UnitedHealthcare utilize direct Clinical Policy Bulletins (CPBs).
+     * Cigna (including Cigna Global, which uses parent Cigna Medical Coverage Policies / Medical Health Policies / EviCore guidelines), Molina, and regional plans utilize Cigna Medical Coverage Policies, EviCore, or Carelon clinical policies. For Knee Arthroscopy & Meniscectomy (CPT 29881), target Cigna Medical Coverage Policy 0066 (Knee Arthroscopy and Open Procedures) or Cigna knee meniscectomy coverage criteria -precert.
+     * Aetna (including Aetna International, which uses parent Aetna Clinical Policy Bulletins / CPBs) and UnitedHealthcare utilize direct Clinical Policy Bulletins (CPBs). For Aetna / Aetna International knee MRI (CPT 73721), target Aetna CPB 0171 (Magnetic Resonance Imaging of the Extremities).
    - Target the active guideline in effect for ${targetYear} (e.g. ${primaryProcedureName} ${primaryCpt} Carelon clinical guideline ${targetYear} -archived OR coverage criteria ${searchPayer}).
 2. Clinical Specialty Society Standard-of-Care Guideline Query:
    - Target authoritative national medical specialty guidelines (NASS for spine/lumbar, AAOS for orthopedics/joint, ACR for imaging/radiology, NCCN for oncology) that establish active clinical necessity and conservative therapy criteria.
@@ -2342,6 +2422,8 @@ Rules:
 - Always include the clinical procedure title (e.g. "lumbar laminectomy decompression", "knee arthroscopy meniscectomy", "total knee arthroplasty", "knee MRI").
 - Combine procedure names with primary CPT codes and authoritative keywords (Carelon, NASS, AAOS, ACR, CMS LCD, coverage criteria).
 - Do NOT search for past years older than ${targetYear}; explicitly seek active guidelines for ${targetYear} and exclude archived versions.
+- Do NOT search for international/travel subsidiary brand names for clinical policies (e.g. search parent insurer 'Cigna' or 'Aetna', not 'Cigna Global' or 'Aetna International' which are expat sales portals without clinical bulletins).
+- Do NOT target administrative precertification code lists, master precert lists, or prior authorization code tables (e.g. exclude -precert). Target substantive clinical coverage policies with medical necessity criteria.
 - Do NOT target university student health portals, travel insurance marketing brochures, state Medicaid forms, or billing blogs.
 - Keep each query concise (under 90 characters) and focused.${rejectedSearchFeedback ? `
 Previous search attempts returned these rejected/stale results:
@@ -2487,19 +2569,36 @@ export const crawlInsurerPolicy = action({
         const successfulSearches: Array<{ payload: Record<string, unknown> }> = [];
         const failedSearches: string[] = [];
 
-        // Run search queries sequentially (not in parallel) to prevent rate-limit bursts
-        for (const query of searchQueries.slice(0, 3)) {
-          try {
-            const payload = await firecrawl.search(ctx, query, {
-              limit: 5,
-              sources: ["web"],
-            });
-            if (payload) successfulSearches.push({ payload: payload as Record<string, unknown> });
-          } catch (error) {
-            const msg = error instanceof Error ? error.message : "Unknown Firecrawl search error";
-            failedSearches.push(msg);
-            // If rate limited, break early to avoid worsening the 429
-            if (msg.includes("429") || msg.includes("Rate limit")) break;
+        // Run search queries with bounded concurrency (strictly max 2 concurrent requests) to honor Firecrawl 2-browser plan limits
+        const MAX_FIRECRAWL_SEARCH_CONCURRENCY = 2;
+        const queriesToRun = searchQueries.slice(0, 3);
+        for (let i = 0; i < queriesToRun.length; i += MAX_FIRECRAWL_SEARCH_CONCURRENCY) {
+          const chunk = queriesToRun.slice(i, i + MAX_FIRECRAWL_SEARCH_CONCURRENCY);
+          const chunkResults = await Promise.all(
+            chunk.map(async (query) => {
+              try {
+                const payload = await firecrawl.search(ctx, query, {
+                  limit: 5,
+                  sources: ["web"],
+                });
+                return { success: true as const, payload: payload as Record<string, unknown> };
+              } catch (error) {
+                const msg = error instanceof Error ? error.message : "Unknown Firecrawl search error";
+                return { success: false as const, error: msg };
+              }
+            }),
+          );
+
+          for (const res of chunkResults) {
+            if (res.success && res.payload) {
+              successfulSearches.push({ payload: res.payload });
+            } else if (!res.success && res.error) {
+              failedSearches.push(res.error);
+            }
+          }
+
+          if (failedSearches.some((s) => s.includes("429") || s.includes("concurrency") || s.includes("Rate limit"))) {
+            break;
           }
         }
 
@@ -2514,32 +2613,35 @@ export const crawlInsurerPolicy = action({
           },
         };
 
-        // Fast path: check if search payload already included substantive markdown
-        const directSource = selectFirecrawlPolicySource(combinedSearchPayload);
-        if (directSource && isPolicyMarkdownSubstantive(directSource.markdown)) {
-          try {
-            const relevance = await evaluatePolicySourceRelevance(
-              directSource,
-              args.payer,
-              args.cptCodes,
-              args.icd10Codes,
-              args.denialReasonCode,
-              args.denialReasonDescription || "",
-              targetYear,
-              effectiveDate,
-            );
-            if (relevance.relevant) {
-              policySource = directSource;
-              break;
+        // Fast path: check if search payload already included substantive markdown across top candidates
+        const directSources = selectFirecrawlPolicySources(combinedSearchPayload, 3);
+        for (const directSource of directSources) {
+          if (directSource && isPolicyMarkdownSubstantive(directSource.markdown)) {
+            try {
+              const relevance = await evaluatePolicySourceRelevance(
+                directSource,
+                args.payer,
+                args.cptCodes,
+                args.icd10Codes,
+                args.denialReasonCode,
+                args.denialReasonDescription || "",
+                targetYear,
+                effectiveDate,
+              );
+              if (relevance.relevant) {
+                policySource = directSource;
+                break;
+              }
+              considerVintageFallback(directSource, relevance.rationale);
+              failedSources.push(
+                `${directSource.sourceUrl}: document rejected as irrelevant (${relevance.rationale})`,
+              );
+            } catch {
+              // Defer to URL scraping
             }
-            considerVintageFallback(directSource, relevance.rationale);
-            failedSources.push(
-              `${directSource.sourceUrl}: document rejected as irrelevant (${relevance.rationale})`,
-            );
-          } catch {
-            // Defer to URL scraping
           }
         }
+        if (policySource) break;
 
         const cptKeywordTerms = getCptKeywords(args.cptCodes);
         const sourceRelevanceTerms = [
@@ -2567,7 +2669,7 @@ export const crawlInsurerPolicy = action({
         discoveredSourceCount += sourceUrls.length;
 
         // Evaluate candidate URLs sequentially (concurrency 1) to honor Firecrawl concurrency limits
-        for (const sourceUrl of sourceUrls.slice(0, 5)) {
+        for (const sourceUrl of sourceUrls.slice(0, 3)) {
           try {
             const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl, {
               payer: args.payer,
@@ -2606,7 +2708,7 @@ export const crawlInsurerPolicy = action({
                 args.cptCodes,
                 targetYear,
               );
-              for (const childUrl of childLinks.slice(0, 2)) {
+              for (const childUrl of childLinks.slice(0, 1)) {
                 if (seenSourceUrls.has(childUrl)) continue;
                 seenSourceUrls.add(childUrl);
                 discoveredSourceCount += 1;

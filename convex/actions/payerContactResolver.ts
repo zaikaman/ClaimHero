@@ -1,6 +1,7 @@
 "use node";
 
-import { action } from "../_generated/server";
+import { action, ActionCtx } from "../_generated/server";
+import { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { components, internal } from "../_generated/api";
 import { createStructuredCompletion } from "../lib/openai";
@@ -15,27 +16,27 @@ const CONTACT_EXTRACTION_SCHEMA = {
     officialAppealsEmail: {
       type: "string",
       description:
-        "Official public email exclusively dedicated to receiving formal claim appeals or grievance submissions. Return empty string if not found or if payer rejects email appeals.",
+        "Official email address for submitting claims, appeals, disputes, grievances, or clinical documentation. Return empty string if not found in search evidence.",
     },
     intakePortalUrl: {
       type: "string",
       description:
-        "Official URL of the payer's online appeals/grievance/claims portal. Return empty string if not found.",
+        "Official URL of the payer's online appeals, grievance, or claims dispute portal. Return empty string if not found.",
     },
     portalName: {
       type: "string",
       description:
-        "Human-readable name of the portal. Return empty string if not found.",
+        "Human-readable name of the portal (e.g. 'Member Hub', 'Provider Appeals Gateway'). Return empty string if not found.",
     },
     appealsFax: {
       type: "string",
       description:
-        "Official fax number dedicated to receiving appeals. Return empty string if not found.",
+        "Official fax number dedicated to receiving appeals, disputes, or claim records. Return empty string if not found.",
     },
     statutoryPoBox: {
       type: "string",
       description:
-        "Physical mailing address or P.O. Box for formal written appeals. Return empty string if not found.",
+        "Physical mailing address or P.O. Box for formal written appeals or claim disputes. Return empty string if not found.",
     },
     ediPayerId: {
       type: "string",
@@ -45,17 +46,17 @@ const CONTACT_EXTRACTION_SCHEMA = {
     tollFreeHelpline: {
       type: "string",
       description:
-        "Customer service or appeals department telephone helpline. Return empty string if not found.",
+        "Customer service, claims, or appeals department telephone helpline. Return empty string if not found.",
     },
     isVerified: {
       type: "boolean",
       description:
-        "True ONLY if authentic, verified contact information was identified from authoritative search results.",
+        "True if authentic, actionable contact information (portal, fax, email, or mailing address) was identified from search results.",
     },
     submissionPolicyNote: {
       type: "string",
       description:
-        "Brief note explaining the payer's official submission requirements based on search results.",
+        "Brief note explaining the payer's official submission requirements and accepted channels based on search results.",
     },
     source: {
       type: "string",
@@ -89,6 +90,346 @@ export interface ResolvedPayerContact {
   isVerified: boolean;
   submissionPolicyNote?: string;
   source?: string;
+  registryDate?: string;
+  verifiedAt?: number;
+  liveVerifiedAt?: number;
+}
+
+
+function extractFirecrawlItems(payload: unknown): Array<{
+  title?: string;
+  url?: string;
+  markdown?: string;
+}> {
+  if (!payload || typeof payload !== "object") return [];
+  const root = payload as Record<string, unknown>;
+  let candidates: unknown[] = [];
+
+  if (Array.isArray(root.web)) {
+    candidates = root.web;
+  } else if (root.data && typeof root.data === "object") {
+    const data = root.data as Record<string, unknown>;
+    if (Array.isArray(data.web)) {
+      candidates = data.web;
+    } else if (Array.isArray(root.data)) {
+      candidates = root.data as unknown[];
+    }
+  } else if (Array.isArray(root.results)) {
+    candidates = root.results;
+  } else if (Array.isArray(root.items)) {
+    candidates = root.items;
+  }
+
+  const results: Array<{ title?: string; url?: string; markdown?: string }> = [];
+  for (const item of candidates) {
+    if (item && typeof item === "object") {
+      const record = item as Record<string, unknown>;
+      const title = typeof record.title === "string" ? record.title : undefined;
+      const url =
+        typeof record.url === "string"
+          ? record.url
+          : typeof record.link === "string"
+            ? record.link
+            : undefined;
+      const markdown =
+        typeof record.markdown === "string"
+          ? record.markdown
+          : typeof record.content === "string"
+            ? record.content
+            : typeof record.description === "string"
+              ? record.description
+              : typeof record.snippet === "string"
+                ? record.snippet
+                : undefined;
+      if (url || markdown) {
+        results.push({ title, url, markdown });
+      }
+    }
+  }
+  return results;
+}
+
+function extractCandidateEmails(text: string, payerName: string): {
+  priorityEmails: string[];
+  allEmails: string[];
+} {
+  const matches = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+  const ignoredDomains = [
+    "example.com",
+    "w3.org",
+    "schema.org",
+    "sentry.io",
+    "github.com",
+    "google.com",
+    "facebook.com",
+    "twitter.com",
+  ];
+  const emailFilterRegex = /\.(png|jpg|jpeg|gif|svg|webp|css|js|ico)$/i;
+
+  const allEmails = Array.from(new Set(matches))
+    .map((e) => e.trim())
+    .filter((email) => {
+      const lower = email.toLowerCase();
+      if (emailFilterRegex.test(lower)) return false;
+      const domain = lower.split("@")[1];
+      if (!domain || ignoredDomains.includes(domain)) return false;
+      return true;
+    });
+
+  const payerClean = payerName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const payerTokens = payerName
+    .toLowerCase()
+    .split(/[\s-]+/)
+    .filter((t) => t.length >= 3 && !["health", "plan", "insurance", "the", "inc", "corp"].includes(t));
+
+  const priorityEmails = allEmails.filter((email) => {
+    const lower = email.toLowerCase();
+    const [local, domain] = lower.split("@");
+    const isRelevantLocal =
+      /^(claims?|appeals?|grievance|disputes?|inquir|member|service|support|contact|submission|auth)/i.test(
+        local
+      );
+    const domainClean = domain.replace(/[^a-z0-9]/g, "");
+    const isPayerDomain =
+      (domainClean.length > 3 && payerClean.includes(domainClean)) ||
+      (payerClean.length > 3 && domainClean.includes(payerClean)) ||
+      payerTokens.some((t) => domain.includes(t));
+
+    return isRelevantLocal || isPayerDomain;
+  });
+
+  return { priorityEmails, allEmails };
+}
+
+/**
+ * Shared execution helper for resolving and validating payer intake gateways.
+ */
+export async function executeResolvePayerGateway(
+  ctx: ActionCtx,
+  args: {
+    claimId: Id<"claims">;
+    payerName?: string;
+    forceWebSearch?: boolean;
+  }
+): Promise<ResolvedPayerContact> {
+  // 1. Authorize claim ownership and fetch context
+  const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
+
+  const payer = args.payerName || claim.patient?.insurancePayer || "Health Insurer";
+
+  // 2. Dynamic Discovery via Multi-Query Firecrawl Search + Candidate Extraction
+  let webSearchContext = "";
+  let detectedPriorityEmails: string[] = [];
+
+  try {
+    const searchQueries = [
+      `"${payer}" appeals dispute claims submission portal fax address contact`,
+      `"${payer}" (claims OR appeals OR grievances OR disputes) email address contact`,
+    ];
+
+    const allRawItems: Array<{ title?: string; url?: string; markdown?: string }> = [];
+
+    const searchPromises = searchQueries.map(async (query) => {
+      try {
+        const searchData = await firecrawl.search(ctx, query, {
+          limit: 5,
+          scrapeOptions: { formats: ["markdown"] },
+        });
+        return extractFirecrawlItems(searchData);
+      } catch (queryErr) {
+        console.warn(`Firecrawl query "${query}" failed:`, queryErr);
+        return [];
+      }
+    });
+
+    const itemsArrays = await Promise.all(searchPromises);
+    for (const items of itemsArrays) {
+      allRawItems.push(...items);
+    }
+
+    const seenUrls = new Set<string>();
+    const deduplicatedItems: Array<{ title: string; url: string; markdown: string }> = [];
+
+    for (const item of allRawItems) {
+      const normUrl = (item.url || "").toLowerCase().split("?")[0].replace(/\/+$/, "");
+      if (normUrl && seenUrls.has(normUrl)) continue;
+      if (normUrl) seenUrls.add(normUrl);
+      deduplicatedItems.push({
+        title: item.title || `${payer} Gateway Portal`,
+        url: item.url || "",
+        markdown: (item.markdown || "").slice(0, 3500),
+      });
+      if (deduplicatedItems.length >= 6) break;
+    }
+
+    webSearchContext = deduplicatedItems
+      .map((r) => `Title: ${r.title}\nURL: ${r.url}\nContent:\n${r.markdown}`)
+      .join("\n\n---\n\n");
+
+    const { priorityEmails } = extractCandidateEmails(webSearchContext, payer);
+    detectedPriorityEmails = priorityEmails;
+  } catch (crawlErr) {
+    console.warn("Firecrawl live search encountered transient error, proceeding to synthesis/fallback:", crawlErr);
+  }
+
+  // 3. Use LLM to extract verified contact details from live Firecrawl context
+  const detectedEmailsSection =
+    detectedPriorityEmails.length > 0
+      ? `Candidate Email Addresses Discovered in Search Content:\n- ${detectedPriorityEmails.join("\n- ")}`
+      : "No candidate email addresses pre-detected in search content.";
+
+  const systemPrompt = `You are ClaimHero's Payer Intake Intelligence Agent.
+Your task is to extract authentic, official appellate, grievance, claims, or customer intake gateway details for the specified health insurer.
+
+EXTRACTION GUIDELINES:
+1. NEVER guess or hallucinate contact information.
+2. Official Appeals / Claims Email:
+   - If the search evidence or candidate email list contains an official email address for claims submission, appeals, disputes, grievances, or customer inquiries (e.g. claims@payer.com, appeals@payer.com, disputes@payer.com), YOU MUST EXTRACT IT as officialAppealsEmail.
+   - Payers frequently accept claims records, dispute documentation, and appeal inquiries via dedicated claims/appeals inboxes. Do NOT discard or omit valid claims, appeals, or dispute email addresses.
+3. Online Appeals & Dispute Portal:
+   - Extract the official URL for provider or member appeals, dispute resolution, or claims management.
+4. Appellate Fax:
+   - Extract dedicated appeals, grievances, or claims department fax numbers.
+5. Statutory Mailing Address:
+   - Extract the formal appeals or claims mailing address / P.O. Box.
+6. Verification Status:
+   - Set isVerified: true if genuine, actionable contact details (portal, fax, email, or statutory mailing address) were found in the authoritative search results.`;
+
+  const userPrompt = `Insurer Name: ${payer}
+Patient State / Jurisdiction: ${claim.patient?.state || "National"}
+
+${detectedEmailsSection}
+
+Web Search Evidence from Firecrawl:
+${webSearchContext || "No live search results available."}
+
+Extract the authentic appeals/grievance/claims intake gateway details for ${payer}.`;
+
+  let resolvedContact: ResolvedPayerContact;
+
+  try {
+    const aiExtraction = await createStructuredCompletion<ResolvedPayerContact>({
+      systemPrompt,
+      userPrompt,
+      schema: CONTACT_EXTRACTION_SCHEMA,
+      schemaName: "ResolvedPayerContact",
+      temperature: 0.1,
+    });
+
+    const cleanField = (val?: string) => {
+      const trimmed = val?.trim();
+      if (!trimmed) return undefined;
+      if (trimmed.includes("555-01") || trimmed.includes("EDI-AUTO") || trimmed.includes("EDI-UNKNOWN")) {
+        return undefined;
+      }
+      return trimmed;
+    };
+
+    let extractedEmail = cleanField(aiExtraction.officialAppealsEmail);
+    // Dynamic Grounding Recovery: if LLM omitted email but crawl evidence contained verified priority emails
+    if ((!extractedEmail || !extractedEmail.includes("@")) && detectedPriorityEmails.length > 0) {
+      const best =
+        detectedPriorityEmails.find((e) =>
+          /^(claims?|appeals?|grievance|disputes?)/i.test(e.split("@")[0])
+        ) || detectedPriorityEmails[0];
+      if (best && best.includes("@")) {
+        extractedEmail = best;
+      }
+    }
+
+    const intakePortalUrl = cleanField(aiExtraction.intakePortalUrl);
+    const portalName = cleanField(aiExtraction.portalName);
+    const appealsFax = cleanField(aiExtraction.appealsFax);
+    const statutoryPoBox = cleanField(aiExtraction.statutoryPoBox);
+    const ediPayerId = cleanField(aiExtraction.ediPayerId);
+    const tollFreeHelpline = cleanField(aiExtraction.tollFreeHelpline);
+    const submissionPolicyNote = cleanField(aiExtraction.submissionPolicyNote);
+
+    const hasLiveContact = Boolean(
+      extractedEmail || intakePortalUrl || appealsFax || statutoryPoBox
+    );
+
+    const isLiveCorroborated = Boolean(
+      hasLiveContact &&
+        (aiExtraction.isVerified ||
+          (webSearchContext && (extractedEmail || intakePortalUrl || appealsFax)))
+    );
+
+    if (isLiveCorroborated) {
+      resolvedContact = {
+        officialAppealsEmail:
+          extractedEmail && extractedEmail.includes("@") ? extractedEmail : undefined,
+        intakePortalUrl:
+          intakePortalUrl && (intakePortalUrl.startsWith("http://") || intakePortalUrl.startsWith("https://"))
+            ? intakePortalUrl
+            : undefined,
+        portalName: portalName || (intakePortalUrl ? `${payer} Appeals Portal` : undefined),
+        appealsFax: appealsFax || undefined,
+        statutoryPoBox: statutoryPoBox || undefined,
+        ediPayerId: ediPayerId || undefined,
+        tollFreeHelpline: tollFreeHelpline || undefined,
+        isVerified: true,
+        liveVerifiedAt: Date.now(),
+        submissionPolicyNote:
+          submissionPolicyNote ||
+          "Submissions accepted via verified official payer channels.",
+        source: webSearchContext ? "firecrawl_live" : "ai_knowledge",
+      };
+    } else {
+      resolvedContact = {
+        officialAppealsEmail: undefined,
+        intakePortalUrl: undefined,
+        portalName: undefined,
+        appealsFax: undefined,
+        statutoryPoBox: undefined,
+        ediPayerId: undefined,
+        tollFreeHelpline: undefined,
+        isVerified: false,
+        submissionPolicyNote:
+          "Payer gateway could not be verified automatically. Consult the denial notice for appellate filing instructions.",
+        source: "unresolved",
+      };
+    }
+  } catch {
+    resolvedContact = {
+      officialAppealsEmail: undefined,
+      intakePortalUrl: undefined,
+      portalName: undefined,
+      appealsFax: undefined,
+      statutoryPoBox: undefined,
+      ediPayerId: undefined,
+      tollFreeHelpline: undefined,
+      isVerified: false,
+      submissionPolicyNote:
+        "Payer gateway could not be verified automatically. Consult the denial notice for appellate filing instructions.",
+      source: "unresolved",
+    };
+  }
+
+  // 4. Persist the discovered contact to the claim record
+  await ctx.runMutation(internal.claims.updatePayerContactInternal, {
+    claimId: args.claimId,
+    payerContact: resolvedContact,
+  });
+
+  // 5. Record audit log
+  const auditActor =
+    resolvedContact.source === "firecrawl_live"
+      ? "Firecrawl Web Crawler"
+      : "Payer Gateway Resolver";
+
+  const auditDetail = resolvedContact.isVerified
+    ? `Resolved official appeals gateway for ${payer}: ${resolvedContact.officialAppealsEmail || resolvedContact.portalName || resolvedContact.appealsFax || "Appellate Gateway"} (Source: ${resolvedContact.source}).`
+    : `Payer gateway for ${payer} could not be verified automatically; manual filing verification required prior to PHI dispatch.`;
+
+  await ctx.runMutation(internal.auditLogs.logEventInternal, {
+    claimId: args.claimId,
+    eventType: "policy_crawled",
+    actor: auditActor,
+    details: auditDetail,
+  });
+
+  return resolvedContact;
 }
 
 /**
@@ -103,282 +444,55 @@ export const resolvePayerGateway = action({
     forceWebSearch: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<ResolvedPayerContact> => {
-    // 1. Authorize claim ownership and fetch context
+    return await executeResolvePayerGateway(ctx, args);
+  },
+});
+
+/**
+ * Autonomous Pre-Dispatch Payer Re-verification Action:
+ * Re-verifies insurer appeals intake gateways via live Firecrawl search immediately
+ * before PHI-bearing appeal dispatch. Prevents HIPAA breach from stale fax/email routing.
+ */
+export const reverifyPayerContactForDispatch = action({
+  args: {
+    claimId: v.id("claims"),
+    intendedChannel: v.optional(
+      v.union(
+        v.literal("email"),
+        v.literal("fax"),
+        v.literal("portal"),
+        v.literal("any")
+      )
+    ),
+  },
+  handler: async (ctx, args): Promise<ResolvedPayerContact> => {
     const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
+    const payer = claim.patient?.insurancePayer || "Health Insurer";
 
-    const payer = args.payerName || claim.patient?.insurancePayer || "Health Insurer";
-    const cleanName = payer.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-    // 2. Statutory Payer Registry for verification, metadata enrichment, and offline resilience
-    const STATUTORY_PAYER_REGISTRY: Record<string, ResolvedPayerContact> = {
-      molina: {
-        officialAppealsEmail: "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com",
-        intakePortalUrl: "https://member.molinahealthcare.com",
-        portalName: "MyMolina Grievance & Appeals Gateway",
-        appealsFax: "1-877-508-5748",
-        statutoryPoBox: "Molina Healthcare of Florida, Grievance and Appeals Dept., P.O. Box 521838, Longwood, FL 32752",
-        ediPayerId: "51062",
-        tollFreeHelpline: "1-888-560-5716",
-        isVerified: true,
-        submissionPolicyNote: "Molina Healthcare accepts formal written appeals and grievance submissions directly via its dedicated state appeals email (MFLGrievanceandAppealsDepartment@MolinaHealthcare.com), MyMolina portal, or appellate fax.",
-        source: "registry_fallback",
-      },
-      geoblue: {
-        officialAppealsEmail: "claims@geo-blue.com",
-        intakePortalUrl: "https://www.geo-blue.com",
-        portalName: "GeoBlue Member & Claims Portal",
-        appealsFax: "1-610-482-9623",
-        statutoryPoBox: "GeoBlue Claims Appeals Unit, One Radnor Corporate Center, Suite 100, Radnor, PA 19087",
-        ediPayerId: "GEO01",
-        tollFreeHelpline: "1-855-282-3517",
-        isVerified: true,
-        submissionPolicyNote: "GeoBlue (Blue Cross Blue Shield Global licensee) accepts direct claim disputes, appeal packets, and clinical records via its official appeals email (claims@geo-blue.com) or portal.",
-        source: "registry_fallback",
-      },
-      bcbsglobal: {
-        officialAppealsEmail: "claims@bcbsglobalcore.com",
-        intakePortalUrl: "https://www.bcbsglobalcore.com",
-        portalName: "BCBS Global Core Service Center Portal",
-        appealsFax: "1-804-673-1179",
-        statutoryPoBox: "BCBS Global Core Service Center, P.O. Box 2048, Richmond, VA 23218-2048",
-        ediPayerId: "BCBSG",
-        tollFreeHelpline: "1-800-810-2583",
-        isVerified: true,
-        submissionPolicyNote: "BCBS Global Core explicitly accepts itemized international medical claim disputes and formal appeal submissions via its dedicated claims email (claims@bcbsglobalcore.com).",
-        source: "registry_fallback",
-      },
-      unitedhealthcare: {
-        intakePortalUrl: "https://www.uhcprovider.com/en/claims-payments-billing/appeals.html",
-        portalName: "UHC Provider Appeals & Grievance Portal",
-        appealsFax: "1-855-899-7400",
-        statutoryPoBox: "P.O. Box 30432, Salt Lake City, UT 84130-0432",
-        ediPayerId: "87726",
-        tollFreeHelpline: "1-800-842-1609",
-        isVerified: true,
-        submissionPolicyNote: "UHC mandates formal appeals via UHCprovider.com portal, fax, or certified mail. Unencrypted emails are rejected by payer filters.",
-        source: "registry_fallback",
-      },
-      aetna: {
-        intakePortalUrl: "https://www.aetna.com",
-        portalName: "Aetna Appeals & Grievances Portal",
-        appealsFax: "1-859-455-8650",
-        statutoryPoBox: "Aetna Provider Resolution Team, P.O. Box 14020, Lexington, KY 40512",
-        ediPayerId: "60054",
-        tollFreeHelpline: "1-800-624-0756",
-        isVerified: true,
-        submissionPolicyNote: "Aetna formal submissions must be submitted via Appellate Fax (1-859-455-8650), Provider Portal, or Mail to Lexington, KY (P.O. Box 14020).",
-        source: "registry_fallback",
-      },
-      cigna: {
-        intakePortalUrl: "https://www.cigna.com/health-care-providers/coverage-and-claims/appeals-disputes",
-        portalName: "CignaforHCP / myCigna Appeals Portal",
-        appealsFax: "1-877-804-1679",
-        statutoryPoBox: "Cigna National Appeals, P.O. Box 188062, Chattanooga, TN 37422",
-        ediPayerId: "62308",
-        tollFreeHelpline: "1-800-882-4462",
-        isVerified: true,
-        submissionPolicyNote: "Cigna accepts appeals via CignaforHCP / myCigna portal, appellate fax (1-877-804-1679), or P.O. Box in Chattanooga, TN. Standard medical emails are strictly rejected.",
-        source: "registry_fallback",
-      },
-      bcbs: {
-        intakePortalUrl: "https://providers.anthem.com/california-provider/contact-us",
-        portalName: "Anthem Provider Portal (Availity Essentials)",
-        appealsFax: "1-866-587-3316",
-        statutoryPoBox: "Anthem Grievances and Appeals, P.O. Box 1407, Church Street Station, New York, NY 10008",
-        ediPayerId: "47198",
-        tollFreeHelpline: "1-800-676-2583",
-        isVerified: true,
-        submissionPolicyNote: "Anthem/Elevance requires appeals through the Availity portal or appellate fax (1-866-587-3316). Standard commercial plans reject email.",
-        source: "registry_fallback",
-      },
-      humana: {
-        intakePortalUrl: "https://resolutions.humana.com/",
-        portalName: "Humana Resolutions Portal",
-        appealsFax: "1-800-949-2961",
-        statutoryPoBox: "Humana Grievances and Appeals, P.O. Box 14165, Lexington, KY 40512",
-        ediPayerId: "61101",
-        tollFreeHelpline: "1-800-448-6262",
-        isVerified: true,
-        submissionPolicyNote: "Upload documentation directly through the Humana Resolutions Portal (resolutions.humana.com) or submit via Medical Appeals Fax (1-800-949-2961).",
-        source: "registry_fallback",
-      },
-      kaiser: {
-        intakePortalUrl: "https://healthy.kaiserpermanente.org/community-providers/permanente-advantage/contact-us",
-        portalName: "Kaiser Community Provider Portal",
-        appealsFax: "1-626-405-3039",
-        statutoryPoBox: "Kaiser Permanente Appeals Department, P.O. Box 30766, Salt Lake City, UT 84130",
-        ediPayerId: "94144",
-        tollFreeHelpline: "1-800-464-4000",
-        isVerified: true,
-        submissionPolicyNote: "Kaiser central intake accepts submissions through the Community Provider Portal, Fax (1-626-405-3039), or Salt Lake City PO Box.",
-        source: "registry_fallback",
-      },
-    };
-
-    let matchedRegistryEntry: ResolvedPayerContact | null = null;
-    for (const [key, entry] of Object.entries(STATUTORY_PAYER_REGISTRY)) {
-      if (cleanName.includes(key)) {
-        matchedRegistryEntry = entry;
-        break;
-      }
-    }
-
-    // 3. Live-First Dynamic Discovery via Firecrawl Search + LLM Extraction
-    let webSearchContext = "";
-    try {
-      const searchQuery = `"${payer}" official appeals portal or fax or claims or "khiếu nại" contact`;
-      const searchData = await firecrawl.search(ctx, searchQuery, {
-        limit: 3,
-        scrapeOptions: { formats: ["markdown"] },
-      });
-
-      const results = searchData?.web || [];
-      webSearchContext = (Array.isArray(results) ? results : [])
-        .map((r: { title?: string; url?: string; markdown?: string; description?: string }) => `Title: ${r.title || "Payer Portal"}\nURL: ${r.url || ""}\nContent: ${(r.markdown || r.description || "").slice(0, 1500)}`)
-        .join("\n\n---\n\n");
-    } catch (crawlErr) {
-      console.warn("Firecrawl live search encountered transient error, proceeding to synthesis/fallback:", crawlErr);
-    }
-
-    // 4. Use LLM to extract verified contact details from live Firecrawl context
-    const systemPrompt = `You are ClaimHero's Payer Intake Intelligence Agent.
-Your task is to extract authentic, official appellate, grievance, claims, or customer care intake gateway details for the specified health insurer or insurance company.
-
-CRITICAL INTEGRITY RULES:
-1. NEVER guess, synthesize, or hallucinate contact information (e.g. do NOT invent fake domains, fake 555 numbers, fake EDI IDs like EDI-AUTO, or fake emails).
-2. Most major health insurers strictly reject appeal submissions via unencrypted public email due to HIPAA compliance and mandate online provider portals, appellate faxes, or certified postal mail.
-3. ONLY return an officialAppealsEmail if a genuine, publicly documented email address explicitly intended for claim appeals/disputes or customer grievances was found in the search results.
-4. If any field (email, portal URL, portal name, fax, PO Box, EDI ID, helpline) is not found in the search evidence, return an empty string "".
-5. Set isVerified to true ONLY if authentic, verified contact information was identified in the evidence.`;
-
-    const userPrompt = `Insurer Name: ${payer}
-Patient State / Jurisdiction: ${claim.patient?.state || "National"}
-Web Search Evidence from Firecrawl:
-${webSearchContext || "No live search results available."}
-
-Extract the official appeals/grievance/claims intake gateway details for ${payer}.`;
-
-    let resolvedContact: ResolvedPayerContact;
-
-    try {
-      const aiExtraction = await createStructuredCompletion<ResolvedPayerContact>({
-        systemPrompt,
-        userPrompt,
-        schema: CONTACT_EXTRACTION_SCHEMA,
-        schemaName: "ResolvedPayerContact",
-        temperature: 0.1,
-      });
-
-      const cleanField = (val?: string) => {
-        const trimmed = val?.trim();
-        if (!trimmed) return undefined;
-        if (trimmed.includes("555-01") || trimmed.includes("EDI-AUTO") || trimmed.includes("EDI-UNKNOWN")) {
-          return undefined;
-        }
-        return trimmed;
-      };
-
-      const extractedEmail = cleanField(aiExtraction.officialAppealsEmail);
-      const intakePortalUrl = cleanField(aiExtraction.intakePortalUrl);
-      const portalName = cleanField(aiExtraction.portalName);
-      const appealsFax = cleanField(aiExtraction.appealsFax);
-      const statutoryPoBox = cleanField(aiExtraction.statutoryPoBox);
-      const ediPayerId = cleanField(aiExtraction.ediPayerId);
-      const tollFreeHelpline = cleanField(aiExtraction.tollFreeHelpline);
-      const submissionPolicyNote = cleanField(aiExtraction.submissionPolicyNote);
-
-      const hasLiveContact = Boolean(
-        extractedEmail || intakePortalUrl || appealsFax || statutoryPoBox
-      );
-
-      if (hasLiveContact && aiExtraction.isVerified) {
-        resolvedContact = {
-          officialAppealsEmail: extractedEmail && extractedEmail.includes("@") ? extractedEmail : matchedRegistryEntry?.officialAppealsEmail,
-          intakePortalUrl:
-            intakePortalUrl && (intakePortalUrl.startsWith("http://") || intakePortalUrl.startsWith("https://"))
-              ? intakePortalUrl
-              : matchedRegistryEntry?.intakePortalUrl,
-          portalName: portalName || (intakePortalUrl ? `${payer} Appeals Portal` : matchedRegistryEntry?.portalName),
-          appealsFax: appealsFax || matchedRegistryEntry?.appealsFax,
-          statutoryPoBox: statutoryPoBox || matchedRegistryEntry?.statutoryPoBox,
-          ediPayerId: ediPayerId || matchedRegistryEntry?.ediPayerId,
-          tollFreeHelpline: tollFreeHelpline || matchedRegistryEntry?.tollFreeHelpline,
-          isVerified: true,
-          submissionPolicyNote:
-            submissionPolicyNote ||
-            matchedRegistryEntry?.submissionPolicyNote ||
-            "Submissions accepted via official payer channels.",
-          source: webSearchContext ? "firecrawl_live" : "ai_knowledge",
-        };
-      } else if (matchedRegistryEntry) {
-        // Fallback to verified statutory registry if live crawl returned no actionable gateway
-        resolvedContact = {
-          ...matchedRegistryEntry,
-          source: "registry_fallback",
-        };
-      } else {
-        resolvedContact = {
-          officialAppealsEmail: undefined,
-          intakePortalUrl: undefined,
-          portalName: undefined,
-          appealsFax: undefined,
-          statutoryPoBox: undefined,
-          ediPayerId: undefined,
-          tollFreeHelpline: undefined,
-          isVerified: false,
-          submissionPolicyNote:
-            "Payer gateway could not be verified automatically. Consult the denial notice for appellate filing instructions.",
-          source: "unresolved",
-        };
-      }
-    } catch {
-      if (matchedRegistryEntry) {
-        resolvedContact = {
-          ...matchedRegistryEntry,
-          source: "registry_fallback",
-        };
-      } else {
-        resolvedContact = {
-          officialAppealsEmail: undefined,
-          intakePortalUrl: undefined,
-          portalName: undefined,
-          appealsFax: undefined,
-          statutoryPoBox: undefined,
-          ediPayerId: undefined,
-          tollFreeHelpline: undefined,
-          isVerified: false,
-          submissionPolicyNote:
-            "Payer gateway could not be verified automatically. Consult the denial notice for appellate filing instructions.",
-          source: "unresolved",
-        };
-      }
-    }
-
-    // 5. Persist the discovered contact to the claim record
-    await ctx.runMutation(internal.claims.updatePayerContactInternal, {
+    const resolved = await executeResolvePayerGateway(ctx, {
       claimId: args.claimId,
-      payerContact: resolvedContact,
+      payerName: payer,
+      forceWebSearch: true,
     });
 
-    // 6. Record audit log
-    const auditActor =
-      resolvedContact.source === "firecrawl_live"
-        ? "Firecrawl Web Crawler"
-        : resolvedContact.source === "registry_fallback"
-          ? "Statutory Payer Registry"
-          : "Payer Gateway Resolver";
-
-    const auditDetail = resolvedContact.isVerified
-      ? `Resolved official appeals gateway for ${payer}: ${resolvedContact.officialAppealsEmail || resolvedContact.portalName || resolvedContact.appealsFax || "Appellate Gateway"} (Source: ${resolvedContact.source}).`
-      : `No verified public appeals gateway found for ${payer}; manual filing verification required.`;
+    const isTargetChannelVerified =
+      args.intendedChannel === "email"
+        ? Boolean(resolved.isVerified && resolved.officialAppealsEmail)
+        : args.intendedChannel === "fax"
+          ? Boolean(resolved.isVerified && resolved.appealsFax)
+          : args.intendedChannel === "portal"
+            ? Boolean(resolved.isVerified && resolved.intakePortalUrl)
+            : resolved.isVerified;
 
     await ctx.runMutation(internal.auditLogs.logEventInternal, {
       claimId: args.claimId,
-      eventType: "policy_crawled",
-      actor: auditActor,
-      details: auditDetail,
+      eventType: "payer_contact_reverified_for_dispatch",
+      actor: "Pre-Dispatch Sentinel",
+      details: isTargetChannelVerified
+        ? `Live pre-dispatch re-verification confirmed ${args.intendedChannel || "gateway"} for ${payer}: ${resolved.officialAppealsEmail || resolved.portalName || resolved.appealsFax || "Appellate Gateway"} (Source: ${resolved.source}).`
+        : `Live pre-dispatch re-verification notice: ${args.intendedChannel || "gateway"} for ${payer} is unverified (Source: ${resolved.source}). Automated PHI dispatch requires verified routing.`,
     });
 
-    return resolvedContact;
+    return resolved;
   },
 });

@@ -25,9 +25,9 @@ To evaluate the end-to-end pipeline without uploading personal health records:
 1. Open the [Production Deployment](https://kindhearted-elephant-992.convex.site) and sign in.
 2. Click **Quick Ingest** (or press `Cmd+K` / `Ctrl+K`) and select **Try demo case (synthetic)**.
 3. Choose one of the synthetic HIPAA Safe Harbor evaluation fixtures:
-   - **GeoBlue Worldwide — Knee Arthroscopy & Meniscectomy**: $6,400 | CPT 29881 | CARC CO-50 (Medical Necessity)
+   - **Cigna Global — Knee Arthroscopy & Meniscectomy**: $6,400 | CPT 29881 | CARC CO-50 (Medical Necessity)
    - **GeoBlue Worldwide — Lumbar Decompression**: $18,200 | CPT 63047 | CARC CO-197 (Pre-Authorization)
-   - **BCBS Global Core — Diagnostic Knee MRI**: $2,850 | CPT 73721 | CARC CO-16 (Prior Records Required)
+   - **Aetna International — Diagnostic Knee MRI**: $2,850 | CPT 73721 | CARC CO-16 (Prior Records Required)
 4. Select **Run Autonomous Pipeline** and track the real-time stepper:
    `Evidence & CPB` -> `Appeal Brief` -> `Payer Dispatch`
 5. Inspect the output: indexed insurer clauses, visual screenshot archives, deterministic four-pillar overturn score, cited appeal brief, physician peer-to-peer call script, and two-way AgentMail thread.

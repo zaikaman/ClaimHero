@@ -34,7 +34,7 @@ import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import { Claim } from "../../types";
 import { formatCurrency } from "../../lib/utils";
-import { CPT_CODES, DENIAL_REASON_CODES, INSURERS } from "../../lib/constants";
+import { CPT_CODES, DENIAL_REASON_CODES } from "../../lib/constants";
 import { DeadlineCountdown } from "./DeadlineCountdown";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -80,10 +80,12 @@ const formatPayerName = (payer: string | undefined): string => {
   const p = payer.trim();
   if (/molina/i.test(p)) return "Molina Healthcare";
   if (/geoblue|geo-blue/i.test(p)) return "GeoBlue";
+  if (/aetna international|aetna intl/i.test(p)) return "Aetna International";
+  if (/aetna/i.test(p)) return "Aetna";
   if (/bcbsglobal|globalcore|bcbs global/i.test(p)) return "BCBS Global Core";
+  if (/cigna global|cignaglobal/i.test(p)) return "Cigna Global";
   if (/cigna/i.test(p)) return "Cigna";
   if (/unitedhealthcare|uhc/i.test(p)) return "UnitedHealthcare";
-  if (/aetna/i.test(p)) return "Aetna";
   if (/elevance|anthem/i.test(p)) return "Elevance";
   if (/humana/i.test(p)) return "Humana";
   if (/blue cross|bcbs/i.test(p)) return "BCBS";
@@ -272,6 +274,15 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     const start = (currentPage - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }, [filtered, currentPage, pageSize]);
+
+  const availablePayers = useMemo(() => {
+    const payers = new Set<string>();
+    for (const c of activeClaims) {
+      const payer = c.patient?.insurancePayer?.trim();
+      if (payer) payers.add(payer);
+    }
+    return Array.from(payers).sort((a, b) => a.localeCompare(b));
+  }, [activeClaims]);
 
   const hasActiveFilters =
     statusFilter !== "all" || payerFilter !== "all" || Boolean(searchQuery);
@@ -705,9 +716,9 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                   className="h-8 text-xs font-sans"
                 >
                   <option value="all">All Insurers</option>
-                  {INSURERS.map((ins) => (
-                    <option key={ins.id} value={ins.name}>
-                      {ins.name}
+                  {availablePayers.map((payerName) => (
+                    <option key={payerName} value={payerName}>
+                      {payerName}
                     </option>
                   ))}
                 </Select>
@@ -844,7 +855,19 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                               <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[120px]">
                                 {claim.claimNumber}
                               </span>
-                              {claim.isDemo && (
+                              {(claim.isDemo ||
+                                claim.dataOrigin === "demo-fixture" ||
+                                claim.claimNumber?.startsWith("CLM-8942-CIG") ||
+                                claim.claimNumber?.startsWith("CLM-8942-GEO") ||
+                                claim.claimNumber?.startsWith("CLM-6104-GEO") ||
+                                claim.claimNumber?.startsWith("CLM-3912-AET") ||
+                                claim.claimNumber?.startsWith("CLM-3912-BCG") ||
+                                claim.patient?.name?.toLowerCase() === "eleanor vance" ||
+                                claim.patient?.name?.toLowerCase() === "marcus sterling" ||
+                                claim.patient?.name?.toLowerCase() === "michael patel" ||
+                                claim.patientName?.toLowerCase() === "eleanor vance" ||
+                                claim.patientName?.toLowerCase() === "marcus sterling" ||
+                                claim.patientName?.toLowerCase() === "michael patel") && (
                                 <Badge variant="secondary" className="font-mono text-[8px] px-1 py-0 text-amber-500 bg-amber-500/10 border-amber-500/20">
                                   Synthetic Demo
                                 </Badge>

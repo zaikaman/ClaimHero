@@ -12,7 +12,6 @@ import {
 } from "../src/lib/utils";
 import {
   getPayerAppellateContact,
-  VERIFIED_PAYER_DIRECTORY,
   DENIAL_REASON_CODES,
   CPT_CODES,
   STATUTORY_REGULATIONS,
@@ -130,20 +129,21 @@ describe("src/lib/utils Unit Tests", () => {
 });
 
 describe("src/lib/constants Unit Tests", () => {
-  it("resolves all verified and unverified payers through getPayerAppellateContact", () => {
+  it("resolves unverified placeholder for all payers through getPayerAppellateContact", () => {
     expect(getPayerAppellateContact(undefined).id).toBe("unknown");
     expect(getPayerAppellateContact("").id).toBe("unknown");
 
-    expect(getPayerAppellateContact("Molina Healthcare").id).toBe("molina");
-    expect(getPayerAppellateContact("GeoBlue Global").id).toBe("geoblue");
-    expect(getPayerAppellateContact("BCBS Global Core").id).toBe("bcbsglobal");
-    expect(getPayerAppellateContact("UnitedHealthcare Optum").id).toBe("uhc");
-    expect(getPayerAppellateContact("Aetna CVS Health").id).toBe("aetna");
-    expect(getPayerAppellateContact("Cigna Global").id).toBe("cignaglobal");
-    expect(getPayerAppellateContact("Cigna Evernorth").id).toBe("cigna");
-    expect(getPayerAppellateContact("Anthem Blue Cross").id).toBe("bcbs");
-    expect(getPayerAppellateContact("Humana Health").id).toBe("humana");
-    expect(getPayerAppellateContact("Kaiser Permanente").id).toBe("kaiser");
+    const molina = getPayerAppellateContact("Molina Healthcare");
+    expect(molina.isVerified).toBe(false);
+    expect(molina.name).toBe("Molina Healthcare");
+    expect(molina.officialAppealsEmail).toBeUndefined();
+    expect(molina.appealsFax).toBeUndefined();
+
+    const geoblue = getPayerAppellateContact("GeoBlue Global");
+    expect(geoblue.isVerified).toBe(false);
+    expect(geoblue.name).toBe("GeoBlue Global");
+    expect(geoblue.officialAppealsEmail).toBeUndefined();
+    expect(geoblue.appealsFax).toBeUndefined();
 
     const customPayer = getPayerAppellateContact("Custom Regional Mutual");
     expect(customPayer.isVerified).toBe(false);

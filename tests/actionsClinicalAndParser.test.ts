@@ -326,14 +326,15 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
         payerName: "UnitedHealthcare",
       });
 
-      expect(res.portalName).toContain("UHC");
-      expect(res.isVerified).toBe(true);
-      expect(res.source).toBe("registry_fallback");
+      expect(res.isVerified).toBe(false);
+      expect(res.source).toBe("unresolved");
+      expect(res.intakePortalUrl).toBeUndefined();
+      expect(res.appealsFax).toBeUndefined();
       expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
         claimId: "c1",
         payerContact: expect.objectContaining({
-          isVerified: true,
-          source: "registry_fallback",
+          isVerified: false,
+          source: "unresolved",
         }),
       }));
     });
@@ -372,6 +373,134 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
       expect(res.officialAppealsEmail).toBe("appeals@custompayer.org");
       expect(res.source).toBe("firecrawl_live");
       expect(res.isVerified).toBe(true);
+      expect(res.liveVerifiedAt).toBeDefined();
+    });
+
+    it("resolvePayerGateway: dynamically recovers claims email from live crawl evidence when LLM is hesitant", async () => {
+      const mockClaim = {
+        _id: "c2_geo",
+        claimNumber: "CLM-201",
+        userId: "user_123",
+        patient: { insurancePayer: "GeoBlue", state: "PA" },
+      };
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(mockClaim),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+        runAction: vi.fn().mockResolvedValue({
+          web: [
+            {
+              title: "GeoBlue Claims & Appeals Information",
+              url: "https://www.geo-blue.com/claims-disputes",
+              markdown:
+                "For claim submissions, dispute records, and appeals inquiries, members can email claims@geo-blue.com or fax to 610-482-9623. Customer care is also reached at customerservice@geo-blue.com.",
+            },
+          ],
+        }),
+      };
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        officialAppealsEmail: "", // LLM was hesitant and left email empty
+        intakePortalUrl: "https://www.geo-blue.com/member-hub",
+        portalName: "GeoBlue Member Hub",
+        appealsFax: "610-482-9623",
+        statutoryPoBox: "PO Box 21974, Eagan, MN 55121",
+        ediPayerId: "60054",
+        tollFreeHelpline: "1-844-713-7660",
+        isVerified: true,
+        submissionPolicyNote: "Submit via portal or fax",
+        source: "firecrawl_live",
+      } as any);
+
+      const res = await (actionPayerContactResolver.resolvePayerGateway as any)._handler(mockCtx, {
+        claimId: "c2_geo",
+        payerName: "GeoBlue",
+      });
+
+      expect(res.officialAppealsEmail).toBe("claims@geo-blue.com");
+      expect(res.source).toBe("firecrawl_live");
+      expect(res.isVerified).toBe(true);
+      expect(res.intakePortalUrl).toBe("https://www.geo-blue.com/member-hub");
+      expect(res.appealsFax).toBe("610-482-9623");
+    });
+
+    it("resolvePayerGateway: returns unverified status without hardcoded fallbacks when live search fails", async () => {
+      const mockClaim = {
+        _id: "c1_unknown",
+        claimNumber: "CLM-999",
+        userId: "user_123",
+        patient: { insurancePayer: "Unknown Regional Payer", state: "OH" },
+      };
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(mockClaim),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+        runAction: vi.fn().mockResolvedValue({ web: [] }),
+      };
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        officialAppealsEmail: "",
+        intakePortalUrl: "",
+        portalName: "",
+        appealsFax: "",
+        statutoryPoBox: "",
+        ediPayerId: "",
+        tollFreeHelpline: "",
+        isVerified: false,
+        submissionPolicyNote: "",
+        source: "unresolved",
+      } as any);
+
+      const res = await (actionPayerContactResolver.resolvePayerGateway as any)._handler(mockCtx, {
+        claimId: "c1_unknown",
+        payerName: "Unknown Regional Payer",
+      });
+
+      expect(res.isVerified).toBe(false);
+      expect(res.source).toBe("unresolved");
+      expect(res.officialAppealsEmail).toBeUndefined();
+      expect(res.intakePortalUrl).toBeUndefined();
+      expect(res.appealsFax).toBeUndefined();
+      expect(res.submissionPolicyNote).toContain("could not be verified automatically");
+    });
+
+    it("reverifyPayerContactForDispatch: executes live re-verification before dispatch and logs audit event", async () => {
+      const mockClaim = {
+        _id: "c3",
+        claimNumber: "CLM-300",
+        userId: "user_123",
+        patient: { insurancePayer: "Molina Healthcare", state: "FL" },
+      };
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(mockClaim),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+        runAction: vi.fn().mockResolvedValue({
+          web: [{ title: "Molina Grievance", url: "https://molinahealthcare.com/appeals", markdown: "Direct Appeals Email: MFLGrievanceandAppealsDepartment@MolinaHealthcare.com" }],
+        }),
+      };
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        officialAppealsEmail: "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com",
+        intakePortalUrl: "https://member.molinahealthcare.com",
+        portalName: "MyMolina Grievance Gateway",
+        appealsFax: "1-877-508-5748",
+        statutoryPoBox: "PO Box 521838",
+        ediPayerId: "51062",
+        tollFreeHelpline: "1-888-560-5716",
+        isVerified: true,
+        submissionPolicyNote: "Live verified email appeals accepted.",
+        source: "firecrawl_live",
+      } as any);
+
+      const res = await (actionPayerContactResolver.reverifyPayerContactForDispatch as any)._handler(mockCtx, {
+        claimId: "c3",
+        intendedChannel: "email",
+      });
+
+      expect(res.isVerified).toBe(true);
+      expect(res.officialAppealsEmail).toBe("MFLGrievanceandAppealsDepartment@MolinaHealthcare.com");
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        claimId: "c3",
+        eventType: "payer_contact_reverified_for_dispatch",
+      }));
     });
   });
 });
