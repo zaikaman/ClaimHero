@@ -196,7 +196,7 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
                       <div className="flex items-center justify-between text-muted-foreground">
                         <span className="text-[11px]">CPT Code:</span>
                         <Badge variant="secondary" className="font-mono text-[10px] h-4.5 px-1.5">
-                          CPT {claim.cptCodes[0] || "27447"}
+                          {claim.cptCodes[0] ? `CPT ${claim.cptCodes[0]}` : "No CPT"}
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between text-muted-foreground">

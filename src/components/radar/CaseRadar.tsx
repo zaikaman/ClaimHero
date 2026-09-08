@@ -807,8 +807,8 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                   const isSelected = claim._id === selectedClaimId;
                   const isWon = claim.status === "won";
                   const denialReason = DENIAL_REASON_CODES[claim.denialReasonCode];
-                  const primaryCpt = claim.cptCodes[0] || "27447";
-                  const cptInfo = CPT_CODES[primaryCpt];
+                  const primaryCpt = claim.cptCodes[0] || "";
+                  const cptInfo = primaryCpt ? CPT_CODES[primaryCpt] : undefined;
                   const payerLabel = formatPayerName(claim.patient?.insurancePayer);
 
                   return (
@@ -895,7 +895,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                       <TableCell className="py-2.5">
                         <div className="flex flex-col min-w-0">
                           <Badge variant="secondary" className="font-mono text-[11px] w-fit px-1.5 py-0">
-                            CPT {primaryCpt}
+                            {primaryCpt ? `CPT ${primaryCpt}` : "No CPT"}
                           </Badge>
                           {cptInfo && (
                             <span className="text-[10px] text-muted-foreground truncate max-w-[110px] mt-0.5" title={cptInfo.name}>

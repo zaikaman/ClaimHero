@@ -4,6 +4,34 @@ import { api } from "../../convex/_generated/api";
 import { Claim, ClinicalEvidence, OverturnScoringResult } from "../types";
 import { Id } from "../../convex/_generated/dataModel";
 
+export function validateClaimClinicalContext(claim?: Claim | null): {
+  cptCodes: string[];
+  icd10Codes: string[];
+  payer: string;
+  denialReasonCode: string;
+} {
+  const cptCodes = (claim?.cptCodes || [])
+    .map((code) => (typeof code === "string" ? code.trim() : ""))
+    .filter(Boolean);
+  const icd10Codes = (claim?.icd10Codes || [])
+    .map((code) => (typeof code === "string" ? code.trim() : ""))
+    .filter(Boolean);
+
+  if (cptCodes.length === 0 || icd10Codes.length === 0) {
+    throw new Error("claim missing procedure/diagnosis codes");
+  }
+
+  const payer = (
+    claim?.patient?.insurancePayer ||
+    (claim as { insurancePayer?: string } | undefined)?.insurancePayer ||
+    ""
+  ).trim();
+
+  const denialReasonCode = (claim?.denialReasonCode || "").trim();
+
+  return { cptCodes, icd10Codes, payer, denialReasonCode };
+}
+
 export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean }) {
   const isEnabled = options?.enabled !== false;
   const claimId = claim?._id as Id<"claims"> | undefined;
@@ -61,12 +89,17 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
       if (!activeClaimId) throw new Error("No claim specified for policy crawl");
 
+      const { cptCodes, icd10Codes, payer, denialReasonCode } = validateClaimClinicalContext(claim);
+      if (!payer) {
+        throw new Error("claim missing insurance payer");
+      }
+
       return await crawlPolicyAction({
         claimId: activeClaimId,
-        payer: claim?.patient?.insurancePayer || "Molina Healthcare",
-        cptCodes: claim?.cptCodes?.length ? claim.cptCodes : ["27447"],
-        icd10Codes: claim?.icd10Codes?.length ? claim.icd10Codes : ["M17.11"],
-        denialReasonCode: claim?.denialReasonCode || "CO-50",
+        payer,
+        cptCodes,
+        icd10Codes,
+        denialReasonCode,
         denialReasonDescription: claim?.denialReasonDescription,
         customPolicyUrl,
       });
@@ -80,11 +113,13 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
       if (!activeClaimId) throw new Error("No claim specified for PubMed research");
 
+      const { cptCodes, icd10Codes, denialReasonCode } = validateClaimClinicalContext(claim);
+
       return await crawlPubMedAction({
         claimId: activeClaimId,
-        cptCodes: claim?.cptCodes?.length ? claim.cptCodes : ["27447"],
-        icd10Codes: claim?.icd10Codes?.length ? claim.icd10Codes : ["M17.11"],
-        denialReasonCode: claim?.denialReasonCode || "CO-50",
+        cptCodes,
+        icd10Codes,
+        denialReasonCode,
         denialReasonDescription: claim?.denialReasonDescription,
         customQuery,
         customUrl,
@@ -99,11 +134,13 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
       if (!activeClaimId) throw new Error("No claim specified for FDA indication research");
 
+      const { cptCodes, icd10Codes, denialReasonCode } = validateClaimClinicalContext(claim);
+
       return await crawlFdaAction({
         claimId: activeClaimId,
-        cptCodes: claim?.cptCodes?.length ? claim.cptCodes : ["27447"],
-        icd10Codes: claim?.icd10Codes?.length ? claim.icd10Codes : ["M17.11"],
-        denialReasonCode: claim?.denialReasonCode || "CO-50",
+        cptCodes,
+        icd10Codes,
+        denialReasonCode,
         customUrl,
         drugOrDeviceName,
       });
@@ -138,12 +175,17 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
       if (!activeClaimId) throw new Error("No claim specified for multi-source crawl");
 
+      const { cptCodes, icd10Codes, payer, denialReasonCode } = validateClaimClinicalContext(claim);
+      if (!payer) {
+        throw new Error("claim missing insurance payer");
+      }
+
       return await crawlMultiSourceHubAction({
         claimId: activeClaimId,
-        payer: claim?.patient?.insurancePayer || "Molina Healthcare",
-        cptCodes: claim?.cptCodes?.length ? claim.cptCodes : ["27447"],
-        icd10Codes: claim?.icd10Codes?.length ? claim.icd10Codes : ["M17.11"],
-        denialReasonCode: claim?.denialReasonCode || "CO-50",
+        payer,
+        cptCodes,
+        icd10Codes,
+        denialReasonCode,
         denialReasonDescription: claim?.denialReasonDescription,
         customPolicyUrl,
       });
@@ -189,6 +231,7 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
       if (!activeClaimId) {
         throw new Error("No claim selected for scoring");
       }
+      validateClaimClinicalContext(claim);
       return await computeScoreAction({
         claimId: activeClaimId,
       });
@@ -213,6 +256,8 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
     async (targetClaimId?: string, customPolicyUrl?: string, physicianNotes?: string) => {
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
       if (!activeClaimId) throw new Error("No claim selected for autonomous pipeline");
+
+      validateClaimClinicalContext(claim);
 
       if (runPipelineAction) {
         try {
@@ -258,6 +303,8 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
     ) => {
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
       if (!activeClaimId) throw new Error("No claim selected for durable workflow");
+
+      validateClaimClinicalContext(claim);
 
       return await startDurablePipelineMutation({
         claimId: activeClaimId,

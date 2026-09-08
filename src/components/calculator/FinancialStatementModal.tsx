@@ -59,8 +59,8 @@ APPEALS OFFICE:      ${claim.payerContact?.statutoryPoBox || "Grievance & Appeal
 APPEALS FAX:         ${claim.payerContact?.appealsFax || "N/A"}
 
 TREATING PROVIDER:   ${claim.providerName || "Treating Physician, MD"}
-PROCEDURE CODES:     CPT ${claim.cptCodes?.join(", ") || "27447"} | ICD-10 ${claim.icd10Codes?.join(", ") || "M17.11"}
-DENIAL REASON:       Code ${claim.denialReasonCode || "CO-50"}: ${claim.denialReasonDescription}
+PROCEDURE CODES:     CPT ${claim.cptCodes?.filter(Boolean).join(", ") || "N/A"} | ICD-10 ${claim.icd10Codes?.filter(Boolean).join(", ") || "N/A"}
+DENIAL REASON:       Code ${claim.denialReasonCode || "N/A"}: ${claim.denialReasonDescription || "Adverse Determination"}
 
 II. PATIENT OUT-OF-POCKET FINANCIAL LIABILITY SCHEDULE
 ${subHr}

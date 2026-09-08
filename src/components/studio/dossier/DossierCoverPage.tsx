@@ -160,8 +160,8 @@ export const DossierCoverPage: React.FC<DossierCoverPageProps> = ({
           </div>
           <div>
             <div className="text-[10.5px] text-slate-500 font-medium">Procedure (CPT)</div>
-            <div className="font-mono font-bold text-slate-900">{dossier.cptCodes.join(", ") || "27447"}</div>
-            <div className="text-[10px] text-slate-600">Diagnosis: {dossier.icd10Codes.join(", ") || "M17.11"}</div>
+            <div className="font-mono font-bold text-slate-900">{dossier.cptCodes.filter(Boolean).join(", ") || "N/A"}</div>
+            <div className="text-[10px] text-slate-600">Diagnosis: {dossier.icd10Codes.filter(Boolean).join(", ") || "N/A"}</div>
           </div>
           <div>
             <div className="text-[10.5px] text-slate-500 font-medium">Adverse Denial Code</div>

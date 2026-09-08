@@ -302,7 +302,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               {formatCurrency(liabilityResult.data.billedAmount)}
             </div>
             <div className="text-[10px] text-muted-foreground font-mono truncate">
-              {claim.patient?.insurancePayer || "Payer"} (CPT {claim.cptCodes?.[0] || "27447"})
+              {claim.patient?.insurancePayer || "Payer"}{claim.cptCodes?.[0] ? ` (CPT ${claim.cptCodes[0]})` : ""}
             </div>
           </div>
 
