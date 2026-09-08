@@ -172,6 +172,9 @@ export const parseDenialDocument = action({
     patientState: v.optional(v.string()),
     patientEmail: v.optional(v.string()),
     autoRunPipeline: v.optional(v.boolean()),
+    origin: v.optional(v.string()),
+    dataOrigin: v.optional(v.string()),
+    isDemo: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<DenialExtractionResult & { claimId: string; pipelineResult?: Record<string, unknown> }> => {
     const userId = await requireAuthUser(ctx);
@@ -312,6 +315,10 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         );
       }
 
+      const isDemo = args.origin === "demo-fixture" || args.dataOrigin === "demo-fixture" || args.isDemo === true;
+      const origin = args.origin || (isDemo ? "demo-fixture" : undefined);
+      const dataOrigin = args.dataOrigin || (isDemo ? "demo-fixture" : "live-pipeline");
+
       // Save patient and claim into Convex database with denialLetterStorageId linked
       claimId = await ctx.runMutation(internal.claims.createWithPatientInternal, {
         userId,
@@ -331,6 +338,10 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         denialReasonDescription: extraction.denialReasonDescription?.trim() || "",
         appealFilingDeadlineDays: extraction.appealFilingDeadlineDays || 180,
         denialLetterStorageId: args.storageId,
+        origin,
+        dataOrigin,
+        isDemo,
+        isSyntheticPII: isDemo,
       });
     } catch (ingestionError) {
       // Clean up orphaned storage file immediately on document rejection or parsing error

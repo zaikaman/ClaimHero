@@ -54,7 +54,8 @@ interface OnboardingWizardProps {
   ) => Promise<DenialExtractionResult & { claimId: string }>;
   onParseText: (
     text: string,
-    patientState?: string
+    patientState?: string,
+    origin?: string
   ) => Promise<DenialExtractionResult & { claimId: string }>;
   onOpenIngestionModal: () => void;
   onSuccess: (claimId: string, directView?: string) => void;
@@ -354,7 +355,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         /(CLM-[A-Za-z0-9-]+)/g,
         `$1-${randomSuffix}`
       );
-      const result = await onParseText(uniqueContent, selectedJurisdiction);
+      const result = await onParseText(uniqueContent, selectedJurisdiction, preset.origin || "demo-fixture");
       setExtractedResult({ ...result, pipelineResult: null });
       setContextSubmitted(false);
       setActivePreset(preset);

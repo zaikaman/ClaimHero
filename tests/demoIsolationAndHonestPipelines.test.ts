@@ -254,35 +254,278 @@ describe("Demo Isolation, Provenance Attribution & Honest Evaluation Pipeline", 
     });
   });
 
-  describe("Unified Synthetic Demo Recognition Across All 3 Presets", () => {
-    it("recognizes all 3 template presets by patient name, claim number, or member ID", async () => {
+  describe("Explicit Origin Gated Demo Recognition & Real Patient Protection", () => {
+    it("recognizes demo fixtures strictly when explicit origin: 'demo-fixture' or dataOrigin: 'demo-fixture' is set", async () => {
       const { isSyntheticDemoClaimIdentifier } = await import("../convex/claims");
 
-      // Preset 1: Eleanor Vance / Cigna Global
-      expect(isSyntheticDemoClaimIdentifier({ patientName: "Eleanor Vance" })).toBe(true);
-      expect(isSyntheticDemoClaimIdentifier({ patientName: "eleanor vance" })).toBe(true);
-      expect(isSyntheticDemoClaimIdentifier({ claimNumber: "CLM-8942-CIG-2388" })).toBe(true);
-      expect(isSyntheticDemoClaimIdentifier({ memberId: "CIG-982341-01" })).toBe(true);
+      // Fixtures with explicit demo origin evaluate to true
+      expect(isSyntheticDemoClaimIdentifier({ origin: "demo-fixture" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ dataOrigin: "demo-fixture" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ origin: "demo-fixture", patientName: "Eleanor Vance" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ origin: "demo-fixture", patientName: "Marcus Sterling" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ origin: "demo-fixture", patientName: "Michael Patel" })).toBe(true);
 
-      // Preset 2: Marcus Sterling / GeoBlue
-      expect(isSyntheticDemoClaimIdentifier({ patientName: "Marcus Sterling" })).toBe(true);
-      expect(isSyntheticDemoClaimIdentifier({ patientName: "marcus sterling" })).toBe(true);
-      expect(isSyntheticDemoClaimIdentifier({ claimNumber: "CLM-6104-GEO-7260" })).toBe(true);
-      expect(isSyntheticDemoClaimIdentifier({ memberId: "GEO-554210-99" })).toBe(true);
+      // Real patients with matching names or member IDs MUST evaluate to false without explicit demo origin
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "Eleanor Vance" })).toBe(false);
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "eleanor vance" })).toBe(false);
+      expect(isSyntheticDemoClaimIdentifier({ claimNumber: "CLM-8942-CIG-2388" })).toBe(false);
+      expect(isSyntheticDemoClaimIdentifier({ memberId: "CIG-982341-01" })).toBe(false);
 
-      // Preset 3: Michael Patel / Aetna International
-      expect(isSyntheticDemoClaimIdentifier({ patientName: "Michael Patel" })).toBe(true);
-      expect(isSyntheticDemoClaimIdentifier({ patientName: "michael patel" })).toBe(true);
-      expect(isSyntheticDemoClaimIdentifier({ claimNumber: "CLM-3912-AET-2952" })).toBe(true);
-      expect(isSyntheticDemoClaimIdentifier({ memberId: "AET-773419-02" })).toBe(true);
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "Marcus Sterling" })).toBe(false);
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "marcus sterling" })).toBe(false);
+      expect(isSyntheticDemoClaimIdentifier({ claimNumber: "CLM-6104-GEO-7260" })).toBe(false);
+      expect(isSyntheticDemoClaimIdentifier({ memberId: "GEO-554210-99" })).toBe(false);
 
-      // Non-demo genuine claims must evaluate to false
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "Michael Patel" })).toBe(false);
+      expect(isSyntheticDemoClaimIdentifier({ patientName: "michael patel" })).toBe(false);
+      expect(isSyntheticDemoClaimIdentifier({ claimNumber: "CLM-3912-AET-2952" })).toBe(false);
+      expect(isSyntheticDemoClaimIdentifier({ memberId: "AET-773419-02" })).toBe(false);
+
+      // Non-demo genuine claims evaluate to false
       expect(isSyntheticDemoClaimIdentifier({
         patientName: "John Doe",
         claimNumber: "CLM-9912-UHC-1234",
         memberId: "UHC-123456-00",
       })).toBe(false);
       expect(isSyntheticDemoClaimIdentifier({})).toBe(false);
+    });
+
+    it("claims.list with includeDemo: false does NOT silently exclude real patients named Eleanor Vance", async () => {
+      const claimsModule = await import("../convex/claims");
+      const listHandler = (claimsModule.list as any)._handler;
+
+      const mockRealClaim = {
+        _id: "claim_real_eleanor",
+        userId: "user_test",
+        patientId: "pat_eleanor",
+        patientName: "Eleanor Vance",
+        insurancePayer: "Cigna Global",
+        claimNumber: "CLM-8942-CIG-REAL",
+        isDemo: false,
+        dataOrigin: "live-pipeline",
+        status: "ingested",
+        deniedAmount: 14200,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const mockDemoClaim = {
+        _id: "claim_demo_eleanor",
+        userId: "user_test",
+        patientId: "pat_eleanor_demo",
+        patientName: "Eleanor Vance",
+        insurancePayer: "Cigna Global",
+        claimNumber: "CLM-8942-CIG-DEMO",
+        isDemo: true,
+        origin: "demo-fixture",
+        dataOrigin: "demo-fixture",
+        status: "ingested",
+        deniedAmount: 14200,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const mockQueryInstance: any = {};
+      mockQueryInstance.withIndex = vi.fn().mockReturnValue(mockQueryInstance);
+      mockQueryInstance.filter = vi.fn().mockReturnValue(mockQueryInstance);
+      mockQueryInstance.order = vi.fn().mockReturnValue(mockQueryInstance);
+      mockQueryInstance.take = vi.fn().mockResolvedValue([mockRealClaim]);
+
+      const mockCtx: any = {
+        auth: {
+          getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_test" }),
+        },
+        db: {
+          query: vi.fn().mockReturnValue(mockQueryInstance),
+          get: vi.fn().mockImplementation((id: string) => {
+            if (id === "pat_eleanor") {
+              return Promise.resolve({
+                _id: "pat_eleanor",
+                userId: "user_test",
+                name: "Eleanor Vance",
+                memberId: "CIG-982341-01",
+                insurancePayer: "Cigna Global",
+                createdAt: Date.now(),
+              });
+            }
+            return Promise.resolve(null);
+          }),
+        },
+      };
+
+      const results = await listHandler(mockCtx, { includeDemo: false });
+      expect(results.length).toBe(1);
+      expect(results[0].patientName).toBe("Eleanor Vance");
+      expect(results[0].isDemo).toBe(false);
+      expect(results[0].dataOrigin).toBe("live-pipeline");
+    });
+
+    it("createWithPatient assigns dataOrigin: live-pipeline and isDemo: false to real patients named Marcus Sterling or Eleanor Vance", async () => {
+      const claimsModule = await import("../convex/claims");
+      const createHandler = (claimsModule.createWithPatient as any)._handler;
+
+      let insertedClaim: any = null;
+      const mockCtx: any = {
+        auth: {
+          getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_test" }),
+        },
+        db: {
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              take: vi.fn().mockResolvedValue([]),
+              first: vi.fn().mockResolvedValue(null),
+            }),
+          }),
+          insert: vi.fn().mockImplementation((table: string, doc: any) => {
+            if (table === "claims") {
+              insertedClaim = { _id: "claim_new_123", ...doc };
+              return Promise.resolve("claim_new_123");
+            }
+            if (table === "patients") {
+              return Promise.resolve("pat_new_123");
+            }
+            return Promise.resolve("doc_id");
+          }),
+          get: vi.fn().mockImplementation((id: string) => {
+            if (id === "claim_new_123") return Promise.resolve(insertedClaim);
+            return Promise.resolve(null);
+          }),
+        },
+        scheduler: {
+          runAfter: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      await createHandler(mockCtx, {
+        patientName: "Marcus Sterling",
+        patientEmail: "marcus.sterling@realpatient.com",
+        memberId: "GEO-554210-99",
+        insurancePayer: "GeoBlue",
+        state: "FL",
+        claimNumber: "CLM-6104-GEO-9999",
+        serviceDate: "2026-05-12",
+        providerName: "Orlando Regional Medical",
+        deniedAmount: 8500,
+        patientOwedAmount: 8500,
+        cptCodes: ["29881"],
+        icd10Codes: ["M23.22"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Investigational service",
+      });
+
+      expect(insertedClaim).toBeDefined();
+      expect(insertedClaim.isDemo).toBe(false);
+      expect(insertedClaim.dataOrigin).toBe("live-pipeline");
+      expect(insertedClaim.origin).toBeUndefined();
+      expect(insertedClaim.isSyntheticPII).toBe(false);
+    });
+
+    it("createWithPatient sets isDemo: true only when origin: 'demo-fixture' is explicitly provided", async () => {
+      const claimsModule = await import("../convex/claims");
+      const createHandler = (claimsModule.createWithPatient as any)._handler;
+
+      let insertedClaim: any = null;
+      const mockCtx: any = {
+        auth: {
+          getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_test" }),
+        },
+        db: {
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              take: vi.fn().mockResolvedValue([]),
+              first: vi.fn().mockResolvedValue(null),
+            }),
+          }),
+          insert: vi.fn().mockImplementation((table: string, doc: any) => {
+            if (table === "claims") {
+              insertedClaim = { _id: "claim_demo_456", ...doc };
+              return Promise.resolve("claim_demo_456");
+            }
+            if (table === "patients") {
+              return Promise.resolve("pat_demo_456");
+            }
+            return Promise.resolve("doc_id");
+          }),
+          get: vi.fn().mockImplementation((id: string) => {
+            if (id === "claim_demo_456") return Promise.resolve(insertedClaim);
+            return Promise.resolve(null);
+          }),
+        },
+        scheduler: {
+          runAfter: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      await createHandler(mockCtx, {
+        patientName: "Marcus Sterling",
+        patientEmail: "marcus.sterling@realpatient.com",
+        memberId: "GEO-554210-99",
+        insurancePayer: "GeoBlue",
+        state: "FL",
+        claimNumber: "CLM-6104-GEO-9999",
+        serviceDate: "2026-05-12",
+        providerName: "Orlando Regional Medical",
+        deniedAmount: 8500,
+        patientOwedAmount: 8500,
+        cptCodes: ["29881"],
+        icd10Codes: ["M23.22"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Investigational service",
+        origin: "demo-fixture",
+      });
+
+      expect(insertedClaim).toBeDefined();
+      expect(insertedClaim.isDemo).toBe(true);
+      expect(insertedClaim.origin).toBe("demo-fixture");
+      expect(insertedClaim.dataOrigin).toBe("demo-fixture");
+      expect(insertedClaim.isSyntheticPII).toBe(true);
+    });
+
+    it("clearDemoData retains real patient claims named Eleanor Vance", async () => {
+      const claimsModule = await import("../convex/claims");
+      const clearHandler = (claimsModule.clearDemoData as any)._handler;
+
+      const realClaim = {
+        _id: "claim_real_eleanor",
+        userId: "user_test",
+        patientName: "Eleanor Vance",
+        claimNumber: "CLM-8942-CIG-REAL",
+        isDemo: false,
+        dataOrigin: "live-pipeline",
+      };
+
+      const demoClaim = {
+        _id: "claim_demo_fixture",
+        userId: "user_test",
+        patientName: "Eleanor Vance",
+        claimNumber: "CLM-8942-CIG-DEMO",
+        isDemo: true,
+        origin: "demo-fixture",
+        dataOrigin: "demo-fixture",
+      };
+
+      const deletedIds: string[] = [];
+      const mockQueryInstance: any = {};
+      mockQueryInstance.withIndex = vi.fn().mockReturnValue(mockQueryInstance);
+      mockQueryInstance.take = vi.fn().mockResolvedValue([realClaim, demoClaim]);
+
+      const mockCtx: any = {
+        auth: {
+          getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_test" }),
+        },
+        db: {
+          query: vi.fn().mockReturnValue(mockQueryInstance),
+          delete: vi.fn().mockImplementation((id: string) => {
+            deletedIds.push(id);
+            return Promise.resolve();
+          }),
+        },
+      };
+
+      const res = await clearHandler(mockCtx, {});
+      expect(res.deletedClaimsCount).toBe(1);
+      expect(deletedIds).toEqual(["claim_demo_fixture"]);
+      expect(deletedIds).not.toContain("claim_real_eleanor");
     });
   });
 });

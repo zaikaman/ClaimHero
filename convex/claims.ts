@@ -29,51 +29,21 @@ export function resolveClaimPatientName(
 }
 
 /**
- * Detect whether claim identifiers match one of the standard synthetic evaluation demo fixtures
- * (Cigna Global - Eleanor Vance, GeoBlue - Marcus Sterling, Aetna International - Michael Patel).
+ * Detect whether claim parameters indicate an explicit synthetic evaluation demo fixture.
+ * Gated strictly on the explicit origin: "demo-fixture" flag (or dataOrigin: "demo-fixture") only,
+ * guaranteeing that genuine patients who share names ("Eleanor Vance", "Marcus Sterling", "Michael Patel")
+ * or member IDs are never silently classified as demo records or excluded from case lists.
  */
 export function isSyntheticDemoClaimIdentifier(params: {
   claimNumber?: string;
   memberId?: string;
   patientName?: string;
   payer?: string;
+  origin?: string;
+  dataOrigin?: string;
+  isDemo?: boolean;
 }): boolean {
-  const norm = (s?: string) => (s || "").trim().toLowerCase();
-  const cNum = norm(params.claimNumber);
-  const mId = norm(params.memberId);
-  const pName = norm(params.patientName);
-
-  if (
-    pName === "eleanor vance" ||
-    pName === "marcus sterling" ||
-    pName === "michael patel"
-  ) {
-    return true;
-  }
-
-  if (
-    cNum.startsWith("clm-8942-cig") ||
-    cNum.startsWith("clm-8942-geo") ||
-    cNum.startsWith("clm-6104-geo") ||
-    cNum.startsWith("clm-3912-aet") ||
-    cNum.startsWith("clm-3912-bcg") ||
-    cNum.includes("-demo-") ||
-    cNum.startsWith("clm-demo")
-  ) {
-    return true;
-  }
-
-  if (
-    mId === "cig-982341-01" ||
-    mId === "geo-982341-01" ||
-    mId === "geo-554210-99" ||
-    mId === "aet-773419-02" ||
-    mId === "bcg-773419-02"
-  ) {
-    return true;
-  }
-
-  return false;
+  return params.origin === "demo-fixture" || params.dataOrigin === "demo-fixture" || params.isDemo === true;
 }
 
 /**
@@ -174,11 +144,8 @@ export const list = query({
         ? paginatedResult.page.filter(
             (c) =>
               !c.isDemo &&
-              !isSyntheticDemoClaimIdentifier({
-                claimNumber: c.claimNumber,
-                patientName: c.patientName,
-                payer: c.insurancePayer,
-              })
+              c.dataOrigin !== "demo-fixture" &&
+              c.origin !== "demo-fixture"
           )
         : paginatedResult.page;
 
@@ -188,11 +155,7 @@ export const list = query({
         const isDemo = Boolean(
           claim.isDemo ||
           claim.dataOrigin === "demo-fixture" ||
-          isSyntheticDemoClaimIdentifier({
-            claimNumber: claim.claimNumber,
-            patientName,
-            payer: insurancePayer,
-          })
+          claim.origin === "demo-fixture"
         );
 
         return {
@@ -202,6 +165,7 @@ export const list = query({
           isDemo,
           isSyntheticPII: isDemo || claim.isSyntheticPII,
           dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
+          origin: isDemo && claim.origin !== "demo-fixture" ? "demo-fixture" : claim.origin,
           patient: {
             _id: claim.patientId,
             name: patientName,
@@ -226,11 +190,8 @@ export const list = query({
       claims = claims.filter(
         (c) =>
           !c.isDemo &&
-          !isSyntheticDemoClaimIdentifier({
-            claimNumber: c.claimNumber,
-            patientName: c.patientName,
-            payer: c.insurancePayer,
-          })
+          c.dataOrigin !== "demo-fixture" &&
+          c.origin !== "demo-fixture"
       );
     }
 
@@ -241,11 +202,7 @@ export const list = query({
       const isDemo = Boolean(
         claim.isDemo ||
         claim.dataOrigin === "demo-fixture" ||
-        isSyntheticDemoClaimIdentifier({
-          claimNumber: claim.claimNumber,
-          patientName,
-          payer: insurancePayer,
-        })
+        claim.origin === "demo-fixture"
       );
 
       return {
@@ -255,6 +212,7 @@ export const list = query({
         isDemo,
         isSyntheticPII: isDemo || claim.isSyntheticPII,
         dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
+        origin: isDemo && claim.origin !== "demo-fixture" ? "demo-fixture" : claim.origin,
         patient: {
           _id: claim.patientId,
           name: patientName,
@@ -309,12 +267,7 @@ export const getById = query({
     const isDemo = Boolean(
       claim.isDemo ||
       claim.dataOrigin === "demo-fixture" ||
-      isSyntheticDemoClaimIdentifier({
-        claimNumber: claim.claimNumber,
-        patientName: resolvedName,
-        payer: claim.insurancePayer,
-        memberId: patient?.memberId,
-      })
+      claim.origin === "demo-fixture"
     );
 
     return {
@@ -322,6 +275,7 @@ export const getById = query({
       isDemo,
       isSyntheticPII: isDemo || claim.isSyntheticPII,
       dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
+      origin: isDemo && claim.origin !== "demo-fixture" ? "demo-fixture" : claim.origin,
       patientName: resolvedName,
       patient: resolvedPatient,
       evidenceCount,
@@ -369,12 +323,7 @@ export const getByIdInternal = internalQuery({
     const isDemo = Boolean(
       claim.isDemo ||
       claim.dataOrigin === "demo-fixture" ||
-      isSyntheticDemoClaimIdentifier({
-        claimNumber: claim.claimNumber,
-        patientName: resolvedName,
-        payer: claim.insurancePayer,
-        memberId: patient?.memberId,
-      })
+      claim.origin === "demo-fixture"
     );
 
     return {
@@ -382,6 +331,7 @@ export const getByIdInternal = internalQuery({
       isDemo,
       isSyntheticPII: isDemo || claim.isSyntheticPII,
       dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
+      origin: isDemo && claim.origin !== "demo-fixture" ? "demo-fixture" : claim.origin,
       patientName: resolvedName,
       patient: resolvedPatient,
       evidenceCount,
@@ -679,6 +629,7 @@ export const create = mutation({
     denialLetterStorageId: v.optional(v.id("_storage")),
     isDemo: v.optional(v.boolean()),
     dataOrigin: v.optional(v.string()),
+    origin: v.optional(v.string()),
     isSyntheticPII: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -695,15 +646,9 @@ export const create = mutation({
 
     const claimNumber = await generateUniqueClaimNumber(ctx, args.claimNumber);
 
-    const isDemoMatch =
-      args.isDemo ??
-      isSyntheticDemoClaimIdentifier({
-        claimNumber,
-        memberId: patient?.memberId,
-        patientName: patient?.name,
-        payer: patient?.insurancePayer,
-      });
-    const isDemo = Boolean(isDemoMatch);
+    const isDemoFixture = args.origin === "demo-fixture" || args.dataOrigin === "demo-fixture";
+    const isDemo = Boolean(args.isDemo ?? isDemoFixture);
+    const origin = args.origin || (isDemo ? "demo-fixture" : undefined);
     const dataOrigin = args.dataOrigin || (isDemo ? "demo-fixture" : "live-pipeline");
     const isSyntheticPII = args.isSyntheticPII ?? isDemo;
 
@@ -728,6 +673,7 @@ export const create = mutation({
       agentMailProvisioningStatus: "pending",
       denialLetterStorageId: args.denialLetterStorageId,
       isDemo,
+      origin,
       dataOrigin,
       isSyntheticPII,
       createdAt: now,
@@ -782,6 +728,7 @@ interface CreateWithPatientArgs {
   denialLetterStorageId?: Id<"_storage">;
   isDemo?: boolean;
   dataOrigin?: string;
+  origin?: string;
   isSyntheticPII?: boolean;
   redactionMetadata?: {
     isRedacted: boolean;
@@ -884,15 +831,9 @@ async function applyCreateWithPatient(
   const deadlineDays = args.appealFilingDeadlineDays || 180;
   const statutoryDeadline = now + deadlineDays * 86400000;
 
-  const isDemoMatch =
-    args.isDemo ??
-    isSyntheticDemoClaimIdentifier({
-      claimNumber,
-      memberId: args.memberId,
-      patientName: resolvedPatientName,
-      payer: args.insurancePayer,
-    });
-  const isDemo = Boolean(isDemoMatch);
+  const isDemoFixture = args.origin === "demo-fixture" || args.dataOrigin === "demo-fixture";
+  const isDemo = Boolean(args.isDemo ?? isDemoFixture);
+  const origin = args.origin || (isDemo ? "demo-fixture" : undefined);
   const dataOrigin = args.dataOrigin || (isDemo ? "demo-fixture" : "live-pipeline");
   const isSyntheticPII = args.isSyntheticPII ?? isDemo;
 
@@ -918,6 +859,7 @@ async function applyCreateWithPatient(
     denialLetterStorageId: args.denialLetterStorageId,
     redactionMetadata: args.redactionMetadata,
     isDemo,
+    origin,
     dataOrigin,
     isSyntheticPII,
     createdAt: now,
@@ -975,6 +917,7 @@ export const createWithPatient = mutation({
     denialLetterStorageId: v.optional(v.id("_storage")),
     isDemo: v.optional(v.boolean()),
     dataOrigin: v.optional(v.string()),
+    origin: v.optional(v.string()),
     isSyntheticPII: v.optional(v.boolean()),
     redactionMetadata: v.optional(
       v.object({
@@ -1017,6 +960,7 @@ export const createWithPatientInternal = internalMutation({
     userId: v.optional(v.id("users")),
     isDemo: v.optional(v.boolean()),
     dataOrigin: v.optional(v.string()),
+    origin: v.optional(v.string()),
     isSyntheticPII: v.optional(v.boolean()),
     redactionMetadata: v.optional(
       v.object({
@@ -1525,11 +1469,8 @@ export const getPortfolioStats = query({
       ? rawClaims.filter(
           (c) =>
             !c.isDemo &&
-            !isSyntheticDemoClaimIdentifier({
-              claimNumber: c.claimNumber,
-              patientName: c.patientName,
-              payer: c.insurancePayer,
-            })
+            c.dataOrigin !== "demo-fixture" &&
+            c.origin !== "demo-fixture"
         )
       : rawClaims;
 
@@ -2160,16 +2101,11 @@ async function applyAppealContextUpdate(ctx: MutationCtx, args: AppealContextUpd
     }
   }
 
-  const effectivePatientName = (patchPayload.patientName as string) || claim.patientName;
-  const isDemoIdent = isSyntheticDemoClaimIdentifier({
-    claimNumber: claim.claimNumber,
-    patientName: effectivePatientName,
-    payer: claim.insurancePayer,
-  });
-  if (isDemoIdent && claim.isDemo !== true) {
+  if ((claim.origin === "demo-fixture" || claim.dataOrigin === "demo-fixture") && claim.isDemo !== true) {
     patchPayload.isDemo = true;
     patchPayload.isSyntheticPII = true;
     patchPayload.dataOrigin = "demo-fixture";
+    patchPayload.origin = "demo-fixture";
   }
 
   await ctx.db.patch(args.claimId, patchPayload);
@@ -2456,11 +2392,8 @@ export const clearDemoData = mutation({
       .filter(
         (c) =>
           c.isDemo === true ||
-          isSyntheticDemoClaimIdentifier({
-            claimNumber: c.claimNumber,
-            patientName: c.patientName,
-            payer: c.insurancePayer,
-          })
+          c.dataOrigin === "demo-fixture" ||
+          c.origin === "demo-fixture"
       )
       .slice(0, 50);
 
@@ -2538,11 +2471,8 @@ export const clearDemoDataInternal = internalMutation({
       .filter(
         (c) =>
           c.isDemo === true ||
-          isSyntheticDemoClaimIdentifier({
-            claimNumber: c.claimNumber,
-            patientName: c.patientName,
-            payer: c.insurancePayer,
-          })
+          c.dataOrigin === "demo-fixture" ||
+          c.origin === "demo-fixture"
       )
       .slice(0, 50);
 
@@ -2642,17 +2572,13 @@ export const healRedactedPatientNames = mutation({
         };
       }
 
-      const isDemoIdent = isSyntheticDemoClaimIdentifier({
-        claimNumber: claim.claimNumber,
-        patientName: targetName || currentClaimName,
-        payer: claim.insurancePayer,
-        memberId: patient?.memberId,
-      });
+      const isDemoFixture = claim.origin === "demo-fixture" || claim.dataOrigin === "demo-fixture" || claim.isDemo === true;
 
-      if (isDemoIdent && (claim.isDemo !== true || claim.dataOrigin !== "demo-fixture" || claim.isSyntheticPII !== true)) {
+      if (isDemoFixture && (claim.isDemo !== true || claim.dataOrigin !== "demo-fixture" || claim.isSyntheticPII !== true || claim.origin !== "demo-fixture")) {
         patches.isDemo = true;
         patches.isSyntheticPII = true;
         patches.dataOrigin = "demo-fixture";
+        patches.origin = "demo-fixture";
       }
 
       if (Object.keys(patches).length > 0) {

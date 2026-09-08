@@ -72,6 +72,7 @@ export interface Claim {
   erisaPenalties?: ErisaPenaltyData;
   isDemo?: boolean;
   dataOrigin?: string;
+  origin?: "demo-fixture" | "live-pipeline" | string;
   isSyntheticPII?: boolean;
   createdAt: number;
   updatedAt: number;

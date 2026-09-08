@@ -164,6 +164,7 @@ export default defineSchema({
     ),
     isDemo: v.optional(v.boolean()),
     dataOrigin: v.optional(v.string()),
+    origin: v.optional(v.string()),
     isSyntheticPII: v.optional(v.boolean()),
     evidenceCount: v.optional(v.number()),
     workflowId: v.optional(v.string()),

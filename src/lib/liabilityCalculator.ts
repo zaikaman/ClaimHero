@@ -505,7 +505,7 @@ export function getDefaultErisaPenalties(claim: Claim): ErisaPenaltyData {
     },
     {
       deniedAmount: claim.deniedAmount || 24500,
-      patientName: claim.patient?.name || "Eleanor Vance",
+      patientName: claim.patient?.name || claim.patientName || "Claimant",
       payerName: claim.patient?.insurancePayer || "Health Insurer",
       claimNumber: claim.claimNumber || "CLM-8942-MOL",
       serviceDate: claim.serviceDate,

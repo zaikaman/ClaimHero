@@ -267,11 +267,12 @@ export function useClaims(options?: {
 
   // Parse raw text pasted by user
   const parseDocumentText = useCallback(
-    async (text: string, patientState?: string) => {
+    async (text: string, patientState?: string, origin?: string) => {
       try {
         const extractionResult: DenialExtractionResult & { claimId: string } = await parseDenialAction({
           rawDocumentText: text,
           patientState,
+          origin,
         });
 
         if (extractionResult?.claimId) {

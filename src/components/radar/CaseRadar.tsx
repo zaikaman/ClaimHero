@@ -857,17 +857,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                               </span>
                               {(claim.isDemo ||
                                 claim.dataOrigin === "demo-fixture" ||
-                                claim.claimNumber?.startsWith("CLM-8942-CIG") ||
-                                claim.claimNumber?.startsWith("CLM-8942-GEO") ||
-                                claim.claimNumber?.startsWith("CLM-6104-GEO") ||
-                                claim.claimNumber?.startsWith("CLM-3912-AET") ||
-                                claim.claimNumber?.startsWith("CLM-3912-BCG") ||
-                                claim.patient?.name?.toLowerCase() === "eleanor vance" ||
-                                claim.patient?.name?.toLowerCase() === "marcus sterling" ||
-                                claim.patient?.name?.toLowerCase() === "michael patel" ||
-                                claim.patientName?.toLowerCase() === "eleanor vance" ||
-                                claim.patientName?.toLowerCase() === "marcus sterling" ||
-                                claim.patientName?.toLowerCase() === "michael patel") && (
+                                claim.origin === "demo-fixture") && (
                                 <Badge variant="secondary" className="font-mono text-[8px] px-1 py-0 text-amber-500 bg-amber-500/10 border-amber-500/20">
                                   Synthetic Demo
                                 </Badge>
