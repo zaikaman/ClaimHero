@@ -157,6 +157,42 @@ async function handleInboundClaimReply(
 
     const subject = normalized.subject || "Adjudication Update";
     const bodyContent = normalized.text || normalized.html || "";
+    const sender = normalized.from || "Insurance Payer";
+    const lowerFrom = (normalized.from || "").toLowerCase();
+    const lowerSubject = subject.toLowerCase();
+    const lowerBody = (normalized.text || normalized.html || "").toLowerCase();
+
+    // Loopback prevention: immediately drop messages originated by ClaimHero's own
+    // infrastructure or alert notifications sent to users, BEFORE executing expensive
+    // claim search queries.
+    let sharedMailboxes;
+    try {
+      sharedMailboxes = getSharedAgentMailboxes();
+    } catch {
+      // Ignore if mailboxes not configured in test environment
+    }
+    const ownIdentities = sharedMailboxes
+      ? {
+          senderEmail: sharedMailboxes.senderEmail,
+          adjudicatorEmail: sharedMailboxes.adjudicatorEmail,
+          senderInboxId: sharedMailboxes.senderInboxId,
+          adjudicatorInboxId: sharedMailboxes.adjudicatorInboxId,
+        }
+      : undefined;
+    const senderClean = (extractEmailAddress(sender) || sender).toLowerCase();
+
+    const isSelfSender =
+      isInternalAgentMailAddress(lowerFrom, ownIdentities) ||
+      isInternalAgentMailAddress(senderClean, ownIdentities) ||
+      isInternalAgentMailAddress(normalized.from, ownIdentities);
+
+    const isAlertMessage = lowerSubject.includes("[claimhero alert]") || isSelfSender;
+
+    // Silently ignore loopback alert emails or self-sent emails from AgentMail inboxes
+    if (isAlertMessage) {
+      return null;
+    }
+
     const recipientEmails = normalized.recipients.map(
       (recipient) => extractEmailAddress(recipient) || recipient.toLowerCase()
     );
@@ -258,44 +294,7 @@ async function handleInboundClaimReply(
       return null;
     }
 
-    const sender = normalized.from || "Insurance Payer";
     const payer = matchingClaim.insurancePayer || "Health Insurer";
-
-    const lowerFrom = (normalized.from || "").toLowerCase();
-    const lowerSubject = subject.toLowerCase();
-    const lowerBody = (normalized.text || normalized.html || "").toLowerCase();
-
-    // Detect system bounce / Delivery Status Notification / mailer-daemon / auto-responder or self-sent / alert loopback.
-    // isInternalAgentMailAddress additionally matches inbox IDs and any
-    // @agentmail.to sender, so internally generated mail can never be
-    // mistaken for a payer response even when mailbox env is unavailable.
-    let sharedMailboxes;
-    try {
-      sharedMailboxes = getSharedAgentMailboxes();
-    } catch {
-      // Ignore if mailboxes not configured in test environment
-    }
-    const ownIdentities = sharedMailboxes
-      ? {
-          senderEmail: sharedMailboxes.senderEmail,
-          adjudicatorEmail: sharedMailboxes.adjudicatorEmail,
-          senderInboxId: sharedMailboxes.senderInboxId,
-          adjudicatorInboxId: sharedMailboxes.adjudicatorInboxId,
-        }
-      : undefined;
-    const senderClean = (extractEmailAddress(sender) || sender).toLowerCase();
-
-    const isSelfSender =
-      isInternalAgentMailAddress(lowerFrom, ownIdentities) ||
-      isInternalAgentMailAddress(senderClean, ownIdentities) ||
-      isInternalAgentMailAddress(normalized.from, ownIdentities);
-
-    const isAlertMessage = lowerSubject.includes("[claimhero alert]") || isSelfSender;
-
-    // Silently ignore loopback alert emails or self-sent emails from AgentMail inboxes
-    if (isAlertMessage) {
-      return null;
-    }
 
     const isBounceSender =
       lowerFrom.includes("mailer-daemon") ||
@@ -749,8 +748,9 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
       userEmail = undefined;
     }
 
-    // Digest rapid-fire inbound bursts into at most one non-victory alert per
-    // cooldown window per claim. Overturn victories always notify immediately.
+    // Digest rapid-fire inbound bursts into at most one alert per cooldown window per claim.
+    // Atomically evaluated and reserved via Convex ACID mutation to eliminate concurrent race condition bursts.
+    // Victory alerts enforce a 60s debounce, non-victory alerts enforce the full PAYER_ALERT_COOLDOWN_MS.
     const isVictoryAlert = determination === "OVERTURNED_APPROVED";
     const lastAlertAt = matchingClaim.lastPayerAlertAt || 0;
     const alertCooldownElapsed = Date.now() - lastAlertAt >= PAYER_ALERT_COOLDOWN_MS;
@@ -759,7 +759,26 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
         `Skipping payer alert for claim #${matchingClaim.claimNumber} (${determination}) within cooldown window`
       );
     } else if (userEmail) {
+      let alertAllowed = true;
       try {
+        const res = await ctx.runMutation(internal.claims.claimPayerAlertThrottleInternal, {
+          claimId: matchingClaim._id,
+          isVictory: isVictoryAlert,
+          cooldownMs: PAYER_ALERT_COOLDOWN_MS,
+        });
+        if (typeof res === "boolean") {
+          alertAllowed = res;
+        }
+      } catch (throttleErr) {
+        console.warn("Failed to check alert throttle atomically; proceeding with memory check:", throttleErr);
+      }
+
+      if (!alertAllowed) {
+        console.log(
+          `Skipping payer alert for claim #${matchingClaim.claimNumber} (${determination}) via atomic reservation`
+        );
+      } else {
+        try {
         const mailboxes = getSharedAgentMailboxes();
         const determinationHeadline =
           determination === "OVERTURNED_APPROVED"
@@ -812,8 +831,9 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
         }
       }
     }
+  }
 
-    return null;
+  return null;
 }
 
 /** Persist replies received on the shared case correspondence inbox. */
@@ -856,7 +876,7 @@ async function performInboxSync(
   }
 
   const inboxesToCheck = Array.from(
-    new Set([mailboxes.senderInboxId, mailboxes.adjudicatorInboxId].filter(Boolean))
+    new Set([mailboxes.senderInboxId].filter(Boolean))
   );
 
   let syncedCount = 0;
@@ -941,7 +961,11 @@ async function performInboxSync(
       const isOwnInboxSender =
         (Boolean(ownSenderEmail) && (senderEmail === ownSenderEmail || fromStr.includes(ownSenderEmail!))) ||
         (Boolean(ownAdjudicatorEmail) && (senderEmail === ownAdjudicatorEmail || fromStr.includes(ownAdjudicatorEmail!))) ||
-        fromStr.includes(inboxId.toLowerCase());
+        fromStr.includes(inboxId.toLowerCase()) ||
+        isInternalAgentMailAddress(senderEmail, {
+          senderEmail: mailboxes.senderEmail,
+          adjudicatorEmail: mailboxes.adjudicatorEmail,
+        });
 
       const subjectStr = typeof msg.subject === "string" ? msg.subject.toLowerCase() : "";
       const isAlertSubject = subjectStr.includes("[claimhero alert]");

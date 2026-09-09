@@ -6,6 +6,7 @@ import { internal } from "./_generated/api";
 import { claimsAggregate } from "./lib/aggregates";
 import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner, getAuthUserId } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
+import { isInternalAgentMailAddress } from "./lib/agentMailWebhook";
 
 /**
  * Resolve authentic patient name, preventing [PATIENT REDACTED] placeholder leakage
@@ -486,7 +487,8 @@ export const getByInboxEmailInternal = internalQuery({
       normalizedEmail.includes("claimhero-sender@") ||
       normalizedEmail.includes("claimhero-adjudicator@") ||
       normalizedEmail === "claimhero-sender@agentmail.to" ||
-      normalizedEmail === "claimhero-adjudicator@agentmail.to"
+      normalizedEmail === "claimhero-adjudicator@agentmail.to" ||
+      isInternalAgentMailAddress(normalizedEmail)
     ) {
       return null;
     }
@@ -579,7 +581,8 @@ export const findMatchingClaimInternal = internalQuery({
         normalized.includes("claimhero-sender@") ||
         normalized.includes("claimhero-adjudicator@") ||
         normalized === "claimhero-sender@agentmail.to" ||
-        normalized === "claimhero-adjudicator@agentmail.to"
+        normalized === "claimhero-adjudicator@agentmail.to" ||
+        isInternalAgentMailAddress(normalized)
       ) {
         continue;
       }
@@ -1140,6 +1143,35 @@ export const setAgentMailThreadIdInternal = internalMutation({
       agentMailThreadId: args.agentMailThreadId,
     });
     return null;
+  },
+});
+
+/**
+ * Atomic mutation that evaluates and reserves an alert dispatch slot for a claim.
+ * Protected by Convex ACID transaction semantics to eliminate concurrent race condition bursts.
+ * Overturn victory alerts are subject to a minimal 60-second debounce to prevent duplicate
+ * webhooks/retries from multi-alerting, while standard alerts enforce the full cooldown.
+ */
+export const claimPayerAlertThrottleInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+    isVictory: v.boolean(),
+    cooldownMs: v.number(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) return false;
+    const now = Date.now();
+    const lastAlertAt = claim.lastPayerAlertAt || 0;
+    const effectiveCooldown = args.isVictory ? Math.min(args.cooldownMs, 60_000) : args.cooldownMs;
+    if (now - lastAlertAt < effectiveCooldown) {
+      return false;
+    }
+    await ctx.db.patch(args.claimId, {
+      lastPayerAlertAt: now,
+    });
+    return true;
   },
 });
 
