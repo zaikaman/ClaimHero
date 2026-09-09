@@ -14,6 +14,7 @@ import {
 import { extractEmailAddress, isInternalAgentMailAddress, normalizeAgentMailWebhook } from "../lib/agentMailWebhook";
 import { formatPayerResponseAlertEmail, escapeHtml } from "../lib/appealEmail";
 import { requireAuthUser } from "../lib/auth";
+import { rateLimiter } from "../lib/rateLimiter";
 
 /**
  * Minimum interval between non-victory payer-response alert emails for the
@@ -856,10 +857,25 @@ async function performInboxSync(
   ctx: ActionCtx,
   limit = 30
 ): Promise<{ syncedCount: number; totalChecked: number }> {
+  // 1. Process-local fast-path cooldown check to avoid unnecessary component calls within the same isolate
   const now = Date.now();
   if (now - lastSyncTimestamp < SYNC_COOLDOWN_MS) {
     return { syncedCount: 0, totalChecked: 0 };
   }
+
+  // 2. Distributed durable cooldown across action runners and worker instances via RateLimiter
+  try {
+    const limitStatus = await rateLimiter.limit(ctx, "inboxSync", { key: "global" });
+    if (limitStatus && typeof limitStatus.ok === "boolean" && !limitStatus.ok) {
+      return { syncedCount: 0, totalChecked: 0 };
+    }
+  } catch (err) {
+    // Tolerate missing component in unit test mocks
+    if (process.env.NODE_ENV !== "test") {
+      console.warn("[RateLimiter] Unexpected error checking inboxSync rate limit:", err);
+    }
+  }
+
   lastSyncTimestamp = now;
 
   const effectiveLimit = Math.min(Math.max(1, limit ?? 30), 30);

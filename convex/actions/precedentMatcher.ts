@@ -256,6 +256,11 @@ export const computeOverturnScore = action({
       if (rateErr instanceof Error && rateErr.message.includes("Rate limit reached")) {
         throw rateErr;
       }
+      // Tolerate unconfigured rate limiter in isolated unit test mocks where the component is unmounted.
+      // In non-test environments, log the failure to ensure operational visibility.
+      if (process.env.NODE_ENV !== "test") {
+        console.warn("[RateLimiter] Unexpected error checking precedentMatcher rate limit:", rateErr);
+      }
     }
 
     // 2. Fetch indexed clinical evidence clauses

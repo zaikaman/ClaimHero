@@ -374,7 +374,7 @@ export const searchClaimsForChatbot = internalQuery({
           .query("claims")
           .withSearchIndex("search_claims", (q) => {
             let builder = q
-              .search("denialReasonDescription", term)
+              .search("searchContent", term)
               .eq("userId", args.userId);
             if (args.status && args.status !== "all") {
               builder = builder.eq("status", args.status);

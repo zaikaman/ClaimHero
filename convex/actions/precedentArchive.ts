@@ -406,6 +406,11 @@ export const hybridSearchPrecedents = action({
       if (rateErr instanceof Error && rateErr.message.includes("Rate limit reached")) {
         throw rateErr;
       }
+      // Tolerate unconfigured rate limiter in isolated unit test mocks where the component is unmounted.
+      // In non-test environments, log the failure to ensure operational visibility.
+      if (process.env.NODE_ENV !== "test") {
+        console.warn("[RateLimiter] Unexpected error checking precedentSearch rate limit:", rateErr);
+      }
     }
 
     const cptCodes = args.cptCodes || [];

@@ -169,27 +169,23 @@ export default defineSchema({
     evidenceCount: v.optional(v.number()),
     workflowId: v.optional(v.string()),
     workflowStatus: v.optional(v.string()),
+    searchContent: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_user_demo", ["userId", "isDemo"])
     .index("by_user_status", ["userId", "status"])
     .index("by_user_payer", ["userId", "insurancePayer"])
     .index("by_user_payer_status", ["userId", "insurancePayer", "status"])
-    .index("by_payer", ["insurancePayer"])
-    .index("by_status", ["status"])
-    .index("by_patient", ["patientId"])
     .index("by_deadline", ["statutoryDeadline"])
     .index("by_claim_number", ["claimNumber"])
     .index("by_inbox_email", ["agentMailInboxEmail"])
     .index("by_adjudicator_email", ["agentMailAdjudicatorEmail"])
     .index("by_assigned_agent_email", ["assignedAgentEmail"])
     .index("by_created", ["createdAt"])
-    .index("by_updated", ["updatedAt"])
     .index("by_threadId", ["agentMailThreadId"])
     .searchIndex("search_claims", {
-      searchField: "denialReasonDescription",
+      searchField: "searchContent",
       filterFields: ["userId", "status", "denialReasonCode"],
     }),
 

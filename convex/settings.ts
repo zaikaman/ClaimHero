@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId, requireAuthUser } from "./lib/auth";
 import { claimsAggregate } from "./lib/aggregates";
+import { rateLimiter } from "./lib/rateLimiter";
 import { Id } from "./_generated/dataModel";
 
 export const DEFAULT_ADVOCATE_PROFILE = {
@@ -191,6 +192,26 @@ export const resetPortfolio = mutation({
     }
 
     const userId = await requireAuthUser(ctx);
+
+    // Enforce strict rate limiting to protect against session hijacking and automated portfolio destruction
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "resetPortfolio", {
+        key: `reset_${userId}`,
+      });
+      if (limitStatus && typeof limitStatus.ok === "boolean" && !limitStatus.ok) {
+        throw new Error(
+          `Rate limit exceeded for portfolio reset. Please retry in ${Math.ceil((limitStatus.retryAfter || 900000) / 60000)} minutes.`
+        );
+      }
+    } catch (rateErr) {
+      if (rateErr instanceof Error && rateErr.message.includes("Rate limit exceeded for portfolio reset")) {
+        throw rateErr;
+      }
+      // Tolerate unconfigured rate limiter in unit test / mock environments where the component is unmounted
+      if (process.env.NODE_ENV !== "test") {
+        console.warn("[RateLimiter] Unexpected error checking resetPortfolio rate limit:", rateErr);
+      }
+    }
 
     // Bounded fetch of claims strictly scoped to user (up to 50 at a time)
     const claimsQuery = ctx.db

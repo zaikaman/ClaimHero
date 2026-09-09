@@ -86,5 +86,19 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 10,
   },
+  // AgentMail inbound inbox sync distributed cooldown (1 call/minute, capacity: 1)
+  inboxSync: {
+    kind: "token bucket",
+    rate: 1,
+    period: MINUTE,
+    capacity: 1,
+  },
+  // Danger Zone portfolio wipe rate limit (strict: 1 reset per 15 minutes, capacity: 1)
+  resetPortfolio: {
+    kind: "token bucket",
+    rate: 1,
+    period: 15 * MINUTE,
+    capacity: 1,
+  },
 });
 
