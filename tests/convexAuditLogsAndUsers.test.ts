@@ -228,6 +228,57 @@ describe("Convex Audit Logs, Users, Auth & Crons", () => {
       expect(res[1].timestamp).toBe(150);
     });
 
+    it("listRecent: filters out tombstoned logs by default but includes them when includeTombstoned is true", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const activeLog = { _id: "l_active", userId: "user_123", timestamp: 200, isTombstoned: false };
+      const tombstonedLog = { _id: "l_tomb", userId: "user_123", timestamp: 250, isTombstoned: true };
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              order: vi.fn().mockReturnValue({
+                take: vi.fn().mockResolvedValue([tombstonedLog, activeLog]),
+              }),
+            }),
+          }),
+        },
+      };
+
+      // By default: tombstoned logs are filtered out
+      const defaultRes = await (auditLogs.listRecent as any)._handler(mockCtx, { limit: 10 });
+      expect(defaultRes.length).toBe(1);
+      expect(defaultRes[0]._id).toBe("l_active");
+
+      // When includeTombstoned is true: both are included
+      const allRes = await (auditLogs.listRecent as any)._handler(mockCtx, { limit: 10, includeTombstoned: true });
+      expect(allRes.length).toBe(2);
+      expect(allRes[0]._id).toBe("l_tomb");
+      expect(allRes[1]._id).toBe("l_active");
+    });
+
+    it("listTombstoned: returns sealed and tombstoned logs for regulatory compliance", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const activeLog = { _id: "l_active", userId: "user_123", timestamp: 200, isTombstoned: false };
+      const tombstonedLog = { _id: "l_tomb", userId: "user_123", timestamp: 250, isTombstoned: true };
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              order: vi.fn().mockReturnValue({
+                take: vi.fn().mockResolvedValue([tombstonedLog, activeLog]),
+              }),
+            }),
+          }),
+        },
+      };
+
+      const res = await (auditLogs.listTombstoned as any)._handler(mockCtx, { limit: 10 });
+      expect(res.length).toBe(1);
+      expect(res[0]._id).toBe("l_tomb");
+    });
+
     it("convex/auth: exports configured Convex Auth v2 methods and enforces long-lived accessTokenTtlSeconds", async () => {
       expect(convexAuthModule.signInWithPassword).toBeDefined();
       expect(convexAuthModule.signUpWithPassword).toBeDefined();

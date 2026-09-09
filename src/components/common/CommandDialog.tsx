@@ -144,7 +144,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       {
         id: "action-audit",
         label: "Audit Timeline",
-        description: "ERISA 29 CFR § 2560.503-1 statutory compliance & immutable audit ledger",
+        description: "ERISA 29 CFR § 2560.503-1 statutory compliance & case audit trail",
         icon: Clock,
         category: "platform",
         categoryLabel: "Platform Command",

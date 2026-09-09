@@ -25,7 +25,7 @@ export const listByClaim = query({
 });
 
 /**
- * Append an immutable event to the appeal audit log, checking claim ownership
+ * Append an event to the case audit log, checking claim ownership
  */
 export const logEvent = mutation({
   args: {
@@ -99,11 +99,12 @@ export const logEventInternal = internalMutation({
 
 /**
  * List the most recent audit events strictly across the authenticated user's claims.
- * Uses bounded queries (take(10) instead of unbounded/oversized scans) to eliminate unnecessary I/O.
+ * Filters out tombstoned records by default to keep active portfolio dashboards clean.
  */
 export const listRecent = query({
   args: {
     limit: v.optional(v.number()),
+    includeTombstoned: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -111,15 +112,19 @@ export const listRecent = query({
 
     const limit = Math.min(Math.max(1, args.limit ?? 15), 20);
 
-    // Primary fast path: single index scan via by_user_and_timestamp (~15 docs vs 210 docs)
+    // Primary fast path: single index scan via by_user_and_timestamp
     const userLogs = await ctx.db
       .query("appealAuditLogs")
       .withIndex("by_user_and_timestamp", (q) => q.eq("userId", userId))
       .order("desc")
-      .take(limit);
+      .take(args.includeTombstoned ? limit : limit * 2);
 
-    if (userLogs.length > 0) {
-      return userLogs;
+    const filtered = args.includeTombstoned
+      ? userLogs
+      : userLogs.filter((log) => !log.isTombstoned);
+
+    if (filtered.length > 0) {
+      return filtered.slice(0, limit);
     }
 
     // Graceful fallback for legacy logs created prior to userId index denormalization
@@ -141,9 +146,34 @@ export const listRecent = query({
       )
     );
 
-    return logsPerClaim
+    const combined = logsPerClaim
       .flat()
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, limit);
+      .filter((log) => args.includeTombstoned || !log.isTombstoned)
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    return combined.slice(0, limit);
+  },
+});
+
+/**
+ * List sealed and tombstoned audit records for ERISA § 503 statutory compliance and regulatory inspection.
+ */
+export const listTombstoned = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const limit = Math.min(Math.max(1, args.limit ?? 20), 50);
+
+    const userLogs = await ctx.db
+      .query("appealAuditLogs")
+      .withIndex("by_user_and_timestamp", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(limit * 3);
+
+    return userLogs.filter((log) => Boolean(log.isTombstoned)).slice(0, limit);
   },
 });

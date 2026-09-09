@@ -300,7 +300,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
       case "get_p2p_defense_script":
         return "Retrieved Physician P2P Tele-Script";
       case "get_audit_trail":
-        return "Audited Immutable Event Timeline";
+        return "Audited Case Event Timeline";
       case "search_claims":
         return "Searched Workspace Claims Roster";
       case "search_precedents":

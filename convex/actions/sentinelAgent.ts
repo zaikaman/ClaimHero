@@ -140,7 +140,7 @@ export const getP2PDefenseScript = createTool({
 // 6. Get Audit Trail Tool
 export const getAuditTrail = createTool({
   description:
-    "Retrieve the immutable cryptographic audit timeline and chronological action history for a claim.",
+    "Retrieve the statutory case audit trail and chronological action history for a claim.",
   inputSchema: z.object({
     claimId: z.string().describe("The unique Convex ID of the claim."),
   }),

@@ -161,7 +161,7 @@ ClaimHero employs a structured 3-tier desktop layout optimized for high-density 
 
 - **Sidebar (Navigation & Quick Case List)**: Fixed 240px (collapsible to 64px) left rail containing system status, active claim queue, and top-level sentinel navigation.
 - **Main Command Surface**: Fluid width with maximum content containment (`max-w-7xl` or full-width viewport in Studio), structured with a 12-column responsive grid and 16px to 24px column gaps.
-- **Auxiliary Drawers & Inspection Rails**: Slide-over panels (400px to 640px) for two-way AgentMail correspondence, Clinical Policy clause side-by-side matching, and immutable audit logs.
+- **Auxiliary Drawers & Inspection Rails**: Slide-over panels (400px to 640px) for two-way AgentMail correspondence, Clinical Policy clause side-by-side matching, and case audit trail logs.
 - **Density & Spacing Rhythm**: Dense 4px base increment. Common vertical rhythms: 8px between related fields, 16px between cards, 24px between major operational sections.
 
 ## Elevation & Depth

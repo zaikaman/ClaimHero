@@ -121,7 +121,7 @@ export const SENTINEL_CHAT_TOOLS = [
     function: {
       name: "get_audit_trail",
       description:
-        "Retrieve the immutable cryptographic audit timeline and chronological action history for a claim.",
+        "Retrieve the statutory case audit trail and chronological action history for a claim.",
       parameters: {
         type: "object",
         properties: {

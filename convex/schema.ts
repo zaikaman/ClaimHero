@@ -344,14 +344,16 @@ export default defineSchema({
       filterFields: ["sourceKind", "primaryCpt", "carcCode"],
     }),
 
-  // Immutable Event Audit Trail
+  // Case Audit Trail (Statutory Record Retention & Tombstoned on Case Purge)
   appealAuditLogs: defineTable({
     claimId: v.id("claims"),
     userId: v.optional(v.id("users")),
-    eventType: v.string(), // denial_ingested, policy_crawled, overturn_score_computed, appeal_edited, appeal_dispatched, decision_recorded, p2p_script_generated, p2p_live_call_completed
+    eventType: v.string(), // denial_ingested, policy_crawled, overturn_score_computed, appeal_edited, appeal_dispatched, decision_recorded, p2p_script_generated, p2p_live_call_completed, case_tombstoned, case_deleted
     actor: v.string(),
     details: v.string(),
     timestamp: v.number(),
+    isTombstoned: v.optional(v.boolean()),
+    tombstonedAt: v.optional(v.number()),
   })
     .index("by_claim", ["claimId"])
     .index("by_claim_and_timestamp", ["claimId", "timestamp"])

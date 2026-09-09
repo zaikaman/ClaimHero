@@ -284,7 +284,7 @@ export const completeSession = mutation({
       updatedAt: now,
     });
 
-    // Record immutable audit log
+    // Record case audit log
     await ctx.db.insert("appealAuditLogs", {
       claimId: session.claimId,
       eventType: "p2p_live_call_completed",

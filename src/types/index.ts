@@ -368,10 +368,13 @@ export interface EmailMessage {
 export interface AppealAuditLog {
   _id: string;
   claimId: string;
+  userId?: string;
   eventType: string;
   actor: string;
   details: string;
   timestamp: number;
+  isTombstoned?: boolean;
+  tombstonedAt?: number;
 }
 
 export type AuditLog = AppealAuditLog;

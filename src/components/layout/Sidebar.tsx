@@ -102,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: "audit" as NavigationView,
       label: "Audit Timeline",
-      description: "ERISA 29 CFR Immutable Ledger",
+      description: "ERISA 29 CFR Case Audit Trail",
       icon: Clock,
     },
   ];

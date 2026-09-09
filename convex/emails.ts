@@ -352,7 +352,7 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
     }
   }
 
-  // Insert audit log (omitting raw subject to prevent storing unredacted PHI in immutable audit trail)
+  // Insert audit log (omitting raw subject to prevent storing unredacted PHI in case audit trail)
   const auditClaimTag = claim?.claimNumber ? `regarding claim #${claim.claimNumber}` : `regarding claim`;
   await ctx.db.insert("appealAuditLogs", {
     claimId: args.claimId,

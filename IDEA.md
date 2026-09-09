@@ -34,7 +34,7 @@ flowchart TD
         C3["Native Full-Text Search Indexes (search_claims, search_evidence)"]
         C4["Statutory Deadline Sweeper (Daily Cron @ 00:00 UTC)"]
         C5["Rate Limiter Component (@convex-dev/rate-limiter)"]
-        C6["Immutable Audit Ledger (appealAuditLogs)"]
+        C6["Case Audit Ledger (appealAuditLogs)"]
     end
 
     subgraph Senses ["3. Deep Clinical Retrieval (Firecrawl)"]

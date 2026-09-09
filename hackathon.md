@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-09T16:04:00Z
+- **Last updated:** 2026-09-09T17:08:00Z
 
 ## Log
 
@@ -1117,8 +1117,15 @@ Resolved M5 precedent vector reindexing transaction limit vulnerability (`convex
 - Deadline Sweep Cascade Batching Pattern (`convex/actions/precedentArchive.ts`): Structured archive re-embedding after statutory deadline sweep pattern (`executeSweepDeadlinesBatch`). Implemented `executeReindexArchiveBatch`, `reindexArchive`, and scheduled continuation action `reindexArchiveBatch` cascading asynchronously via `ctx.scheduler.runAfter(0, ...)`. Ensured each bounded batch generates embeddings and commits updates within safe transaction and execution time budgets.
 - Testing & Regression Verification (`tests/convexPrecedents.test.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`): Added unit tests for cursor pagination, vector stripping, scheduler continuation cascading, and completion termination. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 696 passing unit tests across 42 suites, 80.77% coverage, and successful production build). Convex features: internalQuery, internalAction, pagination, scheduled functions, vector search.
 
-### 2026-09-09 - working tree
+### 2026-09-09 - 706597e
 Resolved M6 hardcoded patient state in claims listing (`convex/claims.ts`, `src/types/index.ts`):
 - Eliminated Fabricated Data in Claims Listing (`convex/claims.ts`): Removed hardcoded `state: "FL"` from both paginated and bounded `claims.list` patient mappings, honoring the zero-mock/hardcoded-data policy in production pathways without introducing N+1 secondary queries.
 - Type Safety Alignment (`src/types/index.ts`): Updated `Patient` interface making `state?: string` optional to reflect denormalized listing shapes, while preserving full patient state queries via `claims.getById` and `claims.getByIdInternal`.
-- Regression Coverage & Verification (`tests/convexClaimsFull.test.ts`): Added regression assertions verifying that both regular and paginated list queries omit fabricated state values. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 696 tests passing across 42 suites, and production build). Convex features: queries.
+- Regression Coverage & Verification (`tests/convexClaimsFull.test.ts`): Added regression assertions verifying that both regular and paginated list queries omit fabricated state values. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 696 tests passing across 42 suites, and production build). Convex features: queries.
+
+### 2026-09-09 - working tree
+Resolved M7 audit trail deletability and marketing claims-vs-reality gap (`convex/claims.ts`, `convex/settings.ts`, `convex/schema.ts`, `convex/auditLogs.ts`):
+- Soft-Delete / Tombstoning Engine: Replaced hard-deletion of `appealAuditLogs` in `deleteCase` and `resetPortfolio` with statutory soft-deletion and tombstoning (`cascadeTombstoneAuditLogsBatchInternal`, aliased to `cascadeDeleteAuditLogsBatchInternal`). Appended a terminal `case_tombstoned` audit record prior to removing active claim records, guaranteeing an unbroken chain of custody and record retention compliance under ERISA 29 CFR § 2560.503-1.
+- Schema & Query Hardening (`convex/schema.ts`, `convex/auditLogs.ts`): Extended `appealAuditLogs` schema with `isTombstoned: v.optional(v.boolean())` and `tombstonedAt: v.optional(v.number())`. Added `includeTombstoned` parameter to `listRecent` (filtering out tombstoned records by default for clean dashboard views) and added dedicated `listTombstoned` query for statutory compliance audits.
+- Terminology & UI Alignment: Replaced over-claimed "immutable cryptographic audit trail" references with "case audit trail" and "statutory audit trail" across UI banners, drawers, command dialog, chatbot tools, executive reports, and documentation (`DeleteCaseModal.tsx`, `Sidebar.tsx`, `CommandDialog.tsx`, `AuditTimeline.tsx`, `SentinelChatbot.tsx`, `ExecutiveReportModal.tsx`, `sentinelAgent.ts`, `sentinelChatbot.ts`).
+- Testing & Verification (`tests/ingestionAndDeletionPipeline.test.ts`, `tests/convexSettings.test.ts`, `tests/convexAuditLogsAndUsers.test.ts`): Updated cascading batch tests to assert patch with tombstone metadata instead of delete, and added tests for `listTombstoned` and tombstone filtering in `listRecent`. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 698 passing unit tests across 42 suites, 80.78% test coverage, and successful production build). Convex features: schema, tables, indexes, mutations, internalMutation, queries.

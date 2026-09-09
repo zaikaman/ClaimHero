@@ -217,7 +217,7 @@ export const resetPortfolio = mutation({
         await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEmailsBatchInternal, {
           claimId: claim._id,
         });
-        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAuditLogsBatchInternal, {
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeTombstoneAuditLogsBatchInternal, {
           claimId: claim._id,
         });
         await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
@@ -286,12 +286,19 @@ export const resetPortfolio = mutation({
           await ctx.db.delete(s._id);
         }
 
+        // Soft-delete / tombstone audit logs for statutory compliance rather than hard purging
         const logs = await ctx.db
           .query("appealAuditLogs")
           .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
           .collect();
+        const now = Date.now();
         for (const l of logs) {
-          await ctx.db.delete(l._id);
+          if (!l.isTombstoned) {
+            await ctx.db.patch(l._id, {
+              isTombstoned: true,
+              tombstonedAt: now,
+            });
+          }
         }
 
         if (claim.denialLetterStorageId) {

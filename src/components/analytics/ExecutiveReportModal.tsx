@@ -88,7 +88,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
     lines.push("");
     lines.push("================================================================================");
     lines.push("AUDIT SIGN-OFF & ATTESTATION");
-    lines.push("This executive statement is compiled from immutable ledger logs in ClaimHero Sentinel.");
+    lines.push("This executive statement is compiled from case audit trail logs in ClaimHero Sentinel.");
     lines.push(`Verification Key: CH-${stats.totalClaims}-${stats.averageWinScore}-ERISA`);
     lines.push("================================================================================");
     return lines.join("\n");

@@ -62,6 +62,16 @@ const EVENT_CONFIGS: Record<
     badgeVariant: "destructive",
     icon: Warning,
   },
+  case_tombstoned: {
+    label: "Case Tombstoned",
+    badgeVariant: "destructive",
+    icon: Warning,
+  },
+  case_deleted: {
+    label: "Case Purged",
+    badgeVariant: "destructive",
+    icon: Warning,
+  },
 };
 
 export const AuditTimeline: React.FC<AuditTimelineProps> = ({
@@ -90,7 +100,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
             </h2>
             <p className="text-xs text-muted-foreground">
               {claim
-                ? `Cryptographic event trail for Claim #${claim.claimNumber} (${claim.patient?.name})`
+                ? `Statutory event trail for Claim #${claim.claimNumber} (${claim.patient?.name})`
                 : "Live portfolio audit trail across medical appeal claims"}
             </p>
           </div>
@@ -110,6 +120,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
             <option value="appeal_dispatched">Appeal Dispatched</option>
             <option value="payer_response_received">Payer Replies</option>
             <option value="statutory_alarm_critical">Statutory Alarms</option>
+            <option value="case_tombstoned">Case Purged / Tombstoned</option>
           </Select>
         </div>
       </Card>
@@ -118,7 +129,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
       <Card className="p-6">
         {isLoading ? (
           <div className="p-8 text-center text-xs font-mono text-muted-foreground animate-pulse">
-            Loading audit ledger events...
+            Loading case audit trail events...
           </div>
         ) : filteredLogs.length === 0 ? (
           <div className="p-8 text-center text-xs text-muted-foreground">

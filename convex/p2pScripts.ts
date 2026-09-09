@@ -163,7 +163,7 @@ async function applyCreateOrUpdateScript(ctx: MutationCtx, args: CreateOrUpdateS
     });
   }
 
-  // Record immutable audit event
+  // Record case audit event
   await ctx.db.insert("appealAuditLogs", {
     claimId: args.claimId,
     eventType: "p2p_script_generated",

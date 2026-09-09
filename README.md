@@ -203,7 +203,7 @@ ClaimHero/
 │   ├── clinicalEvidences.ts   # Evidence persistence and vector retrieval
 │   ├── appeals.ts             # Versioned briefs and escalation
 │   ├── emails.ts              # Threads, messages, and routing
-│   ├── auditLogs.ts           # Immutable case timeline
+│   ├── auditLogs.ts           # Case audit trail & statutory timeline
 │   ├── crons.ts               # Deadline and reconciliation schedules
 │   ├── auth.ts / http.ts      # Auth and webhook routing
 │   └── actions/               # OpenAI, Firecrawl, AgentMail pipelines

@@ -374,7 +374,7 @@ export default function App() {
               />
             )}
 
-            {/* 8. Immutable Case Audit Timeline (Platform) */}
+            {/* 8. Case Audit Timeline (Platform) */}
             {currentView === "audit" && (
               <AuditTimeline
                 claim={selectedClaim}

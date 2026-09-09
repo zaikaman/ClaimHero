@@ -255,7 +255,7 @@ async function applyCreateOrUpdateDraft(
     updatedAt: now,
   });
 
-  // Add immutable audit log entry
+  // Add case audit log entry
   await ctx.db.insert("appealAuditLogs", {
     claimId: args.claimId,
     eventType: "appeal_draft_updated",

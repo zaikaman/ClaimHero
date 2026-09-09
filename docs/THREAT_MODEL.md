@@ -39,7 +39,7 @@ ClaimHero operates an autonomous appeal processing pipeline that receives inboun
 | **AST-02** | Appellate Briefs & Case Strategy | Synthesized legal and clinical arguments, citations, and evidence binders. | High / Confidential |
 | **AST-03** | Webhook Cryptographic Secret (`AGENTMAIL_WEBHOOK_SECRET`) | Shared HMAC-SHA256 secret (`whsec_...`) used to authenticate Svix webhook transmissions. | Critical / Secret |
 | **AST-04** | AgentMail API Credentials (`AGENTMAIL_API_KEY`) | REST API token granting access to read inboxes and send messages. | Critical / Secret |
-| **AST-05** | Claim State & Audit Ledger | Immutable case timeline, adjudication history, and ERISA compliance logs. | High / Integrity |
+| **AST-05** | Claim State & Audit Ledger | Retained statutory case timeline, adjudication history, and ERISA compliance logs. | High / Integrity |
 | **AST-06** | Compute & LLM Quotas | Convex action compute time, OpenAI tokens, and Firecrawl crawl limits. | Medium / Availability |
 
 ---

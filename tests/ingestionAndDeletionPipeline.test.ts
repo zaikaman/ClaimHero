@@ -70,7 +70,7 @@ describe("Ingestion Pipeline & Cascading Deletion Hardening", () => {
             args: { claimId: "claim_to_delete" },
           },
           {
-            func: internal.claims.cascadeDeleteAuditLogsBatchInternal,
+            func: internal.claims.cascadeTombstoneAuditLogsBatchInternal,
             args: { claimId: "claim_to_delete" },
           },
           {
@@ -182,8 +182,8 @@ describe("Ingestion Pipeline & Cascading Deletion Hardening", () => {
       expect(mockCtx.scheduler.runAfter).not.toHaveBeenCalled();
     });
 
-    it("cascadeDeleteAuditLogsBatchInternal: deletes audit logs", async () => {
-      const mockLogs = [{ _id: "log_1" }];
+    it("cascadeTombstoneAuditLogsBatchInternal: tombstones audit logs for statutory compliance", async () => {
+      const mockLogs = [{ _id: "log_1", isTombstoned: false }];
       const mockCtx: any = {
         db: {
           query: vi.fn().mockReturnValue({
@@ -191,6 +191,7 @@ describe("Ingestion Pipeline & Cascading Deletion Hardening", () => {
               take: vi.fn().mockResolvedValue(mockLogs),
             }),
           }),
+          patch: vi.fn().mockResolvedValue(undefined),
           delete: vi.fn().mockResolvedValue(undefined),
         },
         scheduler: {
@@ -198,11 +199,15 @@ describe("Ingestion Pipeline & Cascading Deletion Hardening", () => {
         },
       };
 
-      await (claims.cascadeDeleteAuditLogsBatchInternal as any)._handler(mockCtx, {
+      await (claims.cascadeTombstoneAuditLogsBatchInternal as any)._handler(mockCtx, {
         claimId: "claim_log",
       });
 
-      expect(mockCtx.db.delete).toHaveBeenCalledWith("log_1");
+      expect(mockCtx.db.patch).toHaveBeenCalledWith("log_1", expect.objectContaining({
+        isTombstoned: true,
+        tombstonedAt: expect.any(Number),
+      }));
+      expect(mockCtx.db.delete).not.toHaveBeenCalled();
       expect(mockCtx.scheduler.runAfter).not.toHaveBeenCalled();
     });
 

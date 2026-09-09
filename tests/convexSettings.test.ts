@@ -300,6 +300,7 @@ describe("Convex Settings API (convex/settings.ts)", () => {
             };
           }),
           delete: vi.fn().mockResolvedValue(undefined),
+          patch: vi.fn().mockResolvedValue(undefined),
         },
         storage: {
           delete: vi.fn().mockResolvedValue(undefined),
@@ -315,7 +316,14 @@ describe("Convex Settings API (convex/settings.ts)", () => {
       expect(mockCtx.db.delete).toHaveBeenCalledWith("msg_1");
       expect(mockCtx.db.delete).toHaveBeenCalledWith("p2p_1");
       expect(mockCtx.db.delete).toHaveBeenCalledWith("sess_1");
-      expect(mockCtx.db.delete).toHaveBeenCalledWith("log_1");
+      expect(mockCtx.db.patch).toHaveBeenCalledWith(
+        "log_1",
+        expect.objectContaining({
+          isTombstoned: true,
+          tombstonedAt: expect.any(Number),
+        })
+      );
+      expect(mockCtx.db.delete).not.toHaveBeenCalledWith("log_1");
       expect(mockCtx.db.delete).toHaveBeenCalledWith("claim_1");
       expect(mockCtx.storage.delete).toHaveBeenCalledWith("storage_pdf_1");
       expect(mockCtx.storage.delete).toHaveBeenCalledWith("storage_denial_1");
