@@ -27,7 +27,7 @@ Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel 
 - **Performance Goals**: Sub-50ms reactive UI state updates, Sub-200ms query reads, <1.2s First Contentful Paint.
 - **Constraints**: 
   - Zero mock or placeholder code in production pathways; all data derived from real user inputs and live API integrations.
-  - Strict HIPAA-conscious data handling and sanitization.
+  - Strict HIPAA-conscious data handling and sanitization: mandatory server-side Safe Harbor de-identification (45 CFR § 164.514(b)(2)) across all textual prompt and reasoning streams (`systemPrompt`, `userPrompt`, vector embeddings, chatbot/agent turns); raw binary PDF/image uploads (`fileInputs`, `imageUrls` in `opticalParser.ts`) are a documented multimodal intake exception requiring an enterprise HIPAA BAA for live production documents or synthetic fixtures in demo environments.
   - Unified OpenAI client configured via 3 explicit environment variables (`OPENAI_API_KEY`, `OPENAI_MODEL=gpt-5.4-nano`, `OPENAI_BASE_URL`).
   - Resilient fallbacks for external crawling and email delivery.
 - **Scale/Scope**: 5 prioritized user journeys (Ingestion & Parsing, Evidence Crawling & Precedent Matching, Appeal Brief Synthesis in Studio, Statutory Deadline Countdown & Dispatch, Real-Time Case Analytics & Audit Timeline).
@@ -44,7 +44,7 @@ Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel 
 | **II. Rigorous Testing Standards** | PASS | Multi-tier testing hierarchy defined in `data-model.md` and `contracts/`, including automated Vitest unit tests and `npm run verify` CI script. |
 | **III. UX Consistency & "Precision Medical Dark-Mode"** | PASS | Design tokens codified (`#0b0f17` canvas, `#00e5ff` cyan, `#10b981` emerald, `#f43f5e` crimson, `#f59e0b` amber) with zero-latency reactive Convex subscriptions (`useQuery`). |
 | **IV. High-Throughput & Low-Latency Performance** | PASS | Decoupled non-blocking asynchronous actions for Firecrawl and `gpt-5.4-nano`, sub-50ms reactive mutations, and optimized relational indexing. |
-| **V. Security, Data Privacy & HIPAA Guardrails** | PASS | File storage isolation, encrypted credential management via env variables, and immutable audit logging (`appealAuditLogs`). |
+| **V. Security, Data Privacy & HIPAA Guardrails** | PASS | Dual-tier privacy boundary: mandatory server-side Safe Harbor de-identification on all textual prompt streams (`systemPrompt`, `userPrompt`, embeddings, agent tools), documented multimodal intake exception (`fileInputs`, `imageUrls`) requiring enterprise HIPAA BAA for production OCR, file storage isolation, and immutable audit logging (`appealAuditLogs`). |
 | **VI. Development Workflow & Governance** | PASS | Single-branch workflow on `main`, continuous build logging in `hackathon.md`, and strict English-only communication and technical assets enforcement. |
 
 ---

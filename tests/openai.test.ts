@@ -215,6 +215,76 @@ describe("convex/lib/openai Unit Tests", () => {
     expect(emptyText).toBe("");
   });
 
+  it("enforces HIPAA Safe Harbor de-identification on both systemPrompt and userPrompt in createStructuredCompletion", async () => {
+    mockChatCreate.mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({ sanitized: true }),
+          },
+        },
+      ],
+    });
+
+    await createStructuredCompletion<{ sanitized: boolean }>({
+      systemPrompt: "Auditor review for Patient Eleanor Vance, SSN: 123-45-6789, Member ID: GEO-982341-01, email eleanor.vance@example.com.",
+      userPrompt: "Claim for patient living at 742 Evergreen Terrace, phone (555) 019-2834.",
+      schemaName: "SanitizedResult",
+      schema: { type: "object", properties: { sanitized: { type: "boolean" } } },
+    });
+
+    expect(mockChatCreate).toHaveBeenCalledTimes(1);
+    const passedMessages = mockChatCreate.mock.calls[0][0].messages;
+    const passedSystemPrompt = passedMessages[0].content;
+    const passedUserPrompt = passedMessages[1].content;
+
+    // Verify systemPrompt was sanitized
+    expect(passedSystemPrompt).not.toContain("123-45-6789");
+    expect(passedSystemPrompt).not.toContain("eleanor.vance@example.com");
+    expect(passedSystemPrompt).toContain("***-**-****");
+    expect(passedSystemPrompt).toContain("[REDACTED EMAIL]");
+
+    // Verify userPrompt was sanitized
+    expect(passedUserPrompt).not.toContain("742 Evergreen Terrace");
+    expect(passedUserPrompt).not.toContain("(555) 019-2834");
+    expect(passedUserPrompt).toContain("[REDACTED ADDRESS]");
+    expect(passedUserPrompt).toContain("[REDACTED PHONE]");
+  });
+
+  it("enforces HIPAA Safe Harbor de-identification on both systemPrompt and userPrompt in createChatCompletion", async () => {
+    mockChatCreate.mockResolvedValueOnce({
+      choices: [{ message: { content: "Drafted rebuttal" } }],
+    });
+
+    await createChatCompletion({
+      systemPrompt: "Rebuttal for Eleanor Vance, SSN: 123-45-6789, Member ID: GEO-982341-01.",
+      userPrompt: "Contact patient at eleanor.vance@example.com or (555) 019-2834.",
+    });
+
+    expect(mockChatCreate).toHaveBeenCalledTimes(1);
+    const passedMessages = mockChatCreate.mock.calls[0][0].messages;
+    expect(passedMessages[0].content).not.toContain("123-45-6789");
+    expect(passedMessages[0].content).toContain("***-**-****");
+    expect(passedMessages[1].content).not.toContain("eleanor.vance@example.com");
+    expect(passedMessages[1].content).toContain("[REDACTED EMAIL]");
+  });
+
+  it("enforces HIPAA Safe Harbor de-identification on input text in createEmbedding", async () => {
+    process.env.OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
+    const mockVector = new Array(1536).fill(0.05);
+    mockEmbeddingsCreate.mockResolvedValueOnce({
+      data: [{ embedding: mockVector }],
+    });
+
+    await createEmbedding("Precedent for Eleanor Vance, SSN: 123-45-6789, email eleanor.vance@example.com");
+    expect(mockEmbeddingsCreate).toHaveBeenCalledTimes(1);
+    const passedInput = mockEmbeddingsCreate.mock.calls[0][0].input;
+    expect(passedInput).not.toContain("123-45-6789");
+    expect(passedInput).not.toContain("eleanor.vance@example.com");
+    expect(passedInput).toContain("***-**-****");
+    expect(passedInput).toContain("[REDACTED EMAIL]");
+  });
+
   it("creates embeddings via configured OpenAI embedding model", async () => {
     process.env.OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
 

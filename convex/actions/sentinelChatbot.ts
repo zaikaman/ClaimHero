@@ -3,6 +3,7 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { getOpenAIClient, getOpenAIConfig } from "../lib/openai";
+import { redactBeforeLLM } from "../lib/redactionEngine";
 import { internal, api, components } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { Doc, Id } from "../_generated/dataModel";
@@ -766,7 +767,7 @@ async function maybeSummarizeConversation(
 
       const res = await client.chat.completions.create({
         model: model || "gpt-5.4-nano",
-        messages: [{ role: "user", content: summaryPrompt }],
+        messages: [{ role: "user", content: redactBeforeLLM(summaryPrompt) }],
         temperature: 0.1,
       });
 
@@ -880,8 +881,8 @@ export const sendMessageWithTools = action({
 
     type OpenAIInputMessages = Parameters<ReturnType<typeof getOpenAIClient>["chat"]["completions"]["create"]>[0]["messages"];
     const openaiMessages: OpenAIInputMessages = [
-      { role: "system", content: systemPrompt },
-      ...recentMessages.map((m) => ({ role: m.role, content: m.content })),
+      { role: "system", content: redactBeforeLLM(systemPrompt) },
+      ...recentMessages.map((m) => ({ role: m.role, content: redactBeforeLLM(m.content) })),
     ];
 
     const executedToolCalls: Array<{
@@ -946,7 +947,7 @@ export const sendMessageWithTools = action({
           openaiMessages.push({
             role: "tool",
             tool_call_id: toolCall.id,
-            content: toolResult.output,
+            content: redactBeforeLLM(toolResult.output),
           });
         }
         // Continue to next turn so model can inspect tool output and formulate response

@@ -231,7 +231,18 @@ async function createStructuredCompletionAttempt<T>(options: {
 }
 
 /**
- * Execute a structured output completion with JSON schema validation
+ * Execute a structured output completion with JSON schema validation.
+ *
+ * Privacy & HIPAA De-identification Architecture:
+ * - All textual prompt streams (`systemPrompt`, `userPrompt`) pass through mandatory
+ *   pre-submission de-identification (`redactBeforeLLM`) adhering to HIPAA Safe Harbor
+ *   (45 CFR § 164.514(b)(2)) to prevent transmission of direct patient identifiers.
+ * - Multimodal intake exception: Raw binary PDF/image attachments (`fileInputs`, `imageUrls`)
+ *   submitted during initial optical extraction (`opticalParser.ts`) bypass pre-OCR text
+ *   redaction because optical character recognition precedes entity discovery. In live
+ *   production environments processing genuine patient documents, an executed HIPAA
+ *   Business Associate Agreement (BAA) with OpenAI is required. Demonstration environments
+ *   strictly operate on synthetic Safe Harbor test fixtures.
  */
 export async function createStructuredCompletion<T>(options: {
   systemPrompt: string;
@@ -247,6 +258,7 @@ export async function createStructuredCompletion<T>(options: {
   const { model } = getOpenAIConfig();
   const client = getOpenAIClient({ timeout: 60_000, maxRetries: 3 });
   const safeUserPrompt = redactBeforeLLM(options.userPrompt);
+  const safeSystemPrompt = redactBeforeLLM(options.systemPrompt);
 
   const retries = Math.max(0, Math.min(options.structuredRetries ?? DEFAULT_STRUCTURED_RETRIES, 4));
   const attempts = retries + 1;
@@ -261,7 +273,7 @@ export async function createStructuredCompletion<T>(options: {
         client,
         model,
         userPrompt: `${safeUserPrompt}${retryInstruction}`,
-        systemPrompt: options.systemPrompt,
+        systemPrompt: safeSystemPrompt,
         schemaName: options.schemaName,
         schema: options.schema,
         imageUrls: options.imageUrls,
@@ -282,7 +294,10 @@ export async function createStructuredCompletion<T>(options: {
 }
 
 /**
- * Standard text completion for open-ended clinical brief drafting
+ * Standard text completion for open-ended clinical brief drafting.
+ *
+ * Enforces mandatory server-side de-identification on both systemPrompt
+ * and userPrompt before transmitting payloads to external LLM APIs.
  */
 export async function createChatCompletion(options: {
   systemPrompt: string;
@@ -292,11 +307,12 @@ export async function createChatCompletion(options: {
   const { model } = getOpenAIConfig();
   const client = getOpenAIClient({ timeout: 60_000, maxRetries: 3 });
   const safeUserPrompt = redactBeforeLLM(options.userPrompt);
+  const safeSystemPrompt = redactBeforeLLM(options.systemPrompt);
 
   const response = await client.chat.completions.create({
     model,
     messages: [
-      { role: "system", content: options.systemPrompt },
+      { role: "system", content: safeSystemPrompt },
       { role: "user", content: safeUserPrompt },
     ],
     temperature: options.temperature ?? 0.3,
@@ -309,12 +325,16 @@ export async function createChatCompletion(options: {
  * Produce a 1536-d embedding via OpenAI embeddings API.
  * Requires OPENAI_EMBEDDING_MODEL environment variable to be explicitly configured.
  * Fails hard without fallback if unset or if the API call fails.
+ *
+ * Mandatory de-identification (`redactBeforeLLM`) is enforced on the input text
+ * before transmitting to external embedding endpoints.
  */
 export async function createEmbedding(
   text: string,
   _extraWeightedTokens: string[] = []
 ): Promise<number[]> {
-  const input = text.slice(0, 8000);
+  const safeText = redactBeforeLLM(text);
+  const input = safeText.slice(0, 8000);
   const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL?.trim();
 
   if (!embeddingModel) {

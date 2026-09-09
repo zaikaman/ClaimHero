@@ -57,6 +57,19 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       expect(redactBeforeLLM("")).toBe("");
       expect(redactBeforeLLM(undefined as any)).toBe("");
     });
+
+    it("de-identifies live claim system prompts containing patient identities, member IDs, and contact points", () => {
+      const systemPrompt =
+        "You are drafting an immediate Clinical Rebuttal Addendum for Claim #CLM-98210 (Patient: Eleanor Vance, Member ID: MBN9823412-01, DOB: 1984-05-14). Contact: eleanor.vance@example.com, (555) 234-5678, living at 123 Main St, Springfield IL 62701.";
+      const redacted = redactBeforeLLM(systemPrompt);
+
+      expect(redacted).not.toContain("eleanor.vance@example.com");
+      expect(redacted).not.toContain("(555) 234-5678");
+      expect(redacted).not.toContain("123 Main St");
+      expect(redacted).toContain("[REDACTED EMAIL]");
+      expect(redacted).toContain("[REDACTED PHONE]");
+      expect(redacted).toContain("[REDACTED ADDRESS]");
+    });
   });
 
 

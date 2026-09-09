@@ -577,9 +577,18 @@ export function fastSanitizeText(
 }
 
 /**
- * Server-Side Redaction Gate:
- * Enforces mandatory de-identification before sending any prompt or data payload
- * to third-party LLM APIs (OpenAI) when operating without a signed HIPAA BAA.
+ * Server-Side Text Redaction Gate:
+ * Enforces mandatory HIPAA Safe Harbor de-identification (45 CFR § 164.514(b)(2))
+ * across all textual prompt payloads (`systemPrompt`, `userPrompt`, embedding inputs,
+ * and chatbot dialog turns) before dispatching to third-party LLM APIs (OpenAI).
+ *
+ * Multimodal Intake Exception:
+ * Raw binary PDF/image uploads processed during intake in `opticalParser.ts`
+ * (`fileInputs`, `imageUrls`) bypass pre-OCR text redaction because optical character
+ * recognition and layout analysis precede textual entity discovery. Handling authentic
+ * patient records at the multimodal intake layer requires an enterprise HIPAA Business
+ * Associate Agreement (BAA) with OpenAI. In demonstration and test environments,
+ * ClaimHero operates exclusively on synthetic Safe Harbor evaluation fixtures.
  */
 export function redactBeforeLLM(text: string, options?: RedactionEngineOptions): string {
   if (!text || typeof text !== "string") return "";

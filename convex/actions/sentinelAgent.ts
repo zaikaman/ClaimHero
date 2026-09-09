@@ -6,6 +6,7 @@ import { Agent, createTool, stepCountIs } from "@convex-dev/agent";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { getOpenAIConfig } from "../lib/openai";
+import { redactBeforeLLM } from "../lib/redactionEngine";
 import { api, components, internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import { rateLimiter } from "../lib/rateLimiter";
@@ -48,7 +49,7 @@ export const getActiveClaimDetails = createTool({
       return `Claim not found or access denied for query ${input.claimId || input.claimNumber}.`;
     }
 
-    return JSON.stringify(data, null, 2);
+    return redactBeforeLLM(JSON.stringify(data, null, 2));
   },
 });
 
@@ -72,7 +73,7 @@ export const searchClaims = createTool({
       userId,
     });
 
-    return JSON.stringify(data, null, 2);
+    return redactBeforeLLM(JSON.stringify(data, null, 2));
   },
 });
 
@@ -440,8 +441,8 @@ export const streamSentinelMessage = action({
       ctx,
       { threadId: args.threadId, userId },
       {
-        prompt: args.prompt,
-        instructions,
+        prompt: redactBeforeLLM(args.prompt),
+        instructions: redactBeforeLLM(instructions),
       },
       {
         saveStreamDeltas: {

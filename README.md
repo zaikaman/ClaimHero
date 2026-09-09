@@ -140,9 +140,8 @@ ClaimHero leverages 8 first-party and partner Convex components configured in [`
 
 ---
 
-## Safety, Privacy & HIPAA Compliance
-
-- **HIPAA Safe Harbor Redaction**: Multi-stage client and server redaction strips 18 direct identifiers (names, MRNs, SSNs, phone numbers, facility names) before external API calls (`src/lib/redaction.ts`).
+- **HIPAA Safe Harbor Redaction Gate**: Mandatory server-side pre-submission de-identification (`redactBeforeLLM`) strips 18 direct identifiers (patient names, MRNs, SSNs, phone numbers, emails, addresses, dates of birth) across all textual prompt payloads (`systemPrompt`, `userPrompt`), vector query embeddings, and Sentinel Copilot dialogs before dispatch to third-party LLM APIs (45 CFR § 164.514(b)(2)).
+- **Multimodal Intake Architecture**: Binary PDF and image uploads (`fileInputs`, `imageUrls` in `opticalParser.ts`) bypass pre-OCR text redaction because optical recognition and layout classification precede entity discovery. In enterprise production environments with live health records, a signed HIPAA Business Associate Agreement (BAA) with OpenAI is required; evaluation deployments strictly use synthetic Safe Harbor fixtures.
 - **Server-Side Authorization**: Every Convex query and mutation enforces document ownership (`claim.userId === authUser._id`) to prevent unauthorized cross-tenant data access (`convex/lib/auth.ts`).
 - **Deterministic 4-Pillar Scoring**: Overturn probability is computed using an explainable mathematical formula (0–100 scale), never an opaque hallucinated number (`convex/actions/precedentMatcher.ts`).
 - **Human Approval Gate**: Real outbound email transmission strictly requires manual human confirmation; unreviewed messages are never silently sent to external payers.
