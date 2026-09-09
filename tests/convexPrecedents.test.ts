@@ -59,7 +59,11 @@ describe("Convex Precedents & Controlling Authorities Engine", () => {
         },
       };
 
-      expect(await (precedents.listForReindex as any)._handler(mockCtx, {})).toEqual(docs);
+      expect(await (precedents.listForReindex as any)._handler(mockCtx, {})).toEqual({
+        page: docs,
+        isDone: true,
+        continueCursor: null,
+      });
 
       const res = await (precedents.updateEmbedding as any)._handler(mockCtx, {
         precedentId: "p1",
@@ -70,6 +74,37 @@ describe("Convex Precedents & Controlling Authorities Engine", () => {
         embedding: expect.any(Array),
       });
       expect(mockCtx.db.patch.mock.calls[0][1].embedding).toHaveLength(1536);
+    });
+
+    it("listForReindex strips heavy raw embedding vectors and paginates", async () => {
+      const docsWithEmbedding = [
+        { _id: "p1", title: "Precedent 1", embedding: new Array(1536).fill(0.5) },
+        { _id: "p2", title: "Precedent 2", embedding: new Array(1536).fill(0.2) },
+      ];
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            paginate: vi.fn().mockResolvedValue({
+              page: docsWithEmbedding,
+              isDone: false,
+              continueCursor: "cursor_abc",
+            }),
+          }),
+        },
+      };
+
+      const res = await (precedents.listForReindex as any)._handler(mockCtx, {
+        cursor: null,
+        batchSize: 50,
+      });
+
+      expect(res.isDone).toBe(false);
+      expect(res.continueCursor).toBe("cursor_abc");
+      expect(res.page).toHaveLength(2);
+      expect((res.page[0] as any).embedding).toBeUndefined();
+      expect(res.page[0].title).toBe("Precedent 1");
+      expect((res.page[1] as any).embedding).toBeUndefined();
+      expect(res.page[1].title).toBe("Precedent 2");
     });
   });
 

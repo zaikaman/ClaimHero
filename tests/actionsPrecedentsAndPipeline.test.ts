@@ -72,6 +72,114 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
       expect(mockCtx.runMutation).toHaveBeenCalled();
     });
 
+    it("reindexArchive: batches precedent embedding reindex and cascades continuation via scheduler", async () => {
+      vi.spyOn(libOpenAI, "createEmbedding").mockResolvedValue(new Array(1536).fill(0.1));
+
+      const mockPrecedents = [
+        {
+          _id: "p1",
+          sourceKind: "winning_brief",
+          title: "Precedent 1",
+          citation: "Cit 1",
+          winningArgument: "Arg 1",
+          statutoryLanguage: "Stat 1",
+          outcome: "Overturned",
+          icd10Codes: ["M51.16"],
+          cptCodes: ["63047"],
+          carcCodes: ["CO-50"],
+        },
+        {
+          _id: "p2",
+          sourceKind: "court_overturn",
+          title: "Precedent 2",
+          citation: "Cit 2",
+          winningArgument: "Arg 2",
+          statutoryLanguage: "Stat 2",
+          outcome: "Overturned",
+          icd10Codes: ["M51.16"],
+          cptCodes: ["63047"],
+          carcCodes: ["CO-50"],
+        },
+      ];
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          page: mockPrecedents,
+          isDone: false,
+          continueCursor: "cursor_next",
+        }),
+        runMutation: vi.fn().mockResolvedValue(null),
+        scheduler: {
+          runAfter: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      const res = await (actionPrecedentArchive.reindexArchive as any)._handler(mockCtx, {
+        cursor: null,
+        batchSize: 50,
+      });
+
+      expect(res.isDone).toBe(false);
+      expect(res.continueCursor).toBe("cursor_next");
+      expect(res.batchProcessed).toBe(2);
+      expect(res.reindexed).toBe(2);
+      expect(res.totalReindexed).toBe(2);
+      expect(mockCtx.runMutation).toHaveBeenCalledTimes(2);
+      expect(mockCtx.scheduler.runAfter).toHaveBeenCalledWith(
+        0,
+        expect.anything(),
+        {
+          cursor: "cursor_next",
+          batchSize: 50,
+          totalReindexed: 2,
+        }
+      );
+    });
+
+    it("reindexArchiveBatch: handles scheduled continuation and marks completion when isDone is true", async () => {
+      vi.spyOn(libOpenAI, "createEmbedding").mockResolvedValue(new Array(1536).fill(0.1));
+
+      const mockPrecedents = [
+        {
+          _id: "p3",
+          sourceKind: "statutory_authority",
+          title: "Precedent 3",
+          citation: "Cit 3",
+          winningArgument: "Arg 3",
+          statutoryLanguage: "Stat 3",
+          outcome: "Affirmed",
+          icd10Codes: ["M54.5"],
+          cptCodes: ["99214"],
+          carcCodes: ["CO-50"],
+        },
+      ];
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          page: mockPrecedents,
+          isDone: true,
+          continueCursor: null,
+        }),
+        runMutation: vi.fn().mockResolvedValue(null),
+        scheduler: {
+          runAfter: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      const res = await (actionPrecedentArchive.reindexArchiveBatch as any)._handler(mockCtx, {
+        cursor: "cursor_next",
+        batchSize: 50,
+        totalReindexed: 2,
+      });
+
+      expect(res.isDone).toBe(true);
+      expect(res.continueCursor).toBeNull();
+      expect(res.batchProcessed).toBe(1);
+      expect(res.reindexed).toBe(1);
+      expect(res.totalReindexed).toBe(3);
+      expect(mockCtx.scheduler.runAfter).not.toHaveBeenCalled();
+    });
+
     it("hybridSearchPrecedents: filters search results by sourceKind when provided", async () => {
       vi.spyOn(libOpenAI, "createEmbedding").mockResolvedValue(new Array(1536).fill(0.1));
       vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);

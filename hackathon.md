@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-09T09:37:00Z
+- **Last updated:** 2026-09-09T15:51:00Z
 
 ## Log
 
@@ -1104,9 +1104,15 @@ Resolved M4 defect in portfolio statistics aggregation and demo fixture accounti
 
 - Adjudication Determination & Autopilot Lifecycle Alignment (`convex/emails.ts`, `convex/schema.ts`, `src/types/index.ts`): Resolved runtime error `Invalid detectedDetermination: "POLICY_CONFLICT_CITATION"` thrown by `applyInsertMessage` during AI payer adjudication. Updated `ALLOWED_DETERMINATIONS` to include all adversarial defense moves (`POLICY_CONFLICT_CITATION`, `PARTIAL_SETTLEMENT_OFFER`) and system bounce notifications (`DELIVERY_FAILURE`). Updated `ALLOWED_AUTOREPLY_STATUSES` to include autonomous response lifecycle states (`generating`, `skipped`, `disabled`, `failed`). Exported canonical sets and applied uniform validation across `applyInsertMessage`, `updateMessageAnalysisInternal`, and `insertInboundMessageInternal`. Added 4 unit tests in `tests/convexEmails.test.ts`. Verified with `npm run verify` (100% clean typecheck, lint, 693 passing unit tests across 42 suites, and production build). Convex features: schema, tables, internalMutation, mutations, actions.
 
-### 2026-09-09 - working tree
+### 2026-09-09 - 225ad99
 Resolved duplicate email alert storms, severed zombie cloud deployment, and hardened payer alert concurrency:
 - Zombie Deployment Neutralization & Credential Rotation: Traced the sudden email alert cascade (`CLM-6104-GEO` and `CLM-8942-GEO`) to an abandoned Convex deployment (`usable-sturgeon-376`) whose background cron jobs (`sync-agentmail-inboxes` and `sentinel-autopilot-sla-sweep`) continued running against shared AgentMail mailboxes. Rotated the AgentMail API key across active dev (`peaceful-sparrow-520`) and prod (`kindhearted-elephant-992`), and revoked the compromised legacy API key to permanently cut off the zombie deployment.
 - ACID Payer Alert Throttle Mutation (`convex/claims.ts`): Implemented `claimPayerAlertThrottleInternal` providing transactional OCC reservation for alert notifications. Replaced in-memory race-prone checks with atomic reservations enforcing a 60-second debounce for overturn victories and full cooldown for non-victory determinations, eliminating concurrent webhook/cron burst duplicates.
 - Inbound Adjudication Isolation (`convex/actions/agentMail.ts`, `convex/claims.ts`): Relocated `isAlertMessage` and `isSelfSender` validation to the start of `handleInboundClaimReply`, dropping internal and loopback emails prior to executing database lookups. Updated `getByInboxEmailInternal` and `findMatchingClaimInternal` to reject internal AgentMail addresses (`isInternalAgentMailAddress`). Restricted `performInboxSync` to poll only `mailboxes.senderInboxId` (excluding `adjudicatorInboxId`), preventing outbound appeal briefs from being processed as inbound payer replies.
-- Regression Coverage & Verification: Verified all 25 tests in `tests/actionsAgentMailAndDispatcher.test.ts` and entire test suite via `npm run verify` (100% clean typecheck, 0 ESLint errors, 693 passing unit tests across 42 suites, 80.08% coverage, and successful production build). Convex features: schema, tables, internalMutation, internalQuery, actions, crons.
+- Regression Coverage & Verification: Verified all 25 tests in `tests/actionsAgentMailAndDispatcher.test.ts` and entire test suite via `npm run verify` (100% clean typecheck, 0 ESLint errors, 693 passing unit tests across 42 suites, 80.08% coverage, and successful production build). Convex features: schema, tables, internalMutation, internalQuery, actions, crons.
+
+### 2026-09-09 - working tree
+Resolved M5 precedent vector reindexing transaction limit vulnerability (`convex/actions/precedentArchive.ts`, `convex/precedents.ts`):
+- Paginated Precedent Query & Embedding Stripping (`convex/precedents.ts`): Re-engineered `listForReindex` into a bounded paginated internal query (`cursor`, `batchSize`, max 100). Stripped heavy 1536-dimensional raw embedding vectors (~12-18 KB per document) on load, reducing per-row IPC transport from ~18 KB to ~500 B and eliminating `TransactionTooLarge` read byte exhaustion at scale.
+- Deadline Sweep Cascade Batching Pattern (`convex/actions/precedentArchive.ts`): Structured archive re-embedding after statutory deadline sweep pattern (`executeSweepDeadlinesBatch`). Implemented `executeReindexArchiveBatch`, `reindexArchive`, and scheduled continuation action `reindexArchiveBatch` cascading asynchronously via `ctx.scheduler.runAfter(0, ...)`. Ensured each bounded batch generates embeddings and commits updates within safe transaction and execution time budgets.
+- Testing & Regression Verification (`tests/convexPrecedents.test.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`): Added unit tests for cursor pagination, vector stripping, scheduler continuation cascading, and completion termination. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 696 passing unit tests across 42 suites, 80.77% coverage, and successful production build). Convex features: internalQuery, internalAction, pagination, scheduled functions, vector search.

@@ -65,13 +65,54 @@ export const getBySourceClaim = internalQuery({
 });
 
 /**
- * Read the bounded archive set for the one-shot embedding migration.
- * Reindexing more than 1000 rows should be split into explicit batches.
+ * Read a bounded, paginated batch of precedents for embedding reindexing.
+ * Strips the heavy 1536-dim embedding vectors (~12-18 KB per row) to prevent
+ * query read transaction byte limit exhaustion (TransactionTooLarge).
  */
 export const listForReindex = internalQuery({
-  args: {},
-  handler: async (ctx): Promise<Doc<"precedents">[]> => {
-    return await ctx.db.query("precedents").take(1001);
+  args: {
+    cursor: v.optional(v.union(v.string(), v.null())),
+    batchSize: v.optional(v.number()),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    page: HydratedPrecedent[];
+    isDone: boolean;
+    continueCursor: string | null;
+  }> => {
+    const batchSize = Math.min(Math.max(1, args.batchSize ?? 50), 100);
+    const queryBuilder = ctx.db.query("precedents");
+
+    if (typeof queryBuilder.paginate === "function") {
+      const pageResult = await queryBuilder.paginate({
+        cursor: args.cursor ?? null,
+        numItems: batchSize,
+      });
+
+      const page: HydratedPrecedent[] = pageResult.page.map((doc) => {
+        const { embedding: _, ...rest } = doc;
+        return rest;
+      });
+
+      return {
+        page,
+        isDone: pageResult.isDone,
+        continueCursor: pageResult.continueCursor,
+      };
+    }
+
+    // Fallback for mock environments / unit tests without paginate
+    const docs = await queryBuilder.take(batchSize);
+    return {
+      page: docs.map((doc) => {
+        const { embedding: _, ...rest } = doc;
+        return rest;
+      }),
+      isDone: true,
+      continueCursor: null,
+    };
   },
 });
 

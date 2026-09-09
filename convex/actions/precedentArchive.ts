@@ -82,43 +82,129 @@ export const seedArchive = internalAction({
 });
 
 /**
+ * Helper to process a bounded page of precedents during embedding reindex.
+ * Cascades asynchronously via ctx.scheduler.runAfter to prevent TransactionTooLarge
+ * and stay well within Convex bytesRead / transaction limits.
+ */
+async function executeReindexArchiveBatch(
+  ctx: ActionCtx,
+  args: {
+    cursor: string | null;
+    batchSize?: number;
+    totalReindexed?: number;
+  }
+): Promise<{
+  isDone: boolean;
+  continueCursor: string | null;
+  batchProcessed: number;
+  reindexed: number;
+  totalReindexed: number;
+  total: number;
+}> {
+  const batchSize = Math.min(Math.max(1, args.batchSize ?? 50), 100);
+
+  const pageResult: {
+    page: HydratedPrecedent[];
+    isDone: boolean;
+    continueCursor: string | null;
+  } = await ctx.runQuery(internal.precedents.listForReindex, {
+    cursor: args.cursor,
+    batchSize,
+  });
+
+  let batchReindexed = 0;
+
+  for (const doc of pageResult.page) {
+    const extraTokens = weightedTokensForCodes(
+      doc.icd10Codes,
+      doc.cptCodes,
+      doc.carcCodes
+    );
+    extraTokens.push(`kind:${doc.sourceKind}`);
+    const embedding = await createEmbedding(
+      buildPrecedentEmbedText(doc),
+      extraTokens
+    );
+    await ctx.runMutation(internal.precedents.updateEmbedding, {
+      precedentId: doc._id,
+      embedding,
+    });
+    batchReindexed++;
+  }
+
+  const totalReindexed = (args.totalReindexed ?? 0) + batchReindexed;
+
+  if (!pageResult.isDone && pageResult.continueCursor) {
+    if (ctx.scheduler && typeof ctx.scheduler.runAfter === "function") {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.precedentArchive.reindexArchiveBatch,
+        {
+          cursor: pageResult.continueCursor,
+          batchSize,
+          totalReindexed,
+        }
+      );
+    }
+  }
+
+  return {
+    isDone: pageResult.isDone,
+    continueCursor: pageResult.continueCursor,
+    batchProcessed: pageResult.page.length,
+    reindexed: batchReindexed,
+    totalReindexed,
+    total: totalReindexed,
+  };
+}
+
+/**
  * Re-embed every existing archive row after changing embedding providers.
- * This is intentionally separate from retrieval and should be run once per
- * vector-model migration.
+ * Initiates bounded pagination batching (default 50 rows per batch) to safely
+ * reindex any volume of precedent vectors without blowing transaction or memory limits.
+ * Cascades asynchronously via scheduler like the statutory deadline sweep.
  */
 export const reindexArchive = internalAction({
-  args: {},
+  args: {
+    cursor: v.optional(v.union(v.string(), v.null())),
+    batchSize: v.optional(v.number()),
+  },
   returns: v.object({
+    isDone: v.boolean(),
+    continueCursor: v.union(v.string(), v.null()),
+    batchProcessed: v.number(),
     reindexed: v.number(),
+    totalReindexed: v.number(),
     total: v.number(),
   }),
-  handler: async (ctx): Promise<{ reindexed: number; total: number }> => {
-    const docs = await ctx.runQuery(
-      internal.precedents.listForReindex,
-      {}
-    );
-    if (docs.length > 1000) {
-      throw new Error("Precedent archive exceeds the one-shot reindex limit of 1000 rows");
-    }
+  handler: async (ctx, args) => {
+    return await executeReindexArchiveBatch(ctx, {
+      cursor: args.cursor ?? null,
+      batchSize: args.batchSize ?? 50,
+      totalReindexed: 0,
+    });
+  },
+});
 
-    for (const doc of docs) {
-      const extraTokens = weightedTokensForCodes(
-        doc.icd10Codes,
-        doc.cptCodes,
-        doc.carcCodes
-      );
-      extraTokens.push(`kind:${doc.sourceKind}`);
-      const embedding = await createEmbedding(
-        buildPrecedentEmbedText(doc),
-        extraTokens
-      );
-      await ctx.runMutation(internal.precedents.updateEmbedding, {
-        precedentId: doc._id,
-        embedding,
-      });
-    }
-
-    return { reindexed: docs.length, total: docs.length };
+/**
+ * Internal action for scheduled continuation batches during precedent vector reindex.
+ */
+export const reindexArchiveBatch = internalAction({
+  args: {
+    cursor: v.union(v.string(), v.null()),
+    batchSize: v.optional(v.number()),
+    totalReindexed: v.optional(v.number()),
+  },
+  returns: v.object({
+    isDone: v.boolean(),
+    continueCursor: v.union(v.string(), v.null()),
+    batchProcessed: v.number(),
+    reindexed: v.number(),
+    totalReindexed: v.number(),
+    total: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    return await executeReindexArchiveBatch(ctx, args);
   },
 });
 
