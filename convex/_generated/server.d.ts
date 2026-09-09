@@ -46,7 +46,7 @@ type Env = {
   readonly OPENAI_BASE_URL: string | undefined;
   readonly OPENAI_EMBEDDING_MODEL: string | undefined;
   readonly OPENAI_MODEL: string | undefined;
-  readonly SITE_URL: string | undefined;
+  readonly SITE_URL: string;
 };
 
 /**

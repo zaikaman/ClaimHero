@@ -279,6 +279,109 @@ describe("Convex Emails & Communications API", () => {
       expect(mockCtx.db.patch).toHaveBeenCalledWith("c1", expect.objectContaining({ status: "under_review" }));
       expect(mockCtx.db.insert).toHaveBeenCalledWith("appealAuditLogs", expect.objectContaining({ eventType: "payer_response_received" }));
     });
+
+    it("accepts adversarial adversary countermoves such as POLICY_CONFLICT_CITATION and PARTIAL_SETTLEMENT_OFFER", async () => {
+      const mockCtx: any = {
+        db: {
+          insert: vi.fn().mockImplementation((table) => (table === "emailMessages" ? Promise.resolve("msg_in_policy") : Promise.resolve("log_policy"))),
+          patch: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      const res = await (emails.insertMessageInternal as any)._handler(mockCtx, {
+        threadId: "t1",
+        claimId: "c1",
+        direction: "inbound",
+        sender: "payer@aetna.com",
+        recipient: "agent@claimhero.com",
+        subject: "Adverse Determination - Policy Conflict",
+        bodyHtml: "<p>CPB 0234 exclusion applied</p>",
+        bodyText: "CPB 0234 exclusion applied",
+        hasAttachments: false,
+        detectedDetermination: "POLICY_CONFLICT_CITATION",
+        autoReplyStatus: "pending",
+      });
+
+      expect(res).toBe("msg_in_policy");
+      expect(mockCtx.db.insert).toHaveBeenCalledWith("emailMessages", expect.objectContaining({
+        detectedDetermination: "POLICY_CONFLICT_CITATION",
+        autoReplyStatus: "pending",
+      }));
+    });
+
+    it("rejects unknown detectedDetermination", async () => {
+      const mockCtx: any = {
+        db: {
+          insert: vi.fn(),
+          patch: vi.fn(),
+        },
+      };
+
+      await expect(
+        (emails.insertMessageInternal as any)._handler(mockCtx, {
+          threadId: "t1",
+          claimId: "c1",
+          direction: "inbound",
+          sender: "payer@aetna.com",
+          recipient: "agent@claimhero.com",
+          subject: "Adverse Determination",
+          bodyHtml: "<p>Denied</p>",
+          bodyText: "Denied",
+          hasAttachments: false,
+          detectedDetermination: "SOME_UNRECOGNIZED_STATUS",
+        })
+      ).rejects.toThrow('Invalid detectedDetermination: "SOME_UNRECOGNIZED_STATUS"');
+    });
+
+    it("accepts lifecycle autoReplyStatus values including generating, skipped, disabled, failed", async () => {
+      const mockCtx: any = {
+        db: {
+          insert: vi.fn().mockImplementation(() => Promise.resolve("msg_id")),
+          patch: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      for (const status of ["generating", "skipped", "disabled", "failed", "dispatched", "dismissed", "pending"]) {
+        await expect(
+          (emails.insertMessageInternal as any)._handler(mockCtx, {
+            threadId: "t1",
+            claimId: "c1",
+            direction: "inbound",
+            sender: "payer@aetna.com",
+            recipient: "agent@claimhero.com",
+            subject: "Status Test",
+            bodyHtml: "<p>Test</p>",
+            bodyText: "Test",
+            hasAttachments: false,
+            autoReplyStatus: status,
+          })
+        ).resolves.toBe("msg_id");
+      }
+    });
+
+    it("rejects invalid autoReplyStatus", async () => {
+      const mockCtx: any = {
+        db: {
+          insert: vi.fn(),
+          patch: vi.fn(),
+        },
+      };
+
+      await expect(
+        (emails.insertMessageInternal as any)._handler(mockCtx, {
+          threadId: "t1",
+          claimId: "c1",
+          direction: "inbound",
+          sender: "payer@aetna.com",
+          recipient: "agent@claimhero.com",
+          subject: "Test",
+          bodyHtml: "<p>Test</p>",
+          bodyText: "Test",
+          hasAttachments: false,
+          autoReplyStatus: "invalid_status",
+        })
+      ).rejects.toThrow('Invalid autoReplyStatus: "invalid_status"');
+    });
   });
 
   describe("getExistingAgentMailMessageIds & hasMessageByAgentMailId", () => {

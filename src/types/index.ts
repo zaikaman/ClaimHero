@@ -356,12 +356,12 @@ export interface EmailMessage {
     url?: string | null;
   }>;
   agentMailMessageId?: string;
-  detectedDetermination?: "OVERTURNED_APPROVED" | "PARTIAL_SETTLEMENT_OFFER" | "ADDITIONAL_RECORDS_REQUIRED" | "POLICY_CONFLICT_CITATION" | "DENIAL_UPHELD" | "ACKNOWLEDGMENT_ONLY" | "GENERAL_INQUIRY" | string;
+  detectedDetermination?: "OVERTURNED_APPROVED" | "PARTIAL_SETTLEMENT_OFFER" | "ADDITIONAL_RECORDS_REQUIRED" | "POLICY_CONFLICT_CITATION" | "DENIAL_UPHELD" | "ACKNOWLEDGMENT_ONLY" | "GENERAL_INQUIRY" | "DELIVERY_FAILURE" | string;
   clinicalRationale?: string;
   missingRecordsRequested?: string[];
   settlementAmount?: number;
   autoReplyDraft?: string;
-  autoReplyStatus?: "pending" | "dispatched" | "dismissed" | string;
+  autoReplyStatus?: "pending" | "dispatched" | "dismissed" | "generating" | "skipped" | "disabled" | "failed" | string;
   receivedAt: number;
 }
 

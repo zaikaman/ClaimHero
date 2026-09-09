@@ -527,6 +527,147 @@ describe("Demo Isolation, Provenance Attribution & Honest Evaluation Pipeline", 
       expect(deletedIds).toEqual(["claim_demo_fixture"]);
       expect(deletedIds).not.toContain("claim_real_eleanor");
     });
+
+    it("getPortfolioStats counts demo claims when includeDemo is true or omitted", async () => {
+      const claimsModule = await import("../convex/claims");
+      const statsHandler = (claimsModule.getPortfolioStats as any)._handler;
+
+      const realClaim = {
+        _id: "c_real",
+        userId: "user_test",
+        claimNumber: "CLM-REAL-1",
+        patientName: "Real Patient",
+        insurancePayer: "Aetna",
+        deniedAmount: 10000,
+        status: "ready_for_review",
+        daysRemaining: 20,
+        isDemo: false,
+        dataOrigin: "live-pipeline",
+        origin: "live-pipeline",
+        overturnProbabilityScore: 80,
+      };
+
+      const demoClaim1 = {
+        _id: "c_demo_1",
+        userId: "user_test",
+        claimNumber: "CLM-DEMO-1",
+        patientName: "Eleanor Vance",
+        insurancePayer: "Cigna Global",
+        deniedAmount: 18500,
+        status: "ready_for_review",
+        daysRemaining: 10,
+        isDemo: true,
+        dataOrigin: "demo-fixture",
+        origin: "demo-fixture",
+        overturnProbabilityScore: 92,
+      };
+
+      const demoClaim2 = {
+        _id: "c_demo_2",
+        userId: "user_test",
+        claimNumber: "CLM-DEMO-2",
+        patientName: "Michael Patel",
+        insurancePayer: "Aetna International",
+        deniedAmount: 24000,
+        status: "won",
+        daysRemaining: 45,
+        isDemo: true,
+        dataOrigin: "demo-fixture",
+        origin: "demo-fixture",
+        overturnProbabilityScore: 85,
+      };
+
+      const mockQueryInstance: any = {};
+      mockQueryInstance.withIndex = vi.fn().mockReturnValue(mockQueryInstance);
+      mockQueryInstance.filter = vi.fn().mockReturnValue(mockQueryInstance);
+      mockQueryInstance.order = vi.fn().mockReturnValue(mockQueryInstance);
+      mockQueryInstance.take = vi.fn().mockResolvedValue([realClaim, demoClaim1, demoClaim2]);
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue(mockQueryInstance),
+        },
+      };
+
+      // When includeDemo is omitted (default), demo claims MUST be counted in portfolio stats
+      const statsDefault = await statsHandler(mockCtx, {});
+      expect(statsDefault.totalClaims).toBe(3);
+      expect(statsDefault.totalDisputedAmount).toBe(52500); // 10000 + 18500 + 24000
+      expect(statsDefault.portfolioTotalClaims).toBe(3);
+      expect(statsDefault.portfolioTotalDisputedAmount).toBe(52500);
+      expect(statsDefault.overturnedWonAmount).toBe(24000);
+      expect(statsDefault.activeDisputedAmount).toBe(28500); // 10000 + 18500
+      expect(statsDefault.claimsByStatus.ready_for_review).toBe(2);
+      expect(statsDefault.claimsByStatus.won).toBe(1);
+
+      // When includeDemo is explicitly true, demo claims MUST be counted in portfolio stats
+      const statsInclude = await statsHandler(mockCtx, { includeDemo: true });
+      expect(statsInclude.totalClaims).toBe(3);
+      expect(statsInclude.totalDisputedAmount).toBe(52500);
+      expect(statsInclude.portfolioTotalClaims).toBe(3);
+      expect(statsInclude.portfolioTotalDisputedAmount).toBe(52500);
+      expect(statsInclude.claimsByStatus.ready_for_review).toBe(2);
+      expect(statsInclude.claimsByStatus.won).toBe(1);
+    });
+
+    it("getPortfolioStats excludes demo claims and does not double-count or leak when includeDemo is false", async () => {
+      const claimsModule = await import("../convex/claims");
+      const statsHandler = (claimsModule.getPortfolioStats as any)._handler;
+
+      const realClaim = {
+        _id: "c_real",
+        userId: "user_test",
+        claimNumber: "CLM-REAL-1",
+        patientName: "Real Patient",
+        insurancePayer: "Aetna",
+        deniedAmount: 10000,
+        status: "ready_for_review",
+        daysRemaining: 20,
+        isDemo: false,
+        dataOrigin: "live-pipeline",
+        origin: "live-pipeline",
+        overturnProbabilityScore: 80,
+      };
+
+      const demoClaim = {
+        _id: "c_demo_1",
+        userId: "user_test",
+        claimNumber: "CLM-DEMO-1",
+        patientName: "Eleanor Vance",
+        insurancePayer: "Cigna Global",
+        deniedAmount: 18500,
+        status: "ready_for_review",
+        daysRemaining: 10,
+        isDemo: true,
+        dataOrigin: "demo-fixture",
+        origin: "demo-fixture",
+        overturnProbabilityScore: 92,
+      };
+
+      const mockQueryInstance: any = {};
+      mockQueryInstance.withIndex = vi.fn().mockReturnValue(mockQueryInstance);
+      mockQueryInstance.filter = vi.fn().mockReturnValue(mockQueryInstance);
+      mockQueryInstance.order = vi.fn().mockReturnValue(mockQueryInstance);
+      // Simulating query results where demo claims might be returned by db before client filter
+      mockQueryInstance.take = vi.fn().mockResolvedValue([realClaim, demoClaim]);
+
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue(mockQueryInstance),
+        },
+      };
+
+      const stats = await statsHandler(mockCtx, { includeDemo: false });
+      // Demo claim MUST be excluded: exactly 1 real claim
+      expect(stats.totalClaims).toBe(1);
+      expect(stats.totalDisputedAmount).toBe(10000);
+      expect(stats.portfolioTotalClaims).toBe(1);
+      expect(stats.portfolioTotalDisputedAmount).toBe(10000);
+      expect(stats.activeDisputedAmount).toBe(10000);
+      expect(stats.overturnedWonAmount).toBe(0);
+      expect(stats.claimsByStatus.ready_for_review).toBe(1);
+      expect(stats.claimsByStatus.won).toBe(0);
+    });
   });
 });
 

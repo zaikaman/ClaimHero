@@ -1813,13 +1813,13 @@ export const getPortfolioStats = query({
       .take(500)) as Doc<"claims">[];
 
     const baseCandidates = args.includeDemo === false
-      ? rawClaims.filter(
-          (c) =>
-            !c.isDemo &&
-            c.dataOrigin !== "demo-fixture" &&
-            c.origin !== "demo-fixture"
-        )
+      ? rawClaims.filter((c) => !isSyntheticDemoClaimIdentifier(c))
       : rawClaims;
+
+    let baseTotalDisputedAmount = 0;
+    for (const c of baseCandidates) {
+      baseTotalDisputedAmount += c.deniedAmount;
+    }
 
     // Search filter across candidate pool
     const searchMatching = hasSearch
@@ -1946,20 +1946,37 @@ export const getPortfolioStats = query({
       averageScore: p.scoredCount > 0 ? Math.round(p.scoreSum / p.scoredCount) : 0,
     }));
 
-    const portfolioTotalClaims = aggregateCount !== null && aggregateCount >= baseCandidates.length
-      ? aggregateCount
+    const isDemoExcluded = args.includeDemo === false;
+
+    // Use claimsAggregate when available and valid for the scope:
+    // - When demo claims are excluded (args.includeDemo === false), claimsAggregate cannot be used directly
+    //   because it tracks all user claims (including demo fixtures) without demo partitioning.
+    // - When demo claims are included (args.includeDemo !== false), demo claims are part of the portfolio,
+    //   and claimsAggregate provides authoritative O(log N) scale when the candidate sample is truncated (>= 500).
+    // - When the candidate sample is not truncated (< 500), the in-memory reduction over baseCandidates / activeClaims
+    //   is the exact ground-truth count and sum of current database records.
+    const resolvedAggregateCount = !isDemoExcluded && aggregateCount !== null ? aggregateCount : null;
+    const resolvedAggregateSum = !isDemoExcluded && aggregateSum !== null ? aggregateSum : null;
+
+    const portfolioTotalClaims = resolvedAggregateCount !== null && isSampleTruncated && resolvedAggregateCount >= baseCandidates.length
+      ? resolvedAggregateCount
       : baseCandidates.length;
-    const portfolioTotalDisputedAmount = aggregateSum !== null && aggregateSum > 0
-      ? aggregateSum
+
+    const portfolioTotalDisputedAmount = resolvedAggregateSum !== null && isSampleTruncated && resolvedAggregateSum > 0
+      ? resolvedAggregateSum
+      : baseTotalDisputedAmount;
+
+    const totalClaims = !isFiltered && resolvedAggregateCount !== null && isSampleTruncated && resolvedAggregateCount >= activeClaims.length
+      ? resolvedAggregateCount
+      : activeClaims.length;
+
+    const totalDisputedAmountResult = !isFiltered && resolvedAggregateSum !== null && isSampleTruncated && resolvedAggregateSum > 0
+      ? resolvedAggregateSum
       : totalDisputedAmount;
 
     return {
-      totalClaims: !isFiltered && aggregateCount !== null && aggregateCount >= activeClaims.length
-        ? aggregateCount
-        : activeClaims.length,
-      totalDisputedAmount: !isFiltered && aggregateSum !== null && aggregateSum > 0
-        ? aggregateSum
-        : totalDisputedAmount,
+      totalClaims,
+      totalDisputedAmount: totalDisputedAmountResult,
       activeDisputedAmount,
       overturnedWonAmount,
       averageWinScore,

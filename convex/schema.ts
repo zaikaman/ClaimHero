@@ -273,12 +273,12 @@ export default defineSchema({
     ),
     agentMailMessageId: v.optional(v.string()),
     outboundId: v.optional(v.string()),
-    detectedDetermination: v.optional(v.string()), // OVERTURNED_APPROVED, ADDITIONAL_RECORDS_REQUIRED, DENIAL_UPHELD, ACKNOWLEDGMENT_ONLY, GENERAL_INQUIRY
+    detectedDetermination: v.optional(v.string()), // OVERTURNED_APPROVED, PARTIAL_SETTLEMENT_OFFER, ADDITIONAL_RECORDS_REQUIRED, POLICY_CONFLICT_CITATION, DENIAL_UPHELD, ACKNOWLEDGMENT_ONLY, GENERAL_INQUIRY, DELIVERY_FAILURE
     clinicalRationale: v.optional(v.string()),
     missingRecordsRequested: v.optional(v.array(v.string())),
     settlementAmount: v.optional(v.number()),
     autoReplyDraft: v.optional(v.string()),
-    autoReplyStatus: v.optional(v.string()), // pending, dispatched, dismissed
+    autoReplyStatus: v.optional(v.string()), // pending, dispatched, dismissed, generating, skipped, disabled, failed
     receivedAt: v.number(),
   })
     .index("by_thread", ["threadId"])

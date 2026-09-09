@@ -193,6 +193,27 @@ export const getOrCreateThreadInternal = internalMutation({
   },
 });
 
+export const ALLOWED_DETERMINATIONS = new Set([
+  "OVERTURNED_APPROVED",
+  "PARTIAL_SETTLEMENT_OFFER",
+  "ADDITIONAL_RECORDS_REQUIRED",
+  "POLICY_CONFLICT_CITATION",
+  "DENIAL_UPHELD",
+  "ACKNOWLEDGMENT_ONLY",
+  "GENERAL_INQUIRY",
+  "DELIVERY_FAILURE",
+]);
+
+export const ALLOWED_AUTOREPLY_STATUSES = new Set([
+  "pending",
+  "dispatched",
+  "dismissed",
+  "generating",
+  "skipped",
+  "disabled",
+  "failed",
+]);
+
 interface InsertMessageArgs {
   threadId: Id<"emailThreads">;
   claimId: Id<"claims">;
@@ -240,18 +261,10 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
     throw new Error("settlementAmount must be a non-negative finite number");
   }
 
-  const ALLOWED_DETERMINATIONS = new Set([
-    "OVERTURNED_APPROVED",
-    "ADDITIONAL_RECORDS_REQUIRED",
-    "DENIAL_UPHELD",
-    "ACKNOWLEDGMENT_ONLY",
-    "GENERAL_INQUIRY",
-  ]);
   if (args.detectedDetermination && !ALLOWED_DETERMINATIONS.has(args.detectedDetermination)) {
     throw new Error(`Invalid detectedDetermination: "${args.detectedDetermination}"`);
   }
 
-  const ALLOWED_AUTOREPLY_STATUSES = new Set(["pending", "dispatched", "dismissed"]);
   if (args.autoReplyStatus && !ALLOWED_AUTOREPLY_STATUSES.has(args.autoReplyStatus)) {
     throw new Error(`Invalid autoReplyStatus: "${args.autoReplyStatus}"`);
   }
@@ -456,6 +469,12 @@ export const updateMessageAnalysisInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     const { messageId, ...fields } = args;
+    if (fields.detectedDetermination && !ALLOWED_DETERMINATIONS.has(fields.detectedDetermination)) {
+      throw new Error(`Invalid detectedDetermination: "${fields.detectedDetermination}"`);
+    }
+    if (fields.autoReplyStatus && !ALLOWED_AUTOREPLY_STATUSES.has(fields.autoReplyStatus)) {
+      throw new Error(`Invalid autoReplyStatus: "${fields.autoReplyStatus}"`);
+    }
     await ctx.db.patch(messageId, fields);
   },
 });
@@ -489,6 +508,12 @@ export const insertInboundMessageInternal = internalMutation({
     autoReplyStatus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    if (args.detectedDetermination && !ALLOWED_DETERMINATIONS.has(args.detectedDetermination)) {
+      throw new Error(`Invalid detectedDetermination: "${args.detectedDetermination}"`);
+    }
+    if (args.autoReplyStatus && !ALLOWED_AUTOREPLY_STATUSES.has(args.autoReplyStatus)) {
+      throw new Error(`Invalid autoReplyStatus: "${args.autoReplyStatus}"`);
+    }
     const trimmedId = args.agentMailMessageId.trim();
     if (trimmedId) {
       const recorded = await ctx.db
