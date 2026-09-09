@@ -509,6 +509,25 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
+
+  // Track unattached and pending document uploads per authenticated user
+  pendingUploads: defineTable({
+    userId: v.id("users"),
+    storageId: v.id("_storage"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("consumed")
+    ),
+    claimId: v.optional(v.id("claims")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_storageId", ["storageId"])
+    .index("by_userId_and_storageId", ["userId", "storageId"])
+    .index("by_status_and_createdAt", ["status", "createdAt"])
+    .index("by_createdAt", ["createdAt"]),
 });
 
 

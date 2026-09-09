@@ -209,6 +209,7 @@ export function useClaims(options?: {
 
   // Real Convex mutation & action hooks
   const generateUploadUrlMutation = useMutation(api.claims.generateUploadUrl);
+  const registerPendingUploadMutation = useMutation(api.claims.registerPendingUpload);
   const createWithPatientMutation = useMutation(api.claims.createWithPatient);
   const updateStatusMutation = useMutation(api.claims.updateStatus);
   const deleteCaseMutation = useMutation(api.claims.deleteCase);
@@ -233,7 +234,10 @@ export function useClaims(options?: {
 
       const { storageId } = (await response.json()) as { storageId: Id<"_storage"> };
 
-      // 3. Trigger optical extraction action
+      // 3. Register pending upload under authenticated user before parsing
+      await registerPendingUploadMutation({ storageId });
+
+      // 4. Trigger optical extraction action
       try {
         const extractionResult: DenialExtractionResult & { claimId: string } = await parseDenialAction({
           storageId,
@@ -255,7 +259,7 @@ export function useClaims(options?: {
         throw new Error(msg);
       }
     },
-    [generateUploadUrlMutation, parseDenialAction]
+    [generateUploadUrlMutation, registerPendingUploadMutation, parseDenialAction]
   );
 
   // Parse raw text pasted by user

@@ -205,9 +205,17 @@ export const parseDenialDocument = action({
 
     let claimId: Id<"claims">;
     let extraction: DenialExtractionResult;
+    let isStorageOwner = false;
     try {
       // If storage file was uploaded, fetch and prepare document content with strict size & MIME validation
       if (args.storageId) {
+        // Enforce storage ownership verification before reading or parsing
+        await ctx.runMutation(internal.claims.verifyStorageOwnershipInternal, {
+          storageId: args.storageId,
+          userId,
+        });
+        isStorageOwner = true;
+
         const fileUrl = await ctx.storage.getUrl(args.storageId);
         if (!fileUrl) {
           throw new Error(`File storage ID ${args.storageId} not found`);
@@ -344,11 +352,12 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         isSyntheticPII: isDemo,
       });
     } catch (ingestionError) {
-      // Clean up orphaned storage file immediately on document rejection or parsing error
-      if (args.storageId) {
+      // Clean up orphaned storage file immediately on document rejection or parsing error ONLY IF caller was verified as owner
+      if (args.storageId && isStorageOwner) {
         try {
           await ctx.runMutation(internal.claims.cleanupStorageFileInternal, {
             storageId: args.storageId,
+            userId,
           });
         } catch (cleanupErr) {
           console.warn("Storage cleanup note on parser error:", cleanupErr);

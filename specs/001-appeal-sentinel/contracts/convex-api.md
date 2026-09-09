@@ -45,9 +45,15 @@ Updates the state machine status of a claim and creates an audit log entry.
 - **Returns**: `void`
 
 ### `mutations.claims.generateUploadUrl`
-Generates a one-time secure upload URL for Convex File Storage.
+Generates a one-time secure upload URL for Convex File Storage with burst rate limiting and cumulative storage quotas.
 - **Arguments**: `{}`
 - **Returns**: `string`
+
+### `mutations.claims.registerPendingUpload`
+Registers an uploaded storageId to the authenticated caller's account, preventing unowned file parsing and destructive deletion.
+- **Arguments**:
+  - `storageId`: `v.id("_storage")`
+- **Returns**: `Id<"pendingUploads"> | null`
 
 ---
 

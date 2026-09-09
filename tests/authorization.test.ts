@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "../convex/_generated/api";
+import { rateLimiter } from "../convex/lib/rateLimiter";
 import {
   requireAuthUser,
   requireIdentity,
@@ -576,6 +578,105 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
             storageId: "storage_bin" as any,
           })
         ).rejects.toThrow(/Unsupported document format/i);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it("M1: opticalParser rejects unowned storageId and prevents file parsing", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_attacker" as any);
+      const { parseDenialDocument } = await import("../convex/actions/opticalParser");
+      const mockCtx: any = {
+        runMutation: vi.fn().mockImplementation(async () => {
+          throw new Error("Forbidden: You do not have permission to access or parse this storage file");
+        }),
+        runQuery: vi.fn().mockResolvedValue(null),
+        storage: {
+          getUrl: vi.fn().mockResolvedValue("https://convex.mock/victim.pdf"),
+        },
+      };
+
+      await expect(
+        (parseDenialDocument as any)._handler(mockCtx, {
+          storageId: "storage_victim_unowned" as any,
+        })
+      ).rejects.toThrow(/Forbidden: You do not have permission to access or parse this storage file/i);
+
+      // Verify storage.getUrl was never called because ownership check failed first
+      expect(mockCtx.storage.getUrl).not.toHaveBeenCalled();
+    });
+
+    it("M1: opticalParser does NOT invoke cleanupStorageFileInternal on failure when storageId is not owned by caller", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_attacker" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      const { parseDenialDocument } = await import("../convex/actions/opticalParser");
+      const mockCtx: any = {
+        runMutation: vi.fn().mockImplementation(async (_ref: any, args: any) => {
+          if (args && args.storageId === "storage_unowned_file") {
+            throw new Error("Forbidden: File is not registered to your account");
+          }
+          return null;
+        }),
+        storage: {
+          getUrl: vi.fn(),
+        },
+      };
+
+      await expect(
+        (parseDenialDocument as any)._handler(mockCtx, {
+          storageId: "storage_unowned_file" as any,
+        })
+      ).rejects.toThrow(/File is not registered to your account/i);
+
+      // Verify that verifyStorageOwnershipInternal was called, but cleanupStorageFileInternal was NEVER called
+      expect(mockCtx.runMutation).toHaveBeenCalledTimes(1);
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), {
+        storageId: "storage_unowned_file",
+        userId: "user_attacker",
+      });
+    });
+
+    it("M1: opticalParser invokes cleanupStorageFileInternal with userId on failure ONLY WHEN caller is verified owner", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_owner_1" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      const { parseDenialDocument } = await import("../convex/actions/opticalParser");
+      const mockCtx: any = {
+        runMutation: vi.fn().mockImplementation(async (mutationRef: any) => {
+          if (mutationRef === internal.claims.verifyStorageOwnershipInternal) {
+            return { authorized: true };
+          }
+          return null;
+        }),
+        storage: {
+          getUrl: vi.fn().mockResolvedValue("https://convex.mock/owned.pdf"),
+        },
+      };
+
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        statusText: "OK",
+        headers: {
+          get: () => "application/x-corrupted",
+        },
+        arrayBuffer: vi.fn().mockResolvedValue(new Uint8Array([0x00]).buffer),
+      }) as any;
+
+      try {
+        await expect(
+          (parseDenialDocument as any)._handler(mockCtx, {
+            storageId: "storage_owned_file" as any,
+          })
+        ).rejects.toThrow();
+
+        // Verify that cleanupStorageFileInternal WAS called with userId because caller was verified owner
+        expect(mockCtx.runMutation).toHaveBeenCalledWith(
+          internal.claims.cleanupStorageFileInternal,
+          {
+            storageId: "storage_owned_file",
+            userId: "user_owner_1",
+          }
+        );
       } finally {
         global.fetch = originalFetch;
       }

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-09T04:27:00Z
+- **Last updated:** 2026-09-09T04:36:00Z
 
 ## Log
 
@@ -1067,8 +1067,16 @@ Remediated unauthenticated chatbot session impersonation and PHI exfiltration vu
 - Strict Authentication Enforcement: Replaced insecure fallback `const callerUserId = authUserId || session.userId` with explicit `!authUserId` check throwing `Unauthorized: Authentication required`. Prevented unauthenticated callers with known session IDs from inheriting the session owner's `userId` and passing internal tool ownership checks to exfiltrate patient claim records and Protected Health Information (PHI).
 - Regression Coverage: Added unit test in `tests/actionsP2PAndChatbot.test.ts` verifying unauthenticated invocation is immediately rejected with `Unauthorized`. Validated with `npm run verify` (clean typecheck, clean lint, 648 passing tests across 41 suites, 80.95% coverage, and production build). Convex features: actions, auth.
 
-### 2026-09-09 - working tree
+### 2026-09-09 - 4b08379
 Remediated webhook secret and signature HMAC material exposure in failed verification diagnostics:
 - Elimination of Sensitive Diagnostic Material (`convex/lib/agentMailWebhook.ts`): Removed `secretPrefix` (partial candidate secret) and `expectedPrefix` (computed valid HMAC digest for the payload) from `SvixVerificationResult['diagnostics']`. Removed `firstExpectedSig` storage and evaluation across official Svix and Web Crypto fallback verification paths, preventing valid cryptographic signatures and key prefixes from being retained or exposed on verification failure.
 - Secure HTTP Webhook Rejection Logging (`convex/http.ts`): Stripped `expectedPrefix` and `secretPrefix` from `console.warn` rejection telemetry in the `/agentmail-webhook` handler, adhering strictly to the security invariant to never log secrets or signature material while preserving non-sensitive operational diagnostics (`id`, `sigCount`, `sigPrefix`, `secretCount`, `timestampAgeSec`, `payloadBytes`, `detail`).
 - Regression Coverage & Verification (`tests/convexHttp.test.ts`, `tests/agentMail.test.ts`): Added unit and regression tests asserting that failed webhook verifications do not include `expectedPrefix` or `secretPrefix` in diagnostics or server-side warning logs, and that secrets remain protected. Validated with `npm run verify` (100% clean `tsc --noEmit`, 0 ESLint errors/warnings, 658 passing tests across 41 suites with 80.97% line coverage, and clean production build). Convex features: HTTP actions, actions.
+
+### 2026-09-09 - working tree
+Resolved M1 vulnerability in optical document parsing and file cleanup by establishing per-user upload tracking and strict storage ownership enforcement:
+- Pending Uploads Tracking (`convex/schema.ts`): Created `pendingUploads` table indexed by `by_user`, `by_storageId`, `by_userId_and_storageId`, `by_status_and_createdAt`, and `by_createdAt` to track unconsumed file uploads and associate them exclusively with the authenticated uploader.
+- Upload Registration & Pre-Parse Verification (`convex/claims.ts`): Added `registerPendingUpload` mutation requiring authentication and verifying existence in `_storage` before registering new uploads. Added `verifyStorageOwnershipInternal` mutation verifying ownership across `pendingUploads` and user-owned `claims`, transitioning status to `processing` and rejecting unowned or cross-tenant storage IDs with `Forbidden`.
+- Ingestion & Cleanup Ownership Hardening (`convex/actions/opticalParser.ts`, `convex/claims.ts`): Enforced `verifyStorageOwnershipInternal` in `parseDenialDocument` before fetching or parsing storage files. Guarded `cleanupStorageFileInternal` on parser error paths with verified caller ownership checks and `userId` verification, preventing unauthorized deletion of arbitrary storage files.
+- Claim Creation & Storage Quota Accounting (`convex/claims.ts`, `src/hooks/useClaims.ts`): Marked pending uploads as `consumed` upon successful case creation in `applyCreateWithPatient`. Counted active unconsumed pending uploads towards user storage file quotas in `generateUploadUrl`. Added `registerPendingUpload` call to `uploadAndParseDocument` in `useClaims.ts`. Added daily orphaned upload sweep cron (`convex/crons.ts`, `sweepOrphanedPendingUploadsInternal`).
+- Testing & Verification (`tests/pendingUploads.test.ts`, `tests/authorization.test.ts`): Added 13 dedicated unit tests in `tests/pendingUploads.test.ts` and M1 security tests in `tests/authorization.test.ts`. Validated with `npm run verify` (100% clean typecheck, 0 ESLint errors, 674 passing unit tests across 42 suites, 81.18% coverage, and successful production build). Convex features: schema, tables, indexes, mutations, internalMutation, actions, crons, file storage.

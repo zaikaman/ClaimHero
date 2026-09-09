@@ -38,4 +38,15 @@ crons.interval(
   {}
 );
 
+/**
+ * Daily Orphaned Uploads Sweep Cron:
+ * Sweeps unattached pending uploads older than 24 hours to prevent storage leaks.
+ */
+crons.interval(
+  "sweep-orphaned-uploads",
+  { hours: 24 },
+  internal.claims.sweepOrphanedPendingUploadsInternal,
+  {}
+);
+
 export default crons;

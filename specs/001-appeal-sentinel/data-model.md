@@ -248,6 +248,24 @@ Immutable event trail tracking all claim milestones.
 
 ---
 
+### 2.7 Table `pendingUploads`
+Tracks uploaded documents per authenticated user before case creation, preventing unowned file parsing and destructive deletion exploits.
+
+- `userId`: `v.id("users")`
+- `storageId`: `v.id("_storage")`
+- `status`: `v.union(v.literal("pending"), v.literal("processing"), v.literal("consumed"))`
+- `claimId`: `v.optional(v.id("claims"))`
+- `createdAt`: `v.number()`
+- `updatedAt`: `v.number()`
+- Indexes:
+  - `.index("by_user", ["userId"])`
+  - `.index("by_storageId", ["storageId"])`
+  - `.index("by_userId_and_storageId", ["userId", "storageId"])`
+  - `.index("by_status_and_createdAt", ["status", "createdAt"])`
+  - `.index("by_createdAt", ["createdAt"])`
+
+---
+
 ## 3. Claim State Transition Lifecycle
 
 ```mermaid

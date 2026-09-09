@@ -616,7 +616,8 @@ async function validateClaimFinancialsAndCodes(
     icd10Codes?: string[];
     appealFilingDeadlineDays?: number;
     denialLetterStorageId?: Id<"_storage">;
-  }
+  },
+  userId?: Id<"users">
 ) {
   if (!Number.isFinite(args.deniedAmount) || args.deniedAmount < 0) {
     throw new Error("Invalid deniedAmount: must be a non-negative finite number");
@@ -641,10 +642,30 @@ async function validateClaimFinancialsAndCodes(
   ) {
     throw new Error("appealFilingDeadlineDays must be between 1 and 365 days");
   }
-  if (args.denialLetterStorageId && typeof ctx.db.system?.get === "function") {
-    const storageRecord = await ctx.db.system.get(args.denialLetterStorageId);
-    if (!storageRecord) {
-      throw new Error("Invalid denial letter storage handle: file not found");
+  if (args.denialLetterStorageId) {
+    if (typeof ctx.db.system?.get === "function") {
+      const storageRecord = await ctx.db.system.get(args.denialLetterStorageId);
+      if (!storageRecord) {
+        throw new Error("Invalid denial letter storage handle: file not found");
+      }
+    }
+    if (userId) {
+      if (typeof ctx.db.query("pendingUploads")?.withIndex === "function") {
+        const pending = await ctx.db
+          .query("pendingUploads")
+          .withIndex("by_storageId", (q) => q.eq("storageId", args.denialLetterStorageId!))
+          .first();
+        if (pending && pending.userId !== userId) {
+          throw new Error("Forbidden: This storage file belongs to another user");
+        }
+      }
+      const otherClaim = await ctx.db
+        .query("claims")
+        .filter((q) => q.eq(q.field("denialLetterStorageId"), args.denialLetterStorageId))
+        .first();
+      if (otherClaim && otherClaim.userId !== userId) {
+        throw new Error("Forbidden: This storage file is already linked to another user's claim");
+      }
     }
   }
 }
@@ -702,7 +723,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireAuthUser(ctx);
-    await validateClaimFinancialsAndCodes(ctx, args);
+    await validateClaimFinancialsAndCodes(ctx, args, userId);
     const now = Date.now();
     const deadlineDays = args.appealFilingDeadlineDays || 180;
     const statutoryDeadline = now + deadlineDays * 86400000;
@@ -834,7 +855,7 @@ async function applyCreateWithPatient(
 
   const effectiveUserId: Id<"users"> = userId;
 
-  await validateClaimFinancialsAndCodes(ctx, args);
+  await validateClaimFinancialsAndCodes(ctx, args, effectiveUserId);
 
   // Strictly scope patient matching to effectiveUserId to prevent cross-tenant patient hijack
   const claimNumber = await generateUniqueClaimNumber(ctx, args.claimNumber);
@@ -933,6 +954,20 @@ async function applyCreateWithPatient(
     createdAt: now,
     updatedAt: now,
   });
+
+  if (args.denialLetterStorageId && typeof ctx.db.query("pendingUploads")?.withIndex === "function") {
+    const pending = await ctx.db
+      .query("pendingUploads")
+      .withIndex("by_storageId", (q) => q.eq("storageId", args.denialLetterStorageId!))
+      .first();
+    if (pending) {
+      await ctx.db.patch(pending._id, {
+        status: "consumed",
+        claimId,
+        updatedAt: now,
+      });
+    }
+  }
 
   await ctx.scheduler.runAfter(
     0,
@@ -1391,6 +1426,30 @@ export const generateUploadUrl = mutation({
       }
     }
 
+    // Also include active pending uploads that are not yet consumed in storage quotas
+    if (typeof ctx.db.query("pendingUploads")?.withIndex === "function") {
+      const userPendingUploads = await ctx.db
+        .query("pendingUploads")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+
+      for (const pending of userPendingUploads) {
+        if (pending.status !== "consumed") {
+          totalFiles++;
+          if (typeof ctx.db.system?.get === "function") {
+            try {
+              const fileMeta = await ctx.db.system.get(pending.storageId);
+              if (fileMeta && typeof fileMeta.size === "number") {
+                totalBytes += fileMeta.size;
+              }
+            } catch {
+              // Ignore missing storage record
+            }
+          }
+        }
+      }
+    }
+
     if (totalFiles >= MAX_USER_STORAGE_FILES) {
       throw new Error(
         `Storage quota exceeded: You have reached the maximum document limit (${MAX_USER_STORAGE_FILES} files). Please delete or archive older cases before uploading new files.`
@@ -1404,6 +1463,141 @@ export const generateUploadUrl = mutation({
     }
 
     return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/**
+ * Register a newly uploaded storage file to the authenticated caller's account.
+ * Guarantees that only the uploader can parse or trigger error-cleanup for this storageId.
+ */
+export const registerPendingUpload = mutation({
+  args: {
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUser(ctx);
+
+    // Verify storage record existence in Convex system table
+    if (typeof ctx.db.system?.get === "function") {
+      const storageRecord = await ctx.db.system.get(args.storageId);
+      if (!storageRecord) {
+        throw new Error("Storage file not found");
+      }
+    }
+
+    // Check if this storageId is already tracked in pendingUploads
+    const existingPending = await ctx.db
+      .query("pendingUploads")
+      .withIndex("by_storageId", (q) => q.eq("storageId", args.storageId))
+      .first();
+
+    if (existingPending) {
+      if (existingPending.userId !== userId) {
+        throw new Error("Forbidden: This storage file belongs to another user");
+      }
+      return existingPending._id;
+    }
+
+    // Check if this storageId is already associated with an existing claim
+    const existingClaim = await ctx.db
+      .query("claims")
+      .filter((q) => q.eq(q.field("denialLetterStorageId"), args.storageId))
+      .first();
+
+    if (existingClaim) {
+      if (existingClaim.userId !== userId) {
+        throw new Error("Forbidden: This storage file is already linked to another user's claim");
+      }
+      return null;
+    }
+
+    const now = Date.now();
+    return await ctx.db.insert("pendingUploads", {
+      userId,
+      storageId: args.storageId,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+/**
+ * Internal mutation verifying caller ownership of a storageId before parsing.
+ * Updates pending upload status to "processing".
+ */
+export const verifyStorageOwnershipInternal = internalMutation({
+  args: {
+    storageId: v.id("_storage"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    // 1. Check pendingUploads table
+    const pending = await ctx.db
+      .query("pendingUploads")
+      .withIndex("by_storageId", (q) => q.eq("storageId", args.storageId))
+      .first();
+
+    if (pending) {
+      if (pending.userId !== args.userId) {
+        throw new Error("Forbidden: You do not have permission to access or parse this storage file");
+      }
+      if (pending.status === "pending") {
+        await ctx.db.patch(pending._id, {
+          status: "processing",
+          updatedAt: Date.now(),
+        });
+      }
+      return { authorized: true, source: "pendingUploads" };
+    }
+
+    // 2. Check if storageId is attached to an existing claim owned by the caller (re-parse flow)
+    const existingClaim = await ctx.db
+      .query("claims")
+      .filter((q) => q.eq(q.field("denialLetterStorageId"), args.storageId))
+      .first();
+
+    if (existingClaim) {
+      if (existingClaim.userId !== args.userId) {
+        throw new Error("Forbidden: You do not have permission to access or parse this storage file");
+      }
+      return { authorized: true, source: "claims" };
+    }
+
+    // 3. Not registered to this user
+    throw new Error(
+      "Forbidden: You do not have permission to access or parse this storage file. File is not registered to your account."
+    );
+  },
+});
+
+/**
+ * Sweeps unattached pending uploads older than 24 hours that were never parsed or linked to claims.
+ */
+export const sweepOrphanedPendingUploadsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const staleUploads = await ctx.db
+      .query("pendingUploads")
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", oneDayAgo))
+      .take(50);
+
+    let purgedCount = 0;
+    for (const upload of staleUploads) {
+      if (upload.status !== "consumed") {
+        try {
+          await ctx.storage.delete(upload.storageId);
+        } catch {
+          // File may have been deleted already
+        }
+        await ctx.db.delete(upload._id);
+        purgedCount++;
+      } else if (!upload.claimId) {
+        await ctx.db.delete(upload._id);
+      }
+    }
+    return { purgedCount };
   },
 });
 
@@ -1925,16 +2119,63 @@ export const deleteCase = mutation({
 
 /**
  * Asynchronously deletes a stored document/PDF from Convex Storage in a dedicated transaction.
+ * When userId is provided, strictly verifies that the user owns the storage file
+ * (either in pendingUploads or on a claim owned by that user) before deletion.
  */
 export const cleanupStorageFileInternal = internalMutation({
   args: {
     storageId: v.id("_storage"),
+    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
+    if (args.userId) {
+      let isOwner = false;
+
+      // 1. Check pendingUploads table
+      if (typeof ctx.db?.query === "function" && typeof ctx.db.query("pendingUploads")?.withIndex === "function") {
+        const pending = await ctx.db
+          .query("pendingUploads")
+          .withIndex("by_storageId", (q) => q.eq("storageId", args.storageId))
+          .first();
+        if (pending && pending.userId === args.userId) {
+          isOwner = true;
+        }
+      }
+
+      // 2. Check claims owned by user
+      if (!isOwner && typeof ctx.db?.query === "function") {
+        const claim = await ctx.db
+          .query("claims")
+          .filter((q) => q.eq(q.field("denialLetterStorageId"), args.storageId))
+          .first();
+        if (claim && claim.userId === args.userId) {
+          isOwner = true;
+        }
+      }
+
+      if (!isOwner) {
+        console.warn(
+          `Unauthorized storage cleanup attempt: user ${args.userId} does not own storageId ${args.storageId}`
+        );
+        return;
+      }
+    }
+
     try {
       await ctx.storage.delete(args.storageId);
     } catch {
       // Storage file might already have been purged
+    }
+
+    // Clean up any pendingUpload record for this storage file
+    if (typeof ctx.db?.query === "function" && typeof ctx.db.query("pendingUploads")?.withIndex === "function") {
+      const pendingRecord = await ctx.db
+        .query("pendingUploads")
+        .withIndex("by_storageId", (q) => q.eq("storageId", args.storageId))
+        .first();
+      if (pendingRecord) {
+        await ctx.db.delete(pendingRecord._id);
+      }
     }
   },
 });
