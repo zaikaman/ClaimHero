@@ -11,6 +11,7 @@ import {
 import * as emailsModule from "../convex/emails";
 import {
   normalizeAgentMailWebhook,
+  extractInboxId,
   extractEmailAddress,
   computeSvixSignature,
   verifySvixWebhook,
@@ -159,6 +160,20 @@ describe("convex/lib/agentMailWebhook & appealEmail Unit Tests", () => {
     expect(extractEmailAddress("John Doe <john.doe@molinahealthcare.com>")).toBe("john.doe@molinahealthcare.com");
     expect(extractEmailAddress("reviewer@cigna.com")).toBe("reviewer@cigna.com");
     expect(extractEmailAddress(undefined)).toBeUndefined();
+  });
+
+  it("extracts inbox IDs accurately across direct and nested event shapes", () => {
+    expect(extractInboxId({ inbox_id: "inbox_snake" })).toBe("inbox_snake");
+    expect(extractInboxId({ inboxId: "inbox_camel" })).toBe("inbox_camel");
+    expect(extractInboxId({ message: { inbox_id: "inbox_msg" } })).toBe("inbox_msg");
+    expect(extractInboxId({ message: { inboxId: "inbox_msg_camel" } })).toBe("inbox_msg_camel");
+    expect(extractInboxId({ data: { message: { inbox_id: "inbox_nested" } } })).toBe("inbox_nested");
+    expect(extractInboxId({ send: { inbox_id: "inbox_send" } })).toBe("inbox_send");
+    expect(extractInboxId({ delivery: { inbox_id: "inbox_delivery" } })).toBe("inbox_delivery");
+    expect(extractInboxId({ bounce: { inbox_id: "inbox_bounce" } })).toBe("inbox_bounce");
+    expect(extractInboxId(null)).toBeUndefined();
+    expect(extractInboxId({})).toBeUndefined();
+    expect(extractInboxId("not-an-object")).toBeUndefined();
   });
 
   it("formats appeal and correspondence emails with markdown, tables, and structured headers", () => {

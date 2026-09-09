@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-09T04:45:00Z
+- **Last updated:** 2026-09-09T05:10:00Z
 
 ## Log
 
@@ -1081,9 +1081,16 @@ Resolved M1 vulnerability in optical document parsing and file cleanup by establ
 - Claim Creation & Storage Quota Accounting (`convex/claims.ts`, `src/hooks/useClaims.ts`): Marked pending uploads as `consumed` upon successful case creation in `applyCreateWithPatient`. Counted active unconsumed pending uploads towards user storage file quotas in `generateUploadUrl`. Added `registerPendingUpload` call to `uploadAndParseDocument` in `useClaims.ts`. Added daily orphaned upload sweep cron (`convex/crons.ts`, `sweepOrphanedPendingUploadsInternal`).
 - Testing & Verification (`tests/pendingUploads.test.ts`, `tests/authorization.test.ts`): Added 13 dedicated unit tests in `tests/pendingUploads.test.ts` and M1 security tests in `tests/authorization.test.ts`. Validated with `npm run verify` (100% clean typecheck, 0 ESLint errors, 674 passing unit tests across 42 suites, 81.18% coverage, and successful production build). Convex features: schema, tables, indexes, mutations, internalMutation, actions, crons, file storage.
 
-### 2026-09-09 - working tree
+### 2026-09-09 - 41f866c
 Resolved M2 PHI redaction gate gap and reconciled third-party LLM privacy architecture:
 - Server-Side Prompt Redaction Gate (`convex/lib/openai.ts`): Expanded `redactBeforeLLM` to de-identify `systemPrompt` alongside `userPrompt` across `createStructuredCompletion` and `createChatCompletion`, and sanitized input text in `createEmbedding`. Prevented live claim data (patient legal names, member IDs, DOBs, provider identifiers, and clinical notes) embedded in system prompts (such as `mailDispatcher` counter-rebuttals, `generateAutoReplyDraft`, and `p2pLiveCopilot`) from leaking to external OpenAI APIs.
 - Sentinel Copilot & Agent Sanitization (`convex/actions/sentinelChatbot.ts`, `convex/actions/sentinelAgent.ts`): Applied `redactBeforeLLM` to rolling conversation summaries, message history dialog windows, agent instruction prompts, and database tool return payloads in `getActiveClaimDetails` and `searchClaims`.
 - Multimodal Intake Alignment & Explicit Exception Documentation (`convex/lib/openai.ts`, `convex/lib/redactionEngine.ts`, `specs/001-appeal-sentinel/plan.md`, `README.md`, `docs/THREAT_MODEL.md`): Formally clarified the dual-tier privacy boundary. Documented the explicit multimodal intake exception for raw binary PDF and image uploads (`fileInputs`, `imageUrls` in `opticalParser.ts`), where optical OCR precedes entity discovery, requiring an enterprise HIPAA Business Associate Agreement (BAA) for live patient documents in production or synthetic fixtures in evaluation mode.
 - Testing & Verification (`tests/openai.test.ts`, `tests/securityComplianceHardening.test.ts`): Added 4 regression tests verifying system prompt, user prompt, and embedding de-identification. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 677 passing unit tests across 42 suites, 81.25% test coverage, and successful production build). Convex features: actions, queries, mutations, auth.
+
+### 2026-09-09 - working tree
+Resolved M3 vulnerability in component webhook rate-limiting and input keying:
+- Corrected Signature Verification & Rate-Limiting Execution Order (`convex/http.ts`): Re-ordered `/agentmail/webhook` processing to execute cryptographic Svix signature verification (`verifyAndParseSvixWebhook`) prior to rate limiting, mirroring the security pattern of `/agentmail-webhook`. Rejection of unauthenticated or tampered payloads occurs immediately with 401 without touching the rate limiter component table.
+- Eliminated Client-Controlled Rate-Limiter Bucket Injection (`convex/http.ts`, `convex/lib/agentMailWebhook.ts`): Replaced attacker-controlled `request.headers.get("svix-id")` bucket keying with authenticated event inbox IDs extracted via `extractInboxId(payload)` with a fallback to `"global"`. Prevented unauthenticated floods with random `svix-id` values from generating unbounded writes and runaway document storage in the `@convex-dev/rate-limiter` table.
+- Shared Webhook Verification Engine & Authentic Stale Retry Re-Signing (`convex/http.ts`): Unified Svix verification, JSON payload parsing, and diagnostic reporting across webhook routes in `verifyAndParseSvixWebhook`. Re-signed authentic stale retries (`stale: true`) with fresh headers before forwarding to `agentmail.handleWebhook`, preventing provider retry storms.
+- Regression Coverage & Verification (`tests/convexHttp.test.ts`, `tests/agentMail.test.ts`): Added 8 comprehensive regression tests in `tests/convexHttp.test.ts` asserting that `/agentmail/webhook` rejects missing secrets, invalid signatures, and malformed JSON without invoking `rateLimiter.limit`, enforces 429 when authenticated limits are exceeded without dispatching to `agentmail.handleWebhook`, and keys limits strictly on authenticated inbox IDs. Added unit tests for `extractInboxId`. Verified with typecheck, lint, 687 passing tests across 42 suites, and production build. Convex features: httpRouter, HTTP actions, components (@convex-dev/rate-limiter, @agentmail/convex).

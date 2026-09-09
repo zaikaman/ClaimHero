@@ -552,3 +552,27 @@ export function isInternalAgentMailAddress(
   const domain = addr.split("@").pop() || "";
   return domain === "agentmail.to";
 }
+
+/**
+ * Safely extracts the inbox identifier from an AgentMail payload across
+ * direct and nested (message, send, delivery, bounce, complaint, reject, data)
+ * structures.
+ */
+export function extractInboxId(payload: unknown): string | undefined {
+  if (!isRecord(payload)) return undefined;
+  const direct = firstString(readField(payload, "inbox_id", "inboxId"));
+  if (direct) return direct;
+  for (const key of ["message", "send", "delivery", "bounce", "complaint", "reject", "data"]) {
+    const sub = payload[key];
+    if (isRecord(sub)) {
+      const subId = firstString(readField(sub, "inbox_id", "inboxId"));
+      if (subId) return subId;
+      if (isRecord(sub.message)) {
+        const nestedId = firstString(readField(sub.message, "inbox_id", "inboxId"));
+        if (nestedId) return nestedId;
+      }
+    }
+  }
+  return undefined;
+}
+
