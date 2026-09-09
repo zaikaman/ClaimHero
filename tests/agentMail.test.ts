@@ -1040,14 +1040,14 @@ Paragraph text with **bold** and *italic*.
       );
     });
 
-    it("listComponentInboundMessages queries component inboundMessages table", async () => {
+    it("listComponentInboundMessagesInternal queries component inboundMessages without user auth", async () => {
       const mockCtx: any = {
         runQuery: vi.fn().mockResolvedValue([
           { messageId: "msg_inbound_1", subject: "Adjudication Determination" },
         ]),
       };
 
-      const result = await (emailsModule.listComponentInboundMessages as any)._handler(mockCtx, {
+      const result = await (emailsModule.listComponentInboundMessagesInternal as any)._handler(mockCtx, {
         threadId: "thr_99",
       });
 
@@ -1058,7 +1058,7 @@ Paragraph text with **bold** and *italic*.
       expect(result).toHaveLength(1);
     });
 
-    it("getOutboundDeliveryStatus queries component outbound message status", async () => {
+    it("getOutboundDeliveryStatusInternal queries component outbound message status without user auth", async () => {
       const mockCtx: any = {
         runQuery: vi.fn().mockResolvedValue({
           status: "delivered",
@@ -1068,7 +1068,7 @@ Paragraph text with **bold** and *italic*.
         }),
       };
 
-      const result = await (emailsModule.getOutboundDeliveryStatus as any)._handler(mockCtx, {
+      const result = await (emailsModule.getOutboundDeliveryStatusInternal as any)._handler(mockCtx, {
         outboundId: "outbound_100",
       });
 
@@ -1077,6 +1077,222 @@ Paragraph text with **bold** and *italic*.
         { outboundId: "outbound_100" }
       );
       expect(result.status).toBe("delivered");
+    });
+
+    describe("Component Inbound Query PHI Protection & Authorization Guards", () => {
+      it("listComponentInboundMessages rejects unauthenticated anonymous callers", async () => {
+        const mockCtx: any = {
+          auth: { getUserIdentity: vi.fn().mockResolvedValue(null) },
+          runQuery: vi.fn(),
+        };
+
+        await expect(
+          (emailsModule.listComponentInboundMessages as any)._handler(mockCtx, {
+            threadId: "thr_99",
+          })
+        ).rejects.toThrow(/Unauthorized/i);
+        expect(mockCtx.runQuery).not.toHaveBeenCalled();
+      });
+
+      it("listComponentInboundMessages rejects requests missing both claimId and threadId", async () => {
+        const mockCtx: any = {
+          auth: { getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_123" }) },
+          runQuery: vi.fn(),
+        };
+
+        await expect(
+          (emailsModule.listComponentInboundMessages as any)._handler(mockCtx, {
+            inboxId: "inbox_shared_1",
+          })
+        ).rejects.toThrow(/Must provide a valid claimId or threadId/i);
+        expect(mockCtx.runQuery).not.toHaveBeenCalled();
+      });
+
+      it("listComponentInboundMessages rejects callers when claim belongs to another user", async () => {
+        const mockCtx: any = {
+          auth: { getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_attacker" }) },
+          db: {
+            get: vi.fn().mockResolvedValue({
+              _id: "claim_123",
+              userId: "user_victim",
+              agentMailThreadId: "thr_victim_1",
+            }),
+          },
+          runQuery: vi.fn(),
+        };
+
+        await expect(
+          (emailsModule.listComponentInboundMessages as any)._handler(mockCtx, {
+            claimId: "claim_123",
+          })
+        ).rejects.toThrow(/Forbidden/i);
+        expect(mockCtx.runQuery).not.toHaveBeenCalled();
+      });
+
+      it("listComponentInboundMessages allows claim owner to read inbound messages", async () => {
+        const mockCtx: any = {
+          auth: { getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_owner" }) },
+          db: {
+            get: vi.fn().mockResolvedValue({
+              _id: "claim_123",
+              userId: "user_owner",
+              agentMailThreadId: "thr_owner_1",
+            }),
+          },
+          runQuery: vi.fn().mockResolvedValue([
+            { messageId: "msg_1", subject: "Approved Claim Determination" },
+          ]),
+        };
+
+        const result = await (emailsModule.listComponentInboundMessages as any)._handler(mockCtx, {
+          claimId: "claim_123",
+        });
+
+        expect(mockCtx.runQuery).toHaveBeenCalledWith(
+          expect.anything(),
+          { threadId: "thr_owner_1" }
+        );
+        expect(result).toHaveLength(1);
+      });
+
+      it("listComponentInboundMessages allows owner to query by threadId resolved to their claim", async () => {
+        const mockCtx: any = {
+          auth: { getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_owner" }) },
+          db: {
+            normalizeId: vi.fn((table, id) => (table === "users" ? id : null)),
+            query: vi.fn().mockReturnValue({
+              withIndex: vi.fn().mockReturnValue({
+                first: vi.fn().mockResolvedValue({
+                  _id: "claim_456",
+                  userId: "user_owner",
+                  agentMailThreadId: "thr_owner_456",
+                }),
+              }),
+            }),
+          },
+          runQuery: vi.fn().mockResolvedValue([
+            { messageId: "msg_2", subject: "Review Decision" },
+          ]),
+        };
+
+        const result = await (emailsModule.listComponentInboundMessages as any)._handler(mockCtx, {
+          threadId: "thr_owner_456",
+        });
+
+        expect(mockCtx.runQuery).toHaveBeenCalledWith(
+          expect.anything(),
+          { threadId: "thr_owner_456" }
+        );
+        expect(result).toHaveLength(1);
+      });
+
+      it("listInboundMessagesForClaim enforces claim ownership and returns messages", async () => {
+        const mockCtx: any = {
+          auth: { getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_owner" }) },
+          db: {
+            get: vi.fn().mockResolvedValue({
+              _id: "claim_789",
+              userId: "user_owner",
+              agentMailThreadId: "thr_owner_789",
+            }),
+          },
+          runQuery: vi.fn().mockResolvedValue([
+            { messageId: "msg_3", subject: "Overturned on Internal Appeal" },
+          ]),
+        };
+
+        const result = await (emailsModule.listInboundMessagesForClaim as any)._handler(mockCtx, {
+          claimId: "claim_789",
+        });
+
+        expect(mockCtx.runQuery).toHaveBeenCalledWith(
+          expect.anything(),
+          { threadId: "thr_owner_789" }
+        );
+        expect(result).toHaveLength(1);
+      });
+    });
+
+    describe("Component Outbound Status Authorization Guards", () => {
+      it("getOutboundDeliveryStatus rejects unauthenticated anonymous callers", async () => {
+        const mockCtx: any = {
+          auth: { getUserIdentity: vi.fn().mockResolvedValue(null) },
+          runQuery: vi.fn(),
+        };
+
+        await expect(
+          (emailsModule.getOutboundDeliveryStatus as any)._handler(mockCtx, {
+            outboundId: "outbound_100",
+          })
+        ).rejects.toThrow(/Unauthorized/i);
+        expect(mockCtx.runQuery).not.toHaveBeenCalled();
+      });
+
+      it("getOutboundDeliveryStatus rejects caller when outbound message belongs to another user's claim", async () => {
+        const mockCtx: any = {
+          auth: { getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_attacker" }) },
+          db: {
+            query: vi.fn().mockReturnValue({
+              withIndex: vi.fn().mockReturnValue({
+                first: vi.fn().mockResolvedValue({
+                  _id: "msg_outbound_1",
+                  claimId: "claim_victim",
+                  outboundId: "outbound_victim_100",
+                }),
+              }),
+            }),
+            get: vi.fn().mockResolvedValue({
+              _id: "claim_victim",
+              userId: "user_victim",
+            }),
+          },
+          runQuery: vi.fn(),
+        };
+
+        await expect(
+          (emailsModule.getOutboundDeliveryStatus as any)._handler(mockCtx, {
+            outboundId: "outbound_victim_100",
+          })
+        ).rejects.toThrow(/Forbidden/i);
+        expect(mockCtx.runQuery).not.toHaveBeenCalled();
+      });
+
+      it("getOutboundDeliveryStatus permits claim owner to inspect outbound delivery status", async () => {
+        const mockCtx: any = {
+          auth: { getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_owner" }) },
+          db: {
+            query: vi.fn().mockReturnValue({
+              withIndex: vi.fn().mockReturnValue({
+                first: vi.fn().mockResolvedValue({
+                  _id: "msg_outbound_1",
+                  claimId: "claim_owner_1",
+                  outboundId: "outbound_owner_100",
+                }),
+              }),
+            }),
+            get: vi.fn().mockResolvedValue({
+              _id: "claim_owner_1",
+              userId: "user_owner",
+            }),
+          },
+          runQuery: vi.fn().mockResolvedValue({
+            status: "delivered",
+            agentmailMessageId: "msg_remote_100",
+            threadId: "thr_100",
+            errorMessage: null,
+          }),
+        };
+
+        const result = await (emailsModule.getOutboundDeliveryStatus as any)._handler(mockCtx, {
+          outboundId: "outbound_owner_100",
+        });
+
+        expect(mockCtx.runQuery).toHaveBeenCalledWith(
+          expect.anything(),
+          { outboundId: "outbound_owner_100" }
+        );
+        expect(result.status).toBe("delivered");
+      });
     });
   });
 

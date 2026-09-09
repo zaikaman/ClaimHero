@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { OutboundId } from "@agentmail/convex";
 import type { Doc, Id } from "./_generated/dataModel";
 import { components, internal } from "./_generated/api";
-import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
+import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner } from "./lib/auth";
 
 /**
  * Internal helper to query threads for a claim
@@ -791,6 +791,7 @@ export const cleanupMismatchedMessagesForClaim = mutation({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
+    await requireClaimOwner(ctx, args.claimId);
     const claim = await ctx.db.get(args.claimId);
     if (!claim) return { deletedCount: 0 };
 
@@ -1019,9 +1020,10 @@ export const onMessageReceived = internalMutation({
 });
 
 /**
- * Reactive query over inbound messages persisted directly in the AgentMail component database
+ * Internal query over inbound messages persisted directly in the AgentMail component database.
+ * Restricted to internal server functions, actions, and crons without requiring end-user authentication.
  */
-export const listComponentInboundMessages = query({
+export const listComponentInboundMessagesInternal = internalQuery({
   args: {
     threadId: v.optional(v.string()),
     inboxId: v.optional(v.string()),
@@ -1035,9 +1037,10 @@ export const listComponentInboundMessages = query({
 });
 
 /**
- * Reactive query for live delivery status of an outbound email from the AgentMail component
+ * Internal query for live delivery status of an outbound email from the AgentMail component.
+ * Restricted to internal server functions, actions, and crons without requiring end-user authentication.
  */
-export const getOutboundDeliveryStatus = query({
+export const getOutboundDeliveryStatusInternal = internalQuery({
   args: {
     outboundId: v.string(),
   },
@@ -1047,4 +1050,136 @@ export const getOutboundDeliveryStatus = query({
     });
   },
 });
+
+/**
+ * Owner-scoped query to list inbound messages from the AgentMail component for a specific claim.
+ * Requires authenticated user and verifies ownership of the claim.
+ */
+export const listInboundMessagesForClaim = query({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    const { claim } = await requireClaimOwner(ctx, args.claimId);
+    if (!claim.agentMailThreadId) {
+      return [];
+    }
+    return await ctx.runQuery(components.agentmail.lib.listInboundMessages, {
+      threadId: claim.agentMailThreadId,
+    });
+  },
+});
+
+/**
+ * Owner-scoped query over inbound messages persisted directly in the AgentMail component database.
+ * Requires authentication and verifies ownership of the claim or thread before proxying to AgentMail.
+ * Anonymous or unauthenticated visitors are rejected to prevent PHI exposure.
+ */
+export const listComponentInboundMessages = query({
+  args: {
+    claimId: v.optional(v.id("claims")),
+    threadId: v.optional(v.string()),
+    inboxId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUser(ctx);
+
+    let targetThreadId: string | undefined;
+
+    if (args.claimId) {
+      const claim = await ctx.db.get(args.claimId);
+      if (!claim) {
+        throw new Error(`Claim ${args.claimId} not found`);
+      }
+      if (!claim.userId || claim.userId !== userId) {
+        throw new Error("Forbidden: You do not have permission to access this claim");
+      }
+      targetThreadId = args.threadId || claim.agentMailThreadId;
+    } else if (args.threadId) {
+      const trimmedThreadId = args.threadId.trim();
+      let claim = await ctx.db
+        .query("claims")
+        .withIndex("by_threadId", (q) => q.eq("agentMailThreadId", trimmedThreadId))
+        .first();
+
+      if (!claim) {
+        // Fallback check if threadId references an emailThreads record
+        const normThreadId = ctx.db.normalizeId("emailThreads", trimmedThreadId);
+        if (normThreadId) {
+          const emailThread = await ctx.db.get(normThreadId);
+          if (emailThread) {
+            claim = await ctx.db.get(emailThread.claimId);
+          }
+        }
+      }
+
+      if (!claim) {
+        throw new Error("Forbidden: Thread not found or not associated with an accessible claim");
+      }
+      if (!claim.userId || claim.userId !== userId) {
+        throw new Error("Forbidden: You do not have permission to access this thread");
+      }
+      targetThreadId = trimmedThreadId;
+    } else {
+      // Refuse to query entire inboxes or unassociated messages to prevent PHI leakage
+      throw new Error("Forbidden: Must provide a valid claimId or threadId to access messages");
+    }
+
+    if (!targetThreadId) {
+      return [];
+    }
+
+    return await ctx.runQuery(components.agentmail.lib.listInboundMessages, {
+      threadId: targetThreadId,
+    });
+  },
+});
+
+/**
+ * Owner-scoped query for live delivery status of an outbound email from the AgentMail component.
+ * Requires authentication and verifies ownership of the claim that sent the message.
+ * Anonymous or unauthenticated visitors are rejected to prevent PHI exposure.
+ */
+export const getOutboundDeliveryStatus = query({
+  args: {
+    outboundId: v.string(),
+    claimId: v.optional(v.id("claims")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUser(ctx);
+
+    const trimmedOutboundId = args.outboundId.trim();
+    if (!trimmedOutboundId) return null;
+
+    if (args.claimId) {
+      const claim = await ctx.db.get(args.claimId);
+      if (!claim) {
+        throw new Error(`Claim ${args.claimId} not found`);
+      }
+      if (!claim.userId || claim.userId !== userId) {
+        throw new Error("Forbidden: You do not have permission to access this claim");
+      }
+    }
+
+    const message = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_outbound_id", (q) => q.eq("outboundId", trimmedOutboundId))
+      .first();
+
+    if (message) {
+      const claim = await ctx.db.get(message.claimId);
+      if (!claim || claim.userId !== userId) {
+        throw new Error("Forbidden: You do not have permission to access this outbound delivery status");
+      }
+    } else if (!args.claimId) {
+      // Outbound message not yet indexed in emailMessages and no claimId specified
+      return null;
+    }
+
+    return await ctx.runQuery(components.agentmail.lib.getOutboundStatus, {
+      outboundId: trimmedOutboundId as unknown as OutboundId,
+    });
+  },
+});
+
 
