@@ -35,7 +35,7 @@ export interface Patient {
   memberId: string;
   groupNumber?: string;
   insurancePayer: string;
-  state: string;
+  state?: string;
   createdAt: number;
 }
 

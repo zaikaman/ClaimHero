@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-09T15:51:00Z
+- **Last updated:** 2026-09-09T16:04:00Z
 
 ## Log
 
@@ -1111,8 +1111,14 @@ Resolved duplicate email alert storms, severed zombie cloud deployment, and hard
 - Inbound Adjudication Isolation (`convex/actions/agentMail.ts`, `convex/claims.ts`): Relocated `isAlertMessage` and `isSelfSender` validation to the start of `handleInboundClaimReply`, dropping internal and loopback emails prior to executing database lookups. Updated `getByInboxEmailInternal` and `findMatchingClaimInternal` to reject internal AgentMail addresses (`isInternalAgentMailAddress`). Restricted `performInboxSync` to poll only `mailboxes.senderInboxId` (excluding `adjudicatorInboxId`), preventing outbound appeal briefs from being processed as inbound payer replies.
 - Regression Coverage & Verification: Verified all 25 tests in `tests/actionsAgentMailAndDispatcher.test.ts` and entire test suite via `npm run verify` (100% clean typecheck, 0 ESLint errors, 693 passing unit tests across 42 suites, 80.08% coverage, and successful production build). Convex features: schema, tables, internalMutation, internalQuery, actions, crons.
 
-### 2026-09-09 - working tree
+### 2026-09-09 - 9f2db27
 Resolved M5 precedent vector reindexing transaction limit vulnerability (`convex/actions/precedentArchive.ts`, `convex/precedents.ts`):
 - Paginated Precedent Query & Embedding Stripping (`convex/precedents.ts`): Re-engineered `listForReindex` into a bounded paginated internal query (`cursor`, `batchSize`, max 100). Stripped heavy 1536-dimensional raw embedding vectors (~12-18 KB per document) on load, reducing per-row IPC transport from ~18 KB to ~500 B and eliminating `TransactionTooLarge` read byte exhaustion at scale.
 - Deadline Sweep Cascade Batching Pattern (`convex/actions/precedentArchive.ts`): Structured archive re-embedding after statutory deadline sweep pattern (`executeSweepDeadlinesBatch`). Implemented `executeReindexArchiveBatch`, `reindexArchive`, and scheduled continuation action `reindexArchiveBatch` cascading asynchronously via `ctx.scheduler.runAfter(0, ...)`. Ensured each bounded batch generates embeddings and commits updates within safe transaction and execution time budgets.
-- Testing & Regression Verification (`tests/convexPrecedents.test.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`): Added unit tests for cursor pagination, vector stripping, scheduler continuation cascading, and completion termination. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 696 passing unit tests across 42 suites, 80.77% coverage, and successful production build). Convex features: internalQuery, internalAction, pagination, scheduled functions, vector search.
+- Testing & Regression Verification (`tests/convexPrecedents.test.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`): Added unit tests for cursor pagination, vector stripping, scheduler continuation cascading, and completion termination. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 696 passing unit tests across 42 suites, 80.77% coverage, and successful production build). Convex features: internalQuery, internalAction, pagination, scheduled functions, vector search.
+
+### 2026-09-09 - working tree
+Resolved M6 hardcoded patient state in claims listing (`convex/claims.ts`, `src/types/index.ts`):
+- Eliminated Fabricated Data in Claims Listing (`convex/claims.ts`): Removed hardcoded `state: "FL"` from both paginated and bounded `claims.list` patient mappings, honoring the zero-mock/hardcoded-data policy in production pathways without introducing N+1 secondary queries.
+- Type Safety Alignment (`src/types/index.ts`): Updated `Patient` interface making `state?: string` optional to reflect denormalized listing shapes, while preserving full patient state queries via `claims.getById` and `claims.getByIdInternal`.
+- Regression Coverage & Verification (`tests/convexClaimsFull.test.ts`): Added regression assertions verifying that both regular and paginated list queries omit fabricated state values. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 696 tests passing across 42 suites, and production build). Convex features: queries.

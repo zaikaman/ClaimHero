@@ -215,7 +215,6 @@ export const list = query({
             email: "",
             memberId: "PENDING",
             insurancePayer,
-            state: "FL",
             createdAt: claim.createdAt,
           },
         };
@@ -288,7 +287,6 @@ export const list = query({
           email: "",
           memberId: "PENDING",
           insurancePayer,
-          state: "FL",
           createdAt: claim.createdAt,
         },
       };

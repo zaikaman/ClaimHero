@@ -140,6 +140,17 @@ describe("Convex Claims CRUD, Financials & Analytics Engine", () => {
 
       const res = await (claims.list as any)._handler(mockCtx, { status: "ready_for_review", payer: "Aetna" });
       expect(res).toHaveLength(1);
+      expect(res[0].patient?.state).toBeUndefined();
+      expect(res[0].patient?.state).not.toBe("FL");
+
+      mockDb.query().withIndex().order().paginate.mockResolvedValue({
+        page: [mockClaim1],
+        isDone: true,
+        continueCursor: "",
+      });
+      const paginatedRes = await (claims.list as any)._handler(mockCtx, { paginationOpts: { numItems: 10, cursor: null } });
+      expect(paginatedRes.page[0].patient?.state).toBeUndefined();
+      expect(paginatedRes.page[0].patient?.state).not.toBe("FL");
     });
 
     it("getPortfolioStats: returns zeros if unauthenticated or no claims, else computes stats", async () => {
