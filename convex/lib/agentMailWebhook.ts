@@ -244,9 +244,7 @@ export interface SvixVerificationResult {
     timestamp?: string;
     sigCount?: number;
     sigPrefix?: string;
-    expectedPrefix?: string;
     secretCount?: number;
-    secretPrefix?: string;
     lastError?: string;
   };
 }
@@ -372,7 +370,6 @@ export async function verifySvixWebhook(
   const norm = (s: string) => s.trim().replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
   let matched = false;
   let lastErrorDetail = "";
-  let firstExpectedSig: string | undefined;
 
   // 1. Try official Svix Webhook verification engine across string payload candidates
   for (const sec of candidateSecrets) {
@@ -409,9 +406,6 @@ export async function verifySvixWebhook(
           if (tsDate) {
             const computed = wh.sign(cleanId, tsDate, p);
             const expectedSig = computed.startsWith("v1,") ? computed.slice(3) : computed;
-            if (!firstExpectedSig) {
-              firstExpectedSig = expectedSig;
-            }
             const normExpected = norm(expectedSig);
 
             for (const candidate of extractedSignatures) {
@@ -455,9 +449,6 @@ export async function verifySvixWebhook(
           for (const bytePayload of candidateBytePayloads) {
             try {
               const expected = await computeSvixSignatureFromBytes(cleanId, ts, bytePayload, keyBytes);
-              if (!firstExpectedSig) {
-                firstExpectedSig = expected;
-              }
               const normExpected = norm(expected);
 
               for (const candidate of extractedSignatures) {
@@ -492,9 +483,7 @@ export async function verifySvixWebhook(
         timestamp: rawTimestamp,
         sigCount: extractedSignatures.length,
         sigPrefix: extractedSignatures[0] ? extractedSignatures[0].slice(0, 16) : undefined,
-        expectedPrefix: firstExpectedSig ? firstExpectedSig.slice(0, 16) : undefined,
         secretCount: candidateSecrets.length,
-        secretPrefix: candidateSecrets[0] ? candidateSecrets[0].slice(0, 12) : undefined,
         lastError: lastErrorDetail || undefined,
       },
     };

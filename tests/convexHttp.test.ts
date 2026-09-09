@@ -65,10 +65,17 @@ describe("Convex HTTP Router & Webhook Endpoints", () => {
   });
 
   it("returns 401 if webhook signature verification fails", async () => {
-    process.env.AGENTMAIL_WEBHOOK_SECRET = "whsec_test123";
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    process.env.AGENTMAIL_WEBHOOK_SECRET = "whsec_supersecret123456789";
     vi.spyOn(agentMailWebhook, "verifySvixWebhook").mockResolvedValue({
       valid: false,
       error: "Signature mismatch",
+      diagnostics: {
+        svixId: "msg_123",
+        timestamp: "1725580000",
+        sigCount: 1,
+        secretCount: 1,
+      },
     });
 
     const handler = getHandler();
@@ -83,6 +90,12 @@ describe("Convex HTTP Router & Webhook Endpoints", () => {
     expect(response.status).toBe(401);
     const body = await response.json();
     expect(body.error).toBe("Signature mismatch");
+    expect(warnSpy).toHaveBeenCalled();
+    const warnOutput = warnSpy.mock.calls.map((c) => c.join(" ")).join(" ");
+    expect(warnOutput).not.toContain("expectedPrefix");
+    expect(warnOutput).not.toContain("secretPrefix");
+    expect(warnOutput).not.toContain("whsec_supersecret");
+    warnSpy.mockRestore();
   });
 
   it("returns 400 if payload is invalid JSON", async () => {

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-09T04:21:00Z
+- **Last updated:** 2026-09-09T04:27:00Z
 
 ## Log
 
@@ -1062,7 +1062,13 @@ Hardened AgentMail component queries in `convex/emails.ts` against unauthenticat
 - Mutation Authorization Guard: Added `requireClaimOwner` to `cleanupMismatchedMessagesForClaim` preventing unauthorized cross-claim message deletion.
 - Testing & Verification: Added comprehensive security and regression tests in `tests/agentMail.test.ts`. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 647 passing tests across 41 suites, 80.95% coverage, and successful production build). Convex features: queries, internalQuery, mutations, components (@agentmail/convex), auth.
 
-### 2026-09-09 - working tree
+### 2026-09-09 - 99750f5
 Remediated unauthenticated chatbot session impersonation and PHI exfiltration vulnerability in `sendMessageWithTools` (`convex/actions/sentinelChatbot.ts`):
 - Strict Authentication Enforcement: Replaced insecure fallback `const callerUserId = authUserId || session.userId` with explicit `!authUserId` check throwing `Unauthorized: Authentication required`. Prevented unauthenticated callers with known session IDs from inheriting the session owner's `userId` and passing internal tool ownership checks to exfiltrate patient claim records and Protected Health Information (PHI).
 - Regression Coverage: Added unit test in `tests/actionsP2PAndChatbot.test.ts` verifying unauthenticated invocation is immediately rejected with `Unauthorized`. Validated with `npm run verify` (clean typecheck, clean lint, 648 passing tests across 41 suites, 80.95% coverage, and production build). Convex features: actions, auth.
+
+### 2026-09-09 - working tree
+Remediated webhook secret and signature HMAC material exposure in failed verification diagnostics:
+- Elimination of Sensitive Diagnostic Material (`convex/lib/agentMailWebhook.ts`): Removed `secretPrefix` (partial candidate secret) and `expectedPrefix` (computed valid HMAC digest for the payload) from `SvixVerificationResult['diagnostics']`. Removed `firstExpectedSig` storage and evaluation across official Svix and Web Crypto fallback verification paths, preventing valid cryptographic signatures and key prefixes from being retained or exposed on verification failure.
+- Secure HTTP Webhook Rejection Logging (`convex/http.ts`): Stripped `expectedPrefix` and `secretPrefix` from `console.warn` rejection telemetry in the `/agentmail-webhook` handler, adhering strictly to the security invariant to never log secrets or signature material while preserving non-sensitive operational diagnostics (`id`, `sigCount`, `sigPrefix`, `secretCount`, `timestampAgeSec`, `payloadBytes`, `detail`).
+- Regression Coverage & Verification (`tests/convexHttp.test.ts`, `tests/agentMail.test.ts`): Added unit and regression tests asserting that failed webhook verifications do not include `expectedPrefix` or `secretPrefix` in diagnostics or server-side warning logs, and that secrets remain protected. Validated with `npm run verify` (100% clean `tsc --noEmit`, 0 ESLint errors/warnings, 658 passing tests across 41 suites with 80.97% line coverage, and clean production build). Convex features: HTTP actions, actions.

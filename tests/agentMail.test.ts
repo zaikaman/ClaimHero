@@ -552,6 +552,38 @@ Paragraph text with **bold** and *italic*.
 
       expect(result.valid).toBe(false);
       expect(result.error).toBe("Signature verification failed");
+      expect(result.diagnostics).toBeDefined();
+      expect((result.diagnostics as any)?.secretPrefix).toBeUndefined();
+      expect((result.diagnostics as any)?.expectedPrefix).toBeUndefined();
+    });
+
+    it("does not leak secret material or expected signature HMAC in failure diagnostics", async () => {
+      const id = "msg_probe_1";
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const secret = "whsec_SensitiveProductionSecretValueThatMustNeverLeak123=";
+      const fakeSignature = "v1,dG90YWxseV9mYWtlX3NpZ25hdHVyZV8xMjM0NTY3ODk=";
+
+      const result = await verifySvixWebhook({
+        payload: testPayload,
+        headers: {
+          "svix-id": id,
+          "svix-timestamp": timestamp,
+          "svix-signature": fakeSignature,
+        },
+        secret,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe("Signature verification failed");
+      expect(result.diagnostics).toBeDefined();
+      // Ensure neither secret prefixes nor expected HMAC prefixes are present
+      expect((result.diagnostics as any)?.secretPrefix).toBeUndefined();
+      expect((result.diagnostics as any)?.expectedPrefix).toBeUndefined();
+      // Safe diagnostics remain available
+      expect(result.diagnostics?.svixId).toBe(id);
+      expect(result.diagnostics?.timestamp).toBe(timestamp);
+      expect(result.diagnostics?.sigCount).toBe(1);
+      expect(result.diagnostics?.secretCount).toBe(1);
     });
 
     it("rejects fraudulent signatures with expired timestamps without auto-accepting on timestamp error", async () => {

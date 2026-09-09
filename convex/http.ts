@@ -70,8 +70,6 @@ http.route({
             ` hasId=${Boolean(svixId)} hasTimestamp=${Boolean(svixTimestamp)}` +
             ` hasSignature=${Boolean(svixSignature)} sigCount=${sigCount}` +
             ` sigPrefix=${sigPrefix}` +
-            ` expectedPrefix=${verification.diagnostics?.expectedPrefix || "none"}` +
-            ` secretPrefix=${verification.diagnostics?.secretPrefix || "none"}` +
             ` secretCount=${verification.diagnostics?.secretCount ?? 0}` +
             ` timestampAgeSec=${timestampAgeSec ?? "unknown"}` +
             ` payloadBytes=${rawPayload.length}` +
