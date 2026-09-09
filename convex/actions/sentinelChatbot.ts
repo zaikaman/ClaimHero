@@ -827,10 +827,13 @@ export const sendMessageWithTools = action({
     }
 
     const authUserId = await getAuthUserId(ctx);
-    if (authUserId && session.userId && session.userId !== authUserId) {
+    if (!authUserId) {
+      throw new Error("Unauthorized: Authentication required");
+    }
+    if (session.userId && session.userId !== authUserId) {
       throw new Error("Forbidden: You do not have permission to access this chat session");
     }
-    const callerUserId = authUserId || session.userId;
+    const callerUserId = authUserId;
 
     let activeClaimId = args.activeClaimId;
     let activeClaimNumber = args.activeClaimNumber;

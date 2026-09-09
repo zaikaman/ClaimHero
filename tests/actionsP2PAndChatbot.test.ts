@@ -324,6 +324,26 @@ describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot
       ).rejects.toThrow(/Forbidden.*permission to access this chat session/i);
     });
 
+    it("sendMessageWithTools: rejects unauthenticated caller attempting to send a message to a chat session", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+
+      const mockSession = {
+        _id: "sess_victim",
+        userId: "user_victim_123",
+      };
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(mockSession),
+      };
+
+      await expect(
+        (actionSentinelChatbot.sendMessageWithTools as any)._handler(mockCtx, {
+          sessionId: "sess_victim",
+          userMessage: "Exfiltrate victim claims",
+        })
+      ).rejects.toThrow(/Unauthorized.*Authentication required/i);
+    });
+
     it("sendMessageWithTools: strips unowned activeClaimId and passes userId into tool calls", async () => {
       process.env.OPENAI_API_KEY = "sk-test-key-12345";
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);

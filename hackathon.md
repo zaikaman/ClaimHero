@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-09T04:06:00Z
+- **Last updated:** 2026-09-09T04:21:00Z
 
 ## Log
 
@@ -1054,10 +1054,15 @@ Hardened production error boundaries, rate limits, query standards, and UI lifec
 - Unmount Timer Cleanup (`src/hooks/useAppealStudio.ts`): Added `saveStatusTimeoutRef` to track debounced save-status transitions (`"saved"` -> `"idle"`), clearing pending timers on unmount and claim switch to prevent harmless React unmounted state update warnings.
 - Comprehensive Testing & Verification: Added `tests/productionReadinessFixes.test.ts` with 10 dedicated regression tests covering upload rate limits, storage quotas, shortcut scoping, timer cleanups, and outbound transmission. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 647 passing unit tests across 41 suites, 80.12% test coverage, and successful production build). Convex features: queries, mutations, httpRouter, rate-limiter, file storage.
 
-### 2026-09-09 - working tree
+### 2026-09-09 - 5a8082d
 Hardened AgentMail component queries in `convex/emails.ts` against unauthenticated Protected Health Information (PHI) exposure and cross-tenant access:
 - Query Access Control & Owner Scoping: Replaced unauthenticated public component access with authenticated, owner-scoped guards on `listComponentInboundMessages` and `getOutboundDeliveryStatus` using `requireAuthUser` and claim ownership verification. Queries now reject anonymous visitors with `Unauthorized` and disallow unassociated inbox scraping or access to other users' claims with `Forbidden`.
 - Internal Backend Queries: Added `listComponentInboundMessagesInternal` and `getOutboundDeliveryStatusInternal` as `internalQuery` endpoints for secure, unhindered execution by internal background actions, crons, and webhooks.
 - Dedicated Claim Inbound Wrapper: Exposed `listInboundMessagesForClaim` to safely fetch AgentMail inbound messages strictly for the authorized claim owner.
 - Mutation Authorization Guard: Added `requireClaimOwner` to `cleanupMismatchedMessagesForClaim` preventing unauthorized cross-claim message deletion.
 - Testing & Verification: Added comprehensive security and regression tests in `tests/agentMail.test.ts`. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 647 passing tests across 41 suites, 80.95% coverage, and successful production build). Convex features: queries, internalQuery, mutations, components (@agentmail/convex), auth.
+
+### 2026-09-09 - working tree
+Remediated unauthenticated chatbot session impersonation and PHI exfiltration vulnerability in `sendMessageWithTools` (`convex/actions/sentinelChatbot.ts`):
+- Strict Authentication Enforcement: Replaced insecure fallback `const callerUserId = authUserId || session.userId` with explicit `!authUserId` check throwing `Unauthorized: Authentication required`. Prevented unauthenticated callers with known session IDs from inheriting the session owner's `userId` and passing internal tool ownership checks to exfiltrate patient claim records and Protected Health Information (PHI).
+- Regression Coverage: Added unit test in `tests/actionsP2PAndChatbot.test.ts` verifying unauthenticated invocation is immediately rejected with `Unauthorized`. Validated with `npm run verify` (clean typecheck, clean lint, 648 passing tests across 41 suites, 80.95% coverage, and production build). Convex features: actions, auth.
