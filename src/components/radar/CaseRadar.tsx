@@ -861,6 +861,11 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                   Synthetic Demo
                                 </Badge>
                               )}
+                              {claim.isShared && (
+                                <Badge variant="outline" className="font-mono text-[8px] px-1 py-0 text-violet-300 bg-violet-500/10 border-violet-500/30">
+                                  Shared{claim.accessRole && claim.accessRole !== "owner" ? ` • ${claim.accessRole}` : ""}
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </div>

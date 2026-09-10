@@ -780,7 +780,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
 
 
     it("updateAppealContext: auto-reconciles patient name from physicianNotes when unstated in denial notice", async () => {
-      vi.spyOn(auth, "requireClaimOwner").mockResolvedValue(true as any);
+      vi.spyOn(auth, "requireClaimEditor").mockResolvedValue(true as any);
 
       const mockDb = {
         get: vi.fn().mockImplementation(async (id) => {

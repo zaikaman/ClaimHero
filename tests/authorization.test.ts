@@ -185,7 +185,7 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
       };
 
       const result = await getClaimIfAuthorized(mockCtx, "claim_secret" as any);
-      expect(result).toEqual({ claim: mockClaim, userId: "user_tenant_A" });
+      expect(result).toEqual({ claim: mockClaim, userId: "user_tenant_A", accessRole: "owner" });
     });
   });
 
@@ -372,7 +372,7 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
       };
 
       const result = await requireClaimOwnerAction(mockActionCtx, "claim_789" as any);
-      expect(result).toEqual({ claim: mockClaim, userId: "user_owner_123" });
+      expect(result).toEqual({ claim: mockClaim, userId: "user_owner_123", accessRole: "owner" });
     });
   });
 

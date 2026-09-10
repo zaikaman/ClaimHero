@@ -1,7 +1,7 @@
 import { MutationCtx, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
+import { getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
 import {
   STATUTORY_APPEAL_LEVELS,
   STATUTORY_POSTURES,
@@ -290,7 +290,7 @@ export const createOrUpdateDraft = mutation({
     forceNewRevision: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<Id<"appeals"> | null> => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     return await applyCreateOrUpdateDraft(ctx, args);
   },
 });
@@ -331,7 +331,7 @@ export const escalateTier = mutation({
   },
   handler: async (ctx, args) => {
     assertValidAppealLevel(args.targetLevel);
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
 
     const now = Date.now();
     const tierMeta = getStatutoryTierMetadata(args.targetLevel);
@@ -380,7 +380,7 @@ export const saveDraft = mutation({
       throw new Error(`Appeal ${args.appealId} not found`);
     }
 
-    await requireClaimOwner(ctx, appeal.claimId);
+    await requireClaimEditor(ctx, appeal.claimId);
 
     const now = Date.now();
     await ctx.db.patch(args.appealId, {
@@ -407,7 +407,7 @@ export const updatePdfStorageId = mutation({
       throw new Error(`Appeal ${args.appealId} not found`);
     }
 
-    await requireClaimOwner(ctx, appeal.claimId);
+    await requireClaimEditor(ctx, appeal.claimId);
 
     await ctx.db.patch(args.appealId, {
       pdfExportStorageId: args.pdfExportStorageId,

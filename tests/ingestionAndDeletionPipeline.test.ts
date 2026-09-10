@@ -152,7 +152,19 @@ describe("Ingestion Pipeline & Cascading Deletion Hardening", () => {
       expect(mockCtx.storage.delete).toHaveBeenCalledWith("storage_pdf_1");
       expect(mockCtx.db.delete).toHaveBeenCalledWith("ap_1");
       expect(mockCtx.db.delete).toHaveBeenCalledWith("ap_2");
-      expect(mockCtx.scheduler.runAfter).not.toHaveBeenCalled();
+      // Each deleted appeal fans out its Yjs op-log purge; the appeals batch
+      // itself does not continue (batch smaller than the page size).
+      expect(mockCtx.scheduler.runAfter).toHaveBeenCalledTimes(2);
+      expect(mockCtx.scheduler.runAfter).toHaveBeenCalledWith(
+        0,
+        internal.appealYjs.purgeAppealInternal,
+        { appealId: "ap_1" }
+      );
+      expect(mockCtx.scheduler.runAfter).toHaveBeenCalledWith(
+        0,
+        internal.appealYjs.purgeAppealInternal,
+        { appealId: "ap_2" }
+      );
     });
 
     it("cascadeDeleteEmailsBatchInternal: deletes email messages and threads", async () => {

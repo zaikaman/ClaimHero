@@ -6,7 +6,7 @@ import {
   getChatbotSessionIfAuthorized,
   requireAuthUser,
   requireChatbotSessionOwner,
-  requireClaimOwner,
+  requireClaimAccess,
   getAuthUserId,
 } from "./lib/auth";
 
@@ -41,7 +41,7 @@ export const getOrCreateSession = mutation({
     const now = Date.now();
 
     if (args.activeClaimId) {
-      await requireClaimOwner(ctx, args.activeClaimId);
+      await requireClaimAccess(ctx, args.activeClaimId);
     }
 
     // Check if there is an existing recent session

@@ -3,7 +3,7 @@ import { components, api, internal } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id, Doc } from "./_generated/dataModel";
-import { requireClaimOwner, getAuthUserId } from "./lib/auth";
+import { requireClaimEditor, getAuthUserId } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
 import { ERISA_STATUTORY_EVIDENCE } from "./lib/erisaEvidence";
 import { appealLevelValidator, type StatutoryAppealLevel } from "./lib/statutoryTierValidators";
@@ -488,7 +488,7 @@ export const startDurablePipeline = mutation({
     followUpCadenceDays: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<{ workflowId: string; claimId: string }> => {
-    const { userId } = await requireClaimOwner(ctx, args.claimId);
+    const { userId } = await requireClaimEditor(ctx, args.claimId);
 
     const limitStatus = await rateLimiter.limit(ctx, "sentinelPipeline", {
       key: userId || "global",
@@ -549,7 +549,7 @@ export const getWorkflowExecutionStatus = query({
     let workflowId = args.workflowId;
 
     if (args.claimId) {
-      const { claim } = await requireClaimOwner(ctx, args.claimId);
+      const { claim } = await requireClaimEditor(ctx, args.claimId);
       if (claim.workflowId) {
         workflowId = claim.workflowId;
       }
@@ -613,7 +613,7 @@ export const cancelDurableWorkflow = mutation({
     workflowId: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ success: boolean; workflowId: string }> => {
-    const { claim, userId } = await requireClaimOwner(ctx, args.claimId);
+    const { claim, userId } = await requireClaimEditor(ctx, args.claimId);
 
     const targetWorkflowId = args.workflowId || claim.workflowId;
     if (!targetWorkflowId) {
@@ -652,7 +652,7 @@ export const startStatutoryCountdown = mutation({
     cadenceDays: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<{ workflowId: string }> => {
-    const { claim, userId } = await requireClaimOwner(ctx, args.claimId);
+    const { claim, userId } = await requireClaimEditor(ctx, args.claimId);
     const cadenceDays = Math.max(1, Math.min(args.cadenceDays ?? Math.max(claim.daysRemaining || 14, 1), 90));
 
     const workflowId = await workflow.start(

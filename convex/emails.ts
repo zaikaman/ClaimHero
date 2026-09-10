@@ -3,7 +3,7 @@ import { v, ConvexError } from "convex/values";
 import { OutboundId } from "@agentmail/convex";
 import type { Doc, Id } from "./_generated/dataModel";
 import { components, internal } from "./_generated/api";
-import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner } from "./lib/auth";
+import { getClaimIfAuthorized, requireAuthUser, requireClaimEditor } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
 
 async function takeBounded<T>(query: {
@@ -168,7 +168,7 @@ export const getOrCreateThread = mutation({
     subject: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     return await applyGetOrCreateThread(ctx, args);
   },
 });
@@ -395,7 +395,7 @@ export const insertMessage = mutation({
     autoReplyStatus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     return await applyInsertMessage(ctx, args);
   },
 });
@@ -811,7 +811,7 @@ export const cleanupMismatchedMessagesForClaim = mutation({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     const claim = await ctx.db.get(args.claimId);
     if (!claim) return { deletedCount: 0 };
 
@@ -898,7 +898,7 @@ export const setClaimAutoPilot = mutation({
     enabled: v.boolean(),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     await ctx.db.patch(args.claimId, {
       autoPilotEnabled: args.enabled,
       updatedAt: Date.now(),
@@ -1003,7 +1003,7 @@ export const dismissAutoReplyDraft = mutation({
     messageId: v.id("emailMessages"),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireClaimOwner(ctx, args.claimId);
+    const { userId } = await requireClaimEditor(ctx, args.claimId);
 
     // Enforce claimWrite rate limiting
     try {
@@ -1099,7 +1099,9 @@ export const listInboundMessagesForClaim = query({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
-    const { claim } = await requireClaimOwner(ctx, args.claimId);
+    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!authorized) return [];
+    const { claim } = authorized;
     if (!claim.agentMailThreadId) {
       return [];
     }

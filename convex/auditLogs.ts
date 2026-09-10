@@ -1,6 +1,6 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getClaimIfAuthorized, requireClaimOwner, getAuthUserId } from "./lib/auth";
+import { getClaimIfAuthorized, requireClaimEditor, getAuthUserId } from "./lib/auth";
 
 /**
  * List chronological audit trail events for a specific claim, checking authorization
@@ -49,7 +49,7 @@ export const logEvent = mutation({
     idempotencyKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireClaimOwner(ctx, args.claimId);
+    const { userId } = await requireClaimEditor(ctx, args.claimId);
 
     const eventType = args.eventType.trim();
     if (!eventType || eventType.length > 64) {

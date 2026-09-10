@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   FileText,
   CircleNotch,
@@ -14,15 +14,20 @@ import {
   ClockCounterClockwise,
   Gavel,
   ShieldCheck,
+  UsersThree,
   X,
 } from "@phosphor-icons/react";
-import { Claim, ClinicalEvidence, AppealLevel } from "../../types";
+import { Claim, ClinicalEvidence, AppealLevel, StudioPresenceData } from "../../types";
 import { cn } from "../../lib/utils";
 import { useAppealStudio } from "../../hooks/useAppealStudio";
+import { useClaimCollaborators } from "../../hooks/useClaimCollaborators";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { usePrecedents } from "../../hooks/usePrecedents";
 import { CitationSidebar } from "./CitationSidebar";
 import { ExportDrawer } from "./ExportDrawer";
 import { AppealBriefRenderer } from "./AppealBriefRenderer";
+import { StudioPresenceBridge } from "./CollaboratorPresence";
+import { ShareCaseModal } from "./ShareCaseModal";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
@@ -99,6 +104,21 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   onNavigateView,
   onRunAutonomousPipeline,
 }) => {
+  const { user, userName } = useCurrentUser();
+  const currentUserId = (user?._id as string | undefined) || "";
+  const {
+    collaborators,
+    myAccess,
+    accessRole,
+    isOwner,
+    canEdit,
+    isViewer,
+    invite,
+    updateRole,
+    removeCollaborator,
+    leaveCase,
+  } = useClaimCollaborators(claim._id);
+  const readOnly = myAccess ? isViewer || !canEdit : false;
   const {
     appeal,
     appealVersions,
@@ -119,7 +139,13 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     saveStatus,
     synthesizeAppeal,
     escalateTier,
-  } = useAppealStudio(claim);
+    pendingRemote,
+    remoteFlash,
+    resolveConflict,
+    collabStatus,
+    boundAppealId,
+    registerEditor,
+  } = useAppealStudio(claim, { editorName: userName || undefined, readOnly });
   const { matches: vectorMatches, isLoading: isLoadingPrecedents } = usePrecedents(claim);
 
   const [activeTab, setActiveTab] = useState<"edit" | "preview" | "split">("split");
@@ -127,12 +153,47 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   const [showEscalationModal, setShowEscalationModal] = useState<boolean>(false);
   const [escalationReason, setEscalationReason] = useState<string>("");
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
+  const [isShareOpen, setIsShareOpen] = useState<boolean>(false);
   const [synthesisError, setSynthesisError] = useState<string | null>(null);
   const [injectedPenaltiesSuccess, setInjectedPenaltiesSuccess] = useState<boolean>(false);
+  const [isEditingBrief, setIsEditingBrief] = useState<boolean>(false);
+  const [presenceOthers, setPresenceOthers] = useState<Array<{ userId: string; data: StudioPresenceData }>>([]);
+  const editingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentTierConfig = TIER_METADATA_CONFIG[appealLevel] || TIER_METADATA_CONFIG.level_1_internal;
 
+  const presenceActivity = isSynthesizing || isEscalating ? "synthesizing" : isEditingBrief ? "editing" : "viewing";
+  const presenceSection = activeTab === "edit" ? "Editor" : activeTab === "preview" ? "Preview" : "Split view";
+  // The live CRDT session gates editing until bootstrapped so keystrokes can
+  // never race the initial snapshot/seed merge.
+  const editorSyncLocked = !readOnly && boundAppealId !== null && collabStatus !== "live";
+  const presenceAvatarMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const member of collaborators) {
+      if (member.userId && member.image) map[member.userId] = member.image;
+    }
+    return map;
+  }, [collaborators]);
+  const onlineUserIds = [
+    ...(currentUserId ? [currentUserId] : []),
+    ...presenceOthers.map((entry) => entry.userId),
+  ];
+
+  const markEditingBrief = () => {
+    if (readOnly) return;
+    setIsEditingBrief(true);
+    if (editingTimerRef.current) clearTimeout(editingTimerRef.current);
+    editingTimerRef.current = setTimeout(() => {
+      setIsEditingBrief(false);
+      editingTimerRef.current = null;
+    }, 4000);
+  };
+
   const handleInjectErisaPenalties = () => {
+    if (readOnly) {
+      toast.error("Viewers have read-only access and cannot modify the brief");
+      return;
+    }
     const penaltyClause = `
 
 ## Statutory remedies & ERISA § 502(c) civil penalties demand
@@ -162,6 +223,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   };
 
   const handleRunSynthesis = async () => {
+    if (readOnly) {
+      toast.error("Viewers have read-only access and cannot synthesize briefs");
+      return;
+    }
     setSynthesisError(null);
     const toastId = toast.loading("Synthesizing legal appeal brief with clinical citations...");
     try {
@@ -180,6 +245,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   };
 
   const handleConfirmEscalation = async () => {
+    if (readOnly) {
+      toast.error("Viewers have read-only access and cannot escalate tiers");
+      return;
+    }
     if (!currentTierConfig.nextTier) return;
     setSynthesisError(null);
     const toastId = toast.loading("Escalating statutory tier and re-synthesizing brief...");
@@ -283,9 +352,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               <Button
                 size="sm"
                 onClick={() => setShowEscalationModal(true)}
-                disabled={isEscalating || isSynthesizing}
+                disabled={isEscalating || isSynthesizing || readOnly}
                 className="h-9 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-xs transition-all"
-                title={`Escalate dispute to ${currentTierConfig.nextTierLabel}`}
+                title={readOnly ? "Viewers have read-only access" : `Escalate dispute to ${currentTierConfig.nextTierLabel}`}
               >
                 <TrendUp className="size-3.5" />
                 <span>Escalate to Tier {TIER_METADATA_CONFIG[currentTierConfig.nextTier].levelNumber}</span>
@@ -401,6 +470,17 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 <Badge variant="outline" className="font-mono text-[10px]">
                   Claim #{claim.claimNumber}
                 </Badge>
+                {claim.isShared && (
+                  <Badge variant="outline" className="font-mono text-[10px] border-violet-500/40 text-violet-300 bg-violet-500/10">
+                    Shared case
+                  </Badge>
+                )}
+                {readOnly && (
+                  <Badge variant="outline" className="text-[10px] gap-1 border-amber-500/40 text-amber-300 bg-amber-500/10">
+                    <Eye className="size-3" />
+                    <span>Viewer read-only</span>
+                  </Badge>
+                )}
                 {claim.status === "won" && (
                   <Badge variant="default" className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 text-[10px] font-semibold gap-1">
                     <Check className="size-3 text-emerald-500" />
@@ -419,6 +499,30 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                     <span>Synced (v{appeal?.version || 1})</span>
                   </span>
                 )}
+                {boundAppealId !== null && collabStatus === "live" && (
+                  <span className="flex items-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Live sync</span>
+                  </span>
+                )}
+                {boundAppealId !== null && collabStatus === "bootstrapping" && (
+                  <span className="flex items-center gap-1 text-[11px] font-mono text-amber-400 animate-pulse">
+                    <CircleNotch className="size-3 animate-spin" />
+                    <span>Syncing…</span>
+                  </span>
+                )}
+                {boundAppealId !== null && collabStatus === "offline" && (
+                  <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground">
+                    <span className="size-1.5 rounded-full bg-muted-foreground/50" />
+                    <span>Offline — retrying</span>
+                  </span>
+                )}
+                {remoteFlash && saveStatus !== "saving" && (
+                  <span className="flex items-center gap-1 text-[11px] font-mono text-sky-400 animate-pulse">
+                    <Check className="size-3" />
+                    <span>Teammate update applied</span>
+                  </span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
                 Patient: <span className="text-foreground font-medium">{claim.patient?.name}</span> • Payer:{" "}
@@ -427,7 +531,36 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            {myAccess && currentUserId && accessRole && (
+              <StudioPresenceBridge
+                claimId={claim._id}
+                userId={currentUserId}
+                displayName={userName || senderName || "Advocate"}
+                role={accessRole}
+                tier={currentTierConfig.shortTitle}
+                activity={presenceActivity}
+                section={presenceSection}
+                avatarMap={presenceAvatarMap}
+                onOthersChange={setPresenceOthers}
+              />
+            )}
+            {/* Share Case Trigger */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsShareOpen(true)}
+              className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
+              title="Invite teammates to collaborate live on this case"
+            >
+              <UsersThree className="size-3.5" />
+              <span>Share</span>
+              {collaborators.length > 0 && (
+                <Badge variant="secondary" className="font-mono text-[10px] px-1 py-0 h-4">
+                  {collaborators.length}
+                </Badge>
+              )}
+            </Button>
             {/* Export & Preview Trigger */}
             <Button
               variant="outline"
@@ -444,9 +577,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             <Button
               size="sm"
               onClick={handleRunSynthesis}
-              disabled={isSynthesizing || isSaving || isEscalating}
+              disabled={isSynthesizing || isSaving || isEscalating || readOnly}
               className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
-              title="Synthesize cited appeal brief with AI"
+              title={readOnly ? "Viewers have read-only access" : "Synthesize cited appeal brief with AI"}
             >
               {isSynthesizing || isEscalating ? (
                 <>
@@ -470,6 +603,43 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           </Alert>
         )}
       </Card>
+
+      {/* Viewer read-only notice */}
+      {readOnly && (
+        <Alert className="border-amber-500/30 bg-amber-500/5">
+          <AlertDescription className="flex items-center gap-2 text-xs">
+            <Eye className="size-3.5 text-amber-400 shrink-0" />
+            <span>
+              You are viewing this shared case with <strong>viewer access</strong>. Editing,
+              synthesis, and escalation are disabled. Presence still shows who else is online.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Simultaneous-edit conflict notice */}
+      {pendingRemote && !readOnly && (
+        <Alert className="border-amber-500/40 bg-amber-500/10">
+          <AlertDescription className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+            <span className="flex items-center gap-2 min-w-0">
+              <ShieldWarning className="size-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>{pendingRemote.by}</strong> edited this brief while you had unsaved
+                changes. Loading theirs discards your unsent edits; keeping yours overwrites
+                theirs on next save.
+              </span>
+            </span>
+            <span className="flex items-center gap-2 shrink-0 ml-auto">
+              <Button size="xs" onClick={() => resolveConflict("theirs")} className="h-7 text-[11px]">
+                Load theirs
+              </Button>
+              <Button size="xs" variant="outline" onClick={() => resolveConflict("mine")} className="h-7 text-[11px]">
+                Keep mine
+              </Button>
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Main Studio Dual Pane Editor & Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
@@ -509,8 +679,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 variant="ghost"
                 size="xs"
                 onClick={handleInjectErisaPenalties}
-                className="gap-1 text-xs text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 h-7"
-                title="Inject accrued ERISA 29 U.S.C. § 1132(c) statutory non-disclosure penalties into Section IV"
+                disabled={readOnly}
+                className="gap-1 text-xs text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 h-7 disabled:opacity-50"
+                title={readOnly ? "Viewers have read-only access" : "Inject accrued ERISA 29 U.S.C. § 1132(c) statutory non-disclosure penalties into Section IV"}
               >
                 {injectedPenaltiesSuccess ? (
                   <>
@@ -617,10 +788,22 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             {(activeTab === "edit" || activeTab === "split") && (
               <div className="h-full overflow-hidden flex flex-col p-4 sm:p-5 min-w-0">
                 <textarea
+                  ref={registerEditor}
                   value={markdownContent}
-                  onChange={(e) => setMarkdownContent(e.target.value)}
-                  placeholder="The appeal brief will appear here once synthesized, or write manually..."
-                  className="studio-editor-textarea w-full h-full bg-transparent text-foreground text-xs font-mono resize-none focus:outline-none leading-relaxed placeholder:text-muted-foreground overflow-y-auto"
+                  onChange={(e) => {
+                    setMarkdownContent(e.target.value);
+                    markEditingBrief();
+                  }}
+                  onFocus={markEditingBrief}
+                  readOnly={readOnly || editorSyncLocked}
+                  placeholder={
+                    readOnly
+                      ? "You have viewer access to this shared case. Ask the owner for editor access to modify the brief."
+                      : editorSyncLocked
+                        ? "Syncing live session… editing unlocks in a moment."
+                        : "The appeal brief will appear here once synthesized, or write manually..."
+                  }
+                  className="studio-editor-textarea w-full h-full bg-transparent text-foreground text-xs font-mono resize-none focus:outline-none leading-relaxed placeholder:text-muted-foreground overflow-y-auto disabled:opacity-80"
                 />
               </div>
             )}
@@ -648,8 +831,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
                     <Button
                       onClick={handleRunSynthesis}
-                      disabled={isSynthesizing || isEscalating}
+                      disabled={isSynthesizing || isEscalating || readOnly}
                       className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md mt-2"
+                      title={readOnly ? "Viewers have read-only access" : undefined}
                     >
                       {isSynthesizing || isEscalating ? (
                         <>
@@ -792,7 +976,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               <Button
                 size="sm"
                 onClick={handleConfirmEscalation}
-                disabled={isEscalating}
+                disabled={isEscalating || readOnly}
                 className="text-xs gap-1.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-xs"
               >
                 {isEscalating ? (
@@ -811,6 +995,21 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           </Card>
         </div>
       )}
+
+      {/* Share Case Modal */}
+      <ShareCaseModal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        claimNumber={claim.claimNumber}
+        claimId={claim._id}
+        isOwner={isOwner}
+        collaborators={collaborators}
+        onlineUserIds={onlineUserIds}
+        onInvite={invite}
+        onUpdateRole={updateRole}
+        onRemove={removeCollaborator}
+        onLeave={isOwner ? undefined : leaveCase}
+      />
 
       {/* Export & Print Preview Drawer Modal */}
       <ExportDrawer

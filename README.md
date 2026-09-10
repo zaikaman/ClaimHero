@@ -31,6 +31,7 @@ To evaluate the end-to-end pipeline without uploading personal health records:
 4. Select **Run Autonomous Pipeline** and track the real-time stepper:
    `Evidence & CPB` -> `Appeal Brief` -> `Payer Dispatch`
 5. Inspect the output: indexed insurer clauses, visual screenshot archives, deterministic four-pillar overturn score, cited appeal brief, physician peer-to-peer call script, and two-way AgentMail thread.
+6. Try live collaboration: open the **Appeal Studio**, click **Share**, and invite a teammate by email as editor or viewer. They see the case instantly (shared badge in Case Radar); open the same brief in two accounts and type simultaneously — Yjs CRDT merging keeps both keystroke streams without conflicts while presence shows who is editing.
 
 *Synthetic cases are strictly isolated from real portfolio analytics and can be purged at any time via the "Clear demo data" button.*
 
@@ -57,11 +58,15 @@ Denial Notice (PDF / Image / EOB Text)
   [35% CPB Alignment + 25% Step-Therapy + 20% ERISA + 20% Precedents]
                |
                v
-  OpenAI Grounded Appeal Synthesis (appealSynthesizer.ts)
-  [Strictly cites stored evidence; zero fabricated clauses]
-               |
-               v
-  Court-Ready Formal PDF Dossier Generation (pdfService.ts)
+   OpenAI Grounded Appeal Synthesis (appealSynthesizer.ts)
+   [Strictly cites stored evidence; zero fabricated clauses]
+                |
+                +--> Live Case Collaboration (claimCollaborators.ts, appealYjs.ts)
+                |    [Email invites with editor/viewer roles; Yjs CRDT op log merges
+                |     concurrent keystrokes; presence tracks live teammates]
+                |
+                v
+   Court-Ready Formal PDF Dossier Generation (pdfService.ts)
                |
                v
   Human Approval Gate -> AgentMail Autonomous Transmission (mailDispatcher.ts)
@@ -81,6 +86,7 @@ Convex serves as the core persistence, real-time subscription, compute, and orch
 - **Transactional Consistency**: Atomic mutations govern claim creation, evidence persistence, status transitions, and cascading purges to eliminate orphan records.
 - **Crons & Scheduled Actions**: Automated crons sweep statutory 180-day ERISA deadlines, track pending payer replies, and run the Sentinel Auto-Pilot 1-Hour SLA (`convex/crons.ts`).
 - **File Storage**: Native Convex storage securely hosts uploaded denial documents and compiled appeal PDF dossiers.
+- **Live Presence & CRDT Collaboration**: The `@convex-dev/presence` component tracks live teammates per appeal room while a Yjs operation log (`appealYjsUpdates`) merges concurrent brief edits keystroke-by-keystroke; email-granted editor/viewer roles gate every read and write (`convex/claimCollaborators.ts`, `convex/appealYjs.ts`).
 - **HTTP Routing & Svix Webhooks**: Authenticated endpoints handle inbound AgentMail and Firecrawl webhooks (`convex/http.ts`).
 
 ### 2. Firecrawl — Real-Time Policy Discovery & Visual Proof Archiving
@@ -109,7 +115,7 @@ OpenAI powers clinical reasoning while operating within strict anti-hallucinatio
 
 ## Convex Component Architecture
 
-ClaimHero leverages 8 first-party and partner Convex components configured in [`convex/convex.config.ts`](./convex/convex.config.ts):
+ClaimHero leverages 9 first-party and partner Convex components configured in [`convex/convex.config.ts`](./convex/convex.config.ts):
 
 | Component | Package | Role in ClaimHero |
 | :--- | :--- | :--- |
@@ -120,6 +126,7 @@ ClaimHero leverages 8 first-party and partner Convex components configured in [`
 | **Agent** | `@convex-dev/agent` | Component-backed agentic reasoning and tool coordination |
 | **Aggregate** | `@convex-dev/aggregate` | High-performance reactive portfolio statistics and metrics |
 | **Rate Limiter** | `@convex-dev/rate-limiter` | Token bucket rate limiting for external model and crawler APIs |
+| **Presence** | `@convex-dev/presence` | Live teammate tracking per appeal room (online status, editing activity) |
 | **Static Hosting** | `@convex-dev/static-hosting` | Edge-hosted frontend distribution on `convex.site` |
 
 ---
@@ -132,6 +139,7 @@ ClaimHero leverages 8 first-party and partner Convex components configured in [`
 | **Evidence Matrix** | `src/components/evidence/EvidenceMatrix.tsx` | Side-by-side comparison of denial codes against active CPB clauses with category filtering (Payer / CMS / PubMed). |
 | **Visual Proof Archive** | `src/components/evidence/VisualProofArchive.tsx` | High-resolution full-page screenshots of payer bulletins captured via Firecrawl to prevent policy gaslighting. |
 | **Appeal Studio** | `src/components/studio/AppealStudio.tsx` | Versioned appellate brief editor with clause-level citations, statutory rights notices, and attestation signatures. |
+| **Live Collaboration** | `src/components/studio/ShareCaseModal.tsx`, `src/lib/yjsProvider.ts`, `convex/appealYjs.ts` | Email invites with editor/viewer roles, live teammate facepile with editing activity, and Yjs CRDT merging of concurrent brief keystrokes over a Convex op log with snapshots and offline-tolerant sync. |
 | **Formal PDF Dossier** | `src/lib/pdfService.ts` | Court-ready PDF dossier compiler with indexed clinical exhibits, statutory cover sheets, and print layouts. |
 | **P2P Defense Studio** | `src/components/p2p/P2PDefenseStudio.tsx` | Tele-scripts and tactical counter-argument cards tailored for physician-to-medical-director phone calls. |
 | **P2P Live Copilot** | `src/components/p2p/P2PLiveCopilot.tsx` | Live call assistant with real-time speech transcription, dynamic objection counters, and call recap generation. |
@@ -177,18 +185,18 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **751 automated tests** across 46 test suites (verified via `npm run test:coverage`):
+ClaimHero is backed by **802 automated tests** across 50 test suites (verified via `npm run test:coverage`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking
 npm run lint            # ESLint static code analysis
-npm run test            # Comprehensive Vitest test suite (751 tests)
+npm run test            # Comprehensive Vitest test suite (802 tests)
 npm run test:coverage   # Code coverage report (report-only, ~80.9% lines; no threshold gate)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate
 ```
 
-Test suites cover the master pipeline, Convex authorization and ownership isolation, OpenAI structured outputs and embeddings, Firecrawl policy selection, AgentMail component integration and webhook signatures, deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, durable workflows, and demo isolation.
+Test suites cover the master pipeline, Convex authorization and ownership isolation, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection, AgentMail component integration and webhook signatures, deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, durable workflows, and demo isolation.
 
 ---
 
@@ -197,9 +205,12 @@ Test suites cover the master pipeline, Convex authorization and ownership isolat
 ```text
 ClaimHero/
 ├── convex/
-│   ├── schema.ts              # 10 domain tables, relational indexes, vector index
-│   ├── convex.config.ts       # 8 Convex components configuration
+│   ├── schema.ts              # 20 domain tables, relational indexes, vector index
+│   ├── convex.config.ts       # 9 Convex components configuration
 │   ├── claims.ts              # Claim lifecycle, deadlines, analytics
+│   ├── claimCollaborators.ts  # Case sharing invites with editor/viewer roles
+│   ├── appealYjs.ts           # Yjs CRDT op-log transport (sync, push, snapshots)
+│   ├── presence.ts            # Live teammate presence per appeal room
 │   ├── clinicalEvidences.ts   # Evidence persistence and vector retrieval
 │   ├── appeals.ts             # Versioned briefs and escalation
 │   ├── emails.ts              # Threads, messages, and routing
@@ -235,7 +246,7 @@ ClaimHero/
 | :--- | :--- | :--- |
 | **1. Everyday Apps** | Real-world utility over developer toys | Solves a $1.5B/year health insurance denial crisis for everyday patients and clinical advocates. |
 | **2. Creativity & Usefulness** | Practical domain innovation | Unifies policy discovery, visual proof, statutory ERISA penalties, and physician P2P defense into one workflow. |
-| **3. Convex Depth** | Queries, mutations, crons, auth, components | Employs 8 Convex components, 10 domain tables, 1536-d vector indexes, durable workflows, and scheduled crons. |
+| **3. Convex Depth** | Queries, mutations, crons, auth, components | Employs 9 Convex components, 20 domain tables, 1536-d vector indexes, durable workflows, scheduled crons, live presence, and a Yjs CRDT collaboration log. |
 | **4. Sponsor Stack** | Active production work across sponsors | OpenAI extracts & synthesizes, Firecrawl discovers & screenshots CPBs, AgentMail handles bidirectional dispatch. |
 | **5. Live URL** | Hosted on `convex.site` | Fully deployed and accessible on Convex Static Hosting. |
 | **6. Video Demo** | Under 3 minutes, clicking through product | Concise walkthrough demonstrating ingestion, evidence discovery, scoring, brief drafting, and dispatch. |

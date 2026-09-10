@@ -81,6 +81,9 @@ export interface Claim {
   latestAppeal?: Appeal | null;
   evidenceCount?: number;
   payerContact?: PayerContact;
+  accessRole?: "owner" | "editor" | "viewer";
+  isShared?: boolean;
+  collaboratorCount?: number;
 }
 
 export type NetworkStatus = "in_network" | "out_of_network";
@@ -497,6 +500,42 @@ export interface FdaScrapeResult {
     extractedEvidenceMarkdown: string;
     relevanceScore: number;
   }>;
+}
+
+// Case collaboration (Appeal Studio presence + invites)
+export type ClaimAccessRole = "owner" | "editor" | "viewer";
+
+export interface ClaimCollaborator {
+  _id?: string;
+  userId?: string;
+  email: string;
+  role: ClaimAccessRole;
+  status: string;
+  displayName: string;
+  image?: string;
+  isOwner: boolean;
+  isSelf: boolean;
+}
+
+export type StudioPresenceActivity = "viewing" | "editing" | "synthesizing" | "reviewing" | "idle";
+
+export interface StudioPresenceData {
+  displayName: string;
+  initials: string;
+  role: ClaimAccessRole;
+  tier: string;
+  activity: StudioPresenceActivity;
+  section?: string;
+  color: string;
+}
+
+export interface StudioPresenceEntry {
+  userId: string;
+  online: boolean;
+  lastDisconnected: number;
+  data?: unknown;
+  name?: string;
+  image?: string;
 }
 
 // Physician Peer-to-Peer (P2P) Defense Types

@@ -1,12 +1,55 @@
-import { MutationCtx, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { MutationCtx, internalMutation, internalQuery, mutation, query, QueryCtx } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { v, ConvexError } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { claimsAggregate } from "./lib/aggregates";
-import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner, getAuthUserId } from "./lib/auth";
+import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner, requireClaimEditor, getAuthUserId } from "./lib/auth";
+import { normalizeCollaboratorEmail } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
 import { isInternalAgentMailAddress } from "./lib/agentMailWebhook";
+
+/**
+ * Fetch active collaboration grants for the caller, matched by userId or by
+ * the caller's account email (covers invites sent before signup). Defensive:
+ * returns empty on mock runners without the claimCollaborators table.
+ */
+async function getActiveSharedGrants(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">
+): Promise<Doc<"claimCollaborators">[]> {
+  try {
+    const grantsByUser = await ctx.db
+      .query("claimCollaborators")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(50);
+    let grantsByEmail: Doc<"claimCollaborators">[] = [];
+    try {
+      const user = await ctx.db.get(userId);
+      const email = user?.email ? normalizeCollaboratorEmail(user.email) : null;
+      if (email) {
+        grantsByEmail = await ctx.db
+          .query("claimCollaborators")
+          .withIndex("by_email_and_status", (q) => q.eq("email", email).eq("status", "active"))
+          .take(50);
+      }
+    } catch {
+      grantsByEmail = [];
+    }
+    const seen = new Set<string>();
+    const merged: Doc<"claimCollaborators">[] = [];
+    for (const grant of [...(grantsByUser || []), ...(grantsByEmail || [])]) {
+      if (!grant || grant.status !== "active") continue;
+      const key = String(grant._id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(grant);
+    }
+    return merged;
+  } catch {
+    return [];
+  }
+}
 
 /**
  * Resolve authentic patient name, preventing [PATIENT REDACTED] placeholder leakage
@@ -132,12 +175,23 @@ export const search = query({
         .query("claims")
         .withIndex("by_claim_number", (q) => q.eq("claimNumber", trimmedQuery))
         .first();
-      if (
-        directMatch &&
-        (directMatch.userId !== userId ||
-          (args.status && args.status !== "all" && directMatch.status !== args.status))
-      ) {
-        directMatch = null;
+      if (directMatch) {
+        const isOwner = directMatch.userId === userId;
+        let isShared = false;
+        if (!isOwner) {
+          try {
+            const grants = await getActiveSharedGrants(ctx, userId);
+            isShared = grants.some((g) => String(g.claimId) === String(directMatch!._id));
+          } catch {
+            isShared = false;
+          }
+        }
+        if (
+          (!isOwner && !isShared) ||
+          (args.status && args.status !== "all" && directMatch.status !== args.status)
+        ) {
+          directMatch = null;
+        }
       }
     } catch {
       directMatch = null;
@@ -161,13 +215,43 @@ export const search = query({
       results = [];
     }
 
+    // 3. Shared cases matching the query text (bounded, client-filtered).
+    // Verified shared IDs gate the combine step below so unowned rows can
+    // never leak through a mocked or misconfigured search index.
+    const verifiedSharedIds = new Set<string>();
+    try {
+      const grants = await getActiveSharedGrants(ctx, userId);
+      for (const grant of grants.slice(0, 20)) {
+        verifiedSharedIds.add(String(grant.claimId));
+        if (results.length + 1 >= clampedLimit && directMatch) break;
+        try {
+          const shared = await ctx.db.get(grant.claimId);
+          if (!shared) continue;
+          if (args.status && args.status !== "all" && shared.status !== args.status) continue;
+          if (!matchesClaimSearch(shared, trimmedQuery.toLowerCase())) continue;
+          if (!results.some((c) => c._id === shared._id) && directMatch?._id !== shared._id) {
+            results.push(shared);
+          }
+        } catch {
+          continue;
+        }
+      }
+    } catch {
+      // Shared lookup is best-effort on mock runners.
+    }
+
     // Combine direct match and search results without duplicates
     const combined: Doc<"claims">[] = [];
     if (directMatch) {
       combined.push(directMatch);
     }
     for (const doc of results) {
-      if (!combined.some((c) => c._id === doc._id) && doc.userId === userId) {
+      if (combined.some((c) => c._id === doc._id)) continue;
+      if (doc.userId === userId) {
+        combined.push(doc);
+        continue;
+      }
+      if (verifiedSharedIds.has(String(doc._id))) {
         combined.push(doc);
       }
     }
@@ -287,6 +371,8 @@ export const list = query({
           isSyntheticPII: isDemo || claim.isSyntheticPII,
           dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
           origin: isDemo && claim.origin !== "demo-fixture" ? "demo-fixture" : claim.origin,
+          isShared: false,
+          accessRole: "owner" as const,
           patient: {
             _id: claim.patientId,
             name: patientName,
@@ -306,6 +392,29 @@ export const list = query({
 
     const effectiveLimit = Math.max(1, Math.min(args.limit ?? 100, 100));
     let claims: Doc<"claims">[];
+    const sharedRoleByClaimId = new Map<string, "editor" | "viewer">();
+    let sharedClaims: Doc<"claims">[] = [];
+    try {
+      const grants = await getActiveSharedGrants(ctx, userId);
+      const ids = grants.map((g) => g.claimId);
+      for (const grant of grants) {
+        if (!sharedRoleByClaimId.has(String(grant.claimId))) {
+          sharedRoleByClaimId.set(String(grant.claimId), grant.role);
+        }
+      }
+      const fetched: Doc<"claims">[] = [];
+      for (const claimId of ids.slice(0, 50)) {
+        try {
+          const doc = await ctx.db.get(claimId);
+          if (doc) fetched.push(doc);
+        } catch {
+          // Ignore unreadable shared rows on mock runners.
+        }
+      }
+      sharedClaims = fetched;
+    } catch {
+      sharedClaims = [];
+    }
 
     if (hasSearch || isCriticalDeadline) {
       // 1. Direct indexed match if search text matches an explicit claim number
@@ -318,7 +427,7 @@ export const list = query({
             .first();
           if (
             direct &&
-            direct.userId === userId &&
+            (direct.userId === userId || sharedRoleByClaimId.has(String(direct._id))) &&
             (!hasStatus || direct.status === args.status) &&
             (!hasPayer || direct.insurancePayer === args.payer)
           ) {
@@ -351,6 +460,31 @@ export const list = query({
         if (directClaimMatch && !filtered.some((c) => c._id === directClaimMatch!._id)) {
           filtered.unshift(directClaimMatch);
         }
+        const matchingShared = sharedClaims.filter((c) => {
+          if (args.includeDemo === false && (c.isDemo || c.dataOrigin === "demo-fixture" || c.origin === "demo-fixture")) {
+            return false;
+          }
+          if (hasStatus && c.status !== args.status) return false;
+          if (hasPayer && c.insurancePayer !== args.payer) return false;
+          if (isCriticalDeadline && !(c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost")) {
+            return false;
+          }
+          return matchesClaimSearch(c, trimmedSearch);
+        });
+        for (const shared of matchingShared) {
+          if (!filtered.some((c) => c._id === shared._id)) {
+            filtered.push(shared);
+          }
+        }
+      } else if (isCriticalDeadline) {
+        const matchingShared = sharedClaims.filter(
+          (c) => c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost"
+        );
+        for (const shared of matchingShared) {
+          if (!filtered.some((c) => c._id === shared._id)) {
+            filtered.push(shared);
+          }
+        }
       }
       claims = filtered.slice(0, effectiveLimit);
     } else {
@@ -363,6 +497,20 @@ export const list = query({
             c.origin !== "demo-fixture"
         );
       }
+      // Merge shared cases (bounded) so collaborators see invited matters.
+      for (const shared of sharedClaims) {
+        if (claims.length >= effectiveLimit) break;
+        if (claims.some((c) => c._id === shared._id)) continue;
+        if (hasStatus && shared.status !== args.status) continue;
+        if (hasPayer && shared.insurancePayer !== args.payer) continue;
+        if (
+          args.includeDemo === false &&
+          (shared.isDemo || shared.dataOrigin === "demo-fixture" || shared.origin === "demo-fixture")
+        ) {
+          continue;
+        }
+        claims.push(shared);
+      }
     }
 
     // Map denormalized patient data into the expected Claim shape without N+1 joins
@@ -374,6 +522,8 @@ export const list = query({
         claim.dataOrigin === "demo-fixture" ||
         claim.origin === "demo-fixture"
       );
+      const isShared = claim.userId !== userId;
+      const accessRole = isShared ? (sharedRoleByClaimId.get(String(claim._id)) || "viewer") : "owner";
 
       return {
         ...claim,
@@ -383,6 +533,8 @@ export const list = query({
         isSyntheticPII: isDemo || claim.isSyntheticPII,
         dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
         origin: isDemo && claim.origin !== "demo-fixture" ? "demo-fixture" : claim.origin,
+        isShared,
+        accessRole,
         patient: {
           _id: claim.patientId,
           name: patientName,
@@ -439,6 +591,17 @@ export const getById = query({
       claim.origin === "demo-fixture"
     );
 
+    let collaboratorCount = 0;
+    try {
+      const grants = await ctx.db
+        .query("claimCollaborators")
+        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+        .take(50);
+      collaboratorCount = grants.filter((g) => g.status === "active").length;
+    } catch {
+      collaboratorCount = 0;
+    }
+
     return {
       ...claim,
       isDemo,
@@ -449,6 +612,9 @@ export const getById = query({
       patient: resolvedPatient,
       evidenceCount,
       latestAppeal,
+      accessRole: authorized.accessRole,
+      isShared: authorized.accessRole !== "owner",
+      collaboratorCount,
     };
   },
 });
@@ -1435,7 +1601,7 @@ export const updateStatus = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     return await applyStatusUpdate(ctx, args);
   },
 });
@@ -2468,6 +2634,9 @@ export const cascadeDeleteAppealsBatchInternal = internalMutation({
         }
       }
       await ctx.db.delete(ap._id);
+      await ctx.scheduler.runAfter(0, internal.appealYjs.purgeAppealInternal, {
+        appealId: ap._id,
+      });
     }
 
     if (batch.length === 50) {
@@ -2649,7 +2818,7 @@ export const updatePayerContact = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     return await applyPayerContactUpdate(ctx, args);
   },
 });
@@ -2845,7 +3014,7 @@ export const updateAppealContext = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     return await applyAppealContextUpdate(ctx, args);
   },
 });
@@ -2901,7 +3070,7 @@ export const updateRedactionMetadata = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
 
     const now = Date.now();
     await ctx.db.patch(args.claimId, {
@@ -2933,7 +3102,7 @@ export const recordAuditLog = mutation({
     idempotencyKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireClaimOwner(ctx, args.claimId);
+    const { userId } = await requireClaimEditor(ctx, args.claimId);
 
     // Enforce claimWrite rate limiting per user
     try {
@@ -3016,7 +3185,7 @@ export const updateFinancialLiability = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
 
     const now = Date.now();
     await ctx.db.patch(args.claimId, {
@@ -3062,7 +3231,7 @@ export const updateErisaPenalties = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
 
     const now = Date.now();
     await ctx.db.patch(args.claimId, {

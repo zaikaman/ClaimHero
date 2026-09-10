@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
+import { getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
 
 export const getLatestByClaim = query({
   args: {
@@ -39,7 +39,7 @@ export const startSession = mutation({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
 
     const defaultChecklist = [
       {
@@ -115,7 +115,7 @@ export const appendTranscript = mutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
 
-    await requireClaimOwner(ctx, session.claimId);
+    await requireClaimEditor(ctx, session.claimId);
 
     const existingIndex = session.transcripts.findIndex((t) => t.id === args.transcriptItem.id);
     if (existingIndex >= 0) {
@@ -204,7 +204,7 @@ export const addFastAnswer = mutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
 
-    await requireClaimOwner(ctx, session.claimId);
+    await requireClaimEditor(ctx, session.claimId);
     await applyAddFastAnswer(ctx, args);
   },
 });
@@ -239,7 +239,7 @@ export const updateChecklist = mutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
 
-    await requireClaimOwner(ctx, session.claimId);
+    await requireClaimEditor(ctx, session.claimId);
 
     const updatedChecklist = session.checklistProgress.map((item) => {
       if (item.id === args.checklistId) {
@@ -273,7 +273,7 @@ export const completeSession = mutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
 
-    await requireClaimOwner(ctx, session.claimId);
+    await requireClaimEditor(ctx, session.claimId);
 
     const now = Date.now();
     await ctx.db.patch(args.sessionId, {
@@ -305,7 +305,7 @@ export const updateTranscriptSpeaker = mutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
 
-    await requireClaimOwner(ctx, session.claimId);
+    await requireClaimEditor(ctx, session.claimId);
 
     const updatedTranscripts = session.transcripts.map((t) => {
       if (t.id === args.transcriptId) {

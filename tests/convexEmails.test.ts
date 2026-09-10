@@ -61,7 +61,9 @@ describe("Convex Emails & Communications API", () => {
 
       const res = await (emails.listThreadsByClaim as any)._handler(mockCtx, { claimId: "c1" });
       expect(res).toEqual([]);
-      expect(mockCtx.db.query).not.toHaveBeenCalled();
+      const queriedTables = mockCtx.db.query.mock.calls.map((call: unknown[]) => call[0]);
+      expect(queriedTables).not.toContain("emailThreads");
+      expect(queriedTables).not.toContain("emailMessages");
     });
 
     it("listThreadsByClaimInternal: fetches threads without requiring auth session", async () => {
@@ -137,7 +139,9 @@ describe("Convex Emails & Communications API", () => {
 
       const res = await (emails.getThreadWithMessages as any)._handler(mockCtx, { threadId: "t1" });
       expect(res).toBeNull();
-      expect(mockCtx.db.query).not.toHaveBeenCalled();
+      const queriedTables = mockCtx.db.query.mock.calls.map((call: unknown[]) => call[0]);
+      expect(queriedTables).not.toContain("emailThreads");
+      expect(queriedTables).not.toContain("emailMessages");
     });
 
     it("getThreadWithMessagesInternal: returns null if thread not found", async () => {

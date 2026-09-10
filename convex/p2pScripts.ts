@@ -1,7 +1,7 @@
 import { internalMutation, internalQuery, mutation, query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
+import { getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
 
 /**
  * Get a P2P defense script by its ID, checking claim ownership
@@ -216,7 +216,7 @@ export const createOrUpdateScript = mutation({
     lastEditedBy: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<Id<"p2pScripts"> | null> => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     return await applyCreateOrUpdateScript(ctx, args);
   },
 });
@@ -281,7 +281,7 @@ export const saveScriptEdits = mutation({
       throw new Error(`P2P script ${args.scriptId} not found`);
     }
 
-    await requireClaimOwner(ctx, script.claimId);
+    await requireClaimEditor(ctx, script.claimId);
 
     const now = Date.now();
     await ctx.db.patch(args.scriptId, {

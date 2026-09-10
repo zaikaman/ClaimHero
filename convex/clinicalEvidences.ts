@@ -2,7 +2,7 @@ import { internalMutation, internalQuery, mutation, query, MutationCtx } from ".
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
+import { getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
 
 /**
  * Format and sanitize citation clauses into clean, concise identifiers
@@ -264,7 +264,7 @@ export const insertBatch = mutation({
     evidences: v.array(evidenceValidator),
   },
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">[]> => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     return await applyBatchInsert(ctx, args);
   },
 });
@@ -347,7 +347,7 @@ export const clearByClaim = mutation({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     await applyClearByClaim(ctx, args.claimId);
   },
 });
@@ -375,7 +375,7 @@ export const deleteEvidence = mutation({
     const evidence = await ctx.db.get(args.evidenceId);
     if (!evidence) return null;
 
-    await requireClaimOwner(ctx, evidence.claimId);
+    await requireClaimEditor(ctx, evidence.claimId);
 
     if (evidence.screenshotStorageId) {
       try {
@@ -474,7 +474,7 @@ const singleEvidenceArgs = {
 export const insertSingle = mutation({
   args: singleEvidenceArgs,
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">> => {
-    await requireClaimOwner(ctx, args.claimId);
+    await requireClaimEditor(ctx, args.claimId);
     return await applyInsertSingle(ctx, args);
   },
 });

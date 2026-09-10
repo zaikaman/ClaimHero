@@ -7,12 +7,12 @@
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://kindhearted-elephant-992.convex.cloud
-- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/workflow, @convex-dev/agent
+- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/workflow, @convex-dev/agent, @convex-dev/presence
 - **Convex features:** schema, tables, indexes, vector search, full-text search, queries, mutations, actions, HTTP actions, crons, scheduled functions, file storage, realtime queries, durable workflows, AI agent streaming
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-10T15:08:00Z
+- **Last updated:** 2026-09-10T17:03:01Z
 
 ## Log
 
@@ -1199,7 +1199,7 @@ Implemented backend architectural, performance, and credit-conservation hardenin
 ### 2026-09-10 - 7d4c26b
 Updated environment configuration and enhanced CI/CD workflows (`.github/workflows/ci.yml`, `.github/workflows/deploy.yml`, `.env.example`, `README.md`); expanded ERISA statutory evidence module (`convex/lib/erisaEvidence.ts`) with statutory notice requirements and citations.
 
-### 2026-09-10 - working tree
+### 2026-09-10 - 71e8f56
 Resolved sticky bottom progress action bar overlap with the console status footer:
 - Elevated fixed bottom action bars in `AppealStudio.tsx` and `EvidenceMatrix.tsx` from `bottom-0` to `bottom-7` (`28px`), docking flush above the `h-7` console status footer without visual occlusion or event collision.
 - Increased container scroll padding to `pb-28` across `AppealStudio.tsx` and `EvidenceMatrix.tsx`, guaranteeing clear visibility and clearance for all brief and evidence contents above the action bar.
@@ -1207,3 +1207,13 @@ Resolved sticky bottom progress action bar overlap with the console status foote
 - Added `print:hidden` to fixed workflow bars to ensure clean document printing.
 - Cleaned up Command Dialog input controls in `CommandDialog.tsx`, removing the redundant `X` clear icon next to `ESC` when typing queries, retaining the canonical `ESC` badge for clean dismissal across all devices.
 - Verified 751 passing unit tests across 46 suites, 0 typecheck errors, 0 lint warnings, and successful production build via `npm run verify`.
+
+### 2026-09-10 - working tree
+Shipped live case collaboration in the Appeal Studio with the presence component:
+- Registered `@convex-dev/presence` in `convex/convex.config.ts` and added an access-gated wrapper (`convex/presence.ts`) with `appeal:{claimId}` rooms; heartbeats verify owner/editor/viewer access server-side and presence payloads carry display metadata only, never PHI or brief content.
+- Added claim-level sharing via the `claimCollaborators` table (`convex/schema.ts`, `convex/claimCollaborators.ts`): owners invite by email as editor/viewer with immediate grants, role changes, revocation tombstones, voluntary leave, invite-link copying (`?claim=`), and audit log events.
+- Extended centralized authorization (`convex/lib/auth.ts`) with `getClaimAccessRole`, `requireClaimAccess`, `requireClaimEditor`, and editor-aware `requireClaimOwnerAction`; reads allow viewers, collaborative writes require editors, deletion and invite management stay owner-only across `claims.ts`, `appeals.ts`, `clinicalEvidences.ts`, `emails.ts`, `p2pScripts.ts`, `p2pCallSessions.ts`, `auditLogs.ts`, `chatbot.ts`, and `workflows.ts`. Shared cases merge into claim list, detail, and search with `isShared`/`accessRole` badges.
+- Built Studio presence UI (`CollaboratorPresence.tsx`, `ShareCaseModal.tsx`, `useClaimCollaborators.ts`): live avatar facepile with activity states (viewing/editing/synthesizing), simultaneous-edit warnings, team roster with online dots, viewer read-only mode with disabled editing/synthesis/escalation, and real-name autosave attribution. Shared badge added to `CaseRadar.tsx`.
+- Closed the live-sync gap presence alone left behind: same-document collaborator edits now auto-apply within seconds for idle editors with a "Teammate update applied" pulse, while editors with unsaved work get an explicit Load-theirs/Keep-mine conflict banner instead of a silent last-writer-wins overwrite (`src/lib/collabSync.ts` decision matrix, `useAppealStudio.ts` sync markers, `tests/collabSync.test.ts`).
+- Replaced last-writer-wins with true Yjs CRDT co-editing in the Studio: `appealYjsUpdates` op-log table with server-assigned clocks, `convex/appealYjs.ts` transport (incremental `getSync`, `pushUpdates`, OCC `seedAppealDoc` for legacy briefs, snapshotting `pushSnapshot` with bounded compaction, cascade `purgeAppealInternal`); `BriefSyncProvider` (`src/lib/yjsProvider.ts`) with offline-tolerant flush queue; textarea binder with cursor mapping, IME deferral, and collaborative undo (`src/lib/yjsBrief.ts`); per-revision sessions with edit gating until bootstrapped, read-only live view for viewers, and Live-sync status badge (`useAppealStudio.ts`, `AppealStudio.tsx`).
+- Verified 802 passing unit tests across 50 suites including `tests/collaboration.test.ts` (13 tests), `tests/collabSync.test.ts`, `tests/yjsBrief.test.ts` (cursor/diff/merge matrix), and `tests/appealYjs.test.ts` (transport auth, clocks, seeds, snapshots, purges), clean typecheck, clean lint, and production build via `npm run verify`. Convex features: components (`presence`), schema, indexes, queries, mutations.

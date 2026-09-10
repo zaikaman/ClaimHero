@@ -11,6 +11,7 @@ import username from "@convex-dev/auth/username/convex.config.js";
 import agentmail from "@agentmail/convex/convex.config";
 import workflow from "@convex-dev/workflow/convex.config";
 import agent from "@convex-dev/agent/convex.config";
+import presence from "@convex-dev/presence/convex.config";
 
 const app = defineApp({
   env: {
@@ -72,5 +73,6 @@ app.use(agentmail, {
 });
 app.use(workflow);
 app.use(agent);
+app.use(presence);
 
 export default app;

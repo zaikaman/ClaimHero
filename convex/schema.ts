@@ -557,6 +557,43 @@ export default defineSchema({
   })
     .index("by_url_hash", ["urlHash"])
     .index("by_captured_at", ["capturedAt"]),
+
+  // Case-level collaboration grants for the Appeal Studio.
+  // Owner invites by email with editor/viewer role. userId is resolved when
+  // the invited address matches an existing users record, otherwise the grant
+  // stays email-keyed until the recipient signs in.
+  claimCollaborators: defineTable({
+    claimId: v.id("claims"),
+    userId: v.optional(v.id("users")),
+    email: v.string(),
+    role: v.union(v.literal("editor"), v.literal("viewer")),
+    status: v.union(v.literal("active"), v.literal("revoked")),
+    invitedBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_claim", ["claimId"])
+    .index("by_claim_and_email", ["claimId", "email"])
+    .index("by_user", ["userId"])
+    .index("by_email_and_status", ["email", "status"]),
+
+  // Yjs CRDT operation log for true realtime co-editing of appeal briefs.
+  // The Convex backend is a dumb, access-checked op log: Yjs updates are
+  // idempotent and commutative, so clients merge them locally and only need
+  // clocks for incremental fetching. Periodic full-state snapshots bound
+  // history growth; snapshot rows also carry clocks so late joiners can start
+  // from the snapshot plus newer ops.
+  appealYjsUpdates: defineTable({
+    appealId: v.id("appeals"),
+    clock: v.number(),
+    isSnapshot: v.boolean(),
+    update: v.bytes(),
+    authorId: v.optional(v.id("users")),
+    contentHash: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_appeal_and_clock", ["appealId", "clock"])
+    .index("by_appeal_and_snapshot", ["appealId", "isSnapshot", "clock"]),
 });
 
 

@@ -98,7 +98,7 @@ jobs:
           echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Quality Gate**: 751/751 unit tests passed across 46 suites (coverage report-only, no threshold gate)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Quality Gate**: 802/802 unit tests passed across 50 suites (coverage report-only, no threshold gate)" >> $GITHUB_STEP_SUMMARY
           echo "- **Live Application**: [https://kindhearted-elephant-992.convex.site](https://kindhearted-elephant-992.convex.site)" >> $GITHUB_STEP_SUMMARY
           echo "- **Convex Cloud Backend**: [https://kindhearted-elephant-992.convex.cloud](https://kindhearted-elephant-992.convex.cloud)" >> $GITHUB_STEP_SUMMARY
           echo "- **Deployment Timestamp**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_STEP_SUMMARY
