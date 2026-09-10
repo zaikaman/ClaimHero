@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-10T14:42:00Z
+- **Last updated:** 2026-09-10T15:08:00Z
 
 ## Log
 
@@ -1185,7 +1185,7 @@ Hardened backend security, webhook replays, cron idempotency, query determinism,
 - P2-9 (`src/components/chat/SentinelChatbot.tsx`, `src/components/layout/Header.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/layout/Shell.tsx`, `index.html`): Added print stylesheet rules hiding sidebars, navigation, ambient canvas shaders, and chat overlays; added defense-in-depth CSP `frame-ancestors 'none'` and `X-Content-Type-Options: nosniff` headers and meta tags.
 - Testing & Verification (`tests/convexHttp.test.ts`): Added regression test coverage for 1MB payload caps (413) and fail-closed limiter errors (503). Verified 741 passing unit tests across 45 suites, 100% clean typecheck, 0 ESLint warnings, and successful production build. Convex features: httpAction, schema, indexes, queries, mutations, actions, rateLimiter.
 
-### 2026-09-10 - working tree
+### 2026-09-10 - e0ba6b9
 Implemented backend architectural, performance, and credit-conservation hardening across Convex queries, mutations, indexes, and external actions (D-1 through D-7):
 - Bounded Indexed Reads & Pagination Cursors (D-1): Replaced unbounded collect queries with indexed bounded take(n) across claims storage checks, clearDemoData, audit logs, clinical evidence retrieval, emails, and portfolio reset; added compound index `by_user_updated` on `claims` and `by_claim_time` / `by_claim_relevance` on `clinicalEvidences` and `emailMessages`.
 - Vector Payload Stripping & Retention Policies (D-2): Stripped 12KB embedding vectors from `hydrateByIds`, `listForReindex`, and lexical search mutations, setting `embedding_redacted: true`; added `retentionPolicy` and `retentionExpiresAt` fields to precedents schema with `applyRetentionPolicyInternal`.
@@ -1195,3 +1195,15 @@ Implemented backend architectural, performance, and credit-conservation hardenin
 - Firecrawl Policy Snapshot Caching (D-6): Added `policySnapshots` table with `by_url_hash` and `by_captured_at` indexes; cached raw markdown, extracted JSON, and visual evidence by SHA-256 URL hash in `scrapeFirecrawlPolicySource`, bypassing expensive external web crawls and conserving Firecrawl credits unless `autoRescanPolicies` is active or `forceRescan` is requested.
 - Visual Proof Screenshot Storage URL Resolution (D-7): Enforced strict rejection of raw base64 data URIs in `clinicalEvidences` database rows; visual proof screenshots are persisted exclusively in Convex File Storage and served via signed storage URLs.
 - Testing & Verification: Created `tests/backendOptimizationsD1D7.test.ts` covering D-1 through D-7; validated 751 passing unit tests across 46 test suites, clean typecheck, 0 ESLint warnings, and successful production build via `npm run verify`. Convex features: schema, indexes, queries, mutations, internalMutation, internalQuery, actions, storage, aggregates, rateLimiter.
+
+### 2026-09-10 - 7d4c26b
+Updated environment configuration and enhanced CI/CD workflows (`.github/workflows/ci.yml`, `.github/workflows/deploy.yml`, `.env.example`, `README.md`); expanded ERISA statutory evidence module (`convex/lib/erisaEvidence.ts`) with statutory notice requirements and citations.
+
+### 2026-09-10 - working tree
+Resolved sticky bottom progress action bar overlap with the console status footer:
+- Elevated fixed bottom action bars in `AppealStudio.tsx` and `EvidenceMatrix.tsx` from `bottom-0` to `bottom-7` (`28px`), docking flush above the `h-7` console status footer without visual occlusion or event collision.
+- Increased container scroll padding to `pb-28` across `AppealStudio.tsx` and `EvidenceMatrix.tsx`, guaranteeing clear visibility and clearance for all brief and evidence contents above the action bar.
+- Dynamically raised `OnboardingChecklist.tsx` to `bottom-24` (`96px`) on evidence and studio routes and `bottom-12` (`48px`) elsewhere, preventing HUD floating card overlaps with the action bar buttons.
+- Added `print:hidden` to fixed workflow bars to ensure clean document printing.
+- Cleaned up Command Dialog input controls in `CommandDialog.tsx`, removing the redundant `X` clear icon next to `ESC` when typing queries, retaining the canonical `ESC` badge for clean dismissal across all devices.
+- Verified 751 passing unit tests across 46 suites, 0 typecheck errors, 0 lint warnings, and successful production build via `npm run verify`.

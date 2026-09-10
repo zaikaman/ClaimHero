@@ -15,7 +15,6 @@ import {
   GearSix,
   Shield,
   ArrowRight,
-  X,
   Keyboard,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
@@ -631,21 +630,10 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
             onKeyDown={handleKeyDown}
             className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none font-sans"
           />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className="p-1 text-muted-foreground hover:text-foreground rounded mr-1 cursor-pointer transition-colors"
-              title="Clear search"
-              aria-label="Clear search query"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
           <button
             type="button"
             onClick={onClose}
-            className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors cursor-pointer"
+            className="inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors cursor-pointer shrink-0"
             title="Press ESC to close"
             aria-label="Close command dialog"
           >

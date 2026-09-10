@@ -151,7 +151,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   };
 
   return (
-    <div className="space-y-4 animate-fadeIn pb-16">
+    <div className="space-y-4 animate-fadeIn pb-28">
       {/* 4-Step Guided Sentinel Stepper */}
       <SentinelFlowStepper
         claim={claim}
@@ -692,7 +692,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       </div>
 
       {/* Sticky Bottom Next-Step Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background/95 backdrop-blur-md p-3 px-4 sm:px-8 flex items-center justify-between shadow-lg">
+      <div className="fixed bottom-7 left-0 right-0 z-20 border-t border-border bg-background/95 backdrop-blur-md p-3 px-4 sm:px-8 flex items-center justify-between shadow-lg print:hidden">
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="font-mono text-xs hidden sm:inline-flex">
             Step 1 of 3: Evidence & CPB

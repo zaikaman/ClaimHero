@@ -21,6 +21,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Progress } from "../ui/progress";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { cn } from "../../lib/utils";
 
 interface OnboardingChecklistProps {
   currentView: NavigationView;
@@ -140,10 +141,13 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
 
   if (isDismissed) return null;
 
+  const hasWorkflowBottomBar = currentView === "evidence" || currentView === "studio";
+  const bottomPositionClass = hasWorkflowBottomBar ? "bottom-24" : "bottom-12";
+
   // Minimized Floating Button
   if (isMinimized) {
     return (
-      <div className="fixed bottom-16 right-5 z-40 animate-fadeIn">
+      <div className={cn("fixed right-5 z-40 animate-fadeIn", bottomPositionClass)}>
         <Button
           variant="outline"
           size="sm"
@@ -164,7 +168,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
   }
 
   return (
-    <Card className="fixed bottom-16 right-5 z-40 w-[340px] sm:w-[370px] bg-card/95 border-border shadow-2xl backdrop-blur-md overflow-hidden text-left p-0 animate-blur-fade-up no-print">
+    <Card className={cn("fixed right-5 z-40 w-[340px] sm:w-[370px] bg-card/95 border-border shadow-2xl backdrop-blur-md overflow-hidden text-left p-0 animate-blur-fade-up no-print", bottomPositionClass)}>
 
       
       {/* Header Bar */}
