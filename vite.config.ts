@@ -17,4 +17,16 @@ export default defineConfig({
   optimizeDeps: {
     include: ["three", "@react-three/fiber"],
   },
+  build: {
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/three") || id.includes("node_modules/@react-three")) {
+            return "three-bundle";
+          }
+        },
+      },
+    },
+  },
 });

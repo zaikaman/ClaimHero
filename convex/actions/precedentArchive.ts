@@ -2,7 +2,7 @@
 
 import { action, internalAction } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { createEmbedding } from "../lib/openai";
@@ -398,12 +398,14 @@ export const hybridSearchPrecedents = action({
         key: `precedent_search_${userId}`,
       });
       if (!limitStatus.ok) {
-        throw new Error(
-          `Rate limit reached for precedent search. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
-        );
+        throw new ConvexError({
+          code: "RATE_LIMITED",
+          status: 429,
+          message: `Rate limit reached for precedent search. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`,
+        });
       }
     } catch (rateErr) {
-      if (rateErr instanceof Error && rateErr.message.includes("Rate limit reached")) {
+      if (rateErr instanceof ConvexError || (rateErr instanceof Error && rateErr.message.includes("Rate limit reached"))) {
         throw rateErr;
       }
       // Tolerate unconfigured rate limiter in isolated unit test mocks where the component is unmounted.

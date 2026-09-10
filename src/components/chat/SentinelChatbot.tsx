@@ -330,10 +330,11 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        className="select-none group no-print"
+        className="select-none group no-print print:hidden"
       >
         <button
           type="button"
+          aria-label="Open Sentinel Copilot assistant (shortcut Cmd+J)"
           className={`relative w-[60px] h-[60px] rounded-full flex items-center justify-center backdrop-blur-2xl transition-all cursor-grab active:cursor-grabbing ${
             isOpen
               ? "bg-zinc-900 text-zinc-100 border border-white/25 shadow-2xl scale-105"
@@ -377,7 +378,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
       {isOpen && (
         <Card
           style={chatWindowStyle}
-          className="fixed z-50 bg-card/95 border-border shadow-2xl backdrop-blur-2xl flex flex-col rounded-2xl overflow-hidden p-0 animate-blur-fade-up border no-print"
+          className="fixed z-50 bg-card/95 border-border shadow-2xl backdrop-blur-2xl flex flex-col rounded-2xl overflow-hidden p-0 animate-blur-fade-up border no-print print:hidden"
         >
           {/* Header Bar (also acts as secondary drag handle) */}
           <div className="px-3.5 py-2.5 border-b border-border/80 flex items-center justify-between bg-card/90 backdrop-blur-md select-none">
@@ -534,7 +535,11 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                         }`}
                       >
                         {isAssistant ? (
-                          <div className="prose prose-invert prose-xs max-w-none text-foreground space-y-2">
+                          <div
+                            className="prose prose-invert prose-xs max-w-none text-foreground space-y-2"
+                            aria-live={msg.isStreaming ? "polite" : undefined}
+                            aria-atomic="false"
+                          >
                             {msg.content ? (
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
@@ -604,7 +609,11 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                 {/* Single Thinking State - only shown if backend action is in flight before streaming message appears */}
                 {isSending && !messages.some((m) => m.role === "assistant" && m.isStreaming) && (
                   <div className="flex flex-col items-start space-y-1">
-                    <div className="bg-muted/30 text-foreground border border-border/80 rounded-xl rounded-bl-xs p-3 max-w-[92%] shadow-sm">
+                    <div
+                      className="bg-muted/30 text-foreground border border-border/80 rounded-xl rounded-bl-xs p-3 max-w-[92%] shadow-sm"
+                      aria-live="polite"
+                      aria-atomic="false"
+                    >
                       <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-mono py-0.5">
                         <CircleNotch className="size-3.5 animate-spin text-primary shrink-0" />
                         <span className="text-primary/90">Analyzing clinical guidelines & precedents...</span>
@@ -624,6 +633,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                 ref={textareaRef}
                 rows={1}
                 value={input}
+                aria-label="Ask Sentinel clinical, legal, or CPB questions"
                 onChange={(e) => {
                   setInput(e.target.value);
                   e.target.style.height = "auto";
@@ -643,6 +653,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                 size="icon-xs"
                 onClick={handleSend}
                 disabled={!input.trim() || isSending}
+                aria-label="Send message"
                 className="size-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 shrink-0 transition-transform active:scale-95 cursor-pointer flex items-center justify-center"
                 title="Send message (Enter)"
               >

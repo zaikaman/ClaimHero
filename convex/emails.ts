@@ -1,9 +1,10 @@
 import { internalMutation, internalQuery, mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { OutboundId } from "@agentmail/convex";
 import type { Doc, Id } from "./_generated/dataModel";
 import { components, internal } from "./_generated/api";
 import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner } from "./lib/auth";
+import { rateLimiter } from "./lib/rateLimiter";
 
 /**
  * Internal helper to query threads for a claim
@@ -1007,7 +1008,25 @@ export const dismissAutoReplyDraft = mutation({
     messageId: v.id("emailMessages"),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    const { userId } = await requireClaimOwner(ctx, args.claimId);
+
+    // Enforce claimWrite rate limiting
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "claimWrite", { key: userId });
+      if (!limitStatus.ok) {
+        throw new ConvexError({
+          code: "RATE_LIMITED",
+          status: 429,
+          message: `Claim write rate limit exceeded. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)}s.`,
+        });
+      }
+    } catch (rateErr) {
+      if (rateErr instanceof ConvexError) throw rateErr;
+      if (process.env.NODE_ENV !== "test") {
+        console.warn("[RateLimiter] Unexpected error checking claimWrite rate limit:", rateErr);
+      }
+    }
+
     const msg = await ctx.db.get(args.messageId);
     if (!msg || msg.claimId !== args.claimId) {
       throw new Error("Message not found or mismatch with claim");

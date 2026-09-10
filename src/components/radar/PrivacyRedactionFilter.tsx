@@ -409,6 +409,7 @@ export const PrivacyRedactionFilter: React.FC<PrivacyRedactionFilterProps> = ({
             <Input
               value={newCustomTerm}
               onChange={(e) => setNewCustomTerm(e.target.value)}
+              aria-label="Add custom sensitive phrase to redact"
               placeholder="Add custom sensitive phrase to redact (e.g. clinic name, employer, relative)..."
               className="h-8 text-xs font-sans"
             />

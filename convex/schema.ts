@@ -359,6 +359,7 @@ export default defineSchema({
   })
     .index("by_claim", ["claimId"])
     .index("by_claim_and_timestamp", ["claimId", "timestamp"])
+    .index("by_claim_event", ["claimId", "eventType", "timestamp"])
     .index("by_user_and_timestamp", ["userId", "timestamp"])
     .index("by_timestamp", ["timestamp"]),
 

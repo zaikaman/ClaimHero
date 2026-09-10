@@ -140,6 +140,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
             <MagnifyingGlass className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
             <Input
               type="text"
+              aria-label="Search clauses"
               placeholder="Search clauses..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}

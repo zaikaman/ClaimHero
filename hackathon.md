@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-10T14:05:00Z
+- **Last updated:** 2026-09-10T14:24:00Z
 
 ## Log
 
@@ -1162,7 +1162,7 @@ Eliminated fabricated clinical facts and hardcoded confidence from deterministic
 - Safety & Persistence Invariant: Guaranteed that fallback `chartProof` and simulation answers are never persisted as factual clinical facts in `claims.appealContext.clinicalFacts` and do not artificially inflate live call momentum win scores.
 - Testing & Verification: Added regression tests in `tests/actionsP2PAndChatbot.test.ts` and `tests/p2pLiveCopilot.test.ts` validating fallback simulation-only behavior, absence of fabricated facts, grounded confidence scoring, and UI badging logic. Verified 726 passing tests across 42 suites, 100% clean typecheck, clean ESLint, and production build via `npm run verify`. Convex features: actions, mutations.
 
-### 2026-09-10 - working tree
+### 2026-09-10 - 980bcd0
 Resolved P1-13 through P1-18 across frontend routing, onboarding lifecycle, liability defaults, communications gateway, shortcuts registry, and URL state:
 - P1-13 (`src/hooks/useRouterView.ts`, `src/components/common/NotFoundWorkspace.tsx`, `src/App.tsx`): Eliminated route collapsing where arbitrary `/app...` and unknown paths defaulted to `radar`; added `notFound` view and restricted routing strictly to exact `PATH_TO_VIEW_MAP` keys, rendering a precision medical 404 screen.
 - P1-14 (`src/App.tsx`, `src/components/landing/CinematicHero.tsx`): Gated initial onboarding wizard auto-open strictly on active dashboard views to prevent modal disruption on landing/login; added explicit "Setup Guide" CTA for logged-out users in the landing navbar and hero actions.
@@ -1171,3 +1171,16 @@ Resolved P1-13 through P1-18 across frontend routing, onboarding lifecycle, liab
 - P1-17 (`src/lib/shortcuts.ts`, `src/components/common/ShortcutsHelpDialog.tsx`, `src/components/layout/Shell.tsx`, `src/components/common/CommandDialog.tsx`): Created central shortcut registry and status footer documenting `⌘K`, `⌘B`, `⌘J`, `S`, and `?`, with full cheatsheet dialog and input focus guards.
 - P1-18 (`src/hooks/useRouterView.ts`, `src/App.tsx`): Synchronized active `selectedClaimId` to the `?claim=` query parameter, preserving query state during view transitions and restoring case context on page refresh and browser back/forward.
 - Testing & Verification (`tests/routerAndUrlSync.test.ts`, `tests/liabilityDefaultsEmptyState.test.ts`, `tests/shortcutsRegistry.test.ts`): Added 13 dedicated unit tests; verified 739 passing tests across 45 suites, clean typecheck, clean lint, and production build via `npm run verify`.
+
+### 2026-09-10 - working tree
+Hardened backend security, webhook replays, cron idempotency, query determinism, rate limiting, bundle splitting, accessibility, and print security (P2-1 through P2-9):
+- P2-1 (`convex/http.ts`): Enforced 1MB payload ceiling on AgentMail webhook endpoints with early 413 response; replaced fail-open limiter catch block with fail-closed 503 response on rate-limiter failure.
+- P2-2 (`convex/lib/agentMailWebhook.ts`): Rejected webhook replay attempts older than 7 days (`ageSec > 7 * 86400`) with 401 error, while maintaining idempotent acceptance within the 7-day replay window.
+- P2-3 (`convex/schema.ts`, `convex/claims.ts`): Added compound index `by_claim_event` (`["claimId", "eventType", "timestamp"]`) on `appealAuditLogs` and deduplicated daily statutory deadline sweep to prevent redundant `statutory_alarm_critical` audit events within 24 hours.
+- P2-4 (`convex/settings.ts`): Removed non-deterministic `Date.now()` wall-clock timestamp and synthesized `_id: "default"` fallback from `getSettings` query.
+- P2-5 (`convex/lib/rateLimiter.ts`, `convex/chatbot.ts`, `convex/claims.ts`, `convex/emails.ts`, `convex/actions/precedentArchive.ts`): Added `chatMessage` (30/min) and `claimWrite` (40/min) token-bucket limits, enforcing 429 ConvexError codes across chatbot messaging, audit logging, auto-reply dismissal, and hybrid precedent search.
+- P2-6 (`tailwind.config.js`): Added 'Inter' font family token to `fontFamily.sans`.
+- P2-7 (`vite.config.ts`): Isolated Three.js into dedicated `three-bundle` manual chunk (832 kB) loaded on demand by dynamic Silk shader, keeping landing hero and dashboard lightweight.
+- P2-8 (`src/components/common/CommandDialog.tsx`, `src/components/chat/SentinelChatbot.tsx`, `src/components/evidence/PolicyViewer.tsx`, `src/components/radar/PrivacyRedactionFilter.tsx`): Enhanced keyboard navigation and screen-reader accessibility with ARIA combobox/listbox/option attributes, Tab focus cycle traps, `aria-live="polite"` on streaming responses, and descriptive `aria-label` attributes.
+- P2-9 (`src/components/chat/SentinelChatbot.tsx`, `src/components/layout/Header.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/layout/Shell.tsx`, `index.html`): Added print stylesheet rules hiding sidebars, navigation, ambient canvas shaders, and chat overlays; added defense-in-depth CSP `frame-ancestors 'none'` and `X-Content-Type-Options: nosniff` headers and meta tags.
+- Testing & Verification (`tests/convexHttp.test.ts`): Added regression test coverage for 1MB payload caps (413) and fail-closed limiter errors (503). Verified 741 passing unit tests across 45 suites, 100% clean typecheck, 0 ESLint warnings, and successful production build. Convex features: httpAction, schema, indexes, queries, mutations, actions, rateLimiter.

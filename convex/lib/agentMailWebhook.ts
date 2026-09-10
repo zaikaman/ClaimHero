@@ -493,12 +493,19 @@ export async function verifySvixWebhook(
   const ageSec = nowSec - timestampNum;
   if (Math.abs(ageSec) > toleranceInSeconds) {
     if (ageSec > 0) {
-      // Authentic signature with an old timestamp: this is a provider retry
+      // Reject stale replays exceeding 7 days (604,800 seconds) to prevent unbounded replay attacks
+      const MAX_STALE_TOLERANCE_SECONDS = 7 * 24 * 60 * 60;
+      if (ageSec > MAX_STALE_TOLERANCE_SECONDS) {
+        return {
+          valid: false,
+          error: `Webhook timestamp expired: replay exceeds maximum allowed window of 7 days (${ageSec}s old)`,
+          timestampAgeSec: ageSec,
+        };
+      }
+      // Authentic signature with an old timestamp within 7 days: this is a provider retry
       // reusing the original timestamp, or a late first delivery after an
       // outage. The inbound pipeline is idempotent on AgentMail message ID,
       // so the caller should process it normally and acknowledge with 2xx.
-      // Returning 401 here would cause the provider to retry forever,
-      // producing a permanent 401 storm in the logs.
       return { valid: true, stale: true, timestampAgeSec: ageSec };
     }
     return { valid: false, error: `Webhook timestamp outside allowed tolerance of ${toleranceInSeconds} seconds` };

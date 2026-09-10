@@ -4,7 +4,6 @@ import { v } from "convex/values";
 import { getAuthUserId, requireAuthUser } from "./lib/auth";
 import { claimsAggregate } from "./lib/aggregates";
 import { rateLimiter } from "./lib/rateLimiter";
-import { Id } from "./_generated/dataModel";
 
 export const DEFAULT_ADVOCATE_PROFILE = {
   name: "Dr. Sarah Chen, MD, FACP",
@@ -22,12 +21,12 @@ export const DEFAULT_USER_SETTINGS = {
   autoRescanPolicies: true,
   criticalDeadlineAlerts: true,
   advocateProfile: DEFAULT_ADVOCATE_PROFILE,
-  lastSyncTimestamp: Date.now(),
 };
 
 /**
  * Returns the authenticated user's settings or standard defaults.
  * Returns null when unauthenticated to match sibling query contracts.
+ * Returns defaults without synthetic _id/_creationTime to preserve pure caching determinism.
  */
 export const getSettings = query({
   args: {},
@@ -47,8 +46,6 @@ export const getSettings = query({
     }
 
     return {
-      _id: "default" as unknown as Id<"userSettings">,
-      _creationTime: Date.now(),
       userId,
       ...DEFAULT_USER_SETTINGS,
     };

@@ -1,6 +1,7 @@
 import { query, mutation, internalQuery, internalMutation, MutationCtx } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import type { Id, Doc } from "./_generated/dataModel";
+import { rateLimiter } from "./lib/rateLimiter";
 import {
   getChatbotSessionIfAuthorized,
   requireAuthUser,
@@ -195,7 +196,27 @@ export const addMessage = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    await requireChatbotSessionOwner(ctx, args.sessionId);
+    const { userId } = await requireChatbotSessionOwner(ctx, args.sessionId);
+
+    // Enforce chatMessage rate limiting per user/session
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "chatMessage", {
+        key: userId || args.sessionId,
+      });
+      if (!limitStatus.ok) {
+        throw new ConvexError({
+          code: "RATE_LIMITED",
+          status: 429,
+          message: `Chat message rate limit exceeded. Please wait ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)}s before sending another message.`,
+        });
+      }
+    } catch (rateErr) {
+      if (rateErr instanceof ConvexError) throw rateErr;
+      if (process.env.NODE_ENV !== "test") {
+        console.warn("[RateLimiter] Unexpected error checking chatMessage rate limit:", rateErr);
+      }
+    }
+
     return await applyAddMessage(ctx, args);
   },
 });

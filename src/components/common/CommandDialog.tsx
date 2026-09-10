@@ -20,7 +20,7 @@ import {
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
-import { Dialog, DialogContent } from "../ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import { NavigationView } from "../layout/Sidebar";
 import { BrandIcon } from "./BrandLogo";
@@ -582,6 +582,14 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActiveIndex((prev) => (prev - 1 + flatNavItems.length) % flatNavItems.length);
+    } else if (e.key === "Tab") {
+      // Focus trap: cycle within command palette options without escaping dialog boundary
+      e.preventDefault();
+      if (e.shiftKey) {
+        setActiveIndex((prev) => (prev - 1 + flatNavItems.length) % flatNavItems.length);
+      } else {
+        setActiveIndex((prev) => (prev + 1) % flatNavItems.length);
+      }
     } else if (e.key === "Enter") {
       e.preventDefault();
       const currentItem = flatNavItems[activeIndex];
@@ -597,8 +605,14 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
+        aria-modal="true"
+        aria-labelledby="command-palette-title"
         className="p-0 max-w-xl overflow-hidden gap-0 border-border shadow-xl"
       >
+        <DialogTitle id="command-palette-title" className="sr-only">
+          Command Palette and Navigation
+        </DialogTitle>
+
         {/* Search Input Bar */}
         <div className="flex items-center border-b border-border px-3 py-2.5">
           <MagnifyingGlass className="size-4 text-muted-foreground mr-2 shrink-0" />
@@ -606,6 +620,11 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
             ref={inputRef}
             autoFocus
             type="text"
+            role="combobox"
+            aria-expanded={true}
+            aria-controls="command-results-list"
+            aria-autocomplete="list"
+            aria-label="Search claims, clinical codes, or platform actions"
             placeholder="Type a claim #, patient, CPT code, or action..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -618,20 +637,28 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
               onClick={() => setQuery("")}
               className="p-1 text-muted-foreground hover:text-foreground rounded mr-1 cursor-pointer transition-colors"
               title="Clear search"
+              aria-label="Clear search query"
             >
               <X className="size-3.5" />
             </button>
           )}
           <button
+            type="button"
             onClick={onClose}
             className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors cursor-pointer"
             title="Press ESC to close"
+            aria-label="Close command dialog"
           >
             ESC
           </button>
         </div>
 
-        <div className="max-h-[420px] overflow-y-auto p-2 space-y-3">
+        <div
+          role="listbox"
+          id="command-results-list"
+          aria-label="Command search results"
+          className="max-h-[420px] overflow-y-auto p-2 space-y-3"
+        >
           {/* Empty State when searching with zero results */}
           {isSearching && totalMatches === 0 && (
             <div className="py-8 px-4 text-center space-y-2">
@@ -662,6 +689,9 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                 return (
                   <div
                     key={claim._id}
+                    role="option"
+                    aria-selected={isSelected}
+                    tabIndex={-1}
                     onClick={() => handleSelectClaim(claim._id, "radar")}
                     onMouseEnter={() => itemIndex >= 0 && setActiveIndex(itemIndex)}
                     className={cn(
@@ -703,30 +733,36 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
 
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setCaseToDelete(claim);
                         }}
                         className="p-1.5 text-[10px] rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
                         title="Delete this case"
+                        aria-label={`Delete claim ${claim.claimNumber}`}
                       >
                         <Trash className="size-3.5" />
                       </button>
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleSelectClaim(claim._id, "evidence");
                         }}
                         className="px-2 py-1 text-[10px] rounded bg-muted hover:bg-secondary text-foreground font-mono cursor-pointer"
+                        aria-label={`Open evidence matrix for claim ${claim.claimNumber}`}
                       >
                         Evidence
                       </button>
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleSelectClaim(claim._id, "studio");
                         }}
                         className="px-2 py-1 text-[10px] rounded bg-primary text-primary-foreground font-mono cursor-pointer flex items-center gap-1"
+                        aria-label={`Open appeal studio for claim ${claim.claimNumber}`}
                       >
                         <span>Studio</span>
                         <ArrowRight className="size-2.5" />
@@ -785,12 +821,15 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                     const isSelected = itemIndex === activeIndex;
 
                     return (
-                      <div
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
                         key={action.id}
                         onClick={action.onExecute}
                         onMouseEnter={() => itemIndex >= 0 && setActiveIndex(itemIndex)}
                         className={cn(
-                          "flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer transition-all duration-150 group border",
+                          "w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left cursor-pointer transition-all duration-150 group border",
                           isSelected
                             ? "bg-muted/90 border-border text-foreground ring-1 ring-primary/25 shadow-sm"
                             : "hover:bg-muted/70 border-transparent text-muted-foreground hover:text-foreground"
@@ -832,7 +871,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                             </kbd>
                           </span>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -893,12 +932,15 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                     const isSelected = itemIndex === activeIndex;
 
                     return (
-                      <div
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
                         key={action.id}
                         onClick={action.onExecute}
                         onMouseEnter={() => itemIndex >= 0 && setActiveIndex(itemIndex)}
                         className={cn(
-                          "flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer transition-all duration-150 group border",
+                          "w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left cursor-pointer transition-all duration-150 group border",
                           isSelected
                             ? "bg-muted/90 border-border text-foreground ring-1 ring-primary/25 shadow-sm"
                             : "hover:bg-muted/70 border-transparent text-muted-foreground hover:text-foreground"
@@ -940,7 +982,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                             </kbd>
                           </span>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -969,7 +1011,10 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                   const isSelected = itemIndex === activeIndex;
 
                   return (
-                    <div
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
                       key={action.id}
                       onClick={action.onExecute}
                       onMouseEnter={() => itemIndex >= 0 && setActiveIndex(itemIndex)}
@@ -1018,7 +1063,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                           </kbd>
                         </span>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>

@@ -1,6 +1,6 @@
 import { MutationCtx, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { claimsAggregate } from "./lib/aggregates";
@@ -1788,14 +1788,43 @@ async function executeSweepDeadlinesBatch(
       batchUpdated++;
 
       if (exactRemaining <= 14 && claim.daysRemaining > 14) {
-        batchCritical++;
-        await ctx.db.insert("appealAuditLogs", {
-          claimId: claim._id,
-          eventType: "statutory_alarm_critical",
-          actor: "Statutory Deadline Sentinel",
-          details: `CRITICAL ALARM: Only ${exactRemaining} days remaining before statutory ERISA appeal clock expires for claim ${claim.claimNumber}.`,
-          timestamp: now,
-        });
+        // Deduplication check: verify no statutory_alarm_critical was already logged for this claim within the last 24 hours
+        const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
+        let recentAlarm: unknown = null;
+        try {
+          if (typeof ctx.db.query("appealAuditLogs").withIndex === "function") {
+            recentAlarm = await ctx.db
+              .query("appealAuditLogs")
+              .withIndex("by_claim_event", (q) =>
+                q.eq("claimId", claim._id).eq("eventType", "statutory_alarm_critical").gte("timestamp", twentyFourHoursAgo)
+              )
+              .first();
+          }
+        } catch {
+          // Fallback for mock environments / older index bindings
+          recentAlarm = await ctx.db
+            .query("appealAuditLogs")
+            .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+            .filter((q) =>
+              q.and(
+                q.eq(q.field("eventType"), "statutory_alarm_critical"),
+                q.gte(q.field("timestamp"), twentyFourHoursAgo)
+              )
+            )
+            .first();
+        }
+
+        if (!recentAlarm) {
+          batchCritical++;
+          await ctx.db.insert("appealAuditLogs", {
+            claimId: claim._id,
+            ...(claim.userId ? { userId: claim.userId } : {}),
+            eventType: "statutory_alarm_critical",
+            actor: "Statutory Deadline Sentinel",
+            details: `CRITICAL ALARM: Only ${exactRemaining} days remaining before statutory ERISA appeal clock expires for claim ${claim.claimNumber}.`,
+            timestamp: now,
+          });
+        }
       }
     }
   }
@@ -2877,11 +2906,29 @@ export const recordAuditLog = mutation({
     details: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireClaimOwner(ctx, args.claimId);
+    const { userId } = await requireClaimOwner(ctx, args.claimId);
+
+    // Enforce claimWrite rate limiting per user
+    try {
+      const limitStatus = await rateLimiter.limit(ctx, "claimWrite", { key: userId });
+      if (!limitStatus.ok) {
+        throw new ConvexError({
+          code: "RATE_LIMITED",
+          status: 429,
+          message: `Claim write rate limit exceeded. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)}s.`,
+        });
+      }
+    } catch (rateErr) {
+      if (rateErr instanceof ConvexError) throw rateErr;
+      if (process.env.NODE_ENV !== "test") {
+        console.warn("[RateLimiter] Unexpected error checking claimWrite rate limit:", rateErr);
+      }
+    }
 
     const timestamp = Date.now();
     const logId = await ctx.db.insert("appealAuditLogs", {
       claimId: args.claimId,
+      userId,
       eventType: args.eventType,
       actor: args.actor,
       details: args.details,

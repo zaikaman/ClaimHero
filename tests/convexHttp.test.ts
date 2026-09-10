@@ -22,6 +22,7 @@ describe("Convex HTTP Router & Webhook Endpoints", () => {
     process.env = { ...originalEnv };
     vi.clearAllMocks();
     vi.restoreAllMocks();
+    vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
   });
 
   const getHandler = (path = "/agentmail-webhook") => {
@@ -243,6 +244,56 @@ describe("Convex HTTP Router & Webhook Endpoints", () => {
     expect(response.status).toBe(500);
     const body = await response.json();
     expect(body.error).toBe("Internal server error");
+  });
+
+  it("returns 413 when webhook payload exceeds 1MB cap", async () => {
+    process.env.AGENTMAIL_WEBHOOK_SECRET = "whsec_test123";
+    const handler = getHandler();
+    const mockReq = new Request("http://localhost/agentmail-webhook", {
+      method: "POST",
+      headers: {
+        "content-length": "2000000",
+        "svix-id": "msg_large",
+        "svix-timestamp": `${Math.floor(Date.now() / 1000)}`,
+        "svix-signature": "v1,dummy",
+      },
+      body: JSON.stringify({ data: "too large" }),
+    });
+    const mockCtx: any = { scheduler: { runAfter: vi.fn() } };
+
+    const response = await handler(mockCtx, mockReq);
+    expect(response.status).toBe(413);
+    const body = await response.json();
+    expect(body.error).toContain("Payload exceeds 1MB limit");
+  });
+
+  it("returns 503 fail-closed when rate limiter encounters an internal error", async () => {
+    process.env.AGENTMAIL_WEBHOOK_SECRET = "whsec_test123";
+    vi.spyOn(agentMailWebhook, "verifySvixWebhook").mockResolvedValue({ valid: true });
+    vi.spyOn(agentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+      eventType: "message.received",
+      eventId: "evt_reply",
+      messageId: "msg_reply",
+      inboxId: "inbox_case_456",
+      from: "payer@example.com",
+      recipients: ["case-456@claimhero.com"],
+      subject: "Re: Appeal Overturned",
+      text: "We have approved the claim",
+      attachments: [],
+    });
+    vi.spyOn(rateLimiter, "limit").mockRejectedValue(new Error("Redis / DB connection severed"));
+
+    const handler = getHandler();
+    const mockReq = new Request("http://localhost/agentmail-webhook", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    const mockCtx: any = { scheduler: { runAfter: vi.fn() } };
+
+    const response = await handler(mockCtx, mockReq);
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body.error).toContain("Service temporarily unavailable");
   });
 
   describe("Official /agentmail/webhook component endpoint", () => {

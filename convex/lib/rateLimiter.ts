@@ -79,6 +79,20 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 20,
   },
+  // Chatbot conversation messages (burst: 30, rate: 30/min)
+  chatMessage: {
+    kind: "token bucket",
+    rate: 30,
+    period: MINUTE,
+    capacity: 30,
+  },
+  // Hot claim mutations such as audit logging and draft dismissals (burst: 40, rate: 40/min)
+  claimWrite: {
+    kind: "token bucket",
+    rate: 40,
+    period: MINUTE,
+    capacity: 40,
+  },
   // Denial document attachment upload URL generation (burst: 10, rate: 10/min)
   fileUpload: {
     kind: "token bucket",

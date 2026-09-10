@@ -68,9 +68,9 @@ export const Shell: React.FC<ShellProps> = ({
   }, [handleOpenShortcuts]);
 
   return (
-    <div className="relative flex h-screen w-full flex-col bg-background text-foreground antialiased overflow-hidden">
+    <div className="relative flex h-screen w-full flex-col bg-background text-foreground antialiased overflow-hidden print:h-auto print:overflow-visible">
       {/* Ambient Silk Shader Dynamic Canvas Background */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none print:hidden">
         <div className="absolute -top-[10%] -left-[10%] w-[120vw] h-[120vh] opacity-45 dark:opacity-35 transition-opacity duration-700">
           <Suspense fallback={<div className="w-full h-full bg-background" />}>
             <LazySilk
@@ -99,7 +99,7 @@ export const Shell: React.FC<ShellProps> = ({
       />
 
       {/* Main Workspace Layout */}
-      <div className="relative z-10 flex flex-1 overflow-hidden">
+      <div className="relative z-10 flex flex-1 overflow-hidden print:overflow-visible print:block">
         <Sidebar
           currentView={currentView}
           onSelectView={onSelectView}
@@ -112,13 +112,13 @@ export const Shell: React.FC<ShellProps> = ({
           onDeleteCase={onDeleteCase}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 print:overflow-visible print:p-0">
           <div className="mx-auto max-w-7xl min-h-full flex flex-col">{children}</div>
         </main>
       </div>
 
       {/* Precision Medical Console Status & Shortcuts Footer */}
-      <footer className="relative z-20 h-7 shrink-0 border-t border-border/50 bg-background/80 backdrop-blur-md px-4 flex items-center justify-between text-[11px] text-muted-foreground select-none font-mono">
+      <footer className="relative z-20 h-7 shrink-0 border-t border-border/50 bg-background/80 backdrop-blur-md px-4 flex items-center justify-between text-[11px] text-muted-foreground select-none font-mono print:hidden">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5 text-foreground/80">
             <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />

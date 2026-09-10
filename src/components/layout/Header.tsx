@@ -36,7 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { isAuthenticated } = useCurrentUser();
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/60 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/60 backdrop-blur-xl print:hidden">
       <div className="flex h-12 items-center justify-between px-4 lg:px-6">
         {/* Left: Sidebar trigger, separator & search input */}
         <div className="flex items-center gap-2">
