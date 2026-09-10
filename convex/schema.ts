@@ -1,5 +1,11 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import {
+  appealLevelValidator,
+  statutoryPostureValidator,
+  targetAuthorityValidator,
+  legalAggressivenessValidator,
+} from "./lib/statutoryTierValidators";
 
 export default defineSchema({
   // Users table managed with Convex Auth v2
@@ -215,10 +221,10 @@ export default defineSchema({
   appeals: defineTable({
     claimId: v.id("claims"),
     version: v.number(),
-    appealLevel: v.string(), // level_1_internal, level_2_grievance, level_3_external_state_review
-    statutoryPosture: v.optional(v.string()), // administrative_reconsideration, procedural_grievance_bad_faith, external_iro_erisa_502_petition
-    targetAuthority: v.optional(v.string()), // Payer Medical Director, Multi-Disciplinary Peer Review Panel, External IRO & State Insurance Commissioner
-    legalAggressiveness: v.optional(v.string()), // standard, elevated_grievance, maximum_statutory_enforcement
+    appealLevel: appealLevelValidator,
+    statutoryPosture: v.optional(statutoryPostureValidator),
+    targetAuthority: v.optional(targetAuthorityValidator),
+    legalAggressiveness: v.optional(legalAggressivenessValidator),
     statutoryAuthorities: v.optional(v.array(v.string())),
     escalationNotes: v.optional(v.string()),
     executiveSummary: v.string(),

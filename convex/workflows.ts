@@ -6,6 +6,7 @@ import type { Id, Doc } from "./_generated/dataModel";
 import { requireClaimOwner, getAuthUserId } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
 import { ERISA_STATUTORY_EVIDENCE } from "./actions/policyCrawler";
+import { appealLevelValidator, type StatutoryAppealLevel } from "./lib/statutoryTierValidators";
 
 export const workflow = new WorkflowManager(components.workflow, {
   workpoolOptions: {
@@ -40,7 +41,7 @@ export interface DurableClaimPipelineArgs {
   claimId: Id<"claims">;
   customPolicyUrl?: string;
   physicianNotes?: string;
-  appealLevel?: string;
+  appealLevel?: StatutoryAppealLevel;
   sender?: {
     name: string;
     credentials?: string;
@@ -344,7 +345,7 @@ export const durableClaimPipeline = workflow
       claimId: v.id("claims"),
       customPolicyUrl: v.optional(v.string()),
       physicianNotes: v.optional(v.string()),
-      appealLevel: v.optional(v.string()),
+      appealLevel: v.optional(appealLevelValidator),
       sender: v.optional(
         v.object({
           name: v.string(),
@@ -464,7 +465,7 @@ export const startDurablePipeline = mutation({
     claimId: v.id("claims"),
     customPolicyUrl: v.optional(v.string()),
     physicianNotes: v.optional(v.string()),
-    appealLevel: v.optional(v.string()),
+    appealLevel: v.optional(appealLevelValidator),
     sender: v.optional(
       v.object({
         name: v.string(),

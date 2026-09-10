@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Claim, ClinicalEvidence, OverturnScoringResult } from "../types";
+import { Claim, ClinicalEvidence, OverturnScoringResult, AppealLevel } from "../types";
 import { Id } from "../../convex/_generated/dataModel";
 
 export function validateClaimClinicalContext(claim?: Claim | null): {
@@ -296,7 +296,7 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
       options?: {
         customPolicyUrl?: string;
         physicianNotes?: string;
-        appealLevel?: string;
+        appealLevel?: AppealLevel;
         autoDispatch?: boolean;
         followUpCadenceDays?: number;
       }

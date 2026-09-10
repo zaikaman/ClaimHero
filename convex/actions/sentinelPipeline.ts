@@ -7,6 +7,7 @@ import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { ERISA_STATUTORY_EVIDENCE } from "./policyCrawler";
+import { appealLevelValidator } from "../lib/statutoryTierValidators";
 
 export interface PipelineResult {
   success: boolean;
@@ -34,7 +35,7 @@ export const runAutonomousPipeline = action({
     claimId: v.id("claims"),
     customPolicyUrl: v.optional(v.string()),
     physicianNotes: v.optional(v.string()),
-    appealLevel: v.optional(v.string()),
+    appealLevel: v.optional(appealLevelValidator),
     useDurableWorkflow: v.optional(v.boolean()),
     sender: v.optional(
       v.object({
@@ -273,7 +274,7 @@ export const startDurablePipelineAction = action({
     claimId: v.id("claims"),
     customPolicyUrl: v.optional(v.string()),
     physicianNotes: v.optional(v.string()),
-    appealLevel: v.optional(v.string()),
+    appealLevel: v.optional(appealLevelValidator),
     sender: v.optional(
       v.object({
         name: v.string(),

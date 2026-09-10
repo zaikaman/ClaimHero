@@ -39,7 +39,7 @@ const HERO_SLIDES: ShowcaseSlide[] = [
   {
     badge1: { icon: ShieldCheck, label: "ERISA § 502(c) Sentinel" },
     badge2: { icon: Clock, label: "30-Day Alarms" },
-    badge3: { icon: CheckCircle, label: "94.8% Overturn Yield" },
+    badge3: { icon: CheckCircle, label: "Multi-Tier Appeal Engine" },
     titleLine1: "Overturn Denials.",
     titleLine2: "Defend Coverage.",
     description:
@@ -63,7 +63,7 @@ const HERO_SLIDES: ShowcaseSlide[] = [
   {
     badge1: { icon: Envelope, label: "Two-Way AgentMail Gateway" },
     badge2: { icon: Clock, label: "Statutory SLA Clocks" },
-    badge3: { icon: CheckCircle, label: "$1.4M+ Recovered" },
+    badge3: { icon: CheckCircle, label: "Audit-Logged Dispatch" },
     titleLine1: "Autonomous Dispatch.",
     titleLine2: "Rapid Settlement.",
     description:

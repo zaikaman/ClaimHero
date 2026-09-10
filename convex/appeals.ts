@@ -2,6 +2,47 @@ import { MutationCtx, internalMutation, internalQuery, mutation, query } from ".
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimOwner } from "./lib/auth";
+import {
+  STATUTORY_APPEAL_LEVELS,
+  STATUTORY_POSTURES,
+  STATUTORY_TARGET_AUTHORITIES,
+  LEGAL_AGGRESSIVENESS_TIERS,
+  appealLevelValidator,
+  statutoryPostureValidator,
+  targetAuthorityValidator,
+  legalAggressivenessValidator,
+  assertValidAppealLevel,
+  assertValidStatutoryPosture,
+  assertValidTargetAuthority,
+  assertValidLegalAggressiveness,
+  getStatutoryTierMetadata,
+  type StatutoryAppealLevel,
+  type StatutoryPosture,
+  type StatutoryTargetAuthority,
+  type LegalAggressivenessTier,
+  type StatutoryTierMetadata,
+} from "./lib/statutoryTierValidators";
+
+export {
+  STATUTORY_APPEAL_LEVELS,
+  STATUTORY_POSTURES,
+  STATUTORY_TARGET_AUTHORITIES,
+  LEGAL_AGGRESSIVENESS_TIERS,
+  appealLevelValidator,
+  statutoryPostureValidator,
+  targetAuthorityValidator,
+  legalAggressivenessValidator,
+  assertValidAppealLevel,
+  assertValidStatutoryPosture,
+  assertValidTargetAuthority,
+  assertValidLegalAggressiveness,
+  getStatutoryTierMetadata,
+  type StatutoryAppealLevel,
+  type StatutoryPosture,
+  type StatutoryTargetAuthority,
+  type LegalAggressivenessTier,
+  type StatutoryTierMetadata,
+};
 
 /**
  * Get an appeal brief by its ID, checking claim ownership
@@ -74,9 +115,10 @@ export const getLatestByClaimInternal = internalQuery({
 export const getByClaimAndLevel = query({
   args: {
     claimId: v.id("claims"),
-    appealLevel: v.string(),
+    appealLevel: appealLevelValidator,
   },
   handler: async (ctx, args): Promise<Doc<"appeals"> | null> => {
+    assertValidAppealLevel(args.appealLevel);
     const authorized = await getClaimIfAuthorized(ctx, args.claimId);
     if (!authorized) return null;
 
@@ -109,50 +151,6 @@ export const listVersions = query({
   },
 });
 
-/**
- * Helper to resolve statutory metadata for a given appeal level
- */
-export function getStatutoryTierMetadata(appealLevel: string) {
-  switch (appealLevel) {
-    case "level_2_grievance":
-      return {
-        statutoryPosture: "procedural_grievance_bad_faith",
-        targetAuthority: "Multi-Disciplinary Peer Review Panel & Appeals Committee",
-        legalAggressiveness: "elevated_grievance",
-        statutoryAuthorities: [
-          "ERISA Section 503 (29 U.S.C. § 1133)",
-          "29 C.F.R. § 2560.503-1(h)(3)(iii) (Mandatory Same-Specialty Peer Review)",
-          "Department of Labor Claims Procedure Regulations",
-        ],
-      };
-    case "level_3_external_state_review":
-      return {
-        statutoryPosture: "external_iro_erisa_502_petition",
-        targetAuthority: "External Independent Review Organization (IRO) & State Insurance Commissioner",
-        legalAggressiveness: "maximum_statutory_enforcement",
-        statutoryAuthorities: [
-          "ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)] (Civil Enforcement & Benefit Recovery)",
-          "ERISA Section 502(g)(1) (Mandatory Attorney's Fees & Cost Shifting)",
-          "45 C.F.R. § 147.136 (ACA Federal External Review Mandate)",
-          "State Insurance Code Unfair Claims Settlement Practices Act",
-          "Statutory Bad-Faith Claims Handling & Prompt-Pay Interest Penalties",
-        ],
-      };
-    case "level_1_internal":
-    default:
-      return {
-        statutoryPosture: "administrative_reconsideration",
-        targetAuthority: "Payer Medical Director Review",
-        legalAggressiveness: "standard",
-        statutoryAuthorities: [
-          "ERISA 29 C.F.R. § 2560.503-1 (Full and Fair Review)",
-          "Patient Protection and Affordable Care Act § 2719",
-          "Published Clinical Policy Bulletins (CPB)",
-        ],
-      };
-  }
-}
-
 interface CreateOrUpdateDraftArgs {
   claimId: Id<"claims">;
   appealLevel: string;
@@ -173,6 +171,11 @@ async function applyCreateOrUpdateDraft(
   ctx: MutationCtx,
   args: CreateOrUpdateDraftArgs
 ): Promise<Id<"appeals"> | null> {
+  assertValidAppealLevel(args.appealLevel);
+  assertValidStatutoryPosture(args.statutoryPosture);
+  assertValidTargetAuthority(args.targetAuthority);
+  assertValidLegalAggressiveness(args.legalAggressiveness);
+
   const claim = await ctx.db.get(args.claimId);
   if (!claim) {
     console.warn(`Claim ${args.claimId} not found during createOrUpdateDraft; skipping.`);
@@ -273,15 +276,15 @@ async function applyCreateOrUpdateDraft(
 export const createOrUpdateDraft = mutation({
   args: {
     claimId: v.id("claims"),
-    appealLevel: v.string(),
+    appealLevel: appealLevelValidator,
     executiveSummary: v.string(),
     medicalNecessityArguments: v.string(),
     legalCitations: v.string(),
     fullAppealMarkdown: v.string(),
     lastEditedBy: v.optional(v.string()),
-    statutoryPosture: v.optional(v.string()),
-    targetAuthority: v.optional(v.string()),
-    legalAggressiveness: v.optional(v.string()),
+    statutoryPosture: v.optional(statutoryPostureValidator),
+    targetAuthority: v.optional(targetAuthorityValidator),
+    legalAggressiveness: v.optional(legalAggressivenessValidator),
     statutoryAuthorities: v.optional(v.array(v.string())),
     escalationNotes: v.optional(v.string()),
     forceNewRevision: v.optional(v.boolean()),
@@ -298,15 +301,15 @@ export const createOrUpdateDraft = mutation({
 export const createOrUpdateDraftInternal = internalMutation({
   args: {
     claimId: v.id("claims"),
-    appealLevel: v.string(),
+    appealLevel: appealLevelValidator,
     executiveSummary: v.string(),
     medicalNecessityArguments: v.string(),
     legalCitations: v.string(),
     fullAppealMarkdown: v.string(),
     lastEditedBy: v.optional(v.string()),
-    statutoryPosture: v.optional(v.string()),
-    targetAuthority: v.optional(v.string()),
-    legalAggressiveness: v.optional(v.string()),
+    statutoryPosture: v.optional(statutoryPostureValidator),
+    targetAuthority: v.optional(targetAuthorityValidator),
+    legalAggressiveness: v.optional(legalAggressivenessValidator),
     statutoryAuthorities: v.optional(v.array(v.string())),
     escalationNotes: v.optional(v.string()),
     forceNewRevision: v.optional(v.boolean()),
@@ -322,11 +325,12 @@ export const createOrUpdateDraftInternal = internalMutation({
 export const escalateTier = mutation({
   args: {
     claimId: v.id("claims"),
-    targetLevel: v.string(),
+    targetLevel: appealLevelValidator,
     escalationReason: v.optional(v.string()),
     actor: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    assertValidAppealLevel(args.targetLevel);
     await requireClaimOwner(ctx, args.claimId);
 
     const now = Date.now();

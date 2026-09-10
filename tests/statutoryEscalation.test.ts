@@ -97,6 +97,12 @@ describe('Multi-Tier Statutory Appeal Escalation Workflow', () => {
       expect(metaL3.legalAggressiveness).toBe('maximum_statutory_enforcement');
       expect(metaL3.statutoryAuthorities.some((a) => a.includes('ERISA: Section 502(a)(1)(B)') || a.includes('ERISA: Section 502(a)(1)(B)') || a.includes('ERISA: Section 502(') || a.includes('ERISA Section 502(a)(1)(B)'))).toBe(true);
     });
+
+    it('rejects unknown tier in getStatutoryTierMetadata with a clear error', () => {
+      expect(() => getStatutoryTierMetadata('unknown_tier')).toThrow(
+        /Invalid statutory appeal level: "unknown_tier"/
+      );
+    });
   });
 
   describe('Tier 1: Internal Administrative Appeal Assembly', () => {

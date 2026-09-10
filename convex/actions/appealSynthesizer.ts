@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { api, internal } from "../_generated/api";
 import { precedentMatchValidator } from "../lib/precedentValidators";
+import { appealLevelValidator, assertValidAppealLevel, getStatutoryTierMetadata } from "../lib/statutoryTierValidators";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
 import type { Doc } from "../_generated/dataModel";
@@ -717,7 +718,7 @@ export const assembleProfessionalMemorandum = assembleProfessionalAppealEmail;
 export const generateAppealBrief = action({
   args: {
     claimId: v.id("claims"),
-    appealLevel: v.optional(v.string()),
+    appealLevel: v.optional(appealLevelValidator),
     physicianNotes: v.optional(v.string()),
     senderName: v.optional(v.string()),
     senderCredentials: v.optional(v.string()),
@@ -741,6 +742,7 @@ export const generateAppealBrief = action({
     args
   ): Promise<AppealBriefSynthesisResult & { appealId: string }> => {
     const appealLevel = args.appealLevel || "level_1_internal";
+    assertValidAppealLevel(appealLevel);
 
     // 1. Authorize claim ownership
     const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
@@ -932,47 +934,7 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       .join("\n");
 
     // 6. Resolve statutory tier metadata and persist the generated brief to Convex database
-    const tierMeta = {
-      level_1_internal: {
-        statutoryPosture: "administrative_reconsideration",
-        targetAuthority: "Payer Medical Director Review",
-        legalAggressiveness: "standard",
-        statutoryAuthorities: [
-          "ERISA 29 C.F.R. § 2560.503-1 (Full and Fair Review)",
-          "Patient Protection and Affordable Care Act § 2719",
-          "Published Clinical Policy Bulletins (CPB)",
-        ],
-      },
-      level_2_grievance: {
-        statutoryPosture: "procedural_grievance_bad_faith",
-        targetAuthority: "Multi-Disciplinary Peer Review Panel & Appeals Committee",
-        legalAggressiveness: "elevated_grievance",
-        statutoryAuthorities: [
-          "ERISA Section 503 (29 U.S.C. § 1133)",
-          "29 C.F.R. § 2560.503-1(h)(3)(iii) (Mandatory Same-Specialty Peer Review)",
-          "Department of Labor Claims Procedure Regulations",
-        ],
-      },
-      level_3_external_state_review: {
-        statutoryPosture: "external_iro_erisa_502_petition",
-        targetAuthority: "External Independent Review Organization (IRO) & State Insurance Commissioner",
-        legalAggressiveness: "maximum_statutory_enforcement",
-        statutoryAuthorities: [
-          "ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)] (Civil Enforcement & Benefit Recovery)",
-          "ERISA Section 502(g)(1) (Mandatory Attorney's Fees & Cost Shifting)",
-          "45 C.F.R. § 147.136 (ACA Federal External Review Mandate)",
-          "State Insurance Code Unfair Claims Settlement Practices Act",
-          "Statutory Bad-Faith Claims Handling & Prompt-Pay Interest Penalties",
-        ],
-      },
-    }[appealLevel] || {
-      statutoryPosture: "administrative_reconsideration",
-      targetAuthority: "Payer Medical Director Review",
-      legalAggressiveness: "standard",
-      statutoryAuthorities: [
-        "ERISA 29 C.F.R. § 2560.503-1 (Full and Fair Review)",
-      ],
-    };
+    const tierMeta = getStatutoryTierMetadata(appealLevel);
 
     const appealId = await ctx.runMutation(internal.appeals.createOrUpdateDraftInternal, {
       claimId: args.claimId,

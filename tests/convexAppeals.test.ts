@@ -404,4 +404,181 @@ describe("Convex Appeals API & Escalation Engine", () => {
       }));
     });
   });
+
+  describe("P1-1: Statutory Tier, Posture, and Authority Strict Validation", () => {
+    it("createOrUpdateDraft: rejects unknown appealLevel with clear error", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockClaim = { _id: "claim_1", userId: "user_123" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+        },
+      };
+
+      await expect(
+        (appeals.createOrUpdateDraft as any)._handler(mockCtx, {
+          claimId: "claim_1",
+          appealLevel: "tier_custom_break_dossier",
+          executiveSummary: "Summary",
+          medicalNecessityArguments: "Args",
+          legalCitations: "Citations",
+          fullAppealMarkdown: "Markdown",
+        })
+      ).rejects.toThrow(/Invalid statutory appeal level: "tier_custom_break_dossier"/);
+    });
+
+    it("createOrUpdateDraftInternal: rejects unknown appealLevel with clear error", async () => {
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue({ _id: "claim_1" }),
+        },
+      };
+
+      await expect(
+        (appeals.createOrUpdateDraftInternal as any)._handler(mockCtx, {
+          claimId: "claim_1",
+          appealLevel: "level_99_arbitrary",
+          executiveSummary: "Summary",
+          medicalNecessityArguments: "Args",
+          legalCitations: "Citations",
+          fullAppealMarkdown: "Markdown",
+        })
+      ).rejects.toThrow(/Invalid statutory appeal level: "level_99_arbitrary"/);
+    });
+
+    it("createOrUpdateDraft: rejects unknown statutoryPosture with clear error", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockClaim = { _id: "claim_1", userId: "user_123" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+        },
+      };
+
+      await expect(
+        (appeals.createOrUpdateDraft as any)._handler(mockCtx, {
+          claimId: "claim_1",
+          appealLevel: "level_1_internal",
+          statutoryPosture: "unrecognized_posture",
+          executiveSummary: "Summary",
+          medicalNecessityArguments: "Args",
+          legalCitations: "Citations",
+          fullAppealMarkdown: "Markdown",
+        })
+      ).rejects.toThrow(/Invalid statutory posture: "unrecognized_posture"/);
+    });
+
+    it("createOrUpdateDraft: rejects unknown targetAuthority with clear error", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockClaim = { _id: "claim_1", userId: "user_123" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+        },
+      };
+
+      await expect(
+        (appeals.createOrUpdateDraft as any)._handler(mockCtx, {
+          claimId: "claim_1",
+          appealLevel: "level_1_internal",
+          targetAuthority: "Bogus Medical Board",
+          executiveSummary: "Summary",
+          medicalNecessityArguments: "Args",
+          legalCitations: "Citations",
+          fullAppealMarkdown: "Markdown",
+        })
+      ).rejects.toThrow(/Invalid target authority: "Bogus Medical Board"/);
+    });
+
+    it("createOrUpdateDraft: rejects unknown legalAggressiveness with clear error", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockClaim = { _id: "claim_1", userId: "user_123" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+        },
+      };
+
+      await expect(
+        (appeals.createOrUpdateDraft as any)._handler(mockCtx, {
+          claimId: "claim_1",
+          appealLevel: "level_1_internal",
+          legalAggressiveness: "ultra_nuclear",
+          executiveSummary: "Summary",
+          medicalNecessityArguments: "Args",
+          legalCitations: "Citations",
+          fullAppealMarkdown: "Markdown",
+        })
+      ).rejects.toThrow(/Invalid legal aggressiveness: "ultra_nuclear"/);
+    });
+
+    it("escalateTier: rejects unknown targetLevel with clear error", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockClaim = { _id: "claim_1", userId: "user_123" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+        },
+      };
+
+      await expect(
+        (appeals.escalateTier as any)._handler(mockCtx, {
+          claimId: "claim_1",
+          targetLevel: "invalid_tier_4",
+        })
+      ).rejects.toThrow(/Invalid statutory appeal level: "invalid_tier_4"/);
+    });
+
+    it("getStatutoryTierMetadata: rejects unknown appealLevel with clear error", () => {
+      expect(() => appeals.getStatutoryTierMetadata("bogus_tier")).toThrow(
+        /Invalid statutory appeal level: "bogus_tier"/
+      );
+    });
+
+    it("getByClaimAndLevel: rejects unknown appealLevel with clear error", async () => {
+      const mockCtx: any = { db: {} };
+      await expect(
+        (appeals.getByClaimAndLevel as any)._handler(mockCtx, {
+          claimId: "claim_1",
+          appealLevel: "non_existent_tier",
+        })
+      ).rejects.toThrow(/Invalid statutory appeal level: "non_existent_tier"/);
+    });
+
+    it("persists valid statutory tiers, postures, and target authorities successfully", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockClaim = { _id: "claim_1", userId: "user_123" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+          query: vi.fn().mockReturnValue(createMockQuery([])),
+          insert: vi.fn().mockResolvedValue("appeal_valid_1"),
+          patch: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      const appealId = await (appeals.createOrUpdateDraft as any)._handler(mockCtx, {
+        claimId: "claim_1",
+        appealLevel: "level_2_grievance",
+        statutoryPosture: "procedural_grievance_bad_faith",
+        targetAuthority: "Multi-Disciplinary Peer Review Panel & Appeals Committee",
+        legalAggressiveness: "elevated_grievance",
+        executiveSummary: "Valid Grievance Summary",
+        medicalNecessityArguments: "Valid Arguments",
+        legalCitations: "29 CFR § 2560.503-1(h)(3)(iii)",
+        fullAppealMarkdown: "# Valid Grievance Appeal",
+      });
+
+      expect(appealId).toBe("appeal_valid_1");
+      expect(mockCtx.db.insert).toHaveBeenCalledWith(
+        "appeals",
+        expect.objectContaining({
+          appealLevel: "level_2_grievance",
+          statutoryPosture: "procedural_grievance_bad_faith",
+          targetAuthority: "Multi-Disciplinary Peer Review Panel & Appeals Committee",
+          legalAggressiveness: "elevated_grievance",
+        })
+      );
+    });
+  });
 });
