@@ -6,7 +6,7 @@ import type { Id } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
-import { ERISA_STATUTORY_EVIDENCE } from "./policyCrawler";
+import { ERISA_STATUTORY_EVIDENCE } from "../lib/erisaEvidence";
 import { appealLevelValidator } from "../lib/statutoryTierValidators";
 
 export interface PipelineResult {

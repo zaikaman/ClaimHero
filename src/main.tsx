@@ -13,6 +13,16 @@ if (!convexUrl) {
     "Missing VITE_CONVEX_URL environment variable. Set VITE_CONVEX_URL in your .env.local file or deployment environment."
   );
 }
+try {
+  const parsed = new URL(convexUrl);
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`unsupported protocol "${parsed.protocol}"`);
+  }
+} catch (err) {
+  throw new Error(
+    `VITE_CONVEX_URL environment variable is not a valid http(s) URL: "${convexUrl}". Details: ${err instanceof Error ? err.message : String(err)}`
+  );
+}
 
 /**
  * Remove cached Convex Auth tokens that this deployment can no longer verify.

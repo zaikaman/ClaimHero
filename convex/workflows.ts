@@ -5,7 +5,7 @@ import { v } from "convex/values";
 import type { Id, Doc } from "./_generated/dataModel";
 import { requireClaimOwner, getAuthUserId } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
-import { ERISA_STATUTORY_EVIDENCE } from "./actions/policyCrawler";
+import { ERISA_STATUTORY_EVIDENCE } from "./lib/erisaEvidence";
 import { appealLevelValidator, type StatutoryAppealLevel } from "./lib/statutoryTierValidators";
 
 export const workflow = new WorkflowManager(components.workflow, {

@@ -11,6 +11,9 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     exclude: ["node_modules", "dist", "docs", "convex/_generated"],
     coverage: {
+      // Report-only coverage: no `thresholds` gate is enforced here.
+      // CI consumes `npm run test:coverage` output as a report artifact;
+      // do not claim a 100% gate unless thresholds are added to enforce it.
       provider: "v8",
       reporter: ["text", "json"],
       include: [
