@@ -642,7 +642,7 @@ export function useLiveCallCopilot(claim: Claim) {
           regulatoryLeverage: pushback.regulatoryLeverage,
           confidenceScore: derivedConfidenceScore,
           timestamp: Date.now(),
-          generatedBy: pushback.generatedBy || "openai",
+          generatedBy: pushback.generatedBy || (isFallback ? "fallback" : "openai"),
         };
         setActiveFastAnswer(newFastAnswer);
 

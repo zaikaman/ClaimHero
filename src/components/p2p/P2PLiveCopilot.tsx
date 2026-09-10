@@ -647,19 +647,30 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
 
               {activeFastAnswer && (
                 <div className="flex items-center gap-1.5">
+                  {activeFastAnswer.generatedBy === "fallback" && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-mono border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold uppercase tracking-wider"
+                    >
+                      SIMULATION ONLY
+                    </Badge>
+                  )}
                   <Badge
                     variant="outline"
                     className={cn(
                       "text-[10px] font-mono",
                       isOverturned
                         ? "border-emerald-500/40 text-emerald-400 font-bold"
-                        : authorizationNumber === "Simulation only — no authorization granted"
+                        : activeFastAnswer.generatedBy === "fallback" ||
+                          authorizationNumber === "Simulation only — no authorization granted"
                         ? "border-amber-500/40 text-amber-300 font-bold"
                         : "border-primary/40 text-primary"
                     )}
                   >
                     {isOverturned
                       ? "100% Won"
+                      : activeFastAnswer.generatedBy === "fallback"
+                      ? `${activeFastAnswer.confidenceScore}% Estimated`
                       : authorizationNumber === "Simulation only — no authorization granted"
                       ? "Simulation Only"
                       : `${activeFastAnswer.confidenceScore}% Grounded`}
@@ -686,40 +697,56 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                 {/* Detected Trap Question Header */}
                 <div
                   className={cn(
-                    "p-2.5 rounded-md text-xs text-foreground/90 font-sans flex items-start gap-2 border",
+                    "p-2.5 rounded-md text-xs text-foreground/90 font-sans flex items-start justify-between gap-2 border",
                     isOverturned
                       ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
-                      : authorizationNumber === "Simulation only — no authorization granted"
+                      : activeFastAnswer.generatedBy === "fallback" ||
+                        authorizationNumber === "Simulation only — no authorization granted"
                       ? "bg-amber-500/10 border-amber-500/30 text-amber-200"
                       : "bg-destructive/10 border-destructive/25"
                   )}
                 >
-                  {isOverturned ? (
-                    <ShieldCheck className="size-4 text-emerald-400 shrink-0 mt-0.5" />
-                  ) : authorizationNumber === "Simulation only — no authorization granted" ? (
-                    <WarningCircle className="size-4 text-amber-400 shrink-0 mt-0.5" />
-                  ) : (
-                    <WarningCircle className="size-4 text-destructive shrink-0 mt-0.5" />
-                  )}
-                  <div>
-                    <span
-                      className={cn(
-                        "font-bold",
-                        isOverturned
-                          ? "text-emerald-300"
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    {isOverturned ? (
+                      <ShieldCheck className="size-4 text-emerald-400 shrink-0 mt-0.5" />
+                    ) : activeFastAnswer.generatedBy === "fallback" ||
+                      authorizationNumber === "Simulation only — no authorization granted" ? (
+                      <WarningCircle className="size-4 text-amber-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <WarningCircle className="size-4 text-destructive shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <span
+                        className={cn(
+                          "font-bold",
+                          isOverturned
+                            ? "text-emerald-300"
+                            : activeFastAnswer.generatedBy === "fallback"
+                            ? "text-amber-300"
+                            : authorizationNumber === "Simulation only — no authorization granted"
+                            ? "text-amber-300"
+                            : "text-destructive"
+                        )}
+                      >
+                        {isOverturned
+                          ? "Reviewer Status: "
+                          : activeFastAnswer.generatedBy === "fallback"
+                          ? "Simulation Objection: "
                           : authorizationNumber === "Simulation only — no authorization granted"
-                          ? "text-amber-300"
-                          : "text-destructive"
-                      )}
-                    >
-                      {isOverturned
-                        ? "Reviewer Status: "
-                        : authorizationNumber === "Simulation only — no authorization granted"
-                        ? "Simulation Status: "
-                        : "Insurer Objection: "}
-                    </span>
-                    <span className="italic">&ldquo;{activeFastAnswer.trapQuestion}&rdquo;</span>
+                          ? "Simulation Status: "
+                          : "Insurer Objection: "}
+                      </span>
+                      <span className="italic">&ldquo;{activeFastAnswer.trapQuestion}&rdquo;</span>
+                    </div>
                   </div>
+                  {activeFastAnswer.generatedBy === "fallback" && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] font-mono px-1.5 py-0 h-4 border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold uppercase tracking-wider shrink-0"
+                    >
+                      SIMULATION ONLY
+                    </Badge>
+                  )}
                 </div>
 
                 {/* THE SPOKEN REBUTTAL (BIG, HIGH CONTRAST) */}
@@ -751,9 +778,19 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                 {/* Grounding Facts Strip */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-sans pt-1">
                   <div className="p-2.5 rounded-md bg-card/60 border border-border/70 space-y-1">
-                    <div className="text-[10px] font-mono uppercase text-muted-foreground font-bold flex items-center gap-1">
-                      <Stethoscope className="size-3 text-primary" />
-                      <span>Chart Proof Evidence</span>
+                    <div className="text-[10px] font-mono uppercase text-muted-foreground font-bold flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1">
+                        <Stethoscope className="size-3 text-primary" />
+                        <span>Chart Proof Evidence</span>
+                      </div>
+                      {activeFastAnswer.generatedBy === "fallback" && (
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] font-mono px-1 py-0 h-4 border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold uppercase tracking-wider"
+                        >
+                          SIMULATION ONLY
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-foreground/90 text-xs leading-snug">
                       {activeFastAnswer.chartProof}
@@ -761,9 +798,19 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   </div>
 
                   <div className="p-2.5 rounded-md bg-card/60 border border-border/70 space-y-1">
-                    <div className="text-[10px] font-mono uppercase text-muted-foreground font-bold flex items-center gap-1">
-                      <ShieldCheck className="size-3 text-emerald-400" />
-                      <span>Exact Policy Citation</span>
+                    <div className="text-[10px] font-mono uppercase text-muted-foreground font-bold flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1">
+                        <ShieldCheck className="size-3 text-emerald-400" />
+                        <span>Exact Policy Citation</span>
+                      </div>
+                      {activeFastAnswer.generatedBy === "fallback" && (
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] font-mono px-1 py-0 h-4 border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold uppercase tracking-wider"
+                        >
+                          SIMULATION ONLY
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-foreground/90 text-xs leading-snug font-medium text-primary">
                       {activeFastAnswer.cpbCitation}
@@ -901,7 +948,17 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                       )}
                     >
                       <span className="truncate">{ans.trapQuestion}</span>
-                      <ArrowRight className="size-3 shrink-0 opacity-70" />
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {ans.generatedBy === "fallback" && (
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] font-mono px-1 py-0 h-4 border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold uppercase tracking-wider"
+                          >
+                            SIMULATION ONLY
+                          </Badge>
+                        )}
+                        <ArrowRight className="size-3 opacity-70" />
+                      </div>
                     </button>
                   ))
                 )}

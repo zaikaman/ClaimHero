@@ -97,10 +97,10 @@ Case Context:
 - Patient: ${claim.patient?.name || "Patient"} | Payer: ${payer} | State: ${state}
 - Procedure: ${cptList} | Diagnosis: ${icdList}
 - Denial Reason: ${claim.denialReasonCode || "CO-50"}: ${claim.denialReasonDescription || "Medical Necessity"}
-- Clinical Findings: ${clinicalFacts?.examinationFindings || "Documented clinical necessity"}
-- Physician Notes: ${physicianNotes || "Immediate intervention indicated"}
+- Clinical Findings: ${clinicalFacts?.examinationFindings || "Not documented on file (pending chart review)"}
+- Physician Notes: ${physicianNotes || "Not documented on file"}
 - Relevant CPB Evidence:
-${evidenceList || "Published policy criteria support coverage upon documented clinical necessity."}
+${evidenceList || "Published policy criteria pending retrieval."}
 
 Rules:
 1. "suggestedQuote": Write EXACTLY what the physician should say aloud into the phone. Must be 1 to 2 crisp, firm sentences citing patient findings and policy criteria.
@@ -197,7 +197,8 @@ Generate an instant, grounded Fast Answer response card.`;
       };
     }
 
-    // If sessionId provided, persist directly to session
+    // If sessionId provided, persist directly to session history.
+    // Invariant: Fallback chartProof is labeled generatedBy: "fallback" and must NEVER be persisted as claim clinical facts.
     if (args.sessionId) {
       await ctx.runMutation(api.p2pCallSessions.addFastAnswer, {
         sessionId: args.sessionId,
@@ -326,13 +327,13 @@ Case Details:
 - Diagnosis Codes: ${icdList}
 - Denial Reason: ${claim.denialReasonCode || "CO-50"}: ${claim.denialReasonDescription || "Medical Necessity"}
 - Clinical Facts on File:
-  * Symptoms & Functional Impact: ${clinicalFacts?.symptomsAndFunctionalImpact || "Severe symptoms"}
-  * Physical Exam: ${clinicalFacts?.examinationFindings || "Positive exam findings"}
-  * Imaging/Diagnostics: ${clinicalFacts?.imagingAndDiagnostics || "Diagnostic imaging confirmed severe pathology"}
-  * Prior Conservative Therapy: ${clinicalFacts?.treatmentHistoryAndResponse || "Documented prior therapy"}
-- Treating Physician Notes: ${physicianNotes || "Intervention indicated to prevent permanent functional loss"}
+  * Symptoms & Functional Impact: ${clinicalFacts?.symptomsAndFunctionalImpact || "Not documented on file (do not assume symptoms)"}
+  * Physical Exam: ${clinicalFacts?.examinationFindings || "Not documented on file (do not assume physical findings)"}
+  * Imaging/Diagnostics: ${clinicalFacts?.imagingAndDiagnostics || "Not documented on file (do not assume diagnostic findings)"}
+  * Prior Conservative Therapy: ${clinicalFacts?.treatmentHistoryAndResponse || "Not documented on file (do not assume conservative therapy completion)"}
+- Treating Physician Notes: ${physicianNotes || "Not documented on file"}
 - Published Policy Criteria:
-${evidenceList || "Published policy requires documented conservative therapy failure or severe radiographic pathology (Grade 3/4) or progressive functional deficit."}`;
+${evidenceList || "Published clinical policy criteria pending retrieval (do not assume specific criteria like Grade 3/4 or therapy durations)."}`;
 
     const userPrompt = `Recent Call Transcript History:
 ${historySnippet || "No prior transcript."}
@@ -469,7 +470,7 @@ function buildDeterministicReviewerPushback(
       authorizationNumber: undefined,
       trapQuestion: "Simulation only — no authorization granted",
       suggestedQuote: "Understood. Please provide formal written determination pursuant to ERISA 29 CFR § 2560.503-1.",
-      chartProof: claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse || "Comprehensive conservative therapy failure.",
+      chartProof: claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse || "[Simulation Only] Conservative therapy history pending chart verification.",
       cpbCitation: cpbSection,
       leverageDelta: 15,
       confidenceScore: baseConfidence,
@@ -483,8 +484,10 @@ function buildDeterministicReviewerPushback(
     isOverturned: false,
     authorizationNumber: undefined,
     trapQuestion: "Request for objective findings.",
-    suggestedQuote: `Under ${cpbTitle} ${cpbSection}, the patient demonstrates objective functional loss and completed required conservative management.`,
-    chartProof: claim.appealContext?.clinicalFacts?.examinationFindings || "Positive provocative testing and functional deficits.",
+    suggestedQuote: claim.appealContext?.clinicalFacts?.examinationFindings
+      ? `Under ${cpbTitle} ${cpbSection}, the patient demonstrates objective functional loss and completed required conservative management.`
+      : `Under ${cpbTitle} ${cpbSection}, please review the patient's objective examination findings and conservative therapy record.`,
+    chartProof: claim.appealContext?.clinicalFacts?.examinationFindings || "[Simulation Only] Objective examination findings pending chart verification.",
     cpbCitation: cpbSection,
     leverageDelta: 10,
     confidenceScore: Math.max(70, baseConfidence - 5),
@@ -503,21 +506,25 @@ function buildDeterministicFastAnswer(
   const lower = (transcriptSnippet || "").toLowerCase();
   const cpb = evidences && evidences.length > 0 ? evidences[0] : null;
   const cpbTitle = cpb?.title || `${payer} Clinical Coverage Policy`;
-  const cpbSection = cpb?.citationClause || "Section 2.1 Criteria";
+  const cpbSection = cpb?.citationClause || "Section Criteria";
 
   let trapQuestion = "Insurer challenged medical necessity or conservative therapy duration.";
-  let suggestedQuote = `Under ${payer}'s published policy criteria (${cpbSection}), procedure ${cptList} is fully indicated because the patient completed conservative trials and exhibits objective functional impairment.`;
-  let chartProof = claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse || "Documented failure of structured conservative therapy and positive objective clinical findings in chart.";
+  let suggestedQuote = `Under ${payer}'s published policy criteria (${cpbSection}), procedure ${cptList} is indicated based on documented clinical criteria and objective functional impairment.`;
+  let chartProof = claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse || "[Simulation Only] Conservative therapy trial documentation pending chart verification.";
   const regulatoryLeverage = `ERISA 29 CFR § 2560.503-1(h) & ${state} Insurance Utilization Review Regulations`;
 
   if (lower.includes("conservative") || lower.includes("physical therapy") || lower.includes("pt") || lower.includes("weeks") || lower.includes("months")) {
     trapQuestion = "Did the patient complete sufficient conservative management before scheduling this procedure?";
-    suggestedQuote = `Yes. Patient completed documented conservative therapy without resolution, and under ${cpbTitle} ${cpbSection}, persistent severe symptoms satisfy prior authorization prerequisites.`;
-    chartProof = claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse || "Documented 12 weeks of structured therapy and failed therapeutic injections in medical record.";
+    suggestedQuote = claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse
+      ? `Yes. Patient completed documented conservative therapy without resolution, and under ${cpbTitle} ${cpbSection}, persistent symptoms satisfy prior authorization prerequisites.`
+      : `Under ${cpbTitle} ${cpbSection}, persistent functional impairment meets prior authorization criteria once conservative therapy is documented.`;
+    chartProof = claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse || "[Simulation Only] Conservative therapy trial documentation pending chart verification.";
   } else if (lower.includes("mri") || lower.includes("imaging") || lower.includes("x-ray") || lower.includes("radiograph")) {
     trapQuestion = "Was diagnostic imaging performed within required clinical timeframes?";
-    suggestedQuote = `Yes. Objective diagnostic imaging confirmed severe anatomical pathology for ${icdList}, satisfying ${cpbTitle} criteria.`;
-    chartProof = claim.appealContext?.clinicalFacts?.imagingAndDiagnostics || "Diagnostic imaging confirmed severe pathology matching clinical presentation.";
+    suggestedQuote = claim.appealContext?.clinicalFacts?.imagingAndDiagnostics
+      ? `Yes. Objective diagnostic imaging confirmed anatomical pathology for ${icdList}, satisfying ${cpbTitle} criteria.`
+      : `Objective diagnostic imaging for ${icdList} addresses ${cpbTitle} criteria upon chart review.`;
+    chartProof = claim.appealContext?.clinicalFacts?.imagingAndDiagnostics || "[Simulation Only] Diagnostic imaging documentation pending chart verification.";
   } else if (lower.includes("experimental") || lower.includes("investigational") || lower.includes("unproven")) {
     trapQuestion = "Is this procedure considered investigational or unproven for this diagnosis?";
     suggestedQuote = `No. CPT code ${cptList} is a Category I established standard of care supported by published clinical guidelines for ${icdList}.`;
@@ -528,6 +535,16 @@ function buildDeterministicFastAnswer(
     chartProof = `Treating specialist is board-certified for ${cptList}.`;
   }
 
+  // Grounded confidence score for fallback based on available evidence and clinical facts, NOT hardcoded 94
+  const hasClinicalFacts = Boolean(
+    claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse ||
+    claim.appealContext?.clinicalFacts?.examinationFindings ||
+    claim.appealContext?.clinicalFacts?.imagingAndDiagnostics
+  );
+  const confidenceScore = evidences && evidences.length > 0
+    ? (hasClinicalFacts ? 85 : 78)
+    : (hasClinicalFacts ? 75 : 70);
+
   return {
     id: `fa_det_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     trapQuestion,
@@ -535,8 +552,9 @@ function buildDeterministicFastAnswer(
     chartProof,
     cpbCitation: `${cpbTitle} (${cpbSection})`,
     regulatoryLeverage,
-    confidenceScore: 94,
+    confidenceScore,
     timestamp: Date.now(),
+    generatedBy: "fallback",
   };
 }
 

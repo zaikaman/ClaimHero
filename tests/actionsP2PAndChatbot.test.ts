@@ -148,6 +148,55 @@ describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot
       );
     });
 
+    it("generateLiveFastAnswer: safely falls back to simulation-only without asserting unverified facts or hardcoded 94 confidence", async () => {
+      const mockClaimWithoutFacts = {
+        _id: "c1",
+        claimNumber: "CLM-100",
+        userId: "user_123",
+        providerName: "Dr. Amanda Vance",
+        patient: { name: "Marcus", insurancePayer: "UHC", state: "Texas" },
+        cptCodes: ["63047"],
+        icd10Codes: ["M51.16"],
+        appealContext: {},
+      };
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockRejectedValue(new Error("LLM synthesis timeout"));
+
+      let qCount = 0;
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation(() => {
+          qCount++;
+          if (qCount === 1) return Promise.resolve(mockClaimWithoutFacts);
+          return Promise.resolve([]);
+        }),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const res = await (actionP2PLiveCopilot.generateLiveFastAnswer as any)._handler(mockCtx, {
+        claimId: "c1",
+        sessionId: "sess_1",
+        recentTranscript: "Did the patient complete conservative physical therapy before scheduling?",
+      });
+
+      expect(res.generatedBy).toBe("fallback");
+      expect(res.chartProof).not.toContain("12 weeks of structured therapy");
+      expect(res.chartProof).not.toContain("Severe symptoms");
+      expect(res.chartProof).toContain("[Simulation Only]");
+      expect(res.confidenceScore).not.toBe(94);
+      expect(res.confidenceScore).toBeLessThanOrEqual(85);
+      expect(res.confidenceScore).toBeGreaterThanOrEqual(65);
+
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          sessionId: "sess_1",
+          fastAnswer: expect.objectContaining({
+            generatedBy: "fallback",
+          }),
+        })
+      );
+    });
+
     it("generateInteractiveReviewerPushback: simulates dynamic medical director pushback & concession", async () => {
       const mockClaim = {
         _id: "c1",

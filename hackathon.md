@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-10T13:30:30Z
+- **Last updated:** 2026-09-10T13:52:10Z
 
 ## Log
 
@@ -1151,5 +1151,13 @@ Eliminated hardcoded marketing statistics on landing showcase hero (P0-4 in `src
 
 Remediated free-form statutory tier strings (P1-1) across Convex functions and schema (`convex/appeals.ts:273-293,322-331`, `convex/schema.ts`, `convex/actions/appealSynthesizer.ts`, `convex/actions/sentinelPipeline.ts`, `convex/workflows.ts`, `src/hooks/useEvidence.ts`): replaced loose `v.string()` validators with strict Convex union validators (`appealLevelValidator`, `statutoryPostureValidator`, `targetAuthorityValidator`, `legalAggressivenessValidator`) and runtime assertions in `convex/lib/statutoryTierValidators.ts`. Applied union validation to `createOrUpdateDraft`, `createOrUpdateDraftInternal`, `escalateTier`, `getByClaimAndLevel`, `generateAppealBrief`, and `startDurablePipeline`. Centralized `getStatutoryTierMetadata` with fail-closed rejection for unknown tiers, preventing dossier grouping breakdown from corrupt or unrecognized values. Added comprehensive regression tests in `tests/convexAppeals.test.ts` and `tests/statutoryEscalation.test.ts` verifying rejection of unknown tiers, postures, authorities, and aggressiveness levels. Verified 724 passing tests across 42 test suites, clean typecheck, clean lint, 81.08% coverage, and production build via `npm run verify`. Convex features: schema, union validators, mutations, actions, internalMutation, query, workflows.
 
-### 2026-09-10 - working tree
+### 2026-09-10 - fe2898d
 Remediated internal-only authorization pattern (P1-2) in `convex/precedents.ts:215-230`: removed flawed `if (userId && ...)` pseudo-defense check from `attachMatchesToClaim` and documented why it is internal-only. Because `attachMatchesToClaim` is an `internalMutation` unreachable by external clients, authorization and claim ownership are strictly enforced at the action boundary in `retrieveTopPrecedents` via `requireClaimOwnerAction`. Removed unused `getAuthUserId` import and updated tests in `tests/authorization.test.ts` and `tests/convexPrecedents.test.ts` to assert that `retrieveTopPrecedents` guards the action boundary and prevents unauthorized callers from scheduling or executing `attachMatchesToClaim`. Verified 724 passing unit tests across 42 suites, clean typecheck, clean lint, 81.08% test coverage, and production build via `npm run verify`. Convex features: internalMutation, actions, auth.
+
+### 2026-09-10 - working tree
+Eliminated fabricated clinical facts and hardcoded confidence from deterministic P2P Live Copilot fallback (`convex/actions/p2pLiveCopilot.ts:329-335,503-541`, `src/components/p2p/P2PLiveCopilot.tsx`, `src/hooks/useLiveCallCopilot.ts`):
+- Clinical Facts & Policy Prompt Hardening: Purged ungrounded assertions ("Severe symptoms", "Grade 3/4", "Positive exam findings", "Diagnostic imaging confirmed severe pathology") when patient clinical facts or CPB evidence are unpopulated in LLM system prompts, replacing them with honest "Not documented on file" and "Published policy criteria pending retrieval" notices.
+- Deterministic Rebuttal Fallback Calibration: In `buildDeterministicFastAnswer` and `buildDeterministicReviewerPushback`, eliminated fabricated assertions ("12 weeks of structured therapy and failed therapeutic injections in medical record", "Severe pathology", hardcoded `confidenceScore: 94`), replacing chart proofs with explicit `[Simulation Only]` placeholders and calibrating confidence scores dynamically based on actual documented clinical facts and retrieved CPB records.
+- UI SIMULATION ONLY Badging: Added prominent amber `SIMULATION ONLY` badges across the active Fast Answer header, Detected Objection card, Chart Proof Evidence strip, Exact Policy Citation strip, and the Fast Answers Generated archive list in `P2PLiveCopilot.tsx`.
+- Safety & Persistence Invariant: Guaranteed that fallback `chartProof` and simulation answers are never persisted as factual clinical facts in `claims.appealContext.clinicalFacts` and do not artificially inflate live call momentum win scores.
+- Testing & Verification: Added regression tests in `tests/actionsP2PAndChatbot.test.ts` and `tests/p2pLiveCopilot.test.ts` validating fallback simulation-only behavior, absence of fabricated facts, grounded confidence scoring, and UI badging logic. Verified 726 passing tests across 42 suites, 100% clean typecheck, clean ESLint, and production build via `npm run verify`. Convex features: actions, mutations.

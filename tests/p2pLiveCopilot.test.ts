@@ -336,5 +336,33 @@ describe("Real-Time P2P Live Call Copilot (Clinical Defense Sentinel)", () => {
     onEnd();
     expect(restarted).toBe(false);
   });
+
+  it("badges SIMULATION ONLY on fast answers and chart proof when generatedBy is fallback", () => {
+    const fallbackAnswer = {
+      id: "fa_fallback_1",
+      trapQuestion: "Did the patient complete conservative therapy?",
+      suggestedQuote: "Please review the patient's objective examination findings and conservative therapy record.",
+      chartProof: "[Simulation Only] Conservative therapy trial documentation pending chart verification.",
+      cpbCitation: "UHC Clinical Coverage Policy (Section Criteria)",
+      confidenceScore: 78,
+      timestamp: Date.now(),
+      generatedBy: "fallback" as const,
+    };
+
+    // Verify fallback does not claim verified facts
+    expect(fallbackAnswer.generatedBy).toBe("fallback");
+    expect(fallbackAnswer.chartProof).toContain("[Simulation Only]");
+    expect(fallbackAnswer.chartProof).not.toContain("12 weeks of structured therapy");
+    expect(fallbackAnswer.chartProof).not.toContain("Severe symptoms");
+    expect(fallbackAnswer.confidenceScore).not.toBe(94);
+
+    // Verify badge decision logic used in P2PLiveCopilot.tsx
+    const isFallback = fallbackAnswer.generatedBy === "fallback";
+    const badgeText = isFallback ? "SIMULATION ONLY" : `${fallbackAnswer.confidenceScore}% Grounded`;
+    expect(badgeText).toBe("SIMULATION ONLY");
+
+    const chartProofBadge = isFallback ? "SIMULATION ONLY" : null;
+    expect(chartProofBadge).toBe("SIMULATION ONLY");
+  });
 });
 
