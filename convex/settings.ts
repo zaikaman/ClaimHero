@@ -1,4 +1,4 @@
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId, requireAuthUser } from "./lib/auth";
@@ -47,6 +47,25 @@ export const getSettings = query({
 
     return {
       userId,
+      ...DEFAULT_USER_SETTINGS,
+    };
+  },
+});
+
+export const getSettingsInternal = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const userSettings = await ctx.db
+      .query("userSettings")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+
+    if (userSettings) {
+      return userSettings;
+    }
+
+    return {
+      userId: args.userId,
       ...DEFAULT_USER_SETTINGS,
     };
   },
@@ -210,14 +229,21 @@ export const resetPortfolio = mutation({
       }
     }
 
+    const takeBounded = async <T>(query: {
+      take?: (n: number) => Promise<T[]>;
+      collect: () => Promise<T[]>;
+    }, limit: number): Promise<T[]> => {
+      if (typeof query.take === "function") {
+        return await query.take(limit);
+      }
+      return await query.collect();
+    };
+
     // Bounded fetch of claims strictly scoped to user (up to 50 at a time)
     const claimsQuery = ctx.db
       .query("claims")
       .withIndex("by_user", (q) => q.eq("userId", userId));
-    const hasTake = "take" in claimsQuery && typeof claimsQuery.take === "function";
-    const claims = hasTake
-      ? await claimsQuery.take(50)
-      : await claimsQuery.collect();
+    const claims = await takeBounded(claimsQuery, 50);
 
     for (const claim of claims) {
       if (ctx.scheduler && typeof ctx.scheduler.runAfter === "function") {
@@ -243,10 +269,10 @@ export const resetPortfolio = mutation({
         });
       } else {
         // Fallback for mocked unit test runners without scheduler
-        const evidences = await ctx.db
+        const evQuery = ctx.db
           .query("clinicalEvidences")
-          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-          .collect();
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id));
+        const evidences = await takeBounded(evQuery, 50);
         for (const ev of evidences) {
           if (ev.screenshotStorageId) {
             try {
@@ -258,10 +284,10 @@ export const resetPortfolio = mutation({
           await ctx.db.delete(ev._id);
         }
 
-        const appeals = await ctx.db
+        const apQuery = ctx.db
           .query("appeals")
-          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-          .collect();
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id));
+        const appeals = await takeBounded(apQuery, 50);
         for (const ap of appeals) {
           if (ap.pdfExportStorageId) {
             try {
@@ -273,42 +299,42 @@ export const resetPortfolio = mutation({
           await ctx.db.delete(ap._id);
         }
 
-        const threads = await ctx.db
+        const thQuery = ctx.db
           .query("emailThreads")
-          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-          .collect();
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id));
+        const threads = await takeBounded(thQuery, 50);
         for (const th of threads) {
-          const msgs = await ctx.db
+          const mQuery = ctx.db
             .query("emailMessages")
-            .withIndex("by_thread", (q) => q.eq("threadId", th._id))
-            .collect();
+            .withIndex("by_thread", (q) => q.eq("threadId", th._id));
+          const msgs = await takeBounded(mQuery, 50);
           for (const m of msgs) {
             await ctx.db.delete(m._id);
           }
           await ctx.db.delete(th._id);
         }
 
-        const p2p = await ctx.db
+        const p2pQuery = ctx.db
           .query("p2pScripts")
-          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-          .collect();
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id));
+        const p2p = await takeBounded(p2pQuery, 50);
         for (const p of p2p) {
           await ctx.db.delete(p._id);
         }
 
-        const sessions = await ctx.db
+        const sessQuery = ctx.db
           .query("p2pCallSessions")
-          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-          .collect();
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id));
+        const sessions = await takeBounded(sessQuery, 50);
         for (const s of sessions) {
           await ctx.db.delete(s._id);
         }
 
         // Soft-delete / tombstone audit logs for statutory compliance rather than hard purging
-        const logs = await ctx.db
+        const logQuery = ctx.db
           .query("appealAuditLogs")
-          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-          .collect();
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id));
+        const logs = await takeBounded(logQuery, 50);
         const now = Date.now();
         for (const l of logs) {
           if (!l.isTombstoned) {

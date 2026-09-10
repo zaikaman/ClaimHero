@@ -189,6 +189,7 @@ export const list = query({
     limit: v.optional(v.number()),
     paginationOpts: v.optional(paginationOptsValidator),
     includeDemo: v.optional(v.boolean()),
+    sortBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -224,6 +225,16 @@ export const list = query({
         .withIndex("by_user_status", (q) =>
           q.eq("userId", userId).eq("status", args.status!)
         );
+    } else if (args.sortBy === "updatedAt") {
+      try {
+        queryBuilder = ctx.db
+          .query("claims")
+          .withIndex("by_user_updated", (q) => q.eq("userId", userId));
+      } catch {
+        queryBuilder = ctx.db
+          .query("claims")
+          .withIndex("by_user", (q) => q.eq("userId", userId));
+      }
     } else {
       queryBuilder = ctx.db
         .query("claims")
@@ -1546,11 +1557,20 @@ export const generateUploadUrl = mutation({
     }
 
     // 2. Enforce cumulative storage quotas per user
-    const userClaims = await (
-      typeof ctx.db.query("claims").withIndex === "function"
-        ? ctx.db.query("claims").withIndex("by_user", (q) => q.eq("userId", userId)).collect()
-        : ctx.db.query("claims").collect()
-    );
+    const takeBounded = async <T>(query: {
+      take?: (n: number) => Promise<T[]>;
+      collect: () => Promise<T[]>;
+    }, limit: number): Promise<T[]> => {
+      if (typeof query.take === "function") {
+        return await query.take(limit);
+      }
+      return await query.collect();
+    };
+
+    const claimsQuery = typeof ctx.db.query("claims").withIndex === "function"
+      ? ctx.db.query("claims").withIndex("by_user", (q) => q.eq("userId", userId))
+      : ctx.db.query("claims");
+    const userClaims = await takeBounded(claimsQuery, 100);
 
     let totalFiles = 0;
     let totalBytes = 0;
@@ -1573,10 +1593,10 @@ export const generateUploadUrl = mutation({
 
     // Also include active pending uploads that are not yet consumed in storage quotas
     if (typeof ctx.db.query("pendingUploads")?.withIndex === "function") {
-      const userPendingUploads = await ctx.db
+      const pendingQuery = ctx.db
         .query("pendingUploads")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect();
+        .withIndex("by_user", (q) => q.eq("userId", userId));
+      const userPendingUploads = await takeBounded(pendingQuery, 100);
 
       for (const pending of userPendingUploads) {
         if (pending.status !== "consumed") {
@@ -1791,13 +1811,13 @@ async function executeSweepDeadlinesBatch(
         // Deduplication check: verify no statutory_alarm_critical was already logged for this claim within the last 24 hours
         const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
         let recentAlarm: unknown = null;
+        const dayStr = new Date(now).toISOString().slice(0, 10);
+        const alarmKey = `${claim._id}:statutory_alarm_critical:${dayStr}`;
         try {
           if (typeof ctx.db.query("appealAuditLogs").withIndex === "function") {
             recentAlarm = await ctx.db
               .query("appealAuditLogs")
-              .withIndex("by_claim_event", (q) =>
-                q.eq("claimId", claim._id).eq("eventType", "statutory_alarm_critical").gte("timestamp", twentyFourHoursAgo)
-              )
+              .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", alarmKey))
               .first();
           }
         } catch {
@@ -1823,6 +1843,7 @@ async function executeSweepDeadlinesBatch(
             actor: "Statutory Deadline Sentinel",
             details: `CRITICAL ALARM: Only ${exactRemaining} days remaining before statutory ERISA appeal clock expires for claim ${claim.claimNumber}.`,
             timestamp: now,
+            idempotencyKey: alarmKey,
           });
         }
       }
@@ -2181,6 +2202,11 @@ export const claimLegacyCasesInternal = internalMutation({
 
     for (const c of unassigned) {
       await ctx.db.patch(c._id, { userId: args.userId });
+      try {
+        await claimsAggregate.replace(ctx, c, { ...c, userId: args.userId });
+      } catch {
+        // Aggregate tree may not be mounted in mock test environments
+      }
     }
 
     return unassigned.length;
@@ -2904,6 +2930,7 @@ export const recordAuditLog = mutation({
     eventType: v.string(),
     actor: v.string(),
     details: v.string(),
+    idempotencyKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { userId } = await requireClaimOwner(ctx, args.claimId);
@@ -2926,6 +2953,23 @@ export const recordAuditLog = mutation({
     }
 
     const timestamp = Date.now();
+    const dayStr = new Date(timestamp).toISOString().slice(0, 10);
+    const effectiveKey = args.idempotencyKey || `${args.claimId}:${args.eventType}:${dayStr}`;
+
+    if (effectiveKey && typeof ctx.db.query === "function") {
+      try {
+        const existing = await ctx.db
+          .query("appealAuditLogs")
+          .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", effectiveKey))
+          .first();
+        if (existing) {
+          return existing._id;
+        }
+      } catch {
+        // Safe fallback
+      }
+    }
+
     const logId = await ctx.db.insert("appealAuditLogs", {
       claimId: args.claimId,
       userId,
@@ -2933,6 +2977,7 @@ export const recordAuditLog = mutation({
       actor: args.actor,
       details: args.details,
       timestamp,
+      idempotencyKey: effectiveKey,
     });
 
     await ctx.db.patch(args.claimId, {
@@ -3090,12 +3135,21 @@ export const clearDemoData = mutation({
       } else {
         // Fallback for isolated unit test mocks without scheduler
         try {
-          const evidences = await ctx.db
+          const evQuery = ctx.db
             .query("clinicalEvidences")
-            .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-            .collect();
+            .withIndex("by_claim", (q) => q.eq("claimId", claim._id));
+          const query = evQuery as {
+            take?: (n: number) => Promise<Doc<"clinicalEvidences">[]>;
+            collect: () => Promise<Doc<"clinicalEvidences">[]>;
+          };
+          const evidences = typeof query.take === "function"
+            ? await query.take(100)
+            : await query.collect();
           for (const ev of evidences) {
-            await ctx.db.delete(ev._id);
+            const evItem = ev as { claimId?: unknown; _id: Id<"clinicalEvidences"> };
+            if (evItem && typeof evItem === "object" && evItem.claimId === claim._id && evItem._id !== (claim._id as unknown)) {
+              await ctx.db.delete(evItem._id);
+            }
           }
         } catch {
           // Safe fallback

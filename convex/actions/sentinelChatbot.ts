@@ -773,9 +773,10 @@ async function maybeSummarizeConversation(
 
       const newSummary = res.choices[0]?.message?.content?.trim();
       if (newSummary) {
-        await ctx.runMutation(internal.chatbot.updateSessionSummary, {
+        await ctx.runMutation(internal.chatbot.summarizeAndTrimSessionInternal, {
           sessionId,
           summary: newSummary,
+          keepRecentCount: 10,
         });
       }
     } catch (e) {

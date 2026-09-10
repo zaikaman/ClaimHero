@@ -17,6 +17,17 @@ const sourceKindValidator = v.union(
 export type HydratedPrecedent = Omit<Doc<"precedents">, "embedding">;
 
 /**
+ * Strips 12KB raw embedding vectors from precedent documents and marks embedding_redacted: true
+ */
+export function stripEmbedding(doc: Doc<"precedents">): HydratedPrecedent {
+  const { embedding: _, ...rest } = doc;
+  return {
+    ...rest,
+    embedding_redacted: true,
+  };
+}
+
+/**
  * Hydrate vector-search hits in parallel and strip 12KB raw embedding vectors.
  */
 export const hydrateByIds = internalQuery({
@@ -28,8 +39,7 @@ export const hydrateByIds = internalQuery({
     const docs: HydratedPrecedent[] = [];
     for (const doc of rawDocs) {
       if (doc) {
-        const { embedding: _, ...rest } = doc;
-        docs.push(rest);
+        docs.push(stripEmbedding(doc));
       }
     }
     return docs;
@@ -91,10 +101,7 @@ export const listForReindex = internalQuery({
         numItems: batchSize,
       });
 
-      const page: HydratedPrecedent[] = pageResult.page.map((doc) => {
-        const { embedding: _, ...rest } = doc;
-        return rest;
-      });
+      const page: HydratedPrecedent[] = pageResult.page.map((doc) => stripEmbedding(doc));
 
       return {
         page,
@@ -106,10 +113,7 @@ export const listForReindex = internalQuery({
     // Fallback for mock environments / unit tests without paginate
     const docs = await queryBuilder.take(batchSize);
     return {
-      page: docs.map((doc) => {
-        const { embedding: _, ...rest } = doc;
-        return rest;
-      }),
+      page: docs.map((doc) => stripEmbedding(doc)),
       isDone: true,
       continueCursor: null,
     };
@@ -200,6 +204,8 @@ export const insertPrecedent = internalMutation({
       statutoryLanguage: args.statutoryLanguage,
       outcome: args.outcome,
       embedding: normalized,
+      embedding_redacted: false,
+      retentionPolicy: "active_statutory",
       sourceClaimId: args.sourceClaimId,
       corpusKey: args.corpusKey,
       createdAt: Date.now(),
@@ -376,10 +382,7 @@ export const searchLexicalPrecedentsInternal = internalQuery({
       })
       .take(args.limit || 16);
 
-    return results.map((row) => {
-      const { embedding: _, ...rest } = row;
-      return rest;
-    });
+    return results.map((row) => stripEmbedding(row));
   },
 });
 
@@ -422,7 +425,42 @@ export const searchTextPrecedents = query({
       winningArgument: row.winningArgument,
       statutoryLanguage: row.statutoryLanguage,
       sourceUrl: row.sourceUrl,
+      embedding_redacted: true,
     }));
+  },
+});
+
+/**
+ * Internal mutation to enforce vector retention policies across archived precedents.
+ */
+export const applyRetentionPolicyInternal = internalMutation({
+  args: {
+    maxAgeDays: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const maxAgeDays = args.maxAgeDays ?? 365 * 7; // Standard 7-year ERISA retention window
+    const now = Date.now();
+    const cutoff = now - maxAgeDays * 24 * 60 * 60 * 1000;
+    const candidates = await ctx.db.query("precedents").take(50);
+    let updated = 0;
+
+    for (const doc of candidates) {
+      if (!doc.retentionPolicy) {
+        await ctx.db.patch(doc._id, {
+          retentionPolicy: "active_statutory",
+          retentionExpiresAt: doc.createdAt + maxAgeDays * 24 * 60 * 60 * 1000,
+        });
+        updated++;
+      } else if (doc.createdAt < cutoff && !doc.embedding_redacted) {
+        await ctx.db.patch(doc._id, {
+          embedding_redacted: true,
+          retentionPolicy: "archived_statutory",
+        });
+        updated++;
+      }
+    }
+
+    return { processed: candidates.length, updated };
   },
 });
 

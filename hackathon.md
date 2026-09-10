@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-10T14:24:00Z
+- **Last updated:** 2026-09-10T14:42:00Z
 
 ## Log
 
@@ -1172,7 +1172,7 @@ Resolved P1-13 through P1-18 across frontend routing, onboarding lifecycle, liab
 - P1-18 (`src/hooks/useRouterView.ts`, `src/App.tsx`): Synchronized active `selectedClaimId` to the `?claim=` query parameter, preserving query state during view transitions and restoring case context on page refresh and browser back/forward.
 - Testing & Verification (`tests/routerAndUrlSync.test.ts`, `tests/liabilityDefaultsEmptyState.test.ts`, `tests/shortcutsRegistry.test.ts`): Added 13 dedicated unit tests; verified 739 passing tests across 45 suites, clean typecheck, clean lint, and production build via `npm run verify`.
 
-### 2026-09-10 - working tree
+### 2026-09-10 - a97e66c
 Hardened backend security, webhook replays, cron idempotency, query determinism, rate limiting, bundle splitting, accessibility, and print security (P2-1 through P2-9):
 - P2-1 (`convex/http.ts`): Enforced 1MB payload ceiling on AgentMail webhook endpoints with early 413 response; replaced fail-open limiter catch block with fail-closed 503 response on rate-limiter failure.
 - P2-2 (`convex/lib/agentMailWebhook.ts`): Rejected webhook replay attempts older than 7 days (`ageSec > 7 * 86400`) with 401 error, while maintaining idempotent acceptance within the 7-day replay window.
@@ -1184,3 +1184,14 @@ Hardened backend security, webhook replays, cron idempotency, query determinism,
 - P2-8 (`src/components/common/CommandDialog.tsx`, `src/components/chat/SentinelChatbot.tsx`, `src/components/evidence/PolicyViewer.tsx`, `src/components/radar/PrivacyRedactionFilter.tsx`): Enhanced keyboard navigation and screen-reader accessibility with ARIA combobox/listbox/option attributes, Tab focus cycle traps, `aria-live="polite"` on streaming responses, and descriptive `aria-label` attributes.
 - P2-9 (`src/components/chat/SentinelChatbot.tsx`, `src/components/layout/Header.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/layout/Shell.tsx`, `index.html`): Added print stylesheet rules hiding sidebars, navigation, ambient canvas shaders, and chat overlays; added defense-in-depth CSP `frame-ancestors 'none'` and `X-Content-Type-Options: nosniff` headers and meta tags.
 - Testing & Verification (`tests/convexHttp.test.ts`): Added regression test coverage for 1MB payload caps (413) and fail-closed limiter errors (503). Verified 741 passing unit tests across 45 suites, 100% clean typecheck, 0 ESLint warnings, and successful production build. Convex features: httpAction, schema, indexes, queries, mutations, actions, rateLimiter.
+
+### 2026-09-10 - working tree
+Implemented backend architectural, performance, and credit-conservation hardening across Convex queries, mutations, indexes, and external actions (D-1 through D-7):
+- Bounded Indexed Reads & Pagination Cursors (D-1): Replaced unbounded collect queries with indexed bounded take(n) across claims storage checks, clearDemoData, audit logs, clinical evidence retrieval, emails, and portfolio reset; added compound index `by_user_updated` on `claims` and `by_claim_time` / `by_claim_relevance` on `clinicalEvidences` and `emailMessages`.
+- Vector Payload Stripping & Retention Policies (D-2): Stripped 12KB embedding vectors from `hydrateByIds`, `listForReindex`, and lexical search mutations, setting `embedding_redacted: true`; added `retentionPolicy` and `retentionExpiresAt` fields to precedents schema with `applyRetentionPolicyInternal`.
+- Incremental Aggregate Maintenance (D-3): Fully synchronized `claimsAggregate.replace` during case assignment in `claimLegacyCasesInternal` and verified delete hooks across `deleteCase`, `resetPortfolio`, `clearDemoData`, and unassigned claim cleanups.
+- Chatbot History Summarization & Trimming (D-4): Added `summarizeAndTrimSessionInternal` in `convex/chatbot.ts` and wired Sentinel chatbot action to automatically summarize and trim older conversation messages past the keep threshold.
+- Idempotency Key Deduplication (D-5): Added `idempotencyKey` to `appealAuditLogs` with unique index `by_idempotency_key`; deduplicated statutory alarm inserts in `sweepDeadlinesBatch` and audit logging mutations using standard `claimId:eventType:day` keys.
+- Firecrawl Policy Snapshot Caching (D-6): Added `policySnapshots` table with `by_url_hash` and `by_captured_at` indexes; cached raw markdown, extracted JSON, and visual evidence by SHA-256 URL hash in `scrapeFirecrawlPolicySource`, bypassing expensive external web crawls and conserving Firecrawl credits unless `autoRescanPolicies` is active or `forceRescan` is requested.
+- Visual Proof Screenshot Storage URL Resolution (D-7): Enforced strict rejection of raw base64 data URIs in `clinicalEvidences` database rows; visual proof screenshots are persisted exclusively in Convex File Storage and served via signed storage URLs.
+- Testing & Verification: Created `tests/backendOptimizationsD1D7.test.ts` covering D-1 through D-7; validated 751 passing unit tests across 46 test suites, clean typecheck, 0 ESLint warnings, and successful production build via `npm run verify`. Convex features: schema, indexes, queries, mutations, internalMutation, internalQuery, actions, storage, aggregates, rateLimiter.

@@ -1646,6 +1646,7 @@ describe("Convex Advanced Components & Infrastructure (Rate Limiter, Search Inde
         actor: "Statutory Deadline Sentinel",
         details: expect.stringContaining("CRITICAL ALARM: Only 10 days remaining"),
         timestamp: expect.any(Number),
+        idempotencyKey: expect.stringMatching(/^claim_1:statutory_alarm_critical:/),
       });
 
       // Scheduled the next batch because isDone is false

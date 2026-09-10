@@ -50,15 +50,23 @@ export const listByClaim = query({
     const authorized = await getClaimIfAuthorized(ctx, args.claimId);
     if (!authorized) return [];
 
-    const evidences = await ctx.db
-      .query("clinicalEvidences")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .take(50);
+    let evidences: Doc<"clinicalEvidences">[];
+    try {
+      evidences = await ctx.db
+        .query("clinicalEvidences")
+        .withIndex("by_claim_relevance", (q) => q.eq("claimId", args.claimId))
+        .order("desc")
+        .take(50);
+    } catch {
+      const fallback = await ctx.db
+        .query("clinicalEvidences")
+        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+        .take(50);
+      evidences = fallback.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    }
 
-    // Sort by relevance score descending, resolve signed screenshot URLs, and sanitize raw formatting
-    const sorted = evidences.sort((a, b) => b.relevanceScore - a.relevanceScore);
     return await Promise.all(
-      sorted.map(async (item) => {
+      evidences.map(async (item) => {
         let screenshotUrl = item.screenshotUrl;
         if (item.screenshotStorageId) {
           const resolved = await ctx.storage.getUrl(item.screenshotStorageId);
@@ -87,14 +95,22 @@ export const listByClaimInternal = internalQuery({
     claimId: v.id("claims"),
   },
   handler: async (ctx, args): Promise<Doc<"clinicalEvidences">[]> => {
-    const evidences = await ctx.db
-      .query("clinicalEvidences")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .take(50);
-
-    const sorted = evidences.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    let evidences: Doc<"clinicalEvidences">[];
+    try {
+      evidences = await ctx.db
+        .query("clinicalEvidences")
+        .withIndex("by_claim_relevance", (q) => q.eq("claimId", args.claimId))
+        .order("desc")
+        .take(50);
+    } catch {
+      const fallback = await ctx.db
+        .query("clinicalEvidences")
+        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+        .take(50);
+      evidences = fallback.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    }
     return await Promise.all(
-      sorted.map(async (item) => {
+      evidences.map(async (item) => {
         let screenshotUrl = item.screenshotUrl;
         if (item.screenshotStorageId) {
           const resolved = await ctx.storage.getUrl(item.screenshotStorageId);
@@ -182,8 +198,13 @@ async function applyBatchInsert(ctx: MutationCtx, args: BatchInsertEvidenceArgs)
 
   const now = Date.now();
   const insertedIds: Id<"clinicalEvidences">[] = [];
-
   for (const item of args.evidences) {
+    // Strictly sanitize screenshotUrl: never persist base64 data URIs or raw base64 payloads into database rows
+    const cleanScreenshotUrl =
+      item.screenshotUrl && item.screenshotUrl.startsWith("http") && item.screenshotUrl.length < 2048
+        ? item.screenshotUrl
+        : undefined;
+
     const id = await ctx.db.insert("clinicalEvidences", {
       claimId: args.claimId,
       sourceType: item.sourceType,
@@ -193,7 +214,7 @@ async function applyBatchInsert(ctx: MutationCtx, args: BatchInsertEvidenceArgs)
       extractedEvidenceMarkdown: item.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
       relevanceScore: item.relevanceScore,
       screenshotStorageId: item.screenshotStorageId,
-      screenshotUrl: item.screenshotUrl,
+      screenshotUrl: cleanScreenshotUrl,
       capturedAt: item.capturedAt,
       createdAt: now,
     });
@@ -282,10 +303,16 @@ async function applyClearByClaim(ctx: MutationCtx, claimId: Id<"claims">) {
     .query("clinicalEvidences")
     .withIndex("by_claim", (q) => q.eq("claimId", claimId));
 
-  const hasTake = "take" in queryBuilder && typeof queryBuilder.take === "function";
-  const existing = hasTake
-    ? await queryBuilder.take(50)
-    : await queryBuilder.collect();
+  const takeBounded = async <T>(query: {
+    take?: (n: number) => Promise<T[]>;
+    collect: () => Promise<T[]>;
+  }, limit: number): Promise<T[]> => {
+    if (typeof query.take === "function") {
+      return await query.take(limit);
+    }
+    return await query.collect();
+  };
+  const existing = await takeBounded(queryBuilder, 50);
 
   for (const item of existing) {
     if (item.screenshotStorageId) {
@@ -389,6 +416,11 @@ interface InsertSingleEvidenceArgs extends ClinicalEvidenceItem {
 async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArgs): Promise<Id<"clinicalEvidences">> {
   const now = Date.now();
   const cleanClause = sanitizeCitationClause(args.citationClause);
+  const cleanScreenshotUrl =
+    args.screenshotUrl && args.screenshotUrl.startsWith("http") && args.screenshotUrl.length < 2048
+      ? args.screenshotUrl
+      : undefined;
+
   const id = await ctx.db.insert("clinicalEvidences", {
     claimId: args.claimId,
     sourceType: args.sourceType,
@@ -398,7 +430,7 @@ async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArg
     extractedEvidenceMarkdown: args.extractedEvidenceMarkdown.replace(/\*\*/g, "").trim(),
     relevanceScore: args.relevanceScore,
     screenshotStorageId: args.screenshotStorageId,
-    screenshotUrl: args.screenshotUrl,
+    screenshotUrl: cleanScreenshotUrl,
     capturedAt: args.capturedAt,
     createdAt: now,
   });
@@ -537,5 +569,75 @@ export const searchEvidence = query({
       title: item.title?.replace(/\*\*/g, "") || "",
       citationClause: sanitizeCitationClause(item.citationClause),
     }));
+  },
+});
+
+/**
+ * Internal query to fetch a cached Firecrawl policy snapshot by normalized URL hash.
+ */
+export const getPolicySnapshotInternal = internalQuery({
+  args: {
+    urlHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (typeof ctx.db.query !== "function") return null;
+    try {
+      return await ctx.db
+        .query("policySnapshots")
+        .withIndex("by_url_hash", (q) => q.eq("urlHash", args.urlHash))
+        .first();
+    } catch {
+      return null;
+    }
+  },
+});
+
+/**
+ * Internal mutation to store a cached Firecrawl policy snapshot by URL hash.
+ */
+export const savePolicySnapshotInternal = internalMutation({
+  args: {
+    urlHash: v.string(),
+    url: v.string(),
+    title: v.optional(v.string()),
+    markdown: v.string(),
+    extractedJson: v.optional(v.string()),
+    screenshotStorageId: v.optional(v.id("_storage")),
+    screenshotUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const cleanScreenshotUrl =
+      args.screenshotUrl && args.screenshotUrl.startsWith("http") && args.screenshotUrl.length < 2048
+        ? args.screenshotUrl
+        : undefined;
+
+    const existing = await ctx.db
+      .query("policySnapshots")
+      .withIndex("by_url_hash", (q) => q.eq("urlHash", args.urlHash))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        title: args.title ?? existing.title,
+        markdown: args.markdown,
+        extractedJson: args.extractedJson ?? existing.extractedJson,
+        screenshotStorageId: args.screenshotStorageId ?? existing.screenshotStorageId,
+        screenshotUrl: cleanScreenshotUrl ?? existing.screenshotUrl,
+        capturedAt: now,
+      });
+      return existing._id;
+    }
+
+    return await ctx.db.insert("policySnapshots", {
+      urlHash: args.urlHash,
+      url: args.url,
+      title: args.title,
+      markdown: args.markdown,
+      extractedJson: args.extractedJson,
+      screenshotStorageId: args.screenshotStorageId,
+      screenshotUrl: cleanScreenshotUrl,
+      capturedAt: now,
+    });
   },
 });

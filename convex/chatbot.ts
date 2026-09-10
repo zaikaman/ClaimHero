@@ -309,6 +309,47 @@ export const updateSessionSummary = internalMutation({
   },
 });
 
+/**
+ * Internal mutation to update session summary and trim older messages
+ * to enforce bounded history and prevent unbounded table growth.
+ */
+export const summarizeAndTrimSessionInternal = internalMutation({
+  args: {
+    sessionId: v.id("chatbotSessions"),
+    summary: v.string(),
+    keepRecentCount: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const keepCount = Math.max(4, args.keepRecentCount ?? 10);
+    const now = Date.now();
+
+    // Fetch all messages in the session ordered oldest first
+    const messages = await ctx.db
+      .query("chatbotMessages")
+      .withIndex("by_session_and_time", (q) => q.eq("sessionId", args.sessionId))
+      .order("asc")
+      .take(100);
+
+    // If more messages than the keep threshold, delete the older ones
+    if (messages.length > keepCount) {
+      const messagesToDelete = messages.slice(0, messages.length - keepCount);
+      for (const msg of messagesToDelete) {
+        await ctx.db.delete(msg._id);
+      }
+    }
+
+    const remainingCount = Math.min(messages.length, keepCount);
+
+    await ctx.db.patch(args.sessionId, {
+      summary: args.summary,
+      messageCount: remainingCount,
+      updatedAt: now,
+    });
+
+    return { trimmedCount: Math.max(0, messages.length - keepCount), remainingCount };
+  },
+});
+
 /* ========================================================================= */
 /* Internal Tool Call Data Access Queries                                    */
 /* ========================================================================= */

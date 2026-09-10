@@ -6,6 +6,16 @@ import { components, internal } from "./_generated/api";
 import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
 
+async function takeBounded<T>(query: {
+  take?: (n: number) => Promise<T[]>;
+  collect: () => Promise<T[]>;
+}, limit: number): Promise<T[]> {
+  if (typeof query.take === "function") {
+    return await query.take(limit);
+  }
+  return await query.collect();
+}
+
 /**
  * Internal helper to query threads for a claim
  */
@@ -15,16 +25,7 @@ async function fetchThreadsForClaim(ctx: QueryCtx, claimId: Id<"claims">): Promi
     .withIndex("by_claim", (q) => q.eq("claimId", claimId))
     .order("desc");
 
-  const qWithTake = q as unknown as {
-    take?: (count: number) => Promise<Doc<"emailThreads">[]>;
-    collect: () => Promise<Doc<"emailThreads">[]>;
-  };
-
-  const threads = typeof qWithTake.take === "function"
-    ? await qWithTake.take(50)
-    : await qWithTake.collect();
-
-  return threads;
+  return await takeBounded(q, 50);
 }
 
 /**
@@ -36,14 +37,7 @@ async function fetchThreadWithMessages(ctx: QueryCtx, thread: Doc<"emailThreads"
     .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
     .order("asc");
 
-  const msgQueryWithTake = msgQuery as unknown as {
-    take?: (count: number) => Promise<Doc<"emailMessages">[]>;
-    collect: () => Promise<Doc<"emailMessages">[]>;
-  };
-
-  const messages = typeof msgQueryWithTake.take === "function"
-    ? await msgQueryWithTake.take(50)
-    : await msgQueryWithTake.collect();
+  const messages = await takeBounded(msgQuery, 50);
 
   const messagesWithUrls = await Promise.all(
     messages.map(async (msg) => {
@@ -319,7 +313,7 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
     const pendingMessages = await ctx.db
       .query("emailMessages")
       .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-      .collect();
+      .take(50);
     for (const msg of pendingMessages) {
       if (msg.autoReplyStatus === "pending") {
         await ctx.db.patch(msg._id, { autoReplyStatus: "dispatched" });
@@ -825,7 +819,7 @@ export const cleanupMismatchedMessagesForClaim = mutation({
     const messages = await ctx.db
       .query("emailMessages")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
+      .take(100);
 
     let deletedCount = 0;
     for (const msg of messages) {
@@ -837,16 +831,16 @@ export const cleanupMismatchedMessagesForClaim = mutation({
       }
     }
 
-    const remaining = await ctx.db
+    const remainingQuery = ctx.db
       .query("emailMessages")
-      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .collect();
+      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId));
+    const remaining = await takeBounded(remainingQuery, 1);
 
     if (remaining.length === 0) {
-      const threads = await ctx.db
+      const threadsQuery = ctx.db
         .query("emailThreads")
-        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-        .collect();
+        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId));
+      const threads = await takeBounded(threadsQuery, 50);
       for (const th of threads) {
         await ctx.db.delete(th._id);
       }
@@ -865,7 +859,8 @@ export const cleanupMismatchedMessagesForClaim = mutation({
 export const markBounceMessagesSkippedInternal = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const messages = await ctx.db.query("emailMessages").take(100);
+    const msgQuery = ctx.db.query("emailMessages");
+    const messages = await takeBounded(msgQuery, 100);
     let patched = 0;
     for (const msg of messages) {
       const subj = (msg.subject || "").toLowerCase();

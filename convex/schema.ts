@@ -180,6 +180,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
+    .index("by_user_updated", ["userId", "updatedAt"])
     .index("by_user_status", ["userId", "status"])
     .index("by_user_payer", ["userId", "insurancePayer"])
     .index("by_user_payer_status", ["userId", "insurancePayer", "status"])
@@ -210,6 +211,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_claim", ["claimId"])
+    .index("by_claim_time", ["claimId", "createdAt"])
+    .index("by_claim_relevance", ["claimId", "relevanceScore"])
     .index("by_claim_source", ["claimId", "sourceType"])
     .index("by_source", ["sourceType"])
     .searchIndex("search_evidence", {
@@ -285,6 +288,7 @@ export default defineSchema({
   })
     .index("by_thread", ["threadId"])
     .index("by_claim", ["claimId"])
+    .index("by_claim_time", ["claimId", "receivedAt"])
     .index("by_agent_mail_message_id", ["agentMailMessageId"])
     .index("by_outbound_id", ["outboundId"])
     .index("by_auto_reply_status", ["autoReplyStatus"])
@@ -327,6 +331,9 @@ export default defineSchema({
     statutoryLanguage: v.string(),
     outcome: v.string(),
     embedding: v.array(v.float64()),
+    embedding_redacted: v.optional(v.boolean()),
+    retentionPolicy: v.optional(v.string()),
+    retentionExpiresAt: v.optional(v.number()),
     sourceClaimId: v.optional(v.id("claims")),
     corpusKey: v.string(),
     createdAt: v.number(),
@@ -356,11 +363,13 @@ export default defineSchema({
     timestamp: v.number(),
     isTombstoned: v.optional(v.boolean()),
     tombstonedAt: v.optional(v.number()),
+    idempotencyKey: v.optional(v.string()),
   })
     .index("by_claim", ["claimId"])
     .index("by_claim_and_timestamp", ["claimId", "timestamp"])
     .index("by_claim_event", ["claimId", "eventType", "timestamp"])
     .index("by_user_and_timestamp", ["userId", "timestamp"])
+    .index("by_idempotency_key", ["idempotencyKey"])
     .index("by_timestamp", ["timestamp"]),
 
   // Physician Peer-to-Peer (P2P) Defense Tele-Scripts
@@ -533,6 +542,21 @@ export default defineSchema({
     .index("by_userId_and_storageId", ["userId", "storageId"])
     .index("by_status_and_createdAt", ["status", "createdAt"])
     .index("by_createdAt", ["createdAt"]),
+
+  // Cached Firecrawl policy snapshots by URL hash + capturedAt
+  policySnapshots: defineTable({
+    urlHash: v.string(),
+    url: v.string(),
+    title: v.optional(v.string()),
+    markdown: v.string(),
+    extractedJson: v.optional(v.string()),
+    screenshotStorageId: v.optional(v.id("_storage")),
+    screenshotUrl: v.optional(v.string()),
+    capturedAt: v.number(),
+    expiresAt: v.optional(v.number()),
+  })
+    .index("by_url_hash", ["urlHash"])
+    .index("by_captured_at", ["capturedAt"]),
 });
 
 

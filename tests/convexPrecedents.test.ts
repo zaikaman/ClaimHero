@@ -29,7 +29,10 @@ describe("Convex Precedents & Controlling Authorities Engine", () => {
       };
 
       const res = await (precedents.hydrateByIds as any)._handler(mockCtx, { ids: ["p2", "p1", "p3"] });
-      expect(res).toEqual([doc2, doc1]);
+      expect(res).toEqual([
+        { ...doc2, embedding_redacted: true },
+        { ...doc1, embedding_redacted: true },
+      ]);
     });
 
     it("getByCorpusKey & getBySourceClaim", async () => {
@@ -60,7 +63,7 @@ describe("Convex Precedents & Controlling Authorities Engine", () => {
       };
 
       expect(await (precedents.listForReindex as any)._handler(mockCtx, {})).toEqual({
-        page: docs,
+        page: docs.map((d) => ({ ...d, embedding_redacted: true })),
         isDone: true,
         continueCursor: null,
       });

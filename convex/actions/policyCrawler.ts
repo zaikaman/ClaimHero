@@ -1,6 +1,7 @@
 "use node";
 
 import { action, ActionCtx } from "../_generated/server";
+import crypto from "crypto";
 import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
@@ -312,6 +313,9 @@ export interface FirecrawlPolicySource {
   sourceUrl: string;
   json?: unknown;
   screenshot?: string;
+  screenshotStorageId?: Id<"_storage">;
+  cached?: boolean;
+  capturedAt?: number;
   extractionEngine?: "firecrawl_native" | "openai_fallback";
 }
 
@@ -1521,6 +1525,7 @@ export interface ScrapeExtractionOptions {
   payer?: string;
   cptCodes?: string[];
   denialReasonCode?: string;
+  forceRescan?: boolean;
 }
 
 /**
@@ -1563,6 +1568,39 @@ export async function scrapeFirecrawlPolicySource(
   }
 
   const requestedUrl = sourceUrl.trim();
+  const urlHash = crypto.createHash("sha256").update(requestedUrl.toLowerCase()).digest("hex");
+
+  // Check cached policy snapshots first (honoring autoRescanPolicies setting)
+  if (!extractionOptions?.forceRescan) {
+    try {
+      const cached = await ctx.runQuery(internal.clinicalEvidences.getPolicySnapshotInternal, {
+        urlHash,
+      });
+      if (cached && cached.markdown && !isAccessDeniedDocument(cached.markdown)) {
+        let parsedJson: unknown = undefined;
+        if (cached.extractedJson) {
+          try {
+            parsedJson = JSON.parse(cached.extractedJson);
+          } catch {
+            parsedJson = undefined;
+          }
+        }
+        return {
+          markdown: cached.markdown,
+          sourceUrl: cached.url,
+          json: parsedJson,
+          screenshot: cached.screenshotUrl,
+          screenshotStorageId: cached.screenshotStorageId,
+          cached: true,
+          capturedAt: cached.capturedAt,
+          extractionEngine: parsedJson ? "firecrawl_native" : "openai_fallback",
+        };
+      }
+    } catch {
+      // Continue to live scrape on cache lookup error
+    }
+  }
+
   // Preserve the original deep link (e.g. CMS LCD view/lcd.aspx?lcdid=...) for the
   // primary attempt. Sanitized search permalinks are landing pages without clinical
   // content, so they are only used as a fallback when the deep link is blocked.
@@ -1778,11 +1816,32 @@ export async function scrapeFirecrawlPolicySource(
     metadata: doc.metadata as FirecrawlSearchResult["metadata"],
   });
 
+  const cleanUrl = sanitizePublicPolicyUrl(scrapedSourceUrl ?? workingUrl);
+  let screenshotStorageId: Id<"_storage"> | undefined = undefined;
+  if (screenshot) {
+    screenshotStorageId = await storeScreenshotInStorage(ctx, screenshot);
+  }
+
+  try {
+    await ctx.runMutation(internal.clinicalEvidences.savePolicySnapshotInternal, {
+      urlHash,
+      url: cleanUrl,
+      title: typeof (doc.metadata as Record<string, unknown>)?.title === "string" ? ((doc.metadata as Record<string, unknown>).title as string) : undefined,
+      markdown,
+      extractedJson: doc.json ? JSON.stringify(doc.json) : undefined,
+      screenshotStorageId,
+      screenshotUrl: screenshot?.startsWith("http") ? screenshot : undefined,
+    });
+  } catch {
+    // Non-fatal cache persistence error
+  }
+
   return {
     markdown,
-    sourceUrl: sanitizePublicPolicyUrl(scrapedSourceUrl ?? workingUrl),
+    sourceUrl: cleanUrl,
     json: doc.json,
-    screenshot,
+    screenshot: screenshot?.startsWith("http") ? screenshot : undefined,
+    screenshotStorageId,
   };
 }
 
@@ -2480,9 +2539,15 @@ export const crawlInsurerPolicy = action({
     denialReasonDescription: v.optional(v.string()),
     customPolicyUrl: v.optional(v.string()),
     serviceDate: v.optional(v.string()),
+    forceRescan: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+
+    const userSettings = userId
+      ? await ctx.runQuery(internal.settings.getSettingsInternal, { userId })
+      : null;
+    const shouldForceRescan = args.forceRescan ?? Boolean(userSettings?.autoRescanPolicies);
 
     // Determine target clinical policy year based on date of service or active calendar year
     const effectiveDate = args.serviceDate || claim?.serviceDate || "";
@@ -2516,6 +2581,7 @@ export const crawlInsurerPolicy = action({
         payer: args.payer,
         cptCodes: args.cptCodes,
         denialReasonCode: args.denialReasonCode,
+        forceRescan: shouldForceRescan,
       });
       const relevance = await evaluatePolicySourceRelevance(
         candidateSource,
@@ -2675,6 +2741,7 @@ export const crawlInsurerPolicy = action({
               payer: args.payer,
               cptCodes: args.cptCodes,
               denialReasonCode: args.denialReasonCode,
+              forceRescan: shouldForceRescan,
             });
             const relevance = await evaluatePolicySourceRelevance(
               candidateSource,
@@ -2717,6 +2784,7 @@ export const crawlInsurerPolicy = action({
                     payer: args.payer,
                     cptCodes: args.cptCodes,
                     denialReasonCode: args.denialReasonCode,
+                    forceRescan: shouldForceRescan,
                   });
                   const childRelevance = await evaluatePolicySourceRelevance(
                     childSource,
@@ -3394,6 +3462,7 @@ export const crawlMultiSourceHub = action({
     denialReasonCode: v.string(),
     denialReasonDescription: v.optional(v.string()),
     customPolicyUrl: v.optional(v.string()),
+    forceRescan: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     await requireClaimOwnerAction(ctx, args.claimId);
@@ -3424,6 +3493,7 @@ export const crawlMultiSourceHub = action({
         denialReasonCode: args.denialReasonCode,
         denialReasonDescription: args.denialReasonDescription,
         customPolicyUrl: args.customPolicyUrl,
+        forceRescan: args.forceRescan,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed";

@@ -25,6 +25,19 @@ export const listByClaim = query({
 });
 
 /**
+ * Computes deterministic audit log idempotency key (claimId:eventType:day)
+ * to prevent retry storms from sweeps, crons, and webhooks.
+ */
+export function computeAuditIdempotencyKey(
+  claimId: string,
+  eventType: string,
+  timestamp: number = Date.now()
+): string {
+  const day = new Date(timestamp).toISOString().slice(0, 10);
+  return `${claimId}:${eventType}:${day}`;
+}
+
+/**
  * Append an event to the case audit log, checking claim ownership
  */
 export const logEvent = mutation({
@@ -33,6 +46,7 @@ export const logEvent = mutation({
     eventType: v.string(),
     actor: v.string(),
     details: v.string(),
+    idempotencyKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { userId } = await requireClaimOwner(ctx, args.claimId);
@@ -51,6 +65,25 @@ export const logEvent = mutation({
     }
 
     const timestamp = Date.now();
+    const effectiveKey =
+      args.idempotencyKey ||
+      (eventType.startsWith("statutory_alarm") || eventType.includes("alarm")
+        ? computeAuditIdempotencyKey(args.claimId, eventType, timestamp)
+        : undefined);
+
+    if (effectiveKey && typeof ctx.db.query === "function") {
+      try {
+        const existing = await ctx.db
+          .query("appealAuditLogs")
+          .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", effectiveKey))
+          .first();
+        if (existing) {
+          return existing._id;
+        }
+      } catch {
+        // Safe fallback for mock runners without idempotency index
+      }
+    }
 
     const logId = await ctx.db.insert("appealAuditLogs", {
       claimId: args.claimId,
@@ -59,6 +92,7 @@ export const logEvent = mutation({
       actor,
       details,
       timestamp,
+      idempotencyKey: effectiveKey,
     });
 
     // Update claim's last modified timestamp
@@ -80,11 +114,32 @@ export const logEventInternal = internalMutation({
     eventType: v.string(),
     actor: v.string(),
     details: v.string(),
+    idempotencyKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const timestamp = Date.now();
     const claim = typeof ctx.db.get === "function" ? await ctx.db.get(args.claimId) : null;
     const resolvedUserId = args.userId || claim?.userId;
+
+    const effectiveKey =
+      args.idempotencyKey ||
+      (args.eventType.startsWith("statutory_alarm") || args.eventType.includes("alarm")
+        ? computeAuditIdempotencyKey(args.claimId, args.eventType, timestamp)
+        : undefined);
+
+    if (effectiveKey && typeof ctx.db.query === "function") {
+      try {
+        const existing = await ctx.db
+          .query("appealAuditLogs")
+          .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", effectiveKey))
+          .first();
+        if (existing) {
+          return existing._id;
+        }
+      } catch {
+        // Safe fallback for mock runners
+      }
+    }
 
     return await ctx.db.insert("appealAuditLogs", {
       claimId: args.claimId,
@@ -93,6 +148,7 @@ export const logEventInternal = internalMutation({
       actor: args.actor,
       details: args.details,
       timestamp,
+      idempotencyKey: effectiveKey,
     });
   },
 });
