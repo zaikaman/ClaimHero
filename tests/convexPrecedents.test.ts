@@ -183,20 +183,12 @@ describe("Convex Precedents & Controlling Authorities Engine", () => {
   });
 
   describe("attachMatchesToClaim, listAttachedForClaim & searchTextPrecedents", () => {
-    it("attachMatchesToClaim: throws if claim missing or unauthorized user mismatch", async () => {
+    it("attachMatchesToClaim: throws if claim missing", async () => {
       const mockCtxMissing: any = { db: { get: vi.fn().mockResolvedValue(null) } };
       await expect((precedents.attachMatchesToClaim as any)._handler(mockCtxMissing, {
         claimId: "c_missing",
         matches: [],
       })).rejects.toThrow("Claim c_missing not found");
-
-      vi.mocked(getAuthUserId).mockResolvedValue("attacker_1" as any);
-      const mockClaim = { _id: "c1", userId: "victim_owner" };
-      const mockCtxForbidden: any = { db: { get: vi.fn().mockResolvedValue(mockClaim) } };
-      await expect((precedents.attachMatchesToClaim as any)._handler(mockCtxForbidden, {
-        claimId: "c1",
-        matches: [],
-      })).rejects.toThrow("Forbidden");
     });
 
     it("attachMatchesToClaim: attaches vector matches and inserts audit log", async () => {

@@ -393,24 +393,23 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
       ).rejects.toThrow("Claim claim_missing not found");
     });
 
-    it("attachMatchesToClaim rejects mutation if caller does not own the target claim", async () => {
+    it("retrieveTopPrecedents enforces claim ownership before scheduling attachMatchesToClaim", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_attacker" as any);
-      const { attachMatchesToClaim } = await import("../convex/precedents");
-      const mockCtx: any = {
-        db: {
-          get: vi.fn().mockResolvedValue({
-            _id: "claim_victim",
-            userId: "user_victim",
-          }),
-        },
+      const { retrieveTopPrecedents } = await import("../convex/actions/precedentArchive");
+      const mockActionCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          _id: "claim_victim",
+          userId: "user_victim",
+        }),
+        runMutation: vi.fn(),
       };
 
       await expect(
-        (attachMatchesToClaim as any)._handler(mockCtx, {
+        (retrieveTopPrecedents as any)._handler(mockActionCtx, {
           claimId: "claim_victim" as any,
-          matches: [],
         })
       ).rejects.toThrow("Forbidden: You do not have permission to access this claim");
+      expect(mockActionCtx.runMutation).not.toHaveBeenCalled();
     });
   });
 

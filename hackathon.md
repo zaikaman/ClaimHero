@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-10T13:12:00Z
+- **Last updated:** 2026-09-10T13:30:30Z
 
 ## Log
 
@@ -1146,7 +1146,10 @@ Hardened PHI placeholder reconciliation (P0): replaced the unauthenticated globa
 ### 2026-09-10 - 03a5b0f
 Remediated fail-open demo purge vulnerability (P0-2) in `convex/claims.ts` (`clearDemoData` and `clearDemoDataInternal`). Enforced `await requireAuthUser(ctx)` at entry, eliminating unauthenticated global claim scanning and unauthorized cross-tenant deletion. Dropped all unauthenticated fallback queries, scoping deletion strictly to the caller's identity using the `by_user` index. Required `userId: v.id("users")` on `clearDemoDataInternal` and guarded asynchronous cascading deletion batches with scheduler runtime checks. Returns `{ success: true, deletedClaimsCount: 0 }` for empty owner scopes without touching other tenants or live patient records. Added regression tests in `tests/demoIsolationAndHonestPipelines.test.ts` verifying authentication enforcement, strict user scoping, and internal cascading deletion. Verified 710 passing tests across 42 suites, clean typecheck, clean lint, 80.82% coverage, and production build via `npm run verify`. Convex features: mutations, internalMutation, auth, indexes.
 
-### 2026-09-10 - working tree
+### 2026-09-10 - 4254850
 Eliminated hardcoded marketing statistics on landing showcase hero (P0-4 in `src/components/landing/CinematicHero.tsx`): replaced unverified statistical badges (`94.8% Overturn Yield` and `$1.4M+ Recovered`) with factual architectural and capability badges (`Multi-Tier Appeal Engine` and `Audit-Logged Dispatch`). Avoids discrepancy with empty portfolios and aligns with hackathon data honesty standards. Verified 100% clean typecheck, lint, 710 passing unit tests, and production build via `npm run verify`.
 
 Remediated free-form statutory tier strings (P1-1) across Convex functions and schema (`convex/appeals.ts:273-293,322-331`, `convex/schema.ts`, `convex/actions/appealSynthesizer.ts`, `convex/actions/sentinelPipeline.ts`, `convex/workflows.ts`, `src/hooks/useEvidence.ts`): replaced loose `v.string()` validators with strict Convex union validators (`appealLevelValidator`, `statutoryPostureValidator`, `targetAuthorityValidator`, `legalAggressivenessValidator`) and runtime assertions in `convex/lib/statutoryTierValidators.ts`. Applied union validation to `createOrUpdateDraft`, `createOrUpdateDraftInternal`, `escalateTier`, `getByClaimAndLevel`, `generateAppealBrief`, and `startDurablePipeline`. Centralized `getStatutoryTierMetadata` with fail-closed rejection for unknown tiers, preventing dossier grouping breakdown from corrupt or unrecognized values. Added comprehensive regression tests in `tests/convexAppeals.test.ts` and `tests/statutoryEscalation.test.ts` verifying rejection of unknown tiers, postures, authorities, and aggressiveness levels. Verified 724 passing tests across 42 test suites, clean typecheck, clean lint, 81.08% coverage, and production build via `npm run verify`. Convex features: schema, union validators, mutations, actions, internalMutation, query, workflows.
+
+### 2026-09-10 - working tree
+Remediated internal-only authorization pattern (P1-2) in `convex/precedents.ts:215-230`: removed flawed `if (userId && ...)` pseudo-defense check from `attachMatchesToClaim` and documented why it is internal-only. Because `attachMatchesToClaim` is an `internalMutation` unreachable by external clients, authorization and claim ownership are strictly enforced at the action boundary in `retrieveTopPrecedents` via `requireClaimOwnerAction`. Removed unused `getAuthUserId` import and updated tests in `tests/authorization.test.ts` and `tests/convexPrecedents.test.ts` to assert that `retrieveTopPrecedents` guards the action boundary and prevents unauthorized callers from scheduling or executing `attachMatchesToClaim`. Verified 724 passing unit tests across 42 suites, clean typecheck, clean lint, 81.08% test coverage, and production build via `npm run verify`. Convex features: internalMutation, actions, auth.

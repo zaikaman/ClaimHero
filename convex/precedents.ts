@@ -2,7 +2,7 @@ import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { precedentMatchValidator } from "./lib/precedentValidators";
-import { getClaimIfAuthorized, getAuthUserId } from "./lib/auth";
+import { getClaimIfAuthorized } from "./lib/auth";
 import { fitDimensions, EMBEDDING_DIMENSIONS } from "./lib/embeddings";
 
 export { precedentMatchValidator };
@@ -211,6 +211,10 @@ export const insertPrecedent = internalMutation({
  * Persist the top vector matches onto the claim as legal_precedent evidence
  * so Appeal Studio and the synthesizer consume them through the existing
  * evidence subscription.
+ *
+ * Internal-only mutation: not callable by clients. Caller actions (such as
+ * retrieveTopPrecedents via requireClaimOwnerAction) strictly enforce user
+ * authentication and claim ownership at the boundary before calling this mutation.
  */
 export const attachMatchesToClaim = internalMutation({
   args: {
@@ -222,11 +226,6 @@ export const attachMatchesToClaim = internalMutation({
     const claim = await ctx.db.get(args.claimId);
     if (!claim) {
       throw new Error(`Claim ${args.claimId} not found`);
-    }
-
-    const userId = await getAuthUserId(ctx);
-    if (userId && claim.userId && claim.userId !== userId) {
-      throw new Error("Forbidden: You do not have permission to access this claim");
     }
 
     const now = Date.now();
