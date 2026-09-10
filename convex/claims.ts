@@ -3141,89 +3141,141 @@ export const clearDemoDataInternal = internalMutation({
   },
 });
 
+
+function isPlaceholderPatientName(value: string | undefined): boolean {
+  const trimmed = (value || "").trim();
+  return (
+    !trimmed ||
+    trimmed === "Not specified in denial notice" ||
+    trimmed === "Patient" ||
+    trimmed.startsWith("[PATIENT")
+  );
+}
+
+function extractPatientNameFromNotes(notes: string | undefined): string | null {
+  if (!notes) return null;
+  const match = notes.match(/PATIENT:\s*([^|\n]+)/i);
+  const candidate = match?.[1]?.trim();
+  if (!candidate || isPlaceholderPatientName(candidate)) return null;
+  return candidate;
+}
+
+function isAuthenticPatientName(value: string | undefined): value is string {
+  const trimmed = (value || "").trim();
+  return trimmed !== "" && !isPlaceholderPatientName(trimmed);
+}
+
 /**
- * Administrative and system self-healing mutation:
- * Scans all claims and patients to heal any [PATIENT REDACTED] placeholder values
- * back to their authentic patient names.
+ * Internal developer maintenance: PHI placeholder reconciliation.
+ * Reconciles redacted patient-name placeholders with authentic names already stored
+ * in the same tenant (linked patient record or physician notes PATIENT field).
+ * Callable via Convex CLI (`npx convex run claims:healRedactedPatientNamesInternal`)
+ * or the Convex dashboard.
+ *
+ * Never invents PII, never injects synthetic DOB/contact defaults, and never
+ * clears redactionMetadata (the redaction audit trail is preserved).
  */
-export const healRedactedPatientNames = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const claims = await ctx.db.query("claims").collect();
-    let healedClaims = 0;
-    let healedPatients = 0;
-    let healedMessages = 0;
+export const healRedactedPatientNamesInternal = internalMutation({
+  args: {
+    targetUserId: v.id("users"),
+    confirm: v.boolean(),
+    dryRun: v.optional(v.boolean()),
+    cursor: v.optional(v.union(v.string(), v.null())),
+    batchSize: v.optional(v.number()),
+    reason: v.optional(v.string()),
+    totalScanned: v.optional(v.number()),
+    totalHealedClaims: v.optional(v.number()),
+    totalHealedPatients: v.optional(v.number()),
+    totalHealedMessages: v.optional(v.number()),
+    totalAuditLogs: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    if (args.confirm !== true) {
+      throw new Error("Refusing PHI heal without explicit confirm: true");
+    }
+    const dryRun = args.dryRun === true;
+    const batchSize = Math.min(Math.max(1, args.batchSize ?? 10), 25);
+    const now = Date.now();
+    const reason = args.reason?.trim().slice(0, 280) || "internal maintenance placeholder reconciliation";
 
-    for (const claim of claims) {
-      const currentClaimName = claim.patientName;
-      const patient = await ctx.db.get(claim.patientId);
-      const currentPatientName = patient?.name;
+    const claimsQuery = ctx.db.query("claims").withIndex("by_user", (q) => q.eq("userId", args.targetUserId));
+    const pageResult =
+      typeof claimsQuery.paginate === "function"
+        ? await claimsQuery.paginate({ cursor: args.cursor ?? null, numItems: batchSize })
+        : { page: await claimsQuery.take(batchSize), isDone: true, continueCursor: null as string | null };
 
-      let targetName = resolveClaimPatientName(
-        currentClaimName,
-        claim.claimNumber,
-        patient?.memberId
-      );
+    let batchScanned = 0;
+    let batchHealedClaims = 0;
+    let batchHealedPatients = 0;
+    let batchHealedMessages = 0;
+    let batchAuditLogs = 0;
 
-      // Reconcile patient name from clinical notes if unstated in denial notice
-      if (
-        (!targetName || targetName === "Not specified in denial notice" || targetName === "Patient") &&
-        claim.appealContext?.physicianNotes
-      ) {
-        const noteMatch = claim.appealContext.physicianNotes.match(/PATIENT:\s*([^|\n]+)/i);
-        if (noteMatch && noteMatch[1]?.trim()) {
-          targetName = noteMatch[1].trim();
-        }
+    for (const claim of pageResult.page) {
+      batchScanned++;
+      if (claim.userId !== args.targetUserId) continue;
+      const patient = claim.patientId ? await ctx.db.get(claim.patientId) : null;
+      const sameTenantPatient = patient && patient.userId === args.targetUserId ? patient : null;
+
+      const notesName = extractPatientNameFromNotes(claim.appealContext?.physicianNotes);
+      const patientName =
+        sameTenantPatient && isAuthenticPatientName(sameTenantPatient.name)
+          ? sameTenantPatient.name.trim()
+          : null;
+      const claimName = isAuthenticPatientName(claim.patientName) ? claim.patientName.trim() : null;
+      const targetName = patientName ?? notesName ?? claimName;
+      if (!targetName) continue;
+
+      const claimNeedsNameHeal = isPlaceholderPatientName(claim.patientName);
+      const notes = claim.appealContext?.physicianNotes;
+      const notesNeedHeal = Boolean(notes && notes.includes("[PATIENT"));
+      const patientNeedsHeal = Boolean(sameTenantPatient && isPlaceholderPatientName(sameTenantPatient.name));
+      if (!claimNeedsNameHeal && !notesNeedHeal && !patientNeedsHeal) continue;
+
+      if (dryRun) {
+        if (claimNeedsNameHeal || notesNeedHeal) batchHealedClaims++;
+        if (patientNeedsHeal) batchHealedPatients++;
+        continue;
       }
 
-      const patches: Record<string, unknown> = {};
-
-      if (targetName && targetName !== currentClaimName && !targetName.startsWith("[PATIENT")) {
-        patches.patientName = targetName;
+      let claimChanged = false;
+      const claimPatch: Record<string, unknown> = {};
+      if (claimNeedsNameHeal) {
+        claimPatch.patientName = targetName;
+        claimChanged = true;
       }
-
-      if (claim.redactionMetadata?.isRedacted) {
-        patches.redactionMetadata = {
-          ...claim.redactionMetadata,
-          isRedacted: false,
-          redactedEntityCount: 0,
-          maskedCategories: [],
-        };
-      }
-
-      if (claim.appealContext?.physicianNotes && claim.appealContext.physicianNotes.includes("[PATIENT REDACTED]")) {
-        patches.appealContext = {
+      if (notesNeedHeal && notes) {
+        claimPatch.appealContext = {
           ...claim.appealContext,
-          physicianNotes: claim.appealContext.physicianNotes.replace(/\[PATIENT (?:NAME )?REDACTED\]/g, targetName),
+          physicianNotes: notes.replace(/\[PATIENT (?:NAME )?REDACTED\]/g, targetName),
         };
+        claimChanged = true;
       }
 
-      const isDemoFixture = claim.origin === "demo-fixture" || claim.dataOrigin === "demo-fixture" || claim.isDemo === true;
-
-      if (isDemoFixture && (claim.isDemo !== true || claim.dataOrigin !== "demo-fixture" || claim.isSyntheticPII !== true || claim.origin !== "demo-fixture")) {
-        patches.isDemo = true;
-        patches.isSyntheticPII = true;
-        patches.dataOrigin = "demo-fixture";
-        patches.origin = "demo-fixture";
-      }
-
-      if (Object.keys(patches).length > 0) {
-        await ctx.db.patch(claim._id, patches);
-        healedClaims++;
-      }
-
-      if (patient && targetName && targetName !== currentPatientName && !targetName.startsWith("[PATIENT")) {
-        await ctx.db.patch(patient._id, {
-          name: targetName,
+      if (claimChanged) {
+        claimPatch.searchContent = buildClaimSearchContent({
+          claimNumber: claim.claimNumber,
+          patientName: (claimPatch.patientName as string | undefined) ?? claim.patientName,
+          insurancePayer: claim.insurancePayer,
+          providerName: claim.providerName,
+          denialReasonCode: claim.denialReasonCode,
+          denialReasonDescription: claim.denialReasonDescription,
+          cptCodes: claim.cptCodes,
+          icd10Codes: claim.icd10Codes,
         });
-        healedPatients++;
+        claimPatch.updatedAt = now;
+        await ctx.db.patch(claim._id, claimPatch);
+        batchHealedClaims++;
       }
 
-      // Also heal any drafted appeals for this claim that contain [PATIENT REDACTED]
+      if (patientNeedsHeal && sameTenantPatient) {
+        await ctx.db.patch(sameTenantPatient._id, { name: targetName });
+        batchHealedPatients++;
+      }
+
       const claimAppeals = await ctx.db
         .query("appeals")
         .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
+        .take(25);
 
       for (const app of claimAppeals) {
         if (
@@ -3240,38 +3292,29 @@ export const healRedactedPatientNames = mutation({
         }
       }
 
-      // Also heal past recorded email messages for this claim
       const claimMessages = await ctx.db
         .query("emailMessages")
         .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
-        .collect();
-
-      const senderEmail = claim.appealContext?.sender?.email || "taylor.reed@diagnosticimaging.org";
-      const senderPhone = claim.appealContext?.sender?.phone || "(555) 789-0123";
+        .take(25);
 
       for (const msg of claimMessages) {
         let changed = false;
         let text = msg.bodyText || "";
         let html = msg.bodyHtml || "";
 
-        if (text.includes("[PATIENT REDACTED]") || text.includes("[PATIENT NAME REDACTED]") || text.includes("[REDACTED EMAIL]") || text.includes("[REDACTED PHONE]") || text.includes("DOB: //")) {
+        if (text.includes("[PATIENT REDACTED]") || text.includes("[PATIENT NAME REDACTED]")) {
           text = text
             .replace(/Patient:\s*\[PATIENT (?:NAME )?REDACTED\]/g, `Patient: ${targetName}`)
             .replace(/- Patient\/member:\s*\[PATIENT (?:NAME )?REDACTED\]/g, `- Patient/member: ${targetName}`)
             .replace(/Patient \[PATIENT (?:NAME )?REDACTED\]/g, `Patient ${targetName}`)
-            .replace(/\[PATIENT (?:NAME )?REDACTED\]/g, targetName)
-            .replace(/\[REDACTED EMAIL\]/g, senderEmail)
-            .replace(/\[REDACTED PHONE\]/g, senderPhone)
-            .replace(/DOB:\s*\/\//g, "DOB: 09/03/1982");
+            .replace(/\[PATIENT (?:NAME )?REDACTED\]/g, targetName);
           changed = true;
         }
 
-        if (html.includes("[PATIENT REDACTED]") || html.includes("[PATIENT NAME REDACTED]") || html.includes("[REDACTED EMAIL]") || html.includes("[REDACTED PHONE]")) {
+        if (html.includes("[PATIENT REDACTED]") || html.includes("[PATIENT NAME REDACTED]")) {
           html = html
             .replace(/Patient:\s*\[PATIENT (?:NAME )?REDACTED\]/g, `Patient: ${targetName}`)
-            .replace(/\[PATIENT (?:NAME )?REDACTED\]/g, targetName)
-            .replace(/\[REDACTED EMAIL\]/g, senderEmail)
-            .replace(/\[REDACTED PHONE\]/g, senderPhone);
+            .replace(/\[PATIENT (?:NAME )?REDACTED\]/g, targetName);
           changed = true;
         }
 
@@ -3280,13 +3323,56 @@ export const healRedactedPatientNames = mutation({
             bodyText: text,
             bodyHtml: html,
           });
-          healedMessages++;
+          batchHealedMessages++;
         }
       }
+
+      await ctx.db.insert("appealAuditLogs", {
+        claimId: claim._id,
+        userId: args.targetUserId,
+        eventType: "phi_placeholder_healed",
+        actor: "Internal Maintenance (PHI Heal)",
+        details: `Reconciled redacted patient-name placeholder for claim #${claim.claimNumber} (${reason})`,
+        timestamp: now,
+      });
+      batchAuditLogs++;
     }
 
-    return { healedClaims, healedPatients, healedMessages };
+    const totalScanned = (args.totalScanned ?? 0) + batchScanned;
+    const totalHealedClaims = (args.totalHealedClaims ?? 0) + batchHealedClaims;
+
+    if (!pageResult.isDone) {
+      await ctx.scheduler.runAfter(0, internal.claims.healRedactedPatientNamesInternal, {
+        targetUserId: args.targetUserId,
+        confirm: true,
+        dryRun,
+        cursor: pageResult.continueCursor,
+        batchSize,
+        reason,
+        totalScanned,
+        totalHealedClaims,
+        totalHealedPatients: (args.totalHealedPatients ?? 0) + batchHealedPatients,
+        totalHealedMessages: (args.totalHealedMessages ?? 0) + batchHealedMessages,
+        totalAuditLogs: (args.totalAuditLogs ?? 0) + batchAuditLogs,
+      });
+    }
+
+    return {
+      isDone: pageResult.isDone,
+      continueCursor: pageResult.continueCursor,
+      batchScanned,
+      batchHealedClaims,
+      batchHealedPatients,
+      batchHealedMessages,
+      batchAuditLogs,
+      totalScanned,
+      totalHealedClaims,
+      dryRun,
+    };
   },
 });
+
+
+
 
 

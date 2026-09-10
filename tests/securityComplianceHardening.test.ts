@@ -560,45 +560,224 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       ).rejects.toThrow(/unverified registry fallback/i);
     });
 
-    it("healRedactedPatientNames: reconciles patient name from physicianNotes when unstated in denial notice", async () => {
+    it("healRedactedPatientNamesInternal: rejects missing confirm flag before performing any database work", async () => {
+      const mockCtx: any = { db: {} };
+
+      await expect(
+        (claims.healRedactedPatientNamesInternal as any)._handler(mockCtx, {
+          targetUserId: "user_123",
+          confirm: false,
+        })
+      ).rejects.toThrow(/without explicit confirm/i);
+    });
+
+    it("healRedactedPatientNamesInternal: reconciles patient name from authentic in-tenant sources within the scoped tenant", async () => {
+      const targetUserId = "user_123";
       const mockDb = {
         query: vi.fn().mockReturnValue({
-          collect: vi.fn().mockResolvedValue([
-            {
-              _id: "claim_1",
-              claimNumber: "CLM-6104-GEO-7830",
-              patientId: "patient_1",
-              patientName: "Not specified in denial notice",
-              appealContext: {
-                physicianNotes: "PATIENT: Marcus Sterling | DOB: 11/22/1974 | DOS: 07/04/2026\nATTENDING CLINICAL ATTESTATION...",
-              },
-            },
-          ]),
           withIndex: vi.fn().mockReturnValue({
-            collect: vi.fn().mockResolvedValue([]),
+            paginate: vi.fn().mockResolvedValue({
+              page: [
+                {
+                  _id: "claim_1",
+                  userId: targetUserId,
+                  claimNumber: "CLM-6104-GEO-7830",
+                  patientId: "patient_1",
+                  patientName: "[PATIENT NAME REDACTED]",
+                  appealContext: {
+                    physicianNotes: "PATIENT: Marcus Sterling | DOB: 11/22/1974 | DOS: 07/04/2026",
+                  },
+                },
+              ],
+              isDone: true,
+              continueCursor: null,
+            }),
+            take: vi.fn().mockResolvedValue([]),
           }),
         }),
-        get: vi.fn().mockImplementation(async (id) => {
+        get: vi.fn().mockImplementation(async (id: string) => {
           if (id === "patient_1") {
-            return {
-              _id: "patient_1",
-              name: "Not specified in denial notice",
-              memberId: "GEO-554210-99",
-            };
+            return { _id: "patient_1", userId: targetUserId, name: "[PATIENT NAME REDACTED]", memberId: "GEO-554210-99" };
           }
           return null;
         }),
         patch: vi.fn().mockResolvedValue(true),
+        insert: vi.fn().mockResolvedValue("log_1"),
       };
 
-      const mockCtx: any = { db: mockDb };
-      const res = await (claims.healRedactedPatientNames as any)._handler(mockCtx, {});
+      const mockCtx: any = {
+        db: mockDb,
+        scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) },
+      };
 
-      expect(res.healedClaims).toBe(1);
-      expect(res.healedPatients).toBe(1);
+      const res = await (claims.healRedactedPatientNamesInternal as any)._handler(mockCtx, {
+        targetUserId,
+        confirm: true,
+      });
+
+      expect(res.isDone).toBe(true);
+      expect(res.batchHealedClaims).toBe(1);
+      expect(res.batchHealedPatients).toBe(1);
       expect(mockDb.patch).toHaveBeenCalledWith("claim_1", expect.objectContaining({ patientName: "Marcus Sterling" }));
       expect(mockDb.patch).toHaveBeenCalledWith("patient_1", expect.objectContaining({ name: "Marcus Sterling" }));
+      expect(mockDb.insert).toHaveBeenCalledWith(
+        "appealAuditLogs",
+        expect.objectContaining({ eventType: "phi_placeholder_healed", userId: targetUserId, actor: "Internal Maintenance (PHI Heal)" })
+      );
+      // Redaction audit trail is preserved, never un-redacted by the heal job
+      expect(mockDb.patch).not.toHaveBeenCalledWith(
+        "claim_1",
+        expect.objectContaining({ redactionMetadata: expect.anything() })
+      );
     });
+
+    it("healRedactedPatientNamesInternal: never invents PII when no authentic same-tenant name source exists", async () => {
+      const targetUserId = "user_123";
+      const mockDb = {
+        query: vi.fn().mockReturnValue({
+          withIndex: vi.fn().mockReturnValue({
+            paginate: vi.fn().mockResolvedValue({
+              page: [
+                {
+                  _id: "claim_no_source",
+                  userId: targetUserId,
+                  claimNumber: "CLM-9999",
+                  patientId: "patient_no_source",
+                  patientName: "[PATIENT REDACTED]",
+                  appealContext: {
+                    physicianNotes: "Attending note without patient identifiers.",
+                  },
+                },
+              ],
+              isDone: true,
+              continueCursor: null,
+            }),
+          }),
+        }),
+        get: vi.fn().mockImplementation(async (id: string) => {
+          if (id === "patient_no_source") {
+            return { _id: "patient_no_source", userId: targetUserId, name: "Not specified in denial notice" };
+          }
+          return null;
+        }),
+        patch: vi.fn().mockResolvedValue(true),
+        insert: vi.fn().mockResolvedValue("log_1"),
+      };
+
+      const mockCtx: any = {
+        db: mockDb,
+        scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) },
+      };
+
+      const res = await (claims.healRedactedPatientNamesInternal as any)._handler(mockCtx, {
+        targetUserId,
+        confirm: true,
+      });
+
+      expect(res.batchHealedClaims).toBe(0);
+      expect(res.batchHealedPatients).toBe(0);
+      expect(mockDb.patch).not.toHaveBeenCalled();
+    });
+
+    it("healRedactedPatientNamesInternal: dryRun reports would-be heals without writing any changes", async () => {
+      const targetUserId = "user_123";
+      const mockDb = {
+        query: vi.fn().mockReturnValue({
+          withIndex: vi.fn().mockReturnValue({
+            paginate: vi.fn().mockResolvedValue({
+              page: [
+                {
+                  _id: "claim_dry_1",
+                  userId: targetUserId,
+                  claimNumber: "CLM-6104-GEO-7830",
+                  patientId: "patient_1",
+                  patientName: "[PATIENT REDACTED]",
+                  appealContext: { physicianNotes: "PATIENT: Marcus Sterling | note" },
+                },
+              ],
+              isDone: true,
+              continueCursor: null,
+            }),
+            take: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+        get: vi.fn().mockImplementation(async (id: string) => {
+          if (id === "patient_1") {
+            return { _id: "patient_1", userId: targetUserId, name: "[PATIENT REDACTED]" };
+          }
+          return null;
+        }),
+        patch: vi.fn().mockResolvedValue(true),
+        insert: vi.fn().mockResolvedValue("log_1"),
+      };
+
+      const mockCtx: any = {
+        db: mockDb,
+        scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) },
+      };
+
+      const res = await (claims.healRedactedPatientNamesInternal as any)._handler(mockCtx, {
+        targetUserId,
+        confirm: true,
+        dryRun: true,
+      });
+
+      expect(res.batchHealedClaims).toBe(1);
+      expect(res.batchHealedPatients).toBe(1);
+      expect(mockDb.patch).not.toHaveBeenCalled();
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it("healRedactedPatientNamesInternal: paginates tenant-scoped batches via scheduler continuation", async () => {
+      const targetUserId = "user_123";
+      const mockDb = {
+        query: vi.fn().mockReturnValue({
+          withIndex: vi.fn().mockReturnValue({
+            paginate: vi.fn().mockResolvedValue({
+              page: [
+                {
+                  _id: "claim_more",
+                  userId: targetUserId,
+                  claimNumber: "CLM-6104",
+                  patientId: "patient_1",
+                  patientName: "[PATIENT REDACTED]",
+                  appealContext: { physicianNotes: "PATIENT: Marcus Sterling" },
+                },
+              ],
+              isDone: false,
+              continueCursor: "cursor_next",
+            }),
+            take: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+        get: vi.fn().mockImplementation(async (id: string) => {
+          if (id === "patient_1") return { _id: "patient_1", userId: targetUserId, name: "Marcus Sterling" };
+          return null;
+        }),
+        patch: vi.fn().mockResolvedValue(true),
+        insert: vi.fn().mockResolvedValue("log_1"),
+      };
+
+      const mockCtx: any = {
+        db: mockDb,
+        scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) },
+      };
+
+      const res = await (claims.healRedactedPatientNamesInternal as any)._handler(mockCtx, {
+        targetUserId,
+        confirm: true,
+        batchSize: 1,
+      });
+
+      expect(res.isDone).toBe(false);
+      expect(res.continueCursor).toBe("cursor_next");
+      expect(mockCtx.scheduler.runAfter).toHaveBeenCalledWith(
+        0,
+        expect.anything(),
+        expect.objectContaining({ cursor: "cursor_next", totalScanned: 1 })
+      );
+    });
+
 
     it("updateAppealContext: auto-reconciles patient name from physicianNotes when unstated in denial notice", async () => {
       vi.spyOn(auth, "requireClaimOwner").mockResolvedValue(true as any);

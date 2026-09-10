@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-09T17:18:00Z
+- **Last updated:** 2026-09-10T13:58:30Z
 
 ## Log
 
@@ -1138,4 +1138,7 @@ Hardened production readiness, schema efficiency, and security guardrails across
 - Claims Schema Index Pruning (L4): Removed 5 dead or redundant secondary indexes (`by_user_demo`, `by_payer`, `by_status`, `by_patient`, and `by_updated`) from the `claims` table in `convex/schema.ts`, reducing secondary indexes from 16 to 11 and slashing write amplification on every claim create and patch by over 30%.
 - Full-Text Search Scalability (L5): Added unified `searchContent` field to `claims` schema compiling claim number, patient name, provider, insurance payer, and clinical codes/descriptions via helper `buildClaimSearchContent` (`convex/claims.ts`). Updated `search_claims` search index to target `searchContent` and enhanced `claims.search` and `claims.list` with direct `by_claim_number` index matching to scale searches gracefully beyond bounded candidate scans. Updated `searchClaimsForChatbot` (`convex/chatbot.ts`).
 - Danger Zone Portfolio Reset Rate Limiting (L6): Added strict 1 per 15-minute token-bucket rate limiter rule (`resetPortfolio`) in `convex/lib/rateLimiter.ts` and enforced it in `settings.resetPortfolio` (`convex/settings.ts`) to protect against catastrophic portfolio wiping via hijacked user sessions or automated scripts.
-- Testing & Verification (`tests/productionReadinessFixes.test.ts`): Added 9 dedicated automated unit tests covering all 6 fixes. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint errors (`eslint src convex`), 707/707 passing unit tests across 42 suites with 80.82% coverage, and successful production build in 6.10s. Convex features: schema, indexes, searchIndex, full-text search, mutations, actions, components (@convex-dev/rate-limiter, @convex-dev/auth).
+- Testing & Verification (`tests/productionReadinessFixes.test.ts`): Added 9 dedicated automated unit tests covering all 6 fixes. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint errors (`eslint src convex`), 707/707 passing unit tests across 42 suites with 80.82% coverage, and successful production build in 6.10s. Convex features: schema, indexes, searchIndex, full-text search, mutations, actions, components (@convex-dev/rate-limiter, @convex-dev/auth).
+
+### 2026-09-10 - working tree
+Hardened PHI placeholder reconciliation (P0): replaced the unauthenticated global `healRedactedPatientNames` mutation with a secure, fail-closed `healRedactedPatientNamesInternal` internalMutation in `convex/claims.ts`, designed for developer maintenance via the Convex CLI or dashboard. Enforces explicit `confirm: true` and an explicit `targetUserId` tenant scope. Added cursor-based `claims.by_user` pagination with scheduler continuation (batch size capped at 25), `dryRun` support, per-heal `appealAuditLogs` entries without PHI, and strict in-tenant name-source resolution that never invents PII; removed all hardcoded DOB/sender defaults and preserved `redactionMetadata` audit trails. Removed artificial admin email allowlists and client endpoints to maintain a clean single-role advocate model. Updated regression tests in `tests/securityComplianceHardening.test.ts` covering confirm-guard, tenant-isolation, authentic in-tenant healing, no-PII-invention, dry-run, and scheduled cursor pagination. Convex features: internalMutation, indexed pagination, scheduler.
