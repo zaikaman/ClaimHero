@@ -16,6 +16,7 @@ import {
   Shield,
   ArrowRight,
   X,
+  Keyboard,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
@@ -33,6 +34,7 @@ interface CommandDialogProps {
   onNavigateView: (view: NavigationView) => void;
   onOpenIngestion: () => void;
   onOpenOnboarding?: () => void;
+  onOpenShortcuts?: () => void;
   onDeleteCase?: (claimId: string) => Promise<unknown>;
 }
 
@@ -56,6 +58,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   onNavigateView,
   onOpenIngestion,
   onOpenOnboarding,
+  onOpenShortcuts,
   onDeleteCase,
 }) => {
   const [query, setQuery] = useState("");
@@ -399,8 +402,35 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
             },
           ]
         : []),
+      ...(onOpenShortcuts
+        ? [
+            {
+              id: "action-shortcuts",
+              label: "Keyboard Shortcuts Reference",
+              description: "View cheatsheet of all keyboard hotkeys and console commands",
+              icon: Keyboard,
+              category: "sentinel" as const,
+              categoryLabel: "Quick Sentinel Actions",
+              keywords: [
+                "shortcuts",
+                "hotkeys",
+                "keyboard",
+                "keys",
+                "commands",
+                "cheatsheet",
+                "help",
+                "docs",
+              ],
+              badge: "Cheatsheet",
+              onExecute: () => {
+                onClose();
+                onOpenShortcuts();
+              },
+            },
+          ]
+        : []),
     ],
-    [onClose, onOpenIngestion, onOpenOnboarding]
+    [onClose, onOpenIngestion, onOpenOnboarding, onOpenShortcuts]
   );
 
   const normalizedQuery = query.trim().toLowerCase();

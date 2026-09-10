@@ -15,12 +15,14 @@ import {
   Envelope,
   CheckCircle,
   Compass,
+  Sparkle,
 } from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
 import { BrandLogo } from "../common/BrandLogo";
 
 interface CinematicHeroProps {
   onEnterConsole: (view?: NavigationView) => void;
+  onOpenOnboarding?: () => void;
 }
 
 interface ShowcaseSlide {
@@ -76,6 +78,7 @@ const HERO_SLIDES: ShowcaseSlide[] = [
 
 export const CinematicHero: React.FC<CinematicHeroProps> = ({
   onEnterConsole,
+  onOpenOnboarding,
 }) => {
   const { isAuthenticated } = useCurrentUser();
 
@@ -220,6 +223,19 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
             </button>
           ) : (
             <>
+              {/* Interactive Setup Guide CTA for Logged-Out */}
+              {onOpenOnboarding && (
+                <button
+                  type="button"
+                  onClick={onOpenOnboarding}
+                  className="hidden sm:flex animate-blur-fade-up liquid-glass items-center gap-1.5 rounded-md px-3.5 py-2 text-sm text-white/90 hover:text-white transition-all cursor-pointer hover:bg-white/10 active:scale-95 border border-white/20"
+                  style={{ animationDelay: "290ms" }}
+                >
+                  <Sparkle className="size-4 text-amber-400" />
+                  <span>Setup Guide</span>
+                </button>
+              )}
+
               {/* Sign In Button */}
               <button
                 onClick={() => onEnterConsole("login")}
@@ -297,6 +313,18 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
 
           {/* Below sm Launch Console & Sign In button in dropdown */}
           <div className="sm:hidden pt-3 mt-2 border-t border-gray-800 flex flex-col gap-2">
+            {onOpenOnboarding && (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onOpenOnboarding();
+                }}
+                className="w-full liquid-glass rounded-md py-2.5 px-4 text-xs font-medium flex items-center justify-center gap-2 text-white hover:bg-white/5 border border-white/20"
+              >
+                <Sparkle className="size-4 text-amber-400" />
+                <span>Interactive Setup Guide</span>
+              </button>
+            )}
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);

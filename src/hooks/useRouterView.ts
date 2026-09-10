@@ -46,6 +46,7 @@ export const VIEW_TO_PATH_MAP: Record<NavigationView, string> = {
   audit: "/app/audit",
   settings: "/app/settings",
   login: "/login",
+  notFound: "/404",
 };
 
 export function parsePathToView(pathname: string, hash: string = ""): NavigationView {
@@ -63,21 +64,17 @@ export function parsePathToView(pathname: string, hash: string = ""): Navigation
       ? pathname.slice(0, -1)
       : pathname;
 
+  if (normalized === "" || normalized === "/") {
+    return "landing";
+  }
+
+  // 3. Only map known keys in PATH_TO_VIEW_MAP
   if (PATH_TO_VIEW_MAP[normalized]) {
     return PATH_TO_VIEW_MAP[normalized];
   }
 
-  // 3. Fallback for login / auth routes
-  if (normalized.startsWith("/login") || normalized.startsWith("/auth") || normalized.startsWith("/signin")) {
-    return "login";
-  }
-
-  // 4. Fallback for subpaths under /app or /dashboard
-  if (normalized.startsWith("/app") || normalized.startsWith("/dashboard")) {
-    return "radar";
-  }
-
-  return "landing";
+  // 4. Any mistyped or unrecognized route returns notFound
+  return "notFound";
 }
 
 export function useRouterView() {
@@ -91,12 +88,14 @@ export function useRouterView() {
       setCurrentViewInternal(view);
       if (typeof window !== "undefined") {
         const targetPath = VIEW_TO_PATH_MAP[view] || "/";
-        const currentPath = window.location.pathname;
-        if (currentPath !== targetPath) {
+        const currentSearch = window.location.search || "";
+        const targetUrl = currentSearch ? `${targetPath}${currentSearch}` : targetPath;
+        const currentUrl = `${window.location.pathname}${window.location.search}`;
+        if (currentUrl !== targetUrl) {
           if (replace) {
-            window.history.replaceState({ view }, "", targetPath);
+            window.history.replaceState({ view }, "", targetUrl);
           } else {
-            window.history.pushState({ view }, "", targetPath);
+            window.history.pushState({ view }, "", targetUrl);
           }
         }
       }

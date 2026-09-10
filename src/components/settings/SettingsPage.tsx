@@ -63,8 +63,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
     }
   };
 
-  const senderEmail = import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL || "claimhero-sender@agentmail.to";
-  const adjudicatorEmail = import.meta.env.VITE_AGENTMAIL_ADJUDICATOR_EMAIL || "claimhero-adjudicator@agentmail.to";
+  const senderEmail = import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL || "";
+  const adjudicatorEmail = import.meta.env.VITE_AGENTMAIL_ADJUDICATOR_EMAIL || "";
+  const isSenderConfigured = Boolean(senderEmail && senderEmail.trim().length > 0);
+  const isAdjudicatorConfigured = Boolean(adjudicatorEmail && adjudicatorEmail.trim().length > 0);
 
   // Initialize local form state once settings are loaded
   useEffect(() => {
@@ -246,8 +248,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
                   className="w-full text-xs bg-background/80"
                 >
                   <option value="manual_review">I approve each appeal brief</option>
-                  <option value="autonomous_high_confidence">Autonomous dispatch (Score &ge; 80%)</option>
+                  <option value="autonomous_high_confidence" disabled={!isSenderConfigured}>
+                    Autonomous dispatch (Score &ge; 80%){!isSenderConfigured ? " (Requires AgentMail sender env)" : ""}
+                  </option>
                 </Select>
+                {!isSenderConfigured && (
+                  <p className="text-[10px] text-amber-400 font-mono mt-1">
+                    Autonomous dispatch disabled: VITE_AGENTMAIL_SENDER_EMAIL is not configured in environment.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -470,29 +479,52 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/70 bg-background/80 font-mono text-xs text-foreground shadow-2xs">
-                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>{senderEmail}</span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopySender}
-                  className="h-8 gap-1 text-xs cursor-pointer"
-                  title="Copy Sender Address"
-                >
-                  {copiedSender ? (
-                    <>
-                      <Check className="size-3.5 text-emerald-500" />
-                      <span>Copied</span>
-                    </>
-                  ) : (
-                    <>
+                {isSenderConfigured ? (
+                  <>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/70 bg-background/80 font-mono text-xs text-foreground shadow-2xs">
+                      <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>{senderEmail}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopySender}
+                      className="h-8 gap-1 text-xs cursor-pointer"
+                      title="Copy Sender Address"
+                    >
+                      {copiedSender ? (
+                        <>
+                          <Check className="size-3.5 text-emerald-500" />
+                          <span>Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-3.5" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/70 bg-background/80 font-mono text-xs shadow-2xs">
+                      <Badge variant="outline" className="text-[10px] font-mono text-amber-400 border-amber-500/30 bg-amber-500/10">
+                        Not configured
+                      </Badge>
+                      <span className="text-[11px] text-muted-foreground">VITE_AGENTMAIL_SENDER_EMAIL absent</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled
+                      className="h-8 gap-1 text-xs opacity-50 cursor-not-allowed"
+                      title="Sender address not configured in environment"
+                    >
                       <Copy className="size-3.5" />
                       <span>Copy</span>
-                    </>
-                  )}
-                </Button>
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -504,29 +536,52 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/70 bg-background/80 font-mono text-xs text-foreground shadow-2xs">
-                  <span className="size-2 rounded-full bg-sky-500" />
-                  <span>{adjudicatorEmail}</span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyAdjudicator}
-                  className="h-8 gap-1 text-xs cursor-pointer"
-                  title="Copy Adjudicator Address"
-                >
-                  {copiedAdjudicator ? (
-                    <>
-                      <Check className="size-3.5 text-emerald-500" />
-                      <span>Copied</span>
-                    </>
-                  ) : (
-                    <>
+                {isAdjudicatorConfigured ? (
+                  <>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/70 bg-background/80 font-mono text-xs text-foreground shadow-2xs">
+                      <span className="size-2 rounded-full bg-sky-500" />
+                      <span>{adjudicatorEmail}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyAdjudicator}
+                      className="h-8 gap-1 text-xs cursor-pointer"
+                      title="Copy Adjudicator Address"
+                    >
+                      {copiedAdjudicator ? (
+                        <>
+                          <Check className="size-3.5 text-emerald-500" />
+                          <span>Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-3.5" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/70 bg-background/80 font-mono text-xs shadow-2xs">
+                      <Badge variant="outline" className="text-[10px] font-mono text-amber-400 border-amber-500/30 bg-amber-500/10">
+                        Not configured
+                      </Badge>
+                      <span className="text-[11px] text-muted-foreground">VITE_AGENTMAIL_ADJUDICATOR_EMAIL absent</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled
+                      className="h-8 gap-1 text-xs opacity-50 cursor-not-allowed"
+                      title="Adjudicator address not configured in environment"
+                    >
                       <Copy className="size-3.5" />
                       <span>Copy</span>
-                    </>
-                  )}
-                </Button>
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
 

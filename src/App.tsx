@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { Shell } from "./components/layout/Shell";
 import { NavigationView } from "./components/layout/Sidebar";
 import { CommandDialog } from "./components/common/CommandDialog";
 import { CasePickerEmptyState } from "./components/common/CasePickerEmptyState";
+import { NotFoundWorkspace } from "./components/common/NotFoundWorkspace";
+import { ShortcutsHelpDialog } from "./components/common/ShortcutsHelpDialog";
 import { useClaims } from "./hooks/useClaims";
 import { useEvidence } from "./hooks/useEvidence";
 import { useCommunications } from "./hooks/useCommunications";
@@ -44,10 +46,17 @@ export default function App() {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState<boolean>(false);
   const [pendingTargetView, setPendingTargetView] = useState<NavigationView | null>(null);
 
+  // Initial claim from URL search params (?claim=...)
+  const initialClaimId = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("claim") || "";
+  }, []);
+
   const { isAuthenticated, isAuthLoading, user } = useCurrentUser();
-  const isDashboardActive = isAuthenticated && currentView !== "landing" && currentView !== "login";
+  const isDashboardActive = isAuthenticated && currentView !== "landing" && currentView !== "login" && currentView !== "notFound";
 
   const {
     claims,
@@ -63,7 +72,33 @@ export default function App() {
     uploadAndParseDocument,
     parseDocumentText,
     deleteCase,
-  } = useClaims({ enabled: isDashboardActive });
+  } = useClaims({ enabled: isDashboardActive, defaultClaimId: initialClaimId });
+
+  // Synchronize selectedClaimId to URL query param (?claim=...)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const currentParam = url.searchParams.get("claim") || "";
+    if (selectedClaimId && selectedClaimId !== currentParam) {
+      url.searchParams.set("claim", selectedClaimId);
+      window.history.replaceState(window.history.state, "", url.toString());
+    } else if (!selectedClaimId && currentParam) {
+      url.searchParams.delete("claim");
+      window.history.replaceState(window.history.state, "", url.toString());
+    }
+  }, [selectedClaimId]);
+
+  // Restore claim from URL on browser popstate (back/forward) navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const paramClaimId = new URLSearchParams(window.location.search).get("claim") || "";
+      if (paramClaimId !== selectedClaimId) {
+        setSelectedClaimId(paramClaimId);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [selectedClaimId, setSelectedClaimId]);
 
   const {
     evidences,
@@ -130,16 +165,22 @@ export default function App() {
     }
   }, [currentView, isAuthenticated, pendingTargetView, setCurrentView]);
 
-  // Open Sentinel Setup Guide (Onboarding) for new users on initial login
+  // Open Sentinel Setup Guide (Onboarding) for new users on initial entry into console
   useEffect(() => {
-    if (isAuthenticated && typeof window !== "undefined") {
+    if (
+      isAuthenticated &&
+      currentView !== "landing" &&
+      currentView !== "login" &&
+      currentView !== "notFound" &&
+      typeof window !== "undefined"
+    ) {
       const userKey = user?._id ? `claimhero_onboarding_completed_${user._id}` : "claimhero_onboarding_completed";
       const completed = localStorage.getItem(userKey) || localStorage.getItem("claimhero_onboarding_completed");
       if (!completed) {
         setIsOnboardingOpen(true);
       }
     }
-  }, [isAuthenticated, user?._id]);
+  }, [isAuthenticated, currentView, user?._id]);
 
   if (currentView === "landing") {
     return (
@@ -153,7 +194,23 @@ export default function App() {
               setCurrentView((view as NavigationView) || "radar");
             }
           }}
+          onOpenOnboarding={() => setIsOnboardingOpen(true)}
         />
+        <Toaster position="bottom-right" richColors theme="dark" closeButton />
+      </Suspense>
+    );
+  }
+
+  // Handle unauthenticated Not Found route
+  if (currentView === "notFound" && !isAuthenticated) {
+    return (
+      <Suspense fallback={<div className="h-screen w-screen bg-black" />}>
+        <div className="h-screen w-screen bg-background flex items-center justify-center p-4">
+          <NotFoundWorkspace
+            onNavigateToRadar={() => setCurrentView("radar")}
+            onNavigateHome={() => setCurrentView("landing")}
+          />
+        </div>
         <Toaster position="bottom-right" richColors theme="dark" closeButton />
       </Suspense>
     );
@@ -220,6 +277,7 @@ export default function App() {
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebar={handleToggleSidebar}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
         totalDisputedAmount={stats.activeDisputedAmount + stats.overturnedWonAmount}
         totalWonAmount={stats.overturnedWonAmount}
         winRate={stats.averageWinScore}
@@ -389,6 +447,14 @@ export default function App() {
                 onNavigateToRadar={() => setCurrentView("radar")}
               />
             )}
+
+            {/* 10. Workspace Route Not Found */}
+            {currentView === "notFound" && (
+              <NotFoundWorkspace
+                onNavigateToRadar={() => setCurrentView("radar")}
+                onNavigateHome={() => setCurrentView("landing")}
+              />
+            )}
           </Suspense>
         )}
 
@@ -412,7 +478,14 @@ export default function App() {
           onNavigateView={setCurrentView}
           onOpenIngestion={handleOpenIngestion}
           onOpenOnboarding={() => setIsOnboardingOpen(true)}
+          onOpenShortcuts={() => setIsShortcutsHelpOpen(true)}
           onDeleteCase={deleteCase}
+        />
+
+        {/* Central Keyboard Shortcuts Reference Modal */}
+        <ShortcutsHelpDialog
+          isOpen={isShortcutsHelpOpen}
+          onClose={() => setIsShortcutsHelpOpen(false)}
         />
 
         {/* Interactive 3-Step Sentinel Setup Wizard (Onboarding) */}

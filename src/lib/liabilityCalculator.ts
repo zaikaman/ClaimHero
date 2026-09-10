@@ -36,22 +36,22 @@ export function calculateFinancialLiability(
   input: Partial<FinancialLiabilityData>,
   claimContext?: { deniedAmount?: number; patientOwedAmount?: number }
 ): FinancialLiabilityResult {
-  const billedAmount = Math.max(0, Number(input.billedAmount ?? claimContext?.deniedAmount ?? 24500));
+  const billedAmount = Math.max(0, Number(input.billedAmount ?? claimContext?.deniedAmount ?? 0));
   const contractualDiscount = Math.max(0, Number(input.contractualDiscount ?? 0));
   const allowedAmount = Math.max(
     0,
     Number(input.allowedAmount ?? (billedAmount > contractualDiscount ? billedAmount - contractualDiscount : billedAmount))
   );
 
-  const deductibleTotal = Math.max(0, Number(input.deductibleTotal ?? 1500));
-  const deductibleMet = Math.max(0, Number(input.deductibleMet ?? 500));
+  const deductibleTotal = Math.max(0, Number(input.deductibleTotal ?? (billedAmount > 0 ? 1500 : 0)));
+  const deductibleMet = Math.max(0, Number(input.deductibleMet ?? (billedAmount > 0 ? 500 : 0)));
   const remainingDeductible = Math.max(0, deductibleTotal - deductibleMet);
 
-  const coinsuranceRate = Math.min(100, Math.max(0, Number(input.coinsuranceRate ?? 20))); // % (e.g. 20)
-  const copayAmount = Math.max(0, Number(input.copayAmount ?? 50));
+  const coinsuranceRate = Math.min(100, Math.max(0, Number(input.coinsuranceRate ?? (billedAmount > 0 ? 20 : 0))));
+  const copayAmount = Math.max(0, Number(input.copayAmount ?? (billedAmount > 0 ? 50 : 0)));
 
-  const outOfPocketMax = Math.max(0, Number(input.outOfPocketMax ?? 6000));
-  const outOfPocketSpent = Math.max(0, Number(input.outOfPocketSpent ?? 1800));
+  const outOfPocketMax = Math.max(0, Number(input.outOfPocketMax ?? (billedAmount > 0 ? 6000 : 0)));
+  const outOfPocketSpent = Math.max(0, Number(input.outOfPocketSpent ?? (billedAmount > 0 ? 1800 : 0)));
   const remainingOopCapacity = Math.max(0, outOfPocketMax - outOfPocketSpent);
 
   const networkStatus = input.networkStatus ?? "in_network";
@@ -288,7 +288,7 @@ export function calculateErisaPenalties(
 
   // Statutory Prompt-Pay / Prejudgment Interest (e.g. 18% p.a. under Texas Ins Code § 542.060 or Florida 10%)
   const statutoryInterestRate = input.statutoryInterestRate ?? 18; // % per year
-  const disputedAmount = claimContext?.deniedAmount ?? 24500;
+  const disputedAmount = claimContext?.deniedAmount ?? 0;
   const accruedInterestAmount = Math.round(
     (disputedAmount * (statutoryInterestRate / 100) * (daysElapsedSinceRequest / 365)) * 100
   ) / 100;
@@ -460,15 +460,15 @@ Demand is hereby made for immediate disclosure of all outstanding records within
  * Returns sensible default financial liability data derived from an existing claim.
  */
 export function getDefaultFinancialLiability(claim: Claim): FinancialLiabilityData {
-  const billedAmount = claim.deniedAmount || 24500;
+  const billedAmount = claim.deniedAmount ?? 0;
   const contractualDiscount = Math.round(billedAmount * 0.15); // ~15% discount
-  const allowedAmount = billedAmount - contractualDiscount;
-  const deductibleTotal = 1500;
-  const deductibleMet = 500;
-  const coinsuranceRate = 20; // 20%
-  const copayAmount = 50;
-  const outOfPocketMax = 6000;
-  const outOfPocketSpent = 1800;
+  const allowedAmount = Math.max(0, billedAmount - contractualDiscount);
+  const deductibleTotal = billedAmount > 0 ? 1500 : 0;
+  const deductibleMet = billedAmount > 0 ? 500 : 0;
+  const coinsuranceRate = billedAmount > 0 ? 20 : 0; // 20%
+  const copayAmount = billedAmount > 0 ? 50 : 0;
+  const outOfPocketMax = billedAmount > 0 ? 6000 : 0;
+  const outOfPocketSpent = billedAmount > 0 ? 1800 : 0;
 
   const result = calculateFinancialLiability({
     billedAmount,
@@ -504,10 +504,10 @@ export function getDefaultErisaPenalties(claim: Claim): ErisaPenaltyData {
       requestedDocuments: DEFAULT_REQUESTED_DOCUMENTS,
     },
     {
-      deniedAmount: claim.deniedAmount || 24500,
+      deniedAmount: claim.deniedAmount ?? 0,
       patientName: claim.patient?.name || claim.patientName || "Claimant",
       payerName: claim.patient?.insurancePayer || "Health Insurer",
-      claimNumber: claim.claimNumber || "CLM-8942-MOL",
+      claimNumber: claim.claimNumber || "CLM-PENDING",
       serviceDate: claim.serviceDate,
     }
   );

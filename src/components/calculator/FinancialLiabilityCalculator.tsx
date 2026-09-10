@@ -43,7 +43,7 @@ import {
 
 
 interface FinancialLiabilityCalculatorProps {
-  claim: Claim;
+  claim?: Claim | null;
   onNavigateView?: (view: NavigationView) => void;
 }
 
@@ -70,6 +70,28 @@ export const FinancialLiabilityCalculator: React.FC<FinancialLiabilityCalculator
   const [copiedDemand, setCopiedDemand] = useState<boolean>(false);
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+
+  if (!claim) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center border border-dashed border-border/70 rounded-xl bg-card/30">
+        <Scales className="size-10 text-muted-foreground mb-3" />
+        <h3 className="text-base font-semibold text-foreground">No Case Dossier Selected</h3>
+        <p className="text-xs text-muted-foreground mt-1 max-w-sm leading-relaxed">
+          Select an active denial case from the Case Radar or sidebar to audit financial liability and compute statutory ERISA penalties.
+        </p>
+        {onNavigateView && (
+          <Button
+            onClick={() => onNavigateView("radar")}
+            variant="outline"
+            size="sm"
+            className="mt-4 text-xs cursor-pointer"
+          >
+            Open Case Radar
+          </Button>
+        )}
+      </div>
+    );
+  }
 
   const severityMeta = getSeverityTierMeta(erisaResult.data.severityTier);
 

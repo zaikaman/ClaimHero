@@ -48,7 +48,8 @@ export type NavigationView =
   | "audit"
   | "analytics"
   | "settings"
-  | "login";
+  | "login"
+  | "notFound";
 
 interface SidebarProps {
   currentView: NavigationView;

@@ -304,7 +304,14 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     (claim.appealContext?.sender?.email?.trim() || claim.appealContext?.sender?.phone?.trim())
   );
 
+  const isSenderGatewayConfigured = Boolean(
+    claim.agentMailInboxEmail ||
+    claim.assignedAgentEmail ||
+    import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL
+  );
+
   const canDispatch =
+    isSenderGatewayConfigured &&
     (!isPatientUnspecified || hasSender) &&
     (dispatchMode === "ai_adjudicator"
       ? Boolean(aiAdjudicatorEmail)
@@ -615,7 +622,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               onClick={handleRunDispatch}
               disabled={isDispatching || !canDispatch || !effectiveAppeal}
               title={
-                isPatientUnspecified && !hasSender
+                !isSenderGatewayConfigured
+                  ? "Dispatch disabled: AgentMail sender address is not configured. Set VITE_AGENTMAIL_SENDER_EMAIL in environment."
+                  : isPatientUnspecified && !hasSender
                   ? "Patient name not specified in denial notice. Please supply sender details in Appeal Studio before dispatching."
                   : undefined
               }

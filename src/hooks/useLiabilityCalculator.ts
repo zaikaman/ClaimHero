@@ -30,17 +30,17 @@ export function useLiabilityCalculator(claim?: Claim | null) {
       return getDefaultFinancialLiability(claim);
     }
     return {
-      billedAmount: 24500,
-      contractualDiscount: 3675,
-      allowedAmount: 20825,
-      deductibleTotal: 1500,
-      deductibleMet: 500,
-      coinsuranceRate: 20,
-      copayAmount: 50,
-      outOfPocketMax: 6000,
-      outOfPocketSpent: 1800,
+      billedAmount: 0,
+      contractualDiscount: 0,
+      allowedAmount: 0,
+      deductibleTotal: 0,
+      deductibleMet: 0,
+      coinsuranceRate: 0,
+      copayAmount: 0,
+      outOfPocketMax: 0,
+      outOfPocketSpent: 0,
       networkStatus: "in_network",
-      noSurprisesActProtected: true,
+      noSurprisesActProtected: false,
     };
   });
 
@@ -52,14 +52,11 @@ export function useLiabilityCalculator(claim?: Claim | null) {
     if (claim) {
       return getDefaultErisaPenalties(claim);
     }
-    const now = new Date();
-    const requestDate = new Date(now.getTime() - 48 * 24 * 60 * 60 * 1000);
     return {
-      documentRequestDate: requestDate.toISOString().split("T")[0],
-      calculationDate: now.toISOString().split("T")[0],
-      complianceStatus: "defaulted",
+      complianceStatus: "compliant",
       dailyPenaltyRate: 110.0,
-      statutoryInterestRate: 18,
+      statutoryInterestRate: 0,
+      requestedDocuments: [],
     };
   });
 
@@ -81,6 +78,26 @@ export function useLiabilityCalculator(claim?: Claim | null) {
       } else {
         setErisaInputs(getDefaultErisaPenalties(claim));
       }
+    } else {
+      setFinancialInputs({
+        billedAmount: 0,
+        contractualDiscount: 0,
+        allowedAmount: 0,
+        deductibleTotal: 0,
+        deductibleMet: 0,
+        coinsuranceRate: 0,
+        copayAmount: 0,
+        outOfPocketMax: 0,
+        outOfPocketSpent: 0,
+        networkStatus: "in_network",
+        noSurprisesActProtected: false,
+      });
+      setErisaInputs({
+        complianceStatus: "compliant",
+        dailyPenaltyRate: 110.0,
+        statutoryInterestRate: 0,
+        requestedDocuments: [],
+      });
     }
   }, [claim?._id]);
 
@@ -174,5 +191,6 @@ export function useLiabilityCalculator(claim?: Claim | null) {
     saveSuccess,
     errorMessage,
     saveToClaim,
+    hasClaim: Boolean(claim),
   };
 }
