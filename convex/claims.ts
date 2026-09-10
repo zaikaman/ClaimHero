@@ -2997,22 +2997,16 @@ export const updateErisaPenalties = mutation({
 export const clearDemoData = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuthUser(ctx);
 
-    const queryBuilder = userId
-      ? ctx.db
-          .query("claims")
-          .withIndex("by_user", (q) => q.eq("userId", userId))
-      : ctx.db.query("claims");
+    const queryBuilder = ctx.db
+      .query("claims")
+      .withIndex("by_user", (q) => q.eq("userId", userId));
 
     const hasTake = "take" in queryBuilder && typeof queryBuilder.take === "function";
     const allUserClaims = hasTake
-      ? (userId
-          ? await queryBuilder.take(100)
-          : await queryBuilder.take(200))
-      : (userId
-          ? await queryBuilder.collect()
-          : await queryBuilder.collect());
+      ? await queryBuilder.take(100)
+      : await queryBuilder.collect();
 
     const demoClaims = allUserClaims
       .filter(
@@ -3073,7 +3067,7 @@ export const clearDemoData = mutation({
 
     if (demoClaims.length === 50 && ctx.scheduler && typeof ctx.scheduler.runAfter === "function") {
       await ctx.scheduler.runAfter(0, internal.claims.clearDemoDataInternal, {
-        userId: userId || undefined,
+        userId,
       });
     }
 
@@ -3083,15 +3077,13 @@ export const clearDemoData = mutation({
 
 export const clearDemoDataInternal = internalMutation({
   args: {
-    userId: v.optional(v.id("users")),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const userClaims = args.userId
-      ? await ctx.db
-          .query("claims")
-          .withIndex("by_user", (q) => q.eq("userId", args.userId!))
-          .take(100)
-      : await ctx.db.query("claims").take(200);
+    const userClaims = await ctx.db
+      .query("claims")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .take(100);
 
     const demoClaims = userClaims
       .filter(
@@ -3103,26 +3095,28 @@ export const clearDemoDataInternal = internalMutation({
       .slice(0, 50);
 
     for (const claim of demoClaims) {
-      if (claim.denialLetterStorageId) {
-        await ctx.scheduler.runAfter(0, internal.claims.cleanupStorageFileInternal, {
-          storageId: claim.denialLetterStorageId,
+      if (ctx.scheduler && typeof ctx.scheduler.runAfter === "function") {
+        if (claim.denialLetterStorageId) {
+          await ctx.scheduler.runAfter(0, internal.claims.cleanupStorageFileInternal, {
+            storageId: claim.denialLetterStorageId,
+          });
+        }
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEvidencesBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAppealsBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEmailsBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAuditLogsBatchInternal, {
+          claimId: claim._id,
+        });
+        await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
+          claimId: claim._id,
         });
       }
-      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEvidencesBatchInternal, {
-        claimId: claim._id,
-      });
-      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAppealsBatchInternal, {
-        claimId: claim._id,
-      });
-      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEmailsBatchInternal, {
-        claimId: claim._id,
-      });
-      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAuditLogsBatchInternal, {
-        claimId: claim._id,
-      });
-      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
-        claimId: claim._id,
-      });
 
       try {
         await claimsAggregate.delete(ctx, claim);
@@ -3132,7 +3126,7 @@ export const clearDemoDataInternal = internalMutation({
       await ctx.db.delete(claim._id);
     }
 
-    if (demoClaims.length === 50) {
+    if (demoClaims.length === 50 && ctx.scheduler && typeof ctx.scheduler.runAfter === "function") {
       await ctx.scheduler.runAfter(0, internal.claims.clearDemoDataInternal, {
         userId: args.userId,
       });

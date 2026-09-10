@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-10T13:58:30Z
+- **Last updated:** 2026-09-10T12:53:26Z
 
 ## Log
 
@@ -1130,7 +1130,7 @@ Resolved M7 audit trail deletability and marketing claims-vs-reality gap (`conve
 - Terminology & UI Alignment: Replaced over-claimed "immutable cryptographic audit trail" references with "case audit trail" and "statutory audit trail" across UI banners, drawers, command dialog, chatbot tools, executive reports, and documentation (`DeleteCaseModal.tsx`, `Sidebar.tsx`, `CommandDialog.tsx`, `AuditTimeline.tsx`, `SentinelChatbot.tsx`, `ExecutiveReportModal.tsx`, `sentinelAgent.ts`, `sentinelChatbot.ts`).
 - Testing & Verification (`tests/ingestionAndDeletionPipeline.test.ts`, `tests/convexSettings.test.ts`, `tests/convexAuditLogsAndUsers.test.ts`): Updated cascading batch tests to assert patch with tombstone metadata instead of delete, and added tests for `listTombstoned` and tombstone filtering in `listRecent`. Verified with `npm run verify` (100% clean typecheck, 0 ESLint errors, 698 passing unit tests across 42 suites, 80.78% test coverage, and successful production build). Convex features: schema, tables, indexes, mutations, internalMutation, queries.
 
-### 2026-09-09 - working tree
+### 2026-09-09 - b55e334
 Hardened production readiness, schema efficiency, and security guardrails across Convex functions, rate limiting, and search indexing (L1–L6):
 - Rate-Limiter Error Narrowing & Operational Logging (L1): Narrowed catch blocks across `opticalParser.ts`, `claims.ts` (`generateUploadUrl`), `precedentMatcher.ts`, and `precedentArchive.ts` (`hybridSearchPrecedents`) to strictly rethrow rate-limit exhaustion errors, while logging structured warnings in production environments and documenting unit test mock harness tolerances.
 - Legacy Auth Cleanup (L2): Purged legacy backward-compatibility `signIn` mutation and unused imports in `convex/auth.ts`, standardizing directly on canonical Convex Auth v2 (`@convex-dev/auth`).
@@ -1140,5 +1140,8 @@ Hardened production readiness, schema efficiency, and security guardrails across
 - Danger Zone Portfolio Reset Rate Limiting (L6): Added strict 1 per 15-minute token-bucket rate limiter rule (`resetPortfolio`) in `convex/lib/rateLimiter.ts` and enforced it in `settings.resetPortfolio` (`convex/settings.ts`) to protect against catastrophic portfolio wiping via hijacked user sessions or automated scripts.
 - Testing & Verification (`tests/productionReadinessFixes.test.ts`): Added 9 dedicated automated unit tests covering all 6 fixes. Verified with `npm run verify`: 100% clean typecheck (`tsc --noEmit`), 0 ESLint errors (`eslint src convex`), 707/707 passing unit tests across 42 suites with 80.82% coverage, and successful production build in 6.10s. Convex features: schema, indexes, searchIndex, full-text search, mutations, actions, components (@convex-dev/rate-limiter, @convex-dev/auth).
 
-### 2026-09-10 - working tree
+### 2026-09-10 - 52045ba
 Hardened PHI placeholder reconciliation (P0): replaced the unauthenticated global `healRedactedPatientNames` mutation with a secure, fail-closed `healRedactedPatientNamesInternal` internalMutation in `convex/claims.ts`, designed for developer maintenance via the Convex CLI or dashboard. Enforces explicit `confirm: true` and an explicit `targetUserId` tenant scope. Added cursor-based `claims.by_user` pagination with scheduler continuation (batch size capped at 25), `dryRun` support, per-heal `appealAuditLogs` entries without PHI, and strict in-tenant name-source resolution that never invents PII; removed all hardcoded DOB/sender defaults and preserved `redactionMetadata` audit trails. Removed artificial admin email allowlists and client endpoints to maintain a clean single-role advocate model. Updated regression tests in `tests/securityComplianceHardening.test.ts` covering confirm-guard, tenant-isolation, authentic in-tenant healing, no-PII-invention, dry-run, and scheduled cursor pagination. Convex features: internalMutation, indexed pagination, scheduler.
+
+### 2026-09-10 - working tree
+Remediated fail-open demo purge vulnerability (P0-2) in `convex/claims.ts` (`clearDemoData` and `clearDemoDataInternal`). Enforced `await requireAuthUser(ctx)` at entry, eliminating unauthenticated global claim scanning and unauthorized cross-tenant deletion. Dropped all unauthenticated fallback queries, scoping deletion strictly to the caller's identity using the `by_user` index. Required `userId: v.id("users")` on `clearDemoDataInternal` and guarded asynchronous cascading deletion batches with scheduler runtime checks. Returns `{ success: true, deletedClaimsCount: 0 }` for empty owner scopes without touching other tenants or live patient records. Added regression tests in `tests/demoIsolationAndHonestPipelines.test.ts` verifying authentication enforcement, strict user scoping, and internal cascading deletion. Verified 710 passing tests across 42 suites, clean typecheck, clean lint, 80.82% coverage, and production build via `npm run verify`. Convex features: mutations, internalMutation, auth, indexes.

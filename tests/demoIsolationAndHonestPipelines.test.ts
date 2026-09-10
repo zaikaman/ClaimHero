@@ -168,6 +168,91 @@ describe("Demo Isolation, Provenance Attribution & Honest Evaluation Pipeline", 
       expect(deletedIds).toContain("claim_demo_1");
       expect(deletedIds).toContain("claim_demo_2");
     });
+
+    it("claims.clearDemoData throws Unauthorized error when unauthenticated caller attempts purge", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValueOnce(null as any);
+      const claimsModule = await import("../convex/claims");
+      const clearHandler = (claimsModule.clearDemoData as any)._handler;
+
+      const mockCtx: any = {
+        auth: {
+          getUserIdentity: vi.fn().mockResolvedValue(null),
+        },
+        db: {
+          query: vi.fn(),
+        },
+      };
+
+      await expect(clearHandler(mockCtx, {})).rejects.toThrow("Unauthorized: Authentication required");
+      expect(mockCtx.db.query).not.toHaveBeenCalled();
+    });
+
+    it("claims.clearDemoData strictly queries by_user index and returns deletedClaimsCount: 0 when none exist", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValueOnce("user_owner_42" as any);
+      const claimsModule = await import("../convex/claims");
+      const clearHandler = (claimsModule.clearDemoData as any)._handler;
+
+      let indexQueried = "";
+      let indexUserId = "";
+      const mockQueryInstance: any = {};
+      mockQueryInstance.withIndex = vi.fn().mockImplementation((idx: string, qFn: any) => {
+        indexQueried = idx;
+        const qMock = { eq: vi.fn().mockImplementation((_field: string, val: string) => { indexUserId = val; }) };
+        if (qFn) qFn(qMock);
+        return mockQueryInstance;
+      });
+      mockQueryInstance.take = vi.fn().mockResolvedValue([]);
+
+      const mockCtx: any = {
+        auth: {
+          getUserIdentity: vi.fn().mockResolvedValue({ subject: "user_owner_42" }),
+        },
+        db: {
+          query: vi.fn().mockReturnValue(mockQueryInstance),
+        },
+      };
+
+      const result = await clearHandler(mockCtx, {});
+      expect(result).toEqual({ success: true, deletedClaimsCount: 0 });
+      expect(mockCtx.db.query).toHaveBeenCalledWith("claims");
+      expect(indexQueried).toBe("by_user");
+      expect(indexUserId).toBe("user_owner_42");
+    });
+
+    it("clearDemoDataInternal scopes strictly to args.userId and purges demo records", async () => {
+      const claimsModule = await import("../convex/claims");
+      const internalClearHandler = (claimsModule.clearDemoDataInternal as any)._handler;
+
+      let indexQueried = "";
+      let indexUserId = "";
+      const mockQueryInstance: any = {};
+      mockQueryInstance.withIndex = vi.fn().mockImplementation((idx: string, qFn: any) => {
+        indexQueried = idx;
+        const qMock = { eq: vi.fn().mockImplementation((_field: string, val: string) => { indexUserId = val; }) };
+        if (qFn) qFn(qMock);
+        return mockQueryInstance;
+      });
+      mockQueryInstance.take = vi.fn().mockResolvedValue([
+        { _id: "claim_demo_int", userId: "user_internal_99", isDemo: true },
+      ]);
+
+      const deletedIds: string[] = [];
+      const mockCtx: any = {
+        db: {
+          query: vi.fn().mockReturnValue(mockQueryInstance),
+          delete: vi.fn().mockImplementation((id: string) => {
+            deletedIds.push(id);
+            return Promise.resolve();
+          }),
+        },
+      };
+
+      const res = await internalClearHandler(mockCtx, { userId: "user_internal_99" as any });
+      expect(res).toBe(true);
+      expect(indexQueried).toBe("by_user");
+      expect(indexUserId).toBe("user_internal_99");
+      expect(deletedIds).toEqual(["claim_demo_int"]);
+    });
   });
 
   describe("Honest LLM Fallbacks & Generation Provenance", () => {
