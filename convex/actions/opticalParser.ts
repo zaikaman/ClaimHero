@@ -371,35 +371,65 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
       throw ingestionError;
     }
 
-    // Autonomously resolve the payer intake gateway right from the moment of ingestion
-    try {
-      // 1. Resolve base gateway info (portal URL, fax, PO Box, EDI ID, etc.) from verified directory or web search
-      const resolvedContact = await ctx.runAction(
-        api.actions.payerContactResolver.resolvePayerGateway,
-        {
-          claimId,
-          payerName: extraction.insurancePayer,
-        }
-      );
-
-      // 2. If OCR extracted an explicit appeals email or specific PO Box, overlay it with document provenance
-      if (extraction.payerAppealsEmail && extraction.payerAppealsEmail.includes("@")) {
+    // Autonomously resolve the payer intake gateway without blocking extraction return.
+    // The Document OCR overlay (when present) is applied immediately so the claim is
+    // usable instantly; live gateway search runs in the background and the sentinel
+    // pipeline re-resolves on demand if payerContact is still missing.
+    const ocrAppealsEmail = extraction.payerAppealsEmail;
+    const hasOcrContact =
+      typeof ocrAppealsEmail === "string" && ocrAppealsEmail.includes("@");
+    if (hasOcrContact) {
+      try {
         await ctx.runMutation(internal.claims.updatePayerContactInternal, {
           claimId,
           payerContact: {
-            ...resolvedContact,
-            officialAppealsEmail: extraction.payerAppealsEmail,
+            officialAppealsEmail: ocrAppealsEmail as string,
             statutoryPoBox:
               extraction.payerAppealsAddress ||
-              resolvedContact?.statutoryPoBox ||
               `${extraction.insurancePayer} Appeals Unit`,
             isVerified: true,
             source: "document_ocr",
           },
         });
+      } catch (contactErr) {
+        console.warn("Auto payer gateway resolution note:", contactErr);
       }
-    } catch (contactErr) {
-      console.warn("Auto payer gateway resolution note:", contactErr);
+      // Document-OCR contact is authoritative: skip background search so the
+      // scheduled resolver cannot overwrite document provenance. The sentinel
+      // pipeline only auto-resolves when payerContact is missing.
+    } else {
+      try {
+        const scheduler = (
+          ctx as unknown as {
+            scheduler?: {
+              runAfter: (delayMs: number, fn: unknown, args: unknown) => Promise<unknown>;
+            };
+          }
+        ).scheduler;
+        if (scheduler && typeof scheduler.runAfter === "function") {
+          await scheduler.runAfter(
+            0,
+            internal.actions.payerContactResolver.resolvePayerGatewayInternal,
+            {
+              claimId,
+              payerName: extraction.insurancePayer,
+            }
+          );
+        } else {
+          // Fallback for isolated test runners without scheduler: resolve inline.
+          // The sentinel pipeline also auto-resolves when payerContact is missing.
+          void ctx
+            .runAction(internal.actions.payerContactResolver.resolvePayerGatewayInternal, {
+              claimId,
+              payerName: extraction.insurancePayer,
+            })
+            .catch((contactErr: unknown) => {
+              console.warn("Auto payer gateway resolution note:", contactErr);
+            });
+        }
+      } catch (contactErr) {
+        console.warn("Auto payer gateway resolution note:", contactErr);
+      }
     }
 
     let pipelineResult: Record<string, unknown> | undefined = undefined;

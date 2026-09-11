@@ -29,6 +29,7 @@ import { AppealBriefRenderer } from "./AppealBriefRenderer";
 import { StudioPresenceBridge } from "./CollaboratorPresence";
 import { ShareCaseModal } from "./ShareCaseModal";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
+import { PipelineActivityFeed } from "../common/PipelineActivityFeed";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -267,6 +268,14 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     }
   };
 
+  const isBackgroundPipelineRunning =
+    !markdownContent.trim() &&
+    (claim.status === "analyzing" ||
+      claim.status === "precedent_matched" ||
+      claim.status === "drafting" ||
+      claim.status === "ingested" ||
+      claim.status === "parsing");
+
   return (
     <div className="space-y-4 animate-fadeIn pb-28 flex flex-col">
       {/* 4-Step Guided Sentinel Stepper */}
@@ -280,12 +289,43 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         }}
         evidencesCount={evidences.length}
         hasDraftedBrief={Boolean(markdownContent.trim())}
-        isProcessing={isSynthesizing || isEscalating}
-        processingLabel={isEscalating ? "Escalating Legal Posture..." : "Synthesizing Appeal Brief..."}
+        isProcessing={isSynthesizing || isEscalating || isBackgroundPipelineRunning}
+        processingLabel={
+          isEscalating
+            ? "Escalating Legal Posture..."
+            : isSynthesizing
+              ? "Synthesizing Appeal Brief..."
+              : isBackgroundPipelineRunning
+                ? claim.status === "drafting"
+                  ? "Synthesizing brief in background..."
+                  : "Pipeline running in background..."
+                : "Synthesizing Appeal Brief..."
+        }
         onRunAutonomousPipeline={
           onRunAutonomousPipeline ? () => onRunAutonomousPipeline(claim._id) : undefined
         }
       />
+
+      {/* Background pipeline notice: brief streams in live, evidence available meanwhile */}
+      {isBackgroundPipelineRunning && (
+        <Card className="p-3.5 border-primary/30 bg-primary/5" role="status">
+          <div className="flex items-start gap-2.5">
+            <CircleNotch className="size-4 animate-spin text-primary shrink-0 mt-0.5" />
+            <div className="space-y-1 min-w-0">
+              <span className="text-xs font-semibold text-foreground block">
+                Appeal brief synthesizing in background
+              </span>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                The autonomous pipeline is crawling policy, scoring, and drafting. The brief
+                appears here automatically; review the Evidence Matrix meanwhile. No need to wait.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Live agent thought stream (self-hides for older runs) */}
+      <PipelineActivityFeed claimId={claim._id} />
 
       {/* Multi-Tier Statutory Escalation Stepper Bar */}
       <Card className="p-2 sm:p-2.5 shrink-0 overflow-visible bg-card/90 border-border/80 shadow-xs">
@@ -826,23 +866,27 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                     </div>
                     <div className="space-y-1 max-w-sm">
                       <div className="text-sm font-semibold text-foreground">
-                        Ready to Synthesize {currentTierConfig.shortTitle} Brief
+                        {isBackgroundPipelineRunning
+                          ? "Pipeline Running — Brief Arriving Shortly"
+                          : `Ready to Synthesize ${currentTierConfig.shortTitle} Brief`}
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        Generate a formal cited appeal brief referencing {evidences.length} clinical policy clauses and {currentTierConfig.keyStatute} federal requirements.
+                        {isBackgroundPipelineRunning
+                          ? `Background synthesis in progress for ${claim.claimNumber}. The brief streams in automatically; review ${evidences.length} clinical policy clauses meanwhile.`
+                          : `Generate a formal cited appeal brief referencing ${evidences.length} clinical policy clauses and ${currentTierConfig.keyStatute} federal requirements.`}
                       </p>
                     </div>
 
                     <Button
                       onClick={handleRunSynthesis}
-                      disabled={isSynthesizing || isEscalating || readOnly}
+                      disabled={isSynthesizing || isEscalating || readOnly || isBackgroundPipelineRunning}
                       className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md mt-2"
-                      title={readOnly ? "Viewers have read-only access" : undefined}
+                      title={isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : readOnly ? "Viewers have read-only access" : undefined}
                     >
-                      {isSynthesizing || isEscalating ? (
+                      {isSynthesizing || isEscalating || isBackgroundPipelineRunning ? (
                         <>
                           <CircleNotch className="size-3.5 animate-spin" />
-                          <span>Synthesizing Appeal Brief...</span>
+                          <span>{isBackgroundPipelineRunning && !isSynthesizing ? "Pipeline Running in Background..." : "Synthesizing Appeal Brief..."}</span>
                         </>
                       ) : (
                         <>

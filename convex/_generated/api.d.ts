@@ -44,6 +44,7 @@ import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_erisaEvidence from "../lib/erisaEvidence.js";
 import type * as lib_openai from "../lib/openai.js";
 import type * as lib_pdfGenerator from "../lib/pdfGenerator.js";
+import type * as lib_pipelineActivity from "../lib/pipelineActivity.js";
 import type * as lib_precedentCorpus from "../lib/precedentCorpus.js";
 import type * as lib_precedentValidators from "../lib/precedentValidators.js";
 import type * as lib_rateLimiter from "../lib/rateLimiter.js";
@@ -52,6 +53,7 @@ import type * as lib_statutoryTierValidators from "../lib/statutoryTierValidator
 import type * as model_auth from "../model/auth.js";
 import type * as p2pCallSessions from "../p2pCallSessions.js";
 import type * as p2pScripts from "../p2pScripts.js";
+import type * as pipelineActivities from "../pipelineActivities.js";
 import type * as precedents from "../precedents.js";
 import type * as presence from "../presence.js";
 import type * as sentinelAgentQueries from "../sentinelAgentQueries.js";
@@ -102,6 +104,7 @@ declare const fullApi: ApiFromModules<{
   "lib/erisaEvidence": typeof lib_erisaEvidence;
   "lib/openai": typeof lib_openai;
   "lib/pdfGenerator": typeof lib_pdfGenerator;
+  "lib/pipelineActivity": typeof lib_pipelineActivity;
   "lib/precedentCorpus": typeof lib_precedentCorpus;
   "lib/precedentValidators": typeof lib_precedentValidators;
   "lib/rateLimiter": typeof lib_rateLimiter;
@@ -110,6 +113,7 @@ declare const fullApi: ApiFromModules<{
   "model/auth": typeof model_auth;
   p2pCallSessions: typeof p2pCallSessions;
   p2pScripts: typeof p2pScripts;
+  pipelineActivities: typeof pipelineActivities;
   precedents: typeof precedents;
   presence: typeof presence;
   sentinelAgentQueries: typeof sentinelAgentQueries;

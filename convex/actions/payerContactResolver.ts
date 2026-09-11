@@ -1,7 +1,7 @@
 "use node";
 
-import { action, ActionCtx } from "../_generated/server";
-import { Id } from "../_generated/dataModel";
+import { action, internalAction, ActionCtx } from "../_generated/server";
+import { Id, Doc } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { components, internal } from "../_generated/api";
 import { createStructuredCompletion } from "../lib/openai";
@@ -202,20 +202,20 @@ function extractCandidateEmails(text: string, payerName: string): {
 }
 
 /**
- * Shared execution helper for resolving and validating payer intake gateways.
+ * Internal execution helper for resolving and validating payer intake gateways with an authorized or internal claim context.
  */
-export async function executeResolvePayerGateway(
+export async function performResolvePayerGateway(
   ctx: ActionCtx,
   args: {
     claimId: Id<"claims">;
     payerName?: string;
     forceWebSearch?: boolean;
+  },
+  claim: Doc<"claims"> & {
+    patient?: Doc<"patients"> | null;
   }
 ): Promise<ResolvedPayerContact> {
-  // 1. Authorize claim ownership and fetch context
-  const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
-
-  const payer = args.payerName || claim.patient?.insurancePayer || "Health Insurer";
+  const payer = args.payerName || claim.patient?.insurancePayer || claim.insurancePayer || "Health Insurer";
 
   // 2. Dynamic Discovery via Multi-Query Firecrawl Search + Candidate Extraction
   let webSearchContext = "";
@@ -433,6 +433,23 @@ Extract the authentic appeals/grievance/claims intake gateway details for ${paye
 }
 
 /**
+ * Shared execution helper for resolving and validating payer intake gateways.
+ * Requires caller authentication and claim ownership / editor access.
+ */
+export async function executeResolvePayerGateway(
+  ctx: ActionCtx,
+  args: {
+    claimId: Id<"claims">;
+    payerName?: string;
+    forceWebSearch?: boolean;
+  }
+): Promise<ResolvedPayerContact> {
+  // 1. Authorize claim ownership and fetch context
+  const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
+  return await performResolvePayerGateway(ctx, args, claim);
+}
+
+/**
  * Autonomous Payer Contact Resolver Action:
  * Discovers real insurer grievance, claims, and appeals intake gateways
  * using Firecrawl Web Search + LLM extraction for any domestic or international insurer.
@@ -445,6 +462,28 @@ export const resolvePayerGateway = action({
   },
   handler: async (ctx, args): Promise<ResolvedPayerContact> => {
     return await executeResolvePayerGateway(ctx, args);
+  },
+});
+
+/**
+ * Autonomous Payer Contact Resolver Internal Action:
+ * For server-side background tasks (document upload intake scheduler, durable workflows)
+ * where execution occurs asynchronously without an interactive caller auth session.
+ */
+export const resolvePayerGatewayInternal = internalAction({
+  args: {
+    claimId: v.id("claims"),
+    payerName: v.optional(v.string()),
+    forceWebSearch: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<ResolvedPayerContact> => {
+    const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
+      claimId: args.claimId,
+    });
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+    return await performResolvePayerGateway(ctx, args, claim);
   },
 });
 
@@ -467,13 +506,17 @@ export const reverifyPayerContactForDispatch = action({
   },
   handler: async (ctx, args): Promise<ResolvedPayerContact> => {
     const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
-    const payer = claim.patient?.insurancePayer || "Health Insurer";
+    const payer = claim.patient?.insurancePayer || claim.insurancePayer || "Health Insurer";
 
-    const resolved = await executeResolvePayerGateway(ctx, {
-      claimId: args.claimId,
-      payerName: payer,
-      forceWebSearch: true,
-    });
+    const resolved = await performResolvePayerGateway(
+      ctx,
+      {
+        claimId: args.claimId,
+        payerName: payer,
+        forceWebSearch: true,
+      },
+      claim
+    );
 
     const isTargetChannelVerified =
       args.intendedChannel === "email"

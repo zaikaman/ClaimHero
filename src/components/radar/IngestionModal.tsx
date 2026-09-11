@@ -48,6 +48,9 @@ import { Select } from "../ui/select";
 import { Input } from "../ui/input";
 
 import { Id } from "../../../convex/_generated/dataModel";
+import { toast } from "sonner";
+
+type IngestionStage = "idle" | "extracting" | "preparing_questions" | "saving";
 
 const DEFAULT_CLINICAL_QUESTIONS: ClinicalIntakeQuestion[] = [
   {
@@ -117,6 +120,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const [processingMessage, setProcessingMessage] = useState(
     "Analyzing denial document..."
   );
+  const [processingStage, setProcessingStage] = useState<IngestionStage>("idle");
+  const [processingStartedAt, setProcessingStartedAt] = useState<number | null>(null);
+  const [processingElapsedSec, setProcessingElapsedSec] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [extractedResult, setExtractedResult] = useState<
     (DenialExtractionResult & { claimId: string; pipelineResult?: unknown }) | null
@@ -176,6 +182,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       setPastedText("");
       setIsProcessing(false);
       setProcessingMessage("Analyzing denial document...");
+      setProcessingStage("idle");
+      setProcessingStartedAt(null);
+      setProcessingElapsedSec(0);
       setErrorMessage(null);
       setExtractedResult(null);
       setActivePreset(null);
@@ -203,6 +212,31 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const generateIntakeQuestionsAction = useAction(api.actions.clinicalIntake.generateClinicalIntakeQuestions);
   const updateAppealContextMutation = useMutation(api.claims.updateAppealContext);
 
+  // Elapsed-time ticker so long extractions feel alive instead of frozen.
+  useEffect(() => {
+    if (!isProcessing || processingStartedAt === null) return;
+    const timer = window.setInterval(() => {
+      setProcessingElapsedSec(Math.floor((Date.now() - processingStartedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isProcessing, processingStartedAt]);
+
+  const beginProcessing = (stage: IngestionStage, message: string) => {
+    setIsProcessing(true);
+    setProcessingStage(stage);
+    setProcessingMessage(message);
+    setProcessingStartedAt(Date.now());
+    setProcessingElapsedSec(0);
+    setErrorMessage(null);
+  };
+
+  const endProcessing = () => {
+    setIsProcessing(false);
+    setProcessingStage("idle");
+    setProcessingStartedAt(null);
+    setProcessingElapsedSec(0);
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,40 +247,51 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     }
   };
 
-  const executePostExtractionPipeline = async (claimId: string) => {
+  const executePostExtractionPipeline = async (
+    claimId: string,
+    snapshot?: {
+      senderName: string;
+      senderCredentials: string;
+      senderEmail: string;
+      senderPhone: string;
+      clinicalFacts: ClinicalFacts;
+      physicianNotes: string;
+    }
+  ) => {
     if (!runPipelineAction) return;
-
-    setProcessingMessage("Step 2/3: Indexing Insurer CPB & Evaluating Win Score...");
-    try {
-      const pipelineRes = await runPipelineAction({
-        claimId: claimId as Id<"claims">,
-        sender: {
+    const sender = snapshot
+      ? {
+          name: snapshot.senderName.trim(),
+          credentials: snapshot.senderCredentials.trim() || undefined,
+          email: snapshot.senderEmail.trim() || undefined,
+          phone: snapshot.senderPhone.trim() || undefined,
+        }
+      : {
           name: senderName.trim(),
           credentials: senderCredentials.trim() || undefined,
           email: senderEmail.trim() || undefined,
           phone: senderPhone.trim() || undefined,
-        },
-        clinicalFacts,
-        physicianNotes: physicianNotes.trim() || undefined,
+        };
+    const facts = snapshot?.clinicalFacts ?? clinicalFacts;
+    const notes = (snapshot?.physicianNotes ?? physicianNotes).trim() || undefined;
+
+    try {
+      return await runPipelineAction({
+        claimId: claimId as Id<"claims">,
+        sender,
+        clinicalFacts: facts,
+        physicianNotes: notes,
       });
-      setProcessingMessage("Step 3/3: Synthesizing cited ERISA medical appeal brief...");
-      return pipelineRes;
     } catch (pipelineErr) {
       const errStr = pipelineErr instanceof Error ? pipelineErr.message : String(pipelineErr);
       if (errStr.includes("Token expired") || errStr.includes("InvalidAuthHeader")) {
         console.warn("Auth token expired mid-pipeline execution; waiting for session refresh and retrying...", pipelineErr);
-        setProcessingMessage("Refreshing authentication session & finalizing brief...");
         await new Promise((resolve) => setTimeout(resolve, 1200));
         return await runPipelineAction({
           claimId: claimId as Id<"claims">,
-          sender: {
-            name: senderName.trim(),
-            credentials: senderCredentials.trim() || undefined,
-            email: senderEmail.trim() || undefined,
-            phone: senderPhone.trim() || undefined,
-          },
-          clinicalFacts,
-          physicianNotes: physicianNotes.trim() || undefined,
+          sender,
+          clinicalFacts: facts,
+          physicianNotes: notes,
         });
       }
       console.warn("Pipeline stopped because clinical policy evidence could not be retrieved:", pipelineErr);
@@ -254,10 +299,39 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     }
   };
 
-  const prepareContextReview = async (
+  const fetchIntakeQuestionsInBackground = (
+    result: DenialExtractionResult & { claimId: string }
+  ) => {
+    if (!generateIntakeQuestionsAction) {
+      setIsPreparingContext(false);
+      return;
+    }
+    setIsPreparingContext(true);
+    setProcessingStage("preparing_questions");
+    void generateIntakeQuestionsAction({
+      denialReasonCode: result.denialReasonCode,
+      denialReasonDescription: result.denialReasonDescription,
+      cptCodes: result.cptCodes,
+      icd10Codes: result.icd10Codes,
+    })
+      .then((generated) => {
+        if (generated?.questions?.length) setIntakeQuestions(generated.questions);
+      })
+      .catch((questionErr) => {
+        console.warn("Using neutral clinical intake questions:", questionErr);
+        setIntakeQuestions(DEFAULT_CLINICAL_QUESTIONS);
+      })
+      .finally(() => {
+        setIsPreparingContext(false);
+      });
+  };
+
+  const prepareContextReview = (
     result: DenialExtractionResult & { claimId: string },
     preset?: SampleCasePreset
   ) => {
+    // Show the context form instantly with safe defaults; denial-specific
+    // prompts upgrade in the background without blocking the user.
     setExtractedResult({ ...result, pipelineResult: null });
     setContextSubmitted(false);
     setActivePreset(preset || null);
@@ -289,24 +363,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     setSenderCredentials("");
     setSenderEmail("");
     setSenderPhone("");
-    setIsPreparingContext(true);
-
-    try {
-      if (generateIntakeQuestionsAction) {
-        const generated = await generateIntakeQuestionsAction({
-          denialReasonCode: result.denialReasonCode,
-          denialReasonDescription: result.denialReasonDescription,
-          cptCodes: result.cptCodes,
-          icd10Codes: result.icd10Codes,
-        });
-        if (generated?.questions?.length) setIntakeQuestions(generated.questions);
-      }
-    } catch (questionErr) {
-      console.warn("Using neutral clinical intake questions:", questionErr);
-      setIntakeQuestions(DEFAULT_CLINICAL_QUESTIONS);
-    } finally {
-      setIsPreparingContext(false);
-    }
+    fetchIntakeQuestionsInBackground(result);
   };
 
   const handleProcessFile = async () => {
@@ -315,28 +372,24 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       return;
     }
 
-    setIsProcessing(true);
-    setProcessingMessage("Step 1/3: Optical document analysis & clinical entity extraction...");
-    setErrorMessage(null);
+    beginProcessing("extracting", "Step 1/2: Optical document analysis and clinical entity extraction...");
 
     try {
       const result = await onUploadFile(selectedFile, patientState);
-      await prepareContextReview(result);
+      prepareContextReview(result);
+      endProcessing();
     } catch (err) {
+      endProcessing();
       setErrorMessage(
         err instanceof Error
           ? err.message
           : "Failed to parse denial document. Please verify the document format or try again."
       );
-    } finally {
-      setIsProcessing(false);
     }
   };
 
   const handleProcessPreset = async (preset: SampleCasePreset) => {
-    setIsProcessing(true);
-    setProcessingMessage("Step 1/3: Extracting CPT, CARC & ERISA statutory deadlines...");
-    setErrorMessage(null);
+    beginProcessing("extracting", "Step 1/2: Extracting CPT, CARC and ERISA statutory deadlines...");
 
     try {
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
@@ -345,15 +398,15 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
         `$1-${randomSuffix}`
       );
       const result = await onParseText(uniqueContent, patientState, preset.origin || "demo-fixture");
-      await prepareContextReview(result, preset);
+      prepareContextReview(result, preset);
+      endProcessing();
     } catch (err) {
+      endProcessing();
       setErrorMessage(
         err instanceof Error
           ? err.message
           : "Failed to extract claim information. Please check your document text."
       );
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -365,21 +418,19 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       return;
     }
 
-    setIsProcessing(true);
-    setProcessingMessage("Step 1/3: Parsing clinical records & denial rationale...");
-    setErrorMessage(null);
+    beginProcessing("extracting", "Step 1/2: Parsing clinical records and denial rationale...");
 
     try {
       const result = await onParseText(pastedText, patientState);
-      await prepareContextReview(result);
+      prepareContextReview(result);
+      endProcessing();
     } catch (err) {
+      endProcessing();
       setErrorMessage(
         err instanceof Error
           ? err.message
           : "Failed to extract claim information. Please check your document text."
       );
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -405,8 +456,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       return;
     }
 
-    setIsProcessing(true);
-    setErrorMessage(null);
+    beginProcessing("saving", autoPilotEnabled ? "Saving context and opening workspace..." : "Saving case context...");
     try {
       await updateAppealContextMutation({
         claimId: extractedResult.claimId as Id<"claims">,
@@ -434,34 +484,72 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
         },
       });
 
-      let pipelineResult = null;
-      if (autoPilotEnabled) pipelineResult = await executePostExtractionPipeline(extractedResult.claimId);
-      setExtractedResult((current) => current ? { ...current, pipelineResult } : current);
+      const claimId = extractedResult.claimId;
+      const snapshot = {
+        senderName,
+        senderCredentials,
+        senderEmail: normalizedEmail,
+        senderPhone: normalizedPhone,
+        clinicalFacts,
+        physicianNotes,
+      };
+
+      if (autoPilotEnabled) {
+        // Enter the workspace instantly; the crawl / score / synthesis pipeline
+        // continues in the background with live status in Evidence Matrix.
+        setContextSubmitted(true);
+        setExtractedResult((current) => current ? { ...current, pipelineResult: null } : current);
+        endProcessing();
+        onSuccess(claimId, "evidence");
+        onClose();
+        void executePostExtractionPipeline(claimId, snapshot)
+          .then((pipelineResult) => {
+            if (pipelineResult && typeof pipelineResult === "object") {
+              toast.success("Case indexed and appeal brief compiled. Review it in the Studio.");
+            }
+          })
+          .catch((pipelineErr) => {
+            toast.error(
+              pipelineErr instanceof Error
+                ? pipelineErr.message
+                : "Autonomous pipeline encountered an issue. Retry from the Evidence Matrix."
+            );
+          });
+        return;
+      }
+
+      setExtractedResult((current) => current ? { ...current, pipelineResult: null } : current);
       setContextSubmitted(true);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Could not save the case context. Please try again.");
     } finally {
       setIsProcessing(false);
+      setProcessingStage("idle");
+      setProcessingStartedAt(null);
+      setProcessingElapsedSec(0);
     }
   };
 
   const handleRunPipelineNow = async () => {
     if (!extractedResult?.claimId) return;
-    setIsProcessing(true);
-    setErrorMessage(null);
-    try {
-      const pipelineResult = await executePostExtractionPipeline(extractedResult.claimId);
-      setExtractedResult((current) => (current ? { ...current, pipelineResult } : current));
-    } catch (err) {
-      setErrorMessage(
-        err instanceof Error
-          ? err.message
-          : "Autonomous pipeline encountered an issue. You can retry or proceed directly to the workspace."
-      );
-    } finally {
-      setIsProcessing(false);
-      setProcessingMessage("");
-    }
+    const claimId = extractedResult.claimId;
+    // Manual-pipeline mode: enter the workspace instantly and run in background.
+    setContextSubmitted(true);
+    onSuccess(claimId, "evidence");
+    onClose();
+    void executePostExtractionPipeline(claimId)
+      .then((pipelineResult) => {
+        if (pipelineResult && typeof pipelineResult === "object") {
+          toast.success("Case indexed and appeal brief compiled. Review it in the Studio.");
+        }
+      })
+      .catch((err) => {
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Autonomous pipeline encountered an issue. Retry from the Evidence Matrix."
+        );
+      });
   };
 
   const handleDone = (targetView?: string) => {
@@ -614,9 +702,31 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               </div>
 
               {isProcessing && (
-                <div className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground animate-pulse">
-                  <CircleNotch className="size-4 animate-spin text-primary" />
-                  <span>{processingMessage}</span>
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2" role="status">
+                  <div className="flex items-center gap-2 text-xs text-foreground">
+                    <CircleNotch className="size-4 animate-spin text-primary shrink-0" />
+                    <span className="font-medium">{processingMessage}</span>
+                    {processingElapsedSec > 0 && (
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        {processingElapsedSec}s elapsed
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground">
+                    <span className={processingStage === "extracting" ? "text-primary font-semibold" : "text-emerald-500"}>
+                      {processingStage === "extracting" ? "● Extracting" : "✓ Extracting"}
+                    </span>
+                    <span aria-hidden="true">→</span>
+                    <span className={processingStage === "preparing_questions" ? "text-primary font-semibold" : ""}>
+                      Preparing prompts
+                    </span>
+                    <span aria-hidden="true">→</span>
+                    <span>Context form opens instantly</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Extraction runs live against the denial document. The context form appears
+                    as soon as extraction finishes; clinical prompts refine in the background.
+                  </p>
                 </div>
               )}
             </TabsContent>
@@ -667,7 +777,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     {isProcessing ? (
                       <>
                         <CircleNotch className="size-3.5 animate-spin" />
-                        <span>{processingMessage}</span>
+                        <span>{processingElapsedSec > 0 ? `${processingMessage} (${processingElapsedSec}s)` : processingMessage}</span>
                       </>
                     ) : (
                       <>
@@ -780,7 +890,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                       {isProcessing ? (
                         <>
                           <CircleNotch className="size-3.5 animate-spin" />
-                          <span>{processingMessage}</span>
+                          <span>{processingElapsedSec > 0 ? `${processingMessage} (${processingElapsedSec}s)` : processingMessage}</span>
                         </>
                       ) : (
                         <>
@@ -903,32 +1013,31 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 </Badge>
               </div>
 
-              {isPreparingContext ? (
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground" role="status">
-                  <CircleNotch className="size-3.5 animate-spin text-primary" />
-                  <span>Preparing denial-specific clinical prompts...</span>
-                </div>
-              ) : (
-                <div className="space-y-3.5">
-                  {intakeQuestions.map((question) => (
-                    <div key={question.field} className="space-y-1">
-                      <label htmlFor={`clinical-${question.field}`} className="block text-xs font-medium leading-relaxed text-foreground">
-                        {question.question}
-                      </label>
-                      <p className="text-[11px] leading-relaxed text-muted-foreground">{question.whyItMatters}</p>
-                      <Textarea
-                        id={`clinical-${question.field}`}
-                        rows={3}
-                        value={clinicalFacts[question.field] || ""}
-                        onChange={(e) => setClinicalFacts((current) => ({ ...current, [question.field]: e.target.value }))}
-                        placeholder="Leave blank if this is not documented in available records."
-                        maxLength={10000}
-                        className="bg-background text-xs leading-relaxed"
-                      />
-                    </div>
-                  ))}
+              {isPreparingContext && !activePreset && (
+                <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-xs text-muted-foreground" role="status">
+                  <CircleNotch className="size-3.5 animate-spin text-primary shrink-0" />
+                  <span>Refining denial-specific prompts in the background. You can start filling the form now.</span>
                 </div>
               )}
+              <div className="space-y-3.5">
+                {intakeQuestions.map((question) => (
+                  <div key={question.field} className="space-y-1">
+                    <label htmlFor={`clinical-${question.field}`} className="block text-xs font-medium leading-relaxed text-foreground">
+                      {question.question}
+                    </label>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">{question.whyItMatters}</p>
+                    <Textarea
+                      id={`clinical-${question.field}`}
+                      rows={3}
+                      value={clinicalFacts[question.field] || ""}
+                      onChange={(e) => setClinicalFacts((current) => ({ ...current, [question.field]: e.target.value }))}
+                      placeholder="Leave blank if this is not documented in available records."
+                      maxLength={10000}
+                      className="bg-background text-xs leading-relaxed"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Section 3: Treating Physician Notes & Clinical Addendum */}
@@ -1059,22 +1168,29 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <Button
                 size="sm"
                 onClick={handleConfirmContext}
-                disabled={isProcessing || isPreparingContext || !contextAcknowledged}
+                disabled={isProcessing || !contextAcknowledged}
                 className="gap-1.5 text-xs font-semibold"
+                title={isPreparingContext ? "Prompts are still refining in the background; safe defaults are used" : undefined}
               >
                 {isProcessing ? (
                   <>
                     <CircleNotch className="size-3.5 animate-spin" />
-                    <span>{processingMessage || (autoPilotEnabled ? "Saving context & analyzing..." : "Saving context...")}</span>
+                    <span>{processingMessage || (autoPilotEnabled ? "Saving context and opening workspace..." : "Saving context...")}</span>
                   </>
                 ) : (
                   <>
-                    <span>{autoPilotEnabled ? "Save context & run analysis" : "Save context"}</span>
+                    <span>{autoPilotEnabled ? "Save context and open workspace" : "Save context"}</span>
                     <ArrowRight className="size-3.5" />
                   </>
                 )}
               </Button>
             </div>
+            {autoPilotEnabled && (
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                The evidence crawl, win-score evaluation, and brief synthesis run in the
+                background after save. You land in the Evidence Matrix instantly with live progress.
+              </p>
+            )}
           </Card>
         ) : (
           /* Extraction Result Card & Smart Multi-Vector Triage HUD */

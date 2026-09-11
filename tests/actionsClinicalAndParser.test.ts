@@ -291,6 +291,51 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
         })
       );
     });
+
+    it("parseDenialDocument: schedules resolvePayerGatewayInternal via ctx.scheduler when document OCR contact is absent", async () => {
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        isMedicalClaimDenial: true,
+        claimNumber: "CLM-SCHED-1",
+        patientName: "Bob Smith",
+        memberId: "MEM-777",
+        insurancePayer: "Anthem Blue Cross",
+        serviceDate: "2026-03-01",
+        providerName: "Dr. Clinic",
+        deniedAmount: 4500,
+        patientOwedAmount: 4500,
+        cptCodes: ["99214"],
+        icd10Codes: ["M54.2"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Investigational service",
+        appealFilingDeadlineDays: 180,
+        payerAppealsEmail: "",
+      } as any);
+
+      const mockRunAfter = vi.fn().mockResolvedValue(undefined);
+      const mockCtx: any = {
+        scheduler: {
+          runAfter: mockRunAfter,
+        },
+        runMutation: vi.fn().mockResolvedValue("claim_sched_123"),
+      };
+
+      const res = await (actionOpticalParser.parseDenialDocument as any)._handler(mockCtx, {
+        rawDocumentText: "Claim CLM-SCHED-1 text",
+        patientState: "CA",
+        patientEmail: "bob@example.com",
+      });
+
+      expect(res.claimId).toBe("claim_sched_123");
+      expect(mockRunAfter).toHaveBeenCalledWith(
+        0,
+        expect.anything(),
+        expect.objectContaining({
+          claimId: "claim_sched_123",
+          payerName: "Anthem Blue Cross",
+        })
+      );
+    });
   });
 
 
@@ -501,6 +546,66 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
         claimId: "c3",
         eventType: "payer_contact_reverified_for_dispatch",
       }));
+    });
+
+    it("resolvePayerGatewayInternal: executes successfully for internal scheduler/workflows without requiring caller auth session", async () => {
+      const mockClaim = {
+        _id: "c_internal_1",
+        claimNumber: "CLM-INT-1",
+        userId: "user_owner_456",
+        patient: { insurancePayer: "Cigna Healthcare", state: "IL" },
+      };
+      const mockCtx: any = {
+        auth: {
+          getUserIdentity: vi.fn().mockResolvedValue(null),
+        },
+        runQuery: vi.fn().mockResolvedValue(mockClaim),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+        runAction: vi.fn().mockResolvedValue({
+          web: [{ title: "Cigna Appeals", url: "https://cigna.com/appeals", markdown: "Appeals Email: appeals@cigna.com" }],
+        }),
+      };
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        officialAppealsEmail: "appeals@cigna.com",
+        intakePortalUrl: "https://cigna.com/appeals",
+        portalName: "Cigna Provider Gateway",
+        appealsFax: "1-800-555-0188",
+        statutoryPoBox: "PO Box 1888",
+        ediPayerId: "62308",
+        tollFreeHelpline: "1-800-555-0100",
+        isVerified: true,
+        submissionPolicyNote: "Discovered via Firecrawl search",
+        source: "firecrawl_live",
+      } as any);
+
+      const res = await (actionPayerContactResolver.resolvePayerGatewayInternal as any)._handler(mockCtx, {
+        claimId: "c_internal_1",
+        payerName: "Cigna Healthcare",
+      });
+
+      expect(res.isVerified).toBe(true);
+      expect(res.officialAppealsEmail).toBe("appeals@cigna.com");
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        claimId: "c_internal_1",
+        payerContact: expect.objectContaining({
+          officialAppealsEmail: "appeals@cigna.com",
+          isVerified: true,
+        }),
+      }));
+    });
+
+    it("resolvePayerGatewayInternal: throws error when claim does not exist", async () => {
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(null),
+      };
+
+      await expect(
+        (actionPayerContactResolver.resolvePayerGatewayInternal as any)._handler(mockCtx, {
+          claimId: "c_missing",
+          payerName: "Cigna Healthcare",
+        })
+      ).rejects.toThrow(/Claim c_missing not found/);
     });
   });
 });

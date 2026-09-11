@@ -19,6 +19,7 @@ import type { PrecedentSourceKind } from "../lib/embeddings";
 import { precedentMatchValidator } from "../lib/precedentValidators";
 import { requireClaimOwnerAction, requireAuthUser } from "../lib/auth";
 import { rateLimiter } from "../lib/rateLimiter";
+import { logPipelineActivity } from "../lib/pipelineActivity";
 
 const matchListValidator = v.array(precedentMatchValidator);
 
@@ -218,10 +219,19 @@ export const reindexArchiveBatch = internalAction({
 export const retrieveTopPrecedents = action({
   args: {
     claimId: v.id("claims"),
+    pipelineRunId: v.optional(v.string()),
   },
   returns: matchListValidator,
   handler: async (ctx, args) => {
     const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
+
+    await logPipelineActivity(ctx, {
+      claimId: args.claimId,
+      runId: args.pipelineRunId,
+      stage: "precedents",
+      status: "running",
+      message: `Searching past overturned cases with a similar ${claim.denialReasonCode || "denial"} denial.`,
+    });
 
     const icd10Codes: string[] = claim.icd10Codes || [];
     const cptCodes: string[] = claim.cptCodes || [];
@@ -371,6 +381,17 @@ export const retrieveTopPrecedents = action({
         matches,
       });
     }
+
+    await logPipelineActivity(ctx, {
+      claimId: args.claimId,
+      runId: args.pipelineRunId,
+      stage: "precedents",
+      status: "completed",
+      message:
+        matches.length > 0
+          ? `Found ${matches.length} similar cases that were overturned. Weaving them into the argument.`
+          : "No close past-case matches turned up, so the brief will lean on policy clauses and statutory rights.",
+    });
 
     return matches;
   },

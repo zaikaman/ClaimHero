@@ -91,7 +91,7 @@ export async function executeDurableClaimPipeline(
     if (!claim.payerContact) {
       try {
         await step.runAction(
-          api.actions.payerContactResolver.resolvePayerGateway,
+          internal.actions.payerContactResolver.resolvePayerGatewayInternal,
           {
             claimId: args.claimId,
             payerName: payer,

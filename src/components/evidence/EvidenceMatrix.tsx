@@ -25,6 +25,7 @@ import { ClinicalResearchConsole } from "./ClinicalResearchConsole";
 import { formatCurrency, formatDate, stripMarkdownFormatting } from "../../lib/utils";
 import { DENIAL_REASON_CODES } from "../../lib/constants";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
+import { PipelineActivityFeed } from "../common/PipelineActivityFeed";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -150,6 +151,20 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
     }
   };
 
+  const isBackgroundPipelineRunning =
+    claim.status === "ingested" ||
+    claim.status === "parsing" ||
+    claim.status === "analyzing" ||
+    claim.status === "precedent_matched" ||
+    claim.status === "drafting";
+
+  const pipelineStepLabel =
+    claim.status === "drafting"
+      ? "Step 3/3: Synthesizing cited ERISA appeal brief"
+      : claim.status === "precedent_matched"
+        ? "Step 2/3: Matching precedents and scoring overturn probability"
+        : "Step 1/3: Crawling insurer Clinical Policy Bulletins";
+
   return (
     <div className="space-y-4 animate-fadeIn pb-28">
       {/* 4-Step Guided Sentinel Stepper */}
@@ -167,7 +182,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           claim.status === "dispatched" ||
           claim.status === "won"
         }
-        isProcessing={isUnifiedAnalyzing || isCrawling || isScoring}
+        isProcessing={isUnifiedAnalyzing || isCrawling || isScoring || isBackgroundPipelineRunning}
         processingLabel={
           isUnifiedAnalyzing
             ? "Running Complete Analysis..."
@@ -175,12 +190,51 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             ? "Indexing Policy Guidelines..."
             : isScoring
             ? "Evaluating Rubric..."
+            : isBackgroundPipelineRunning
+            ? pipelineStepLabel
             : "Processing..."
         }
         onRunAutonomousPipeline={
           onRunAutonomousPipeline ? () => onRunAutonomousPipeline(claim._id) : undefined
         }
       />
+
+      {/* Background pipeline progress: visible the moment ingestion hands off */}
+      {isBackgroundPipelineRunning && (
+        <Card className="p-3.5 border-primary/30 bg-primary/5" role="status">
+          <div className="flex items-start gap-2.5">
+            <CircleNotch className="size-4 animate-spin text-primary shrink-0 mt-0.5" />
+            <div className="space-y-1.5 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-foreground">
+                  Autonomous pipeline running in background
+                </span>
+                <Badge variant="outline" className="font-mono text-[10px] border-primary/40 text-primary">
+                  {claim.status.replace(/_/g, " ")}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                {pipelineStepLabel}. Evidence clauses, win score, and the appeal brief
+                stream in live below. You can keep working; no need to wait.
+              </p>
+              <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground" aria-hidden="true">
+                <span className="text-emerald-500">✓ Ingested</span>
+                <span>→</span>
+                <span className={claim.status === "analyzing" || claim.status === "precedent_matched" || claim.status === "drafting" ? "text-primary font-semibold" : ""}>
+                  Crawl + Score
+                </span>
+                <span>→</span>
+                <span className={claim.status === "drafting" ? "text-primary font-semibold" : ""}>
+                  Synthesize brief
+                </span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Live agent thought stream (self-hides for older runs) */}
+      <PipelineActivityFeed claimId={claim._id} />
 
       {/* Header & Main Control Toolbar */}
       <Card className="p-4">
@@ -663,7 +717,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             <TabsContent value="policy" className="pt-1">
               <PolicyViewer
                 evidences={evidences}
-                isLoading={isLoadingEvidences || isCrawling}
+                isLoading={isLoadingEvidences || isCrawling || (isBackgroundPipelineRunning && evidences.length === 0)}
                 onDeleteEvidence={onDeleteEvidence}
                 onOpenResearchConsole={() => setActiveTab("research")}
               />

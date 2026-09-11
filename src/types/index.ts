@@ -227,6 +227,20 @@ export interface ClinicalIntakeQuestion {
   whyItMatters: string;
 }
 
+export type PipelineActivityStage = "run" | "crawl" | "score" | "precedents" | "synthesis";
+
+export type PipelineActivityStatus = "running" | "completed" | "error";
+
+export interface PipelineActivity {
+  _id: string;
+  claimId: string;
+  runId: string;
+  stage: PipelineActivityStage | string;
+  status: PipelineActivityStatus | string;
+  message: string;
+  createdAt: number;
+}
+
 export interface PayerContact {
   officialAppealsEmail?: string;
   intakePortalUrl?: string;

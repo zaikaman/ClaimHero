@@ -1,13 +1,14 @@
 "use node";
 
-import { action } from "../_generated/server";
+import { action, type ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { ERISA_STATUTORY_EVIDENCE } from "../lib/erisaEvidence";
-import { appealLevelValidator } from "../lib/statutoryTierValidators";
+import { appealLevelValidator, type StatutoryAppealLevel } from "../lib/statutoryTierValidators";
+import { logPipelineActivity } from "../lib/pipelineActivity";
 
 export interface PipelineResult {
   success: boolean;
@@ -96,11 +97,91 @@ export const runAutonomousPipeline = action({
       throw new Error("Complete sender details before drafting");
     }
 
+    // Unique id for this run so the live activity feed can group its events.
+    const pipelineRunId = `run_${Date.now()}`;
+    await logPipelineActivity(ctx, {
+      claimId: args.claimId,
+      runId: pipelineRunId,
+      stage: "run",
+      status: "running",
+      message: `Kicking off the autonomous review. First I'll look up ${payer}'s official policy bulletins for this denial.`,
+    });
+
+    try {
+      return await executePipelineStages(ctx, args.claimId, {
+        payer,
+        cptCodes: claim.cptCodes || [],
+        icd10Codes: claim.icd10Codes || [],
+        denialReasonCode: claim.denialReasonCode || "CO-50",
+        denialReasonDescription: claim.denialReasonDescription || "",
+        serviceDate: claim.serviceDate,
+        hasPayerContact: Boolean(claim.payerContact),
+        customPolicyUrl: args.customPolicyUrl,
+        appealLevel: args.appealLevel,
+        sender: {
+          name: sender.name,
+          credentials: sender.credentials,
+          email: sender.email,
+          phone: sender.phone,
+        },
+        clinicalFacts,
+        physicianNotes,
+        pipelineRunId,
+      });
+    } catch (stageErr) {
+      await logPipelineActivity(ctx, {
+        claimId: args.claimId,
+        runId: pipelineRunId,
+        stage: "run",
+        status: "error",
+        message:
+          "The autonomous review ran into an issue before finishing. You can retry it from the Evidence Matrix.",
+      });
+      throw stageErr;
+    }
+  },
+});
+
+type PipelineStageInput = {
+  payer: string;
+  cptCodes: string[];
+  icd10Codes: string[];
+  denialReasonCode: string;
+  denialReasonDescription: string;
+  serviceDate: string;
+  hasPayerContact: boolean;
+  customPolicyUrl?: string;
+  appealLevel?: StatutoryAppealLevel;
+  sender: {
+    name: string;
+    credentials?: string;
+    email?: string;
+    phone?: string;
+  };
+  clinicalFacts?: {
+    symptomsAndFunctionalImpact?: string;
+    examinationFindings?: string;
+    imagingAndDiagnostics?: string;
+    treatmentHistoryAndResponse?: string;
+    otherDocumentedFacts?: string;
+    recordsAreIncomplete: boolean;
+  };
+  physicianNotes?: string;
+  pipelineRunId: string;
+};
+
+async function executePipelineStages(
+  ctx: ActionCtx,
+  claimId: Id<"claims">,
+  stage: PipelineStageInput
+): Promise<PipelineResult> {
+  const { payer, sender, clinicalFacts, physicianNotes, pipelineRunId } = stage;
+
     // Auto-resolve payer intake gateway if not yet cached
-    if (!claim.payerContact) {
+    if (!stage.hasPayerContact) {
       try {
-        await ctx.runAction(api.actions.payerContactResolver.resolvePayerGateway, {
-          claimId: args.claimId,
+        await ctx.runAction(internal.actions.payerContactResolver.resolvePayerGatewayInternal, {
+          claimId,
           payerName: payer,
         });
       } catch (e) {
@@ -110,7 +191,7 @@ export const runAutonomousPipeline = action({
 
     // Step 1: Policy Crawling & Evidence Extraction
     await ctx.runMutation(internal.claims.updateStatusInternal, {
-      claimId: args.claimId,
+      claimId,
       status: "analyzing",
       actor: "Autonomous Sentinel Pipeline",
       details: "Step 1/3: Crawling clinical policy bulletins & medical guidelines...",
@@ -121,28 +202,37 @@ export const runAutonomousPipeline = action({
       crawlResult = await ctx.runAction(
         api.actions.policyCrawler.crawlInsurerPolicy,
         {
-          claimId: args.claimId,
+          claimId,
           payer,
-          cptCodes: claim.cptCodes || [],
-          icd10Codes: claim.icd10Codes || [],
-          denialReasonCode: claim.denialReasonCode || "CO-50",
-          denialReasonDescription: claim.denialReasonDescription || "",
-          customPolicyUrl: args.customPolicyUrl,
-          serviceDate: claim.serviceDate,
+          cptCodes: stage.cptCodes,
+          icd10Codes: stage.icd10Codes,
+          denialReasonCode: stage.denialReasonCode,
+          denialReasonDescription: stage.denialReasonDescription,
+          customPolicyUrl: stage.customPolicyUrl,
+          serviceDate: stage.serviceDate,
+          pipelineRunId,
         }
       );
     } catch (crawlError) {
       const crawlMessage = crawlError instanceof Error ? crawlError.message : String(crawlError);
+      await logPipelineActivity(ctx, {
+        claimId,
+        runId: pipelineRunId,
+        stage: "crawl",
+        status: "completed",
+        message:
+          "The live policy search hit a snag, so I'm proceeding with statutory references instead of stalling.",
+      });
       // Check if clinical evidences already exist for this claim (preserved via clear-after-success).
       // If none exist (e.g. brand new claim where crawl failed due to 429/WAF), insert the statutory ERISA fallback.
       const existingEvidences = await ctx.runQuery(
         internal.clinicalEvidences.listByClaimInternal,
-        { claimId: args.claimId }
+        { claimId }
       );
       if (existingEvidences.length === 0) {
         try {
           await ctx.runMutation(internal.clinicalEvidences.insertBatchInternal, {
-            claimId: args.claimId,
+            claimId,
             evidences: [{ ...ERISA_STATUTORY_EVIDENCE }],
           });
         } catch (e) {
@@ -150,7 +240,7 @@ export const runAutonomousPipeline = action({
         }
       }
       await ctx.runMutation(internal.claims.updateStatusInternal, {
-        claimId: args.claimId,
+        claimId,
         status: "analyzing",
         actor: "Autonomous Sentinel Pipeline",
         details: `Policy crawl unavailable: ${crawlMessage}. Proceeding with ${existingEvidences.length > 0 ? "retained clinical evidence and " : ""}statutory precedent.`,
@@ -165,7 +255,7 @@ export const runAutonomousPipeline = action({
 
     // Step 2: Precedent Matching & Overturn Probability Scoring
     await ctx.runMutation(internal.claims.updateStatusInternal, {
-      claimId: args.claimId,
+      claimId,
       status: "analyzing",
       actor: "Autonomous Sentinel Pipeline",
       details: "Step 2/3: Matching precedent vectors & evaluating 4-pillar overturn score...",
@@ -174,12 +264,13 @@ export const runAutonomousPipeline = action({
     const scoreResult = await ctx.runAction(
       api.actions.precedentMatcher.computeOverturnScore,
       {
-        claimId: args.claimId,
+        claimId,
+        pipelineRunId,
       }
     );
 
     await ctx.runMutation(internal.claims.updateStatusInternal, {
-      claimId: args.claimId,
+      claimId,
       status: "precedent_matched",
       actor: "Autonomous Sentinel Pipeline",
       details: "Step 2b/3: Running Convex native vector search against the Precedent Vector Archive...",
@@ -206,13 +297,21 @@ export const runAutonomousPipeline = action({
     try {
       vectorPrecedents = await ctx.runAction(
         api.actions.precedentArchive.retrieveTopPrecedents,
-        { claimId: args.claimId }
+        { claimId, pipelineRunId }
       );
     } catch (precedentErr) {
       console.warn("Pipeline vector archive note:", precedentErr);
       precedentsUnavailable = true;
+      await logPipelineActivity(ctx, {
+        claimId,
+        runId: pipelineRunId,
+        stage: "precedents",
+        status: "completed",
+        message:
+          "The past-cases archive was unreachable, so I'm carrying on with the policy evidence alone.",
+      });
       await ctx.runMutation(internal.auditLogs.logEventInternal, {
-        claimId: args.claimId,
+        claimId,
         eventType: "pipeline_precedents_unavailable_warning",
         actor: "Autonomous Sentinel Pipeline",
         details: "Warning: Precedent vector retrieval was unavailable during autonomous pipeline execution.",
@@ -221,7 +320,7 @@ export const runAutonomousPipeline = action({
 
     // Step 3: Formal ERISA Appeal Brief Synthesis
     await ctx.runMutation(internal.claims.updateStatusInternal, {
-      claimId: args.claimId,
+      claimId,
       status: "drafting",
       actor: "Autonomous Sentinel Pipeline",
       details: "Step 3/3: Synthesizing cited ERISA & clinical appeal brief...",
@@ -230,8 +329,8 @@ export const runAutonomousPipeline = action({
     const synthesisResult = await ctx.runAction(
       api.actions.appealSynthesizer.generateAppealBrief,
       {
-        claimId: args.claimId,
-        appealLevel: args.appealLevel || "level_1_internal",
+        claimId,
+        appealLevel: stage.appealLevel || "level_1_internal",
         physicianNotes,
         senderName: sender.name,
         senderCredentials: sender.credentials,
@@ -239,12 +338,13 @@ export const runAutonomousPipeline = action({
         senderPhone: sender.phone,
         clinicalFacts,
         vectorPrecedents,
+        pipelineRunId,
       }
     );
 
     // Step 4: Final status update to ready_for_review
     await ctx.runMutation(internal.claims.updateStatusInternal, {
-      claimId: args.claimId,
+      claimId,
       status: "ready_for_review",
       actor: "Autonomous Sentinel Pipeline",
       details: `Autonomous pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}% win likelihood score computed, and formal brief synthesized. Ready for dispatch.`,
@@ -253,9 +353,17 @@ export const runAutonomousPipeline = action({
       scoringBreakdown: scoreResult?.scoringBreakdown,
     });
 
+    await logPipelineActivity(ctx, {
+      claimId,
+      runId: pipelineRunId,
+      stage: "run",
+      status: "completed",
+      message: `Review complete: ${scoreResult?.overturnProbabilityScore || 0}% win likelihood with the appeal brief drafted and ready.`,
+    });
+
     return {
       success: true,
-      claimId: args.claimId,
+      claimId,
       policyTitle: crawlResult?.policyTitle,
       clausesExtracted: crawlResult?.clausesExtracted,
       overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
@@ -263,8 +371,7 @@ export const runAutonomousPipeline = action({
       appealId: synthesisResult?.appealId,
       precedentsUnavailable,
     };
-  },
-});
+}
 
 /**
  * Action wrapper to initiate the durable Convex workflow pipeline

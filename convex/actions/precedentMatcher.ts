@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { internal } from "../_generated/api";
 import { requireClaimOwnerAction } from "../lib/auth";
+import { logPipelineActivity } from "../lib/pipelineActivity";
 import { rateLimiter } from "../lib/rateLimiter";
 import type { Doc } from "../_generated/dataModel";
 
@@ -237,6 +238,7 @@ export function calculateDeterministicRubric(
 export const computeOverturnScore = action({
   args: {
     claimId: v.id("claims"),
+    pipelineRunId: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<OverturnScoringResult> => {
     // 1. Authorize claim ownership
@@ -268,6 +270,14 @@ export const computeOverturnScore = action({
       (await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
         claimId: args.claimId,
       })) || [];
+
+    await logPipelineActivity(ctx, {
+      claimId: args.claimId,
+      runId: args.pipelineRunId,
+      stage: "score",
+      status: "running",
+      message: `Weighing ${evidences.length} evidence clauses across the 4-pillar rubric to estimate win likelihood.`,
+    });
 
     // 3. Compute deterministic 4-pillar score
     const deterministicCalculation = calculateDeterministicRubric(claim, evidences);
@@ -360,6 +370,20 @@ ${evidencesSummary}`,
       scoringBreakdown: finalResult.scoringBreakdown,
       actor: "Precedent Matcher & Rubric Engine",
       details: `Evaluated 4-pillar overturn score: ${finalResult.overturnProbabilityScore}% (${finalResult.riskLevel.replace(/_/g, " ").toUpperCase()}). Found ${finalResult.keyPolicyContradictions.length} cited policy contradictions.`,
+    });
+
+    const confidenceLabel =
+      finalResult.riskLevel === "high_confidence"
+        ? "strong"
+        : finalResult.riskLevel === "moderate"
+          ? "moderate"
+          : "complex";
+    await logPipelineActivity(ctx, {
+      claimId: args.claimId,
+      runId: args.pipelineRunId,
+      stage: "score",
+      status: "completed",
+      message: `Win likelihood looks ${confidenceLabel} at ${finalResult.overturnProbabilityScore}%, with ${finalResult.keyPolicyContradictions.length} policy contradictions working in your favor.`,
     });
 
     return finalResult;

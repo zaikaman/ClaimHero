@@ -9,6 +9,7 @@ import { ERISA_STATUTORY_EVIDENCE } from "../lib/erisaEvidence";
 import { api, components, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
+import { logPipelineActivity } from "../lib/pipelineActivity";
 import { FirecrawlClient, type Format, type FirecrawlDocument } from "@firecrawl/firecrawl-convex";
 
 const firecrawl = new FirecrawlClient(components.firecrawl);
@@ -2432,6 +2433,151 @@ export function cleanPayerForSearch(payer: string): string {
   return clean.length >= 3 ? clean : payer;
 }
 
+/**
+ * Extract explicitly cited clinical policy identifiers from denial text.
+ * Parses generic references such as "CPB 0171", "CPB-0093", "Policy 0066",
+ * "SURG.00011", "CMM-312", "LCD L33394" without any template-specific
+ * hardcoding. These identifiers are authored by the payer in the adverse
+ * determination notice and provide the highest-precision retrieval signal,
+ * immune to search-engine ranking drift that otherwise surfaces related
+ * but non-applicable bulletins (e.g. hip CPB 0736 for a knee MRI claim).
+ */
+export function extractCitedPolicyIdentifiers(text: string): {
+  cpbNumbers: string[];
+  policyTokens: string[];
+} {
+  if (!text || typeof text !== "string") return { cpbNumbers: [], policyTokens: [] };
+
+  const cpbNumbers: string[] = [];
+  const seenCpb = new Set<string>();
+  const cpbPattern = /CPB\s*[):#-]*\s*0*(\d{1,4})\b/gi;
+  let cpbMatch: RegExpExecArray | null;
+  while ((cpbMatch = cpbPattern.exec(text)) !== null) {
+    const raw = cpbMatch[1];
+    const num = parseInt(raw, 10);
+    if (Number.isNaN(num) || num <= 0 || num > 9999) continue;
+    const normalized = String(num).padStart(4, "0");
+    if (!seenCpb.has(normalized)) {
+      seenCpb.add(normalized);
+      cpbNumbers.push(normalized);
+    }
+    if (cpbNumbers.length >= 3) break;
+  }
+
+  const policyTokens: string[] = [];
+  const seenTokens = new Set<string>();
+  const tokenPatterns: RegExp[] = [
+    /SURG\s*[.-]?\s*0*\d[\d.]*/gi,
+    /CMM\s*[-.]?\s*\d{2,4}\b/gi,
+    /\bLCD\s*L?\d{4,6}\b/gi,
+    /\bNCD\s*[\d.]+\b/gi,
+    /(?:Coverage\s+)?Policy\s*(?:No\.?\s*)?0*(\d{3,4})\b/gi,
+  ];
+  for (const pattern of tokenPatterns) {
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(text)) !== null) {
+      const token = m[0].trim().replace(/\s+/g, " ");
+      const key = token.toLowerCase();
+      if (!seenTokens.has(key) && token.length >= 4 && token.length <= 40) {
+        seenTokens.add(key);
+        policyTokens.push(token);
+      }
+      if (policyTokens.length >= 4) break;
+    }
+    if (policyTokens.length >= 4) break;
+  }
+
+  return { cpbNumbers, policyTokens };
+}
+
+/**
+ * Build the canonical public Aetna Clinical Policy Bulletin URL for a given
+ * CPB number using Aetna's stable public pattern:
+ * https://www.aetna.com/cpb/medical/data/{range}/{number}.html
+ * where {range} is 1_99 for numbers <100, else floor(N/100)*100 floor(N/100)*100+99
+ * (e.g. 0093 -> 1_99/0093, 0171 -> 100_199/0171, 0736 -> 700_799/0736).
+ * Generic pattern resolution for any cited CPB number, not a template hardcode.
+ */
+export function buildAetnaCpbCanonicalUrl(cpbNumber: string): string | null {
+  if (!cpbNumber || typeof cpbNumber !== "string") return null;
+  const digits = cpbNumber.replace(/\D/g, "");
+  if (!digits) return null;
+  const num = parseInt(digits, 10);
+  if (Number.isNaN(num) || num <= 0 || num > 9999) return null;
+  const filename = String(num).padStart(4, "0");
+  const range = num < 100 ? "1_99" : `${Math.floor(num / 100) * 100}_${Math.floor(num / 100) * 100 + 99}`;
+  return `https://www.aetna.com/cpb/medical/data/${range}/${filename}.html`;
+}
+
+/**
+ * Build direct canonical Aetna CPB URLs for cited numbers when the claim payer
+ * is Aetna (including subsidiaries like Aetna International that use parent
+ * Aetna CPBs). Returns empty for non-Aetna payers. Generic: works for any
+ * future Aetna CPB citation, not just the demo templates.
+ */
+export function buildCitedAetnaCpbUrls(payer: string, cpbNumbers: string[]): string[] {
+  if (!payer || !cpbNumbers.length) return [];
+  if (getPayerHostKeyword(payer) !== "aetna") return [];
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const num of cpbNumbers.slice(0, 3)) {
+    const url = buildAetnaCpbCanonicalUrl(num);
+    if (url && isAcceptableSourceUrl(url) && !seen.has(url)) {
+      seen.add(url);
+      urls.push(url);
+    }
+  }
+  return urls;
+}
+
+/**
+ * Build deterministic high-precision search queries from explicitly cited
+ * policy identifiers. These augment (never replace) the LLM-generated
+ * multi-angle queries, guaranteeing the exact cited bulletin is requested
+ * from Firecrawl even when generic procedure queries rank related bulletins
+ * higher. Generic: derived from denial text + CPT, no template hardcoding.
+ */
+export function buildCitedPolicySearchQueries(
+  payer: string,
+  cpbNumbers: string[],
+  policyTokens: string[],
+  cptCodes: string[],
+): string[] {
+  const searchPayer = cleanPayerForSearch(payer);
+  const primaryCpt = cptCodes[0] || "";
+  const queries: string[] = [];
+  const seen = new Set<string>();
+
+  for (const num of cpbNumbers.slice(0, 2)) {
+    const bare = `${searchPayer} CPB ${num}`.trim();
+    if (bare.length >= 8 && !seen.has(bare.toLowerCase())) {
+      seen.add(bare.toLowerCase());
+      queries.push(bare);
+    }
+    if (primaryCpt) {
+      const withCpt = `CPB ${num} ${primaryCpt} coverage criteria`.trim();
+      if (!seen.has(withCpt.toLowerCase())) {
+        seen.add(withCpt.toLowerCase());
+        queries.push(withCpt);
+      }
+    }
+    if (queries.length >= 2) break;
+  }
+
+  for (const token of policyTokens.slice(0, 2)) {
+    const q = primaryCpt
+      ? `${searchPayer} ${token} ${primaryCpt}`.trim()
+      : `${searchPayer} ${token}`.trim();
+    if (q.length >= 8 && q.length <= 90 && !seen.has(q.toLowerCase())) {
+      seen.add(q.toLowerCase());
+      queries.push(q);
+    }
+    if (queries.length >= 4) break;
+  }
+
+  return queries.slice(0, 4);
+}
+
 async function generatePolicySearchQueries(
   payer: string,
   cptCodes: string[],
@@ -2536,6 +2682,7 @@ export const crawlInsurerPolicy = action({
     customPolicyUrl: v.optional(v.string()),
     serviceDate: v.optional(v.string()),
     forceRescan: v.optional(v.boolean()),
+    pipelineRunId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
@@ -2571,6 +2718,16 @@ export const crawlInsurerPolicy = action({
       throw new Error("The custom policy URL must be a valid HTTP or HTTPS source URL.");
     }
 
+    await logPipelineActivity(ctx, {
+      claimId: args.claimId,
+      runId: args.pipelineRunId,
+      stage: "crawl",
+      status: "running",
+      message: args.customPolicyUrl
+        ? "Reading the payer policy page you shared for the qualifying criteria."
+        : `Searching ${args.payer}'s official policy bulletins for procedures ${args.cptCodes.join(", ")}.`,
+    });
+
     let policySource: FirecrawlPolicySource | null = null;
     if (args.customPolicyUrl) {
       const candidateSource = await scrapeFirecrawlPolicySource(ctx, args.customPolicyUrl, {
@@ -2594,7 +2751,26 @@ export const crawlInsurerPolicy = action({
       }
       policySource = candidateSource;
     } else {
-      let searchQueries = await generatePolicySearchQueries(
+      // Cited-policy fast path: denial notices explicitly name the controlling
+      // bulletin (e.g. "CPB 0171", "Policy 0066", "SURG.00011"). Extract those
+      // identifiers generically and resolve them deterministically so search
+      // ranking drift can never hide the exact cited policy behind related
+      // bulletins (e.g. hip CPB 0736 surfacing for a knee MRI claim).
+      const denialTextForIdentifiers = [
+        args.denialReasonDescription || "",
+        args.denialReasonCode || "",
+        claim?.denialReasonDescription || "",
+      ].join(" ");
+      const citedIdentifiers = extractCitedPolicyIdentifiers(denialTextForIdentifiers);
+      const citedSearchQueries = buildCitedPolicySearchQueries(
+        args.payer,
+        citedIdentifiers.cpbNumbers,
+        citedIdentifiers.policyTokens,
+        args.cptCodes,
+      );
+      const directCitedUrls = buildCitedAetnaCpbUrls(args.payer, citedIdentifiers.cpbNumbers);
+
+      const llmSearchQueries = await generatePolicySearchQueries(
         args.payer,
         args.cptCodes,
         args.icd10Codes,
@@ -2604,6 +2780,12 @@ export const crawlInsurerPolicy = action({
         effectiveDate,
         targetYear,
       );
+      // Deterministic cited-ID queries lead so Firecrawl is always asked for the
+      // exact bulletin named in the denial; LLM multi-angle queries follow.
+      let searchQueries = [...new Set([...citedSearchQueries, ...llmSearchQueries])].slice(0, 5);
+      if (!searchQueries.length) {
+        searchQueries = llmSearchQueries;
+      }
       const failedSources: string[] = [];
       const searchFailures: string[] = [];
       const seenSourceUrls = new Set<string>();
@@ -2626,6 +2808,50 @@ export const crawlInsurerPolicy = action({
         if (candidateSource.markdown.trim().length < 2000) return;
         vintageFallbackHolder.value = { source: candidateSource, rationale };
       };
+      const evaluateDirectCitedUrl = async (sourceUrl: string): Promise<FirecrawlPolicySource | null> => {
+        if (seenSourceUrls.has(sourceUrl)) return null;
+        seenSourceUrls.add(sourceUrl);
+        discoveredSourceCount += 1;
+        try {
+          const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl, {
+            payer: args.payer,
+            cptCodes: args.cptCodes,
+            denialReasonCode: args.denialReasonCode,
+            forceRescan: shouldForceRescan,
+          });
+          const relevance = await evaluatePolicySourceRelevance(
+            candidateSource,
+            args.payer,
+            args.cptCodes,
+            args.icd10Codes,
+            args.denialReasonCode,
+            args.denialReasonDescription || "",
+            targetYear,
+            effectiveDate,
+          );
+          if (relevance.relevant) {
+            return candidateSource;
+          }
+          failedSources.push(`${sourceUrl}: document rejected as irrelevant (${relevance.rationale})`);
+          considerVintageFallback(candidateSource, relevance.rationale);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unknown source error";
+          failedSources.push(`${sourceUrl}: ${message}`);
+        }
+        return null;
+      };
+
+      // Attempt canonical cited-policy URLs first (highest precision, no search
+      // ranking involved). For Aetna this resolves CPB 0171 directly even when
+      // generic queries return 0736/0093.
+      for (const directUrl of directCitedUrls) {
+        if (policySource) break;
+        const directHit = await evaluateDirectCitedUrl(directUrl);
+        if (directHit) {
+          policySource = directHit;
+          break;
+        }
+      }
 
       for (let searchRound = 0; searchRound < MAX_POLICY_SEARCH_ROUNDS && !policySource; searchRound += 1) {
         const successfulSearches: Array<{ payload: Record<string, unknown> }> = [];
@@ -2633,7 +2859,10 @@ export const crawlInsurerPolicy = action({
 
         // Run search queries with bounded concurrency (strictly max 2 concurrent requests) to honor Firecrawl 2-browser plan limits
         const MAX_FIRECRAWL_SEARCH_CONCURRENCY = 2;
-        const queriesToRun = searchQueries.slice(0, 3);
+        // Cited-ID queries lead the set (up to 5 total) so the exact bulletin
+        // named in the denial is always requested, not just generic procedure
+        // queries that rank related bulletins higher.
+        const queriesToRun = searchQueries.slice(0, 5);
         for (let i = 0; i < queriesToRun.length; i += MAX_FIRECRAWL_SEARCH_CONCURRENCY) {
           const chunk = queriesToRun.slice(i, i + MAX_FIRECRAWL_SEARCH_CONCURRENCY);
           const chunkResults = await Promise.all(
@@ -2676,7 +2905,7 @@ export const crawlInsurerPolicy = action({
         };
 
         // Fast path: check if search payload already included substantive markdown across top candidates
-        const directSources = selectFirecrawlPolicySources(combinedSearchPayload, 3);
+        const directSources = selectFirecrawlPolicySources(combinedSearchPayload, 4);
         for (const directSource of directSources) {
           if (directSource && isPolicyMarkdownSubstantive(directSource.markdown)) {
             try {
@@ -2730,15 +2959,48 @@ export const crawlInsurerPolicy = action({
         });
         discoveredSourceCount += sourceUrls.length;
 
-        // Evaluate candidate URLs sequentially (concurrency 1) to honor Firecrawl concurrency limits
-        for (const sourceUrl of sourceUrls.slice(0, 3)) {
-          try {
-            const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl, {
-              payer: args.payer,
-              cptCodes: args.cptCodes,
-              denialReasonCode: args.denialReasonCode,
-              forceRescan: shouldForceRescan,
-            });
+        // Evaluate ranked candidates in batches of 2 concurrent scrapes to fully
+        // utilize the Firecrawl 2-browser plan limit (searches already run in
+        // chunks of 2). Relevance is still judged sequentially in rank order so
+        // the highest-ranked relevant bulletin wins, not the fastest download.
+        // Cover up to 5 ranked candidates per round (not just the top 3) so an
+        // exact cited bulletin ranked 4th-5th is still scraped when generic
+        // queries surface related bulletins first.
+        const MAX_FIRECRAWL_SCRAPE_CONCURRENCY = 2;
+        const rankedCandidates = sourceUrls.slice(0, 5);
+        let scrapeRateLimited = false;
+        for (
+          let batchStart = 0;
+          batchStart < rankedCandidates.length && !policySource && !scrapeRateLimited;
+          batchStart += MAX_FIRECRAWL_SCRAPE_CONCURRENCY
+        ) {
+          const batch = rankedCandidates.slice(batchStart, batchStart + MAX_FIRECRAWL_SCRAPE_CONCURRENCY);
+          const scrapedBatch = await Promise.all(
+            batch.map(async (sourceUrl) => {
+              try {
+                const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl, {
+                  payer: args.payer,
+                  cptCodes: args.cptCodes,
+                  denialReasonCode: args.denialReasonCode,
+                  forceRescan: shouldForceRescan,
+                });
+                return { ok: true as const, sourceUrl, candidateSource };
+              } catch (error) {
+                const message = error instanceof Error ? error.message : "Unknown source error";
+                return { ok: false as const, sourceUrl, errorMessage: message };
+              }
+            }),
+          );
+          for (const scraped of scrapedBatch) {
+            if (policySource || scrapeRateLimited) break;
+            if (!scraped.ok) {
+              failedSources.push(`${scraped.sourceUrl}: ${scraped.errorMessage}`);
+              if (scraped.errorMessage.includes("429") || scraped.errorMessage.includes("Rate limit")) {
+                scrapeRateLimited = true;
+              }
+              continue;
+            }
+            const { sourceUrl, candidateSource } = scraped;
             const relevance = await evaluatePolicySourceRelevance(
               candidateSource,
               args.payer,
@@ -2805,16 +3067,12 @@ export const crawlInsurerPolicy = action({
               }
               if (policySource) break;
             }
-          } catch (error) {
-            const message = error instanceof Error ? error.message : "Unknown source error";
-            failedSources.push(`${sourceUrl}: ${message}`);
-            if (message.includes("429") || message.includes("Rate limit")) break;
           }
         }
 
         if (!policySource && searchRound + 1 < MAX_POLICY_SEARCH_ROUNDS && !failedSearches.some((s) => s.includes("429"))) {
           const feedback = [...searchFailures, ...failedSources.slice(-10)].join(" | ");
-          searchQueries = await generatePolicySearchQueries(
+          const refinedQueries = await generatePolicySearchQueries(
             args.payer,
             args.cptCodes,
             args.icd10Codes,
@@ -2824,6 +3082,9 @@ export const crawlInsurerPolicy = action({
             effectiveDate,
             targetYear,
           );
+          // Preserve deterministic cited-ID queries across rounds so the exact
+          // bulletin named in the denial is re-requested even after refinement.
+          searchQueries = [...new Set([...citedSearchQueries, ...refinedQueries])].slice(0, 5);
         }
       }
 
@@ -2965,6 +3226,14 @@ For each clause:
       status: "analyzing",
       actor: "Firecrawl & Policy Engine",
       details: `Policy indexed (${extractionEngine === "firecrawl_native" ? "Firecrawl Native AI Extraction" : "OpenAI LLM"}): "${extractedData.policyTitle}". ${evidencesToInsert.length} clauses extracted.`,
+    });
+
+    await logPipelineActivity(ctx, {
+      claimId: args.claimId,
+      runId: args.pipelineRunId,
+      stage: "crawl",
+      status: "completed",
+      message: `Found ${evidencesToInsert.length} relevant clauses in ${extractedData.policyTitle}. Now weighing the case.`,
     });
 
     return {

@@ -718,6 +718,300 @@ Welcome to the NASS guidelines directory. Below are the published clinical pract
       expect(await actionPolicyCrawler.storeScreenshotInStorage(mockCtx, "not-base64!!!")).toBeUndefined();
       expect(mockCtx.storage.store).not.toHaveBeenCalled();
     });
+
+    it("extractCitedPolicyIdentifiers: pulls CPB numbers and policy tokens from denial text (generic, no template hardcode)", () => {
+      const aetna = actionPolicyCrawler.extractCitedPolicyIdentifiers(
+        "Aetna Clinical Policy Bulletin (CPB) 0171 (Magnetic Resonance Imaging of the Extremities) requires documented weight-bearing plain radiographs."
+      );
+      expect(aetna.cpbNumbers).toContain("0171");
+
+      const cigna = actionPolicyCrawler.extractCitedPolicyIdentifiers(
+        "Under Cigna Medical Coverage Policy 0066 (Knee Arthroscopy and Open Procedures), arthroscopic partial meniscectomy requires documented mechanical symptoms."
+      );
+      expect(cigna.policyTokens.some((t) => t.includes("0066"))).toBe(true);
+
+      const geoblue = actionPolicyCrawler.extractCitedPolicyIdentifiers(
+        "Under Carelon Musculoskeletal Clinical Appropriateness Guidelines for Spine Surgery / Policy SURG.00011, non-emergent surgery requires authorization."
+      );
+      expect(geoblue.policyTokens.some((t) => t.toUpperCase().includes("SURG"))).toBe(true);
+
+      const empty = actionPolicyCrawler.extractCitedPolicyIdentifiers("Medical necessity not established.");
+      expect(empty.cpbNumbers).toEqual([]);
+    });
+
+    it("buildAetnaCpbCanonicalUrl: resolves stable public pattern mathematically for any CPB number", () => {
+      expect(actionPolicyCrawler.buildAetnaCpbCanonicalUrl("0171")).toBe(
+        "https://www.aetna.com/cpb/medical/data/100_199/0171.html"
+      );
+      expect(actionPolicyCrawler.buildAetnaCpbCanonicalUrl("0736")).toBe(
+        "https://www.aetna.com/cpb/medical/data/700_799/0736.html"
+      );
+      expect(actionPolicyCrawler.buildAetnaCpbCanonicalUrl("0093")).toBe(
+        "https://www.aetna.com/cpb/medical/data/1_99/0093.html"
+      );
+      expect(actionPolicyCrawler.buildAetnaCpbCanonicalUrl("not-a-number")).toBeNull();
+    });
+
+    it("buildCitedAetnaCpbUrls: gates canonical resolution on Aetna payers only", () => {
+      expect(
+        actionPolicyCrawler.buildCitedAetnaCpbUrls("Aetna International", ["0171"])
+      ).toEqual(["https://www.aetna.com/cpb/medical/data/100_199/0171.html"]);
+      expect(actionPolicyCrawler.buildCitedAetnaCpbUrls("Cigna Global", ["0171"])).toEqual([]);
+      expect(actionPolicyCrawler.buildCitedAetnaCpbUrls("Aetna", [])).toEqual([]);
+    });
+
+    it("buildCitedPolicySearchQueries: generates exact-ID queries from denial citations without hardcoding procedures", () => {
+      const queries = actionPolicyCrawler.buildCitedPolicySearchQueries(
+        "Aetna International",
+        ["0171"],
+        [],
+        ["73721"]
+      );
+      expect(queries.length).toBeGreaterThan(0);
+      expect(queries.some((q) => q.includes("0171"))).toBe(true);
+      expect(queries.some((q) => q.includes("73721"))).toBe(true);
+    });
+
+    it("crawlInsurerPolicy: resolves cited Aetna CPB 0171 directly when search ranks related bulletins first (73721 knee MRI)", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      process.env.FIRECRAWL_API_KEY = "fc-test-key";
+
+      const { FirecrawlClient } = await import("@firecrawl/firecrawl-convex");
+      const searchSpy = vi.spyOn(FirecrawlClient.prototype, "search").mockResolvedValue({
+        data: {
+          web: [
+            {
+              url: "https://www.aetna.com/cpb/medical/data/700_799/0736.html",
+              title: "Aetna CPB 0736 Hip Preservation Surgery",
+              description: "Hip arthroscopy criteria.",
+            },
+            {
+              url: "https://www.aetna.com/cpb/medical/data/1_99/0093.html",
+              title: "Aetna CPB 0093 Open Air Low Field MRI",
+              description: "Open and positional MRI units.",
+            },
+            {
+              url: "https://www.jacr.org/article/S1546-1440(26)00233-4/abstract",
+              title: "JACR abstract",
+              description: "Imaging abstract.",
+            },
+          ],
+        },
+      } as any);
+
+      const kneeMriMarkdown =
+        "# Aetna Clinical Policy Bulletin 0171: Magnetic Resonance Imaging (MRI) of the Extremities\n\n" +
+        "Medical necessity and coverage criteria: MRI of the knee (CPT 73721) is considered medically necessary " +
+        "when weight-bearing plain radiographs performed within the preceding 6 months fail to explain persistent " +
+        "joint line pain, clicking, or giving way, and conservative therapy including NSAIDs and activity modification " +
+        "has failed. Clinical policy establishes coverage criteria for knee MRI with meniscus derangement (M23.22). " +
+        "Contraindications include absence of prior radiographs. Prior authorization requires submitted radiograph reports.";
+      const hipMarkdown =
+        "# Aetna CPB 0736 Hip Preservation Surgery\n\nMedical necessity and coverage criteria for hip arthroscopy " +
+        "and hip preservation surgery with femoroacetabular impingement. Clinical policy coverage criteria for hip procedures.";
+      const hardwareMarkdown =
+        "# Aetna CPB 0093 Open Air Low Field MRI\n\nMedical necessity coverage criteria for open air and positional " +
+        "MRI units and low field strength systems. Clinical policy for imaging hardware.";
+
+      const scrapeSpy = vi.spyOn(FirecrawlClient.prototype, "scrape").mockImplementation(
+        async (_ctx: any, targetUrl: string, options: any) => {
+          const formats = JSON.stringify(options?.formats || []);
+          if (formats.includes("screenshot")) {
+            return { screenshot: undefined, metadata: { statusCode: 200 } } as any;
+          }
+          if (typeof targetUrl === "string" && targetUrl.includes("0171")) {
+            return { markdown: kneeMriMarkdown, metadata: { statusCode: 200 } } as any;
+          }
+          if (typeof targetUrl === "string" && targetUrl.includes("0736")) {
+            return { markdown: hipMarkdown, metadata: { statusCode: 200 } } as any;
+          }
+          if (typeof targetUrl === "string" && targetUrl.includes("0093")) {
+            return { markdown: hardwareMarkdown, metadata: { statusCode: 200 } } as any;
+          }
+          return { markdown: "", metadata: { statusCode: 404 } } as any;
+        }
+      );
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockImplementation(async (params: any) => {
+        if (params.schemaName === "PolicySearchIntentResponse") {
+          return { queries: ["Aetna knee MRI coverage criteria", "knee MRI ACR guideline", "knee MRI CMS LCD"] } as any;
+        }
+        if (params.schemaName === "PolicyRelevanceResponse") {
+          const prompt: string = params.userPrompt || "";
+          if (prompt.includes("0171") || prompt.includes("MRI of the Extremities")) {
+            return { relevant: true, rationale: "Exact cited Aetna CPB 0171 for knee MRI." } as any;
+          }
+          return { relevant: false, rationale: "Document addresses a different anatomy or hardware topic." } as any;
+        }
+        if (params.schemaName === "PolicyExtractionResponse") {
+          return {
+            policyTitle: "Aetna Clinical Policy Bulletin 0171: Magnetic Resonance Imaging (MRI) of the Extremities",
+            policyNumber: "0171",
+            effectiveDate: "2026-01-01",
+            clauses: [
+              {
+                sourceType: "payer_cpb",
+                title: "Aetna CPB 0171 Knee MRI Criteria",
+                citationClause: "Section 1.A",
+                extractedEvidenceMarkdown: "Knee MRI is covered after weight-bearing radiographs within 6 months.",
+                relevanceScore: 95,
+              },
+            ],
+          } as any;
+        }
+        throw new Error(`Unexpected schema ${params.schemaName}`);
+      });
+
+      const mockClaim = {
+        _id: "c1",
+        userId: "user_123",
+        serviceDate: "07/18/2026",
+        denialReasonDescription:
+          "Aetna Clinical Policy Bulletin (CPB) 0171 (Magnetic Resonance Imaging of the Extremities) requires documented weight-bearing plain radiographs.",
+      };
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(mockClaim),
+        runMutation: vi.fn().mockResolvedValue(null),
+        storage: { store: vi.fn() },
+      };
+
+      const res = await (actionPolicyCrawler.crawlInsurerPolicy as any)._handler(mockCtx, {
+        claimId: "c1",
+        payer: "Aetna International",
+        cptCodes: ["73721"],
+        icd10Codes: ["M23.22"],
+        denialReasonCode: "CO-16",
+        denialReasonDescription:
+          "Aetna Clinical Policy Bulletin (CPB) 0171 (Magnetic Resonance Imaging of the Extremities) requires documented weight-bearing plain radiographs within the preceding 6 months.",
+        serviceDate: "07/18/2026",
+      });
+
+      expect(res.policyTitle).toContain("0171");
+      expect(res.clausesExtracted).toBeGreaterThanOrEqual(1);
+      // Direct canonical cited-policy scrape must have been attempted
+      expect(scrapeSpy.mock.calls.some((c) => String(c[1]).includes("0171"))).toBe(true);
+
+      searchSpy.mockRestore();
+      scrapeSpy.mockRestore();
+    });
+
+    it("crawlInsurerPolicy: scrapes ranked candidates with bounded concurrency and selects highest-ranked relevant doc", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      process.env.FIRECRAWL_API_KEY = "fc-test-key";
+
+      const { FirecrawlClient } = await import("@firecrawl/firecrawl-convex");
+      // No cited policy IDs in this denial: exercises the search-round batch path.
+      const searchSpy = vi.spyOn(FirecrawlClient.prototype, "search").mockResolvedValue({
+        data: {
+          web: [
+            {
+              url: "https://example-clinic.com/bunionectomy-coding-guide/",
+              title: "Bunionectomy Coding Guide",
+              description: "Foot bunion correction billing guide.",
+            },
+            {
+              url: "https://guidelines.carelonmedicalbenefitsmanagement.com/spine-surgery-lumbar-decompression.pdf",
+              title: "Carelon Spine Surgery Lumbar Decompression Guideline",
+              description: "Clinical coverage policy and medical necessity criteria for CPT 63047 lumbar laminectomy.",
+            },
+          ],
+        },
+      } as any);
+
+      const bunionMarkdown =
+        "# Bunionectomy Coding Guide\n\nFoot bunion correction with hallux valgus osteotomy and ankle fixation. " +
+        "Medical necessity and coverage criteria for foot bunion procedures: bunionectomy is considered medically necessary " +
+        "for painful hallux valgus deformity refractory to conservative shoe modification and orthotics. Clinical policy " +
+        "coverage criteria include documented radiographic angles, failed orthotic management, and functional impairment " +
+        "in ambulation. This coding guide establishes billing and reimbursement documentation standards for foot and ankle " +
+        "surgical procedures across commercial health plans with prior authorization requirements.";
+      const lumbarMarkdown =
+        "# Carelon Spine Surgery Lumbar Decompression Guideline\n\nMedical necessity and coverage criteria " +
+        "for CPT 63047 lumbar laminectomy decompression with documented neurogenic claudication, MRI-confirmed " +
+        "canal stenosis matching radicular symptoms, and failure of at least 6 weeks of structured conservative therapy " +
+        "including formal physical therapy and NSAIDs. Clinical policy establishes coverage criteria for spinal decompression " +
+        "when objective neurological deficits and imaging compression correlate. Contraindications include active infection. " +
+        "Prior authorization requires submitted MRI reports and conservative therapy logs.";
+      let concurrentScrapes = 0;
+      let maxConcurrentScrapes = 0;
+      const scrapeSpy = vi.spyOn(FirecrawlClient.prototype, "scrape").mockImplementation(
+        async (_ctx: any, targetUrl: string, options: any) => {
+          const formats = JSON.stringify(options?.formats || []);
+          if (formats.includes("screenshot")) {
+            return { screenshot: undefined, metadata: { statusCode: 200 } } as any;
+          }
+          concurrentScrapes += 1;
+          maxConcurrentScrapes = Math.max(maxConcurrentScrapes, concurrentScrapes);
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          concurrentScrapes -= 1;
+          if (typeof targetUrl === "string" && targetUrl.includes("lumbar-decompression")) {
+            return { markdown: lumbarMarkdown, metadata: { statusCode: 200 } } as any;
+          }
+          return { markdown: bunionMarkdown, metadata: { statusCode: 200 } } as any;
+        }
+      );
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockImplementation(async (params: any) => {
+        if (params.schemaName === "PolicySearchIntentResponse") {
+          return { queries: ["lumbar laminectomy decompression coverage criteria"] } as any;
+        }
+        if (params.schemaName === "PolicyRelevanceResponse") {
+          const prompt: string = params.userPrompt || "";
+          if (prompt.includes("lumbar-decompression") || prompt.includes("Lumbar Decompression Guideline")) {
+            return { relevant: true, rationale: "Authoritative lumbar decompression guideline." } as any;
+          }
+          return { relevant: false, rationale: "Document appears to address foot/ankle pathology without lumbar criteria." } as any;
+        }
+        if (params.schemaName === "PolicyExtractionResponse") {
+          return {
+            policyTitle: "Carelon Spine Surgery Lumbar Decompression Guideline",
+            policyNumber: "CG-SURG-01",
+            effectiveDate: "2026-01-01",
+            clauses: [
+              {
+                sourceType: "payer_cpb",
+                title: "Carelon Lumbar Decompression Criteria",
+                citationClause: "Section 2.1",
+                extractedEvidenceMarkdown: "Decompression is indicated after 6 weeks failed conservative care.",
+                relevanceScore: 95,
+              },
+            ],
+          } as any;
+        }
+        throw new Error(`Unexpected schema ${params.schemaName}`);
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          _id: "c1",
+          userId: "user_123",
+          serviceDate: "07/04/2026",
+          denialReasonDescription: "Medical necessity criteria not satisfied.",
+        }),
+        runMutation: vi.fn().mockResolvedValue(null),
+        storage: { store: vi.fn() },
+      };
+
+      const res = await (actionPolicyCrawler.crawlInsurerPolicy as any)._handler(mockCtx, {
+        claimId: "c1",
+        payer: "UnitedHealthcare",
+        cptCodes: ["63047"],
+        icd10Codes: ["M51.26"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Medical necessity criteria not satisfied.",
+        serviceDate: "07/04/2026",
+      });
+
+      // Highest-ranked *relevant* doc wins even though the bunion guide ranked first
+      expect(res.policyTitle).toContain("Lumbar Decompression");
+      // Both candidates scraped concurrently within the 2-browser limit
+      expect(maxConcurrentScrapes).toBeLessThanOrEqual(2);
+
+      searchSpy.mockRestore();
+      scrapeSpy.mockRestore();
+    });
   });
 
   describe("convex/actions/appealSynthesizer", () => {

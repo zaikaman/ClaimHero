@@ -8,6 +8,7 @@ import { precedentMatchValidator } from "../lib/precedentValidators";
 import { appealLevelValidator, assertValidAppealLevel, getStatutoryTierMetadata } from "../lib/statutoryTierValidators";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
+import { logPipelineActivity } from "../lib/pipelineActivity";
 import type { Doc } from "../_generated/dataModel";
 
 const APPEAL_SYNTHESIS_SCHEMA = {
@@ -736,6 +737,7 @@ export const generateAppealBrief = action({
     ),
     customInstructions: v.optional(v.string()),
     vectorPrecedents: v.optional(v.array(precedentMatchValidator)),
+    pipelineRunId: v.optional(v.string()),
   },
   handler: async (
     ctx,
@@ -761,6 +763,14 @@ export const generateAppealBrief = action({
     const evidences: Doc<"clinicalEvidences">[] = (await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
     })) || [];
+
+    await logPipelineActivity(ctx, {
+      claimId: args.claimId,
+      runId: args.pipelineRunId,
+      stage: "synthesis",
+      status: "running",
+      message: `Drafting the appeal brief from ${evidences.length} evidence clauses with legal citations.`,
+    });
 
     const externalEvidences = evidences.filter(
       (e) => isExternalEvidence(e) && !isBlockedEvidence(e) && !isPayerMismatchedEvidence(e, claim) && !isEvidenceSiteMismatched(e, claim)
@@ -958,6 +968,14 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
         details: "Precedent retrieval was unavailable during appeal synthesis. Baseline statutory citations were applied.",
       });
     }
+
+    await logPipelineActivity(ctx, {
+      claimId: args.claimId,
+      runId: args.pipelineRunId,
+      stage: "synthesis",
+      status: "completed",
+      message: "The appeal brief is drafted with policy citations and statutory references.",
+    });
 
     return {
       appealId: String(appealId),

@@ -558,6 +558,31 @@ export default defineSchema({
     .index("by_url_hash", ["urlHash"])
     .index("by_captured_at", ["capturedAt"]),
 
+  // Live autonomous pipeline activity stream (human-language progress events).
+  // Kept separate from the statutory audit trail so operational chatter never
+  // pollutes the legal record. Entries contain no PHI: payer names, public
+  // procedure codes, counts, and scores only.
+  pipelineActivities: defineTable({
+    claimId: v.id("claims"),
+    runId: v.string(),
+    stage: v.union(
+      v.literal("run"),
+      v.literal("crawl"),
+      v.literal("score"),
+      v.literal("precedents"),
+      v.literal("synthesis")
+    ),
+    status: v.union(
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("error")
+    ),
+    message: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_claim", ["claimId"])
+    .index("by_claim_and_run", ["claimId", "runId"]),
+
   // Case-level collaboration grants for the Appeal Studio.
   // Owner invites by email with editor/viewer role. Invites start as pending
   // and grant nothing until the recipient accepts; userId is resolved when
