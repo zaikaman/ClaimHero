@@ -11,7 +11,9 @@ import { useCommunications } from "./hooks/useCommunications";
 import { useRouterView } from "./hooks/useRouterView";
 import { useCurrentUser } from "./hooks/useCurrentUser";
 import { BrandIcon, BrandWordmark } from "./components/common/BrandLogo";
-import { CircleNotch } from "@phosphor-icons/react";
+import { CircleNotch, Clock, X } from "@phosphor-icons/react";
+import { Button } from "./components/ui/button";
+import { Badge } from "./components/ui/badge";
 import { Toaster } from "sonner";
 
 // Lazy-load heavy views and standalone feature workspaces
@@ -49,6 +51,7 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState<boolean>(false);
+  const [isAuditDrawerOpen, setIsAuditDrawerOpen] = useState<boolean>(false);
   const [pendingTargetView, setPendingTargetView] = useState<NavigationView | null>(null);
 
   // Initial claim from URL search params (?claim=...)
@@ -330,6 +333,7 @@ export default function App() {
                   onNavigateToStudio={() => setCurrentView("studio")}
                   onNavigateView={setCurrentView}
                   onRunAutonomousPipeline={runFullPipeline}
+                  onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
                 />
               ) : selectedClaimId ? (
                 <ViewLoadingFallback message="Opening case dossier & clinical policy matrix..." />
@@ -353,6 +357,7 @@ export default function App() {
                   onNavigateToEvidence={() => setCurrentView("evidence")}
                   onNavigateView={setCurrentView}
                   onRunAutonomousPipeline={runFullPipeline}
+                  onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
                 />
               ) : selectedClaimId && isLoadingSelectedClaim ? (
                 <ViewLoadingFallback message="Opening appeal synthesis workspace..." />
@@ -426,6 +431,7 @@ export default function App() {
                   onRunAutonomousPipeline={runFullPipeline}
                   onSyncInboxes={syncInboxes}
                   isSyncingInboxes={isSyncingInboxes}
+                  onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
                 />
               ) : selectedClaimId ? (
                 <ViewLoadingFallback message="Connecting to secure AgentMail payer inbox..." />
@@ -536,6 +542,52 @@ export default function App() {
             currentView={currentView}
           />
         </Suspense>
+
+        {/* Slide-out Real-time Case Audit Trail Drawer */}
+        {isAuditDrawerOpen && (
+          <div
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex justify-end animate-fadeIn"
+            onClick={() => setIsAuditDrawerOpen(false)}
+          >
+            <div
+              className="w-full max-w-xl bg-background border-l border-border h-full shadow-2xl flex flex-col p-4 space-y-3 overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="size-4 text-cyan-400" />
+                  <h2 className="text-sm font-bold text-foreground">
+                    ERISA 29 CFR Case Audit Trail
+                  </h2>
+                  {selectedClaim && (
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      #{selectedClaim.claimNumber} • {selectedClaim.patient?.insurancePayer}
+                    </Badge>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsAuditDrawerOpen(false)}
+                  className="size-7 rounded-md cursor-pointer"
+                  title="Close Audit Trail"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+
+              <div className="flex-1">
+                <Suspense fallback={<ViewLoadingFallback message="Loading real-time case audit telemetry..." />}>
+                  <AuditTimeline
+                    claim={selectedClaim}
+                    logs={auditLogs}
+                    isLoading={isLoadingAudit}
+                  />
+                </Suspense>
+              </div>
+            </div>
+          </div>
+        )}
       </Shell>
       <Toaster position="bottom-right" richColors theme="dark" closeButton />
     </>

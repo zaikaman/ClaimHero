@@ -24,6 +24,7 @@ import {
   FileText,
   WarningCircle,
   X,
+  PhoneCall,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
@@ -50,6 +51,7 @@ interface AgentMailDrawerProps {
   onRunAutonomousPipeline?: (claimId?: string) => Promise<unknown>;
   onSyncInboxes?: () => Promise<unknown>;
   isSyncingInboxes?: boolean;
+  onOpenAuditDrawer?: () => void;
 }
 
 // Module-level in-flight deduplication set across all component mounts and StrictMode double-renders
@@ -66,6 +68,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   onRunAutonomousPipeline,
   onSyncInboxes,
   isSyncingInboxes,
+  onOpenAuditDrawer,
 }) => {
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -395,7 +398,43 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         onRunAutonomousPipeline={
           onRunAutonomousPipeline ? () => onRunAutonomousPipeline(claim._id) : undefined
         }
+        onOpenAuditDrawer={onOpenAuditDrawer}
       />
+
+      {/* Contextual P2P Defense Prompt for Medical Necessity Denials */}
+      {(claim.denialReasonCode === "CO-50" ||
+        claim.denialReasonDescription?.toLowerCase().includes("medical necessity") ||
+        claim.denialReasonDescription?.toLowerCase().includes("investigational")) && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="size-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center justify-center shrink-0">
+              <PhoneCall className="size-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-xs text-foreground">
+                  Insurer Peer-to-Peer Challenge Detected
+                </span>
+                <Badge variant="outline" className="text-[9px] font-mono border-emerald-500/30 text-emerald-500">
+                  {claim.denialReasonCode || "CO-50"}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                {claim.patient?.insurancePayer || "Insurer"} routinely requires a physician Peer-to-Peer conference before overturn. Prepare the rebuttal tele-script.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => onNavigateView?.("p2p")}
+            className="shrink-0 h-8 px-3 border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10 gap-1.5 text-xs font-semibold cursor-pointer"
+          >
+            <PhoneCall className="size-3.5" />
+            <span>Prep Tele-Script</span>
+          </Button>
+        </div>
+      )}
 
       {/* Prominent Multi-Channel Transmission Gateway Banner if not yet sent */}
       {claim.status !== "dispatched" && claim.status !== "won" && onDispatchAppeal && (

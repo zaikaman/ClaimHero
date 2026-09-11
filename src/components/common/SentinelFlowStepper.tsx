@@ -9,6 +9,9 @@ import {
   PaperPlaneTilt,
   ArrowLeft,
   TrendUp,
+  Clock,
+  Scales,
+  HourglassHigh,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
@@ -26,6 +29,7 @@ interface SentinelFlowStepperProps {
   isProcessing?: boolean;
   processingLabel?: string;
   onRunAutonomousPipeline?: () => Promise<unknown>;
+  onOpenAuditDrawer?: () => void;
 }
 
 export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
@@ -37,9 +41,15 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
   isProcessing = false,
   processingLabel = "Processing...",
   onRunAutonomousPipeline,
+  onOpenAuditDrawer,
 }) => {
   const isWon = claim.status === "won";
   const isDispatched = claim.status === "dispatched" || isWon;
+  const daysRemaining = claim.daysRemaining ?? 180;
+  const isUrgent = daysRemaining <= 14 && !isWon && !isDispatched;
+
+
+
   const hasEvidence =
     evidencesCount > 0 ||
     claim.overturnProbabilityScore !== undefined ||
@@ -59,7 +69,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     {
       id: "evidence",
       number: 1,
-      title: "Evidence & CPB",
+      title: "1. Evidence & CPB",
       subtitle: hasEvidence
         ? `${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}% Win Score` : `${evidencesCount} Clauses`}`
         : "Pending analysis",
@@ -71,7 +81,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     {
       id: "studio",
       number: 2,
-      title: "Appeal Brief",
+      title: "2. Appeal Brief",
       subtitle: hasBrief
         ? `Brief v${claim.latestAppeal?.version || 1} Ready`
         : "AI synthesis ready",
@@ -83,7 +93,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     {
       id: "communications",
       number: 3,
-      title: isWon ? "Case Won" : "Payer Dispatch",
+      title: isWon ? "3. Case Won" : "3. Payer Dispatch",
       subtitle: isWon
         ? "100% Payer Reversal"
         : isDispatched
@@ -99,8 +109,8 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
   return (
     <div className="rounded-xl border border-border bg-card/70 backdrop-blur-sm p-3 shadow-xs space-y-2.5">
       {/* Case Header & Quick Context Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-border/60">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 pb-2.5 border-b border-border/60">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <Button
             variant="ghost"
             size="xs"
@@ -108,17 +118,17 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
             className="gap-1 text-xs text-muted-foreground hover:text-foreground h-7 px-2"
           >
             <ArrowLeft className="size-3" />
-            <span className="hidden sm:inline">Radar</span>
+            <span className="font-medium">All Cases</span>
           </Button>
 
           <div className="h-4 w-px bg-border shrink-0" />
 
           <div className="flex items-center gap-2 min-w-0">
-            <span className="font-semibold text-xs text-foreground truncate">
+            <span className="font-bold text-xs text-foreground truncate max-w-[180px]">
               {claim.patient?.name || "Patient Record"}
             </span>
             <Badge variant="outline" className="font-mono text-[10px] shrink-0">
-              {claim.patient?.insurancePayer || "Insurer"}
+              #{claim.claimNumber} • {claim.patient?.insurancePayer || "Insurer"}
             </Badge>
             {isWon ? (
               <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 text-[10px] shrink-0">
@@ -132,20 +142,57 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
           </div>
         </div>
 
-        {/* Status Indicators & Fast Pipeline Action */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        {/* Status Indicators, ERISA Statutory Clock, & Actions */}
+        <div className="flex flex-wrap items-center gap-2 self-end lg:self-auto">
+          {/* ERISA §502(c) Statutory Liability Exposure & Countdown */}
+          <button
+            onClick={() => onNavigateView("calculator")}
+            className={cn(
+              "flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px] font-mono transition-colors text-left cursor-pointer",
+              isUrgent
+                ? "bg-destructive/15 border-destructive/40 text-destructive hover:bg-destructive/20 animate-pulse"
+                : "bg-muted/40 border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            )}
+            title="Click to view statutory ERISA 29 U.S.C. § 1132(c) penalty exposure and liability breakdown"
+          >
+            {isUrgent ? (
+              <HourglassHigh className="size-3.5 shrink-0 text-destructive" />
+            ) : (
+              <Scales className="size-3.5 shrink-0 text-primary" />
+            )}
+            <span className="font-semibold">
+              $110/day ERISA exposure
+            </span>
+            <span className="text-[10px] text-muted-foreground">•</span>
+            <span className={cn("font-medium", isUrgent ? "text-destructive font-bold" : "text-foreground/80")}>
+              {daysRemaining}d left
+            </span>
+          </button>
+
+          {/* Audit Trail Drawer Trigger */}
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => onOpenAuditDrawer ? onOpenAuditDrawer() : onNavigateView("audit")}
+            className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground border-border/70 cursor-pointer"
+            title="Open real-time 29 CFR case audit trail drawer"
+          >
+            <Clock className="size-3 text-cyan-400" />
+            <span>Audit Trail</span>
+          </Button>
+
           {isWon ? (
-            <div className="flex items-center gap-1 text-xs font-mono">
+            <div className="flex items-center gap-1 text-xs font-mono px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20">
               <CheckCircle className="size-3.5 text-emerald-500" />
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
                 Overturned & Won
               </span>
             </div>
           ) : claim.overturnProbabilityScore !== undefined ? (
-            <div className="flex items-center gap-1 text-xs font-mono">
+            <div className="flex items-center gap-1 text-xs font-mono px-2 py-1 rounded bg-secondary/80 border border-border/60">
               <TrendUp className="size-3 text-emerald-500" />
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                {claim.overturnProbabilityScore}% Win Likelihood
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                {claim.overturnProbabilityScore}% Overturn Prob.
               </span>
             </div>
           ) : null}
@@ -155,7 +202,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
               size="xs"
               onClick={() => hasAppealContext ? onRunAutonomousPipeline() : onNavigateView("studio")}
               disabled={isProcessing}
-              className="gap-1.5 h-7 px-2.5 bg-primary text-primary-foreground text-xs shadow-2xs"
+              className="gap-1.5 h-7 px-2.5 bg-primary text-primary-foreground text-xs shadow-2xs cursor-pointer font-medium"
             >
               {isProcessing ? (
                 <>
@@ -165,16 +212,15 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
               ) : (
                 <>
                   <Lightning className="size-3" weight="fill" />
-                  <span>{hasAppealContext ? "1-Click Auto-Pilot" : "Complete case context"}</span>
+                  <span>{hasAppealContext ? "Auto-Pilot Appeal" : "Complete Context"}</span>
                 </>
               )}
             </Button>
-
           )}
         </div>
       </div>
 
-      {/* 3-Step Macro Workflow Stepper */}
+      {/* 3-Step Master Workflow Stepper */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {steps.map((step) => {
           const StepIcon = step.icon;

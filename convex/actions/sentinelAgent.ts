@@ -377,12 +377,8 @@ export const SENTINEL_AGENT_TOOLS = {
   search_claims: searchClaims,
   get_clinical_evidence: getClinicalEvidence,
   get_appeal_brief: getAppealBrief,
-  get_p2p_defense_script: getP2PDefenseScript,
   get_audit_trail: getAuditTrail,
   search_precedents: searchPrecedents,
-  firecrawl_web_search: firecrawlWebSearch,
-  firecrawl_scrape_url: firecrawlScrapeUrl,
-  crawl_and_attach_evidence: crawlAndAttachEvidence,
 };
 
 /**

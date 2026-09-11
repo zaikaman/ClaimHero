@@ -15,22 +15,18 @@ describe("Convex AI Agent Component Integration (@convex-dev/agent)", () => {
       delete process.env.OPENAI_API_KEY;
     }
   });
-  it("defines all 10 native tools with valid inputSchema and execute methods", () => {
+  it("defines all 6 focused case inspection tools with valid inputSchema and execute methods", () => {
     expect(SENTINEL_AGENT_TOOLS).toBeDefined();
     const toolKeys = Object.keys(SENTINEL_AGENT_TOOLS);
-    expect(toolKeys.length).toBe(10);
+    expect(toolKeys.length).toBe(6);
 
     const expectedTools = [
       "get_active_claim_details",
       "search_claims",
       "get_clinical_evidence",
       "get_appeal_brief",
-      "get_p2p_defense_script",
       "get_audit_trail",
       "search_precedents",
-      "firecrawl_web_search",
-      "firecrawl_scrape_url",
-      "crawl_and_attach_evidence",
     ];
 
     for (const expected of expectedTools) {
