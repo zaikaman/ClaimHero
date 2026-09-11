@@ -2749,9 +2749,12 @@ export const cascadeDeleteP2PBatchInternal = internalMutation({
     }
 
     if (scripts.length === 50 || sessions.length === 50) {
-      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
-        claimId: args.claimId,
-      });
+    await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
+      claimId: args.claimId,
+    });
+    await ctx.scheduler.runAfter(0, internal.claimCollaborators.purgeClaimInternal, {
+      claimId: args.claimId,
+    });
     }
   },
 });

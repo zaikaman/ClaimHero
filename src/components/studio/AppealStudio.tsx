@@ -113,9 +113,11 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     isOwner,
     canEdit,
     isViewer,
+    isLoadingCollaborators,
     invite,
     updateRole,
     removeCollaborator,
+    cancelInvite,
     leaveCase,
   } = useClaimCollaborators(claim._id);
   const readOnly = myAccess ? isViewer || !canEdit : false;
@@ -165,8 +167,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   const presenceActivity = isSynthesizing || isEscalating ? "synthesizing" : isEditingBrief ? "editing" : "viewing";
   const presenceSection = activeTab === "edit" ? "Editor" : activeTab === "preview" ? "Preview" : "Split view";
   // The live CRDT session gates editing until bootstrapped so keystrokes can
-  // never race the initial snapshot/seed merge.
-  const editorSyncLocked = !readOnly && boundAppealId !== null && collabStatus !== "live";
+  // never race the initial snapshot/seed merge. Access itself also gates:
+  // before the role resolves everyone is treated as read-only.
+  const editorSyncLocked =
+    !readOnly && (boundAppealId !== null && collabStatus !== "live" || isLoadingCollaborators);
   const presenceAvatarMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (const member of collaborators) {
@@ -1008,6 +1012,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         onInvite={invite}
         onUpdateRole={updateRole}
         onRemove={removeCollaborator}
+        onCancelInvite={cancelInvite}
         onLeave={isOwner ? undefined : leaveCase}
       />
 

@@ -559,7 +559,8 @@ export default defineSchema({
     .index("by_captured_at", ["capturedAt"]),
 
   // Case-level collaboration grants for the Appeal Studio.
-  // Owner invites by email with editor/viewer role. userId is resolved when
+  // Owner invites by email with editor/viewer role. Invites start as pending
+  // and grant nothing until the recipient accepts; userId is resolved when
   // the invited address matches an existing users record, otherwise the grant
   // stays email-keyed until the recipient signs in.
   claimCollaborators: defineTable({
@@ -567,7 +568,12 @@ export default defineSchema({
     userId: v.optional(v.id("users")),
     email: v.string(),
     role: v.union(v.literal("editor"), v.literal("viewer")),
-    status: v.union(v.literal("active"), v.literal("revoked")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("active"),
+      v.literal("declined"),
+      v.literal("revoked")
+    ),
     invitedBy: v.id("users"),
     createdAt: v.number(),
     updatedAt: v.number(),

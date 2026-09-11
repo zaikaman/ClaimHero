@@ -30,6 +30,8 @@ const AuthPage = lazy(() => import("./components/auth/AuthPage").then((m) => ({ 
 const OnboardingWizard = lazy(() => import("./components/onboarding/OnboardingWizard").then((m) => ({ default: m.OnboardingWizard })));
 const OnboardingChecklist = lazy(() => import("./components/onboarding/OnboardingChecklist").then((m) => ({ default: m.OnboardingChecklist })));
 const SentinelChatbot = lazy(() => import("./components/chat/SentinelChatbot").then((m) => ({ default: m.SentinelChatbot })));
+const InvitationsInbox = lazy(() => import("./components/collaboration/InvitationsInbox").then((m) => ({ default: m.InvitationsInbox })));
+const PendingInviteGate = lazy(() => import("./components/collaboration/PendingInviteGate").then((m) => ({ default: m.PendingInviteGate })));
 
 function ViewLoadingFallback({ message = "Connecting to Sentinel Engine..." }: { message?: string }) {
   return (
@@ -66,6 +68,7 @@ export default function App() {
     selectedClaim,
     selectedClaimId,
     setSelectedClaimId,
+    isLoadingSelectedClaim,
     includeDemo,
     setIncludeDemo,
     stats,
@@ -289,17 +292,25 @@ export default function App() {
           <Suspense fallback={<ViewLoadingFallback message="Loading Sentinel Workspace..." />}>
             {/* 1. Case Ingestion Radar View (Platform) */}
             {currentView === "radar" && (
-              <CaseRadar
-                claims={claims}
-                selectedClaimId={selectedClaimId}
-                onSelectClaim={setSelectedClaimId}
-                onOpenIngestion={handleOpenIngestion}
-                onNavigateView={setCurrentView}
-                onDeleteCase={deleteCase}
-                onRunAutonomousPipeline={runFullPipeline}
-                includeDemo={includeDemo}
-                onToggleIncludeDemo={() => setIncludeDemo((prev) => !prev)}
-              />
+              <div className="space-y-4">
+                <InvitationsInbox
+                  onOpenCase={(claimId) => {
+                    setSelectedClaimId(claimId);
+                    setCurrentView("studio");
+                  }}
+                />
+                <CaseRadar
+                  claims={claims}
+                  selectedClaimId={selectedClaimId}
+                  onSelectClaim={setSelectedClaimId}
+                  onOpenIngestion={handleOpenIngestion}
+                  onNavigateView={setCurrentView}
+                  onDeleteCase={deleteCase}
+                  onRunAutonomousPipeline={runFullPipeline}
+                  includeDemo={includeDemo}
+                  onToggleIncludeDemo={() => setIncludeDemo((prev) => !prev)}
+                />
+              </div>
             )}
 
             {/* 2. Clinical Policy Evidence Matrix & Inspector (Active Case Workspace) */}
@@ -343,8 +354,16 @@ export default function App() {
                   onNavigateView={setCurrentView}
                   onRunAutonomousPipeline={runFullPipeline}
                 />
-              ) : selectedClaimId ? (
+              ) : selectedClaimId && isLoadingSelectedClaim ? (
                 <ViewLoadingFallback message="Opening appeal synthesis workspace..." />
+              ) : selectedClaimId ? (
+                <PendingInviteGate
+                  claimId={selectedClaimId}
+                  onDismiss={() => {
+                    setSelectedClaimId("");
+                    setCurrentView("radar");
+                  }}
+                />
               ) : (
                 <CasePickerEmptyState
                   viewType="studio"

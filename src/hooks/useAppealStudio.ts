@@ -274,7 +274,11 @@ export function useAppealStudio(
         delta = null;
       }
       applyRemoteYjsText(str, delta);
-      schedulePersistRef.current();
+      // Viewers never persist: editors on the case own canonical saves, so a
+      // read-only session must not attempt doomed saveDraft writes per batch.
+      if (!readOnlyRef.current) {
+        schedulePersistRef.current();
+      }
       flashRemoteApplied();
     },
     [applyRemoteYjsText, flashRemoteApplied]
@@ -419,7 +423,11 @@ export function useAppealStudio(
     }
 
     // Live mode: the shared Y.Doc owns the text for the latest revision.
-    if (yjsAppealIdRef.current !== activeAppeal._id || !providerRef.current) {
+    // Role flips pause/resume pushing on the live session instead of
+    // rebinding, so a demoted editor's unflushed tail survives a re-promotion
+    // and read sync never interrupts.
+    const boundProvider = providerRef.current;
+    if (yjsAppealIdRef.current !== activeAppeal._id || !boundProvider) {
       activeAppealIdRef.current = activeAppeal._id;
       bindYjs(activeAppeal, incoming);
       if (activeAppeal.appealLevel) {
@@ -427,6 +435,7 @@ export function useAppealStudio(
       }
       return;
     }
+    boundProvider.setPushEnabled(!readOnlyRef.current);
     // Same bound revision: the op channel is truth; the canonical document is
     // persistence lag. Adopt markers when converged, otherwise ignore.
     const liveText = ytextRef.current?.toString();

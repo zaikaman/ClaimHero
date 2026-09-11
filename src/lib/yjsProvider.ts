@@ -69,6 +69,7 @@ export class BriefSyncProvider {
   private destroyed = false;
   private bootstrapped = false;
   private ready = false;
+  private pushEnabled: boolean;
   private seedAttempted = false;
   private appliedClock = -1;
   private opsSinceSnapshot = 0;
@@ -80,7 +81,7 @@ export class BriefSyncProvider {
   private status: BriefSyncStatus = "bootstrapping";
 
   private updateListener = (update: Uint8Array, origin: unknown) => {
-    if (this.destroyed || origin !== YJS_LOCAL_ORIGIN) return;
+    if (this.destroyed || origin !== YJS_LOCAL_ORIGIN || !this.pushEnabled) return;
     this.queue.push(update);
     this.scheduleFlush();
   };
@@ -89,6 +90,7 @@ export class BriefSyncProvider {
     this.appealId = appealId;
     this.baseline = opts.baseline;
     this.isEditor = opts.isEditor;
+    this.pushEnabled = opts.isEditor;
     this.cbs = opts.cbs;
     this.doc.on("update", this.updateListener);
   }
@@ -103,6 +105,19 @@ export class BriefSyncProvider {
 
   get isReady(): boolean {
     return this.ready;
+  }
+
+  /**
+   * Pause or resume op upload without touching the live document. Demotion
+   * pauses (queued tail is retained, so a re-promotion still propagates it);
+   * promotion resumes flushing. Read sync continues in both states.
+   */
+  setPushEnabled(enabled: boolean) {
+    if (this.destroyed || this.pushEnabled === enabled) return;
+    this.pushEnabled = enabled;
+    if (enabled) {
+      this.scheduleFlush();
+    }
   }
 
   destroy() {
@@ -130,7 +145,7 @@ export class BriefSyncProvider {
 
   /** Force-flush queued ops (e.g. before unmount). Best effort. */
   flushNow() {
-    if (this.destroyed || !this.isEditor || this.queue.length === 0) return;
+    if (this.destroyed || !this.pushEnabled || this.queue.length === 0) return;
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
@@ -273,6 +288,7 @@ export class BriefSyncProvider {
   private maybeSnapshot() {
     if (
       !this.isEditor ||
+      !this.pushEnabled ||
       this.destroyed ||
       this.snapshotInFlight ||
       this.opsSinceSnapshot < SNAPSHOT_EVERY_OPS ||
@@ -307,7 +323,7 @@ export class BriefSyncProvider {
   }
 
   private scheduleFlush() {
-    if (this.destroyed || !this.isEditor || this.queue.length === 0) return;
+    if (this.destroyed || !this.pushEnabled || this.queue.length === 0) return;
     if (this.flushTimer) return;
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null;
@@ -324,7 +340,7 @@ export class BriefSyncProvider {
   }
 
   private async flush() {
-    if (this.destroyed || !this.isEditor || this.queue.length === 0) return;
+    if (this.destroyed || !this.pushEnabled || this.queue.length === 0) return;
     const batches = splitByteBatch(this.queue, PUSH_MAX_COUNT, PUSH_MAX_BYTES);
     const batch = batches[0];
     try {

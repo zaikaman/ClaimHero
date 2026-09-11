@@ -31,7 +31,7 @@ To evaluate the end-to-end pipeline without uploading personal health records:
 4. Select **Run Autonomous Pipeline** and track the real-time stepper:
    `Evidence & CPB` -> `Appeal Brief` -> `Payer Dispatch`
 5. Inspect the output: indexed insurer clauses, visual screenshot archives, deterministic four-pillar overturn score, cited appeal brief, physician peer-to-peer call script, and two-way AgentMail thread.
-6. Try live collaboration: open the **Appeal Studio**, click **Share**, and invite a teammate by email as editor or viewer. They see the case instantly (shared badge in Case Radar); open the same brief in two accounts and type simultaneously — Yjs CRDT merging keeps both keystroke streams without conflicts while presence shows who is editing.
+6. Try live collaboration: open the **Appeal Studio**, click **Share**, and invite a teammate by email as editor or viewer. Invites stay pending until accepted — nothing is shared before then. They accept from the Case Radar inbox (or the invite link, which opens an accept screen), see the case with a shared badge, and can co-edit the same brief while presence shows who is editing.
 
 *Synthetic cases are strictly isolated from real portfolio analytics and can be purged at any time via the "Clear demo data" button.*
 
@@ -139,7 +139,7 @@ ClaimHero leverages 9 first-party and partner Convex components configured in [`
 | **Evidence Matrix** | `src/components/evidence/EvidenceMatrix.tsx` | Side-by-side comparison of denial codes against active CPB clauses with category filtering (Payer / CMS / PubMed). |
 | **Visual Proof Archive** | `src/components/evidence/VisualProofArchive.tsx` | High-resolution full-page screenshots of payer bulletins captured via Firecrawl to prevent policy gaslighting. |
 | **Appeal Studio** | `src/components/studio/AppealStudio.tsx` | Versioned appellate brief editor with clause-level citations, statutory rights notices, and attestation signatures. |
-| **Live Collaboration** | `src/components/studio/ShareCaseModal.tsx`, `src/lib/yjsProvider.ts`, `convex/appealYjs.ts` | Email invites with editor/viewer roles, live teammate facepile with editing activity, and Yjs CRDT merging of concurrent brief keystrokes over a Convex op log with snapshots and offline-tolerant sync. |
+| **Live Collaboration** | `src/components/studio/ShareCaseModal.tsx`, `src/lib/yjsProvider.ts`, `convex/appealYjs.ts` | Pending email invites with editor/viewer roles (nothing shared until accepted), live teammate facepile with editing activity, and Yjs CRDT merging of concurrent brief keystrokes over a Convex op log with snapshots and offline-tolerant sync. |
 | **Formal PDF Dossier** | `src/lib/pdfService.ts` | Court-ready PDF dossier compiler with indexed clinical exhibits, statutory cover sheets, and print layouts. |
 | **P2P Defense Studio** | `src/components/p2p/P2PDefenseStudio.tsx` | Tele-scripts and tactical counter-argument cards tailored for physician-to-medical-director phone calls. |
 | **P2P Live Copilot** | `src/components/p2p/P2PLiveCopilot.tsx` | Live call assistant with real-time speech transcription, dynamic objection counters, and call recap generation. |
@@ -185,12 +185,12 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **802 automated tests** across 50 test suites (verified via `npm run test:coverage`):
+ClaimHero is backed by **815 automated tests** across 50 test suites (verified via `npm run test:coverage`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking
 npm run lint            # ESLint static code analysis
-npm run test            # Comprehensive Vitest test suite (802 tests)
+npm run test            # Comprehensive Vitest test suite (815 tests)
 npm run test:coverage   # Code coverage report (report-only, ~80.9% lines; no threshold gate)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate

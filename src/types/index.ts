@@ -538,6 +538,16 @@ export interface StudioPresenceEntry {
   image?: string;
 }
 
+export type ClaimInviteStatus = "pending" | "active" | "declined" | "revoked";
+
+export interface CaseInvite {
+  claimId: string;
+  claimNumber: string;
+  role: ClaimAccessRole;
+  invitedBy: string;
+  invitedAt: number;
+}
+
 // Physician Peer-to-Peer (P2P) Defense Types
 export interface PolicyCitationScriptItem {
   cpbTitle: string;

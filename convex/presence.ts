@@ -34,6 +34,13 @@ function parseClaimIdFromRoom(roomId: string): Id<"claims"> {
   return roomId.slice(prefix.length) as Id<"claims">;
 }
 
+function initialsForName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "A";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 function assertSafePresenceData(data: {
   displayName: string;
   initials: string;
@@ -108,6 +115,8 @@ export const list = query({
 /**
  * Update the caller's ephemeral Studio state (activity, tier, section).
  * Viewers may publish presence; this carries no document content.
+ * Identity fields are stamped server-side from the account record so a
+ * caller cannot impersonate a teammate in the facepile.
  */
 export const updateState = mutation({
   args: {
@@ -125,7 +134,14 @@ export const updateState = mutation({
     if (args.data.role !== access.accessRole) {
       throw new Error("Forbidden: Presence role must match case access");
     }
-    return await presence.updateRoomUser(ctx, args.roomId, authUserId, args.data);
+    const account = await ctx.db.get(authUserId);
+    const displayName =
+      account?.name || account?.email?.split("@")[0] || args.data.displayName;
+    return await presence.updateRoomUser(ctx, args.roomId, authUserId, {
+      ...args.data,
+      displayName: displayName.slice(0, 64),
+      initials: initialsForName(displayName).slice(0, 4),
+    });
   },
 });
 

@@ -107,6 +107,13 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 1,
   },
+  // Case collaboration invites (burst: 10, rate: 10/min per owner)
+  collabInvite: {
+    kind: "token bucket",
+    rate: 10,
+    period: MINUTE,
+    capacity: 10,
+  },
   // Danger Zone portfolio wipe rate limit (strict: 1 reset per 15 minutes, capacity: 1)
   resetPortfolio: {
     kind: "token bucket",

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  ArrowCounterClockwise,
   Check,
   CircleNotch,
   EnvelopeSimple,
@@ -7,6 +8,7 @@ import {
   SignOut,
   Trash,
   UsersThree,
+  XCircle,
 } from "@phosphor-icons/react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Button } from "../ui/button";
@@ -30,6 +32,7 @@ interface ShareCaseModalProps {
   onInvite: (email: string, role: "editor" | "viewer") => Promise<unknown>;
   onUpdateRole: (email: string, role: "editor" | "viewer") => Promise<unknown>;
   onRemove: (email: string) => Promise<unknown>;
+  onCancelInvite: (email: string) => Promise<unknown>;
   onLeave?: () => Promise<unknown>;
 }
 
@@ -50,6 +53,7 @@ export const ShareCaseModal: React.FC<ShareCaseModalProps> = ({
   onInvite,
   onUpdateRole,
   onRemove,
+  onCancelInvite,
   onLeave,
 }) => {
   const [email, setEmail] = useState("");
@@ -58,21 +62,41 @@ export const ShareCaseModal: React.FC<ShareCaseModalProps> = ({
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
-  const handleInvite = async () => {
-    const trimmed = email.trim();
+  const sendInvite = async (targetEmail: string, targetRole: "editor" | "viewer") => {
+    const trimmed = targetEmail.trim();
     if (!trimmed) {
       toast.error("Enter a teammate email address to invite");
       return;
     }
     setIsInviting(true);
     try {
-      await onInvite(trimmed, role);
-      toast.success(`Invited ${trimmed} as ${role}`);
+      const result = (await onInvite(trimmed, targetRole)) as { updated?: boolean } | undefined;
+      toast.success(
+        result && typeof result === "object" && "updated" in result && result.updated
+          ? `Updated the pending invite for ${trimmed}`
+          : `Invite sent to ${trimmed} — pending acceptance`
+      );
       setEmail("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send invite");
     } finally {
       setIsInviting(false);
+    }
+  };
+
+  const handleInvite = async () => {
+    await sendInvite(email, role);
+  };
+
+  const handleReinvite = async (targetEmail: string, targetRole: "editor" | "viewer") => {
+    setBusyEmail(targetEmail);
+    try {
+      await onInvite(targetEmail, targetRole);
+      toast.success(`Re-invited ${targetEmail} — pending acceptance`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send invite");
+    } finally {
+      setBusyEmail(null);
     }
   };
 
@@ -100,6 +124,18 @@ export const ShareCaseModal: React.FC<ShareCaseModalProps> = ({
     }
   };
 
+  const handleCancelInvite = async (targetEmail: string) => {
+    setBusyEmail(targetEmail);
+    try {
+      await onCancelInvite(targetEmail);
+      toast.success(`Canceled the invite for ${targetEmail}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to cancel invite");
+    } finally {
+      setBusyEmail(null);
+    }
+  };
+
   const handleCopyLink = async () => {
     const url =
       typeof window !== "undefined"
@@ -116,7 +152,7 @@ export const ShareCaseModal: React.FC<ShareCaseModalProps> = ({
       document.body.removeChild(ta);
     }
     setLinkCopied(true);
-    toast.success("Invite link copied. Your teammate gets access once invited by email.");
+    toast.success("Invite link copied. Your teammate accepts it to open this exact case.");
     setTimeout(() => setLinkCopied(false), 2500);
   };
 
@@ -182,8 +218,9 @@ export const ShareCaseModal: React.FC<ShareCaseModalProps> = ({
               </Button>
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Editors can draft, synthesize, and escalate. Viewers have read-only access. Access is
-              granted immediately; share the invite link so they can open this exact case.
+              Editors can draft, synthesize, and escalate. Viewers have read-only access. Use the
+              email they sign in with. Invites stay pending until accepted — nothing is shared
+              before then.
             </p>
             <Button variant="outline" size="sm" onClick={handleCopyLink} className="w-full gap-1.5">
               {linkCopied ? (
@@ -261,7 +298,46 @@ export const ShareCaseModal: React.FC<ShareCaseModalProps> = ({
                     <Badge className={cn("text-[9px] font-mono px-1.5 py-0 h-5 shrink-0 capitalize", roleBadgeClass(member.role))}>
                       {member.role}
                     </Badge>
-                    {isOwner && !member.isOwner && !member.isSelf && (
+                    {member.status === "pending" && (
+                      <Badge className="text-[9px] font-mono px-1.5 py-0 h-5 shrink-0 bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        Invite pending
+                      </Badge>
+                    )}
+                    {member.status === "declined" && (
+                      <Badge className="text-[9px] font-mono px-1.5 py-0 h-5 shrink-0 bg-muted text-muted-foreground border border-border/60">
+                        Declined
+                      </Badge>
+                    )}
+                    {isOwner && !member.isOwner && !member.isSelf && member.status === "pending" && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => handleCancelInvite(member.email)}
+                          disabled={busy}
+                          title={`Cancel invite for ${member.email}`}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          {busy ? <CircleNotch className="size-3.5 animate-spin" /> : <XCircle className="size-3.5" />}
+                        </Button>
+                      </div>
+                    )}
+                    {isOwner && !member.isOwner && !member.isSelf && member.status === "declined" && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleReinvite(member.email, member.role === "owner" ? "editor" : member.role)}
+                          disabled={busy || isInviting}
+                          title={`Re-invite ${member.email}`}
+                          className="h-7 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                        >
+                          {busy ? <CircleNotch className="size-3 animate-spin" /> : <ArrowCounterClockwise className="size-3" />}
+                          <span>Re-invite</span>
+                        </Button>
+                      </div>
+                    )}
+                    {isOwner && !member.isOwner && !member.isSelf && member.status !== "pending" && member.status !== "declined" && (
                       <div className="flex items-center gap-1 shrink-0">
                         <Select
                           value={member.role === "owner" ? "editor" : member.role}
