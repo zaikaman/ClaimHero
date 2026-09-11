@@ -1,13 +1,13 @@
 "use node";
 
-import { action } from "../_generated/server";
+import { action, internalAction, ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { internal } from "../_generated/api";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { logPipelineActivity } from "../lib/pipelineActivity";
 import { rateLimiter } from "../lib/rateLimiter";
-import type { Doc } from "../_generated/dataModel";
+import type { Id, Doc } from "../_generated/dataModel";
 
 const OVERTURN_ANALYSIS_SCHEMA = {
   type: "object",
@@ -233,18 +233,20 @@ export function calculateDeterministicRubric(
 }
 
 /**
- * Precedent Matcher Action: Evaluate clinical evidence using deterministic 4-pillar rubric
+ * Precedent Matcher Core Logic: Evaluate clinical evidence using deterministic 4-pillar rubric.
+ * Shared between public user-facing action and internal durable workflow execution.
  */
-export const computeOverturnScore = action({
+export async function performComputeOverturnScore(
+  ctx: ActionCtx,
   args: {
-    claimId: v.id("claims"),
-    pipelineRunId: v.optional(v.string()),
+    claimId: Id<"claims">;
+    pipelineRunId?: string;
   },
-  handler: async (ctx, args): Promise<OverturnScoringResult> => {
-    // 1. Authorize claim ownership
-    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
-
-    // Rate limiting check per authenticated user
+  claim: Doc<"claims"> & { patient?: Doc<"patients"> },
+  userId?: string
+): Promise<OverturnScoringResult> {
+  // Rate limiting check per user if available
+  if (userId) {
     try {
       const limitStatus = await rateLimiter.limit(ctx, "precedentMatcher", {
         key: `precedent_matcher_${userId}`,
@@ -264,35 +266,36 @@ export const computeOverturnScore = action({
         console.warn("[RateLimiter] Unexpected error checking precedentMatcher rate limit:", rateErr);
       }
     }
+  }
 
-    // 2. Fetch indexed clinical evidence clauses
-    const evidences: Doc<"clinicalEvidences">[] =
-      (await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
-        claimId: args.claimId,
-      })) || [];
-
-    await logPipelineActivity(ctx, {
+  // 2. Fetch indexed clinical evidence clauses
+  const evidences: Doc<"clinicalEvidences">[] =
+    (await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
       claimId: args.claimId,
-      runId: args.pipelineRunId,
-      stage: "score",
-      status: "running",
-      message: `Weighing ${evidences.length} evidence clauses across the 4-pillar rubric to estimate win likelihood.`,
-    });
+    })) || [];
 
-    // 3. Compute deterministic 4-pillar score
-    const deterministicCalculation = calculateDeterministicRubric(claim, evidences);
+  await logPipelineActivity(ctx, {
+    claimId: args.claimId,
+    runId: args.pipelineRunId,
+    stage: "score",
+    status: "running",
+    message: `Weighing ${evidences.length} evidence clauses across the 4-pillar rubric to estimate win likelihood.`,
+  });
 
-    const evidencesSummary = evidences.length > 0
-      ? evidences.map((e, i: number) => `[Evidence ${i + 1}] (${e.sourceType.toUpperCase()} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
-      : "Standard national clinical practice guideline applied.";
+  // 3. Compute deterministic 4-pillar score
+  const deterministicCalculation = calculateDeterministicRubric(claim, evidences);
 
-    // 4. Call OpenAI for deep qualitative legal/clinical contradictions
-    let llmAnalysis: RawLLMAnalysisOutput;
-    let generatedBy: "openai" | "fallback" = "openai";
-    let llmAvailable = true;
-    try {
-      llmAnalysis = await createStructuredCompletion<RawLLMAnalysisOutput>({
-        systemPrompt: `You are a Senior Medical Director, ERISA Claim Adjudication Expert, and Clinical Appeals Evaluator.
+  const evidencesSummary = evidences.length > 0
+    ? evidences.map((e, i: number) => `[Evidence ${i + 1}] (${e.sourceType.toUpperCase()} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
+    : "Standard national clinical practice guideline applied.";
+
+  // 4. Call OpenAI for deep qualitative legal/clinical contradictions
+  let llmAnalysis: RawLLMAnalysisOutput;
+  let generatedBy: "openai" | "fallback" = "openai";
+  let llmAvailable = true;
+  try {
+    llmAnalysis = await createStructuredCompletion<RawLLMAnalysisOutput>({
+      systemPrompt: `You are a Senior Medical Director, ERISA Claim Adjudication Expert, and Clinical Appeals Evaluator.
 Your task is to identify specific, cited policy contradictions and formulate a winning legal precedent summary for an insurance denial appeal.
 
 Requirements:
@@ -300,7 +303,7 @@ Requirements:
 - Formulate a winning precedent summary citing specific clause numbers and clinical standards.
 - Provide a brief 1-sentence rationale for each of the 4 statutory pillars.
 - Write everything in clean plain text. Strictly do NOT use markdown bold asterisks (such as **bold**) or formatting tokens in any contradiction strings, summaries, or rationales.`,
-        userPrompt: `Analyze the following insurance denial case:
+      userPrompt: `Analyze the following insurance denial case:
 
 Claim Details:
 - Claim Number: ${claim.claimNumber}
@@ -317,75 +320,109 @@ Claim Details:
 
 Retrieved Clinical Policy Evidence & Precedents:
 ${evidencesSummary}`,
-        schemaName: "OverturnAnalysisResult",
-        schema: OVERTURN_ANALYSIS_SCHEMA,
-        temperature: 0.0,
-      });
-    } catch (err) {
-      console.warn("LLM precedent analysis failed, falling back to deterministic calculation without fabricated citations:", err);
-      generatedBy = "fallback";
-      llmAvailable = false;
-      llmAnalysis = {
-        keyPolicyContradictions: [],
-        winningPrecedentSummary: "Deterministic rubric baseline evaluated against statutory procedural requirements and indexed policy evidence.",
-        suggestedAppealLevel: deterministicCalculation.riskLevel === "complex_litigation" ? "level_2_grievance" : "level_1_internal",
-      };
-    }
-
-    // Merge rich rationales if generated by LLM, while keeping deterministic numerical points
-    const finalBreakdown: ScoringCriterionResult[] = deterministicCalculation.scoringBreakdown.map((item) => {
-      let customRationale = item.rationale;
-      if (item.category === "policy_alignment" && llmAnalysis.policyAlignmentRationale) {
-        customRationale = llmAnalysis.policyAlignmentRationale.replace(/\*\*/g, "");
-      } else if (item.category === "clinical_documentation" && llmAnalysis.clinicalDocumentationRationale) {
-        customRationale = llmAnalysis.clinicalDocumentationRationale.replace(/\*\*/g, "");
-      } else if (item.category === "statutory_erisa" && llmAnalysis.statutoryErisaRationale) {
-        customRationale = llmAnalysis.statutoryErisaRationale.replace(/\*\*/g, "");
-      } else if (item.category === "precedent_strength" && llmAnalysis.precedentStrengthRationale) {
-        customRationale = llmAnalysis.precedentStrengthRationale.replace(/\*\*/g, "");
-      }
-      return {
-        ...item,
-        rationale: customRationale.replace(/\*\*/g, ""),
-      };
+      schemaName: "OverturnAnalysisResult",
+      schema: OVERTURN_ANALYSIS_SCHEMA,
+      temperature: 0.0,
     });
-
-    const finalResult: OverturnScoringResult = {
-      overturnProbabilityScore: deterministicCalculation.overturnProbabilityScore,
-      riskLevel: deterministicCalculation.riskLevel,
-      scoringBreakdown: finalBreakdown,
-      keyPolicyContradictions: (llmAnalysis.keyPolicyContradictions || []).map((c) => c.replace(/\*\*/g, "")),
-      winningPrecedentSummary: llmAnalysis.winningPrecedentSummary?.replace(/\*\*/g, "") || "",
-      suggestedAppealLevel: llmAnalysis.suggestedAppealLevel,
-      llmAvailable,
-      generatedBy,
+  } catch (err) {
+    console.warn("LLM precedent analysis failed, falling back to deterministic calculation without fabricated citations:", err);
+    generatedBy = "fallback";
+    llmAvailable = false;
+    llmAnalysis = {
+      keyPolicyContradictions: [],
+      winningPrecedentSummary: "Deterministic rubric baseline evaluated against statutory procedural requirements and indexed policy evidence.",
+      suggestedAppealLevel: deterministicCalculation.riskLevel === "complex_litigation" ? "level_2_grievance" : "level_1_internal",
     };
+  }
 
-    // 5. Update claim in database with deterministic score, risk level, and criteria breakdown
-    await ctx.runMutation(internal.claims.updateStatusInternal, {
+  // Merge rich rationales if generated by LLM, while keeping deterministic numerical points
+  const finalBreakdown: ScoringCriterionResult[] = deterministicCalculation.scoringBreakdown.map((item) => {
+    let customRationale = item.rationale;
+    if (item.category === "policy_alignment" && llmAnalysis.policyAlignmentRationale) {
+      customRationale = llmAnalysis.policyAlignmentRationale.replace(/\*\*/g, "");
+    } else if (item.category === "clinical_documentation" && llmAnalysis.clinicalDocumentationRationale) {
+      customRationale = llmAnalysis.clinicalDocumentationRationale.replace(/\*\*/g, "");
+    } else if (item.category === "statutory_erisa" && llmAnalysis.statutoryErisaRationale) {
+      customRationale = llmAnalysis.statutoryErisaRationale.replace(/\*\*/g, "");
+    } else if (item.category === "precedent_strength" && llmAnalysis.precedentStrengthRationale) {
+      customRationale = llmAnalysis.precedentStrengthRationale.replace(/\*\*/g, "");
+    }
+    return {
+      ...item,
+      rationale: customRationale.replace(/\*\*/g, ""),
+    };
+  });
+
+  const finalResult: OverturnScoringResult = {
+    overturnProbabilityScore: deterministicCalculation.overturnProbabilityScore,
+    riskLevel: deterministicCalculation.riskLevel,
+    scoringBreakdown: finalBreakdown,
+    keyPolicyContradictions: (llmAnalysis.keyPolicyContradictions || []).map((c) => c.replace(/\*\*/g, "")),
+    winningPrecedentSummary: llmAnalysis.winningPrecedentSummary?.replace(/\*\*/g, "") || "",
+    suggestedAppealLevel: llmAnalysis.suggestedAppealLevel,
+    llmAvailable,
+    generatedBy,
+  };
+
+  // 5. Update claim in database with deterministic score, risk level, and criteria breakdown
+  await ctx.runMutation(internal.claims.updateStatusInternal, {
+    claimId: args.claimId,
+    status: "precedent_matched",
+    overturnProbabilityScore: finalResult.overturnProbabilityScore,
+    riskLevel: finalResult.riskLevel,
+    scoringBreakdown: finalResult.scoringBreakdown,
+    actor: "Precedent Matcher & Rubric Engine",
+    details: `Evaluated 4-pillar overturn score: ${finalResult.overturnProbabilityScore}% (${finalResult.riskLevel.replace(/_/g, " ").toUpperCase()}). Found ${finalResult.keyPolicyContradictions.length} cited policy contradictions.`,
+  });
+
+  const confidenceLabel =
+    finalResult.riskLevel === "high_confidence"
+      ? "strong"
+      : finalResult.riskLevel === "moderate"
+        ? "moderate"
+        : "complex";
+  await logPipelineActivity(ctx, {
+    claimId: args.claimId,
+    runId: args.pipelineRunId,
+    stage: "score",
+    status: "completed",
+    message: `Win likelihood looks ${confidenceLabel} at ${finalResult.overturnProbabilityScore}%, with ${finalResult.keyPolicyContradictions.length} policy contradictions working in your favor.`,
+  });
+
+  return finalResult;
+}
+
+/**
+ * Precedent Matcher Action: Evaluate clinical evidence using deterministic 4-pillar rubric (User-facing)
+ */
+export const computeOverturnScore = action({
+  args: {
+    claimId: v.id("claims"),
+    pipelineRunId: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<OverturnScoringResult> => {
+    // 1. Authorize claim ownership
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+    return await performComputeOverturnScore(ctx, args, claim, userId);
+  },
+});
+
+/**
+ * Internal Precedent Matcher Action:
+ * For durable workflows and scheduled background processing without active user token session.
+ */
+export const computeOverturnScoreInternal = internalAction({
+  args: {
+    claimId: v.id("claims"),
+    pipelineRunId: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<OverturnScoringResult> => {
+    const claim = (await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
-      status: "precedent_matched",
-      overturnProbabilityScore: finalResult.overturnProbabilityScore,
-      riskLevel: finalResult.riskLevel,
-      scoringBreakdown: finalResult.scoringBreakdown,
-      actor: "Precedent Matcher & Rubric Engine",
-      details: `Evaluated 4-pillar overturn score: ${finalResult.overturnProbabilityScore}% (${finalResult.riskLevel.replace(/_/g, " ").toUpperCase()}). Found ${finalResult.keyPolicyContradictions.length} cited policy contradictions.`,
-    });
-
-    const confidenceLabel =
-      finalResult.riskLevel === "high_confidence"
-        ? "strong"
-        : finalResult.riskLevel === "moderate"
-          ? "moderate"
-          : "complex";
-    await logPipelineActivity(ctx, {
-      claimId: args.claimId,
-      runId: args.pipelineRunId,
-      stage: "score",
-      status: "completed",
-      message: `Win likelihood looks ${confidenceLabel} at ${finalResult.overturnProbabilityScore}%, with ${finalResult.keyPolicyContradictions.length} policy contradictions working in your favor.`,
-    });
-
-    return finalResult;
+    })) as (Doc<"claims"> & { patient?: Doc<"patients"> }) | null;
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+    return await performComputeOverturnScore(ctx, args, claim, claim.userId);
   },
 });

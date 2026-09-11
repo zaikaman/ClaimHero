@@ -1,6 +1,6 @@
 import { WorkflowManager, type WorkflowStatus, type WorkflowCtx, type WorkflowId } from "@convex-dev/workflow";
-import { components, api, internal } from "./_generated/api";
-import { mutation, query } from "./_generated/server";
+import { components, internal } from "./_generated/api";
+import { mutation, query, internalQuery, internalMutation, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id, Doc } from "./_generated/dataModel";
 import { requireClaimEditor, getAuthUserId } from "./lib/auth";
@@ -58,6 +58,24 @@ export interface DurableClaimPipelineArgs {
   };
   autoDispatch?: boolean;
   followUpCadenceDays?: number;
+  pipelineRunId?: string;
+}
+
+async function logWorkflowActivity(
+  step: WorkflowCtx,
+  input: {
+    claimId: Id<"claims">;
+    runId: string;
+    stage: "run" | "crawl" | "score" | "precedents" | "synthesis";
+    status: "running" | "completed" | "error";
+    message: string;
+  }
+) {
+  try {
+    await step.runMutation(internal.pipelineActivities.logPipelineActivityInternal, input);
+  } catch (err) {
+    console.warn("Workflow activity logging note:", err);
+  }
 }
 
 /**
@@ -87,251 +105,299 @@ export async function executeDurableClaimPipeline(
       throw new Error("Complete sender details before drafting");
     }
 
-    // Step 1: Payer Intake Gateway Resolution (Durable with retries)
-    if (!claim.payerContact) {
-      try {
-        await step.runAction(
-          internal.actions.payerContactResolver.resolvePayerGatewayInternal,
-          {
-            claimId: args.claimId,
-            payerName: payer,
-          },
-          {
-            retry: { maxAttempts: 3, initialBackoffMs: 1000, base: 2 },
-            name: "resolvePayerGateway",
-          }
-        );
-      } catch (gatewayErr) {
-        console.warn("Durable workflow note: Payer gateway auto-resolution notice:", gatewayErr);
-      }
-    }
-
-    // Step 2: Policy Crawling & Clinical Evidence Extraction (Firecrawl)
-    await step.runMutation(internal.claims.updateStatusInternal, {
+    const pipelineRunId = args.pipelineRunId || `run_${Date.now()}`;
+    await logWorkflowActivity(step, {
       claimId: args.claimId,
-      status: "analyzing",
-      actor: "Durable Sentinel Workflow",
-      details: "Step 1/4: Crawling clinical policy bulletins & medical guidelines with durable retry...",
+      runId: pipelineRunId,
+      stage: "run",
+      status: "running",
+      message: `Kicking off the autonomous review. First I'll look up ${payer}'s official policy bulletins for this denial.`,
     });
 
-    let crawlResult: { policyTitle?: string; clausesExtracted?: number } | null = null;
     try {
-      crawlResult = await step.runAction(
-        api.actions.policyCrawler.crawlInsurerPolicy,
-        {
-          claimId: args.claimId,
-          payer,
-          cptCodes: claim.cptCodes || [],
-          icd10Codes: claim.icd10Codes || [],
-          denialReasonCode: claim.denialReasonCode || "CO-50",
-          denialReasonDescription: claim.denialReasonDescription || "",
-          customPolicyUrl: args.customPolicyUrl,
-          serviceDate: claim.serviceDate,
-        },
-        {
-          retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 },
-          name: "crawlInsurerPolicy",
-        }
-      );
-    } catch (crawlErr) {
-      const crawlMessage = crawlErr instanceof Error ? crawlErr.message : String(crawlErr);
-      const existingEvidences = (await step.runQuery(
-        internal.clinicalEvidences.listByClaimInternal,
-        { claimId: args.claimId }
-      )) as Array<{ _id: Id<"clinicalEvidences"> }>;
-
-      if (!existingEvidences || existingEvidences.length === 0) {
+      // Step 1: Payer Intake Gateway Resolution (Durable with retries)
+      if (!claim.payerContact) {
         try {
-          await step.runMutation(internal.clinicalEvidences.insertBatchInternal, {
-            claimId: args.claimId,
-            evidences: [{ ...ERISA_STATUTORY_EVIDENCE }],
-          });
-        } catch (insertErr) {
-          console.warn("Durable workflow fallback evidence insertion note:", insertErr);
+          await step.runAction(
+            internal.actions.payerContactResolver.resolvePayerGatewayInternal,
+            {
+              claimId: args.claimId,
+              payerName: payer,
+            },
+            {
+              retry: { maxAttempts: 3, initialBackoffMs: 1000, base: 2 },
+              name: "resolvePayerGateway",
+            }
+          );
+        } catch (gatewayErr) {
+          console.warn("Durable workflow note: Payer gateway auto-resolution notice:", gatewayErr);
         }
       }
 
+      // Step 2: Policy Crawling & Clinical Evidence Extraction (Firecrawl)
       await step.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
         actor: "Durable Sentinel Workflow",
-        details: `Policy crawl fallback applied: ${crawlMessage}. Proceeding with statutory evidence.`,
+        details: "Step 1/4: Crawling clinical policy bulletins & medical guidelines with durable retry...",
       });
 
-      const count = Array.isArray(existingEvidences) ? existingEvidences.length : 0;
-      crawlResult = {
-        policyTitle: count > 0
-          ? "Retained existing clinical evidence (live crawler fallback applied)"
-          : "No publicly accessible policy source (ERISA statutory protocol applied)",
-        clausesExtracted: Math.max(count, 1),
-      };
-    }
-
-    // Step 3: Precedent Matching & Overturn Probability Scoring
-    await step.runMutation(internal.claims.updateStatusInternal, {
-      claimId: args.claimId,
-      status: "analyzing",
-      actor: "Durable Sentinel Workflow",
-      details: "Step 2/4: Matching precedent vectors & evaluating 4-pillar overturn score...",
-    });
-
-    const scoreResult = await step.runAction(
-      api.actions.precedentMatcher.computeOverturnScore,
-      { claimId: args.claimId },
-      {
-        retry: { maxAttempts: 2, initialBackoffMs: 1000, base: 2 },
-        name: "computeOverturnScore",
-      }
-    );
-
-    await step.runMutation(internal.claims.updateStatusInternal, {
-      claimId: args.claimId,
-      status: "precedent_matched",
-      actor: "Durable Sentinel Workflow",
-      details: "Step 2b/4: Running Convex native vector search against the Precedent Vector Archive...",
-    });
-
-    let vectorPrecedents: Array<{
-      _id: Id<"precedents">;
-      sourceKind: string;
-      title: string;
-      citation: string;
-      jurisdiction: string;
-      sourceUrl?: string;
-      icd10Codes: string[];
-      cptCodes: string[];
-      carcCodes: string[];
-      winningArgument: string;
-      statutoryLanguage: string;
-      outcome: string;
-      vectorScore: number;
-      combinedScore: number;
-      codeOverlap: number;
-    }> = [];
-    let precedentsUnavailable = false;
-    try {
-      vectorPrecedents = await step.runAction(
-        api.actions.precedentArchive.retrieveTopPrecedents,
-        { claimId: args.claimId },
-        { name: "retrieveTopPrecedents" }
-      );
-    } catch (precErr) {
-      console.warn("Durable workflow vector precedent retrieval note:", precErr);
-      precedentsUnavailable = true;
-      await step.runMutation(internal.auditLogs.logEventInternal, {
-        claimId: args.claimId,
-        eventType: "workflow_precedents_unavailable_warning",
-        actor: "Durable Sentinel Workflow",
-        details: "Warning: Precedent vector retrieval was unavailable during durable workflow execution.",
-      });
-    }
-
-    // Step 4: Formal ERISA Appeal Brief Synthesis
-    await step.runMutation(internal.claims.updateStatusInternal, {
-      claimId: args.claimId,
-      status: "drafting",
-      actor: "Durable Sentinel Workflow",
-      details: "Step 3/4: Synthesizing cited ERISA & clinical appeal brief...",
-    });
-
-    const synthesisResult = await step.runAction(
-      api.actions.appealSynthesizer.generateAppealBrief,
-      {
-        claimId: args.claimId,
-        appealLevel: args.appealLevel || "level_1_internal",
-        physicianNotes,
-        senderName: sender.name,
-        senderCredentials: sender.credentials,
-        senderEmail: sender.email,
-        senderPhone: sender.phone,
-        clinicalFacts,
-        vectorPrecedents,
-      },
-      {
-        retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 },
-        name: "generateAppealBrief",
-      }
-    );
-
-    // Step 5: Checkpoint final status to ready_for_review
-    await step.runMutation(internal.claims.updateStatusInternal, {
-      claimId: args.claimId,
-      status: "ready_for_review",
-      actor: "Durable Sentinel Workflow",
-      details: `Durable pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}% win score computed, and formal brief synthesized.`,
-      overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
-      riskLevel: scoreResult?.riskLevel,
-      scoringBreakdown: scoreResult?.scoringBreakdown,
-    });
-
-    let wasDispatched = false;
-
-    // Step 6: Optional Auto-Pilot Dispatch & Statutory Cadence Delay
-    if (args.autoDispatch && claim.autoPilotEnabled && synthesisResult?.appealId) {
+      let crawlResult: { policyTitle?: string; clausesExtracted?: number } | null = null;
       try {
-        await step.runMutation(internal.claims.updateStatusInternal, {
-          claimId: args.claimId,
-          status: "ready_for_review",
-          actor: "Durable Sentinel Workflow",
-          details: "Step 4/4: Auto-Pilot dispatch initiated for formal appeal packet...",
-        });
-
-        await step.runAction(
-          api.actions.mailDispatcher.dispatchAppealPacket,
+        crawlResult = await step.runAction(
+          internal.actions.policyCrawler.crawlInsurerPolicyInternal,
           {
             claimId: args.claimId,
-            appealId: synthesisResult.appealId as Id<"appeals">,
-            dispatchMode: "official_payer",
+            payer,
+            cptCodes: claim.cptCodes || [],
+            icd10Codes: claim.icd10Codes || [],
+            denialReasonCode: claim.denialReasonCode || "CO-50",
+            denialReasonDescription: claim.denialReasonDescription || "",
+            customPolicyUrl: args.customPolicyUrl,
+            serviceDate: claim.serviceDate,
+            pipelineRunId,
           },
           {
-            retry: { maxAttempts: 2, initialBackoffMs: 1500, base: 2 },
-            name: "autoDispatchAppealPacket",
+            retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 },
+            name: "crawlInsurerPolicy",
           }
         );
-        wasDispatched = true;
+      } catch (crawlErr) {
+        const crawlMessage = crawlErr instanceof Error ? crawlErr.message : String(crawlErr);
+        await logWorkflowActivity(step, {
+          claimId: args.claimId,
+          runId: pipelineRunId,
+          stage: "crawl",
+          status: "completed",
+          message:
+            "The live policy search hit a snag, so I'm proceeding with statutory references instead of stalling.",
+        });
 
-        // Durable ERISA statutory follow-up cadence countdown (clamped 1..90 days)
-        const cadenceDays = Math.max(1, Math.min(args.followUpCadenceDays ?? 14, 90));
-        if (cadenceDays > 0) {
-          const sleepDurationMs = cadenceDays * 24 * 60 * 60 * 1000;
-          await step.runMutation(internal.claims.updateStatusInternal, {
-            claimId: args.claimId,
-            status: "dispatched",
-            actor: "Durable Sentinel Workflow",
-            details: `Appeal transmitted. Commencing ${cadenceDays}-day durable statutory cadence countdown via step.sleep().`,
-          });
+        const existingEvidences = (await step.runQuery(
+          internal.clinicalEvidences.listByClaimInternal,
+          { claimId: args.claimId }
+        )) as Array<{ _id: Id<"clinicalEvidences"> }>;
 
-          await step.sleep(sleepDurationMs, { name: "erisaStatutoryFollowUpCadence" });
-
-          // Wake up after statutory sleep without keeping active threads or VMs alive
-          await step.runMutation(internal.claims.updateStatusInternal, {
-            claimId: args.claimId,
-            status: "dispatched",
-            actor: "Durable Sentinel Workflow",
-            details: `Statutory ${cadenceDays}-day follow-up window elapsed. Checking communication thread for payer determination.`,
-          });
+        if (!existingEvidences || existingEvidences.length === 0) {
+          try {
+            await step.runMutation(internal.clinicalEvidences.insertBatchInternal, {
+              claimId: args.claimId,
+              evidences: [{ ...ERISA_STATUTORY_EVIDENCE }],
+            });
+          } catch (insertErr) {
+            console.warn("Durable workflow fallback evidence insertion note:", insertErr);
+          }
         }
-      } catch (dispatchErr) {
-        console.warn("Durable workflow auto-dispatch note:", dispatchErr);
+
+        await step.runMutation(internal.claims.updateStatusInternal, {
+          claimId: args.claimId,
+          status: "analyzing",
+          actor: "Durable Sentinel Workflow",
+          details: `Policy crawl fallback applied: ${crawlMessage}. Proceeding with statutory evidence.`,
+        });
+
+        const count = Array.isArray(existingEvidences) ? existingEvidences.length : 0;
+        crawlResult = {
+          policyTitle: count > 0
+            ? "Retained existing clinical evidence (live crawler fallback applied)"
+            : "No publicly accessible policy source (ERISA statutory protocol applied)",
+          clausesExtracted: Math.max(count, 1),
+        };
       }
+
+      // Step 3: Precedent Matching & Overturn Probability Scoring
+      await step.runMutation(internal.claims.updateStatusInternal, {
+        claimId: args.claimId,
+        status: "analyzing",
+        actor: "Durable Sentinel Workflow",
+        details: "Step 2/4: Matching precedent vectors & evaluating 4-pillar overturn score...",
+      });
+
+      const scoreResult = await step.runAction(
+        internal.actions.precedentMatcher.computeOverturnScoreInternal,
+        { claimId: args.claimId, pipelineRunId },
+        {
+          retry: { maxAttempts: 2, initialBackoffMs: 1000, base: 2 },
+          name: "computeOverturnScore",
+        }
+      );
+
+      await step.runMutation(internal.claims.updateStatusInternal, {
+        claimId: args.claimId,
+        status: "precedent_matched",
+        actor: "Durable Sentinel Workflow",
+        details: "Step 2b/4: Running Convex native vector search against the Precedent Vector Archive...",
+      });
+
+      let vectorPrecedents: Array<{
+        _id: Id<"precedents">;
+        sourceKind: string;
+        title: string;
+        citation: string;
+        jurisdiction: string;
+        sourceUrl?: string;
+        icd10Codes: string[];
+        cptCodes: string[];
+        carcCodes: string[];
+        winningArgument: string;
+        statutoryLanguage: string;
+        outcome: string;
+        vectorScore: number;
+        combinedScore: number;
+        codeOverlap: number;
+      }> = [];
+      let precedentsUnavailable = false;
+      try {
+        vectorPrecedents = await step.runAction(
+          internal.actions.precedentArchive.retrieveTopPrecedentsInternal,
+          { claimId: args.claimId, pipelineRunId },
+          { name: "retrieveTopPrecedents" }
+        );
+      } catch (precErr) {
+        console.warn("Durable workflow vector precedent retrieval note:", precErr);
+        precedentsUnavailable = true;
+        await logWorkflowActivity(step, {
+          claimId: args.claimId,
+          runId: pipelineRunId,
+          stage: "precedents",
+          status: "completed",
+          message:
+            "The past-cases archive was unreachable, so I'm carrying on with the policy evidence alone.",
+        });
+        await step.runMutation(internal.auditLogs.logEventInternal, {
+          claimId: args.claimId,
+          eventType: "workflow_precedents_unavailable_warning",
+          actor: "Durable Sentinel Workflow",
+          details: "Warning: Precedent vector retrieval was unavailable during durable workflow execution.",
+        });
+      }
+
+      // Step 4: Formal ERISA Appeal Brief Synthesis
+      await step.runMutation(internal.claims.updateStatusInternal, {
+        claimId: args.claimId,
+        status: "drafting",
+        actor: "Durable Sentinel Workflow",
+        details: "Step 3/4: Synthesizing cited ERISA & clinical appeal brief...",
+      });
+
+      const synthesisResult = await step.runAction(
+        internal.actions.appealSynthesizer.generateAppealBriefInternal,
+        {
+          claimId: args.claimId,
+          appealLevel: args.appealLevel || "level_1_internal",
+          physicianNotes,
+          senderName: sender.name,
+          senderCredentials: sender.credentials,
+          senderEmail: sender.email,
+          senderPhone: sender.phone,
+          clinicalFacts,
+          vectorPrecedents,
+          pipelineRunId,
+        },
+        {
+          retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 },
+          name: "generateAppealBrief",
+        }
+      );
+
+      // Step 5: Checkpoint final status to ready_for_review
+      await step.runMutation(internal.claims.updateStatusInternal, {
+        claimId: args.claimId,
+        status: "ready_for_review",
+        actor: "Durable Sentinel Workflow",
+        details: `Durable pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}% win score computed, and formal brief synthesized.`,
+        overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
+        riskLevel: scoreResult?.riskLevel,
+        scoringBreakdown: scoreResult?.scoringBreakdown,
+      });
+
+      await logWorkflowActivity(step, {
+        claimId: args.claimId,
+        runId: pipelineRunId,
+        stage: "run",
+        status: "completed",
+        message: `Review complete: ${scoreResult?.overturnProbabilityScore || 0}% win likelihood with the appeal brief drafted and ready.`,
+      });
+
+      let wasDispatched = false;
+
+      // Step 6: Optional Auto-Pilot Dispatch & Statutory Cadence Delay
+      if (args.autoDispatch && claim.autoPilotEnabled && synthesisResult?.appealId) {
+        try {
+          await step.runMutation(internal.claims.updateStatusInternal, {
+            claimId: args.claimId,
+            status: "ready_for_review",
+            actor: "Durable Sentinel Workflow",
+            details: "Step 4/4: Auto-Pilot dispatch initiated for formal appeal packet...",
+          });
+
+          await step.runAction(
+            internal.actions.mailDispatcher.dispatchAppealPacketInternal,
+            {
+              claimId: args.claimId,
+              appealId: synthesisResult.appealId as Id<"appeals">,
+              dispatchMode: "official_payer",
+            },
+            {
+              retry: { maxAttempts: 2, initialBackoffMs: 1500, base: 2 },
+              name: "autoDispatchAppealPacket",
+            }
+          );
+          wasDispatched = true;
+
+          // Durable ERISA statutory follow-up cadence countdown (clamped 1..90 days)
+          const cadenceDays = Math.max(1, Math.min(args.followUpCadenceDays ?? 14, 90));
+          if (cadenceDays > 0) {
+            const sleepDurationMs = cadenceDays * 24 * 60 * 60 * 1000;
+            await step.runMutation(internal.claims.updateStatusInternal, {
+              claimId: args.claimId,
+              status: "dispatched",
+              actor: "Durable Sentinel Workflow",
+              details: `Appeal transmitted. Commencing ${cadenceDays}-day durable statutory cadence countdown via step.sleep().`,
+            });
+
+            await step.sleep(sleepDurationMs, { name: "erisaStatutoryFollowUpCadence" });
+
+            // Wake up after statutory sleep without keeping active threads or VMs alive
+            await step.runMutation(internal.claims.updateStatusInternal, {
+              claimId: args.claimId,
+              status: "dispatched",
+              actor: "Durable Sentinel Workflow",
+              details: `Statutory ${cadenceDays}-day follow-up window elapsed. Checking communication thread for payer determination.`,
+            });
+          }
+        } catch (dispatchErr) {
+          console.warn("Durable workflow auto-dispatch note:", dispatchErr);
+        }
+      }
+
+      await step.runMutation(internal.claims.updateClaimWorkflowStatusInternal, {
+        claimId: args.claimId,
+        workflowStatus: "completed",
+      });
+
+      return {
+        success: true,
+        claimId: args.claimId,
+        policyTitle: crawlResult?.policyTitle,
+        clausesExtracted: crawlResult?.clausesExtracted,
+        overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
+        riskLevel: scoreResult?.riskLevel,
+        appealId: synthesisResult?.appealId,
+        dispatched: wasDispatched,
+        precedentsUnavailable,
+      };
+    } catch (stageErr) {
+      await logWorkflowActivity(step, {
+        claimId: args.claimId,
+        runId: pipelineRunId,
+        stage: "run",
+        status: "error",
+        message:
+          "The autonomous review ran into an issue before finishing. You can retry it from the Evidence Matrix.",
+      });
+      throw stageErr;
     }
-
-    await step.runMutation(internal.claims.updateClaimWorkflowStatusInternal, {
-      claimId: args.claimId,
-      workflowStatus: "completed",
-    });
-
-    return {
-      success: true,
-      claimId: args.claimId,
-      policyTitle: crawlResult?.policyTitle,
-      clausesExtracted: crawlResult?.clausesExtracted,
-      overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
-      riskLevel: scoreResult?.riskLevel,
-      appealId: synthesisResult?.appealId,
-      dispatched: wasDispatched,
-      precedentsUnavailable,
-    };
 }
 
 /**
@@ -366,6 +432,7 @@ export const durableClaimPipeline = workflow
       ),
       autoDispatch: v.optional(v.boolean()),
       followUpCadenceDays: v.optional(v.number()),
+      pipelineRunId: v.optional(v.string()),
     },
     returns: v.object({
       success: v.boolean(),
@@ -456,40 +523,43 @@ export const erisaStatutoryCountdownWorkflow = workflow
   })
   .handler(executeErisaStatutoryCountdown);
 
-/**
- * Start a durable claim orchestration pipeline.
- * Authorizes the user, limits rate, starts the workflow, and attaches the workflowId to the claim.
- */
-export const startDurablePipeline = mutation({
-  args: {
-    claimId: v.id("claims"),
-    customPolicyUrl: v.optional(v.string()),
-    physicianNotes: v.optional(v.string()),
-    appealLevel: v.optional(appealLevelValidator),
-    sender: v.optional(
-      v.object({
-        name: v.string(),
-        credentials: v.optional(v.string()),
-        email: v.optional(v.string()),
-        phone: v.optional(v.string()),
-      })
-    ),
-    clinicalFacts: v.optional(
-      v.object({
-        symptomsAndFunctionalImpact: v.optional(v.string()),
-        examinationFindings: v.optional(v.string()),
-        imagingAndDiagnostics: v.optional(v.string()),
-        treatmentHistoryAndResponse: v.optional(v.string()),
-        otherDocumentedFacts: v.optional(v.string()),
-        recordsAreIncomplete: v.boolean(),
-      })
-    ),
-    autoDispatch: v.optional(v.boolean()),
-    followUpCadenceDays: v.optional(v.number()),
-  },
-  handler: async (ctx, args): Promise<{ workflowId: string; claimId: string }> => {
-    const { userId } = await requireClaimEditor(ctx, args.claimId);
+export const startDurablePipelineArgs = {
+  claimId: v.id("claims"),
+  customPolicyUrl: v.optional(v.string()),
+  physicianNotes: v.optional(v.string()),
+  appealLevel: v.optional(appealLevelValidator),
+  sender: v.optional(
+    v.object({
+      name: v.string(),
+      credentials: v.optional(v.string()),
+      email: v.optional(v.string()),
+      phone: v.optional(v.string()),
+    })
+  ),
+  clinicalFacts: v.optional(
+    v.object({
+      symptomsAndFunctionalImpact: v.optional(v.string()),
+      examinationFindings: v.optional(v.string()),
+      imagingAndDiagnostics: v.optional(v.string()),
+      treatmentHistoryAndResponse: v.optional(v.string()),
+      otherDocumentedFacts: v.optional(v.string()),
+      recordsAreIncomplete: v.boolean(),
+    })
+  ),
+  autoDispatch: v.optional(v.boolean()),
+  followUpCadenceDays: v.optional(v.number()),
+  pipelineRunId: v.optional(v.string()),
+};
 
+/**
+ * Shared durable pipeline launch helper.
+ */
+export async function performStartDurablePipeline(
+  ctx: MutationCtx,
+  args: DurableClaimPipelineArgs,
+  userId?: Id<"users">
+): Promise<{ workflowId: string; claimId: string }> {
+  if (userId) {
     const limitStatus = await rateLimiter.limit(ctx, "sentinelPipeline", {
       key: userId || "global",
     });
@@ -498,41 +568,69 @@ export const startDurablePipeline = mutation({
         `Rate limit reached for pipeline execution. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
       );
     }
+  }
 
-    const workflowId = await workflow.start(
-      ctx,
-      internal.workflows.durableClaimPipeline,
-      {
-        claimId: args.claimId,
-        customPolicyUrl: args.customPolicyUrl,
-        physicianNotes: args.physicianNotes,
-        appealLevel: args.appealLevel,
-        sender: args.sender,
-        clinicalFacts: args.clinicalFacts,
-        autoDispatch: args.autoDispatch,
-        followUpCadenceDays: args.followUpCadenceDays,
-      }
-    );
-
-    await ctx.db.patch(args.claimId, {
-      workflowId,
-      workflowStatus: "inProgress",
-      updatedAt: Date.now(),
-    });
-
-    await ctx.db.insert("appealAuditLogs", {
+  const workflowId = await workflow.start(
+    ctx,
+    internal.workflows.durableClaimPipeline,
+    {
       claimId: args.claimId,
-      userId,
-      eventType: "durable_workflow_started",
-      actor: "Autonomous Sentinel Workflow",
-      details: `Started durable execution pipeline [Workflow ID: ${workflowId}] with automatic exponential backoff retries and checkpointing.`,
-      timestamp: Date.now(),
-    });
+      customPolicyUrl: args.customPolicyUrl,
+      physicianNotes: args.physicianNotes,
+      appealLevel: args.appealLevel,
+      sender: args.sender,
+      clinicalFacts: args.clinicalFacts,
+      autoDispatch: args.autoDispatch,
+      followUpCadenceDays: args.followUpCadenceDays,
+      pipelineRunId: args.pipelineRunId,
+    }
+  );
 
-    return {
-      workflowId,
-      claimId: args.claimId,
-    };
+  await ctx.db.patch(args.claimId, {
+    workflowId,
+    workflowStatus: "inProgress",
+    updatedAt: Date.now(),
+  });
+
+  await ctx.db.insert("appealAuditLogs", {
+    claimId: args.claimId,
+    userId,
+    eventType: "durable_workflow_started",
+    actor: "Autonomous Sentinel Workflow",
+    details: `Started durable execution pipeline [Workflow ID: ${workflowId}] with automatic exponential backoff retries and checkpointing.`,
+    timestamp: Date.now(),
+  });
+
+  return {
+    workflowId,
+    claimId: args.claimId,
+  };
+}
+
+/**
+ * Start a durable claim orchestration pipeline (User-facing mutation).
+ * Authorizes the user, limits rate, starts the workflow, and attaches the workflowId to the claim.
+ */
+export const startDurablePipeline = mutation({
+  args: startDurablePipelineArgs,
+  handler: async (ctx, args): Promise<{ workflowId: string; claimId: string }> => {
+    const { userId } = await requireClaimEditor(ctx, args.claimId);
+    return await performStartDurablePipeline(ctx, args, userId);
+  },
+});
+
+/**
+ * Start a durable claim orchestration pipeline (Internal mutation).
+ * For background tasks and actions (such as runAutonomousPipeline) that already authorized the caller.
+ */
+export const startDurablePipelineInternal = internalMutation({
+  args: startDurablePipelineArgs,
+  handler: async (ctx, args): Promise<{ workflowId: string; claimId: string }> => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+    return await performStartDurablePipeline(ctx, args, claim.userId);
   },
 });
 
@@ -599,6 +697,30 @@ export const getWorkflowExecutionStatus = query({
           type: "unknown",
           error: statusErr instanceof Error ? statusErr.message : String(statusErr),
         },
+      };
+    }
+  },
+});
+
+/**
+ * Direct internal query to inspect durable workflow status without user auth scoping.
+ * Used by sentinelPipeline action to await workflow completion.
+ */
+export const getWorkflowStatusDirectInternal = internalQuery({
+  args: {
+    workflowId: v.string(),
+  },
+  handler: async (ctx, args): Promise<WorkflowStatus | { type: "unknown"; error: string }> => {
+    try {
+      const status: WorkflowStatus = await workflow.status(
+        ctx,
+        args.workflowId as WorkflowId
+      );
+      return status;
+    } catch (err) {
+      return {
+        type: "unknown",
+        error: err instanceof Error ? err.message : String(err),
       };
     }
   },

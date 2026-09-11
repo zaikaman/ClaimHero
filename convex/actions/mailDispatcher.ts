@@ -464,51 +464,69 @@ async function deliverAiAdjudication(
  * - "custom_email": Transmits to judge/user's interactive test email inbox
  * - "official_payer": Transmits to the insurer's official verified appellate gateway
  */
-export const dispatchAppealPacket = action({
+export const dispatchAppealPacketArgs = {
+  claimId: v.id("claims"),
+  appealId: v.optional(v.id("appeals")),
+  recipientEmail: v.optional(v.string()),
+  customRecipient: v.optional(v.string()),
+  customSubject: v.optional(v.string()),
+  dispatchMode: v.optional(v.string()), // "ai_adjudicator" | "custom_email" | "official_payer"
+  waiveRedaction: v.optional(v.boolean()),
+  sender: v.optional(
+    v.object({
+      name: v.string(),
+      credentials: v.optional(v.string()),
+      email: v.optional(v.string()),
+      phone: v.optional(v.string()),
+    })
+  ),
+};
+
+/**
+ * Appeal Packet Dispatch Core Logic:
+ * Shared between public user-facing action and internal durable workflow execution.
+ */
+export async function performDispatchAppealPacket(
+  ctx: ActionCtx,
   args: {
-    claimId: v.id("claims"),
-    appealId: v.optional(v.id("appeals")),
-    recipientEmail: v.optional(v.string()),
-    customRecipient: v.optional(v.string()),
-    customSubject: v.optional(v.string()),
-    dispatchMode: v.optional(v.string()), // "ai_adjudicator" | "custom_email" | "official_payer"
-    waiveRedaction: v.optional(v.boolean()),
-    sender: v.optional(
-      v.object({
-        name: v.string(),
-        credentials: v.optional(v.string()),
-        email: v.optional(v.string()),
-        phone: v.optional(v.string()),
-      })
-    ),
+    claimId: Id<"claims">;
+    appealId?: Id<"appeals">;
+    recipientEmail?: string;
+    customRecipient?: string;
+    customSubject?: string;
+    dispatchMode?: string;
+    waiveRedaction?: boolean;
+    sender?: {
+      name: string;
+      credentials?: string;
+      email?: string;
+      phone?: string;
+    };
   },
-  handler: async (
-    ctx,
-    args
-  ): Promise<DispatchReceipt> => {
-    // 1. Authorize claim ownership
-    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+  claim: Doc<"claims"> & { patient?: Doc<"patients"> | null },
+  userId?: string
+): Promise<DispatchReceipt> {
+  const rawPatientName = claim.patient?.name || claim.patientName;
+  const patientName = resolveClaimPatientName(rawPatientName, claim.claimNumber, claim.patient?.memberId);
+  const isPatientUnspecified =
+    !patientName ||
+    patientName === "Not specified in denial notice" ||
+    patientName.startsWith("[PATIENT") ||
+    patientName === "Patient" ||
+    patientName === "Patient Record";
 
-    const rawPatientName = claim.patient?.name || claim.patientName;
-    const patientName = resolveClaimPatientName(rawPatientName, claim.claimNumber, claim.patient?.memberId);
-    const isPatientUnspecified =
-      !patientName ||
-      patientName === "Not specified in denial notice" ||
-      patientName.startsWith("[PATIENT") ||
-      patientName === "Patient" ||
-      patientName === "Patient Record";
+  const senderDetails = args.sender || claim.appealContext?.sender;
+  const hasValidSender = Boolean(
+    senderDetails?.name?.trim() && (senderDetails.email?.trim() || senderDetails.phone?.trim())
+  );
 
-    const senderDetails = args.sender || claim.appealContext?.sender;
-    const hasValidSender = Boolean(
-      senderDetails?.name?.trim() && (senderDetails.email?.trim() || senderDetails.phone?.trim())
+  if (isPatientUnspecified && !hasValidSender) {
+    throw new Error(
+      "Cannot dispatch appeal: patient name was not specified in denial notice. Please supply sender details before dispatching."
     );
+  }
 
-    if (isPatientUnspecified && !hasValidSender) {
-      throw new Error(
-        "Cannot dispatch appeal: patient name was not specified in denial notice. Please supply sender details before dispatching."
-      );
-    }
-
+  if (userId) {
     // Enforce rate limiting per user
     const limitStatus = await rateLimiter.limit(ctx, "mailDispatcher", {
       key: userId || "global",
@@ -518,6 +536,7 @@ export const dispatchAppealPacket = action({
         `Rate limit reached for outbound payer transmission. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
       );
     }
+  }
 
     let appeal: Doc<"appeals"> | null = null;
     if (args.appealId) {
@@ -768,6 +787,39 @@ export const dispatchAppealPacket = action({
       pdfMissing,
       adjudicationDetermination: adjudicationResult?.determination,
     };
+}
+
+/**
+ * Outbound Appeal Packet Dispatch Action (User-facing)
+ */
+export const dispatchAppealPacket = action({
+  args: dispatchAppealPacketArgs,
+  handler: async (
+    ctx,
+    args
+  ): Promise<DispatchReceipt> => {
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+    return await performDispatchAppealPacket(ctx, args, claim as Doc<"claims"> & { patient?: Doc<"patients"> | null }, userId);
+  },
+});
+
+/**
+ * Internal Outbound Appeal Packet Dispatch Action:
+ * For durable workflows and scheduled tasks without active user session.
+ */
+export const dispatchAppealPacketInternal = internalAction({
+  args: dispatchAppealPacketArgs,
+  handler: async (
+    ctx,
+    args
+  ): Promise<DispatchReceipt> => {
+    const claim = (await ctx.runQuery(internal.claims.getByIdInternal, {
+      claimId: args.claimId,
+    })) as (Doc<"claims"> & { patient?: Doc<"patients"> | null }) | null;
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+    return await performDispatchAppealPacket(ctx, args, claim, claim.userId);
   },
 });
 

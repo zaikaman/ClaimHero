@@ -1,15 +1,20 @@
 "use node";
 
-import { action } from "../_generated/server";
+import { action, internalAction, ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import { precedentMatchValidator } from "../lib/precedentValidators";
-import { appealLevelValidator, assertValidAppealLevel, getStatutoryTierMetadata } from "../lib/statutoryTierValidators";
+import {
+  appealLevelValidator,
+  assertValidAppealLevel,
+  getStatutoryTierMetadata,
+  type StatutoryAppealLevel,
+} from "../lib/statutoryTierValidators";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { logPipelineActivity } from "../lib/pipelineActivity";
-import type { Doc } from "../_generated/dataModel";
+import type { Id, Doc } from "../_generated/dataModel";
 
 const APPEAL_SYNTHESIS_SCHEMA = {
   type: "object",
@@ -150,8 +155,6 @@ function formatDenialReason(code?: string, description?: string): string {
 
   return [code, cleanDescription].filter(Boolean).join(" - ");
 }
-
-import type { Id } from "../_generated/dataModel";
 
 export interface AppealSynthesizerClaimContext {
   _id?: Id<"claims"> | string;
@@ -716,39 +719,55 @@ export const assembleProfessionalMemorandum = assembleProfessionalAppealEmail;
 /**
  * Appeal Synthesizer Action: Generate grounded professional payer appeal correspondence.
  */
-export const generateAppealBrief = action({
+export const generateAppealBriefArgs = {
+  claimId: v.id("claims"),
+  appealLevel: v.optional(appealLevelValidator),
+  physicianNotes: v.optional(v.string()),
+  senderName: v.optional(v.string()),
+  senderCredentials: v.optional(v.string()),
+  senderEmail: v.optional(v.string()),
+  senderPhone: v.optional(v.string()),
+  clinicalFacts: v.optional(
+    v.object({
+      symptomsAndFunctionalImpact: v.optional(v.string()),
+      examinationFindings: v.optional(v.string()),
+      imagingAndDiagnostics: v.optional(v.string()),
+      treatmentHistoryAndResponse: v.optional(v.string()),
+      otherDocumentedFacts: v.optional(v.string()),
+      recordsAreIncomplete: v.boolean(),
+    })
+  ),
+  customInstructions: v.optional(v.string()),
+  vectorPrecedents: v.optional(v.array(precedentMatchValidator)),
+  pipelineRunId: v.optional(v.string()),
+};
+
+/**
+ * Appeal Synthesizer Core Logic: Generate grounded professional payer appeal correspondence.
+ * Shared between public user-facing action and internal durable workflow execution.
+ */
+export async function performGenerateAppealBrief(
+  ctx: ActionCtx,
   args: {
-    claimId: v.id("claims"),
-    appealLevel: v.optional(appealLevelValidator),
-    physicianNotes: v.optional(v.string()),
-    senderName: v.optional(v.string()),
-    senderCredentials: v.optional(v.string()),
-    senderEmail: v.optional(v.string()),
-    senderPhone: v.optional(v.string()),
-    clinicalFacts: v.optional(
-      v.object({
-        symptomsAndFunctionalImpact: v.optional(v.string()),
-        examinationFindings: v.optional(v.string()),
-        imagingAndDiagnostics: v.optional(v.string()),
-        treatmentHistoryAndResponse: v.optional(v.string()),
-        otherDocumentedFacts: v.optional(v.string()),
-        recordsAreIncomplete: v.boolean(),
-      })
-    ),
-    customInstructions: v.optional(v.string()),
-    vectorPrecedents: v.optional(v.array(precedentMatchValidator)),
-    pipelineRunId: v.optional(v.string()),
+    claimId: Id<"claims">;
+    appealLevel?: StatutoryAppealLevel;
+    physicianNotes?: string;
+    senderName?: string;
+    senderCredentials?: string;
+    senderEmail?: string;
+    senderPhone?: string;
+    clinicalFacts?: ClinicalFacts;
+    customInstructions?: string;
+    vectorPrecedents?: VectorPrecedentMatch[];
+    pipelineRunId?: string;
   },
-  handler: async (
-    ctx,
-    args
-  ): Promise<AppealBriefSynthesisResult & { appealId: string }> => {
-    const appealLevel = args.appealLevel || "level_1_internal";
-    assertValidAppealLevel(appealLevel);
+  claim: Doc<"claims"> & { patient?: Doc<"patients"> },
+  userId?: string
+): Promise<AppealBriefSynthesisResult & { appealId: string }> {
+  const appealLevel = args.appealLevel || "level_1_internal";
+  assertValidAppealLevel(appealLevel);
 
-    // 1. Authorize claim ownership
-    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
-
+  if (userId) {
     // Enforce rate limiting per user
     const limitStatus = await rateLimiter.limit(ctx, "appealSynthesizer", {
       key: userId || "global",
@@ -758,6 +777,7 @@ export const generateAppealBrief = action({
         `Rate limit reached for legal brief synthesis. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
       );
     }
+  }
 
     // 2. Fetch indexed clinical evidence clauses
     const evidences: Doc<"clinicalEvidences">[] = (await ctx.runQuery(internal.clinicalEvidences.listByClaimInternal, {
@@ -802,7 +822,7 @@ export const generateAppealBrief = action({
     if (!args.vectorPrecedents) {
       try {
         vectorPrecedents = await ctx.runAction(
-          api.actions.precedentArchive.retrieveTopPrecedents,
+          internal.actions.precedentArchive.retrieveTopPrecedentsInternal,
           { claimId: args.claimId }
         );
       } catch (precedentErr) {
@@ -982,5 +1002,43 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       precedentsUnavailable,
       ...result,
     };
+}
+
+/**
+ * Appeal Synthesizer Action: Generate grounded professional payer appeal correspondence (User-facing).
+ */
+export const generateAppealBrief = action({
+  args: generateAppealBriefArgs,
+  handler: async (
+    ctx,
+    args
+  ): Promise<AppealBriefSynthesisResult & { appealId: string }> => {
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+    return await performGenerateAppealBrief(
+      ctx,
+      args,
+      claim as Doc<"claims"> & { patient?: Doc<"patients"> },
+      userId
+    );
+  },
+});
+
+/**
+ * Internal Appeal Synthesizer Action:
+ * For durable workflows and scheduled background processing without active user token session.
+ */
+export const generateAppealBriefInternal = internalAction({
+  args: generateAppealBriefArgs,
+  handler: async (
+    ctx,
+    args
+  ): Promise<AppealBriefSynthesisResult & { appealId: string }> => {
+    const claim = (await ctx.runQuery(internal.claims.getByIdInternal, {
+      claimId: args.claimId,
+    })) as (Doc<"claims"> & { patient?: Doc<"patients"> }) | null;
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+    return await performGenerateAppealBrief(ctx, args, claim, claim.userId);
   },
 });

@@ -289,6 +289,52 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
       }));
     });
 
+    it("computeOverturnScoreInternal: evaluates score via getByIdInternal without caller auth session", async () => {
+      const mockClaim = {
+        _id: "c1",
+        claimNumber: "CLM-INTERNAL-1",
+        userId: "user_owner",
+        patient: { name: "Bob", insurancePayer: "Aetna" },
+        providerName: "General Hospital",
+        serviceDate: "2024-01-15",
+        cptCodes: ["99214"],
+        icd10Codes: ["M54.5"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+        deniedAmount: 1500,
+        patientOwedAmount: 300,
+      };
+      const mockEvidences = [
+        {
+          sourceType: "payer_cpb",
+          citationClause: "Section 1",
+          extractedEvidenceMarkdown: "Clinical evidence text",
+        },
+      ];
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockRejectedValue(new Error("LLM offline"));
+
+      let qCall = 0;
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation(() => {
+          qCall++;
+          if (qCall === 1) return Promise.resolve(mockClaim);
+          return Promise.resolve(mockEvidences);
+        }),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const res = await (actionPrecedentMatcher.computeOverturnScoreInternal as any)._handler(mockCtx, {
+        claimId: "c1",
+      });
+
+      expect(res.overturnProbabilityScore).toBeGreaterThanOrEqual(5);
+      expect(res.scoringBreakdown).toHaveLength(4);
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        status: "precedent_matched",
+      }));
+    });
+
     it("calculateDeterministicRubric: scales ERISA and precedent scores down on zero evidence", () => {
       const claim = {
         cptCodes: ["99214"],
@@ -385,59 +431,9 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
   });
 
   describe("convex/actions/sentinelPipeline", () => {
-    it("runAutonomousPipeline: throws error if sender details are missing", async () => {
-      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
-      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
-
-      const mockClaim = {
-        _id: "c1",
-        userId: "user_123",
-        claimNumber: "CLM-AUTO-1",
-        patient: { name: "Marcus Holloway", insurancePayer: "UnitedHealthcare", state: "CA" },
-      };
-
+    it("runAutonomousPipeline: dispatches to startDurablePipeline workflow as the sole execution path", async () => {
       const mockCtx: any = {
-        runQuery: vi.fn().mockResolvedValue(mockClaim),
-        runAction: vi.fn(),
-        runMutation: vi.fn(),
-      };
-
-      await expect(
-        (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
-          claimId: "c1",
-        })
-      ).rejects.toThrow("Complete sender details before drafting");
-    });
-
-    it("runAutonomousPipeline: orchestrates the entire autonomous claim workflow", async () => {
-      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
-      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
-
-      const mockClaim = {
-        _id: "c1",
-        userId: "user_123",
-        claimNumber: "CLM-AUTO-1",
-        patient: { name: "Marcus Holloway", insurancePayer: "UnitedHealthcare", state: "CA" },
-        cptCodes: ["63047"],
-        icd10Codes: ["M51.16"],
-        denialReasonCode: "CO-50",
-        denialReasonDescription: "Medical necessity criteria not satisfied",
-        deniedAmount: 18450,
-        appealContext: {
-          sender: {
-            name: "Dr. Gregory House, MD",
-            credentials: "MD, Board Certified Neurologist",
-            email: "ghouse@princetonplainsboro.edu",
-          },
-        },
-      };
-
-      const mockCtx: any = {
-        runQuery: vi.fn().mockResolvedValue(mockClaim),
-        runAction: vi.fn().mockImplementation((fn) => {
-          return Promise.resolve({ success: true, count: 3, appealId: "app_1", scriptId: "sc_1" });
-        }),
-        runMutation: vi.fn().mockResolvedValue(undefined),
+        runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_sentinel_123", claimId: "c1" }),
       };
 
       const res = await (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
@@ -445,7 +441,60 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
       });
 
       expect(res.success).toBe(true);
-      expect(mockCtx.runAction).toHaveBeenCalled();
+      expect(res.claimId).toBe("c1");
+      expect(res.workflowId).toBe("wf_sentinel_123");
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ claimId: "c1" })
+      );
+    });
+
+    it("runAutonomousPipeline: passes through full configuration options to the durable workflow", async () => {
+      const mockCtx: any = {
+        runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_sentinel_456", claimId: "c1" }),
+      };
+
+      const sender = {
+        name: "Dr. Gregory House, MD",
+        credentials: "MD, Board Certified Neurologist",
+        email: "ghouse@princetonplainsboro.edu",
+      };
+
+      const clinicalFacts = {
+        symptomsAndFunctionalImpact: "Severe radiculopathy",
+        examinationFindings: "Positive SLR test",
+        imagingAndDiagnostics: "MRI confirms L4-L5 herniation",
+        treatmentHistoryAndResponse: "Failed conservative therapy",
+        otherDocumentedFacts: "No contraindications",
+        recordsAreIncomplete: false,
+      };
+
+      const res = await (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
+        claimId: "c1",
+        customPolicyUrl: "https://example.com/cpb.pdf",
+        physicianNotes: "Patient has exhausted conservative care.",
+        appealLevel: "level_1_internal",
+        sender,
+        clinicalFacts,
+        autoDispatch: true,
+        followUpCadenceDays: 14,
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.workflowId).toBe("wf_sentinel_456");
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          claimId: "c1",
+          customPolicyUrl: "https://example.com/cpb.pdf",
+          physicianNotes: "Patient has exhausted conservative care.",
+          appealLevel: "level_1_internal",
+          sender,
+          clinicalFacts,
+          autoDispatch: true,
+          followUpCadenceDays: 14,
+        })
+      );
     });
   });
 });

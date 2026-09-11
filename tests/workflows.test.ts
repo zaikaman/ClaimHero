@@ -380,6 +380,21 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
       expect(res.workflowId).toBe("wf_live_999");
       expect(res.status.type).toBe("inProgress");
     });
+
+    it("getWorkflowStatusDirectInternal queries workflow status directly", async () => {
+      vi.spyOn(workflows.workflow, "status").mockResolvedValue({
+        type: "completed",
+        result: { appealId: "appeal_999" },
+      } as any);
+
+      const mockCtx: any = {};
+      const res = await (workflows.getWorkflowStatusDirectInternal as any)._handler(mockCtx, {
+        workflowId: "wf_direct_1",
+      });
+
+      expect(res.type).toBe("completed");
+      expect(res.result).toEqual({ appealId: "appeal_999" });
+    });
   });
 
   describe("cancelDurableWorkflow mutation", () => {
@@ -416,9 +431,26 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
   });
 
   describe("sentinelPipeline integration with workflows", () => {
-    it("runAutonomousPipeline delegates to durable workflow when useDurableWorkflow is true", async () => {
+    it("runAutonomousPipeline delegates to durable workflow as the sole execution path", async () => {
       const mockCtx: any = {
         runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_delegated_1" }),
+      };
+
+      const res = await (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
+        claimId: "c1",
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.workflowId).toBe("wf_delegated_1");
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ claimId: "c1" })
+      );
+    });
+
+    it("runAutonomousPipeline delegates to durable workflow even if useDurableWorkflow flag is passed", async () => {
+      const mockCtx: any = {
+        runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_delegated_2" }),
       };
 
       const res = await (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
@@ -427,7 +459,7 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
       });
 
       expect(res.success).toBe(true);
-      expect(res.workflowId).toBe("wf_delegated_1");
+      expect(res.workflowId).toBe("wf_delegated_2");
       expect(mockCtx.runMutation).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ claimId: "c1" })
@@ -448,6 +480,80 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
         expect.anything(),
         expect.objectContaining({ claimId: "c1" })
       );
+    });
+
+    it("runAutonomousPipeline awaits durable workflow completion when ctx.runQuery is present", async () => {
+      const mockCtx: any = {
+        runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_await_1", claimId: "c1" }),
+        runQuery: vi.fn().mockResolvedValue({
+          type: "completed",
+          result: {
+            policyTitle: "Aetna CPB 0244",
+            clausesExtracted: 5,
+            overturnProbabilityScore: 88,
+            riskLevel: "high_confidence",
+            appealId: "appeal_sync_1",
+          },
+        }),
+      };
+
+      const res = await (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
+        claimId: "c1",
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.workflowId).toBe("wf_await_1");
+      expect(res.policyTitle).toBe("Aetna CPB 0244");
+      expect(res.clausesExtracted).toBe(5);
+      expect(res.overturnProbabilityScore).toBe(88);
+      expect(res.riskLevel).toBe("high_confidence");
+      expect(res.appealId).toBe("appeal_sync_1");
+      expect(mockCtx.runQuery).toHaveBeenCalled();
+    });
+
+    it("runAutonomousPipeline throws error when durable workflow fails", async () => {
+      const mockCtx: any = {
+        runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_failed_1", claimId: "c1" }),
+        runQuery: vi.fn().mockResolvedValue({
+          type: "failed",
+          error: "Firecrawl crawler service unavailable",
+        }),
+      };
+
+      await expect(
+        (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
+          claimId: "c1",
+        })
+      ).rejects.toThrow("Firecrawl crawler service unavailable");
+    });
+
+    it("startDurablePipelineInternal initiates durable workflow without caller JWT session", async () => {
+      const mockDb: any = {
+        get: vi.fn().mockResolvedValue({
+          _id: "c1",
+          userId: "user_owner",
+          claimNumber: "CLM-1",
+        }),
+        patch: vi.fn().mockResolvedValue(undefined),
+        insert: vi.fn().mockResolvedValue("log_1"),
+      };
+      const mockCtx: any = {
+        db: mockDb,
+      };
+
+      vi.spyOn(workflows.workflow, "start").mockResolvedValue("wf_internal_start" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+
+      const res = await (workflows.startDurablePipelineInternal as any)._handler(mockCtx, {
+        claimId: "c1",
+      });
+
+      expect(res.workflowId).toBe("wf_internal_start");
+      expect(res.claimId).toBe("c1");
+      expect(mockDb.patch).toHaveBeenCalledWith("c1", expect.objectContaining({
+        workflowId: "wf_internal_start",
+        workflowStatus: "inProgress",
+      }));
     });
   });
 });

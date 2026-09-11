@@ -2,9 +2,9 @@
 
 import { action, internalAction } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
-import { v, ConvexError } from "convex/values";
+import { v, ConvexError, type Infer } from "convex/values";
 import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Id, Doc } from "../_generated/dataModel";
 import { createEmbedding } from "../lib/openai";
 import { PRECEDENT_CORPUS } from "../lib/precedentCorpus";
 import type { HydratedPrecedent } from "../precedents";
@@ -216,14 +216,25 @@ export const reindexArchiveBatch = internalAction({
  * 3. Reciprocal Rank Fusion (RRF, k=60) + clinical code overlap
  * 4. Persist top matches as legal_precedent evidence on the claim
  */
-export const retrieveTopPrecedents = action({
+export const retrieveTopPrecedentsArgs = {
+  claimId: v.id("claims"),
+  pipelineRunId: v.optional(v.string()),
+};
+
+export type PrecedentMatch = Infer<typeof precedentMatchValidator>;
+
+/**
+ * Precedent Retrieval Core Logic:
+ * Shared between public user-facing action and internal durable workflow execution.
+ */
+export async function performRetrieveTopPrecedents(
+  ctx: ActionCtx,
   args: {
-    claimId: v.id("claims"),
-    pipelineRunId: v.optional(v.string()),
+    claimId: Id<"claims">;
+    pipelineRunId?: string;
   },
-  returns: matchListValidator,
-  handler: async (ctx, args) => {
-    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
+  claim: Doc<"claims">
+): Promise<PrecedentMatch[]> {
 
     await logPipelineActivity(ctx, {
       claimId: args.claimId,
@@ -394,6 +405,35 @@ export const retrieveTopPrecedents = action({
     });
 
     return matches;
+}
+
+/**
+ * Precedent Matching Action: Retrieve top matching precedents (User-facing)
+ */
+export const retrieveTopPrecedents = action({
+  args: retrieveTopPrecedentsArgs,
+  returns: matchListValidator,
+  handler: async (ctx, args): Promise<PrecedentMatch[]> => {
+    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
+    return await performRetrieveTopPrecedents(ctx, args, claim as Doc<"claims">);
+  },
+});
+
+/**
+ * Internal Precedent Matching Action:
+ * For durable workflows and scheduled tasks without active user session.
+ */
+export const retrieveTopPrecedentsInternal = internalAction({
+  args: retrieveTopPrecedentsArgs,
+  returns: matchListValidator,
+  handler: async (ctx, args): Promise<PrecedentMatch[]> => {
+    const claim = (await ctx.runQuery(internal.claims.getByIdInternal, {
+      claimId: args.claimId,
+    })) as Doc<"claims"> | null;
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+    return await performRetrieveTopPrecedents(ctx, args, claim);
   },
 });
 

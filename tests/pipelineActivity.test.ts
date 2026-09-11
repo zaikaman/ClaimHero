@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as pipelineActivities from "../convex/pipelineActivities";
+import * as workflows from "../convex/workflows";
 import * as actionSentinelPipeline from "../convex/actions/sentinelPipeline";
 import { rateLimiter } from "../convex/lib/rateLimiter";
 // @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
@@ -88,8 +89,8 @@ describe("Convex Pipeline Activity Stream", () => {
     });
   });
 
-  describe("convex/actions/sentinelPipeline run scoping", () => {
-    it("runAutonomousPipeline: propagates a shared run id to every stage action", async () => {
+  describe("convex/workflows durableClaimPipeline run scoping", () => {
+    it("executeDurableClaimPipeline: propagates a shared run id to every stage action", async () => {
       vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
       const mockClaim = {
         _id: "c1",
@@ -107,8 +108,7 @@ describe("Convex Pipeline Activity Stream", () => {
       };
       const runActionCalls: Array<{ fn: unknown; args: Record<string, unknown> }> = [];
       let actionCallIndex = 0;
-      const mockCtx: any = {
-        // Ownership check resolves the claim; no evidence lookups run on the success path.
+      const mockStep: any = {
         runQuery: vi.fn().mockResolvedValue(mockClaim),
         runAction: vi.fn().mockImplementation((fn: unknown, args: Record<string, unknown>) => {
           runActionCalls.push({ fn, args });
@@ -126,10 +126,11 @@ describe("Convex Pipeline Activity Stream", () => {
           return Promise.resolve({ appealId: "app_9" });
         }),
         runMutation: vi.fn().mockResolvedValue(undefined),
+        sleep: vi.fn(),
       };
 
-      const res = await (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
-        claimId: "c1",
+      const res = await workflows.executeDurableClaimPipeline(mockStep, {
+        claimId: "c1" as any,
       });
 
       expect(res.success).toBe(true);

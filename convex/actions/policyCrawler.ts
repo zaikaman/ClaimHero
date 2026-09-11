@@ -1,8 +1,8 @@
 "use node";
 
-import { action, ActionCtx } from "../_generated/server";
+import { action, internalAction, ActionCtx } from "../_generated/server";
 import crypto from "crypto";
-import type { Id } from "../_generated/dataModel";
+import type { Id, Doc } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
 import { ERISA_STATUTORY_EVIDENCE } from "../lib/erisaEvidence";
@@ -2671,21 +2671,59 @@ export { ERISA_STATUTORY_EVIDENCE };
  * Insurer CPB & Clinical Policy Bulletin Crawler Action
  * Dynamically queries Firecrawl to retrieve, parse, and extract clinical coverage criteria for any US insurer.
  */
-export const crawlInsurerPolicy = action({
+export const crawlInsurerPolicyArgs = {
+  claimId: v.id("claims"),
+  payer: v.string(),
+  cptCodes: v.array(v.string()),
+  icd10Codes: v.array(v.string()),
+  denialReasonCode: v.string(),
+  denialReasonDescription: v.optional(v.string()),
+  customPolicyUrl: v.optional(v.string()),
+  serviceDate: v.optional(v.string()),
+  forceRescan: v.optional(v.boolean()),
+  pipelineRunId: v.optional(v.string()),
+};
+
+export interface CrawlInsurerPolicyResult {
+  policyTitle: string;
+  policyNumber?: string;
+  effectiveDate?: string;
+  clausesExtracted: number;
+  evidences: Array<{
+    sourceType: string;
+    title: string;
+    sourceUrl?: string;
+    citationClause: string;
+    extractedEvidenceMarkdown: string;
+    relevanceScore: number;
+    screenshotStorageId?: Id<"_storage">;
+    screenshotUrl?: string;
+    capturedAt?: number;
+  }>;
+  extractionEngine: string;
+}
+
+/**
+ * Core clinical policy crawling and evidence extraction execution logic.
+ * Shared between public user-facing action and internal durable workflow execution.
+ */
+export async function performCrawlInsurerPolicy(
+  ctx: ActionCtx,
   args: {
-    claimId: v.id("claims"),
-    payer: v.string(),
-    cptCodes: v.array(v.string()),
-    icd10Codes: v.array(v.string()),
-    denialReasonCode: v.string(),
-    denialReasonDescription: v.optional(v.string()),
-    customPolicyUrl: v.optional(v.string()),
-    serviceDate: v.optional(v.string()),
-    forceRescan: v.optional(v.boolean()),
-    pipelineRunId: v.optional(v.string()),
+    claimId: Id<"claims">;
+    payer: string;
+    cptCodes: string[];
+    icd10Codes: string[];
+    denialReasonCode: string;
+    denialReasonDescription?: string;
+    customPolicyUrl?: string;
+    serviceDate?: string;
+    forceRescan?: boolean;
+    pipelineRunId?: string;
   },
-  handler: async (ctx, args) => {
-    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+  claim: Doc<"claims">,
+  userId?: Id<"users">
+): Promise<CrawlInsurerPolicyResult> {
 
     const userSettings = userId
       ? await ctx.runQuery(internal.settings.getSettingsInternal, { userId })
@@ -3244,6 +3282,33 @@ For each clause:
       evidences: evidencesToInsert,
       extractionEngine,
     };
+}
+
+/**
+ * Insurer CPB & Clinical Policy Bulletin Crawler Action (User-facing)
+ */
+export const crawlInsurerPolicy = action({
+  args: crawlInsurerPolicyArgs,
+  handler: async (ctx, args): Promise<CrawlInsurerPolicyResult> => {
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+    return await performCrawlInsurerPolicy(ctx, args, claim as Doc<"claims">, userId);
+  },
+});
+
+/**
+ * Insurer CPB & Clinical Policy Bulletin Crawler Internal Action:
+ * For durable workflows and background jobs without active user session.
+ */
+export const crawlInsurerPolicyInternal = internalAction({
+  args: crawlInsurerPolicyArgs,
+  handler: async (ctx, args): Promise<CrawlInsurerPolicyResult> => {
+    const claim = (await ctx.runQuery(internal.claims.getByIdInternal, {
+      claimId: args.claimId,
+    })) as Doc<"claims"> | null;
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+    return await performCrawlInsurerPolicy(ctx, args, claim, claim.userId);
   },
 });
 
