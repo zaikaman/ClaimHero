@@ -16,9 +16,19 @@ Built for the **Convex All Gas Hackathon** (August 25 – September 22, 2026) us
 
 ---
 
-ClaimHero is for the moment you open a denial letter you didn't expect and realize the clock is already running.
+ClaimHero is a daily operations workspace for the people who keep denied-care
+appeals moving: patients, nurses, case managers, patient advocates, billing
+teams, and payer-relations staff. A denial is not just a letter to answer once;
+it creates a case that must be triaged, researched, explained, reviewed,
+dispatched, and followed until the payer commits to an outcome.
 
-1. **Upload the denial.** (Synthetic demo fixtures are available — no personal records needed.)
+The Case Radar gives a team one live portfolio view of those cases. The Case
+Workspace gives each denial a repeatable, source-linked path from intake to
+appeal. This makes ClaimHero useful for the next denial that arrives, and the
+one after that, without requiring staff to rebuild the evidence trail from
+scratch.
+
+1. **Upload the denial.** Real PDF and image intake is supported. Synthetic demo fixtures are also available so a judge can test the complete workflow without uploading personal health information.
 2. **ClaimHero pulls the insurer's active policy bulletins via Firecrawl** and lifts the exact clause the denial turned on.
 3. **You review a cited brief**, one click away from the clause it cites, then approve dispatch from an AgentMail inbox. Claims under the ERISA §502(c) clock show the exposure as they age; you never send without approving.
 
@@ -50,7 +60,26 @@ To evaluate the complete end-to-end pipeline without uploading personal health r
    - **Step 3: Payer Dispatch** — Transmit the packet via AgentMail with one click. For medical necessity denials (`CO-50`), review the contextual Physician Peer-to-Peer tele-script.
 5. Track the statutory stakes at all times: the case header monitors the active **ERISA §502(c) statutory liability exposure ($110/day)** alongside a slide-out **Audit Trail** drawer proving real-time pipeline execution.
 
-*Demo cases are strictly isolated from real portfolio analytics and can be purged at any time via the "Clear demo data" button.*
+*The demo cases are a privacy-preserving evaluation harness, not a substitute for the product workflow. They use the same intake, evidence, drafting, collaboration, deadline, audit, and dispatch path as a real case, are visibly marked as synthetic, are isolated from portfolio analytics, and can be purged at any time via the "Clear demo data" button.*
+
+### Why this is an everyday app
+
+ClaimHero is designed for recurring operational use, not only for a one-time
+consumer emergency:
+
+- A nurse or case manager can turn a denial into a structured case, see the
+  governing policy clause, and hand a cited brief to the next reviewer.
+- A billing or appeals team can triage a portfolio, share a brief, monitor
+  statutory deadlines, and keep payer correspondence attached to the right
+  claim.
+- A patient advocate can review the evidence, correct the draft, and approve
+  exactly what leaves the organization.
+- A team can return to the same workspace when the payer requests records,
+  changes its position, or misses a response deadline.
+
+The demo fixtures make that recurring workflow easy and safe to evaluate. They
+do not define the target user or imply that ClaimHero is limited to fictional
+cases.
 
 ---
 
