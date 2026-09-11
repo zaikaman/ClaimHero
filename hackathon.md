@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-11T16:25:00Z
+- **Last updated:** 2026-09-11T17:18:00Z
 
 ## Log
 
@@ -1236,7 +1236,7 @@ Unified Autonomous Sentinel Pipeline on durable @convex-dev/workflow as the sole
 - Re-routed `executeDurableClaimPipeline` in `convex/workflows.ts` to execute internal actions across all pipeline steps (policy crawling, rubric scoring, vector search, appeal drafting, and auto-dispatch) with durable retries and activity streaming.
 - Verified with `npm run verify`: clean typecheck (`tsc --noEmit`), clean lint, 835 passing unit tests across 51 test suites, 100% statement and branch coverage on `sentinelPipeline.ts`, and successful production build. Convex features: components (`@convex-dev/workflow`), durable workflows, mutations, actions, internalAction, internalMutation, internalQuery.
 
-### 2026-09-11 - working tree
+### 2026-09-11 - 3f24153
 Refactored application layout and navigation into a focused two-surface Case Workspace and streamlined copilot tooling (`src/components/layout/Sidebar.tsx`, `src/components/layout/Shell.tsx`, `src/components/common/SentinelFlowStepper.tsx`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/studio/AppealStudio.tsx`, `src/components/chat/SentinelChatbot.tsx`, `src/App.tsx`, `convex/actions/sentinelAgent.ts`, `tests/sentinelAgent.test.ts`, `README.md`):
 - Collapsed navigation from 10 flat peer destinations into a focused Case List Rail: prominent Quick Ingest action, active cases stream with real-time ERISA statutory countdown badges, claim balances, and a clean platform settings footer.
 - Promoted the 3-step appellate stepper (1. Evidence & CPB -> 2. Appeal Brief -> 3. Payer Dispatch) to the master Case Workspace shell, complete with dynamic ERISA 29 U.S.C. § 1132(c) statutory liability exposure calculations ($110/day exposure and days remaining) in the header, resolving double dollar rendering.
@@ -1248,3 +1248,12 @@ Refactored application layout and navigation into a focused two-surface Case Wor
 - Streamlined Sentinel Copilot agent tools in `convex/actions/sentinelAgent.ts` from 10 down to 6 core case inspection and audit verification tools (`get_active_claim_details`, `search_claims`, `get_clinical_evidence`, `get_appeal_brief`, `get_audit_trail`, `search_precedents`), eliminating tool selection ambiguity while preserving autonomous background crawls in the durable pipeline.
 - Rewrote `README.md` around the one-sentence core loop ("Upload a denial. ClaimHero pulls the insurer's own clinical policy bulletins via Firecrawl, writes an indisputable cited brief, and dispatches it via AgentMail before the ERISA clock expires — three steps, one deadline") and documented the Two-Surface Case Architecture.
 - Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 835 passing unit tests across 51 test suites, and successful production build. Convex features: components (`@convex-dev/agent`, `@convex-dev/workflow`, `@convex-dev/aggregate`), actions, mutations, queries.
+
+### 2026-09-11 - working tree
+Refactored `README.md` and `PRODUCT.md` with patient-first framing, streamlined quickstart friction flow, and conversational judging criteria alignment:
+- Rewrote the opening logline to speak directly to the person facing an unexpected denial rather than describing developer tooling.
+- Pushed an urgent, 60-second real-friction scene to the very top with a linear case lifecycle path mini-flow (`denial letter` -> `OpenAI vision OCR` -> `Firecrawl policy clause` -> `deterministic 4-pillar score` -> `cited brief` -> `human approval gate` -> `AgentMail two-way dispatch`).
+- Reframed Safe Harbor test fixtures responsibly once near the top and purged repetitive "synthetic" references across documentation copy in favor of clean demo fixtures.
+- Replaced the judging criteria matrix table with direct conversational defenses tailored for everyday app utility, domain usefulness, Convex platform depth, and full sponsor integration.
+- Updated automated test documentation across `README.md` and `PRODUCT.md` to reflect the verified 835 Vitest tests across 51 suites (~81.3% line coverage).
+- Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 835 passing unit tests across 51 test suites, and successful production build.
