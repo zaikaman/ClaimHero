@@ -16,10 +16,14 @@ import {
   FloppyDisk,
   Sparkle,
   Trash,
+  SpeakerSimpleHigh,
+  SpeakerSimpleSlash,
+  Play,
 } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useSettings, UserSettings } from "../../hooks/useSettings";
+import { useSoundEffects } from "../../hooks/useSoundEffects";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -35,6 +39,13 @@ interface SettingsPageProps {
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar }) => {
   const { settings, isLoading, isSaving, isSyncing, isResetting, saveSettings, syncNow, resetPortfolio } = useSettings();
+  const {
+    isEnabled: isAudioEnabled,
+    volume: audioVolume,
+    setEnabled: setAudioEnabled,
+    setVolume: setAudioVolume,
+    playSound,
+  } = useSoundEffects();
 
   const [formState, setFormState] = useState<UserSettings | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -605,6 +616,147 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
                 <ArrowsClockwise className={cn("size-3.5", isSyncing && "animate-spin")} />
                 <span>{isSyncing ? "Synchronizing..." : "Sync Inboxes & Sweep Deadlines"}</span>
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card: Acoustic Sentinel Sensory Feedback */}
+        <Card className="border-border/60 bg-card/60 backdrop-blur-md">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <div className="flex items-center gap-2">
+              {isAudioEnabled ? (
+                <SpeakerSimpleHigh className="size-4 text-primary" />
+              ) : (
+                <SpeakerSimpleSlash className="size-4 text-muted-foreground/60" />
+              )}
+              <CardTitle className="text-sm font-semibold">Acoustic Sentinel Sensory Feedback</CardTitle>
+            </div>
+            <CardDescription className="text-xs">
+              Configure precision Web Audio acoustic tones for synthesis completion, document extractions, dossier compilations, and P2P defense alerts.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="pt-4 space-y-5">
+            {/* Master Toggle */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/30">
+              <div className="space-y-0.5 max-w-lg">
+                <div className="text-xs font-semibold text-foreground">Acoustic feedback cues</div>
+                <div className="text-[11px] text-muted-foreground leading-relaxed">
+                  Synthesize clinical acoustic feedback when long background jobs resolve or real-time citations surface.
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-muted-foreground">
+                  {isAudioEnabled ? "Enabled" : "Muted"}
+                </span>
+                <Switch
+                  checked={isAudioEnabled}
+                  onCheckedChange={(checked) => {
+                    setAudioEnabled(checked);
+                    if (checked) {
+                      playSound("tactile_click");
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Volume Control */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/30">
+              <div className="space-y-0.5 max-w-lg">
+                <div className="text-xs font-semibold text-foreground">Master acoustic volume</div>
+                <div className="text-[11px] text-muted-foreground leading-relaxed">
+                  Adjust procedural synthesizer amplitude. Kept soft and clinical by default to prevent alarm fatigue.
+                </div>
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-64">
+                <input
+                  type="range"
+                  min="0.05"
+                  max="1.0"
+                  step="0.05"
+                  value={audioVolume}
+                  disabled={!isAudioEnabled}
+                  aria-label="Master acoustic volume"
+                  onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
+                  className="w-full accent-primary h-1.5 bg-muted rounded-lg appearance-none cursor-pointer disabled:opacity-40"
+                />
+                <span className="text-xs font-mono text-foreground w-10 text-right">
+                  {Math.round(audioVolume * 100)}%
+                </span>
+              </div>
+            </div>
+
+            {/* Audition Tones Grid */}
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-foreground">Audition Sentinel Acoustic Profiles</div>
+              <div className="text-[11px] text-muted-foreground">
+                Preview real-time synthesized tones directly generated through Web Audio API:
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+                {[
+                  {
+                    name: "Appeal Synthesis",
+                    desc: "Harmonic dual chime on brief ready",
+                    cue: "appeal_synthesis_complete" as const,
+                  },
+                  {
+                    name: "Ingestion / OCR",
+                    desc: "Dual micro-tick on entity parse",
+                    cue: "extraction_complete" as const,
+                  },
+                  {
+                    name: "Dossier Compiled",
+                    desc: "Resonant pulse on legal binder",
+                    cue: "dossier_compiled" as const,
+                  },
+                  {
+                    name: "AgentMail Dispatch",
+                    desc: "Acoustic whoosh on transmission",
+                    cue: "transmission_dispatched" as const,
+                  },
+                  {
+                    name: "P2P Copilot Citation",
+                    desc: "Clinical sonar pip on live rebuttal",
+                    cue: "copilot_citation" as const,
+                  },
+                  {
+                    name: "P2P Overturn Victory",
+                    desc: "Ascending triad on authorization",
+                    cue: "p2p_overturned_victory" as const,
+                  },
+                  {
+                    name: "Deadline Urgency",
+                    desc: "Double-pulse beacon on ERISA limit",
+                    cue: "deadline_alert" as const,
+                  },
+                  {
+                    name: "Command Palette",
+                    desc: "Tactile micro-click on navigation",
+                    cue: "tactile_click" as const,
+                  },
+                ].map((item) => (
+                  <button
+                    key={item.cue}
+                    type="button"
+                    aria-label={`Preview ${item.name} acoustic cue`}
+                    onClick={() => playSound(item.cue, Math.max(audioVolume, 0.25))}
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-border/70 bg-background/60 hover:bg-muted/50 hover:border-border transition-all text-left group cursor-pointer"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">
+                        {item.name}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground truncate font-mono">
+                        {item.desc}
+                      </div>
+                    </div>
+                    <div className="size-6 rounded-md bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all shrink-0">
+                      <Play className="size-3 fill-current" />
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>

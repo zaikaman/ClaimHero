@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-12T16:28:00Z
+- **Last updated:** 2026-09-12T16:47:00Z
 
 ## Log
 
@@ -1302,12 +1302,20 @@ Implemented quad-solution UX architecture for Clinical Evidence Dossier to elimi
 - Added comprehensive unit test suite (`tests/evidenceDossierUx.test.ts`) testing production `RESEARCH_MODES` and `PRESET_RESEARCH_URLS`, all 5 research modes, multi-source 3-pipeline architecture, dynamic unclipped action buttons, statutory leverage text integrity, WAI-ARIA contracts, and verified 100% clean across typecheck, lint, 873 passing unit tests across 53 test suites, and production build with `npm run verify`.
 - Synchronized automated test documentation across `README.md`, `IDEA.md`, and `PRODUCT.md` to reflect the verified 873 Vitest tests across 53 suites (~81.3% line coverage across the entire project).
 
-### 2026-09-12 - working tree
+### 2026-09-12 - 1a8c52d
 Hardened Case Radar export pipeline and resolved HIPAA Safe Harbor PHI leakage across all 4 export modalities (`src/lib/exportUtils.ts`, `src/lib/redactionEngine.ts`, `convex/lib/redactionEngine.ts`, `src/components/radar/CaseRadar.tsx`, `src/types/index.ts`, `tests/radarExport.test.ts`):
 - Diagnosed PHI leakage where free-text clinical notes (`appealContext.physicianNotes`), date of birth (DOB), date of service (DOS), and coordinator direct contact details remained exposed in exported JSON while top-level patient profile was masked.
 - Built centralized export module (`src/lib/exportUtils.ts`) providing deep Safe Harbor sanitization: scrubs isolated patient name tokens, masks dates of birth and service dates (`**/**/YYYY`), sanitizes clinical facts and search content, masks coordinator phone and email, anonymizes user linkability IDs, and synchronizes `redactionMetadata` (`isRedacted: true`, entity count, categories).
 - Hardened `redactionEngine` (both client and Convex backend) with dedicated Date of Service (`DOS`) pattern detection and case-insensitive chart headers (`PATIENT:`), while preserving case-sensitive capitalization guards on patient names to prevent false positives on lowercase text.
 - Validated all 4 export options: Redacted JSON (HIPAA Safe Harbor de-identified dataset), Redacted CSV (15-column RFC-4180 format with masked PHI and year-only DOS), Unredacted CSV (advocate audit copy keeping flagged cases masked), and Unredacted JSON (full technical audit payload).
 - Added comprehensive regression test suite (`tests/radarExport.test.ts`) and verified 100% clean across typecheck, lint, 885 unit tests across 54 test suites, and production build with `npm run verify`.
+
+### 2026-09-12 - working tree
+Built zero-asset Web Audio acoustic sentinel sensory feedback system and wired real-time cues across all key workflows (`src/lib/soundEffects.ts`, `src/hooks/useSoundEffects.ts`, `src/components/layout/Header.tsx`, `src/components/settings/SettingsPage.tsx`, `src/hooks/useAppealStudio.ts`, `src/components/radar/IngestionModal.tsx`, `src/components/studio/ExportDrawer.tsx`, `src/components/communications/AgentMailDrawer.tsx`, `src/hooks/useLiveCallCopilot.ts`, `src/components/common/CommandDialog.tsx`, `tests/soundEffects.test.ts`):
+- Engineered procedural Web Audio API engine (`SoundEffectsEngine`) generating clinical acoustic cues in real-time via native browser `AudioContext` oscillators, gain envelopes, and biquad filters, eliminating external audio asset network latency and bundle bloat.
+- Implemented 10 clinical acoustic profiles tailored to medical sentinel aesthetics: ascending harmonic chime on One-Click Appeal Synthesis completion, dual-tick impulse on optical document ingestion / OCR parse, resonant pulse on Court-Ready Dossier Binder compilation, filtered directional whoosh on AgentMail outbound dispatch, clinical sonar pip on live P2P copilot rebuttal, ascending triad on P2P overturn victory, live mic chirps on audio capture toggle, and mechanical micro-clicks on Command Palette navigation.
+- Added 1-click mute/unmute control in global Header with responsive visual state and persistent user preferences in `localStorage`.
+- Created dedicated "Acoustic Sentinel Sensory Feedback" settings card in `SettingsPage.tsx` with master toggle, volume slider (0-100%), and interactive audition buttons allowing users to test every acoustic profile.
+- Added comprehensive unit test suite (`tests/soundEffects.test.ts`) and verified 100% clean across typecheck, lint, 892 passing unit tests across 55 test suites, and production build with `npm run verify`.
 
 

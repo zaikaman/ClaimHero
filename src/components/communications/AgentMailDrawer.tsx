@@ -37,6 +37,7 @@ import { Button, buttonVariants } from "../ui/button";
 import { Input } from "../ui/input";
 import { ExportDrawer } from "../studio/ExportDrawer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { soundEffects } from "../../lib/soundEffects";
 
 type DispatchMode = "ai_adjudicator" | "custom_email" | "official_payer";
 
@@ -238,6 +239,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     setIsSending(true);
     try {
       await onSendMessage(activeAutoDraft);
+      soundEffects.play("transmission_dispatched");
       setActiveAutoDraft("");
       setReplyText("");
     } finally {
@@ -360,6 +362,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     setIsSending(true);
     try {
       await onSendMessage(replyText);
+      soundEffects.play("transmission_dispatched");
       setReplyText("");
       setActiveAutoDraft("");
     } finally {
@@ -372,6 +375,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     setIsDispatching(true);
     try {
       await onDispatchAppeal(effectiveRecipient, dispatchMode);
+      soundEffects.play("transmission_dispatched");
     } finally {
       setIsDispatching(false);
     }

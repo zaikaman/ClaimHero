@@ -3,6 +3,7 @@ import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { Claim, CallTranscriptItem, LiveFastAnswer, CallSpeaker } from "../types";
+import { soundEffects } from "../lib/soundEffects";
 
 export interface ReviewerChallenge {
   id: string;
@@ -173,6 +174,7 @@ export function useLiveCallCopilot(claim: Claim) {
         });
 
         setActiveFastAnswer(answer);
+        soundEffects.play("copilot_citation");
       } catch (err) {
         console.error("Failed to generate live fast answer:", err);
       } finally {
@@ -397,6 +399,7 @@ export function useLiveCallCopilot(claim: Claim) {
 
   // Start Live Call
   const startLiveCall = useCallback(async () => {
+    soundEffects.play("mic_toggle_on");
     setIsCallLive(true);
     isCallLiveRef.current = true;
     setActiveSpeaker("physician");
@@ -421,6 +424,7 @@ export function useLiveCallCopilot(claim: Claim) {
 
   // End Live Call
   const endLiveCall = useCallback(async () => {
+    soundEffects.play("mic_toggle_off");
     setIsCallLive(false);
     isCallLiveRef.current = false;
     setIsSimulating(false);
@@ -591,6 +595,7 @@ export function useLiveCallCopilot(claim: Claim) {
           Boolean(pushback.authorizationNumber?.toLowerCase().includes("simulation only"));
 
         if (pushback.isOverturned && !isFallback && !hasSimulationNotice) {
+          soundEffects.play("p2p_overturned_victory");
           setIsOverturned(true);
           setAuthorizationNumber(pushback.authorizationNumber || "Simulation only — no authorization granted");
           setCallResolutionStage("overturned");

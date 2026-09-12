@@ -24,6 +24,7 @@ import { Badge } from "../ui/badge";
 import { NavigationView } from "../layout/Sidebar";
 import { BrandIcon } from "./BrandLogo";
 import { DeleteCaseModal } from "./DeleteCaseModal";
+import { soundEffects } from "../../lib/soundEffects";
 
 interface CommandDialogProps {
   isOpen: boolean;
@@ -81,12 +82,14 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   }, [query]);
 
   const handleSelectClaim = (claimId: string, view: NavigationView = "radar") => {
+    soundEffects.play("tactile_click");
     onSelectClaim(claimId);
     onNavigateView(view);
     onClose();
   };
 
   const handleNavigate = (view: NavigationView) => {
+    soundEffects.play("tactile_click");
     onNavigateView(view);
     onClose();
   };
@@ -577,9 +580,11 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
+      soundEffects.play("tactile_click");
       setActiveIndex((prev) => (prev + 1) % flatNavItems.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
+      soundEffects.play("tactile_click");
       setActiveIndex((prev) => (prev - 1 + flatNavItems.length) % flatNavItems.length);
     } else if (e.key === "Tab") {
       // Focus trap: cycle within command palette options without escaping dialog boundary

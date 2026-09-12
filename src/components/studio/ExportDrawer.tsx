@@ -34,6 +34,7 @@ import {
 } from "../../lib/dossierBuilder";
 import { fastSanitizeText } from "../../lib/redactionEngine";
 import { cn } from "../../lib/utils";
+import { soundEffects } from "../../lib/soundEffects";
 
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -117,6 +118,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
   };
 
   const handleDownloadTxt = () => {
+    soundEffects.play("dossier_compiled");
     const text = getExportText();
     const blob = new Blob([text], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -132,6 +134,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
   };
 
   const handleDownloadHtml = () => {
+    soundEffects.play("dossier_compiled");
     const printable = document.querySelector<HTMLElement>(".printable-dossier");
     if (!printable) return;
 
@@ -176,6 +179,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
   };
 
   const handlePrint = () => {
+    soundEffects.play("dossier_compiled");
     const printable = document.querySelector<HTMLElement>(".printable-dossier");
     if (!printable) {
       window.print();

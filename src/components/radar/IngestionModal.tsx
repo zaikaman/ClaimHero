@@ -31,6 +31,7 @@ import {
   detectPiiEntities,
   fastSanitizeText,
 } from "../../lib/redactionEngine";
+import { soundEffects } from "../../lib/soundEffects";
 import { PrivacyRedactionFilter } from "./PrivacyRedactionFilter";
 import {
   Dialog,
@@ -330,6 +331,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     result: DenialExtractionResult & { claimId: string },
     preset?: SampleCasePreset
   ) => {
+    soundEffects.play("extraction_complete");
     // Show the context form instantly with safe defaults; denial-specific
     // prompts upgrade in the background without blocking the user.
     setExtractedResult({ ...result, pipelineResult: null });
@@ -505,6 +507,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
         void executePostExtractionPipeline(claimId, snapshot)
           .then((pipelineResult) => {
             if (pipelineResult && typeof pipelineResult === "object") {
+              soundEffects.play("appeal_synthesis_complete");
               toast.success("Case indexed and appeal brief compiled. Review it in the Studio.");
             }
           })
@@ -540,6 +543,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     void executePostExtractionPipeline(claimId)
       .then((pipelineResult) => {
         if (pipelineResult && typeof pipelineResult === "object") {
+          soundEffects.play("appeal_synthesis_complete");
           toast.success("Case indexed and appeal brief compiled. Review it in the Studio.");
         }
       })

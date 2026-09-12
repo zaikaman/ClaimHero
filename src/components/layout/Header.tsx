@@ -7,7 +7,11 @@ import {
   GithubLogo,
   Pulse,
   SignIn,
+  SpeakerSimpleHigh,
+  SpeakerSimpleSlash,
+  ShieldWarning,
 } from "@phosphor-icons/react";
+import { useSoundEffects } from "../../hooks/useSoundEffects";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { formatCurrency } from "../../lib/utils";
@@ -35,6 +39,15 @@ export const Header: React.FC<HeaderProps> = ({
   criticalDeadlinesCount = 0,
 }) => {
   const { isAuthenticated } = useCurrentUser();
+  const { isMuted, toggleMute, playSound } = useSoundEffects();
+
+  const handleToggleAudio = () => {
+    const nextActive = toggleMute();
+    if (nextActive) {
+      playSound("tactile_click");
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/60 backdrop-blur-xl print:hidden">
       <div className="flex h-12 items-center justify-between px-4 lg:px-6">
@@ -81,9 +94,18 @@ export const Header: React.FC<HeaderProps> = ({
             {criticalDeadlinesCount > 0 && (
               <>
                 <Separator orientation="vertical" className="h-3" />
-                <div className="flex items-center gap-1 text-destructive font-semibold">
+                <button
+                  onClick={() => {
+                    playSound("deadline_alert");
+                    onSelectView?.("radar");
+                  }}
+                  className="flex items-center gap-1.5 text-destructive font-semibold hover:opacity-80 transition-opacity cursor-pointer text-xs"
+                  title="Critical statutory deadline alarms (click to view and play alert tone)"
+                  aria-label={`${criticalDeadlinesCount} urgent alarms`}
+                >
+                  <ShieldWarning className="size-3.5 animate-pulse" />
                   <span>{criticalDeadlinesCount} Urgent Alarms</span>
-                </div>
+                </button>
               </>
             )}
           </div>
@@ -115,6 +137,20 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <GithubLogo className="size-4" />
             </a>
+
+            {/* Acoustic Feedback Toggle */}
+            <button
+              onClick={handleToggleAudio}
+              className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title={isMuted ? "Acoustic sentinel cues muted (click to enable)" : "Acoustic sentinel cues active (click to mute)"}
+              aria-label={isMuted ? "Unmute acoustic cues" : "Mute acoustic cues"}
+            >
+              {isMuted ? (
+                <SpeakerSimpleSlash className="size-4 text-muted-foreground/60" />
+              ) : (
+                <SpeakerSimpleHigh className="size-4 text-emerald-500 dark:text-emerald-400" />
+              )}
+            </button>
 
             {/* Sign In Link (when unauthenticated) */}
             {!isAuthenticated && (

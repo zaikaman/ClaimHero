@@ -14,6 +14,7 @@ import {
 } from "../lib/yjsBrief";
 import { BriefSyncProvider, type BriefSyncStatus, type SyncPayload } from "../lib/yjsProvider";
 import { Id } from "../../convex/_generated/dataModel";
+import { soundEffects } from "../lib/soundEffects";
 
 export interface AppealSenderDetails {
   name: string;
@@ -602,6 +603,7 @@ export function useAppealStudio(
         });
 
         if (result?.fullAppealMarkdown) {
+          soundEffects.play("appeal_synthesis_complete");
           setMarkdownContent(result.fullAppealMarkdown);
           setSaveStatus("saved");
           if (saveStatusTimeoutRef.current) {
