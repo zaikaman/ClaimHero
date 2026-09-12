@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-12T16:13:00Z
+- **Last updated:** 2026-09-12T16:28:00Z
 
 ## Log
 
@@ -1291,7 +1291,7 @@ Resolved Score Rubric background spinner freeze, removed button clutter, and eli
 - Removed duplicate 'Draft Appeal Brief' button from the Overturn Probability Score banner, resolving vertical button stacking.
 - Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 850 passing unit tests across 52 test suites, and clean production build.
 
-### 2026-09-12 - working tree
+### 2026-09-12 - a7df9de
 Implemented quad-solution UX architecture for Clinical Evidence Dossier to eliminate vertical scroll sprawl and context loss (`src/components/evidence/EvidenceMatrix.tsx`, `src/components/evidence/PolicyViewer.tsx`, `src/components/evidence/ClauseInspectorDrawer.tsx`, `tests/evidenceDossierUx.test.ts`):
 - Pinned Denial Baseline: added `lg:sticky lg:top-4 self-start` and internal scroll containment to the 5-column left panel in `EvidenceMatrix.tsx`. Patient metadata, CPT procedure codes, CARC CO-58 denial reason, and disputed charges remain permanently visible alongside scrolled evidence clauses, eliminating blank void and reference loss.
 - Document & Exhibit Accordion Grouping: organized raw multi-clause evidence feeds into structured policy exhibits grouped by parent document and source type. Added exhibit headers featuring clause counters, peak relevance match badges, visual proof indicators, direct external source links, and expand/collapse controls with master 'Expand All' / 'Collapse All' toggles.
@@ -1301,4 +1301,13 @@ Implemented quad-solution UX architecture for Clinical Evidence Dossier to elimi
 - Redesigned Clinical Research Console Channel Architecture (`src/components/evidence/ClinicalResearchConsole.tsx`): eliminated cramped 5-card row with truncated 1-line text descriptions (`line-clamp-2` ellipses). Converted channel selection into a unified, symmetrical single-row 5-column segmented track (`grid grid-cols-5 w-full`) featuring equal 20% column spans (`Multi-Source`, `Insurer CPB`, `PubMed Trials`, `FDA Labels`, `Custom URL`) with Phosphor icons, `whitespace-nowrap`, and compact status indicators, guaranteeing exactly 1 line with zero wrapping or orphaned buttons. Relocated category taglines exclusively to the unclipped Active Channel Station Deck header (`role="tabpanel"`). The workstation deck presents full, unclipped clinical/statutory rationale, 3-column concurrent pipeline telemetry for multi-source scans (Cigna CPB, PubMed RCTs, and FDA DailyMed), interactive search suggestion chips, quick presets, and unified execution CTAs.
 - Added comprehensive unit test suite (`tests/evidenceDossierUx.test.ts`) testing production `RESEARCH_MODES` and `PRESET_RESEARCH_URLS`, all 5 research modes, multi-source 3-pipeline architecture, dynamic unclipped action buttons, statutory leverage text integrity, WAI-ARIA contracts, and verified 100% clean across typecheck, lint, 873 passing unit tests across 53 test suites, and production build with `npm run verify`.
 - Synchronized automated test documentation across `README.md`, `IDEA.md`, and `PRODUCT.md` to reflect the verified 873 Vitest tests across 53 suites (~81.3% line coverage across the entire project).
+
+### 2026-09-12 - working tree
+Hardened Case Radar export pipeline and resolved HIPAA Safe Harbor PHI leakage across all 4 export modalities (`src/lib/exportUtils.ts`, `src/lib/redactionEngine.ts`, `convex/lib/redactionEngine.ts`, `src/components/radar/CaseRadar.tsx`, `src/types/index.ts`, `tests/radarExport.test.ts`):
+- Diagnosed PHI leakage where free-text clinical notes (`appealContext.physicianNotes`), date of birth (DOB), date of service (DOS), and coordinator direct contact details remained exposed in exported JSON while top-level patient profile was masked.
+- Built centralized export module (`src/lib/exportUtils.ts`) providing deep Safe Harbor sanitization: scrubs isolated patient name tokens, masks dates of birth and service dates (`**/**/YYYY`), sanitizes clinical facts and search content, masks coordinator phone and email, anonymizes user linkability IDs, and synchronizes `redactionMetadata` (`isRedacted: true`, entity count, categories).
+- Hardened `redactionEngine` (both client and Convex backend) with dedicated Date of Service (`DOS`) pattern detection and case-insensitive chart headers (`PATIENT:`), while preserving case-sensitive capitalization guards on patient names to prevent false positives on lowercase text.
+- Validated all 4 export options: Redacted JSON (HIPAA Safe Harbor de-identified dataset), Redacted CSV (15-column RFC-4180 format with masked PHI and year-only DOS), Unredacted CSV (advocate audit copy keeping flagged cases masked), and Unredacted JSON (full technical audit payload).
+- Added comprehensive regression test suite (`tests/radarExport.test.ts`) and verified 100% clean across typecheck, lint, 885 unit tests across 54 test suites, and production build with `npm run verify`.
+
 

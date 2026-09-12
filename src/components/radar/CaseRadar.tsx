@@ -34,6 +34,11 @@ import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import { Claim } from "../../types";
 import { formatCurrency, matchesClaimSearch } from "../../lib/utils";
+import {
+  exportClaimsToCsv,
+  exportClaimsToJson,
+  triggerFileDownload,
+} from "../../lib/exportUtils";
 import { CPT_CODES, DENIAL_REASON_CODES } from "../../lib/constants";
 import { DeadlineCountdown } from "./DeadlineCountdown";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -312,121 +317,18 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   ];
 
   const handleExportCsv = (redactMode: boolean) => {
-    const escapeCsv = (val: unknown) => {
-      if (val === undefined || val === null) return '""';
-      const str = String(val).replace(/"/g, '""');
-      return `"${str}"`;
-    };
-
-    const headers = [
-      "Claim Number",
-      "Patient Name",
-      "Member ID",
-      "Insurer / Payer",
-      "CPT Codes",
-      "CARC Denial Code",
-      "Denial Reason Description",
-      "Denied Amount ($)",
-      "Patient Share ($)",
-      "Service Date",
-      "Statutory Deadline",
-      "Days Remaining",
-      "Overturn Probability (%)",
-      "Status",
-      "Redaction Applied",
-    ];
-
-    const rows = filtered.map((c) => {
-      const isClaimRedacted = redactMode || Boolean(c.redactionMetadata?.isRedacted);
-
-      // Redaction gate: mask Patient Name and Member ID per HIPAA Safe Harbor standard
-      const name = isClaimRedacted
-        ? (c.patient?.name ? `[REDACTED - ${c.patient.name.charAt(0)}***]` : "[REDACTED]")
-        : (c.patient?.name || "");
-
-      const memberId = isClaimRedacted
-        ? (c.patient?.memberId ? c.patient.memberId.replace(/^([A-Za-z0-9]{3}).*/, "$1*****") : "[REDACTED]")
-        : (c.patient?.memberId || "");
-
-      // Redaction gate: mask CPT codes and CARC codes if custom category masked or public exhibit mode
-      const maskCpt = isClaimRedacted && (
-        c.redactionMetadata?.maskedCategories?.includes("cpt") ||
-        c.redactionMetadata?.mode === "PUBLIC_EXHIBIT"
-      );
-      const cptStr = maskCpt ? "[REDACTED-CPT]" : (c.cptCodes?.join("; ") || "");
-
-      const maskCarc = isClaimRedacted && (
-        c.redactionMetadata?.maskedCategories?.includes("carc") ||
-        c.redactionMetadata?.mode === "PUBLIC_EXHIBIT"
-      );
-      const carcStr = maskCarc ? "[REDACTED-CARC]" : (c.denialReasonCode || "");
-
-      return [
-        escapeCsv(c.claimNumber),
-        escapeCsv(name),
-        escapeCsv(memberId),
-        escapeCsv(c.patient?.insurancePayer || ""),
-        escapeCsv(cptStr),
-        escapeCsv(carcStr),
-        escapeCsv(c.denialReasonDescription || ""),
-        escapeCsv(c.deniedAmount || 0),
-        escapeCsv(c.patientOwedAmount || 0),
-        escapeCsv(c.serviceDate || ""),
-        escapeCsv(c.statutoryDeadline ? new Date(c.statutoryDeadline).toISOString().split("T")[0] : ""),
-        escapeCsv(c.daysRemaining),
-        escapeCsv(c.overturnProbabilityScore ?? "N/A"),
-        escapeCsv(c.status),
-        escapeCsv(isClaimRedacted ? "YES (HIPAA Safe Harbor)" : "NO (Full Audit)"),
-      ];
-    });
-
-    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
+    const csvContent = exportClaimsToCsv(filtered, redactMode);
     const prefix = redactMode ? "claimhero-cases-redacted" : "claimhero-cases-audit";
-    a.download = `${prefix}-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const filename = `${prefix}-${new Date().toISOString().split("T")[0]}.csv`;
+    triggerFileDownload(csvContent, filename, "text/csv;charset=utf-8;");
     toast.success(redactMode ? "Exported HIPAA-redacted CSV" : "Exported advocate audit CSV");
   };
 
   const handleExportJson = (redactMode: boolean) => {
-    const exportData = filtered.map((c) => {
-      const isClaimRedacted = redactMode || Boolean(c.redactionMetadata?.isRedacted);
-      if (!isClaimRedacted) return c;
-
-      return {
-        ...c,
-        patientName: c.patientName ? `[REDACTED - ${c.patientName.charAt(0)}***]` : "[REDACTED]",
-        patient: c.patient
-          ? {
-              ...c.patient,
-              name: `[REDACTED - ${c.patient.name.charAt(0)}***]`,
-              memberId: c.patient.memberId.replace(/^([A-Za-z0-9]{3}).*/, "$1*****"),
-              email: "[REDACTED]",
-            }
-          : undefined,
-        cptCodes: c.redactionMetadata?.maskedCategories?.includes("cpt") || c.redactionMetadata?.mode === "PUBLIC_EXHIBIT"
-          ? ["[REDACTED-CPT]"]
-          : c.cptCodes,
-        denialReasonCode: c.redactionMetadata?.maskedCategories?.includes("carc") || c.redactionMetadata?.mode === "PUBLIC_EXHIBIT"
-          ? "[REDACTED-CARC]"
-          : c.denialReasonCode,
-        redactionApplied: "HIPAA Safe Harbor 45 CFR § 164.514",
-      };
-    });
-
-    const jsonContent = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([jsonContent], { type: "application/json;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
+    const jsonContent = exportClaimsToJson(filtered, redactMode);
     const prefix = redactMode ? "claimhero-cases-redacted" : "claimhero-cases-audit";
-    a.download = `${prefix}-${new Date().toISOString().split("T")[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const filename = `${prefix}-${new Date().toISOString().split("T")[0]}.json`;
+    triggerFileDownload(jsonContent, filename, "application/json;charset=utf-8;");
     toast.success(redactMode ? "Exported HIPAA-redacted JSON" : "Exported advocate audit JSON");
   };
 

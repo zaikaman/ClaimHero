@@ -41,8 +41,10 @@ export interface Patient {
 
 export interface Claim {
   _id: string;
+  userId?: string;
   patientId: string;
   claimNumber: string;
+  searchContent?: string;
   serviceDate: string;
   providerName: string;
   deniedAmount: number;

@@ -336,6 +336,25 @@ export function detectPiiEntities(
     );
   }
 
+  // 2b. Dates of Service (DOS)
+  const dosPrefixedRegex = /\b(?:DOS|Date\s*of\s*Service|Service\s*Date)[\s:]*([0-9]{1,2}[/.-][0-9]{1,2}[/.-][0-9]{2,4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+[0-9]{1,2},?\s+[0-9]{4})\b/gi;
+  while ((match = dosPrefixedRegex.exec(text)) !== null) {
+    const matchedDate = match[1];
+    const fullText = match[0];
+    const dateOffset = fullText.lastIndexOf(matchedDate);
+    const startIdx = match.index + dateOffset;
+    addEntity(
+      "dob",
+      "Date of Service",
+      matchedDate,
+      maskDob(matchedDate, standard),
+      startIdx,
+      startIdx + matchedDate.length,
+      "DOS explicit prefix pattern",
+      0.95
+    );
+  }
+
   // 3. Member ID & Suffixes
   // E.g. Member ID: MBN9823412-01, Subscriber ID: W123456789-02, Policy # ABC12345678
   const memberIdPrefixedRegex = /\b(?:Member\s*(?:ID|#|No\.?)|Subscriber\s*(?:ID|#|No\.?)|Policy\s*(?:ID|#|No\.?)|Insured\s*(?:ID|#|No\.?))[\s:]*([A-Z0-9]{6,16}(?:-[A-Z0-9]{1,4})?)\b/gi;
@@ -412,8 +431,8 @@ export function detectPiiEntities(
       }
     }
 
-    // Contextual Patient Name e.g. Patient: Johnathan Doe, Insured: Jane Smith
-    const contextualNameRegex = /\b(?:Patient(?:\s*Name)?|Insured(?:\s*Name)?|Member(?:\s*Name)?|Claimant)[\s:]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/g;
+    // Contextual Patient Name e.g. Patient: Johnathan Doe, PATIENT: Marcus Sterling
+    const contextualNameRegex = /\b(?:Patient|PATIENT|patient|Insured|INSURED|insured|Member|MEMBER|member|Claimant|CLAIMANT|claimant)(?:\s*(?:Name|NAME|name))?[\s:]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/g;
     while ((match = contextualNameRegex.exec(text)) !== null) {
       const rawName = match[1];
       // Skip if contains common false positive header words
