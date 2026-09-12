@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
+import { appendAuditLog } from "./auditLogs";
 
 /**
  * Format and sanitize citation clauses into clean, concise identifiers
@@ -231,7 +232,7 @@ async function applyBatchInsert(ctx: MutationCtx, args: BatchInsertEvidenceArgs)
   }
 
   // Append audit log event with user association
-  await ctx.db.insert("appealAuditLogs", {
+  await appendAuditLog(ctx, {
     claimId: args.claimId,
     userId: claim.userId,
     eventType: "policy_crawled",
@@ -396,7 +397,7 @@ export const deleteEvidence = mutation({
     }
 
     // Audit log
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: evidence.claimId,
       userId: claim?.userId,
       eventType: "evidence_removed",
@@ -443,7 +444,7 @@ async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArg
     });
   }
 
-  await ctx.db.insert("appealAuditLogs", {
+  await appendAuditLog(ctx, {
     claimId: args.claimId,
     userId: claim?.userId,
     eventType: "evidence_added",

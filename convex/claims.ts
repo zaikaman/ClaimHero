@@ -8,6 +8,7 @@ import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner, requireClaimE
 import { normalizeCollaboratorEmail } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
 import { isInternalAgentMailAddress } from "./lib/agentMailWebhook";
+import { appendAuditLog } from "./auditLogs";
 
 /**
  * Fetch active collaboration grants for the caller, matched by userId or by
@@ -1055,8 +1056,9 @@ export const create = mutation({
     );
 
     // Log initial audit event
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId,
+      userId,
       eventType: "denial_ingested",
       actor: "ClaimHero Intake Engine",
       details: `Ingested denial claim ${args.claimNumber} for ${args.providerName} ($${args.deniedAmount.toLocaleString()} denied, Code ${args.denialReasonCode})`,
@@ -1265,8 +1267,9 @@ async function applyCreateWithPatient(
   );
 
   // Log audit event (omitting direct patient name to prevent storing unredacted PHI in case audit trail)
-  await ctx.db.insert("appealAuditLogs", {
+  await appendAuditLog(ctx, {
     claimId,
+    userId,
     eventType: "denial_ingested",
     actor: "Optical OCR Parser",
     details: `Extracted denial document for claim #${args.claimNumber} (${args.insurancePayer})`,
@@ -1557,7 +1560,7 @@ async function applyStatusUpdate(ctx: MutationCtx, args: StatusUpdateArgs) {
 
   await ctx.db.patch(args.claimId, patchData);
 
-  await ctx.db.insert("appealAuditLogs", {
+  await appendAuditLog(ctx, {
     claimId: args.claimId,
     eventType: `status_changed_to_${args.status}`,
     actor: args.actor || "ClaimHero Sentinel",
@@ -2002,7 +2005,7 @@ async function executeSweepDeadlinesBatch(
 
         if (!recentAlarm) {
           batchCritical++;
-          await ctx.db.insert("appealAuditLogs", {
+          await appendAuditLog(ctx, {
             claimId: claim._id,
             ...(claim.userId ? { userId: claim.userId } : {}),
             eventType: "statutory_alarm_critical",
@@ -2463,7 +2466,7 @@ export const deleteCase = mutation({
     // 1. Insert terminal audit log entry capturing case deletion/tombstoning before removing the active claim record
     const now = Date.now();
     try {
-      await ctx.db.insert("appealAuditLogs", {
+      await appendAuditLog(ctx, {
         claimId: args.claimId,
         userId: claim.userId,
         eventType: "case_tombstoned",
@@ -2963,7 +2966,7 @@ async function applyAppealContextUpdate(ctx: MutationCtx, args: AppealContextUpd
 
   await ctx.db.patch(args.claimId, patchPayload);
 
-  await ctx.db.insert("appealAuditLogs", {
+  await appendAuditLog(ctx, {
     claimId: args.claimId,
     eventType: "appeal_context_completed",
     actor: name,
@@ -2972,7 +2975,7 @@ async function applyAppealContextUpdate(ctx: MutationCtx, args: AppealContextUpd
   });
 
   if (args.redactionMetadata?.isRedacted) {
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       eventType: "hipaa_redaction_applied",
       actor: "HIPAA Privacy Filter",
@@ -3081,7 +3084,7 @@ export const updateRedactionMetadata = mutation({
       updatedAt: now,
     });
 
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       eventType: "hipaa_redaction_applied",
       actor: "HIPAA Privacy Filter",
@@ -3124,39 +3127,14 @@ export const recordAuditLog = mutation({
       }
     }
 
-    const timestamp = Date.now();
-    const dayStr = new Date(timestamp).toISOString().slice(0, 10);
-    const effectiveKey = args.idempotencyKey || `${args.claimId}:${args.eventType}:${dayStr}`;
-
-    if (effectiveKey && typeof ctx.db.query === "function") {
-      try {
-        const existing = await ctx.db
-          .query("appealAuditLogs")
-          .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", effectiveKey))
-          .first();
-        if (existing) {
-          return existing._id;
-        }
-      } catch {
-        // Safe fallback
-      }
-    }
-
-    const logId = await ctx.db.insert("appealAuditLogs", {
+    return await appendAuditLog(ctx, {
       claimId: args.claimId,
       userId,
       eventType: args.eventType,
       actor: args.actor,
       details: args.details,
-      timestamp,
-      idempotencyKey: effectiveKey,
+      idempotencyKey: args.idempotencyKey,
     });
-
-    await ctx.db.patch(args.claimId, {
-      updatedAt: timestamp,
-    });
-
-    return logId;
   },
 });
 
@@ -3196,7 +3174,7 @@ export const updateFinancialLiability = mutation({
       updatedAt: now,
     });
 
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       eventType: "financial_liability_calculated",
       actor: "Financial Liability Sentinel",
@@ -3242,7 +3220,7 @@ export const updateErisaPenalties = mutation({
       updatedAt: now,
     });
 
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       eventType: "erisa_penalties_assessed",
       actor: "Statutory ERISA Sentinel",
@@ -3594,7 +3572,7 @@ export const healRedactedPatientNamesInternal = internalMutation({
         }
       }
 
-      await ctx.db.insert("appealAuditLogs", {
+      await appendAuditLog(ctx, {
         claimId: claim._id,
         userId: args.targetUserId,
         eventType: "phi_placeholder_healed",

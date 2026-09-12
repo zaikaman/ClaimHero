@@ -115,7 +115,7 @@ Convex serves as the core persistence, real-time subscription, compute, and orch
 - **Reactive State & Live Subscriptions**: Claims, clinical evidence, appeal versions, audit timelines, and communication threads update reactively across the entire UI without manual polling (`convex/schema.ts`).
 - **Durable Workflow Engine**: Multi-step pipeline execution (`@convex-dev/workflow`) powers reliable, idempotent background orchestration across crawls, scoring, and drafting (`convex/actions/sentinelPipeline.ts`).
 - **Vector Search Engine**: 1536-dimensional vector search on the `precedents` table powers semantic precedent retrieval against past won appeals (`convex/clinicalEvidences.ts`).
-- **Transactional Consistency**: Atomic mutations govern claim creation, evidence persistence, status transitions, and cascading purges to eliminate orphan records.
+- **Transactional Consistency & Cryptographic Merkle Chain**: Atomic mutations govern claim creation, evidence persistence, status transitions, and cascading purges to eliminate orphan records. Implements a tamper-evident rolling SHA-256 Merkle audit chain (`currentHash = sha256(previousHash + eventType + claimId + timestamp + details)`) under ERISA 29 CFR § 2560.503-1, with an interactive "Cryptographic Proof of Case Integrity" badge and 1-click verification in under 10ms.
 - **Crons & Scheduled Actions**: Automated crons sweep statutory 180-day ERISA deadlines, track pending payer replies, and run the Sentinel Auto-Pilot 1-Hour SLA (`convex/crons.ts`).
 - **File Storage**: Native Convex storage securely hosts uploaded denial documents and compiled appeal PDF dossiers.
 - **Live Presence & CRDT Collaboration**: The `@convex-dev/presence` component tracks live teammates per appeal room while a Yjs operation log (`appealYjsUpdates`) merges concurrent brief edits keystroke-by-keystroke (`convex/claimCollaborators.ts`, `convex/appealYjs.ts`).
@@ -203,18 +203,18 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **873 automated tests** across 53 test suites (verified via `npm run test`):
+ClaimHero is backed by **920 automated tests** across 57 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (873 tests across 53 suites)
-npm run test:coverage   # Code coverage report (~81.3% lines)
+npm run test            # Comprehensive Vitest test suite (920 tests across 57 suites)
+npm run test:coverage   # Code coverage report (~81.1% lines)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate
 ```
 
-Test suites cover the master durable workflow pipeline, Convex authorization and ownership isolation, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
+Test suites cover the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
 
 ---
 

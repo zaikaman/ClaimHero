@@ -7,10 +7,12 @@ import { Claim, AuditLog } from "../src/types";
 // Mock convex/react hooks
 const mockUseQuery = vi.fn();
 const mockUseAction = vi.fn();
+const mockUseMutation = vi.fn(() => vi.fn().mockResolvedValue({ totalSealed: 1, terminalHash: "0".repeat(64) }));
 
 vi.mock("convex/react", () => ({
   useQuery: (...args: any[]) => mockUseQuery(...args),
   useAction: (...args: any[]) => mockUseAction(...args),
+  useMutation: (...args: any[]) => mockUseMutation(...args),
 }));
 
 // Mock React
@@ -265,6 +267,73 @@ describe("Audit Trail Activation, Drawer & Timeline Verification", () => {
       });
 
       expect(element).not.toBeNull();
+    });
+
+    it("renders Cryptographic Proof of Case Integrity HUD badge and Verify Hash Chain CTA", () => {
+      const element = AuditTimeline({
+        claim: mockClaim,
+        logs: mockLogs,
+        isDrawer: true,
+      });
+
+      expect(element).not.toBeNull();
+      // Check that Cryptographic Proof HUD is rendered in children
+      const str = JSON.stringify(element);
+      expect(str).toContain("Cryptographic Proof of Case Integrity");
+      expect(str).toContain("Verify Hash Chain");
+    });
+
+    it("renders block sequence and SHA-256 hash seal tags on timeline event cards", () => {
+      const logsWithHashes: AuditLog[] = [
+        {
+          ...mockLogs[0],
+          hash: "a1b2c3d4e5f67890123456789012345678901234567890123456789012345678",
+          previousHash: "0".repeat(64),
+          sequenceNumber: 1,
+        },
+      ];
+
+      const element = AuditTimeline({
+        claim: mockClaim,
+        logs: logsWithHashes,
+        isDrawer: true,
+      });
+
+      const str = JSON.stringify(element);
+      expect(str).toContain("Block #");
+      expect(str).toContain("SHA:");
+    });
+
+    it("renders SHA-256 Chain badge in AuditTrailDrawer header", () => {
+      const originalDoc = (globalThis as any).document;
+      const originalWin = (globalThis as any).window;
+      const mockBody = { nodeType: 1, style: { overflow: "" } };
+      (globalThis as any).document = { body: mockBody };
+      (globalThis as any).window = { addEventListener: vi.fn(), removeEventListener: vi.fn() };
+
+      try {
+        const element = AuditTrailDrawer({
+          isOpen: true,
+          onClose: vi.fn(),
+          claim: mockClaim,
+          logs: mockLogs,
+        });
+
+        const str = JSON.stringify(element);
+        expect(str).toContain("SHA-256 Chain");
+        expect(str).toContain("Live Sync");
+      } finally {
+        if (originalDoc === undefined) {
+          delete (globalThis as any).document;
+        } else {
+          (globalThis as any).document = originalDoc;
+        }
+        if (originalWin === undefined) {
+          delete (globalThis as any).window;
+        } else {
+          (globalThis as any).window = originalWin;
+        }
+      }
     });
   });
 });

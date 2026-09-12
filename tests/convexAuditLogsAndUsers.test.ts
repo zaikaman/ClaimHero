@@ -279,6 +279,43 @@ describe("Convex Audit Logs, Users, Auth & Crons", () => {
       expect(res[0]._id).toBe("l_tomb");
     });
 
+    it("verifyAuditChain: computes and verifies whole case audit trail under ERISA § 503", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockClaim = { _id: "c1", userId: "user_123" };
+      const testHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+      const logs = [
+        {
+          _id: "l1",
+          claimId: "c1",
+          eventType: "denial_ingested",
+          timestamp: 100,
+          details: "Details 1",
+          previousHash: auditLogs.GENESIS_HASH,
+          sequenceNumber: 1,
+        },
+      ];
+
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              order: vi.fn().mockReturnValue({
+                take: vi.fn().mockResolvedValue(logs),
+              }),
+            }),
+          }),
+        },
+      };
+
+      const res = await (auditLogs.verifyAuditChain as any)._handler(mockCtx, { claimId: "c1" });
+      expect(res.isValid).toBe(true);
+      expect(res.totalRecords).toBe(1);
+      expect(res.verifiedRecords).toBe(1);
+      expect(res.genesisHash).toBe(auditLogs.GENESIS_HASH);
+      expect(res.terminalHash).toHaveLength(64);
+    });
+
     it("convex/auth: exports configured Convex Auth v2 methods and enforces long-lived accessTokenTtlSeconds", async () => {
       expect(convexAuthModule.signInWithPassword).toBeDefined();
       expect(convexAuthModule.signUpWithPassword).toBeDefined();

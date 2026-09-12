@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-12T17:30:00Z
+- **Last updated:** 2026-09-12T18:30:00Z
 
 ## Log
 
@@ -1321,7 +1321,7 @@ Built zero-asset Web Audio acoustic sentinel sensory feedback system and wired r
 ### 2026-09-12 - 15f4e56
 Streamlined top Header metrics and actions by removing the redundant portfolio win rate percentage from the 'Recovered' financial pill and eliminating the non-functional 'Clinical Intelligence' status badge and unused Pulse icon (`src/components/layout/Header.tsx`), presenting clean disputed and recovered totals without cluttering the global bar.
 
-### 2026-09-12 - working tree
+### 2026-09-12 - faea372
 Redesigned Sentinel Copilot into a docked right slide-out drawer, eliminating bottom-right floating pill occlusion and consumer AI button clutter (`src/components/chat/SentinelChatbot.tsx`, `src/components/layout/Header.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/layout/Shell.tsx`, `src/hooks/useSentinelChat.ts`, `src/components/studio/AppealStudio.tsx`, `src/App.tsx`, `tests/sentinelDrawerAndTrigger.test.ts`):
 - Diagnosed UX collision where the fixed floating chatbot capsule at bottom-right directly occluded primary sticky footer controls (`Export PDF Dossier` and `Next: Dispatch Appeal Packet`) in the Appeal Studio.
 - Removed floating draggable capsule from the viewport and eliminated consumer-style sparkle buttons from the top navigation bar. Converted the bottom-left sidebar's existing 'ERISA Sentinel' status card (`29 CFR § 2560`) into an interactive launcher in both expanded and collapsed modes with `⌘J` hover cues, while preserving the global `⌘J` / `Ctrl+J` power-user shortcut.
@@ -1329,3 +1329,13 @@ Redesigned Sentinel Copilot into a docked right slide-out drawer, eliminating bo
 - Refactored `SentinelChatbot` into a full-height portaled right drawer (`w-full max-w-xl bg-background border-l shadow-2xl`) with backdrop blur, focus restoration, modal focus trapping on Tab key, and clean Escape key / outside click dismissal.
 - Enhanced clinical appeal workflow with a 1-click 'Insert into Brief' action on assistant responses, seamlessly injecting cited statutory authorities and clinical addenda into the Appeal Studio brief editor right before formal closing salutations with Sonner toast feedback.
 - Resolved keyboard toggle stale closure in `useSentinelChat` via ref tracking, decoupled scroll lock to prevent render thrashing, and added regression test suite (`tests/sentinelDrawerAndTrigger.test.ts`). Verified with `npm run verify` (typecheck, lint, 897 unit tests, and production build).
+
+### 2026-09-12 - working tree
+Implemented Tamper-Evident Cryptographic Merkle/Audit Chain under ERISA 29 CFR § 2560.503-1 and resolved database sealing discrepancy (`convex/schema.ts`, `convex/auditLogs.ts`, `convex/claims.ts`, `convex/workflows.ts`, `convex/appeals.ts`, `convex/clinicalEvidences.ts`, `src/lib/auditCrypto.ts`, `src/types/index.ts`, `src/components/communications/AuditTrailDrawer.tsx`, `src/components/communications/AuditTimeline.tsx`, `tests/auditCryptoChain.test.ts`, `tests/auditTrailDrawer.test.ts`, `tests/convexAuditLogsAndUsers.test.ts`, `tests/claimhero.test.ts`):
+- Clinical & Legal Compliance Engine: under ERISA 29 CFR § 2560.503-1, courts and federal healthcare regulators reject appeal logs if an insurer or advocate could backdate or alter records. In Convex ACID mutations (`convex/auditLogs.ts`), computed a deterministic rolling SHA-256 hash: `currentHash = sha256(previousHash + eventType + claimId + timestamp + details)` linking to `previousHash` (or Genesis `0^64`) in the same serializable transaction with an auto-incrementing `sequenceNumber`.
+- Schema & Index Hardening: extended `appealAuditLogs` in `convex/schema.ts` with `hash: v.optional(v.string())`, `previousHash: v.optional(v.string())`, and `sequenceNumber: v.optional(v.number())`, accompanied by a dedicated `.index("by_claim_and_sequence", ["claimId", "sequenceNumber"])`.
+- Database Sealing Discrepancy Fix: resolved issue where top HUD falsely reported '14 / 14 blocks mathematically sealed' while event cards #3 through #14 rendered 'Unsealed Block' due to unsealed records inserted by background mutations. Added `sealedRecords` (count of records with stored SHA-256 hashes) and `unsealedRecords` to `AuditChainVerificationResult` in `src/types/index.ts`, `src/lib/auditCrypto.ts`, and `convex/auditLogs.ts`.
+- Accurate HUD Status & 1-Click Sealer: updated HUD banner in `AuditTimeline.tsx` to display `Chain Seal Pending (X/Y Sealed)` with `${sealedRecords} / ${totalRecords} blocks sealed in database (${unsealedRecords} unsealed) • Click 'Seal Complete Chain'`. Prominently exposed 1-click 'Seal Complete Chain' CTA button invoking `sealClaimAuditChain` to write rolling hashes for all historical records into Convex.
+- Universal `appendAuditLog` Integration: exported `appendAuditLog` helper in `convex/auditLogs.ts` and replaced bare `ctx.db.insert("appealAuditLogs", ...)` calls across `convex/claims.ts`, `convex/workflows.ts`, `convex/appeals.ts`, and `convex/clinicalEvidences.ts`, guaranteeing that all intake, extraction, workflow start, status change, and evidence synthesis mutations seal their blocks immediately with sequential rolling hashes.
+- Verified Live Deployment: executed internal mutation on active dev deployment (`peaceful-sparrow-520`) to seal all 14 blocks for Eleanor Vance (`CLM-8942-CIG-1513`), establishing complete cryptographic continuity.
+- Verified 100% clean with `npm run verify`: 0 typecheck errors, 0 lint warnings, 920 passing unit tests across 57 test suites, ~81.1% line coverage, and clean production build.

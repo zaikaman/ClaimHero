@@ -5,6 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { components, internal } from "./_generated/api";
 import { getClaimIfAuthorized, requireAuthUser, requireClaimEditor } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
+import { appendAuditLog } from "./auditLogs";
 
 async function takeBounded<T>(query: {
   take?: (n: number) => Promise<T[]>;
@@ -349,7 +350,7 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
 
   // Insert audit log (omitting raw subject to prevent storing unredacted PHI in case audit trail)
   const auditClaimTag = claim?.claimNumber ? `regarding claim #${claim.claimNumber}` : `regarding claim`;
-  await ctx.db.insert("appealAuditLogs", {
+  await appendAuditLog(ctx, {
     claimId: args.claimId,
     ...(claim?.userId ? { userId: claim.userId } : {}),
     eventType: args.direction === "inbound" ? "payer_response_received" : "appeal_dispatched",

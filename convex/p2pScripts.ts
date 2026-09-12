@@ -2,6 +2,7 @@ import { internalMutation, internalQuery, mutation, query, MutationCtx } from ".
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
+import { appendAuditLog } from "./auditLogs";
 
 /**
  * Get a P2P defense script by its ID, checking claim ownership
@@ -164,7 +165,7 @@ async function applyCreateOrUpdateScript(ctx: MutationCtx, args: CreateOrUpdateS
   }
 
   // Record case audit event
-  await ctx.db.insert("appealAuditLogs", {
+  await appendAuditLog(ctx, {
     claimId: args.claimId,
     eventType: "p2p_script_generated",
     actor: args.lastEditedBy || "P2P Defense Generator",

@@ -364,9 +364,13 @@ export default defineSchema({
     isTombstoned: v.optional(v.boolean()),
     tombstonedAt: v.optional(v.number()),
     idempotencyKey: v.optional(v.string()),
+    hash: v.optional(v.string()),
+    previousHash: v.optional(v.string()),
+    sequenceNumber: v.optional(v.number()),
   })
     .index("by_claim", ["claimId"])
     .index("by_claim_and_timestamp", ["claimId", "timestamp"])
+    .index("by_claim_and_sequence", ["claimId", "sequenceNumber"])
     .index("by_claim_event", ["claimId", "eventType", "timestamp"])
     .index("by_user_and_timestamp", ["userId", "timestamp"])
     .index("by_idempotency_key", ["idempotencyKey"])

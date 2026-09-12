@@ -12,6 +12,7 @@ import {
   type ClaimAccessRole,
 } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
+import { appendAuditLog } from "./auditLogs";
 
 export const collaboratorRoleValidator = v.union(v.literal("editor"), v.literal("viewer"));
 export const collaboratorStatusValidator = v.union(
@@ -338,7 +339,7 @@ export const invite = mutation({
         invitedBy: ownerId,
         updatedAt: now,
       });
-      await ctx.db.insert("appealAuditLogs", {
+      await appendAuditLog(ctx, {
         claimId: args.claimId,
         userId: ownerId,
         eventType: "collaborator_invited",
@@ -378,7 +379,7 @@ export const invite = mutation({
         updatedAt: now,
       });
     }
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       userId: ownerId,
       eventType: "collaborator_invited",
@@ -414,7 +415,7 @@ export const accept = mutation({
     }
     const user = await ctx.db.get(userId);
     await ctx.db.patch(grant._id, { status: "active", userId, updatedAt: Date.now() });
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       userId,
       eventType: "collaborator_accepted",
@@ -444,7 +445,7 @@ export const decline = mutation({
     }
     const user = await ctx.db.get(userId);
     await ctx.db.patch(grant._id, { status: "declined", updatedAt: Date.now() });
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       userId,
       eventType: "collaborator_declined",
@@ -478,7 +479,7 @@ export const cancelInvite = mutation({
     const ownerId = await requireAuthUser(ctx);
     const owner = await ctx.db.get(ownerId);
     await ctx.db.patch(grant._id, { status: "revoked", updatedAt: Date.now() });
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       userId: ownerId,
       eventType: "collaborator_invite_canceled",
@@ -513,7 +514,7 @@ export const updateRole = mutation({
     const ownerId = await requireAuthUser(ctx);
     const owner = await ctx.db.get(ownerId);
     await ctx.db.patch(grant._id, { role: args.role, updatedAt: Date.now() });
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       userId: ownerId,
       eventType: "collaborator_role_changed",
@@ -548,7 +549,7 @@ export const remove = mutation({
     const ownerId = await requireAuthUser(ctx);
     const owner = await ctx.db.get(ownerId);
     await ctx.db.patch(grant._id, { status: "revoked", updatedAt: Date.now() });
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       userId: ownerId,
       eventType: "collaborator_removed",
@@ -581,7 +582,7 @@ export const leave = mutation({
     }
     const user = await ctx.db.get(userId);
     await ctx.db.patch(mine._id, { status: "revoked", updatedAt: Date.now() });
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       userId,
       eventType: "collaborator_left",

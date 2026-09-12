@@ -7,6 +7,7 @@ import { requireClaimEditor, getAuthUserId } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
 import { ERISA_STATUTORY_EVIDENCE } from "./lib/erisaEvidence";
 import { appealLevelValidator, type StatutoryAppealLevel } from "./lib/statutoryTierValidators";
+import { appendAuditLog } from "./auditLogs";
 
 export const workflow = new WorkflowManager(components.workflow, {
   workpoolOptions: {
@@ -592,7 +593,7 @@ export async function performStartDurablePipeline(
     updatedAt: Date.now(),
   });
 
-  await ctx.db.insert("appealAuditLogs", {
+  await appendAuditLog(ctx, {
     claimId: args.claimId,
     userId,
     eventType: "durable_workflow_started",
@@ -749,7 +750,7 @@ export const cancelDurableWorkflow = mutation({
       updatedAt: Date.now(),
     });
 
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       userId,
       eventType: "durable_workflow_canceled",
@@ -786,7 +787,7 @@ export const startStatutoryCountdown = mutation({
       }
     );
 
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       userId,
       eventType: "statutory_countdown_started",

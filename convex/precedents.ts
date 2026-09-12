@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { precedentMatchValidator } from "./lib/precedentValidators";
 import { getClaimIfAuthorized } from "./lib/auth";
 import { fitDimensions, EMBEDDING_DIMENSIONS } from "./lib/embeddings";
+import { appendAuditLog } from "./auditLogs";
 
 export { precedentMatchValidator };
 
@@ -301,7 +302,7 @@ export const attachMatchesToClaim = internalMutation({
         ? `Hybrid Precedent Search (Vector + Full-Text RRF Fusion) retrieved ${args.matches.length} controlling authorities (${hybridCount} dual-matched): ${uniqueCitations.join("; ")}.`
         : `Convex vector search returned ${args.matches.length} controlling authorities: ${uniqueCitations.join("; ")}.`;
 
-      await ctx.db.insert("appealAuditLogs", {
+      await appendAuditLog(ctx, {
         claimId: args.claimId,
         eventType: "precedent_vectors_retrieved",
         actor: "Precedent Vector Archive",

@@ -7,6 +7,8 @@ export function useSoundEffects() {
   const [settings, setSettingsState] = useState<AudioSettings>(() => soundEffects.getSettings());
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const handleSettingsChange = (e: Event) => {
       const customEvent = e as CustomEvent<AudioSettings>;
       if (customEvent.detail) {

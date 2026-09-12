@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
+import { appendAuditLog } from "./auditLogs";
 
 export const getLatestByClaim = query({
   args: {
@@ -285,7 +286,7 @@ export const completeSession = mutation({
     });
 
     // Record case audit log
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: session.claimId,
       eventType: "p2p_live_call_completed",
       actor: "P2P Live Call Copilot",

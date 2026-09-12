@@ -2,6 +2,7 @@ import { MutationCtx, internalMutation, internalQuery, mutation, query } from ".
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
+import { appendAuditLog } from "./auditLogs";
 import {
   STATUTORY_APPEAL_LEVELS,
   STATUTORY_POSTURES,
@@ -259,7 +260,7 @@ async function applyCreateOrUpdateDraft(
   });
 
   // Add case audit log entry
-  await ctx.db.insert("appealAuditLogs", {
+  await appendAuditLog(ctx, {
     claimId: args.claimId,
     eventType: "appeal_draft_updated",
     actor: args.lastEditedBy || "Appeal Studio",
@@ -347,7 +348,7 @@ export const escalateTier = mutation({
       ? `Statutory dispute escalated to ${args.targetLevel.replace(/_/g, " ").toUpperCase()} (${tierMeta.targetAuthority}). Reason: ${args.escalationReason}`
       : `Statutory dispute escalated to ${args.targetLevel.replace(/_/g, " ").toUpperCase()} (${tierMeta.targetAuthority}). Increased legal posture to ${tierMeta.legalAggressiveness}.`;
 
-    await ctx.db.insert("appealAuditLogs", {
+    await appendAuditLog(ctx, {
       claimId: args.claimId,
       eventType: "statutory_tier_escalated",
       actor: args.actor || "Advocate Legal Officer",

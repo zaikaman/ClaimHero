@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Clock, X, Circle } from "@phosphor-icons/react";
+import { Clock, X, Circle, ShieldCheck } from "@phosphor-icons/react";
 import { Claim, AuditLog } from "../../types";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -121,6 +121,10 @@ export const AuditTrailDrawer: React.FC<AuditTrailDrawerProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-[10px] font-mono text-cyan-300">
+              <ShieldCheck className="size-3 text-cyan-400" weight="fill" />
+              <span>SHA-256 Chain</span>
+            </div>
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-[10px] font-mono text-emerald-400">
               <Circle className="size-2 fill-emerald-400 text-emerald-400 animate-pulse" weight="fill" />
               <span>Live Sync</span>

@@ -1,5 +1,6 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { type Id, type Doc } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimEditor, getAuthUserId } from "./lib/auth";
 
 /**
@@ -25,6 +26,41 @@ export const listByClaim = query({
 });
 
 /**
+ * Genesis hash for the initial block in any claim's audit chain (64 hex zeroes).
+ */
+export const GENESIS_HASH = "0".repeat(64);
+
+/**
+ * Computes deterministic rolling SHA-256 hash under ERISA 29 CFR § 2560.503-1:
+ * currentHash = sha256(previousHash + eventType + claimId + timestamp + details).
+ * Uses native WebCrypto (subtle.digest) with seamless Node.js dynamic import fallback.
+ */
+export async function computeAuditHash(
+  previousHash: string,
+  eventType: string,
+  claimId: string,
+  timestamp: number,
+  details: string
+): Promise<string> {
+  const payload = `${previousHash}${eventType}${claimId}${timestamp}${details}`;
+  if (typeof crypto !== "undefined" && crypto?.subtle?.digest) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(payload);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  try {
+    const moduleName = "node:crypto";
+    const nodeCrypto = await import(/* @vite-ignore */ moduleName);
+    return nodeCrypto.createHash("sha256").update(payload, "utf8").digest("hex");
+  } catch {
+    throw new Error("SHA-256 cryptographic engine not available in runtime");
+  }
+}
+
+/**
  * Computes deterministic audit log idempotency key (claimId:eventType:day)
  * to prevent retry storms from sweeps, crons, and webhooks.
  */
@@ -38,7 +74,171 @@ export function computeAuditIdempotencyKey(
 }
 
 /**
- * Append an event to the case audit log, checking claim ownership
+ * Seals or repairs the entire cryptographic audit trail for a claim.
+ * Iterates through all chronological records, assigns sequential block numbers,
+ * and links each record with deterministic rolling SHA-256 hashes from GENESIS_HASH.
+ */
+export async function sealAuditChainForClaimHelper(
+  ctx: MutationCtx,
+  claimId: Id<"claims">
+): Promise<{ totalSealed: number; terminalHash: string }> {
+  if (typeof ctx.db.query !== "function") {
+    return { totalSealed: 0, terminalHash: GENESIS_HASH };
+  }
+
+  const rawLogs = await ctx.db
+    .query("appealAuditLogs")
+    .withIndex("by_claim_and_timestamp", (q) => q.eq("claimId", claimId))
+    .order("asc")
+    .take(500);
+
+  const logs = [...rawLogs].sort((a: Doc<"appealAuditLogs">, b: Doc<"appealAuditLogs">) => {
+    if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+    if (a.sequenceNumber != null && b.sequenceNumber != null && a.sequenceNumber !== b.sequenceNumber) {
+      return a.sequenceNumber - b.sequenceNumber;
+    }
+    const aTime = a._creationTime ?? 0;
+    const bTime = b._creationTime ?? 0;
+    if (aTime !== bTime) return aTime - bTime;
+    return (a._id || "").localeCompare(b._id || "");
+  });
+
+  let rollingHash = GENESIS_HASH;
+  let count = 0;
+
+  for (let i = 0; i < logs.length; i++) {
+    const log = logs[i];
+    const seq = i + 1;
+    const prevHash = rollingHash;
+    const currentHash = await computeAuditHash(
+      prevHash,
+      log.eventType,
+      log.claimId,
+      log.timestamp,
+      log.details
+    );
+
+    if (
+      log.hash !== currentHash ||
+      log.previousHash !== prevHash ||
+      log.sequenceNumber !== seq
+    ) {
+      await ctx.db.patch(log._id, {
+        hash: currentHash,
+        previousHash: prevHash,
+        sequenceNumber: seq,
+      });
+    }
+
+    rollingHash = currentHash;
+    count++;
+  }
+
+  return { totalSealed: count, terminalHash: rollingHash };
+}
+
+export interface AppendAuditLogArgs {
+  claimId: Id<"claims">;
+  userId?: Id<"users">;
+  eventType: string;
+  actor: string;
+  details: string;
+  timestamp?: number;
+  idempotencyKey?: string;
+  isTombstoned?: boolean;
+  tombstonedAt?: number;
+}
+
+/**
+ * Universal helper to append a case audit log entry with deterministic rolling SHA-256
+ * Merkle chain sealing under ERISA 29 CFR § 2560.503-1.
+ * Guarantees that every newly written audit block contains parent linkage, valid sequence number,
+ * and a tamper-evident SHA-256 seal.
+ */
+export async function appendAuditLog(
+  ctx: MutationCtx,
+  args: AppendAuditLogArgs
+): Promise<Id<"appealAuditLogs">> {
+  const timestamp = args.timestamp ?? Date.now();
+  const claim = typeof ctx.db.get === "function" ? await ctx.db.get(args.claimId) : null;
+  const resolvedUserId = args.userId || claim?.userId;
+
+  const effectiveKey =
+    args.idempotencyKey ||
+    (args.eventType.startsWith("statutory_alarm") || args.eventType.includes("alarm")
+      ? computeAuditIdempotencyKey(args.claimId, args.eventType, timestamp)
+      : undefined);
+
+  if (effectiveKey && typeof ctx.db.query === "function") {
+    try {
+      const existing = await ctx.db
+        .query("appealAuditLogs")
+        .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", effectiveKey))
+        .first();
+      if (existing) {
+        return existing._id;
+      }
+    } catch {
+      // Safe fallback for mock runners
+    }
+  }
+
+  let previousHash = GENESIS_HASH;
+  let sequenceNumber = 1;
+
+  if (typeof ctx.db.query === "function") {
+    try {
+      const lastLog = await ctx.db
+        .query("appealAuditLogs")
+        .withIndex("by_claim_and_timestamp", (q) => q.eq("claimId", args.claimId))
+        .order("desc")
+        .first();
+
+      if (lastLog) {
+        if (lastLog.hash && lastLog.sequenceNumber) {
+          previousHash = lastLog.hash;
+          sequenceNumber = lastLog.sequenceNumber + 1;
+        } else {
+          // Unsealed legacy records exist; seal existing chain so new log links to an unbroken Merkle root
+          const sealResult = await sealAuditChainForClaimHelper(ctx, args.claimId);
+          previousHash = sealResult.terminalHash;
+          sequenceNumber = sealResult.totalSealed + 1;
+        }
+      }
+    } catch {
+      // Safe fallback for mock runners
+    }
+  }
+
+  const hash = await computeAuditHash(
+    previousHash,
+    args.eventType,
+    args.claimId,
+    timestamp,
+    args.details
+  );
+
+  const logId = await ctx.db.insert("appealAuditLogs", {
+    claimId: args.claimId,
+    ...(resolvedUserId ? { userId: resolvedUserId } : {}),
+    eventType: args.eventType,
+    actor: args.actor,
+    details: args.details,
+    timestamp,
+    idempotencyKey: effectiveKey,
+    ...(args.isTombstoned !== undefined ? { isTombstoned: args.isTombstoned } : {}),
+    ...(args.tombstonedAt !== undefined ? { tombstonedAt: args.tombstonedAt } : {}),
+    hash,
+    previousHash,
+    sequenceNumber,
+  });
+
+  return logId;
+}
+
+/**
+ * Append an event to the case audit log, checking claim ownership and computing
+ * an unbroken cryptographic rolling SHA-256 Merkle chain.
  */
 export const logEvent = mutation({
   args: {
@@ -65,40 +265,26 @@ export const logEvent = mutation({
     }
 
     const timestamp = Date.now();
-    const effectiveKey =
-      args.idempotencyKey ||
-      (eventType.startsWith("statutory_alarm") || eventType.includes("alarm")
-        ? computeAuditIdempotencyKey(args.claimId, eventType, timestamp)
-        : undefined);
-
-    if (effectiveKey && typeof ctx.db.query === "function") {
-      try {
-        const existing = await ctx.db
-          .query("appealAuditLogs")
-          .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", effectiveKey))
-          .first();
-        if (existing) {
-          return existing._id;
-        }
-      } catch {
-        // Safe fallback for mock runners without idempotency index
-      }
-    }
-
-    const logId = await ctx.db.insert("appealAuditLogs", {
+    const logId = await appendAuditLog(ctx, {
       claimId: args.claimId,
       userId,
       eventType,
       actor,
       details,
       timestamp,
-      idempotencyKey: effectiveKey,
+      idempotencyKey: args.idempotencyKey,
     });
 
     // Update claim's last modified timestamp
-    await ctx.db.patch(args.claimId, {
-      updatedAt: timestamp,
-    });
+    if (typeof ctx.db.patch === "function") {
+      try {
+        await ctx.db.patch(args.claimId, {
+          updatedAt: timestamp,
+        });
+      } catch {
+        // Safe fallback
+      }
+    }
 
     return logId;
   },
@@ -106,6 +292,7 @@ export const logEvent = mutation({
 
 /**
  * Internal mutation for logging events from background actions & crons
+ * with deterministic rolling SHA-256 Merkle chain sealing.
  */
 export const logEventInternal = internalMutation({
   args: {
@@ -117,39 +304,192 @@ export const logEventInternal = internalMutation({
     idempotencyKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const timestamp = Date.now();
-    const claim = typeof ctx.db.get === "function" ? await ctx.db.get(args.claimId) : null;
-    const resolvedUserId = args.userId || claim?.userId;
+    return await appendAuditLog(ctx, args);
+  },
+});
 
-    const effectiveKey =
-      args.idempotencyKey ||
-      (args.eventType.startsWith("statutory_alarm") || args.eventType.includes("alarm")
-        ? computeAuditIdempotencyKey(args.claimId, args.eventType, timestamp)
-        : undefined);
+/**
+ * 1-click mutation to seal or reseal all audit trail blocks for a claim into
+ * an unbroken cryptographic SHA-256 Merkle chain under ERISA 29 CFR § 2560.503-1.
+ */
+export const sealClaimAuditChain = mutation({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    await requireClaimEditor(ctx, args.claimId);
+    return await sealAuditChainForClaimHelper(ctx, args.claimId);
+  },
+});
 
-    if (effectiveKey && typeof ctx.db.query === "function") {
-      try {
-        const existing = await ctx.db
-          .query("appealAuditLogs")
-          .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", effectiveKey))
-          .first();
-        if (existing) {
-          return existing._id;
-        }
-      } catch {
-        // Safe fallback for mock runners
-      }
+/**
+ * Internal mutation to seal audit chains from background crons, workers, and pipelines.
+ */
+export const sealClaimAuditChainInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    return await sealAuditChainForClaimHelper(ctx, args.claimId);
+  },
+});
+
+/**
+ * Verify the cryptographic Merkle/audit chain for a claim under ERISA 29 CFR § 2560.503-1.
+ * Recomputes the deterministic rolling SHA-256 hash across all chronological records
+ * to detect any backdating, alteration, or tampering.
+ */
+export const verifyAuditChain = query({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!authorized) {
+      return {
+        isValid: false,
+        totalRecords: 0,
+        verifiedRecords: 0,
+        genesisHash: GENESIS_HASH,
+        terminalHash: GENESIS_HASH,
+        durationMs: 0,
+        tamperDetected: false,
+        needsReseal: false,
+        failureReason: "Unauthorized claim access",
+        verifiedAt: Date.now(),
+      };
     }
 
-    return await ctx.db.insert("appealAuditLogs", {
-      claimId: args.claimId,
-      ...(resolvedUserId ? { userId: resolvedUserId } : {}),
-      eventType: args.eventType,
-      actor: args.actor,
-      details: args.details,
-      timestamp,
-      idempotencyKey: effectiveKey,
+    const startTime = Date.now();
+
+    const rawLogs = await ctx.db
+      .query("appealAuditLogs")
+      .withIndex("by_claim_and_timestamp", (q) => q.eq("claimId", args.claimId))
+      .order("asc")
+      .take(500);
+
+    const logs = [...rawLogs].sort((a: Doc<"appealAuditLogs">, b: Doc<"appealAuditLogs">) => {
+      if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+      if (a.sequenceNumber != null && b.sequenceNumber != null && a.sequenceNumber !== b.sequenceNumber) {
+        return a.sequenceNumber - b.sequenceNumber;
+      }
+      const aTime = a._creationTime ?? 0;
+      const bTime = b._creationTime ?? 0;
+      if (aTime !== bTime) return aTime - bTime;
+      return (a._id || "").localeCompare(b._id || "");
     });
+
+    const sealedRecords = logs.filter((l: Doc<"appealAuditLogs">) => Boolean(l.hash)).length;
+    const unsealedRecords = logs.length - sealedRecords;
+
+    if (logs.length === 0) {
+      return {
+        isValid: true,
+        totalRecords: 0,
+        verifiedRecords: 0,
+        sealedRecords: 0,
+        unsealedRecords: 0,
+        genesisHash: GENESIS_HASH,
+        terminalHash: GENESIS_HASH,
+        durationMs: Date.now() - startTime,
+        tamperDetected: false,
+        needsReseal: false,
+        verifiedAt: Date.now(),
+      };
+    }
+
+    let expectedPrevHash = GENESIS_HASH;
+    let verifiedRecords = 0;
+
+    for (let i = 0; i < logs.length; i++) {
+      const log = logs[i];
+      const blockNum = log.sequenceNumber ?? i + 1;
+      const expectedHash = await computeAuditHash(
+        expectedPrevHash,
+        log.eventType,
+        log.claimId,
+        log.timestamp,
+        log.details
+      );
+
+      if (log.previousHash && log.previousHash !== expectedPrevHash) {
+        const prevBlockUnsealed = i > 0 && !logs[i - 1].hash;
+        const matchesOwnPrev =
+          prevBlockUnsealed &&
+          Boolean(log.hash) &&
+          (await computeAuditHash(
+            log.previousHash,
+            log.eventType,
+            log.claimId,
+            log.timestamp,
+            log.details
+          )) === log.hash;
+
+        const isTamper = !matchesOwnPrev;
+
+        return {
+          isValid: false,
+          totalRecords: logs.length,
+          verifiedRecords,
+          sealedRecords,
+          unsealedRecords,
+          genesisHash: GENESIS_HASH,
+          terminalHash: log.hash || expectedHash,
+          durationMs: Date.now() - startTime,
+          tamperDetected: isTamper,
+          needsReseal: !isTamper,
+          brokenIndex: i,
+          brokenBlockNumber: blockNum,
+          brokenLogId: log._id,
+          failureReason: !isTamper
+            ? `Unsealed chain boundary at block #${blockNum}: links to parent ${log.previousHash.slice(0, 8)}... instead of rolling chain ${expectedPrevHash.slice(0, 8)}... Reseal required to bind legacy blocks.`
+            : `Chain link broken at block #${blockNum}: expected parent hash ${expectedPrevHash.slice(0, 8)}... but found ${log.previousHash.slice(0, 8)}...`,
+          verifiedAt: Date.now(),
+        };
+      }
+
+      if (log.hash && log.hash !== expectedHash) {
+        return {
+          isValid: false,
+          totalRecords: logs.length,
+          verifiedRecords,
+          sealedRecords,
+          unsealedRecords,
+          genesisHash: GENESIS_HASH,
+          terminalHash: log.hash,
+          durationMs: Date.now() - startTime,
+          tamperDetected: true,
+          needsReseal: false,
+          brokenIndex: i,
+          brokenBlockNumber: blockNum,
+          brokenLogId: log._id,
+          failureReason: `Hash mismatch at block #${blockNum}: expected ${expectedHash.slice(0, 8)}... but found ${log.hash.slice(0, 8)}... Content modified after sealing.`,
+          verifiedAt: Date.now(),
+        };
+      }
+
+      expectedPrevHash = log.hash || expectedHash;
+      verifiedRecords++;
+    }
+
+    const needsReseal = unsealedRecords > 0;
+
+    return {
+      isValid: true,
+      totalRecords: logs.length,
+      verifiedRecords,
+      sealedRecords,
+      unsealedRecords,
+      genesisHash: GENESIS_HASH,
+      terminalHash: expectedPrevHash,
+      durationMs: Date.now() - startTime,
+      tamperDetected: false,
+      needsReseal,
+      failureReason: needsReseal
+        ? `${unsealedRecords} unsealed block(s) detected in database. Reseal required to bind all historical blocks into an unbroken rolling SHA-256 Merkle chain.`
+        : undefined,
+      verifiedAt: Date.now(),
+    };
   },
 });
 

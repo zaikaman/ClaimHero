@@ -1640,14 +1640,14 @@ describe("Convex Advanced Components & Infrastructure (Rate Limiter, Search Inde
 
       // Only Claim 1 triggered the critical alarm (crossed >14 to <=14)
       expect(mockInsert).toHaveBeenCalledTimes(1);
-      expect(mockInsert).toHaveBeenCalledWith("appealAuditLogs", {
+      expect(mockInsert).toHaveBeenCalledWith("appealAuditLogs", expect.objectContaining({
         claimId: "claim_1",
         eventType: "statutory_alarm_critical",
         actor: "Statutory Deadline Sentinel",
         details: expect.stringContaining("CRITICAL ALARM: Only 10 days remaining"),
         timestamp: expect.any(Number),
         idempotencyKey: expect.stringMatching(/^claim_1:statutory_alarm_critical:/),
-      });
+      }));
 
       // Scheduled the next batch because isDone is false
       expect(mockRunAfter).toHaveBeenCalledTimes(1);

@@ -394,9 +394,31 @@ export interface AppealAuditLog {
   timestamp: number;
   isTombstoned?: boolean;
   tombstonedAt?: number;
+  hash?: string;
+  previousHash?: string;
+  sequenceNumber?: number;
 }
 
 export type AuditLog = AppealAuditLog;
+
+export interface AuditChainVerificationResult {
+  isValid: boolean;
+  totalRecords: number;
+  verifiedRecords: number;
+  sealedRecords: number;
+  unsealedRecords: number;
+  genesisHash: string;
+  terminalHash: string;
+  durationMs: number;
+  tamperDetected: boolean;
+  needsReseal?: boolean;
+  brokenIndex?: number;
+  brokenBlockNumber?: number;
+  brokenLogId?: string;
+  failureReason?: string;
+  verifiedAt: number;
+}
+
 
 // LLM Output Structured Schemas
 export interface DenialExtractionResult {
