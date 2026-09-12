@@ -203,12 +203,12 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **835 automated tests** across 51 test suites (verified via `npm run test`):
+ClaimHero is backed by **873 automated tests** across 53 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (835 tests across 51 suites)
+npm run test            # Comprehensive Vitest test suite (873 tests across 53 suites)
 npm run test:coverage   # Code coverage report (~81.3% lines)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate

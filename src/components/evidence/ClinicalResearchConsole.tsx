@@ -52,47 +52,89 @@ interface TelemetryLog {
   type: "info" | "success" | "warning" | "error";
 }
 
-const RESEARCH_MODES: Array<{
+export interface ResearchChannelConfig {
   id: ResearchMode;
-  label: string;
+  shortLabel: string;
+  fullLabel: string;
+  tagline: string;
   icon: React.ElementType;
-  description: string;
+  iconColor: string;
   badge?: string;
-}> = [
-    {
-      id: "multi_source",
-      label: "Full Multi-Source Sentinel Scan",
-      icon: Lightning,
-      description: "Concurrent sweep of Insurer CPB, PubMed clinical trials, and FDA indications",
-      badge: "Recommended",
-    },
-    {
-      id: "payer_cpb",
-      label: "Insurer Policy Bulletin (CPB)",
-      icon: BookOpen,
-      description: "Official Clinical Policy Bulletins, medical necessity rules & criteria",
-    },
-    {
-      id: "pubmed_trials",
-      label: "PubMed & ClinicalTrials.gov",
-      icon: Flask,
-      description: "Peer-reviewed RCTs, meta-analyses & standard-of-care efficacy abstracts",
-    },
-    {
-      id: "fda_labels",
-      label: "FDA Package Inserts & Labels",
-      icon: ShieldCheck,
-      description: "FDA-approved on-label indications to legally refute investigational denials",
-    },
-    {
-      id: "custom_url",
-      label: "Live Web & Guideline URL Scanner",
-      icon: Globe,
-      description: "Scrape and extract structured criteria clauses from any custom health URL",
-    },
-  ];
+  description: string;
+  clinicalImpact: string;
+  actionButtonLabel: string;
+}
 
-const PRESET_RESEARCH_URLS = [
+export const RESEARCH_MODES: ResearchChannelConfig[] = [
+  {
+    id: "multi_source",
+    shortLabel: "Multi-Source",
+    fullLabel: "Full Multi-Source Sentinel Scan",
+    tagline: "3-Channel Sweep",
+    icon: Lightning,
+    iconColor: "text-cyan-400 bg-cyan-500/15 border-cyan-500/30",
+    badge: "Recommended",
+    description:
+      "Concurrently sweeps official Insurer Clinical Policy Bulletins (CPBs), queries PubMed for peer-reviewed clinical trial abstracts matching disputed CPT codes, and cross-references FDA indications in one synchronized extraction pipeline.",
+    clinicalImpact:
+      "Builds a comprehensive tri-pillar evidence dossier that simultaneously invalidates insurer policy misinterpretations, establishes medical efficacy, and verifies FDA on-label safety profiles.",
+    actionButtonLabel: "Launch Multi-Source Research Scan",
+  },
+  {
+    id: "payer_cpb",
+    shortLabel: "Insurer CPB",
+    fullLabel: "Insurer Policy Bulletin (CPB)",
+    tagline: "Payer Coverage Rules",
+    icon: BookOpen,
+    iconColor: "text-blue-400 bg-blue-500/15 border-blue-500/30",
+    description:
+      "Indexes official clinical criteria and medical coverage policies published by the insurer to discover documentation prerequisites, step-therapy rules, and clinical necessity thresholds.",
+    clinicalImpact:
+      "Exposes when the payer's adverse determination contradicts its own published medical bulletin or imposes unwritten coverage restrictions prohibited under ERISA.",
+    actionButtonLabel: "Crawl Insurer Policy Bulletin",
+  },
+  {
+    id: "pubmed_trials",
+    shortLabel: "PubMed Trials",
+    fullLabel: "PubMed & ClinicalTrials.gov",
+    tagline: "Peer-Reviewed RCTs",
+    icon: Flask,
+    iconColor: "text-emerald-400 bg-emerald-500/15 border-emerald-500/30",
+    description:
+      "Searches National Library of Medicine (NLM) databases for randomized controlled trials (RCTs), prospective cohort studies, and systematic meta-analyses supporting the clinical standard of care.",
+    clinicalImpact:
+      "Overcomes subjective insurer medical necessity rejections by citing peer-reviewed evidence proving therapeutic efficacy and patient outcome superiority.",
+    actionButtonLabel: "Search PubMed Trial Database",
+  },
+  {
+    id: "fda_labels",
+    shortLabel: "FDA Labels",
+    fullLabel: "FDA Package Inserts & Labels",
+    tagline: "On-Label Indications",
+    icon: ShieldCheck,
+    iconColor: "text-purple-400 bg-purple-500/15 border-purple-500/30",
+    description:
+      "Retrieves Drugs@FDA and DailyMed official package inserts, FDA clearance summaries, and approved on-label medical device indications.",
+    clinicalImpact:
+      "Legally dismantles CARC CO-50 and CO-58 investigational denials by proving the procedure, implant, or pharmaceutical has received federal FDA marketing authorization for the diagnosed pathology.",
+    actionButtonLabel: "Search FDA Approved Labels",
+  },
+  {
+    id: "custom_url",
+    shortLabel: "Custom URL",
+    fullLabel: "Live Web & Guideline URL Scanner",
+    tagline: "External Guideline",
+    icon: Globe,
+    iconColor: "text-amber-400 bg-amber-500/15 border-amber-500/30",
+    description:
+      "Crawls and extracts structured clinical criteria clauses directly from any publicly accessible insurer document, specialty society guideline (e.g., AAOS, NCCN, ACR), or hospital clinical pathway URL.",
+    clinicalImpact:
+      "Integrates specialized medical society consensus statements and state Medicaid policies directly into the claim's evidence matrix.",
+    actionButtonLabel: "Scrape & Extract Criteria Clauses",
+  },
+];
+
+export const PRESET_RESEARCH_URLS = [
   {
     label: "Molina TKA Arthroplasty CPB",
     url: "https://www.molinahealthcare.com/providers/common/medicaid/clinical-guidelines.aspx",
@@ -338,188 +380,356 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
           </div>
         </div>
 
-        {/* Mode Selector Pill Buttons */}
+        {/* Research Channel Selector */}
         <div className="space-y-2">
-          <span className="text-[11px] font-semibold text-muted-foreground uppercase font-mono tracking-wider">
-            Select Clinical Research Channel:
-          </span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
-            {RESEARCH_MODES.map((mode) => {
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-foreground font-sans">
+              Clinical Research Channel
+            </span>
+            <span className="text-[11px] font-mono text-muted-foreground">
+              Select ingestion pipeline
+            </span>
+          </div>
+
+          <div
+            role="tablist"
+            aria-label="Clinical research channels"
+            className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-muted/30 border border-border/70 w-full"
+          >
+            {RESEARCH_MODES.map((mode, index) => {
               const Icon = mode.icon;
               const isSelected = activeMode === mode.id;
               return (
                 <button
                   key={mode.id}
+                  id={`tab-${mode.id}`}
+                  role="tab"
+                  aria-selected={isSelected}
+                  aria-controls={`panel-${mode.id}`}
+                  tabIndex={isSelected ? 0 : -1}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                      e.preventDefault();
+                      const nextIndex = (index + 1) % RESEARCH_MODES.length;
+                      setActiveMode(RESEARCH_MODES[nextIndex].id);
+                      document.getElementById(`tab-${RESEARCH_MODES[nextIndex].id}`)?.focus();
+                    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                      e.preventDefault();
+                      const prevIndex = (index - 1 + RESEARCH_MODES.length) % RESEARCH_MODES.length;
+                      setActiveMode(RESEARCH_MODES[prevIndex].id);
+                      document.getElementById(`tab-${RESEARCH_MODES[prevIndex].id}`)?.focus();
+                    }
+                  }}
                   onClick={() => setActiveMode(mode.id)}
                   disabled={isExecuting}
-                  className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all cursor-pointer ${isSelected
-                      ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40 text-foreground"
-                      : "border-border/70 bg-card/60 hover:bg-card/90 text-muted-foreground hover:text-foreground"
-                    }`}
+                  className={`group relative flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer whitespace-nowrap min-w-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
+                    isSelected
+                      ? "border-primary/50 bg-card text-foreground shadow-xs ring-1 ring-primary/30"
+                      : "border-transparent bg-transparent hover:bg-card/60 text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  <div className="flex items-center justify-between w-full mb-1">
-                    <Icon className={`size-4 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
-                    {mode.badge && (
-                      <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-primary/20 text-primary font-bold">
-                        {mode.badge}
-                      </span>
-                    )}
+                  <div
+                    className={`size-5 rounded flex items-center justify-center border transition-colors shrink-0 ${
+                      isSelected
+                        ? mode.iconColor
+                        : "border-border/60 bg-muted/40 text-muted-foreground group-hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="size-3" />
                   </div>
-                  <span className="text-xs font-semibold block leading-tight text-foreground">
-                    {mode.label}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground leading-tight mt-1 line-clamp-2">
-                    {mode.description}
-                  </span>
+                  <span className="truncate">{mode.shortLabel}</span>
+                  {mode.badge && (
+                    <span
+                      className="size-1.5 rounded-full bg-primary shrink-0 ring-2 ring-primary/30"
+                      title="Recommended"
+                    />
+                  )}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Input Parameters & Preset Scanners */}
-        <div className="rounded-xl border border-border/70 bg-muted/20 p-3 space-y-3">
-          {activeMode === "custom_url" ? (
-            <div className="space-y-2">
-              <div className="flex flex-col sm:flex-row gap-2">
-                <div className="flex-1 space-y-1">
-                  <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                    Custom Insurance or Clinical Guideline URL:
-                  </span>
-                  <Input
-                    type="url"
-                    placeholder="https://www.insurer.com/clinical-policy/arthroplasty.pdf or https://pubmed.ncbi.nlm.nih.gov/..."
-                    value={customUrl}
-                    onChange={(e) => setCustomUrl(e.target.value)}
-                    className="h-8 text-xs font-mono"
-                    disabled={isExecuting}
-                  />
-                </div>
-                <div className="w-full sm:w-44 space-y-1">
-                  <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                    Source Category:
-                  </span>
-                  <Select
-                    value={customCategory}
-                    onChange={(e) => setCustomCategory(e.target.value)}
-                    className="h-8 text-xs font-sans"
-                    disabled={isExecuting}
-                  >
-                    <option value="payer_cpb">Insurer CPB</option>
-                    <option value="pubmed_study">PubMed Study</option>
-                    <option value="fda_package_insert">FDA Label</option>
-                    <option value="nccn_guideline">NCCN Guideline</option>
-                    <option value="legal_precedent">Statutory Precedent</option>
-                  </Select>
-                </div>
-              </div>
+        {/* Active Channel Station Deck */}
+        {(() => {
+          const currentModeConfig = RESEARCH_MODES.find((m) => m.id === activeMode) ?? RESEARCH_MODES[0];
+          const ActiveIcon = currentModeConfig.icon;
 
-              {/* Presets Row */}
-              <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                <span className="text-[10px] font-mono text-muted-foreground">Quick Presets:</span>
-                {PRESET_RESEARCH_URLS.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      setCustomUrl(preset.url);
-                      setCustomCategory(preset.category);
-                    }}
-                    disabled={isExecuting}
-                    className="text-[10px] font-sans px-2 py-0.5 rounded border border-border/80 bg-card hover:bg-muted text-foreground/80 hover:text-foreground transition-colors cursor-pointer"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : activeMode === "pubmed_trials" ? (
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                PubMed / ClinicalTrials Search Query Focus (Optional):
-              </span>
-              <Input
-                type="text"
-                placeholder={`Leave blank to auto-query CPT [${claim.cptCodes.join(", ")}] efficacy, or enter custom medical keywords...`}
-                value={customQuery}
-                onChange={(e) => setCustomQuery(e.target.value)}
-                className="h-8 text-xs font-sans"
-                disabled={isExecuting}
-              />
-            </div>
-          ) : activeMode === "fda_labels" ? (
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                FDA Device / Drug / Implant Name (Optional):
-              </span>
-              <Input
-                type="text"
-                placeholder={`Leave blank for procedure CPT ${claim.cptCodes[0] || "27447"} indications, or enter specific device (e.g. Persona Knee System)...`}
-                value={customQuery}
-                onChange={(e) => setCustomQuery(e.target.value)}
-                className="h-8 text-xs font-sans"
-                disabled={isExecuting}
-              />
-            </div>
-          ) : activeMode === "payer_cpb" ? (
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                Custom Insurer Policy URL (Optional Override):
-              </span>
-              <Input
-                type="url"
-                placeholder={`Leave blank to auto-discover ${claim.patient?.insurancePayer} policies, or paste specific PDF link...`}
-                value={customUrl}
-                onChange={(e) => setCustomUrl(e.target.value)}
-                className="h-8 text-xs font-mono"
-                disabled={isExecuting}
-              />
-            </div>
-          ) : (
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>
-                Multi-source scan targets: <strong className="text-foreground">{claim.patient?.insurancePayer}</strong> CPB, PubMed Trial Databases for CPT <strong className="font-mono text-foreground">{claim.cptCodes.join(", ")}</strong>, and FDA Indications.
-              </span>
-              <Badge variant="outline" className="font-mono text-[10px]">
-                3 Ingestion Channels
-              </Badge>
-            </div>
-          )}
-
-          {/* Trigger Action Bar */}
-          <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/60">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Sliders className="size-3.5 text-primary" />
-              <span>Target: #{claim.claimNumber} • {claim.patient?.name}</span>
-            </div>
-
-            <Button
-              size="sm"
-              onClick={handleExecuteResearch}
-              disabled={isExecuting}
-              className="h-8 text-xs px-4 gap-1.5 bg-primary text-primary-foreground font-semibold shadow-xs"
+          return (
+            <div
+              id={`panel-${activeMode}`}
+              role="tabpanel"
+              aria-labelledby={`tab-${activeMode}`}
+              tabIndex={0}
+              className="rounded-xl border border-border/80 bg-card/90 p-4 space-y-4 shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-primary/40"
             >
-              {isExecuting ? (
-                <>
-                  <CircleNotch className="size-3.5 animate-spin" />
-                  <span>Streaming Extraction ({(elapsedMs / 1000).toFixed(1)}s)...</span>
-                </>
-              ) : (
-                <>
-                  <Globe className="size-3.5" />
-                  <span>
-                    {activeMode === "multi_source"
-                      ? "Launch Multi-Source Research Scan"
-                      : activeMode === "custom_url"
-                        ? "Scrape & Extract Criteria Clauses"
-                        : `Crawl ${RESEARCH_MODES.find((m) => m.id === activeMode)?.label}`}
-                  </span>
-                </>
-              )}
-            </Button>
+              {/* Channel Briefing Header */}
+              <div className="space-y-2">
+                <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`size-8 rounded-lg flex items-center justify-center border ${currentModeConfig.iconColor}`}
+                    >
+                      <ActiveIcon className="size-4.5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-semibold text-foreground font-sans">
+                          {currentModeConfig.fullLabel}
+                        </h4>
+                        {currentModeConfig.badge && (
+                          <Badge variant="outline" className="font-mono text-[9px] h-4 px-1.5 text-primary border-primary/30">
+                            {currentModeConfig.badge}
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+                        {currentModeConfig.tagline}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-          </div>
-        </div>
+                {/* Full Unclipped Description */}
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {currentModeConfig.description}
+                </p>
+
+                {/* Clinical & Statutory Leverage Callout */}
+                <div className="rounded-lg bg-primary/[0.04] border border-primary/20 p-2.5 flex items-start gap-2 text-xs">
+                  <ShieldCheck className="size-4 text-primary shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] font-semibold text-primary block">
+                      Clinical & Statutory Leverage:
+                    </span>
+                    <p className="text-[11px] text-foreground/85 leading-relaxed">
+                      {currentModeConfig.clinicalImpact}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive Channel Parameters Surface */}
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-3 space-y-3">
+                {activeMode === "multi_source" ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase font-mono tracking-wider">
+                        Active Ingestion Pipelines (3 Channels Concurrent):
+                      </span>
+                      <Badge variant="outline" className="font-mono text-[10px] text-primary border-primary/30">
+                        Parallel Autonomous Sweep
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      {/* Pipeline 1: Insurer CPB */}
+                      <div className="rounded-lg border border-border/70 bg-card/60 p-2.5 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+                            <BookOpen className="size-3.5 text-blue-400" />
+                            Insurer Policy (CPB)
+                          </span>
+                          <Badge variant="outline" className="text-[9px] font-mono border-blue-500/30 text-blue-400">
+                            Payer Rules
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-tight">
+                          Target: <strong className="text-foreground">{claim.patient?.insurancePayer || "Insurer"}</strong> clinical bulletin for CPT <strong className="font-mono text-foreground">{claim.cptCodes.join(", ")}</strong>.
+                        </p>
+                      </div>
+
+                      {/* Pipeline 2: PubMed Clinical Trials */}
+                      <div className="rounded-lg border border-border/70 bg-card/60 p-2.5 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+                            <Flask className="size-3.5 text-emerald-400" />
+                            PubMed RCT Database
+                          </span>
+                          <Badge variant="outline" className="text-[9px] font-mono border-emerald-500/30 text-emerald-400">
+                            Medical Literature
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-tight">
+                          Target: Efficacy trials & meta-analyses for CPT <strong className="font-mono text-foreground">{claim.cptCodes.join(", ")}</strong>.
+                        </p>
+                      </div>
+
+                      {/* Pipeline 3: FDA Approved Labels */}
+                      <div className="rounded-lg border border-border/70 bg-card/60 p-2.5 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+                            <ShieldCheck className="size-3.5 text-purple-400" />
+                            FDA DailyMed Labels
+                          </span>
+                          <Badge variant="outline" className="text-[9px] font-mono border-purple-500/30 text-purple-400">
+                            On-Label Match
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-tight">
+                          Target: Approved indications & device safety specs to refute CARC <strong className="font-mono text-foreground">{claim.denialReasonCode}</strong>.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : activeMode === "custom_url" ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex-1 space-y-1">
+                        <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                          Custom Insurance or Clinical Guideline URL:
+                        </span>
+                        <Input
+                          type="url"
+                          placeholder="https://www.insurer.com/clinical-policy/arthroplasty.pdf or https://pubmed.ncbi.nlm.nih.gov/..."
+                          value={customUrl}
+                          onChange={(e) => setCustomUrl(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                          disabled={isExecuting}
+                        />
+                      </div>
+                      <div className="w-full sm:w-44 space-y-1">
+                        <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                          Source Category:
+                        </span>
+                        <Select
+                          value={customCategory}
+                          onChange={(e) => setCustomCategory(e.target.value)}
+                          className="h-8 text-xs font-sans"
+                          disabled={isExecuting}
+                        >
+                          <option value="payer_cpb">Insurer CPB</option>
+                          <option value="pubmed_study">PubMed Study</option>
+                          <option value="fda_package_insert">FDA Label</option>
+                          <option value="nccn_guideline">NCCN Guideline</option>
+                          <option value="legal_precedent">Statutory Precedent</option>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Presets Row */}
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                      <span className="text-[10px] font-mono text-muted-foreground">Quick Presets:</span>
+                      {PRESET_RESEARCH_URLS.map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setCustomUrl(preset.url);
+                            setCustomCategory(preset.category);
+                          }}
+                          disabled={isExecuting}
+                          className="text-[10px] font-sans px-2 py-0.5 rounded border border-border/80 bg-card hover:bg-muted text-foreground/80 hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : activeMode === "pubmed_trials" ? (
+                  <div className="space-y-2">
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                        PubMed / ClinicalTrials Search Query Focus (Optional):
+                      </span>
+                      <Input
+                        type="text"
+                        placeholder={`Leave blank to auto-query CPT [${claim.cptCodes.join(", ")}] efficacy, or enter custom medical keywords...`}
+                        value={customQuery}
+                        onChange={(e) => setCustomQuery(e.target.value)}
+                        className="h-8 text-xs font-sans"
+                        disabled={isExecuting}
+                      />
+                    </div>
+
+                    {/* Quick Suggestions for PubMed */}
+                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                      <span className="text-[10px] font-mono text-muted-foreground">Suggested Queries:</span>
+                      {[
+                        `Knee Arthroscopy vs Physical Therapy RCT`,
+                        `Meniscal Tear Surgical Efficacy`,
+                        `Conservative Management Failure Criteria`,
+                      ].map((sq, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setCustomQuery(sq)}
+                          disabled={isExecuting}
+                          className="text-[10px] font-sans px-2 py-0.5 rounded border border-border/80 bg-card hover:bg-muted text-foreground/80 hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          {sq}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : activeMode === "fda_labels" ? (
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                      FDA Device / Drug / Implant Name (Optional):
+                    </span>
+                    <Input
+                      type="text"
+                      placeholder={`Leave blank for procedure CPT ${claim.cptCodes[0] || "27447"} indications, or enter specific device (e.g. Persona Knee System)...`}
+                      value={customQuery}
+                      onChange={(e) => setCustomQuery(e.target.value)}
+                      className="h-8 text-xs font-sans"
+                      disabled={isExecuting}
+                    />
+                    <p className="text-[10.5px] text-muted-foreground leading-tight pt-0.5">
+                      Retrieves FDA DailyMed package inserts proving on-label clearance, dismantling CARC {claim.denialReasonCode || "CO-50"} experimental determinations.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                      Custom Insurer Policy URL (Optional Override):
+                    </span>
+                    <Input
+                      type="url"
+                      placeholder={`Leave blank to auto-discover ${claim.patient?.insurancePayer} policies, or paste specific PDF link...`}
+                      value={customUrl}
+                      onChange={(e) => setCustomUrl(e.target.value)}
+                      className="h-8 text-xs font-mono"
+                      disabled={isExecuting}
+                    />
+                    <p className="text-[10.5px] text-muted-foreground leading-tight pt-0.5">
+                      ClaimHero automatically crawls official {claim.patient?.insurancePayer} bulletins for CPT {claim.cptCodes.join(", ")}. Enter a URL only to override with an unindexed state or plan bulletin.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Trigger Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-border/60">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Sliders className="size-3.5 text-primary shrink-0" />
+                  <span>
+                    Target: <strong className="font-mono text-foreground">#{claim.claimNumber}</strong> &bull; {claim.patient?.name} (CPT {claim.cptCodes.join(", ")})
+                  </span>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={handleExecuteResearch}
+                  disabled={isExecuting}
+                  className="h-8.5 text-xs px-4 gap-2 bg-primary text-primary-foreground font-semibold shadow-xs hover:bg-primary/90 transition-all cursor-pointer shrink-0"
+                >
+                  {isExecuting ? (
+                    <>
+                      <CircleNotch className="size-3.5 animate-spin" />
+                      <span>Streaming Extraction ({(elapsedMs / 1000).toFixed(1)}s)...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ActiveIcon className="size-3.5" />
+                      <span>{currentModeConfig.actionButtonLabel}</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Error / Success Alerts */}
         {errorMessage && (

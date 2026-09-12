@@ -160,6 +160,8 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   const pipelineStepLabel =
     claim.status === "drafting"
       ? "Step 3/3: Synthesizing cited ERISA appeal brief"
+      : claim.status === "analyzing" || claim.status === "precedent_matched"
+      ? "Step 2/3: Evaluating clinical rubric & policy criteria"
       : "Step 1/3: Crawling insurer Clinical Policy Bulletins";
 
   return (
@@ -564,9 +566,9 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       )}
 
       {/* Dual Pane Layout: Baseline (5 cols) & Evidence Feed (7 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Left Column: Denial Baseline & Patient Record */}
-        <div className="lg:col-span-5 space-y-3">
+        <div className="lg:col-span-5 space-y-3 lg:sticky lg:top-4 self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
           <Card className="p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">

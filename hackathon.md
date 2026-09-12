@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-12T14:57:00Z
+- **Last updated:** 2026-09-12T16:13:00Z
 
 ## Log
 
@@ -1283,10 +1283,22 @@ Resolved Case Audit Trail Drawer loading freeze and layout clipping (`src/App.ts
 - Enhanced `AuditTimeline` with drawer-aware compact toolbar (`isDrawer: true`), dynamic filter dropdown options reflecting real event labels and counts, detailed timestamps (`formatDateTime`), animated skeleton loaders, and expanded event mappings across 40+ backend telemetry events.
 - Added regression test suite (`tests/auditTrailDrawer.test.ts`) and verified 100% clean across typecheck, lint, 842 unit tests, and production build with `npm run verify`.
 
-### 2026-09-12 - working tree
+### 2026-09-12 - 3dc17cf
 Resolved Score Rubric background spinner freeze, removed button clutter, and eliminated duplicate Appeal Brief triggers (`src/components/evidence/EvidenceMatrix.tsx`, `src/components/studio/AppealStudio.tsx`, `convex/actions/precedentMatcher.ts`):
 - Diagnosed root cause of perpetual spinning 'Autonomous pipeline running in background [precedent matched]': `precedentMatcher.ts` set claim status to `precedent_matched` which was mistakenly classified in frontend components as an active background task rather than a completed milestone. Fixed `isBackgroundPipelineRunning` to only trigger on active asynchronous tasks (`parsing`, `analyzing`, `drafting`) when no brief has been drafted.
 - Protected claim status progression in `precedentMatcher.ts`: rubric score recalculations now explicitly check `latestAppeal` and preserve all advanced lifecycle stages (`ready_for_review`, `dispatched`, `won`, `lost`, `escalated`) instead of regressing them to `precedent_matched`.
 - Streamlined `EvidenceMatrix` header toolbar from 5 redundant controls (`Re-run Analysis`, `Index CPB`, `Research Hub`, `Score Rubric`, `Review Appeal Brief`) to a crisp 2-button layout (`Re-run Analysis` outline and `Review Appeal Brief ->` primary CTA), deferring research tools to the dedicated tab.
 - Removed duplicate 'Draft Appeal Brief' button from the Overturn Probability Score banner, resolving vertical button stacking.
 - Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 850 passing unit tests across 52 test suites, and clean production build.
+
+### 2026-09-12 - working tree
+Implemented quad-solution UX architecture for Clinical Evidence Dossier to eliminate vertical scroll sprawl and context loss (`src/components/evidence/EvidenceMatrix.tsx`, `src/components/evidence/PolicyViewer.tsx`, `src/components/evidence/ClauseInspectorDrawer.tsx`, `tests/evidenceDossierUx.test.ts`):
+- Pinned Denial Baseline: added `lg:sticky lg:top-4 self-start` and internal scroll containment to the 5-column left panel in `EvidenceMatrix.tsx`. Patient metadata, CPT procedure codes, CARC CO-58 denial reason, and disputed charges remain permanently visible alongside scrolled evidence clauses, eliminating blank void and reference loss.
+- Document & Exhibit Accordion Grouping: organized raw multi-clause evidence feeds into structured policy exhibits grouped by parent document and source type. Added exhibit headers featuring clause counters, peak relevance match badges, visual proof indicators, direct external source links, and expand/collapse controls with master 'Expand All' / 'Collapse All' toggles.
+- Compact vs. Detailed View Mode: introduced a toolbar view density switch between rich cards and sleek 42px single-row compact items (relevance match badge, citation tag, single-line criteria snippet, and quick action buttons), compressing 12+ clauses into a single screenful without infinite scrolling.
+- Master-Detail Clause Inspector Drawer: built a full portaled slide-out inspector drawer (`ClauseInspectorDrawer.tsx`) accessible from any clause card or compact row with keyboard navigation (Esc, Arrow Left/Right), sequential clause paging (e.g. Clause 3 of 12), verbatim medical criteria rendering, statutory ERISA significance guidance, and high-resolution visual proof exhibit previews.
+- Resolved Source Filter Discrepancy & Overflow Clipping: diagnosed why 5 CPB + 4 ERISA Law = 9 showed against 12 total—`sourceCounts` and `categoryTabs` previously omitted `nccn_guideline` (`Clinical Guidelines`). Added `Clinical Guidelines` with full accounting (5 CPB + 3 Guidelines + 4 ERISA = 12). Replaced brittle horizontal `overflow-x-auto whitespace-nowrap` with responsive `flex-wrap gap-1.5` and progressive disclosure for empty research sources (`+2 More Sources`), completely eliminating right-edge tab clipping.
+- Redesigned Clinical Research Console Channel Architecture (`src/components/evidence/ClinicalResearchConsole.tsx`): eliminated cramped 5-card row with truncated 1-line text descriptions (`line-clamp-2` ellipses). Converted channel selection into a unified, symmetrical single-row 5-column segmented track (`grid grid-cols-5 w-full`) featuring equal 20% column spans (`Multi-Source`, `Insurer CPB`, `PubMed Trials`, `FDA Labels`, `Custom URL`) with Phosphor icons, `whitespace-nowrap`, and compact status indicators, guaranteeing exactly 1 line with zero wrapping or orphaned buttons. Relocated category taglines exclusively to the unclipped Active Channel Station Deck header (`role="tabpanel"`). The workstation deck presents full, unclipped clinical/statutory rationale, 3-column concurrent pipeline telemetry for multi-source scans (Cigna CPB, PubMed RCTs, and FDA DailyMed), interactive search suggestion chips, quick presets, and unified execution CTAs.
+- Added comprehensive unit test suite (`tests/evidenceDossierUx.test.ts`) testing production `RESEARCH_MODES` and `PRESET_RESEARCH_URLS`, all 5 research modes, multi-source 3-pipeline architecture, dynamic unclipped action buttons, statutory leverage text integrity, WAI-ARIA contracts, and verified 100% clean across typecheck, lint, 873 passing unit tests across 53 test suites, and production build with `npm run verify`.
+- Synchronized automated test documentation across `README.md`, `IDEA.md`, and `PRODUCT.md` to reflect the verified 873 Vitest tests across 53 suites (~81.3% line coverage across the entire project).
+
