@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-12T17:12:00Z
+- **Last updated:** 2026-09-12T17:30:00Z
 
 ## Log
 
@@ -1318,5 +1318,14 @@ Built zero-asset Web Audio acoustic sentinel sensory feedback system and wired r
 - Created dedicated "Acoustic Sentinel Sensory Feedback" settings card in `SettingsPage.tsx` with master toggle, volume slider (0-100%), and interactive audition buttons allowing users to test every acoustic profile.
 - Added comprehensive unit test suite (`tests/soundEffects.test.ts`) and verified 100% clean across typecheck, lint, 892 passing unit tests across 55 test suites, and production build with `npm run verify`.
 
-### 2026-09-12 - working tree
+### 2026-09-12 - 15f4e56
 Streamlined top Header metrics and actions by removing the redundant portfolio win rate percentage from the 'Recovered' financial pill and eliminating the non-functional 'Clinical Intelligence' status badge and unused Pulse icon (`src/components/layout/Header.tsx`), presenting clean disputed and recovered totals without cluttering the global bar.
+
+### 2026-09-12 - working tree
+Redesigned Sentinel Copilot into a docked right slide-out drawer, eliminating bottom-right floating pill occlusion and consumer AI button clutter (`src/components/chat/SentinelChatbot.tsx`, `src/components/layout/Header.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/layout/Shell.tsx`, `src/hooks/useSentinelChat.ts`, `src/components/studio/AppealStudio.tsx`, `src/App.tsx`, `tests/sentinelDrawerAndTrigger.test.ts`):
+- Diagnosed UX collision where the fixed floating chatbot capsule at bottom-right directly occluded primary sticky footer controls (`Export PDF Dossier` and `Next: Dispatch Appeal Packet`) in the Appeal Studio.
+- Removed floating draggable capsule from the viewport and eliminated consumer-style sparkle buttons from the top navigation bar. Converted the bottom-left sidebar's existing 'ERISA Sentinel' status card (`29 CFR § 2560`) into an interactive launcher in both expanded and collapsed modes with `⌘J` hover cues, while preserving the global `⌘J` / `Ctrl+J` power-user shortcut.
+- Updated the global search input label to 'Search claims, CPT, or ask Sentinel... ⌘K', framing Sentinel as a unified platform intelligence capability rather than a standalone chat widget.
+- Refactored `SentinelChatbot` into a full-height portaled right drawer (`w-full max-w-xl bg-background border-l shadow-2xl`) with backdrop blur, focus restoration, modal focus trapping on Tab key, and clean Escape key / outside click dismissal.
+- Enhanced clinical appeal workflow with a 1-click 'Insert into Brief' action on assistant responses, seamlessly injecting cited statutory authorities and clinical addenda into the Appeal Studio brief editor right before formal closing salutations with Sonner toast feedback.
+- Resolved keyboard toggle stale closure in `useSentinelChat` via ref tracking, decoupled scroll lock to prevent render thrashing, and added regression test suite (`tests/sentinelDrawerAndTrigger.test.ts`). Verified with `npm run verify` (typecheck, lint, 897 unit tests, and production build).

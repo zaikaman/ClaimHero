@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import {
   FileText,
   CircleNotch,
@@ -240,6 +240,42 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     setInjectedPenaltiesSuccess(true);
     setTimeout(() => setInjectedPenaltiesSuccess(false), 2500);
   };
+
+  const markdownContentRef = useRef(markdownContent);
+  markdownContentRef.current = markdownContent;
+
+  // Listen for 1-click citation and argument injections from Sentinel Copilot
+  useEffect(() => {
+    const handleInsertText = (e: Event) => {
+      if (readOnly) {
+        toast.error("Viewers have read-only access and cannot modify the brief");
+        return;
+      }
+      const customEvent = e as CustomEvent<{ text: string }>;
+      const textToInsert = customEvent.detail?.text?.trim();
+      if (!textToInsert) return;
+
+      const currentMarkdown = markdownContentRef.current || "";
+      const closingPattern = /\n(?=(?:Sincerely|Respectfully|Regards|Submitted by|Authorized Representative:))/i;
+      const matchIndex = currentMarkdown.search(closingPattern);
+
+      const addendum = `\n\n### Clinical & Statutory Addendum (via Sentinel Copilot)\n${textToInsert}\n`;
+
+      if (matchIndex !== -1) {
+        const before = currentMarkdown.slice(0, matchIndex).trimEnd();
+        const after = currentMarkdown.slice(matchIndex).trimStart();
+        setMarkdownContent(`${before}\n${addendum}\n${after}`);
+      } else {
+        setMarkdownContent(`${currentMarkdown.trim()}\n${addendum}`);
+      }
+
+      markEditingBrief();
+      toast.success("Inserted cited argument into Appeal Brief");
+    };
+
+    window.addEventListener("claimhero:insert-brief-text", handleInsertText);
+    return () => window.removeEventListener("claimhero:insert-brief-text", handleInsertText);
+  }, [readOnly, setMarkdownContent]);
 
   const handleRunSynthesis = async () => {
     if (readOnly) {

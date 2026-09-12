@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { useUIMessages } from "@convex-dev/agent/react";
 import { api } from "../../convex/_generated/api";
@@ -27,11 +27,28 @@ export interface UseSentinelChatOptions {
   selectedClaim: Claim | null;
   currentView: NavigationView;
   enabled?: boolean;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function useSentinelChat(options: UseSentinelChatOptions) {
-  const { selectedClaim, currentView, enabled = true } = options;
-  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const { selectedClaim, currentView, enabled = true, isOpen: controlledIsOpen, onOpenChange } = options;
+  const [internalIsOpen, setInternalIsOpen] = useState<boolean>(false);
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
+
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+
+  const setIsOpen = useCallback((valueOrUpdater: boolean | ((prev: boolean) => boolean)) => {
+    const current = isOpenRef.current;
+    const nextValue = typeof valueOrUpdater === "function" ? valueOrUpdater(current) : valueOrUpdater;
+    onOpenChangeRef.current?.(nextValue);
+    setInternalIsOpen(nextValue);
+  }, []);
+
   const [isSending, setIsSending] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<Id<"chatbotSessions"> | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -47,7 +64,7 @@ export function useSentinelChat(options: UseSentinelChatOptions) {
     if (isOpen && (currentView === "landing" || currentView === "login" || !enabled)) {
       setIsOpen(false);
     }
-  }, [currentView, enabled, isOpen]);
+  }, [currentView, enabled, isOpen, setIsOpen]);
 
   // Initialize or synchronize session
   useEffect(() => {
@@ -160,7 +177,7 @@ export function useSentinelChat(options: UseSentinelChatOptions) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentView, enabled]);
+  }, [currentView, enabled, setIsOpen]);
 
   const sendMessage = useCallback(
     async (text: string) => {

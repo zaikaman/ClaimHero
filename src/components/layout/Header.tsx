@@ -63,11 +63,11 @@ export const Header: React.FC<HeaderProps> = ({
           <Separator orientation="vertical" className="h-4 mx-1 border-border/50" />
           <button
             onClick={onOpenCommandPalette}
-            className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 backdrop-blur-sm px-3 py-1 text-xs text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors w-48 sm:w-64"
-            title="Quick search across claims and actions (⌘K / Ctrl+K)"
+            className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 backdrop-blur-sm px-3 py-1 text-xs text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors w-56 sm:w-72"
+            title="Search claims, CPT, or ask Sentinel (⌘K / Ctrl+K)"
           >
             <MagnifyingGlass className="size-3.5" />
-            <span className="flex-1 text-left truncate">Search claims, CPT, payers...</span>
+            <span className="flex-1 text-left truncate">Search claims, CPT, or ask Sentinel...</span>
             <kbd className="pointer-events-none hidden sm:inline-flex h-4 items-center gap-0.5 rounded border border-border/60 bg-muted/60 px-1.5 font-mono text-[9px] font-medium text-muted-foreground">
               ⌘K
             </kbd>

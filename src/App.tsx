@@ -51,6 +51,7 @@ export default function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState<boolean>(false);
   const [isAuditDrawerOpen, setIsAuditDrawerOpen] = useState<boolean>(false);
+  const [isSentinelOpen, setIsSentinelOpen] = useState<boolean>(false);
   const [pendingTargetView, setPendingTargetView] = useState<NavigationView | null>(null);
 
   // Initial claim from URL search params (?claim=...)
@@ -287,6 +288,7 @@ export default function App() {
         onToggleSidebar={handleToggleSidebar}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
+        onOpenSentinel={() => setIsSentinelOpen((prev) => !prev)}
         totalDisputedAmount={stats.activeDisputedAmount + stats.overturnedWonAmount}
         totalWonAmount={stats.overturnedWonAmount}
         winRate={stats.averageWinScore}
@@ -538,11 +540,14 @@ export default function App() {
           />
         </Suspense>
 
-        {/* Floating Autonomous Sentinel Copilot AI Chatbot (⌘J / Ctrl+J) */}
+        {/* Autonomous Sentinel Copilot AI Drawer (⌘J / Ctrl+J) */}
         <Suspense fallback={null}>
           <SentinelChatbot
             selectedClaim={selectedClaim}
             currentView={currentView}
+            isOpen={isSentinelOpen}
+            onClose={() => setIsSentinelOpen(false)}
+            onOpenChange={setIsSentinelOpen}
           />
         </Suspense>
       </Shell>

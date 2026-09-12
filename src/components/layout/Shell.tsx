@@ -19,6 +19,7 @@ interface ShellProps {
   onToggleSidebar?: () => void;
   onOpenCommandPalette?: () => void;
   onOpenShortcutsHelp?: () => void;
+  onOpenSentinel?: () => void;
   totalDisputedAmount?: number;
   totalWonAmount?: number;
   winRate?: number;
@@ -38,6 +39,7 @@ export const Shell: React.FC<ShellProps> = ({
   onToggleSidebar,
   onOpenCommandPalette,
   onOpenShortcutsHelp,
+  onOpenSentinel,
   totalDisputedAmount = 0,
   totalWonAmount = 0,
   winRate = 0,
@@ -110,6 +112,7 @@ export const Shell: React.FC<ShellProps> = ({
           onToggleCollapse={onToggleSidebar}
           onOpenIngestion={onOpenIngestion}
           onDeleteCase={onDeleteCase}
+          onOpenSentinel={onOpenSentinel}
         />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6 print:overflow-visible print:p-0">

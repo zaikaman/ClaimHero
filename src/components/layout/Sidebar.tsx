@@ -56,6 +56,7 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
   onOpenIngestion?: () => void;
   onDeleteCase?: (claimId: string) => Promise<unknown>;
+  onOpenSentinel?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -67,6 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed = false,
   onOpenIngestion,
   onDeleteCase,
+  onOpenSentinel,
 }) => {
   const { viewer, isAuthenticated, userName, userEmail, userInitial, signOut } = useCurrentUser();
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
@@ -364,12 +366,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {!isCollapsed && (
-          <div className="rounded-lg border border-border/60 bg-card/60 backdrop-blur-md px-2.5 py-2 space-y-1 text-xs shadow-2xs">
+        {!isCollapsed ? (
+          <button
+            type="button"
+            onClick={onOpenSentinel}
+            className="w-full text-left rounded-lg border border-border/60 bg-card/60 hover:bg-card/90 hover:border-primary/50 backdrop-blur-md px-2.5 py-2 space-y-1 text-xs shadow-2xs transition-all cursor-pointer group"
+            title="Open ERISA Sentinel Copilot (⌘J / Ctrl+J)"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <ShieldCheck className="size-3.5 text-primary" />
-                <span className="font-semibold text-foreground text-[11px]">
+                <ShieldCheck className="size-3.5 text-primary group-hover:scale-110 transition-transform" />
+                <span className="font-semibold text-foreground text-[11px] group-hover:text-primary transition-colors">
                   ERISA Sentinel
                 </span>
               </div>
@@ -380,10 +387,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 29 CFR § 2560
               </Badge>
             </div>
-            <p className="text-[10px] text-muted-foreground leading-tight">
-              Statutory deadline & evidence guard active.
-            </p>
-          </div>
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground leading-tight">
+              <span>Statutory deadline & evidence guard active.</span>
+              <kbd className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity font-mono text-[9px] text-primary bg-primary/10 border border-primary/20 px-1 rounded">
+                ⌘J
+              </kbd>
+            </div>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpenSentinel}
+            className="w-full flex justify-center p-2 rounded-lg hover:bg-muted/60 transition-colors text-primary cursor-pointer"
+            title="Open ERISA Sentinel Copilot (⌘J / Ctrl+J)"
+          >
+            <ShieldCheck className="size-4" />
+          </button>
         )}
 
         {/* User Profile Dropdown */}
