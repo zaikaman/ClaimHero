@@ -13,7 +13,6 @@ import {
   Lightning,
   Copy,
   Check,
-
   ShieldCheck,
   Scales,
   Clock,
@@ -78,7 +77,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
   const prevTranscriptsLengthRef = useRef<number>(0);
   const userHasScrolledUpRef = useRef<boolean>(false);
 
-  // Auto-scroll transcript container only once when a new message arrives (and never steal page scroll)
+  // Auto-scroll transcript container smoothly when new message arrives
   useEffect(() => {
     const currentLength = session?.transcripts?.length || 0;
     if (currentLength > prevTranscriptsLengthRef.current) {
@@ -92,7 +91,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
     }
   }, [session?.transcripts]);
 
-  // Keyboard shortcut to quickly toggle active speaker on live call ('S' key when not typing)
+  // Keyboard shortcut to toggle active speaker ('S' key when not typing)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
@@ -142,23 +141,31 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
       {/* Live Call Control HUD */}
       <Card className="p-3.5 rounded-xl border-border/80 bg-card/75 backdrop-blur-xl shadow-md">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* Left: Call State & Audio Waveform */}
+          {/* Left: Call State & Audio Indicator */}
           <div className="flex items-center gap-3">
             <div
               className={cn(
                 "size-10 rounded-lg flex items-center justify-center shrink-0 transition-all",
                 isCallLive
                   ? "bg-destructive text-destructive-foreground animate-pulse shadow-sm shadow-destructive/30"
+                  : isSimulating
+                  ? "bg-primary text-primary-foreground"
                   : "bg-primary/10 text-primary border border-primary/25"
               )}
             >
-              {isCallLive ? <PhoneCall className="size-5" /> : <Microphone className="size-5" />}
+              {isCallLive ? (
+                <PhoneCall className="size-5" />
+              ) : isSimulating ? (
+                <Headset className="size-5" />
+              ) : (
+                <Microphone className="size-5" />
+              )}
             </div>
 
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-foreground tracking-tight">
-                  P2P Live Call Copilot (Clinical Defense Sentinel)
+                  Live Defense Copilot
                 </h2>
                 <Badge
                   variant="outline"
@@ -168,38 +175,42 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                       ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400 font-bold"
                       : isCallLive
                       ? "border-destructive/60 bg-destructive/10 text-destructive font-bold animate-pulse"
+                      : isSimulating
+                      ? "border-primary/60 bg-primary/10 text-primary font-bold"
                       : "border-border text-muted-foreground"
                   )}
                 >
                   {isOverturned
-                    ? "OVERTURNED • AUTH GRANTED"
+                    ? "Overturned & Won"
                     : isCallLive
                     ? callResolutionStage === "probing"
-                      ? "LIVE: PROBING PHASE"
-                      : "LIVE TELE-CONFERENCE"
-                    : "STANDBY / READY"}
+                      ? "Live: Probing Phase"
+                      : "Live Call Active"
+                    : isSimulating
+                    ? "Practice Simulation"
+                    : "Standby"}
                 </Badge>
               </div>
 
               <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mt-0.5">
                 <Clock className="size-3.5" />
-                <span className="text-foreground font-semibold">
+                <span className="text-foreground font-bold">
                   {formatSeconds(callDuration)}
                 </span>
-                <span>•</span>
+                <span>&bull;</span>
                 <span>Claim #{claim.claimNumber}</span>
-                <span>•</span>
+                <span>&bull;</span>
                 <span>{claim.patient?.insurancePayer || "Health Insurer"}</span>
               </div>
             </div>
           </div>
 
           {/* Center: Live Waveform Visualizer (when listening) */}
-          <div className="hidden md:flex items-center gap-1 bg-background/80 border border-border/70 px-3 py-1.5 rounded-lg h-9">
-            <Waveform className="size-4 text-primary shrink-0 mr-1" />
+          <div className="hidden md:flex items-center gap-1.5 bg-background/80 border border-border/70 px-3 py-1.5 rounded-lg h-9">
+            <Waveform className="size-4 text-primary shrink-0 mr-0.5" />
             <div className="flex items-center gap-0.5 h-5">
               {[15, 45, 80, 60, 30, 90, 70, 40, 60, 85, 40, 20].map((baseHeight, idx) => {
-                const heightPct = isCallLive
+                const heightPct = isCallLive || isSimulating
                   ? Math.max(15, Math.min(100, (audioLevel || 20) * (baseHeight / 50)))
                   : 15;
                 return (
@@ -207,7 +218,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                     key={idx}
                     className={cn(
                       "w-1 rounded-full transition-all duration-75",
-                      isCallLive ? "bg-primary" : "bg-muted-foreground/30"
+                      isCallLive || isSimulating ? "bg-primary" : "bg-muted-foreground/30"
                     )}
                     style={{ height: `${heightPct}%` }}
                   />
@@ -215,7 +226,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               })}
             </div>
             <span className="text-[10px] font-mono text-muted-foreground ml-1.5">
-              {isCallLive ? (isWaitingForDoctor ? "LISTENING TO YOU" : "LISTENING") : "IDLE"}
+              {isCallLive ? (isWaitingForDoctor ? "Listening to You" : "Mic Active") : isSimulating ? "Simulation Mode" : "Mic Standby"}
             </span>
           </div>
 
@@ -232,7 +243,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   ? "text-muted-foreground bg-muted/30"
                   : "text-primary border-primary/40 bg-primary/5"
               )}
-              title={isReviewerVoiceMuted ? "Reviewer Voice Audio: Muted (Text Only)" : "Reviewer Voice Audio: Enabled"}
+              title={isReviewerVoiceMuted ? "Reviewer Voice Audio: Muted" : "Reviewer Voice Audio: Enabled"}
             >
               {isReviewerVoiceMuted ? (
                 <SpeakerSlash className="size-3.5" />
@@ -244,53 +255,6 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               </span>
             </Button>
 
-            {/* Interactive Simulation Button */}
-            {!isSimulating ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={startSimulation}
-                className="h-8 rounded-md px-2.5 text-xs gap-1.5 border-primary/40 text-primary hover:bg-primary/10 cursor-pointer"
-                title="Start interactive call where AI Medical Director speaks objections, listens to your voice, and responds"
-              >
-                <Play className="size-3.5" weight="fill" />
-                <span>Start Reviewer Practice</span>
-              </Button>
-            ) : isGeneratingPushback ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled
-                className="h-8 rounded-md px-2.5 text-xs gap-1.5 border-primary/40 text-primary cursor-wait"
-              >
-                <CircleNotch className="size-3.5 animate-spin" />
-                <span>Reviewer Listening...</span>
-              </Button>
-            ) : isWaitingForDoctor ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => respondToDoctorSpeech()}
-                className="h-8 rounded-md px-2.5 text-xs gap-1.5 border-emerald-500/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 cursor-pointer animate-pulse"
-                title="Medical Director will listen to your spoken argument and counter"
-              >
-                <Lightning className="size-3.5" weight="fill" />
-                <span>Hear Reviewer Pushback</span>
-                <ArrowRight className="size-3.5" />
-              </Button>
-
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled
-                className="h-8 rounded-md px-2.5 text-xs gap-1.5 border-primary/40 text-primary cursor-wait"
-              >
-                <CircleNotch className="size-3.5 animate-spin" />
-                <span>Reviewer Speaking...</span>
-              </Button>
-            )}
-
             {/* Encounter Summary Button */}
             <Button
               variant="outline"
@@ -300,11 +264,85 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               title="View, export or print complete EHR post-call clinical encounter addendum"
             >
               <FileText className="size-3.5 text-primary" />
-              <span>Encounter Summary</span>
+              <span>Summary</span>
             </Button>
 
-            {/* Mic / Live Call Toggle */}
-            {isCallLive ? (
+            {/* If NO call or simulation is active */}
+            {!isCallLive && !isSimulating && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={startSimulation}
+                  className="h-8 rounded-md px-2.5 text-xs gap-1.5 border-primary/40 text-primary hover:bg-primary/10 cursor-pointer"
+                  title="Practice against realistic AI Medical Director objections"
+                >
+                  <Play className="size-3" weight="fill" />
+                  <span>Reviewer Practice</span>
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={startLiveCall}
+                  className="h-8 rounded-md px-3 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer shadow-xs"
+                >
+                  <Microphone className="size-3.5" />
+                  <span>Start Live Call (Mic)</span>
+                </Button>
+              </>
+            )}
+
+            {/* If SIMULATION is active */}
+            {isSimulating && (
+              <>
+                {isGeneratingPushback ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    className="h-8 rounded-md px-2.5 text-xs gap-1.5 border-primary/40 text-primary cursor-wait"
+                  >
+                    <CircleNotch className="size-3.5 animate-spin" />
+                    <span>Reviewer Listening...</span>
+                  </Button>
+                ) : isWaitingForDoctor ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => respondToDoctorSpeech()}
+                    className="h-8 rounded-md px-2.5 text-xs gap-1.5 border-emerald-500/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 cursor-pointer animate-pulse"
+                    title="Medical Director will evaluate your statement and respond"
+                  >
+                    <Lightning className="size-3.5" weight="fill" />
+                    <span>Hear Pushback</span>
+                    <ArrowRight className="size-3.5" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    className="h-8 rounded-md px-2.5 text-xs gap-1.5 border-primary/40 text-primary cursor-wait"
+                  >
+                    <CircleNotch className="size-3.5 animate-spin" />
+                    <span>Reviewer Speaking...</span>
+                  </Button>
+                )}
+
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={endLiveCall}
+                  className="h-8 rounded-md px-2.5 text-xs font-semibold gap-1 bg-destructive hover:bg-destructive/90 text-white cursor-pointer shadow-xs"
+                >
+                  <PhoneDisconnect className="size-3.5" />
+                  <span>End Practice</span>
+                </Button>
+              </>
+            )}
+
+            {/* If LIVE CALL is active */}
+            {isCallLive && !isSimulating && (
               <Button
                 variant="destructive"
                 size="sm"
@@ -313,15 +351,6 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               >
                 <PhoneDisconnect className="size-3.5" />
                 <span>End Call</span>
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={startLiveCall}
-                className="h-8 rounded-md px-3 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer shadow-xs"
-              >
-                <Microphone className="size-3.5" />
-                <span>Start Live Call (Mic)</span>
               </Button>
             )}
           </div>
@@ -359,84 +388,57 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                 {isOverturned && authorizationNumber && !authorizationNumber.toLowerCase().includes("simulation only") ? (
                   <>
                     <strong className="text-emerald-300 font-bold uppercase tracking-wider">
-                      Denial Overturned • Verbal Authorization Granted:
+                      Denial Overturned &bull; Prior Authorization Granted:
                     </strong>{" "}
-                    <span className="font-mono font-semibold text-white">{authorizationNumber}</span>. Criteria fully satisfied under clinical policy bulletin.
+                    <span className="font-mono font-semibold text-white">{authorizationNumber}</span>.
                   </>
                 ) : authorizationNumber === "Simulation only — no authorization granted" ? (
                   <>
                     <strong className="text-amber-300 font-bold uppercase tracking-wider">
-                      Simulation Only — No Authorization Granted:
+                      Simulation Complete:
                     </strong>{" "}
-                    Clinical criteria acknowledged in practice mode. In a live payer call, obtain written verification.
+                    Clinical defense arguments delivered. On a real payer call, obtain confirmation number.
                   </>
                 ) : isGeneratingPushback ? (
                   <>
                     <strong className="text-foreground font-semibold">
                       Medical Director is evaluating your statement... (Exchange {simulationStepIndex + 1})
-                    </strong>{" "}
-                    Formulating clinical evaluation.
+                    </strong>
                   </>
                 ) : isWaitingForDoctor ? (
                   <>
                     <strong className="text-emerald-100 font-semibold">
                       Your turn to speak! (Exchange {simulationStepIndex + 1} of 3)
                     </strong>{" "}
-                    Speak your rebuttal into your mic, then click <strong className="text-emerald-300">&ldquo;Hear Reviewer Pushback&rdquo;</strong> to hear their response.
+                    Speak your argument into the mic, then click <strong className="text-emerald-300">&ldquo;Hear Pushback&rdquo;</strong> to hear the reviewer counter.
                   </>
                 ) : (
                   <>
-                    <strong className="text-foreground">Reviewer is speaking...</strong> Listen to the clinical challenge.
+                    <strong className="text-foreground">Reviewer is speaking...</strong> Listen to the clinical pushback.
                   </>
                 )}
               </span>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              {isOverturned || authorizationNumber === "Simulation only — no authorization granted" ? (
+              {isWaitingForDoctor && (
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => setIsSummaryModalOpen(true)}
-                  className={cn(
-                    "h-6 text-[11px] px-2.5 gap-1 font-semibold cursor-pointer",
-                    isOverturned
-                      ? "border-emerald-400 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
-                      : "border-amber-400/60 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30"
-                  )}
+                  variant="ghost"
+                  onClick={startSimulation}
+                  className="h-6 text-[11px] px-2 text-muted-foreground hover:text-foreground gap-1 cursor-pointer"
                 >
-                  <FileText className={cn("size-3", isOverturned ? "text-emerald-300" : "text-amber-300")} />
-                  <span>View Encounter EHR Addendum</span>
+                  <ArrowCounterClockwise className="size-3" />
+                  <span>Restart</span>
                 </Button>
-              ) : isWaitingForDoctor ? (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => respondToDoctorSpeech()}
-                    className="h-6 text-[11px] px-2 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20 gap-1 cursor-pointer"
-                  >
-                    <span>Hear Pushback</span>
-                    <ArrowRight className="size-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={startSimulation}
-                    className="h-6 text-[11px] px-2 text-muted-foreground hover:text-foreground gap-1 cursor-pointer"
-                  >
-                    <ArrowCounterClockwise className="size-3" />
-                    <span>Restart</span>
-                  </Button>
-                </>
-              ) : null}
+              )}
             </div>
           </div>
         )}
       </Card>
 
       {/* Main Split-Screen Copilot Command Center */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 min-h-[580px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 min-h-[560px]">
         {/* LEFT PANE (5 Cols): Live Speech Stream & Transcript Feed */}
         <div className="lg:col-span-5 flex flex-col rounded-xl border border-border/80 bg-card/60 backdrop-blur-xl p-3.5 space-y-3 shadow-xs">
           {/* Pane Header */}
@@ -444,14 +446,15 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
             <div className="flex items-center gap-1.5">
               <SpeakerHigh className="size-4 text-primary" />
               <h3 className="text-xs font-bold text-foreground font-sans">
-                Live Speech Transcript Stream
+                Live Speech Stream
               </h3>
             </div>
 
             {/* Speaker Selector Toggle */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1">
               <div className="flex items-center gap-0.5 bg-secondary/80 p-0.5 rounded-md border border-border/60 text-[10px] font-sans">
                 <button
+                  type="button"
                   onClick={() => setActiveSpeaker("physician")}
                   className={cn(
                     "px-2 py-0.5 rounded transition-all cursor-pointer",
@@ -459,11 +462,12 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                       ? "bg-primary/20 text-primary font-semibold"
                       : "text-muted-foreground hover:text-foreground"
                   )}
-                  title="Attributing mic speech to Treating MD (Press 'S' to switch)"
+                  title="Attributing microphone speech to Treating Physician (Press 'S' to switch)"
                 >
                   Treating MD (You)
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveSpeaker("insurer")}
                   className={cn(
                     "px-2 py-0.5 rounded transition-all cursor-pointer",
@@ -491,12 +495,12 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
           >
             {transcripts.length === 0 && !interimText && (
               <div className="p-8 text-center space-y-2 text-muted-foreground my-auto">
-                <Microphone className="size-8 mx-auto opacity-40 text-primary" />
-                <p className="text-xs font-sans">
-                  Live call speech will stream here in real time.
+                <Microphone className="size-8 mx-auto opacity-30 text-primary" />
+                <p className="text-xs font-sans text-foreground/80 font-medium">
+                  Speech transcription will stream here in real time.
                 </p>
                 <p className="text-[11px] font-sans opacity-70">
-                  Click <strong className="text-foreground">"Start Reviewer Practice"</strong> to hear the Medical Director speak and respond with your microphone.
+                  Click <strong className="text-foreground">&ldquo;Start Live Call (Mic)&rdquo;</strong> to speak, or practice with <strong className="text-foreground">&ldquo;Reviewer Practice&rdquo;</strong>.
                 </p>
               </div>
             )}
@@ -523,14 +527,14 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                       {isInsurer ? "Insurer Medical Director" : "Treating Physician (You)"}
                     </span>
                     <div className="flex items-center gap-2">
-                      {/* Reassign Speaker 1-Click Button */}
                       <button
+                        type="button"
                         onClick={() => toggleTranscriptSpeaker(t.id)}
                         className="opacity-0 group-hover/item:opacity-100 transition-opacity text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-secondary border border-transparent hover:border-border/60 cursor-pointer"
                         title={isInsurer ? "Switch attribution to Treating MD" : "Switch attribution to Insurer MD & generate Fast Answer"}
                       >
                         <ArrowsLeftRight className="size-2.5" />
-                        <span>Switch to {isInsurer ? "Treating MD" : "Insurer MD"}</span>
+                        <span>Switch</span>
                       </button>
                       <span className="text-muted-foreground opacity-70">
                         {new Date(t.timestamp).toLocaleTimeString([], {
@@ -554,7 +558,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               <div className="p-3 rounded-lg border border-primary/40 bg-primary/10 text-xs font-sans space-y-1 animate-pulse">
                 <div className="flex items-center gap-1.5 text-[10px] font-mono text-primary font-bold">
                   <CircleNotch className="size-3 animate-spin" />
-                  <span>Transcribing your speech live...</span>
+                  <span>Transcribing speech live...</span>
                 </div>
                 <p className="text-foreground/90 italic leading-relaxed text-xs">
                   {interimText}
@@ -563,20 +567,20 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
             )}
           </div>
 
-          {/* Quick Manual Speech Input / Objection Trigger Bar */}
+          {/* Quick Manual Speech Input / Fallback */}
           <form onSubmit={handleManualSubmit} className="flex items-center gap-1.5 pt-2 border-t border-border/50">
             <input
               type="text"
               value={manualInput}
               onChange={(e) => setManualInput(e.target.value)}
-              placeholder={`Speak or type what ${activeSpeaker === "physician" ? "you say" : "Insurer MD says"}...`}
+              placeholder={`Type what ${activeSpeaker === "physician" ? "you say" : "Insurer MD says"}...`}
               className="flex-1 h-8 rounded-md bg-secondary/50 border border-border/70 px-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary font-sans"
             />
             <Button
               type="submit"
               size="sm"
               disabled={!manualInput.trim()}
-              className="h-8 rounded-md px-2.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 gap-1"
+              className="h-8 rounded-md px-2.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 gap-1 cursor-pointer"
             >
               <span>Send</span>
               <PaperPlaneRight className="size-3" />
@@ -623,56 +627,41 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   <h3 className="text-sm font-bold text-foreground font-sans flex items-center gap-1.5">
                     <span>
                       {isOverturned
-                        ? "Denial Overturned • Prior Authorization Issued"
+                        ? "Denial Overturned &bull; Prior Authorization Granted"
                         : authorizationNumber === "Simulation only — no authorization granted"
-                        ? "Simulation Only — No Authorization Granted"
+                        ? "Simulation Complete"
                         : "Instant Verbal Counter-Strike"}
                     </span>
                     {isGeneratingAnswer && (
                       <span className="flex items-center gap-1 text-[10px] font-mono text-primary animate-pulse font-normal">
                         <CircleNotch className="size-3 animate-spin" />
-                        <span>Synthesizing Fast Answer...</span>
+                        <span>Synthesizing Answer...</span>
                       </span>
                     )}
                   </h3>
                   <p className="text-[11px] text-muted-foreground font-sans">
                     {isOverturned
-                      ? "Verbal authorization granted on the record. Read aloud final closing confirmation statement."
+                      ? "Verbal authorization granted on the record. Read aloud final confirmation."
                       : authorizationNumber === "Simulation only — no authorization granted"
-                      ? "Practice simulation only. No legal prior authorization granted. Read aloud closing notice."
-                      : "Read aloud into your microphone the instant the medical director asks this question"}
+                      ? "Practice simulation complete. Practice again or launch live microphone call."
+                      : "Read aloud into microphone the instant reviewer presents this objection"}
                   </p>
                 </div>
               </div>
 
               {activeFastAnswer && (
                 <div className="flex items-center gap-1.5">
-                  {activeFastAnswer.generatedBy === "fallback" && (
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] font-mono border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold uppercase tracking-wider"
-                    >
-                      SIMULATION ONLY
-                    </Badge>
-                  )}
                   <Badge
                     variant="outline"
                     className={cn(
                       "text-[10px] font-mono",
                       isOverturned
                         ? "border-emerald-500/40 text-emerald-400 font-bold"
-                        : activeFastAnswer.generatedBy === "fallback" ||
-                          authorizationNumber === "Simulation only — no authorization granted"
-                        ? "border-amber-500/40 text-amber-300 font-bold"
                         : "border-primary/40 text-primary"
                     )}
                   >
                     {isOverturned
                       ? "100% Won"
-                      : activeFastAnswer.generatedBy === "fallback"
-                      ? `${activeFastAnswer.confidenceScore}% Estimated`
-                      : authorizationNumber === "Simulation only — no authorization granted"
-                      ? "Simulation Only"
                       : `${activeFastAnswer.confidenceScore}% Grounded`}
                   </Badge>
                   <Button
@@ -700,18 +689,12 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                     "p-2.5 rounded-md text-xs text-foreground/90 font-sans flex items-start justify-between gap-2 border",
                     isOverturned
                       ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
-                      : activeFastAnswer.generatedBy === "fallback" ||
-                        authorizationNumber === "Simulation only — no authorization granted"
-                      ? "bg-amber-500/10 border-amber-500/30 text-amber-200"
                       : "bg-destructive/10 border-destructive/25"
                   )}
                 >
                   <div className="flex items-start gap-2 flex-1 min-w-0">
                     {isOverturned ? (
                       <ShieldCheck className="size-4 text-emerald-400 shrink-0 mt-0.5" />
-                    ) : activeFastAnswer.generatedBy === "fallback" ||
-                      authorizationNumber === "Simulation only — no authorization granted" ? (
-                      <WarningCircle className="size-4 text-amber-400 shrink-0 mt-0.5" />
                     ) : (
                       <WarningCircle className="size-4 text-destructive shrink-0 mt-0.5" />
                     )}
@@ -719,34 +702,14 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                       <span
                         className={cn(
                           "font-bold",
-                          isOverturned
-                            ? "text-emerald-300"
-                            : activeFastAnswer.generatedBy === "fallback"
-                            ? "text-amber-300"
-                            : authorizationNumber === "Simulation only — no authorization granted"
-                            ? "text-amber-300"
-                            : "text-destructive"
+                          isOverturned ? "text-emerald-300" : "text-destructive"
                         )}
                       >
-                        {isOverturned
-                          ? "Reviewer Status: "
-                          : activeFastAnswer.generatedBy === "fallback"
-                          ? "Simulation Objection: "
-                          : authorizationNumber === "Simulation only — no authorization granted"
-                          ? "Simulation Status: "
-                          : "Insurer Objection: "}
+                        {isOverturned ? "Reviewer Status: " : "Insurer Objection: "}
                       </span>
                       <span className="italic">&ldquo;{activeFastAnswer.trapQuestion}&rdquo;</span>
                     </div>
                   </div>
-                  {activeFastAnswer.generatedBy === "fallback" && (
-                    <Badge
-                      variant="outline"
-                      className="text-[9px] font-mono px-1.5 py-0 h-4 border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold uppercase tracking-wider shrink-0"
-                    >
-                      SIMULATION ONLY
-                    </Badge>
-                  )}
                 </div>
 
                 {/* THE SPOKEN REBUTTAL (BIG, HIGH CONTRAST) */}
@@ -778,19 +741,9 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                 {/* Grounding Facts Strip */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-sans pt-1">
                   <div className="p-2.5 rounded-md bg-card/60 border border-border/70 space-y-1">
-                    <div className="text-[10px] font-mono uppercase text-muted-foreground font-bold flex items-center justify-between gap-1">
-                      <div className="flex items-center gap-1">
-                        <Stethoscope className="size-3 text-primary" />
-                        <span>Chart Proof Evidence</span>
-                      </div>
-                      {activeFastAnswer.generatedBy === "fallback" && (
-                        <Badge
-                          variant="outline"
-                          className="text-[9px] font-mono px-1 py-0 h-4 border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold uppercase tracking-wider"
-                        >
-                          SIMULATION ONLY
-                        </Badge>
-                      )}
+                    <div className="text-[10px] font-mono uppercase text-muted-foreground font-bold flex items-center gap-1">
+                      <Stethoscope className="size-3 text-primary" />
+                      <span>Chart Proof Evidence</span>
                     </div>
                     <p className="text-foreground/90 text-xs leading-snug">
                       {activeFastAnswer.chartProof}
@@ -798,19 +751,9 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   </div>
 
                   <div className="p-2.5 rounded-md bg-card/60 border border-border/70 space-y-1">
-                    <div className="text-[10px] font-mono uppercase text-muted-foreground font-bold flex items-center justify-between gap-1">
-                      <div className="flex items-center gap-1">
-                        <ShieldCheck className="size-3 text-emerald-400" />
-                        <span>Exact Policy Citation</span>
-                      </div>
-                      {activeFastAnswer.generatedBy === "fallback" && (
-                        <Badge
-                          variant="outline"
-                          className="text-[9px] font-mono px-1 py-0 h-4 border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold uppercase tracking-wider"
-                        >
-                          SIMULATION ONLY
-                        </Badge>
-                      )}
+                    <div className="text-[10px] font-mono uppercase text-muted-foreground font-bold flex items-center gap-1">
+                      <ShieldCheck className="size-3 text-emerald-400" />
+                      <span>Exact Policy Citation</span>
                     </div>
                     <p className="text-foreground/90 text-xs leading-snug font-medium text-primary">
                       {activeFastAnswer.cpbCitation}
@@ -845,7 +788,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   Awaiting insurer objection or question on the live call.
                 </p>
                 <p className="text-[11px] font-sans opacity-75">
-                  The moment the medical director speaks, ClaimHero AI will flash the exact spoken counter-strike and policy citation here.
+                  The moment the medical director speaks, ClaimHero will flash the exact spoken counter-strike and policy citation here.
                 </p>
               </div>
             )}
@@ -859,7 +802,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                 <div className="flex items-center gap-1.5">
                   <ShieldCheck className="size-4 text-emerald-400" />
                   <h4 className="text-xs font-bold text-foreground font-sans">
-                    Live Call Legal Checklist
+                    Live Statutory Checklist
                   </h4>
                 </div>
                 <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/40 text-emerald-400">
@@ -939,6 +882,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   fastAnswers.map((ans: LiveFastAnswer) => (
                     <button
                       key={ans.id}
+                      type="button"
                       onClick={() => setActiveFastAnswer(ans)}
                       className={cn(
                         "w-full text-left p-2 rounded-md border text-xs font-sans transition-all cursor-pointer flex items-center justify-between gap-2",
@@ -948,17 +892,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                       )}
                     >
                       <span className="truncate">{ans.trapQuestion}</span>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {ans.generatedBy === "fallback" && (
-                          <Badge
-                            variant="outline"
-                            className="text-[9px] font-mono px-1 py-0 h-4 border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold uppercase tracking-wider"
-                          >
-                            SIMULATION ONLY
-                          </Badge>
-                        )}
-                        <ArrowRight className="size-3 opacity-70" />
-                      </div>
+                      <ArrowRight className="size-3 opacity-70 shrink-0" />
                     </button>
                   ))
                 )}

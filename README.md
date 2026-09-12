@@ -141,7 +141,7 @@ AgentMail provides two-way programmatic email infrastructure for appellate dispa
 OpenAI powers clinical reasoning while operating within strict anti-hallucination boundaries:
 - **Vision OCR Denial Parser**: Extracts structured CPT/HCPCS, ICD-10, CARC/RARC codes, disputed amounts, and payer contact info from raw denial documents (`convex/actions/opticalParser.ts`).
 - **Grounded Brief Synthesis**: Synthesizes formal appeals using strictly human-confirmed clinical facts and stored policy clauses; fabricated policy text is prohibited by schema contracts (`convex/actions/appealSynthesizer.ts`).
-- **P2P Defense Studio & Live Copilot**: Generates physician tele-scripts with trap-question counterarguments, real-time pushback cards, and live speech-to-text call summarization (`convex/actions/p2pLiveCopilot.ts`).
+- **P2P Defense Playbook & Live Copilot**: Generates structured 4-phase clinical defense playbooks with clipboard pocket sheets, trap-question counter-strikes, real-time voice defense, and interactive reviewer simulation (`convex/actions/p2pLiveCopilot.ts`).
 - **Sentinel Case Copilot**: Grounded assistant powered by `@convex-dev/agent` with 6 dedicated inspection tools to query active claims, evidence clauses, and statutory audit trails on demand (`convex/actions/sentinelAgent.ts`).
 
 ---

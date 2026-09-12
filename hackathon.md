@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-11T17:18:00Z
+- **Last updated:** 2026-09-12T13:02:00Z
 
 ## Log
 
@@ -1249,7 +1249,7 @@ Refactored application layout and navigation into a focused two-surface Case Wor
 - Rewrote `README.md` around the one-sentence core loop ("Upload a denial. ClaimHero pulls the insurer's own clinical policy bulletins via Firecrawl, writes an indisputable cited brief, and dispatches it via AgentMail before the ERISA clock expires — three steps, one deadline") and documented the Two-Surface Case Architecture.
 - Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 835 passing unit tests across 51 test suites, and successful production build. Convex features: components (`@convex-dev/agent`, `@convex-dev/workflow`, `@convex-dev/aggregate`), actions, mutations, queries.
 
-### 2026-09-11 - working tree
+### 2026-09-11 - 446cd2d
 Refactored `README.md` and `PRODUCT.md` with patient-first framing, streamlined quickstart friction flow, and conversational judging criteria alignment:
 - Rewrote the opening logline to speak directly to the person facing an unexpected denial rather than describing developer tooling.
 - Pushed an urgent, 60-second real-friction scene to the very top with a linear case lifecycle path mini-flow (`denial letter` -> `OpenAI vision OCR` -> `Firecrawl policy clause` -> `deterministic 4-pillar score` -> `cited brief` -> `human approval gate` -> `AgentMail two-way dispatch`).
@@ -1257,3 +1257,11 @@ Refactored `README.md` and `PRODUCT.md` with patient-first framing, streamlined 
 - Replaced the judging criteria matrix table with direct conversational defenses tailored for everyday app utility, domain usefulness, Convex platform depth, and full sponsor integration.
 - Updated automated test documentation across `README.md` and `PRODUCT.md` to reflect the verified 835 Vitest tests across 51 suites (~81.3% line coverage).
 - Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 835 passing unit tests across 51 test suites, and successful production build.
+
+### 2026-09-12 - working tree
+Redesigned and streamlined Physician Peer-to-Peer (P2P) Defense module (`src/components/p2p/P2PDefenseStudio.tsx`, `src/components/p2p/P2PLiveCopilot.tsx`):
+- Collapsed 4 fragmented tabs, conflicting dual timers, and 30+ simultaneous buttons into a focused 2-mode architecture: Defense Playbook (pre-call battle card and 1-page clipboard print guide) and Live Call Copilot (real-time voice transcription, AI fast answers, and interactive reviewer simulation).
+- Purged developer-only raw markdown editor and merged redundant full-script and pocket cheat sheet views into a unified, high-contrast Playbook with 4 clear operational phases (Statutory Opening, Policy Citations, Trap Counters, Written Determination Demand).
+- Eliminated disconnected 3:00 stopwatch and phase-jump pills from the main studio header; call duration timer now strictly syncs with live microphone calls and AI simulation sessions.
+- Streamlined Live Copilot controls: separated live microphone defense from reviewer practice, simplified transcript dialogue feeds, and prioritized high-contrast "SAY THIS RIGHT NOW" counter-strike cards.
+- Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 835 passing unit tests across 51 test suites, and production build.
