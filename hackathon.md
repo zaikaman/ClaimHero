@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-12T14:30:00Z
+- **Last updated:** 2026-09-12T14:57:00Z
 
 ## Log
 
@@ -1275,10 +1275,18 @@ Streamlined ERISA & Financial Liability Audit module (`src/components/calculator
 - Streamlined action toolbar into one clear primary CTA ("Embed in Appeal Brief") alongside secondary "Print Exhibit" and "Copy Summary" actions.
 - Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 835 passing unit tests across 51 test suites, and successful production build.
 
-### 2026-09-12 - working tree
+### 2026-09-12 - 2f248bc
 Resolved Case Audit Trail Drawer loading freeze and layout clipping (`src/App.tsx`, `src/hooks/useCommunications.ts`, `src/components/communications/AuditTrailDrawer.tsx`, `src/components/communications/AuditTimeline.tsx`, `tests/auditTrailDrawer.test.ts`):
 - Diagnosed root cause of permanent "Loading case audit trail events...": `useCommunications` skipped `api.auditLogs.listByClaim` queries outside the dedicated audit page without passing `enableAudit`, leaving query results `undefined` and indefinitely evaluating `isLoadingAudit: true`. Fixed by linking `enableAudit: isAuditDrawerOpen || currentView === "audit"` and gating `isLoadingAudit` strictly to active queries.
 - Extracted dedicated `AuditTrailDrawer` portaled directly to `document.body`, eliminating parent stacking context trapping under `Header.tsx` (`z-40`) that was clipping the drawer title and covering the close button.
 - Added drawer backdrop mouse-down safety to prevent accidental dismissals on text selection, decoupled escape listeners with stable refs to prevent body scroll churn, and added smooth slide-in animations.
 - Enhanced `AuditTimeline` with drawer-aware compact toolbar (`isDrawer: true`), dynamic filter dropdown options reflecting real event labels and counts, detailed timestamps (`formatDateTime`), animated skeleton loaders, and expanded event mappings across 40+ backend telemetry events.
 - Added regression test suite (`tests/auditTrailDrawer.test.ts`) and verified 100% clean across typecheck, lint, 842 unit tests, and production build with `npm run verify`.
+
+### 2026-09-12 - working tree
+Resolved Score Rubric background spinner freeze, removed button clutter, and eliminated duplicate Appeal Brief triggers (`src/components/evidence/EvidenceMatrix.tsx`, `src/components/studio/AppealStudio.tsx`, `convex/actions/precedentMatcher.ts`):
+- Diagnosed root cause of perpetual spinning 'Autonomous pipeline running in background [precedent matched]': `precedentMatcher.ts` set claim status to `precedent_matched` which was mistakenly classified in frontend components as an active background task rather than a completed milestone. Fixed `isBackgroundPipelineRunning` to only trigger on active asynchronous tasks (`parsing`, `analyzing`, `drafting`) when no brief has been drafted.
+- Protected claim status progression in `precedentMatcher.ts`: rubric score recalculations now explicitly check `latestAppeal` and preserve all advanced lifecycle stages (`ready_for_review`, `dispatched`, `won`, `lost`, `escalated`) instead of regressing them to `precedent_matched`.
+- Streamlined `EvidenceMatrix` header toolbar from 5 redundant controls (`Re-run Analysis`, `Index CPB`, `Research Hub`, `Score Rubric`, `Review Appeal Brief`) to a crisp 2-button layout (`Re-run Analysis` outline and `Review Appeal Brief ->` primary CTA), deferring research tools to the dedicated tab.
+- Removed duplicate 'Draft Appeal Brief' button from the Overturn Probability Score banner, resolving vertical button stacking.
+- Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 850 passing unit tests across 52 test suites, and clean production build.

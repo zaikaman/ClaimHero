@@ -242,7 +242,7 @@ export async function performComputeOverturnScore(
     claimId: Id<"claims">;
     pipelineRunId?: string;
   },
-  claim: Doc<"claims"> & { patient?: Doc<"patients"> },
+  claim: Doc<"claims"> & { patient?: Doc<"patients">; latestAppeal?: Doc<"appeals"> | null },
   userId?: string
 ): Promise<OverturnScoringResult> {
   // Rate limiting check per user if available
@@ -365,9 +365,46 @@ ${evidencesSummary}`,
   };
 
   // 5. Update claim in database with deterministic score, risk level, and criteria breakdown
+  // Do not regress status if the claim has already drafted an appeal brief or reached dispatch/resolution
+  const hasDraftedAppeal = Boolean(claim.latestAppeal);
+  const preservesAdvancedStatus =
+    hasDraftedAppeal ||
+    claim.status === "ready_for_review" ||
+    claim.status === "dispatched" ||
+    claim.status === "delivered" ||
+    claim.status === "under_review" ||
+    claim.status === "won" ||
+    claim.status === "lost" ||
+    claim.status === "escalated";
+
+  const updatedStatus = (
+    preservesAdvancedStatus
+      ? (hasDraftedAppeal &&
+         (claim.status === "ingested" ||
+          claim.status === "parsing" ||
+          claim.status === "analyzing" ||
+          claim.status === "precedent_matched" ||
+          claim.status === "drafting")
+          ? "ready_for_review"
+          : claim.status)
+      : "precedent_matched"
+  ) as
+    | "ingested"
+    | "parsing"
+    | "analyzing"
+    | "precedent_matched"
+    | "drafting"
+    | "ready_for_review"
+    | "dispatched"
+    | "delivered"
+    | "under_review"
+    | "won"
+    | "lost"
+    | "escalated";
+
   await ctx.runMutation(internal.claims.updateStatusInternal, {
     claimId: args.claimId,
-    status: "precedent_matched",
+    status: updatedStatus,
     overturnProbabilityScore: finalResult.overturnProbabilityScore,
     riskLevel: finalResult.riskLevel,
     scoringBreakdown: finalResult.scoringBreakdown,
@@ -419,7 +456,7 @@ export const computeOverturnScoreInternal = internalAction({
   handler: async (ctx, args): Promise<OverturnScoringResult> => {
     const claim = (await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
-    })) as (Doc<"claims"> & { patient?: Doc<"patients"> }) | null;
+    })) as (Doc<"claims"> & { patient?: Doc<"patients">; latestAppeal?: Doc<"appeals"> | null }) | null;
     if (!claim) {
       throw new Error(`Claim ${args.claimId} not found`);
     }

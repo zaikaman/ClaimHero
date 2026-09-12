@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import {
   FileMagnifyingGlass,
-  TrendUp,
   Warning,
   CheckCircle,
+  Check,
   Lightning,
   CircleNotch,
   ArrowsClockwise,
@@ -68,7 +68,6 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   onOpenAuditDrawer,
 }) => {
   const [activeTab, setActiveTab] = useState<string>("policy");
-  const [isCrawling, setIsCrawling] = useState(false);
   const [isScoring, setIsScoring] = useState(false);
   const [isUnifiedAnalyzing, setIsUnifiedAnalyzing] = useState(false);
   const [scoringResult, setScoringResult] = useState<OverturnScoringResult | null>(
@@ -78,6 +77,21 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
 
   const denialReason = DENIAL_REASON_CODES[claim.denialReasonCode];
 
+  const hasAnalyzedEvidence = Boolean(
+    (evidences && evidences.length > 0) ||
+    claim.overturnProbabilityScore !== undefined ||
+    scoringResult !== null ||
+    (claim.evidenceCount !== undefined && claim.evidenceCount > 0)
+  );
+
+  const hasDraftedBrief = Boolean(
+    claim.latestAppeal ||
+    claim.status === "ready_for_review" ||
+    claim.status === "dispatched" ||
+    claim.status === "won" ||
+    claim.status === "lost" ||
+    claim.status === "escalated"
+  );
 
   // 1-Click Complete Analysis (Crawl CPB + Compute Score in a single fluid action)
   const handleRunCompleteAnalysis = async () => {
@@ -95,22 +109,6 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       toast.error(msg, { id: toastId });
     } finally {
       setIsUnifiedAnalyzing(false);
-    }
-  };
-
-  const handleRunCrawl = async () => {
-    setIsCrawling(true);
-    setErrorMessage(null);
-    const toastId = toast.loading(`Crawling ${claim.patient?.insurancePayer || "payer"} Clinical Policy Bulletin via Firecrawl...`);
-    try {
-      await onCrawlPolicy(claim._id);
-      toast.success("Clinical Policy Bulletin crawled and indexed", { id: toastId });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to crawl insurer Clinical Policy Bulletin.";
-      setErrorMessage(msg);
-      toast.error(msg, { id: toastId });
-    } finally {
-      setIsCrawling(false);
     }
   };
 
@@ -154,18 +152,15 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   };
 
   const isBackgroundPipelineRunning =
-    claim.status === "ingested" ||
-    claim.status === "parsing" ||
-    claim.status === "analyzing" ||
-    claim.status === "precedent_matched" ||
-    claim.status === "drafting";
+    !hasDraftedBrief &&
+    (claim.status === "parsing" ||
+      claim.status === "analyzing" ||
+      claim.status === "drafting");
 
   const pipelineStepLabel =
     claim.status === "drafting"
       ? "Step 3/3: Synthesizing cited ERISA appeal brief"
-      : claim.status === "precedent_matched"
-        ? "Step 2/3: Matching precedents and scoring overturn probability"
-        : "Step 1/3: Crawling insurer Clinical Policy Bulletins";
+      : "Step 1/3: Crawling insurer Clinical Policy Bulletins";
 
   return (
     <div className="space-y-4 animate-fadeIn pb-24">
@@ -178,18 +173,11 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           else if (v === "studio") onNavigateToStudio();
         }}
         evidencesCount={evidences.length}
-        hasDraftedBrief={
-          Boolean(claim.latestAppeal) ||
-          claim.status === "ready_for_review" ||
-          claim.status === "dispatched" ||
-          claim.status === "won"
-        }
-        isProcessing={isUnifiedAnalyzing || isCrawling || isScoring || isBackgroundPipelineRunning}
+        hasDraftedBrief={hasDraftedBrief}
+        isProcessing={isUnifiedAnalyzing || isScoring || isBackgroundPipelineRunning}
         processingLabel={
           isUnifiedAnalyzing
             ? "Running Complete Analysis..."
-            : isCrawling
-            ? "Indexing Policy Guidelines..."
             : isScoring
             ? "Evaluating Rubric..."
             : isBackgroundPipelineRunning
@@ -221,7 +209,10 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 stream in live below. You can keep working; no need to wait.
               </p>
               <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground" aria-hidden="true">
-                <span className="text-emerald-500">✓ Ingested</span>
+                <span className="text-emerald-500 inline-flex items-center gap-0.5">
+                  <Check className="size-3 text-emerald-500 shrink-0" weight="bold" />
+                  <span>Ingested</span>
+                </span>
                 <span>→</span>
                 <span className={claim.status === "analyzing" || claim.status === "precedent_matched" || claim.status === "drafting" ? "text-primary font-semibold" : ""}>
                   Crawl + Score
@@ -247,13 +238,18 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               <FileMagnifyingGlass className="size-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-semibold text-foreground font-sans">
                   Clinical Evidence Matrix & Policy Inspector
                 </h2>
                 <Badge variant="outline" className="font-mono text-[10px]">
                   Deterministic 4-Pillar Rubric
                 </Badge>
+                {hasAnalyzedEvidence && (
+                  <Badge variant="outline" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                    Analysis Complete
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 Cross-referencing denial codes against official Clinical Policy Bulletins and legal precedents
@@ -262,78 +258,64 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap shrink-0">
-            {/* 1-Click Unified Analysis Trigger */}
-            <Button
-              size="sm"
-              onClick={handleRunCompleteAnalysis}
-              disabled={isUnifiedAnalyzing || isCrawling || isScoring}
-              className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
-            >
-              {isUnifiedAnalyzing ? (
-                <>
-                  <CircleNotch className="size-3.5 animate-spin" />
-                  <span>Analyzing Policy...</span>
-                </>
-              ) : (
-                <>
-                  <Lightning className="size-3.5" weight="fill" />
-                  <span>1-Click Complete Analysis</span>
-                </>
-              )}
-            </Button>
+            {hasAnalyzedEvidence ? (
+              <>
+                {/* Re-run Policy Analysis Trigger (Secondary Outline) */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRunCompleteAnalysis}
+                  disabled={isUnifiedAnalyzing || isScoring || isBackgroundPipelineRunning}
+                  className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0"
+                  title={isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Re-crawl policy bulletin and recalculate 4-pillar score"}
+                >
+                  {isUnifiedAnalyzing ? (
+                    <>
+                      <CircleNotch className="size-3.5 animate-spin" />
+                      <span>Re-analyzing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowsClockwise className="size-3.5" />
+                      <span>Re-run Analysis</span>
+                    </>
+                  )}
+                </Button>
 
-            {/* Run Policy Crawl Trigger */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRunCrawl}
-              disabled={isCrawling || isScoring || isUnifiedAnalyzing}
-              className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0"
-            >
-              {isCrawling ? (
-                <>
-                  <CircleNotch className="size-3.5 animate-spin" />
-                  <span>Indexing...</span>
-                </>
-              ) : (
-                <>
-                  <ArrowsClockwise className="size-3.5" />
-                  <span>Index CPB</span>
-                </>
-              )}
-            </Button>
-
-            {/* Research Hub Direct Trigger */}
-            <Button
-              variant={activeTab === "research" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveTab("research")}
-              className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0"
-            >
-              <Globe className="size-3.5 text-primary" />
-              <span>Research Hub</span>
-            </Button>
-
-            {/* Run Win Score Calculation Trigger */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRunScoring}
-              disabled={isScoring || isCrawling || isUnifiedAnalyzing}
-              className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0"
-            >
-              {isScoring ? (
-                <>
-                  <CircleNotch className="size-3.5 animate-spin" />
-                  <span>Scoring...</span>
-                </>
-              ) : (
-                <>
-                  <TrendUp className="size-3.5" />
-                  <span>Score Rubric</span>
-                </>
-              )}
-            </Button>
+                {/* Primary Blue CTA: Next step in the Sentinel pipeline */}
+                <Button
+                  size="sm"
+                  onClick={onNavigateToStudio}
+                  className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
+                  title="Proceed to Collaborative Appeal Studio to review or synthesize brief"
+                >
+                  <FileText className="size-3.5" />
+                  <span>{hasDraftedBrief ? "Review Appeal Brief" : "Draft Appeal Brief"}</span>
+                  <ArrowRight className="size-3" />
+                </Button>
+              </>
+            ) : (
+              /* 1-Click Unified Analysis Trigger (Primary Initial CTA) */
+              <Button
+                size="sm"
+                onClick={handleRunCompleteAnalysis}
+                disabled={isUnifiedAnalyzing || isScoring || isBackgroundPipelineRunning}
+                className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
+                title={isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Automatically index Clinical Policy Bulletin and calculate Overturn Probability Score"}
+              >
+                {isUnifiedAnalyzing ? (
+                  <>
+                    <CircleNotch className="size-3.5 animate-spin" />
+                    <span>Analyzing Policy...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lightning className="size-3.5" weight="fill" />
+                    <span>1-Click Complete Analysis</span>
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </Card>
@@ -376,16 +358,6 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 </p>
               </div>
             </div>
-
-            <Button
-              size="sm"
-              onClick={onNavigateToStudio}
-              className="gap-1.5 shrink-0"
-            >
-              <FileText className="size-3.5" />
-              <span>Draft Appeal Brief</span>
-              <ArrowRight className="size-3" />
-            </Button>
           </div>
 
           {/* 4-Pillar Deterministic Rubric Criteria Breakdown */}
@@ -720,7 +692,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             <TabsContent value="policy" className="pt-1">
               <PolicyViewer
                 evidences={evidences}
-                isLoading={isLoadingEvidences || isCrawling || (isBackgroundPipelineRunning && evidences.length === 0)}
+                isLoading={isLoadingEvidences || isUnifiedAnalyzing || (isBackgroundPipelineRunning && evidences.length === 0)}
                 onDeleteEvidence={onDeleteEvidence}
                 onOpenResearchConsole={() => setActiveTab("research")}
               />
@@ -764,8 +736,13 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
         <Button
           onClick={onNavigateToStudio}
           className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all"
+          title="Proceed to Collaborative Appeal Studio to review and synthesize appeal brief"
         >
-          <span>Next: Review & Synthesize Appeal Brief in Studio</span>
+          <span>
+            {hasDraftedBrief
+              ? "Next: Review Synthesized Appeal Brief in Studio"
+              : "Next: Review & Synthesize Appeal Brief in Studio"}
+          </span>
           <ArrowRight className="size-3.5" />
         </Button>
       </div>

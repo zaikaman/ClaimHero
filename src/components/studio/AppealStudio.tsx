@@ -8,6 +8,7 @@ import {
   PencilSimpleLine,
   Printer,
   ArrowRight,
+  ArrowsClockwise,
   Scales,
   TrendUp,
   ShieldWarning,
@@ -165,6 +166,17 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   const [presenceOthers, setPresenceOthers] = useState<Array<{ userId: string; data: StudioPresenceData }>>([]);
   const editingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const hasSynthesizedBrief = Boolean(
+    appeal ||
+    claim.latestAppeal ||
+    (markdownContent && markdownContent.trim().length > 100) ||
+    claim.status === "ready_for_review" ||
+    claim.status === "dispatched" ||
+    claim.status === "won" ||
+    claim.status === "lost" ||
+    claim.status === "escalated"
+  );
+
   const currentTierConfig = TIER_METADATA_CONFIG[appealLevel] || TIER_METADATA_CONFIG.level_1_internal;
 
   const presenceActivity = isSynthesizing || isEscalating ? "synthesizing" : isEditingBrief ? "editing" : "viewing";
@@ -271,11 +283,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   };
 
   const isBackgroundPipelineRunning =
+    !hasSynthesizedBrief &&
     !markdownContent.trim() &&
     (claim.status === "analyzing" ||
-      claim.status === "precedent_matched" ||
       claim.status === "drafting" ||
-      claim.status === "ingested" ||
       claim.status === "parsing");
 
   return (
@@ -517,6 +528,11 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 <Badge variant="outline" className="font-mono text-[10px]">
                   Claim #{claim.claimNumber}
                 </Badge>
+                {hasSynthesizedBrief && (
+                  <Badge variant="outline" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                    Brief Ready (v{appeal?.version || claim.latestAppeal?.version || 1})
+                  </Badge>
+                )}
                 {claim.isShared && (
                   <Badge variant="outline" className="font-mono text-[10px] border-violet-500/40 text-violet-300 bg-violet-500/10">
                     Shared case
@@ -608,38 +624,106 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 </Badge>
               )}
             </Button>
-            {/* Export & Preview Trigger */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsExportOpen(true)}
-              className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
-              title="Preview printable appeal brief"
-            >
-              <Printer className="size-3.5" />
-              <span>Preview Email</span>
-            </Button>
+            {hasSynthesizedBrief ? (
+              <>
+                {/* Re-synthesize Trigger (Secondary Outline) */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRunSynthesis}
+                  disabled={isSynthesizing || isSaving || isEscalating || readOnly || isBackgroundPipelineRunning}
+                  className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
+                  title={readOnly ? "Viewers have read-only access" : isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Re-generate appeal brief with AI"}
+                >
+                  {isSynthesizing || isEscalating ? (
+                    <>
+                      <CircleNotch className="size-3.5 animate-spin" />
+                      <span>Re-synthesizing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowsClockwise className="size-3.5" />
+                      <span>Re-synthesize</span>
+                    </>
+                  )}
+                </Button>
 
-            {/* Synthesize Appeal Brief */}
-            <Button
-              size="sm"
-              onClick={handleRunSynthesis}
-              disabled={isSynthesizing || isSaving || isEscalating || readOnly}
-              className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
-              title={readOnly ? "Viewers have read-only access" : "Synthesize cited appeal brief with AI"}
-            >
-              {isSynthesizing || isEscalating ? (
-                <>
-                  <CircleNotch className="size-3.5 animate-spin" />
-                  <span>Synthesizing...</span>
-                </>
-              ) : (
-                <>
-                  <FileText className="size-3.5" />
-                  <span>Synthesize Brief</span>
-                </>
-              )}
-            </Button>
+                {/* Export & Preview Trigger */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsExportOpen(true)}
+                  className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
+                  title="Preview printable appeal brief"
+                >
+                  <Printer className="size-3.5" />
+                  <span>Preview Email</span>
+                </Button>
+
+                {/* Primary Blue CTA: Next step in the Sentinel pipeline */}
+                {onNavigateToDispatch ? (
+                  <Button
+                    size="sm"
+                    onClick={onNavigateToDispatch}
+                    className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
+                    title="Proceed to Payer Dispatch to review transmission and send appeal"
+                  >
+                    <span>Proceed to Dispatch</span>
+                    <ArrowRight className="size-3.5" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => setIsExportOpen(true)}
+                    className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
+                    title="Preview printable appeal brief"
+                  >
+                    <Printer className="size-3.5" />
+                    <span>Preview Email</span>
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Export & Preview Trigger */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsExportOpen(true)}
+                  className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
+                  title="Preview printable appeal brief"
+                >
+                  <Printer className="size-3.5" />
+                  <span>Preview Email</span>
+                </Button>
+
+                {/* Synthesize Appeal Brief (Primary Initial Action) */}
+                <Button
+                  size="sm"
+                  onClick={handleRunSynthesis}
+                  disabled={isSynthesizing || isSaving || isEscalating || readOnly || isBackgroundPipelineRunning}
+                  className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
+                  title={readOnly ? "Viewers have read-only access" : isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Synthesize cited appeal brief with AI"}
+                >
+                  {isSynthesizing || isEscalating ? (
+                    <>
+                      <CircleNotch className="size-3.5 animate-spin" />
+                      <span>Synthesizing...</span>
+                    </>
+                  ) : isBackgroundPipelineRunning ? (
+                    <>
+                      <CircleNotch className="size-3.5 animate-spin" />
+                      <span>Pipeline Running...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="size-3.5" />
+                      <span>Synthesize Brief</span>
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -938,20 +1022,49 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             size="sm"
             onClick={() => setIsExportOpen(true)}
             className="gap-1.5 text-xs h-8 hidden sm:inline-flex"
+            title="Export printable PDF brief and statutory exhibits"
           >
             <Printer className="size-3.5" />
             <span>Export PDF Dossier</span>
           </Button>
 
-          <Button
-            onClick={() => {
-              if (onNavigateToDispatch) onNavigateToDispatch();
-            }}
-            className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all h-8"
-          >
-            <span>Next: Dispatch Appeal Packet</span>
-            <ArrowRight className="size-3.5" />
-          </Button>
+          {hasSynthesizedBrief ? (
+            <Button
+              onClick={() => {
+                if (onNavigateToDispatch) onNavigateToDispatch();
+              }}
+              className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all h-8"
+              title="Proceed to Payer Dispatch to review transmission and send appeal"
+            >
+              <span>Next: Dispatch Appeal Packet</span>
+              <ArrowRight className="size-3.5" />
+            </Button>
+          ) : (
+            <Button
+              onClick={handleRunSynthesis}
+              disabled={isSynthesizing || isSaving || isEscalating || readOnly || isBackgroundPipelineRunning}
+              className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all h-8"
+              title={readOnly ? "Viewers have read-only access" : isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Synthesize cited appeal brief with AI before dispatching"}
+            >
+              {isSynthesizing || isEscalating ? (
+                <>
+                  <CircleNotch className="size-3.5 animate-spin" />
+                  <span>Synthesizing Brief...</span>
+                </>
+              ) : isBackgroundPipelineRunning ? (
+                <>
+                  <CircleNotch className="size-3.5 animate-spin" />
+                  <span>Pipeline Running in Background...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="size-3.5" />
+                  <span>Next: Synthesize Appeal Brief</span>
+                  <ArrowRight className="size-3.5" />
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 

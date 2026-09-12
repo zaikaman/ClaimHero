@@ -335,6 +335,40 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
       }));
     });
 
+    it("computeOverturnScore: does not regress claim status if appeal was already drafted or dispatched", async () => {
+      const draftedClaim = {
+        _id: "c_drafted",
+        claimNumber: "CLM-DRAFTED-1",
+        userId: "user_123",
+        status: "ready_for_review",
+        cptCodes: ["63047"],
+        icd10Codes: ["M51.1"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+        deniedAmount: 18450,
+        patientOwedAmount: 18450,
+        latestAppeal: { _id: "app_1", version: 1 },
+      };
+
+      let qCall = 0;
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation(() => {
+          qCall++;
+          if (qCall === 1) return Promise.resolve(draftedClaim);
+          return Promise.resolve([]);
+        }),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await (actionPrecedentMatcher.computeOverturnScore as any)._handler(mockCtx, {
+        claimId: "c_drafted",
+      });
+
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        status: "ready_for_review",
+      }));
+    });
+
     it("calculateDeterministicRubric: scales ERISA and precedent scores down on zero evidence", () => {
       const claim = {
         cptCodes: ["99214"],
