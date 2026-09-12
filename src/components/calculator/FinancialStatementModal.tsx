@@ -104,10 +104,28 @@ Authorized Representative / Claimant: ___________________________   Date: ${eris
 `;
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(generateStatementPlainText());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      const text = generateStatementPlainText();
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "absolute";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable; user can still download or print the statement.
+      setCopied(false);
+    }
   };
 
   const handleDownloadTxt = () => {
@@ -117,7 +135,9 @@ Authorized Representative / Claimant: ___________________________   Date: ${eris
     const a = document.createElement("a");
     a.href = url;
     a.download = `Financial_ERISA_Statement_${claim.claimNumber}_${erisaResult.data.calculationDate}.txt`;
+    document.body.appendChild(a);
     a.click();
+    a.remove();
     URL.revokeObjectURL(url);
   };
 
@@ -178,9 +198,11 @@ Authorized Representative / Claimant: ___________________________   Date: ${eris
               <span>Print Statement</span>
             </Button>
             <button
+              type="button"
               onClick={onClose}
               className="size-8 flex items-center justify-center rounded-md hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors cursor-pointer ml-1"
               title="Close modal"
+              aria-label="Close statement modal"
             >
               <X className="size-4" />
             </button>
@@ -250,7 +272,7 @@ Authorized Representative / Claimant: ___________________________   Date: ${eris
                 <div className="text-base font-bold text-amber-800 mt-0.5">
                   {formatCurrency(erisaResult.data.totalPlanAdministratorExposure)}
                 </div>
-                <div className="text-[10px] text-slate-500">{erisaResult.data.daysInDefault}d @ $110/day + Fees</div>
+                <div className="text-[10px] text-slate-500">{erisaResult.data.daysInDefault}d @ ${erisaResult.data.dailyPenaltyRate.toFixed(0)}/day + Fees</div>
               </div>
             </div>
 
@@ -326,7 +348,7 @@ Authorized Representative / Claimant: ___________________________   Date: ${eris
                 <div className="p-3 border border-slate-300 rounded space-y-1.5">
                   <div className="text-[10px] uppercase font-bold text-slate-500">Itemized Plan Administrator Exposure</div>
                   <div className="flex justify-between"><span>Principal Disputed Claim:</span><span>{formatCurrency(liabilityResult.data.billedAmount)}</span></div>
-                  <div className="flex justify-between text-amber-800"><span>Accrued Penalties ($110/d):</span><strong>{formatCurrency(erisaResult.data.accruedPenaltyAmount)}</strong></div>
+                  <div className="flex justify-between text-amber-800"><span>Accrued Penalties (${erisaResult.data.dailyPenaltyRate.toFixed(0)}/d):</span><strong>{formatCurrency(erisaResult.data.accruedPenaltyAmount)}</strong></div>
                   <div className="flex justify-between"><span>Statutory Interest ({erisaResult.data.statutoryInterestRate}%):</span><span>{formatCurrency(erisaResult.data.accruedInterestAmount)}</span></div>
                   <div className="flex justify-between"><span>Attorney Fees (§ 502(g)(1)):</span><span>{formatCurrency(erisaResult.data.estimatedAttorneysFees)}</span></div>
                   <div className="flex justify-between pt-1 border-t border-slate-300 font-bold text-slate-950">

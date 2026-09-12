@@ -152,8 +152,8 @@ export function useLiabilityCalculator(claim?: Claim | null) {
     []
   );
 
-  const saveToClaim = useCallback(async () => {
-    if (!claim?._id) return;
+  const saveToClaim = useCallback(async (): Promise<boolean> => {
+    if (!claim?._id) return false;
     setIsSaving(true);
     setErrorMessage(null);
     try {
@@ -169,10 +169,12 @@ export function useLiabilityCalculator(claim?: Claim | null) {
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+      return true;
     } catch (err) {
       console.error("Failed to save liability calculations:", err);
       const message = err instanceof Error ? err.message : "Failed to save calculation to case";
       setErrorMessage(message);
+      return false;
     } finally {
       setIsSaving(false);
     }

@@ -71,7 +71,10 @@ export function calculateFinancialLiability(
 
   // Step 5: Capped Covered Patient Cost-Sharing (cannot exceed remaining OOP Max capacity)
   const coveredPatientShare = Math.min(uncappedPatientCostShare, remainingOopCapacity);
-  const isOopMaxReached = uncappedPatientCostShare >= remainingOopCapacity && remainingOopCapacity > 0;
+  const isOopMaxReached =
+    outOfPocketMax > 0 &&
+    (outOfPocketSpent >= outOfPocketMax ||
+      (remainingOopCapacity >= 0 && uncappedPatientCostShare >= remainingOopCapacity));
 
   // Step 6: Coinsurance owed after OOP cap adjustment
   const coinsuranceOwed = Math.max(0, coveredPatientShare - deductibleApplied - copayAmount);
@@ -81,9 +84,11 @@ export function calculateFinancialLiability(
   const payerExpectedObligation = Math.max(0, allowedAmount - coveredPatientShare);
 
   // Step 8: Balance Billing Exposure (if Out-of-Network and NOT protected by No Surprises Act)
+  // Note: contractualDiscount is an in-network write-off already reflected in allowedAmount,
+  // so OON exposure is billed minus allowed (do not subtract the discount a second time).
   let balanceBillingExposure = 0;
   if (networkStatus === "out_of_network" && !noSurprisesActProtected) {
-    balanceBillingExposure = Math.max(0, billedAmount - allowedAmount - contractualDiscount);
+    balanceBillingExposure = Math.max(0, billedAmount - allowedAmount);
   }
 
   // Step 9: Denied vs Overturned Total Patient Exposure
@@ -317,10 +322,12 @@ export function calculateErisaPenalties(
     "29 U.S.C. § 1132(c)(1)(B); 29 C.F.R. § 2560.503-1(h)(2)(iii); 29 C.F.R. § 2575.502c-1; 29 U.S.C. § 1132(g)(1)";
 
   // Future 30/60/90/120-Day Trajectories
+  // If the plan is compliant, no future default accrues. Otherwise project continued non-compliance.
+  const isNonCompliant = complianceStatus !== "compliant";
   const horizons = [30, 60, 90, 120];
   const trajectories: ErisaPenaltyTrajectoryItem[] = horizons.map((h) => {
     const futureDateObj = new Date(calcDate.getTime() + h * 24 * 60 * 60 * 1000);
-    const projectedDaysInDefault = daysInDefault + h;
+    const projectedDaysInDefault = isNonCompliant ? daysInDefault + h : 0;
     const projectedPenalties = projectedDaysInDefault * dailyPenaltyRate;
     const projectedInterest = Math.round(
       (disputedAmount * (statutoryInterestRate / 100) * ((daysElapsedSinceRequest + h) / 365)) * 100
