@@ -5,7 +5,6 @@ import {
   MagnifyingGlass,
   PlusCircle,
   GithubLogo,
-  Pulse,
   SignIn,
   SpeakerSimpleHigh,
   SpeakerSimpleSlash,
@@ -24,7 +23,7 @@ interface HeaderProps {
   onOpenCommandPalette?: () => void;
   totalDisputedAmount: number;
   totalWonAmount: number;
-  winRate: number;
+  winRate?: number;
   criticalDeadlinesCount: number;
 }
 
@@ -35,7 +34,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCommandPalette,
   totalDisputedAmount = 0,
   totalWonAmount = 0,
-  winRate = 0,
   criticalDeadlinesCount = 0,
 }) => {
   const { isAuthenticated } = useCurrentUser();
@@ -69,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Quick search across claims and actions (⌘K / Ctrl+K)"
           >
             <MagnifyingGlass className="size-3.5" />
-            <span className="flex-1 text-left">Search claims, CPT, payers...</span>
+            <span className="flex-1 text-left truncate">Search claims, CPT, payers...</span>
             <kbd className="pointer-events-none hidden sm:inline-flex h-4 items-center gap-0.5 rounded border border-border/60 bg-muted/60 px-1.5 font-mono text-[9px] font-medium text-muted-foreground">
               ⌘K
             </kbd>
@@ -88,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-1.5">
               <span>Recovered:</span>
               <strong className="text-emerald-600 dark:text-emerald-400 font-mono">
-                {formatCurrency(totalWonAmount)} ({winRate}%)
+                {formatCurrency(totalWonAmount)}
               </strong>
             </div>
             {criticalDeadlinesCount > 0 && (
@@ -111,12 +109,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="flex items-center gap-1">
-            <div className="hidden sm:flex items-center gap-1.5 rounded-lg border border-border bg-muted/30 px-2.5 py-1 text-[11px] text-muted-foreground font-mono mr-1">
-              <Pulse className="size-3 text-foreground" />
-              <span>Clinical Intelligence</span>
-              <span className="size-1.5 rounded-full bg-emerald-500"></span>
-            </div>
-
             {/* Quick Ingest Button */}
             <Button
               size="sm"

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-12T16:47:00Z
+- **Last updated:** 2026-09-12T17:12:00Z
 
 ## Log
 
@@ -1310,7 +1310,7 @@ Hardened Case Radar export pipeline and resolved HIPAA Safe Harbor PHI leakage a
 - Validated all 4 export options: Redacted JSON (HIPAA Safe Harbor de-identified dataset), Redacted CSV (15-column RFC-4180 format with masked PHI and year-only DOS), Unredacted CSV (advocate audit copy keeping flagged cases masked), and Unredacted JSON (full technical audit payload).
 - Added comprehensive regression test suite (`tests/radarExport.test.ts`) and verified 100% clean across typecheck, lint, 885 unit tests across 54 test suites, and production build with `npm run verify`.
 
-### 2026-09-12 - working tree
+### 2026-09-12 - 5fa6e6f
 Built zero-asset Web Audio acoustic sentinel sensory feedback system and wired real-time cues across all key workflows (`src/lib/soundEffects.ts`, `src/hooks/useSoundEffects.ts`, `src/components/layout/Header.tsx`, `src/components/settings/SettingsPage.tsx`, `src/hooks/useAppealStudio.ts`, `src/components/radar/IngestionModal.tsx`, `src/components/studio/ExportDrawer.tsx`, `src/components/communications/AgentMailDrawer.tsx`, `src/hooks/useLiveCallCopilot.ts`, `src/components/common/CommandDialog.tsx`, `tests/soundEffects.test.ts`):
 - Engineered procedural Web Audio API engine (`SoundEffectsEngine`) generating clinical acoustic cues in real-time via native browser `AudioContext` oscillators, gain envelopes, and biquad filters, eliminating external audio asset network latency and bundle bloat.
 - Implemented 10 clinical acoustic profiles tailored to medical sentinel aesthetics: ascending harmonic chime on One-Click Appeal Synthesis completion, dual-tick impulse on optical document ingestion / OCR parse, resonant pulse on Court-Ready Dossier Binder compilation, filtered directional whoosh on AgentMail outbound dispatch, clinical sonar pip on live P2P copilot rebuttal, ascending triad on P2P overturn victory, live mic chirps on audio capture toggle, and mechanical micro-clicks on Command Palette navigation.
@@ -1318,4 +1318,5 @@ Built zero-asset Web Audio acoustic sentinel sensory feedback system and wired r
 - Created dedicated "Acoustic Sentinel Sensory Feedback" settings card in `SettingsPage.tsx` with master toggle, volume slider (0-100%), and interactive audition buttons allowing users to test every acoustic profile.
 - Added comprehensive unit test suite (`tests/soundEffects.test.ts`) and verified 100% clean across typecheck, lint, 892 passing unit tests across 55 test suites, and production build with `npm run verify`.
 
-
+### 2026-09-12 - working tree
+Streamlined top Header metrics and actions by removing the redundant portfolio win rate percentage from the 'Recovered' financial pill and eliminating the non-functional 'Clinical Intelligence' status badge and unused Pulse icon (`src/components/layout/Header.tsx`), presenting clean disputed and recovered totals without cluttering the global bar.
