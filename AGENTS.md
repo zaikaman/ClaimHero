@@ -37,6 +37,7 @@ Hardened structured model response handling in `convex/lib/openai.ts` with two s
 - Do not use the browser agent to verify the UI, the user will do that himself.
 - Do not use emojis anywhere, docs, frontend code, no where.
 - You don't have to run npm run deploy or deploy to prod, we already have github actions that do that when it's pushed to Github, and do not commit anything yourself.
+- Upon completing your work, spawn a subagent to do a full and thorough quality pass through it for any remaining bugs, issues or QoL improvements
 
 <!-- convex-ai-start -->
 

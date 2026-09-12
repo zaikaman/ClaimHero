@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-12T13:10:00Z
+- **Last updated:** 2026-09-12T14:30:00Z
 
 ## Log
 
@@ -1266,7 +1266,7 @@ Redesigned and streamlined Physician Peer-to-Peer (P2P) Defense module (`src/com
 - Streamlined Live Copilot controls: separated live microphone defense from reviewer practice, simplified transcript dialogue feeds, and prioritized high-contrast "SAY THIS RIGHT NOW" counter-strike cards.
 - Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 835 passing unit tests across 51 test suites, and production build.
 
-### 2026-09-12 - working tree
+### 2026-09-12 - 582fc8f
 Streamlined ERISA & Financial Liability Audit module (`src/components/calculator/FinancialLiabilityCalculator.tsx`):
 - Collapsed 3 fragmented tabs into a focused 2-mode architecture: Mode 1 (Patient Savings & Bill Breakdown: out-of-pocket impact, Before vs. After overturn comparison, annual OOP cap gauge, and plain-English bill schedule) and Mode 2 (Insurer Penalty Sentinel: federal 30-day disclosure rule explainer, $110/day live penalty counter, escalating delay trajectory, and ready-to-use Notice of Default statutory demand).
 - Purged the redundant 3rd "Legal-Financial Balance Sheet" tab; full formal reconciliation and statutory affidavits are now directly accessible through the dedicated 1-click Exhibit Statement preview/print modal (`FinancialStatementModal.tsx`).
@@ -1274,3 +1274,11 @@ Streamlined ERISA & Financial Liability Audit module (`src/components/calculator
 - Clarified legal jargon into patient-first value propositions, explaining exactly how statutory non-compliance ($110/day ERISA § 502(c) fines) creates direct settlement leverage to compel payers to overturn medical necessity denials.
 - Streamlined action toolbar into one clear primary CTA ("Embed in Appeal Brief") alongside secondary "Print Exhibit" and "Copy Summary" actions.
 - Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 835 passing unit tests across 51 test suites, and successful production build.
+
+### 2026-09-12 - working tree
+Resolved Case Audit Trail Drawer loading freeze and layout clipping (`src/App.tsx`, `src/hooks/useCommunications.ts`, `src/components/communications/AuditTrailDrawer.tsx`, `src/components/communications/AuditTimeline.tsx`, `tests/auditTrailDrawer.test.ts`):
+- Diagnosed root cause of permanent "Loading case audit trail events...": `useCommunications` skipped `api.auditLogs.listByClaim` queries outside the dedicated audit page without passing `enableAudit`, leaving query results `undefined` and indefinitely evaluating `isLoadingAudit: true`. Fixed by linking `enableAudit: isAuditDrawerOpen || currentView === "audit"` and gating `isLoadingAudit` strictly to active queries.
+- Extracted dedicated `AuditTrailDrawer` portaled directly to `document.body`, eliminating parent stacking context trapping under `Header.tsx` (`z-40`) that was clipping the drawer title and covering the close button.
+- Added drawer backdrop mouse-down safety to prevent accidental dismissals on text selection, decoupled escape listeners with stable refs to prevent body scroll churn, and added smooth slide-in animations.
+- Enhanced `AuditTimeline` with drawer-aware compact toolbar (`isDrawer: true`), dynamic filter dropdown options reflecting real event labels and counts, detailed timestamps (`formatDateTime`), animated skeleton loaders, and expanded event mappings across 40+ backend telemetry events.
+- Added regression test suite (`tests/auditTrailDrawer.test.ts`) and verified 100% clean across typecheck, lint, 842 unit tests, and production build with `npm run verify`.

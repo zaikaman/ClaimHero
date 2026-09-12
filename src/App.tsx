@@ -11,9 +11,7 @@ import { useCommunications } from "./hooks/useCommunications";
 import { useRouterView } from "./hooks/useRouterView";
 import { useCurrentUser } from "./hooks/useCurrentUser";
 import { BrandIcon, BrandWordmark } from "./components/common/BrandLogo";
-import { CircleNotch, Clock, X } from "@phosphor-icons/react";
-import { Button } from "./components/ui/button";
-import { Badge } from "./components/ui/badge";
+import { CircleNotch } from "@phosphor-icons/react";
 import { Toaster } from "sonner";
 
 // Lazy-load heavy views and standalone feature workspaces
@@ -25,6 +23,7 @@ const P2PDefenseStudio = lazy(() => import("./components/p2p/P2PDefenseStudio").
 const FinancialLiabilityCalculator = lazy(() => import("./components/calculator/FinancialLiabilityCalculator").then((m) => ({ default: m.FinancialLiabilityCalculator })));
 const AgentMailDrawer = lazy(() => import("./components/communications/AgentMailDrawer").then((m) => ({ default: m.AgentMailDrawer })));
 const AuditTimeline = lazy(() => import("./components/communications/AuditTimeline").then((m) => ({ default: m.AuditTimeline })));
+const AuditTrailDrawer = lazy(() => import("./components/communications/AuditTrailDrawer").then((m) => ({ default: m.AuditTrailDrawer })));
 const AnalyticsMetrics = lazy(() => import("./components/analytics/AnalyticsMetrics").then((m) => ({ default: m.AnalyticsMetrics })));
 const SettingsPage = lazy(() => import("./components/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const CinematicHero = lazy(() => import("./components/landing/CinematicHero").then((m) => ({ default: m.CinematicHero })));
@@ -129,7 +128,11 @@ export default function App() {
     dispatchAppeal,
     syncInboxes,
     isSyncingInboxes,
-  } = useCommunications(selectedClaim, { activeView: currentView, enabled: isDashboardActive });
+  } = useCommunications(selectedClaim, {
+    activeView: currentView,
+    enableAudit: isAuditDrawerOpen || currentView === "audit",
+    enabled: isDashboardActive,
+  });
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarCollapsed((prev) => !prev);
@@ -542,53 +545,19 @@ export default function App() {
             currentView={currentView}
           />
         </Suspense>
-
-        {/* Slide-out Real-time Case Audit Trail Drawer */}
-        {isAuditDrawerOpen && (
-          <div
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex justify-end animate-fadeIn"
-            onClick={() => setIsAuditDrawerOpen(false)}
-          >
-            <div
-              className="w-full max-w-xl bg-background border-l border-border h-full shadow-2xl flex flex-col p-4 space-y-3 overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                <div className="flex items-center gap-2">
-                  <Clock className="size-4 text-cyan-400" />
-                  <h2 className="text-sm font-bold text-foreground">
-                    ERISA 29 CFR Case Audit Trail
-                  </h2>
-                  {selectedClaim && (
-                    <Badge variant="outline" className="text-[10px] font-mono">
-                      #{selectedClaim.claimNumber} • {selectedClaim.patient?.insurancePayer}
-                    </Badge>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsAuditDrawerOpen(false)}
-                  className="size-7 rounded-md cursor-pointer"
-                  title="Close Audit Trail"
-                >
-                  <X className="size-4" />
-                </Button>
-              </div>
-
-              <div className="flex-1">
-                <Suspense fallback={<ViewLoadingFallback message="Loading real-time case audit telemetry..." />}>
-                  <AuditTimeline
-                    claim={selectedClaim}
-                    logs={auditLogs}
-                    isLoading={isLoadingAudit}
-                  />
-                </Suspense>
-              </div>
-            </div>
-          </div>
-        )}
       </Shell>
+
+      {/* Slide-out Real-time Case Audit Trail Drawer (Portaled to document.body, outside Shell) */}
+      <Suspense fallback={null}>
+        <AuditTrailDrawer
+          isOpen={isAuditDrawerOpen}
+          onClose={() => setIsAuditDrawerOpen(false)}
+          claim={selectedClaim}
+          logs={auditLogs}
+          isLoading={isLoadingAudit}
+        />
+      </Suspense>
+
       <Toaster position="bottom-right" richColors theme="dark" closeButton />
     </>
   );

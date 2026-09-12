@@ -152,9 +152,9 @@ export function useCommunications(claim?: Claim | null, options?: UseCommunicati
   return {
     threads: sortedThreads,
     messages: threadDetails?.messages || [],
-    auditLogs: claimId ? claimAuditLogs || [] : recentAuditLogs || [],
-    isLoadingCommunications: claimId ? threads === undefined : false,
-    isLoadingAudit: claimId ? claimAuditLogs === undefined : recentAuditLogs === undefined,
+    auditLogs: isAuditActive ? (claimId ? claimAuditLogs || [] : recentAuditLogs || []) : [],
+    isLoadingCommunications: isCommunicationsActive && claimId ? threads === undefined : false,
+    isLoadingAudit: isAuditActive ? (claimId ? claimAuditLogs === undefined : recentAuditLogs === undefined) : false,
     sendMessage,
     dispatchAppeal,
     resolvePayerGateway,
