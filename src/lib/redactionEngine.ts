@@ -41,6 +41,7 @@ export interface RedactionEngineOptions {
   customTerms?: string[];
   patientName?: string;
   preservePatientName?: boolean;
+  maskDateOfService?: boolean;
   disabledEntityIds?: string[];
   maskingStyleOverrides?: Partial<Record<PiiCategory, "full" | "partial" | "safe_harbor">>;
 }
@@ -337,22 +338,34 @@ export function detectPiiEntities(
   }
 
   // 2b. Dates of Service (DOS)
-  const dosPrefixedRegex = /\b(?:DOS|Date\s*of\s*Service|Service\s*Date)[\s:]*([0-9]{1,2}[/.-][0-9]{1,2}[/.-][0-9]{2,4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+[0-9]{1,2},?\s+[0-9]{4})\b/gi;
-  while ((match = dosPrefixedRegex.exec(text)) !== null) {
-    const matchedDate = match[1];
-    const fullText = match[0];
-    const dateOffset = fullText.lastIndexOf(matchedDate);
-    const startIdx = match.index + dateOffset;
-    addEntity(
-      "dob",
-      "Date of Service",
-      matchedDate,
-      maskDob(matchedDate, standard),
-      startIdx,
-      startIdx + matchedDate.length,
-      "DOS explicit prefix pattern",
-      0.95
-    );
+  // Date of Service is a core claim transaction attribute required by healthcare insurers to identify,
+  // adjudicate, and reprocess claims. Redacting DOS in live operations or appeal correspondence causes
+  // automatic payer rejection. Therefore, DOS is preserved by default and is only de-identified when
+  // explicitly requested for de-identified public exports or court exhibits.
+  if (options.maskDateOfService || standard === "PUBLIC_EXHIBIT") {
+    const dosPrefixedRegex = /\b(?:DOS|Date\s*of\s*Service|Service\s*Date)[\s:]*([0-9]{1,2}[/.-][0-9]{1,2}[/.-][0-9]{2,4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+[0-9]{1,2},?\s+[0-9]{4})\b/gi;
+    while ((match = dosPrefixedRegex.exec(text)) !== null) {
+      const matchedDate = match[1];
+      const fullText = match[0];
+      const dateOffset = fullText.lastIndexOf(matchedDate);
+      const startIdx = match.index + dateOffset;
+      const yearMatch = matchedDate.match(/\b(19\d{2}|20\d{2})\b/);
+      const maskedDate = standard === "PUBLIC_EXHIBIT"
+        ? "[REDACTED DOS]"
+        : yearMatch
+        ? `**/**/${yearMatch[1]}`
+        : "**/**/****";
+      addEntity(
+        "dob",
+        "Date of Service",
+        matchedDate,
+        maskedDate,
+        startIdx,
+        startIdx + matchedDate.length,
+        "DOS explicit prefix pattern",
+        0.95
+      );
+    }
   }
 
   // 3. Member ID & Suffixes

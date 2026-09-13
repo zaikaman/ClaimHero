@@ -3617,6 +3617,144 @@ export const healRedactedPatientNamesInternal = internalMutation({
   },
 });
 
+// Maintenance mutation to heal claims and appeals whose serviceDate was accidentally
+// corrupted into masked asterisks or [DATE REDACTED] by pre-LLM redaction gates.
+// Reconciles the authentic Date of Service from physician notes, case presets, or claim context.
+export const healCorruptedServiceDatesInternal = internalMutation({
+  args: {
+    targetUserId: v.optional(v.id("users")),
+    confirm: v.boolean(),
+    dryRun: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    if (args.confirm !== true) {
+      throw new Error("Refusing serviceDate heal without explicit confirm: true");
+    }
+    const dryRun = args.dryRun === true;
+    const now = Date.now();
+
+    const allClaims = args.targetUserId
+      ? await ctx.db
+          .query("claims")
+          .withIndex("by_user", (q) => q.eq("userId", args.targetUserId!))
+          .collect()
+      : await ctx.db.query("claims").collect();
+
+    let healedClaimsCount = 0;
+    let healedAppealsCount = 0;
+    const healedDetails: Array<{ claimNumber: string; oldDate: string; newDate: string }> = [];
+
+    const formatHelper = (value: string): string => {
+      const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (isoMatch) {
+        const [, year, month, day] = isoMatch;
+        return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+          timeZone: "UTC",
+        });
+      }
+      const usMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (usMatch) {
+        const [, month, day, year] = usMatch;
+        return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+          timeZone: "UTC",
+        });
+      }
+      return value;
+    };
+
+    for (const claim of allClaims) {
+      const isCorrupted = !claim.serviceDate || claim.serviceDate.includes("**") || claim.serviceDate.includes("[DATE");
+      if (!isCorrupted) continue;
+
+      let recoveredDate: string | null = null;
+
+      // 1. Check physicianNotes for explicit DOS
+      const notes = claim.appealContext?.physicianNotes || "";
+      const dosMatch = notes.match(
+        /\b(?:DOS|Date\s*of\s*Service|Service\s*Date)[\s:]*([0-9]{1,2}[/.-][0-9]{1,2}[/.-][0-9]{2,4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+[0-9]{1,2},?\s+[0-9]{4})\b/i
+      );
+      if (dosMatch) {
+        recoveredDate = dosMatch[1];
+      }
+
+      // 2. Check known demo presets if not found in notes
+      if (!recoveredDate) {
+        if (claim.claimNumber.includes("GEO") || claim.claimNumber.startsWith("CLM-6104")) {
+          recoveredDate = "07/04/2026";
+        } else if (claim.claimNumber.includes("MOL") || claim.claimNumber.startsWith("CLM-9823")) {
+          recoveredDate = "06/12/2026";
+        } else if (claim.claimNumber.includes("BCB") || claim.claimNumber.startsWith("CLM-7730")) {
+          recoveredDate = "07/18/2026";
+        }
+      }
+
+      if (!recoveredDate) continue;
+
+      if (!dryRun) {
+        await ctx.db.patch(claim._id, {
+          serviceDate: recoveredDate,
+          updatedAt: now,
+        });
+
+        const formattedDate = formatHelper(recoveredDate);
+
+        // Heal associated appeals
+        const claimAppeals = await ctx.db
+          .query("appeals")
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+          .collect();
+
+        for (const app of claimAppeals) {
+          let appealChanged = false;
+          const patch: Record<string, unknown> = {};
+
+          if (app.fullAppealMarkdown && (app.fullAppealMarkdown.includes("**/**/****") || app.fullAppealMarkdown.includes("[DATE REDACTED]"))) {
+            patch.fullAppealMarkdown = app.fullAppealMarkdown
+              .replace(/- Date of service: \*\*(\/|\*\*)+/g, `- Date of service: ${formattedDate}`)
+              .replace(/service provided on \*\*(\/|\*\*)+/g, `service provided on ${formattedDate}`)
+              .replace(/service date: \*\*(\/|\*\*)+/g, `service date: ${formattedDate}`)
+              .replace(/\[DATE REDACTED\]/g, formattedDate);
+            appealChanged = true;
+          }
+
+          if (app.executiveSummary && (app.executiveSummary.includes("[DATE REDACTED]") || app.executiveSummary.includes("**/**/****"))) {
+            patch.executiveSummary = app.executiveSummary
+              .replace(/\[DATE REDACTED\]/g, formattedDate)
+              .replace(/\*\*(\/|\*\*)+/g, formattedDate);
+            appealChanged = true;
+          }
+
+          if (appealChanged) {
+            patch.updatedAt = now;
+            await ctx.db.patch(app._id, patch);
+            healedAppealsCount++;
+          }
+        }
+      }
+
+      healedClaimsCount++;
+      healedDetails.push({
+        claimNumber: claim.claimNumber,
+        oldDate: claim.serviceDate || "(empty)",
+        newDate: recoveredDate,
+      });
+    }
+
+    return {
+      dryRun,
+      healedClaimsCount,
+      healedAppealsCount,
+      healedDetails,
+    };
+  },
+});
+
 
 
 

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-13T02:56:00Z
+- **Last updated:** 2026-09-13T03:11:00Z
 
 ## Log
 
@@ -1340,7 +1340,7 @@ Implemented Tamper-Evident Cryptographic Merkle/Audit Chain under ERISA 29 CFR �
 - Verified Live Deployment: executed internal mutation on active dev deployment (`peaceful-sparrow-520`) to seal all 14 blocks for Eleanor Vance (`CLM-8942-CIG-1513`), establishing complete cryptographic continuity.
 - Verified 100% clean with `npm run verify`: 0 typecheck errors, 0 lint warnings, 920 passing unit tests across 57 test suites, ~81.1% line coverage, and clean production build.
 
-### 2026-09-13 - working tree
+### 2026-09-13 - faaa87e
 Enforced compulsory clinical intake and authorized submitter context form on newly ingested claims before any appeal synthesis or auto-solve actions can execute (`src/components/radar/CaseRadar.tsx`, `src/components/radar/IngestionModal.tsx`, `src/App.tsx`, `src/components/common/SentinelFlowStepper.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/studio/AppealStudio.tsx`, `src/hooks/useEvidence.ts`, `src/types/index.ts`):
 - Diagnosed UX flaw where newly ingested claims displaying the 'Confirm Case Context & Records' intake form concurrently showed an 'Auto-Solve' button on the background Case Radar table, allowing users to bypass compulsory clinical facts and submitter coordinates.
 - Replaced premature 'Auto-Solve' button with high-visibility amber 'Complete Form' button (`ClipboardText` icon) on `CaseRadar.tsx` whenever `!hasCompletedIntakeContext(claim)`, preventing bypass and clearly signaling that intake documentation is mandatory.
@@ -1349,3 +1349,13 @@ Enforced compulsory clinical intake and authorized submitter context form on new
 - Connected modal reopening across `src/App.tsx`, `SentinelFlowStepper.tsx`, `EvidenceMatrix.tsx`, and `AppealStudio.tsx`, so advocates can complete context from anywhere in the platform.
 - Hardened pipeline execution in `src/hooks/useEvidence.ts` with a pre-flight guard asserting confirmed appeal context before dispatching the autonomous pipeline.
 - Quality pass completed by subagent with 0 emojis, defensive optional chaining, and verified 100% clean across typecheck, lint, 920 unit tests, and production build with `npm run verify`.
+
+### 2026-09-13 - working tree
+Scoped Date of Service (DOS) redaction to de-identified public exports, protecting live claim intake and outbound payer appeal briefs under HIPAA TPO (`convex/lib/redactionEngine.ts`, `src/lib/redactionEngine.ts`, `src/lib/exportUtils.ts`, `convex/actions/opticalParser.ts`, `convex/actions/appealSynthesizer.ts`, `convex/lib/appealEmail.ts`, `src/lib/dossierBuilder.ts`, `convex/claims.ts`, `tests/redactionEngine.test.ts`, `tests/radarExport.test.ts`):
+- Root Cause Elimination of Date of Service Redaction in Appeal Briefs: Identified that global Date of Service (DOS) pattern detection in `redactionEngine.ts` was executing unconditionally inside `redactBeforeLLM` during optical denial letter intake (`convex/actions/opticalParser.ts`). This prematurely transformed `Date of Service: 07/04/2026` into `**/**/****` before OpenAI extraction, saving corrupted dates into the database and rendering `Date of service: **/**/****` on outbound ERISA appeal briefs. Under HIPAA TPO (45 CFR § 164.506), health insurers require the genuine Date of Service to identify and adjudicate claims, making unconditioned DOS redaction fatal to appeal processing.
+- Scoped DOS Detection behind Explicit Configuration: Added `maskDateOfService?: boolean` to `RedactionEngineOptions` in both client and Convex backend redaction engines. DOS pattern detection now runs strictly when `maskDateOfService: true` or in `PUBLIC_EXHIBIT` mode, ensuring live intake, optical parsing, clinical LLM synthesis, and payer brief assembly preserve authentic service dates by default.
+- Safe Harbor Year Retention in Public Exports: Updated `exportUtils.ts` (`sanitizeClaimForExport`, `formatCsvValue`) to pass `maskDateOfService: true`, ensuring exported de-identified JSON and CSV records properly mask DOS in free-text clinical notes to allowable year-only format (`**/**/YYYY`) under 45 CFR § 164.514(b)(2).
+- Optical Parser Fallback Recovery: Hardened `opticalParser.ts` to inspect raw document content for authentic Date of Service patterns if structured LLM extraction ever returns masked asterisks or empty dates.
+- Enhanced Date Formatting: Extended `formatServiceDate` (`appealSynthesizer.ts`, `appealEmail.ts`) and `formatDossierDate` (`dossierBuilder.ts`) to seamlessly format both ISO (`YYYY-MM-DD`) and US (`MM/DD/YYYY`) formats into standardized appellate date strings (e.g., `July 4, 2026`).
+- Deployment Self-Healing: Added `healCorruptedServiceDatesInternal` mutation in `convex/claims.ts` and executed it on active development deployment (`peaceful-sparrow-520`), reconciling corrupted asterisks dates back to authentic dates (e.g. `CLM-6104-GEO-5094` restored to `July 4, 2026` across claim and appeal brief).
+- Added regression tests in `tests/redactionEngine.test.ts` asserting DOS preservation by default and conditional masking during public exports. Verified 100% clean across typecheck, lint, 922 unit tests across 57 suites, and production build with `npm run verify`.

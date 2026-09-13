@@ -135,6 +135,17 @@ export function formatDossierDate(timestampOrString?: number | string): string {
     });
   }
 
+  const usMatch = timestampOrString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (usMatch) {
+    const [, month, day, year] = usMatch;
+    return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+  }
+
   return timestampOrString;
 }
 

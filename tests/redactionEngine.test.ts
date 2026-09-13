@@ -230,5 +230,33 @@ CPT: 27447 (Total Knee Arthroplasty) - Denied $24,500.00`;
       const sanitizedAddress = fastSanitizeText(textWithAddress);
       expect(sanitizedAddress.sanitizedText).toContain("[REDACTED ADDRESS]");
     });
+
+    it("preserves Date of Service (DOS) by default during normal intake and LLM prompts", () => {
+      const claimText = "Claim #CLM-6104-GEO | Patient: Marcus Sterling | DOB: 11/22/1974 | Date of Service: 07/04/2026 | Procedure: 63047";
+      const sanitized = fastSanitizeText(claimText);
+
+      // DOB must be redacted under HIPAA Safe Harbor
+      expect(sanitized.sanitizedText).toContain("**/**/****");
+      // Date of Service must be PRESERVED so that claims and appeals have the authentic date
+      expect(sanitized.sanitizedText).toContain("Date of Service: 07/04/2026");
+      expect(sanitized.sanitizedText).not.toContain("Date of Service: **/**/****");
+    });
+
+    it("masks Date of Service (DOS) only when explicitly configured or in PUBLIC_EXHIBIT mode", () => {
+      const claimText = "DOS: 07/04/2026 and Service Date: 06/12/2026";
+
+      // 1. Explicit maskDateOfService (e.g. for de-identified exports) retains year under Safe Harbor
+      const exportSanitized = fastSanitizeText(claimText, {
+        standard: "HIPAA_SAFE_HARBOR",
+        maskDateOfService: true,
+      });
+      expect(exportSanitized.sanitizedText).toBe("DOS: **/**/2026 and Service Date: **/**/2026");
+
+      // 2. PUBLIC_EXHIBIT mode masks to exhibit placeholder
+      const exhibitSanitized = fastSanitizeText(claimText, {
+        standard: "PUBLIC_EXHIBIT",
+      });
+      expect(exhibitSanitized.sanitizedText).toBe("DOS: [REDACTED DOS] and Service Date: [REDACTED DOS]");
+    });
   });
 });

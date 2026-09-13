@@ -332,6 +332,16 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
       const origin = args.origin || (isDemo ? "demo-fixture" : undefined);
       const dataOrigin = args.dataOrigin || (isDemo ? "demo-fixture" : "live-pipeline");
 
+      let resolvedServiceDate = extraction.serviceDate?.trim() || "";
+      if (resolvedServiceDate.includes("**") || !resolvedServiceDate) {
+        const dateMatch = documentContent.match(
+          /\b(?:DOS|Date\s*of\s*Service|Service\s*Date)[\s:]*([0-9]{1,2}[/.-][0-9]{1,2}[/.-][0-9]{2,4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+[0-9]{1,2},?\s+[0-9]{4})\b/i
+        );
+        if (dateMatch) {
+          resolvedServiceDate = dateMatch[1];
+        }
+      }
+
       // Save patient and claim into Convex database with denialLetterStorageId linked
       claimId = await ctx.runMutation(internal.claims.createWithPatientInternal, {
         userId,
@@ -341,7 +351,7 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         insurancePayer: extraction.insurancePayer?.trim() || "Unspecified Payer",
         state: args.patientState || "California",
         claimNumber: extraction.claimNumber?.trim() || "",
-        serviceDate: extraction.serviceDate?.trim() || "",
+        serviceDate: resolvedServiceDate,
         providerName: extraction.providerName?.trim() || "",
         deniedAmount: typeof extraction.deniedAmount === "number" ? extraction.deniedAmount : 0,
         patientOwedAmount: typeof extraction.patientOwedAmount === "number" ? extraction.patientOwedAmount : 0,

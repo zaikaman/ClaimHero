@@ -49,6 +49,7 @@ export function sanitizeClaimForExport(
       standard: "HIPAA_SAFE_HARBOR",
       patientName: rawPatientName,
       customTerms: nameParts,
+      maskDateOfService: true,
     }).sanitizedText;
   };
 
@@ -244,6 +245,7 @@ export function buildClaimCsvRow(claim: Claim, redactMode: boolean): string[] {
       standard: "HIPAA_SAFE_HARBOR",
       patientName: rawPatientName,
       customTerms: nameParts,
+      maskDateOfService: true,
     }).sanitizedText;
   };
 
