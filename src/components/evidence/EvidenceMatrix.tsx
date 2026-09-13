@@ -22,6 +22,7 @@ import { Claim, ClinicalEvidence, OverturnScoringResult, ScoringCriterion, Disco
 import { PolicyViewer } from "./PolicyViewer";
 import { PrecedentFeed } from "./PrecedentFeed";
 import { ClinicalResearchConsole } from "./ClinicalResearchConsole";
+import { PolicyDriftSentinel } from "./PolicyDriftSentinel";
 import { formatCurrency, formatDate, stripMarkdownFormatting, cn } from "../../lib/utils";
 import { DENIAL_REASON_CODES } from "../../lib/constants";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
@@ -732,6 +733,10 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 <BookOpen className="size-3.5" />
                 <span>Evidence Dossier ({evidences.length})</span>
               </TabsTrigger>
+              <TabsTrigger value="drift" className="gap-1.5">
+                <Scales className="size-3.5 text-cyan-400" />
+                <span>Policy Drift Sentinel</span>
+              </TabsTrigger>
               <TabsTrigger value="research" className="gap-1.5">
                 <Globe className="size-3.5 text-primary" />
                 <span>Research Hub</span>
@@ -748,6 +753,15 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 isLoading={isLoadingEvidences || isUnifiedAnalyzing || (isBackgroundPipelineRunning && evidences.length === 0)}
                 onDeleteEvidence={onDeleteEvidence}
                 onOpenResearchConsole={() => setActiveTab("research")}
+                onOpenPolicyDrift={() => setActiveTab("drift")}
+              />
+            </TabsContent>
+
+            <TabsContent value="drift" className="pt-1">
+              <PolicyDriftSentinel
+                claim={claim}
+                evidences={evidences}
+                onNavigateToStudio={onNavigateToStudio}
               />
             </TabsContent>
 

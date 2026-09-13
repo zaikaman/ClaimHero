@@ -17,6 +17,7 @@ import type * as actions_p2pDefenseGenerator from "../actions/p2pDefenseGenerato
 import type * as actions_p2pLiveCopilot from "../actions/p2pLiveCopilot.js";
 import type * as actions_payerContactResolver from "../actions/payerContactResolver.js";
 import type * as actions_policyCrawler from "../actions/policyCrawler.js";
+import type * as actions_policyDriftSentinel from "../actions/policyDriftSentinel.js";
 import type * as actions_precedentArchive from "../actions/precedentArchive.js";
 import type * as actions_precedentMatcher from "../actions/precedentMatcher.js";
 import type * as actions_sentinelAgent from "../actions/sentinelAgent.js";
@@ -54,6 +55,7 @@ import type * as model_auth from "../model/auth.js";
 import type * as p2pCallSessions from "../p2pCallSessions.js";
 import type * as p2pScripts from "../p2pScripts.js";
 import type * as pipelineActivities from "../pipelineActivities.js";
+import type * as policyDrift from "../policyDrift.js";
 import type * as precedents from "../precedents.js";
 import type * as presence from "../presence.js";
 import type * as sentinelAgentQueries from "../sentinelAgentQueries.js";
@@ -77,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   "actions/p2pLiveCopilot": typeof actions_p2pLiveCopilot;
   "actions/payerContactResolver": typeof actions_payerContactResolver;
   "actions/policyCrawler": typeof actions_policyCrawler;
+  "actions/policyDriftSentinel": typeof actions_policyDriftSentinel;
   "actions/precedentArchive": typeof actions_precedentArchive;
   "actions/precedentMatcher": typeof actions_precedentMatcher;
   "actions/sentinelAgent": typeof actions_sentinelAgent;
@@ -114,6 +117,7 @@ declare const fullApi: ApiFromModules<{
   p2pCallSessions: typeof p2pCallSessions;
   p2pScripts: typeof p2pScripts;
   pipelineActivities: typeof pipelineActivities;
+  policyDrift: typeof policyDrift;
   precedents: typeof precedents;
   presence: typeof presence;
   sentinelAgentQueries: typeof sentinelAgentQueries;

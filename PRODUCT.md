@@ -47,7 +47,7 @@ Unlike generic AI document tools or manual template appeals, ClaimHero connects:
 ## Evidence on Hand
 
 - Verified domain models and regulatory rules in `src/lib/constants.ts` (ERISA regulations, CARC/RARC code sets, CPT procedure codes).
-- Comprehensive test suite in `tests/` (938 automated tests across 59 test suites).
+- Comprehensive test suite in `tests/` (953 automated tests across 60 test suites).
 - Production-grade schema in `convex/schema.ts` supporting patients, claims, clinical evidences, appeals, email threads, and audit logs.
 - Formal specifications in `specs/001-appeal-sentinel/` and hackathon build log in `hackathon.md`.
 

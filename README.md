@@ -100,9 +100,10 @@ ClaimHero organizes its capabilities into two clean surfaces designed for extrem
 ├───────────────────────────────┬───────────────────────────────┬─────────────────────────────┤
 │ Step 1: Evidence & CPB        │ Step 2: Appeal Brief          │ Step 3: Payer Dispatch      │
 │ • Firecrawl Live Policy Crawl │ • Grounded Synthesis (OpenAI) │ • AgentMail Two-Way Gateway │
-│ • Visual Screenshot Exhibits  │ • Verifiable Clause Citations │ • Inbound Webhook Triage    │
-│ • Neutral Benchmarks (PubMed) │ • Yjs CRDT Real-Time Collab   │ • Contextual P2P Script     │
-│ • 4-Pillar Overturn Score     │ • Formal PDF Dossier Export   │ • Auto-Pilot 1-Hour SLA     │
+│ • Policy Drift Sentinel (CPB) │ • Verifiable Clause Citations │ • Inbound Webhook Triage    │
+│ • Visual Screenshot Exhibits  │ • Yjs CRDT Real-Time Collab   │ • Contextual P2P Script     │
+│ • Neutral Benchmarks (PubMed) │ • Formal PDF Dossier Export   │ • Auto-Pilot 1-Hour SLA     │
+│ • 4-Pillar Overturn Score     │                               │                             │
 └───────────────────────────────┴───────────────────────────────┴─────────────────────────────┘
 ```
 
@@ -112,7 +113,7 @@ ClaimHero organizes its capabilities into two clean surfaces designed for extrem
 
 ### 1. Convex — Central System of Record & Reactive Backend Engine
 Convex serves as the core persistence, real-time subscription, compute, and orchestration layer:
-- **Reactive State & Live Subscriptions**: Claims, clinical evidence, appeal versions, audit timelines, and communication threads update reactively across the entire UI without manual polling (`convex/schema.ts`).
+- **Reactive State & Live Subscriptions**: Claims, clinical evidence, policy drift reports, appeal versions, audit timelines, and communication threads update reactively across the entire UI without manual polling (`convex/schema.ts`, `convex/policyDrift.ts`).
 - **Durable Workflow Engine**: Multi-step pipeline execution (`@convex-dev/workflow`) powers reliable, idempotent background orchestration across crawls, scoring, and drafting (`convex/actions/sentinelPipeline.ts`).
 - **Vector Search Engine**: 1536-dimensional vector search on the `precedents` table powers semantic precedent retrieval against past won appeals (`convex/clinicalEvidences.ts`).
 - **Native BM25 Full-Text Search Engine**: Convex native `.searchIndex("search_claims")` indexes unified `searchContent` (clinical denial terms, CARC codes, CPT/ICD-10 codes, patient names, and claim numbers) across the entire portfolio. Directly wired into the global command palette (`CommandDialog.tsx`, `⌘K` / `Ctrl+K`) with debounced reactive querying (`api.claims.search`) for real-time lexical discovery.
@@ -125,6 +126,7 @@ Convex serves as the core persistence, real-time subscription, compute, and orch
 
 ### 2. Firecrawl — Real-Time Policy Discovery & Visual Proof Archiving
 Firecrawl actively crawls, scrapes, and verifies insurer Clinical Policy Bulletins (CPBs):
+- **Policy Drift Sentinel (Retroactive CPB Alteration Detector)**: Leverages Firecrawl to crawl live payer policies with cache-bypassing scans, comparing the live document against the cryptographically hashed snapshot (`policySnapshots`) captured at the date of denial. Automatically detects post-hoc additions of step-therapy hurdles, tightened documentation thresholds, or experimental exclusions, and drafts an authoritative ERISA Bad-Faith Notice of Violation under 29 CFR § 2560.503-1 and 29 U.S.C. § 1132 (`convex/actions/policyDriftSentinel.ts`, `convex/policyDrift.ts`).
 - **Insurer Policy Directory Discovery (`firecrawl.map` / `/v1/map`)**: Leverages Firecrawl's top-tier domain mapping engine to discover and map an insurer's entire Clinical Policy Bulletin directory structure in seconds (e.g., Aetna CPBs, Cigna Coverage Policies, Carelon Musculoskeletal Guidelines, UHC Medical Policies). Filters by clinical specialty (Orthopedics, Oncology, Cardiology, Spine, Neurology), extracts bulletin reference codes (`CPB 0736`, `0512`), and persists discovered bulletins directly to Convex (`discoveredPolicies` table) for immediate one-click evidence citation.
 - **Live Search & Scrape Engine**: Queries live payer portals across Aetna, Cigna, UnitedHealthcare, Carelon, and Blue Cross Blue Shield (`convex/actions/policyCrawler.ts`).
 - **Visual Proof Screenshot Extraction**: Captures full-page screenshots of active policy pages alongside extracted markdown, establishing indisputable visual evidence in the appeal docket (`convex/actions/policyCrawler.ts`).
@@ -205,18 +207,18 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **938 automated tests** across 59 test suites (verified via `npm run test`):
+ClaimHero is backed by **953 automated tests** across 60 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (938 tests across 59 suites)
-npm run test:coverage   # Code coverage report (~81.1% lines)
+npm run test            # Comprehensive Vitest test suite (953 tests across 60 suites)
+npm run test:coverage   # Code coverage report (~81.2% lines)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate
 ```
 
-Test suites cover the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
+Test suites cover the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
 
 ---
 
@@ -225,11 +227,12 @@ Test suites cover the master durable workflow pipeline, Convex authorization and
 ```text
 ClaimHero/
 ├── convex/
-│   ├── schema.ts              # 20 domain tables, relational indexes, vector index
+│   ├── schema.ts              # 23 domain tables, relational indexes, vector index
 │   ├── convex.config.ts       # 9 Convex components configuration
 │   ├── claims.ts              # Claim lifecycle, deadlines, analytics
 │   ├── claimCollaborators.ts  # Case sharing invites with editor/viewer roles
 │   ├── appealYjs.ts           # Yjs CRDT op-log transport (sync, push, snapshots)
+│   ├── policyDrift.ts         # Policy Drift Sentinel queries, mutations, notices
 │   ├── presence.ts            # Live teammate presence per appeal room
 │   ├── clinicalEvidences.ts   # Evidence persistence and vector retrieval
 │   ├── appeals.ts             # Versioned briefs and escalation
@@ -237,7 +240,7 @@ ClaimHero/
 │   ├── auditLogs.ts           # Case audit trail & statutory timeline
 │   ├── crons.ts               # Deadline and reconciliation schedules
 │   ├── auth.ts / http.ts      # Auth and webhook routing
-│   └── actions/               # OpenAI, Firecrawl, AgentMail pipelines
+│   └── actions/               # OpenAI, Firecrawl, AgentMail, Drift Sentinel pipelines
 ├── src/
 │   ├── App.tsx                # Authenticated routing and application shell
 │   ├── components/            # Radar, evidence, studio, P2P, communications
@@ -264,8 +267,8 @@ ClaimHero/
 
 - **Everyday Apps**: If you got this in your mailbox today, this is the sequence you would want to see. No HIPAA-relevant front-end hurdles, no advocacy-degree onboarding. Fictional fixtures are for the evaluation; the exact same screen serves real cases once credentials are wired.
 - **Creativity & Usefulness**: One linear path to a defensible cited appeal; the hard part (which clause actually governs the denial) is solved by reading the issuer's own policy, not an opinion of it.
-- **Convex Depth**: 9 components, 20 tables, native BM25 full-text search in global ⌘K palette, vector search on prior wins, crons for the ERISA clock, durable workflows, real-time collab on briefs, and authentication with human approval gates on every outbound send. The stack is documented in [`PRODUCT.md`](./PRODUCT.md) and [`convex/convex.config.ts`](./convex/convex.config.ts); this README is the public face.
-- **Sponsor Stack**: Firecrawl finds the policy and screenshots the page as evidence; AgentMail does the two-way dispatch with a Svix-verified webhook and a closed-loop demo inbox; OpenAI extracts the codes and synthesizes the brief inside a redaction gate and a schema that prohibits fabricating policy text.
+- **Convex Depth**: 9 components, 23 tables, native BM25 full-text search in global ⌘K palette, vector search on prior wins, crons for the ERISA clock, durable workflows, real-time collab on briefs, and authentication with human approval gates on every outbound send. The stack is documented in [`PRODUCT.md`](./PRODUCT.md) and [`convex/convex.config.ts`](./convex/convex.config.ts); this README is the public face.
+- **Sponsor Stack**: Firecrawl finds the policy, detects retroactive policy drift, and screenshots the page as evidence; AgentMail does the two-way dispatch with a Svix-verified webhook and a closed-loop demo inbox; OpenAI extracts the codes and synthesizes the brief inside a redaction gate and a schema that prohibits fabricating policy text.
 
 ---
 

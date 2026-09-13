@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-13T04:41:34Z
+- **Last updated:** 2026-09-13T05:34:00Z
 
 ## Log
 
@@ -1375,9 +1375,17 @@ Wired Convex BM25 native full-text search into the global command palette with d
 - Added live visual indicators in palette header (`Convex BM25 Index` / `Querying BM25...`) without emojis, refined empty-state suggestions, and preserved unified keyboard navigation.
 - Added unit tests in `tests/commandPaletteSearch.test.ts` (5 tests) and verified 100% clean with `npm run verify` across typecheck, lint, 929 passing unit tests across 58 suites, and production build.
 
-### 2026-09-13 - working tree
+### 2026-09-13 - 5fa4452
 Implemented Firecrawl Map API (`/v1/map` / `firecrawl.map`) for Insurer Clinical Policy Bulletin (CPB) Directory Discovery (`convex/schema.ts`, `convex/actions/policyCrawler.ts`, `convex/clinicalEvidences.ts`, `src/components/evidence/ClinicalResearchConsole.tsx`, `src/types/index.ts`, `src/lib/constants.ts`, `src/hooks/useEvidence.ts`, `src/components/evidence/EvidenceMatrix.tsx`, `src/App.tsx`, `tests/firecrawlDirectoryMap.test.ts`, `tests/evidenceDossierUx.test.ts`, `README.md`, `PRODUCT.md`, `IDEA.md`):
 - Insurer Policy Directory Mapping: Added `discoverInsurerPolicyDirectory` and `discoverInsurerPolicyDirectoryInternal` Convex actions leveraging `firecrawl.map` on payer clinical domains (Aetna, Cigna, UHC, Carelon, BCBS) with clinical specialty filtering (Orthopedics, Oncology, Cardiology, Spine, Neurology), bulletin identifier extraction (`extractBulletinIdentifier`), CPT/ICD specialty deduction (`deduceClaimSpecialty`), SSRF link-local URL filtering, and rate-limiting.
 - Reactive Discovered Policies Persistence: Created `discoveredPolicies` schema table with composite indexes (`by_claim`, `by_payer_and_specialty`, `by_domain`), batch mutation `saveDiscoveredPoliciesInternal`, and reactive queries (`listDiscoveredPolicies`, `listDiscoveredPoliciesInternal`).
 - Clinical Research Console Workstation: Added 6th research channel ("Directory Discovery") to `ClinicalResearchConsole` featuring specialty selector, payer preset pills, URL limit slider, evidence linkage toggle, 5-stage live progress bar, and real-time discovered policy inspection feed card with 1-click citation. Redesigned the channel selection into a spacious 2x3 responsive card deck (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`) with zero label truncation, distinct channel badges, informative pipeline taglines, pulsing selection pips, and 4-way arrow key navigation.
 - Added comprehensive unit test suite in `tests/firecrawlDirectoryMap.test.ts` (8 tests) and updated `tests/evidenceDossierUx.test.ts` (24 tests with 4-way arrow navigation). Verified 100% clean with `npm run verify` across typecheck, lint, 938 passing unit tests across 59 suites, and production build.
+
+### 2026-09-13 - working tree
+Implemented "Policy Drift Sentinel" retroactive policy alteration detector to combat bad-faith insurer tactics (`convex/schema.ts`, `convex/policyDrift.ts`, `convex/actions/policyDriftSentinel.ts`, `src/components/evidence/PolicyDriftSentinel.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/evidence/PolicyViewer.tsx`, `src/types/index.ts`, `tests/policyDriftSentinel.test.ts`, `README.md`, `PRODUCT.md`, `IDEA.md`):
+- Schema & Persistence: Added `policyDrifts` table in `convex/schema.ts` tracking baseline vs. live cryptographic hashes (SHA-256), timestamp deltas, criteria severity, itemized criteria modifications, and synthesized ERISA notices. Implemented queries/mutations in `convex/policyDrift.ts` (`getLatestDrift`, `listDrifts`, `getBaselineSnapshotInternal`, `saveDriftInternal`, `updateErisaNotice`, `appendErisaNoticeToAppeal`) recording cryptographic `policy_drift_detected` audit log events with tamper-evident chain verification.
+- Firecrawl Re-Crawling & Semantic Analysis: Created `detectPolicyDriftAction` in `convex/actions/policyDriftSentinel.ts` using Firecrawl live web crawling (`forceRescan: true`) to fetch live policy text, computing normalized SHA-256 content hashes, and executing OpenAI `gpt-5.4-nano` structured extraction to pinpoint retroactive clinical step-therapy and exclusion additions compared against the intake/denial baseline snapshot.
+- Automated ERISA Notice Synthesis: Built automatic generator for formal ERISA Bad-Faith Notice of Violation citing 29 CFR § 2560.503-1(b)(5), 29 CFR § 2560.503-1(g)(1)(v)(A), and 29 U.S.C. § 1132, demanding immediate reversal or full claims file disclosure with 1-click appeal brief appending.
+- Precision Medical Dark-Mode Interface: Built `PolicyDriftSentinel.tsx` featuring real-time scan telemetry, SHA-256 baseline vs live cryptographic hash comparison cards with 1-click copy, color-coded severity badges, itemized criteria diff cards, and formal notice modal. Integrated seamlessly as a dedicated tab in `EvidenceMatrix.tsx` and via direct shortcut button in `PolicyViewer.tsx`.
+- Automated Testing & Verification: Added comprehensive unit tests in `tests/policyDriftSentinel.test.ts` (15 tests). Verified 100% clean with `npm run verify` across typecheck, lint, 953 passing unit tests across 60 suites, and production build.

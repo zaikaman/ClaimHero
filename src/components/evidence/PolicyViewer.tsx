@@ -38,6 +38,7 @@ interface PolicyViewerProps {
   isLoading?: boolean;
   onDeleteEvidence?: (evidenceId: string) => Promise<unknown>;
   onOpenResearchConsole?: () => void;
+  onOpenPolicyDrift?: () => void;
 }
 
 const SOURCE_TYPE_LABELS: Record<
@@ -86,6 +87,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
   isLoading,
   onDeleteEvidence,
   onOpenResearchConsole,
+  onOpenPolicyDrift,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterSource, setFilterSource] = useState<string>("all");
@@ -447,6 +449,19 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
             >
               <Camera className="size-3 text-blue-400" />
               <span>{visualProofs.length} Visual Proof{visualProofs.length === 1 ? "" : "s"}</span>
+            </Button>
+          )}
+
+          {onOpenPolicyDrift && (
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={onOpenPolicyDrift}
+              className="h-6 text-[11px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 border-cyan-500/30"
+              title="Detect retroactive policy changes via Policy Drift Sentinel"
+            >
+              <Scales className="size-3 text-cyan-400" />
+              <span>Detect Policy Drift</span>
             </Button>
           )}
         </div>

@@ -645,6 +645,56 @@ export default defineSchema({
   })
     .index("by_appeal_and_clock", ["appealId", "clock"])
     .index("by_appeal_and_snapshot", ["appealId", "isSnapshot", "clock"]),
+
+  // Policy Drift Sentinel: Track retroactive Clinical Policy Bulletin (CPB) alterations
+  policyDrifts: defineTable({
+    claimId: v.id("claims"),
+    policyUrl: v.string(),
+    policyTitle: v.string(),
+    payer: v.optional(v.string()),
+    baselineSnapshotId: v.optional(v.id("policySnapshots")),
+    baselineCapturedAt: v.number(),
+    baselineContentHash: v.string(),
+    baselineEffectiveDate: v.optional(v.string()),
+    baselineMarkdown: v.string(),
+    liveCapturedAt: v.number(),
+    liveContentHash: v.string(),
+    liveEffectiveDate: v.optional(v.string()),
+    liveMarkdown: v.string(),
+    hasDrift: v.boolean(),
+    isRetroactiveAlteration: v.boolean(),
+    severity: v.union(
+      v.literal("none"),
+      v.literal("minor"),
+      v.literal("moderate"),
+      v.literal("critical_bad_faith")
+    ),
+    summary: v.string(),
+    denialDate: v.optional(v.string()),
+    serviceDate: v.optional(v.string()),
+    detectedChanges: v.array(
+      v.object({
+        category: v.string(), // added_step_therapy, added_exclusion, tightened_criteria, modified_criterion, removed_pathway
+        title: v.string(),
+        baselineText: v.optional(v.string()),
+        liveText: v.string(),
+        impact: v.string(),
+        isAdverseToClaim: v.boolean(),
+      })
+    ),
+    erisaNoticeDraft: v.optional(v.string()),
+    erisaNoticeGeneratedAt: v.optional(v.number()),
+    status: v.union(
+      v.literal("analyzing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_claim", ["claimId"])
+    .index("by_claim_and_created", ["claimId", "createdAt"]),
 });
 
 
