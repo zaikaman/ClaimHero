@@ -26,17 +26,6 @@ crons.interval(
   {}
 );
 
-/**
- * Sentinel Auto-Pilot 1-Hour SLA Sweep Cron:
- * Sweeps pending inbound clinical rebuttals every 15 minutes and autonomously dispatches
- * any whose 1-hour review SLA has elapsed.
- */
-crons.interval(
-  "sentinel-autopilot-sla-sweep",
-  { minutes: 15 },
-  internal.actions.mailDispatcher.sweepPendingAutoPilotReplies,
-  {}
-);
 
 /**
  * Daily Orphaned Uploads Sweep Cron:

@@ -391,7 +391,7 @@ describe("Ingestion Pipeline & Cascading Deletion Hardening", () => {
         expect.objectContaining({
           status: "analyzing",
           workflowStatus: "inProgress",
-          autoPilotEnabled: true,
+          autoPilotEnabled: false,
         })
       );
     });

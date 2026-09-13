@@ -2968,7 +2968,7 @@ async function applyAppealContextUpdate(ctx: MutationCtx, args: AppealContextUpd
   if (args.launchAutoPilot) {
     patchPayload.status = "analyzing";
     patchPayload.workflowStatus = "inProgress";
-    patchPayload.autoPilotEnabled = true;
+    patchPayload.autoPilotEnabled = false;
   }
 
   await ctx.db.patch(args.claimId, patchPayload);
@@ -2986,7 +2986,7 @@ async function applyAppealContextUpdate(ctx: MutationCtx, args: AppealContextUpd
       claimId: args.claimId,
       eventType: "autonomous_pipeline_initiated",
       actor: "Autonomous Sentinel Master",
-      details: "Auto-Pilot dispatched: Resolving payer gateway, clinical policies, and cited ERISA brief synthesis.",
+      details: "Sentinel analysis initiated: Resolving payer gateway, clinical policies, and cited ERISA brief synthesis. Mandatory human approval required before dispatch.",
       timestamp: now,
     });
   }

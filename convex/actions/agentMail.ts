@@ -703,30 +703,17 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
       });
     }
 
-    // Autonomous Sentinel Auto-Pilot 1-Hour SLA:
-    // If enabled and non-overturned, schedule autonomous clinical rebuttal dispatch in 1 hour if not manually reviewed or sent
-    if (!isOverturned && matchingClaim.autoPilotEnabled !== false && suggestedAutoReply.trim() && ctx.scheduler?.runAfter) {
-      try {
-        const ONE_HOUR_MS = 60 * 60 * 1000;
-        await ctx.scheduler.runAfter(
-          ONE_HOUR_MS,
-          internal.actions.mailDispatcher.dispatchScheduledAutoPilotReply,
-          {
-            messageId: messageDbId,
-            claimId: matchingClaim._id,
-            threadId,
-          }
-        );
-        await ctx.runMutation(internal.auditLogs.logEventInternal, {
-          claimId: matchingClaim._id,
-          ...(matchingClaim.userId ? { userId: matchingClaim.userId } : {}),
-          eventType: "appeal_review_requested",
-          actor: "Sentinel Auto-Pilot",
-          details: `Sentinel Auto-Pilot armed: 1-hour autonomous dispatch SLA scheduled for Claim #${matchingClaim.claimNumber} if no manual action is taken.`,
-        });
-      } catch (scheduleErr) {
-        console.warn("Autonomous Sentinel Auto-Pilot scheduling failed:", scheduleErr);
-      }
+    // Mandatory Human Review Gate:
+    // AI may prepare, classify, cite, and recommend. A human must approve every clinical assertion,
+    // legal assertion, recipient, and outbound message. The rebuttal draft is staged for mandatory human review.
+    if (!isOverturned && suggestedAutoReply.trim()) {
+      await ctx.runMutation(internal.auditLogs.logEventInternal, {
+        claimId: matchingClaim._id,
+        ...(matchingClaim.userId ? { userId: matchingClaim.userId } : {}),
+        eventType: "appeal_review_requested",
+        actor: "Sentinel AI Preparer",
+        details: `Clinical rebuttal addendum prepared and cited for Claim #${matchingClaim.claimNumber}. Awaiting mandatory human review and sign-off before dispatch.`,
+      });
     }
 
     // User Email Notification: Notify user account owner whenever a valid inbound reply arrives (never for bounces, daemons, or self-sent)

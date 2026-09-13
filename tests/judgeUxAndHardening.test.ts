@@ -12,17 +12,16 @@ describe("Judge UX & Pipeline Hardening", () => {
     expect(content).toContain("All synthetic smoke tests passed successfully.");
   });
 
-  it("crons.ts 15-minute sweep interval aligns with mailDispatcher.ts doc comment", () => {
+  it("crons.ts does NOT run unreviewed autonomous sweeps and enforces mandatory human review", () => {
     const cronsPath = path.resolve(__dirname, "../convex/crons.ts");
     const cronsContent = fs.readFileSync(cronsPath, "utf-8");
 
     const dispatcherPath = path.resolve(__dirname, "../convex/actions/mailDispatcher.ts");
     const dispatcherContent = fs.readFileSync(dispatcherPath, "utf-8");
 
-    expect(cronsContent).toContain('"sentinel-autopilot-sla-sweep"');
-    expect(cronsContent).toContain("{ minutes: 15 }");
-    expect(dispatcherContent).toContain("Runs periodically every 15 minutes (via crons.ts sentinel-autopilot-sla-sweep)");
-    expect(dispatcherContent).toContain("older than the 1-hour review SLA");
+    expect(cronsContent).not.toContain('"sentinel-autopilot-sla-sweep"');
+    expect(dispatcherContent).toContain("Autonomous dispatch is disabled by clinical safety policy");
+    expect(dispatcherContent).toContain("A human must approve every clinical assertion, legal assertion, recipient, and outbound message");
   });
 
   it("claims.list defaults to limit 100 rather than capping at 50", async () => {

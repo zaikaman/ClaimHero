@@ -321,57 +321,17 @@ export async function executeDurableClaimPipeline(
         message: `Review complete: ${scoreResult?.overturnProbabilityScore || 0}/100 readiness score with the appeal brief drafted and ready.`,
       });
 
-      let wasDispatched = false;
+      // Step 6: Mandatory Human Review Gate
+      // Safer product rule: AI may prepare, classify, cite, and recommend.
+      // A human must approve every clinical assertion, legal assertion, recipient, and outbound message.
+      await step.runMutation(internal.claims.updateStatusInternal, {
+        claimId: args.claimId,
+        status: "ready_for_review",
+        actor: "Durable Sentinel Workflow",
+        details: "Sentinel analysis complete: Policy citations and legal brief synthesized. Claim is held in ready_for_review for mandatory human approval before dispatch.",
+      });
 
-      // Step 6: Optional Auto-Pilot Dispatch & Statutory Cadence Delay
-      if (args.autoDispatch && claim.autoPilotEnabled && synthesisResult?.appealId) {
-        try {
-          await step.runMutation(internal.claims.updateStatusInternal, {
-            claimId: args.claimId,
-            status: "ready_for_review",
-            actor: "Durable Sentinel Workflow",
-            details: "Step 4/4: Auto-Pilot dispatch initiated for formal appeal packet...",
-          });
-
-          await step.runAction(
-            internal.actions.mailDispatcher.dispatchAppealPacketInternal,
-            {
-              claimId: args.claimId,
-              appealId: synthesisResult.appealId as Id<"appeals">,
-              dispatchMode: "official_payer",
-            },
-            {
-              retry: { maxAttempts: 2, initialBackoffMs: 1500, base: 2 },
-              name: "autoDispatchAppealPacket",
-            }
-          );
-          wasDispatched = true;
-
-          // Durable ERISA statutory follow-up cadence countdown (clamped 1..90 days)
-          const cadenceDays = Math.max(1, Math.min(args.followUpCadenceDays ?? 14, 90));
-          if (cadenceDays > 0) {
-            const sleepDurationMs = cadenceDays * 24 * 60 * 60 * 1000;
-            await step.runMutation(internal.claims.updateStatusInternal, {
-              claimId: args.claimId,
-              status: "dispatched",
-              actor: "Durable Sentinel Workflow",
-              details: `Appeal transmitted. Commencing ${cadenceDays}-day durable statutory cadence countdown via step.sleep().`,
-            });
-
-            await step.sleep(sleepDurationMs, { name: "erisaStatutoryFollowUpCadence" });
-
-            // Wake up after statutory sleep without keeping active threads or VMs alive
-            await step.runMutation(internal.claims.updateStatusInternal, {
-              claimId: args.claimId,
-              status: "dispatched",
-              actor: "Durable Sentinel Workflow",
-              details: `Statutory ${cadenceDays}-day follow-up window elapsed. Checking communication thread for payer determination.`,
-            });
-          }
-        } catch (dispatchErr) {
-          console.warn("Durable workflow auto-dispatch note:", dispatchErr);
-        }
-      }
+      const wasDispatched = false;
 
       await step.runMutation(internal.claims.updateClaimWorkflowStatusInternal, {
         claimId: args.claimId,

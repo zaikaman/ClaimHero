@@ -88,14 +88,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
   const [certificateMessageId, setCertificateMessageId] = useState<string | undefined>(undefined);
 
-  // Auto-Pilot & Smart Rebuttal State
-  const setAutoPilotMutation = useMutation(api.emails.setClaimAutoPilot);
+  // Smart Rebuttal State
   const dismissDraftMutation = useMutation(api.emails.dismissAutoReplyDraft);
   const generateDraftAction = useAction(api.actions.mailDispatcher.generateAutoReplyDraft);
-  const [autoPilotEnabled, setAutoPilotEnabled] = useState<boolean>(
-    claim.autoPilotEnabled !== false
-  );
-  const [isTogglingAutoPilot, setIsTogglingAutoPilot] = useState(false);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [isDismissingDraft, setIsDismissingDraft] = useState(false);
   const [activeAutoDraft, setActiveAutoDraft] = useState<string>("");
@@ -205,20 +200,6 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     isGeneratingDraft ||
     Boolean(latestInbound && latestInbound.autoReplyStatus === "generating" && !latestInbound.autoReplyDraft);
 
-  const handleToggleAutoPilot = async () => {
-    if (isTogglingAutoPilot || !claim._id) return;
-    setIsTogglingAutoPilot(true);
-    try {
-      const nextState = !autoPilotEnabled;
-      await setAutoPilotMutation({
-        claimId: claim._id as Id<"claims">,
-        enabled: nextState,
-      });
-      setAutoPilotEnabled(nextState);
-    } finally {
-      setIsTogglingAutoPilot(false);
-    }
-  };
 
   const handleGenerateSmartDraft = async (customPrompt?: string) => {
     if (isSynthesizing || !claim._id || !latestInbound) return;
@@ -759,37 +740,20 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Auto-Pilot Sentinel Interactive Badge Button with 1-Hour SLA Tooltip */}
+            {/* Mandatory Human Review Gate Interactive Badge */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={handleToggleAutoPilot}
-                    disabled={isTogglingAutoPilot}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all cursor-pointer select-none",
-                      autoPilotEnabled
-                        ? "bg-primary/15 text-primary border-primary/30 hover:bg-primary/25"
-                        : "bg-muted/40 text-muted-foreground border-border hover:bg-muted/70 hover:text-foreground"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "size-1.5 rounded-full shrink-0",
-                        autoPilotEnabled
-                          ? "bg-primary shadow-[0_0_6px_rgba(14,165,233,0.8)] animate-pulse"
-                          : "bg-muted-foreground/40"
-                      )}
-                    />
-                    <span>Auto-Pilot: {autoPilotEnabled ? "ON" : "OFF"}</span>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border bg-primary/10 text-primary border-primary/30 select-none cursor-default">
+                    <ShieldCheck className="size-3.5 text-primary shrink-0" />
+                    <span>Human Review Mandatory</span>
                     <Info className="size-3 opacity-60 hover:opacity-100 transition-opacity ml-0.5" />
-                  </button>
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="end" className="max-w-xs space-y-1">
-                  <div className="font-semibold text-foreground">Sentinel Auto-Pilot (1-Hour SLA)</div>
+                  <div className="font-semibold text-foreground">Mandatory Human Approval Gate</div>
                   <div className="text-[11px] text-muted-foreground leading-relaxed">
-                    Monitors inbound payer replies. If you don't manually review or reply within 1 hour, Auto-Pilot autonomously synthesizes and transmits the cited clinical rebuttal.
+                    AI may prepare, classify, cite, and recommend. A human must approve every clinical assertion, legal assertion, recipient, and outbound message before dispatch.
                   </div>
                 </TooltipContent>
               </Tooltip>
@@ -1092,8 +1056,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               <span>Transmission History ({messages.length})</span>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" size="sm" className="text-[10px] font-mono">
-                {autoPilotEnabled ? "Auto-Pilot Active" : "Manual Review Mode"}
+              <Badge variant="outline" size="sm" className="text-[10px] font-mono text-primary border-primary/30">
+                Human Review Gate Enforced
               </Badge>
             </div>
           </div>
@@ -1328,34 +1292,26 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             )}
           </div>
 
-          {/* Autonomous Clinical Addendum Draft Card */}
+          {/* Prepared Clinical Rebuttal Draft Card (Pending Human Approval) */}
           {(activeAutoDraft || isSynthesizing) && claim.status !== "won" && !isAwaitingPayer && (
             <div className="p-3 bg-muted/20 border-t border-border space-y-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <ShieldCheck className="size-4 text-primary shrink-0" />
-                  <span>Autonomous Clinical Addendum</span>
+                  <span>AI-Prepared Clinical Rebuttal</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {autoPilotEnabled && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
-                      <Clock className="size-3 text-primary animate-pulse" />
-                      <span>
-                        {(() => {
-                          const slaReceivedAt = latestInbound?.receivedAt || 0;
-                          const elapsedMinutes = slaReceivedAt ? Math.floor((Date.now() - slaReceivedAt) / 60000) : 0;
-                          const remainingSlaMinutes = Math.max(0, 60 - elapsedMinutes);
-                          return remainingSlaMinutes > 0
-                            ? `Auto-dispatch in ${remainingSlaMinutes}m if unreviewed`
-                            : "1-Hour SLA elapsed — Auto-dispatching";
-                        })()}
-                      </span>
-                    </span>
-                  )}
                   <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
-                    Cited Evidence
+                    Human Review Mandatory
                   </Badge>
                 </div>
+              </div>
+
+              <div className="rounded border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-[11px] text-muted-foreground flex items-center gap-2">
+                <Info className="size-3.5 text-primary shrink-0" />
+                <span>
+                  AI may prepare, classify, cite, and recommend. An authorized human must approve every clinical assertion, legal assertion, recipient, and outbound message.
+                </span>
               </div>
 
               {isSynthesizing && !activeAutoDraft ? (
@@ -1381,7 +1337,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   ) : (
                     <PaperPlaneTilt className="size-3.5" />
                   )}
-                  <span>Transmit Addendum</span>
+                  <span>Approve &amp; Transmit Rebuttal</span>
                 </Button>
 
                 <Button

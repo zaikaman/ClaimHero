@@ -440,21 +440,11 @@ export function formatPayerResponseAlertEmail(
   }
   const normalizedSafeUrl = safeUrl.replace(/\/$/, "");
 
-  const isAutoPilot = context.autoPilotEnabled !== false;
-
   const subject = `[ClaimHero Alert] Payer Response: Claim #${safeClaimNumberText} (${safeHeadlineText})`;
 
-  const text = `Hello,\n\nA new response has been received from ${safePayerText} regarding Claim #${safeClaimNumberText} (${safePatientText}).\n\nDetermination: ${safeHeadlineText}\nSummary: ${safeRationaleText}\n\n${
-    isAutoPilot
-      ? "Sentinel Auto-Pilot is ACTIVE for this claim. If no manual action is taken within 1 hour, Auto-Pilot will autonomously synthesize and dispatch the cited clinical rebuttal addendum."
-      : "Sentinel Auto-Pilot is currently OFF. Please log in to ClaimHero to review this response."
-  }\n\nReview Claim Docket: ${normalizedSafeUrl}/app/inbox\n\nClaimHero Sentinel System`;
+  const text = `Hello,\n\nA new response has been received from ${safePayerText} regarding Claim #${safeClaimNumberText} (${safePatientText}).\n\nDetermination: ${safeHeadlineText}\nSummary: ${safeRationaleText}\n\nMandatory Human Review: ClaimHero AI has classified this response and prepared a cited rebuttal draft. In accordance with clinical safety protocols, a human must approve every clinical assertion, legal assertion, recipient, and outbound message before dispatch.\n\nPlease log in to ClaimHero to review and approve this communication.\n\nReview Claim Docket: ${normalizedSafeUrl}/app/inbox\n\nClaimHero Sentinel System`;
 
-  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:24px;background-color:#0b0f17;color:#f8fafc;border-radius:8px;border:1px solid #1e293b;"><div style="font-size:18px;font-weight:700;color:#00e5ff;margin-bottom:16px;">ClaimHero Sentinel Alert</div><p style="font-size:14px;line-height:1.6;color:#cbd5e1;">A new inbound response was received from <strong>${safePayerHtml}</strong> for <strong>Claim #${safeClaimNumberHtml}</strong>.</p><div style="background-color:#141c2c;border:1px solid #1e293b;padding:16px;border-radius:6px;margin:16px 0;"><div style="font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:4px;">Payer Determination</div><div style="font-size:15px;font-weight:600;color:#f8fafc;margin-bottom:8px;">${safeHeadlineHtml}</div><div style="font-size:13px;color:#94a3b8;line-height:1.5;">${safeRationaleHtml}</div></div><p style="font-size:13px;color:#94a3b8;line-height:1.6;">${
-    isAutoPilot
-      ? "<strong style='color:#00e5ff;'>Sentinel Auto-Pilot is ACTIVE.</strong> If no manual action is taken within 1 hour, ClaimHero will autonomously synthesize and dispatch the cited rebuttal addendum."
-      : "Please log in to your ClaimHero console to review this communication."
-  }</p><div style="margin-top:24px;"><a href="${escapeHtml(normalizedSafeUrl)}/app/inbox" style="display:inline-block;background-color:#0ea5e9;color:#ffffff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Open Claim Inbox</a></div></div>`;
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:24px;background-color:#0b0f17;color:#f8fafc;border-radius:8px;border:1px solid #1e293b;"><div style="font-size:18px;font-weight:700;color:#00e5ff;margin-bottom:16px;">ClaimHero Sentinel Alert</div><p style="font-size:14px;line-height:1.6;color:#cbd5e1;">A new inbound response was received from <strong>${safePayerHtml}</strong> for <strong>Claim #${safeClaimNumberHtml}</strong>.</p><div style="background-color:#141c2c;border:1px solid #1e293b;padding:16px;border-radius:6px;margin:16px 0;"><div style="font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:4px;">Payer Determination</div><div style="font-size:15px;font-weight:600;color:#f8fafc;margin-bottom:8px;">${safeHeadlineHtml}</div><div style="font-size:13px;color:#94a3b8;line-height:1.5;">${safeRationaleHtml}</div></div><p style="font-size:13px;color:#94a3b8;line-height:1.6;"><strong style="color:#00e5ff;">Mandatory Human Review Gate:</strong> ClaimHero AI has prepared and cited a recommended rebuttal. In accordance with clinical safety protocols, a human must approve every clinical assertion, legal assertion, recipient, and outbound message before dispatch.</p><div style="margin-top:24px;"><a href="${escapeHtml(normalizedSafeUrl)}/app/inbox" style="display:inline-block;background-color:#0ea5e9;color:#ffffff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Review &amp; Approve in ClaimHero</a></div></div>`;
 
   return {
     subject,

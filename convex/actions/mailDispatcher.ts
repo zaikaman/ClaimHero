@@ -369,7 +369,7 @@ async function deliverAiAdjudication(
     }
   }
 
-  const insertedMsgId = await ctx.runMutation(internal.emails.insertMessageInternal, withAgentMailMessageId({
+  await ctx.runMutation(internal.emails.insertMessageInternal, withAgentMailMessageId({
     threadId,
     claimId: claim._id,
     direction: "inbound",
@@ -389,21 +389,6 @@ async function deliverAiAdjudication(
     autoReplyStatus: isOverturned ? undefined : "pending",
   }, liveReply.messageId, liveReply.outboundId));
 
-  if (claim.autoPilotEnabled !== false && !isOverturned && insertedMsgId && ctx.scheduler?.runAfter) {
-    try {
-      await ctx.scheduler.runAfter(
-        60 * 60 * 1000,
-        internal.actions.mailDispatcher.dispatchScheduledAutoPilotReply,
-        {
-          messageId: insertedMsgId as Id<"emailMessages">,
-          claimId: claim._id,
-          threadId,
-        }
-      );
-    } catch (schedErr) {
-      console.warn("Failed to schedule auto-pilot in deliverAiAdjudication:", schedErr);
-    }
-  }
 
   const nextStatus = getCountermoveClaimStatus(adjudicationResult.determination);
   if (adjudicationResult.determination === "OVERTURNED_APPROVED") {
@@ -1202,8 +1187,9 @@ Guidelines:
 });
 
 /**
- * Autonomous Sentinel Auto-Pilot 1-Hour SLA Dispatch Core Logic:
- * Checks prerequisites, ensures no subsequent manual response was sent, and autonomously transmits rebuttal.
+ * Autonomous dispatch is disabled by clinical safety policy.
+ * Safer product rule: AI may prepare, classify, cite, and recommend.
+ * A human must approve every clinical assertion, legal assertion, recipient, and outbound message.
  */
 async function performDispatchScheduledAutoPilotReply(
   ctx: ActionCtx,
@@ -1213,83 +1199,24 @@ async function performDispatchScheduledAutoPilotReply(
     threadId: Id<"emailThreads">;
   }
 ): Promise<{ executed: boolean; reason?: string; claimNumber?: string }> {
-  const messageState = await ctx.runQuery(internal.emails.getAutoPilotMessageStateInternal, {
-    messageId: args.messageId,
-    threadId: args.threadId,
-  });
-  if (!messageState) return { executed: false, reason: "message_not_found" };
-
-  if (messageState.autoReplyStatus !== "pending") {
-    return { executed: false, reason: `status_not_pending_${messageState.autoReplyStatus}` };
-  }
-
   const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
     claimId: args.claimId,
-  });
-  if (!claim) {
-    await ctx.runMutation(internal.emails.updateMessageAnalysisInternal, {
-      messageId: args.messageId,
-      autoReplyStatus: "skipped",
-    });
-    return { executed: false, reason: "claim_not_found" };
-  }
-  if (claim.status === "won") {
-    await ctx.runMutation(internal.emails.markAutoReplyDispatchedInternal, {
-      messageId: args.messageId,
-    });
-    return { executed: false, reason: "claim_already_won" };
-  }
-  if (claim.autoPilotEnabled === false) {
-    // Crucial: Mark as disabled so background cron does not endlessly re-sweep this message every 5 minutes
-    await ctx.runMutation(internal.emails.updateMessageAnalysisInternal, {
-      messageId: args.messageId,
-      autoReplyStatus: "disabled",
-    });
-    return { executed: false, reason: "autopilot_disabled" };
-  }
-
-  // Check if an outbound reply was already sent on this thread AFTER this message
-  if (messageState.hasSubsequentOutbound) {
-    await ctx.runMutation(internal.emails.markAutoReplyDispatchedInternal, {
-      messageId: args.messageId,
-    });
-    return { executed: false, reason: "already_replied" };
-  }
-
-  let rebuttalText = messageState.autoReplyDraft?.trim();
-  if (!rebuttalText) {
-    rebuttalText = `We acknowledge your correspondence regarding Claim #${claim.claimNumber}. In accordance with statutory ERISA protections under 29 C.F.R. § 2560.503-1, we formally maintain our demand for full claim reimbursement based on documented medical necessity and request immediate escalation to Independent External Review (IRO).`;
-  }
-
-  const subject = `Re: Formal Medical Appeal | Claim #${claim.claimNumber} | Sentinel 1-Hour SLA Addendum`;
-  await performSendOutboundMessage(
-    ctx,
-    {
-      claimId: args.claimId,
-      threadId: args.threadId,
-      text: rebuttalText,
-      customSubject: subject,
-    },
-    claim
-  );
-
-  await ctx.runMutation(internal.emails.markAutoReplyDispatchedInternal, {
-    messageId: args.messageId,
   });
 
   await ctx.runMutation(internal.auditLogs.logEventInternal, {
     claimId: args.claimId,
-    ...(claim.userId ? { userId: claim.userId } : {}),
-    eventType: "appeal_dispatched",
-    actor: "Sentinel Auto-Pilot (1-Hour SLA)",
-    details: `Autonomous Sentinel SLA: Transmitted clinical rebuttal addendum to payer for Claim #${claim.claimNumber} after 1-hour review window elapsed without manual intervention.`,
+    ...(claim?.userId ? { userId: claim.userId } : {}),
+    eventType: "appeal_review_requested",
+    actor: "Sentinel Safety Guard",
+    details: `Autonomous dispatch blocked for Claim #${claim?.claimNumber || "Unknown"}. Mandatory human review is enforced: an authorized operator must approve every clinical assertion, legal assertion, recipient, and outbound message.`,
   });
 
-  return { executed: true, claimNumber: claim.claimNumber };
+  return { executed: false, reason: "mandatory_human_review_required", claimNumber: claim?.claimNumber };
 }
 
 /**
- * Scheduled execution action for a single inbound message after 1 hour SLA
+ * Scheduled execution action for a single inbound message.
+ * Enforces mandatory human review policy and rejects unapproved autonomous dispatch.
  */
 export const dispatchScheduledAutoPilotReply = internalAction({
   args: {
@@ -1306,69 +1233,22 @@ export const dispatchScheduledAutoPilotReply = internalAction({
 });
 
 /**
- * Sentinel Auto-Pilot SLA Cron Sweep:
- * Runs periodically every 15 minutes (via crons.ts sentinel-autopilot-sla-sweep) to detect any inbound messages
- * with pending auto-reply drafts older than the 1-hour review SLA (3,600,000 ms) and dispatches them autonomously.
+ * Deprecated cron sweep action retained for backwards compatibility.
+ * Autonomous dispatch without human approval is disabled.
  */
 export const sweepPendingAutoPilotReplies = internalAction({
   args: {
     customMaxAgeMs: v.optional(v.number()),
   },
-  handler: async (
-    ctx,
-    args
-  ): Promise<{ totalFound: number; dispatchedCount: number; skippedCount: number }> => {
-    const maxAgeMs = args.customMaxAgeMs ?? 60 * 60 * 1000;
-    const maxReceivedAt = Date.now() - maxAgeMs;
-
-    const pendingMessages: Array<{
-      messageId: Id<"emailMessages">;
-      claimId: Id<"claims">;
-      threadId: Id<"emailThreads">;
-      autoReplyDraft?: string;
-      receivedAt: number;
-      detectedDetermination?: string;
-    }> = await ctx.runQuery(
-      internal.emails.getPendingAutoPilotMessagesInternal,
-      { maxReceivedAt }
-    );
-
-    let dispatchedCount = 0;
-    let skippedCount = 0;
-
-    for (const pending of pendingMessages) {
-      try {
-        const res = await performDispatchScheduledAutoPilotReply(ctx, {
-          messageId: pending.messageId,
-          claimId: pending.claimId,
-          threadId: pending.threadId,
-        });
-        if (res.executed) {
-          dispatchedCount++;
-        } else {
-          skippedCount++;
-        }
-      } catch (err) {
-        console.warn(`Sentinel Auto-Pilot sweep error for message ${pending.messageId}:`, err);
-        try {
-          await ctx.runMutation(internal.emails.updateMessageAnalysisInternal, {
-            messageId: pending.messageId,
-            autoReplyStatus: "failed",
-          });
-        } catch {
-          // Graceful fallback
-        }
-        skippedCount++;
-      }
-    }
-
+  handler: async (): Promise<{ totalFound: number; dispatchedCount: number; skippedCount: number }> => {
     return {
-      totalFound: pendingMessages.length,
-      dispatchedCount,
-      skippedCount,
+      totalFound: 0,
+      dispatchedCount: 0,
+      skippedCount: 0,
     };
   },
 });
+
 
 /**
  * Autonomous Adversary Negotiation Round (on-demand simulation):

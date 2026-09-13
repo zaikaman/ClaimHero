@@ -135,60 +135,15 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
     });
   });
 
-  describe("convex/actions/mailDispatcher: Scheduled Auto-Pilot Rebuttal Worker", () => {
-    it("skips dispatch if message is no longer pending", async () => {
+  describe("convex/actions/mailDispatcher: Mandatory Human Review Gate", () => {
+    it("blocks autonomous dispatch and enforces mandatory human review", async () => {
       const mockCtx: any = {
         runQuery: vi.fn().mockImplementation(async (fn: any, args: any) => {
-          if (args?.messageId && args?.threadId) {
-            return {
-              messageId: args.messageId,
-              autoReplyStatus: "dispatched",
-              autoReplyDraft: "Draft",
-              hasSubsequentOutbound: false,
-            };
-          }
-          if (args?.threadId) {
-            return {
-              thread: { _id: "th_1" },
-              messages: [{ _id: "msg_1", autoReplyStatus: "dispatched" }],
-            };
-          }
-          return null;
-        }),
-      };
-
-      const res = await (actionMailDispatcher.dispatchScheduledAutoPilotReply as any)._handler(mockCtx, {
-        messageId: "msg_1",
-        claimId: "c_1",
-        threadId: "th_1",
-      });
-
-      expect(res.executed).toBe(false);
-      expect(res.reason).toContain("status_not_pending");
-    });
-
-    it("skips dispatch if autoPilotEnabled is false on the claim", async () => {
-      const mockCtx: any = {
-        runQuery: vi.fn().mockImplementation(async (fn: any, args: any) => {
-          if (args?.messageId && args?.threadId) {
-            return {
-              messageId: args.messageId,
-              autoReplyStatus: "pending",
-              autoReplyDraft: "Draft",
-              hasSubsequentOutbound: false,
-            };
-          }
-          if (args?.threadId) {
-            return {
-              thread: { _id: "th_1" },
-              messages: [{ _id: "msg_1", autoReplyStatus: "pending", receivedAt: 1000 }],
-            };
-          }
           if (args?.claimId) {
             return {
               _id: "c_1",
               claimNumber: "CLM-100",
-              autoPilotEnabled: false,
+              userId: "user_123",
               status: "under_review",
             };
           }
@@ -204,203 +159,29 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
       });
 
       expect(res.executed).toBe(false);
-      expect(res.reason).toBe("autopilot_disabled");
+      expect(res.reason).toBe("mandatory_human_review_required");
       expect(mockCtx.runMutation).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          messageId: "msg_1",
-          autoReplyStatus: "disabled",
+          claimId: "c_1",
+          eventType: "appeal_review_requested",
+          actor: "Sentinel Safety Guard",
         })
       );
     });
 
-    it("skips and marks dispatched if manual outbound reply was already sent after inbound message", async () => {
-      const mockCtx: any = {
-        runQuery: vi.fn().mockImplementation(async (fn: any, args: any) => {
-          if (args?.messageId && args?.threadId) {
-            return {
-              messageId: args.messageId,
-              autoReplyStatus: "pending",
-              autoReplyDraft: "Draft",
-              hasSubsequentOutbound: true,
-            };
-          }
-          if (args?.threadId) {
-            return {
-              thread: { _id: "th_1" },
-              messages: [
-                { _id: "msg_1", direction: "inbound", autoReplyStatus: "pending", receivedAt: 1000 },
-                { _id: "msg_2", direction: "outbound", receivedAt: 2000 }, // manual reply sent!
-              ],
-            };
-          }
-          if (args?.claimId) {
-            return {
-              _id: "c_1",
-              claimNumber: "CLM-100",
-              autoPilotEnabled: true,
-              status: "under_review",
-            };
-          }
-          return null;
-        }),
-        runMutation: vi.fn().mockResolvedValue(undefined),
-      };
-
-      const res = await (actionMailDispatcher.dispatchScheduledAutoPilotReply as any)._handler(mockCtx, {
-        messageId: "msg_1",
-        claimId: "c_1",
-        threadId: "th_1",
-      });
-
-      expect(res.executed).toBe(false);
-      expect(res.reason).toBe("already_replied");
-      expect(mockCtx.runMutation).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ messageId: "msg_1" })
-      );
-    });
-
-    it("executes autonomous transmission and updates audit log when SLA window elapses unreviewed", async () => {
-      process.env.AGENTMAIL_API_KEY = "test_key";
-      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_sender";
-      process.env.AGENTMAIL_SENDER_EMAIL = "sender@claimhero.com";
-
-      vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
-        messageId: "out_sent_1",
-        threadId: "th_live_1",
-      });
-
-      const mockClaim = {
-        _id: "c_1",
-        claimNumber: "CLM-100",
-        autoPilotEnabled: true,
-        status: "under_review",
-        deniedAmount: 5000,
-        patientName: "John Doe",
-        payerContact: { officialAppealsEmail: "appeals@payer.com" },
-      };
-
-      const mockCtx: any = {
-        runQuery: vi.fn().mockImplementation(async (fn: any, args: any) => {
-          if (args?.messageId && args?.threadId) {
-            return {
-              messageId: args.messageId,
-              autoReplyStatus: "pending",
-              autoReplyDraft: "We formally maintain that CPT 29881 is medically necessary under ERISA.",
-              hasSubsequentOutbound: false,
-            };
-          }
-          if (args?.threadId) {
-            return {
-              thread: { _id: "th_1", payerEmail: "appeals@payer.com" },
-              messages: [
-                {
-                  _id: "msg_1",
-                  direction: "inbound",
-                  autoReplyStatus: "pending",
-                  autoReplyDraft: "We formally maintain that CPT 29881 is medically necessary under ERISA.",
-                  receivedAt: 1000,
-                },
-              ],
-            };
-          }
-          if (args?.claimId) {
-            return mockClaim;
-          }
-          return null;
-        }),
-        runMutation: vi.fn().mockResolvedValue("mutation_ok"),
-      };
-
-      const res = await (actionMailDispatcher.dispatchScheduledAutoPilotReply as any)._handler(mockCtx, {
-        messageId: "msg_1",
-        claimId: "c_1",
-        threadId: "th_1",
-      });
-
-      expect(res.executed).toBe(true);
-      expect(res.claimNumber).toBe("CLM-100");
-      expect(mockCtx.runMutation).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          eventType: "appeal_dispatched",
-          actor: "Sentinel Auto-Pilot (1-Hour SLA)",
-        })
-      );
-    });
-
-    it("sweepPendingAutoPilotReplies sweeps unreviewed pending messages older than 1 hour", async () => {
-      process.env.AGENTMAIL_API_KEY = "test_key";
-      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_sender";
-      process.env.AGENTMAIL_SENDER_EMAIL = "sender@claimhero.com";
-
-      vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
-        messageId: "out_sent_sweep",
-        threadId: "th_sweep",
-      });
-
-      const mockCtx: any = {
-        runQuery: vi.fn().mockImplementation(async (fn: any, args: any) => {
-          // getPendingAutoPilotMessagesInternal
-          if (args?.maxReceivedAt) {
-            return [
-              {
-                messageId: "msg_sweep_1",
-                claimId: "claim_sweep_1",
-                threadId: "thread_sweep_1",
-                autoReplyDraft: "Rebuttal draft 1",
-                receivedAt: 500,
-              },
-            ];
-          }
-          if (args?.messageId && args?.threadId) {
-            return {
-              messageId: args.messageId,
-              autoReplyStatus: "pending",
-              autoReplyDraft: "Rebuttal draft 1",
-              hasSubsequentOutbound: false,
-            };
-          }
-          if (args?.threadId === "thread_sweep_1") {
-            return {
-              thread: { _id: "thread_sweep_1", payerEmail: "appeals@payer.com" },
-              messages: [
-                {
-                  _id: "msg_sweep_1",
-                  direction: "inbound",
-                  autoReplyStatus: "pending",
-                  autoReplyDraft: "Rebuttal draft 1",
-                  receivedAt: 500,
-                },
-              ],
-            };
-          }
-          if (args?.claimId === "claim_sweep_1") {
-            return {
-              _id: "claim_sweep_1",
-              claimNumber: "CLM-SWEEP",
-              autoPilotEnabled: true,
-              status: "under_review",
-              deniedAmount: 4200,
-              payerContact: { officialAppealsEmail: "appeals@payer.com" },
-            };
-          }
-          return null;
-        }),
-        runMutation: vi.fn().mockResolvedValue("mut_ok"),
-      };
-
+    it("sweepPendingAutoPilotReplies returns 0 dispatches since unapproved automated sweeps are disabled", async () => {
+      const mockCtx: any = {};
       const sweepRes = await (actionMailDispatcher.sweepPendingAutoPilotReplies as any)._handler(mockCtx, {});
 
-      expect(sweepRes.totalFound).toBe(1);
-      expect(sweepRes.dispatchedCount).toBe(1);
+      expect(sweepRes.totalFound).toBe(0);
+      expect(sweepRes.dispatchedCount).toBe(0);
       expect(sweepRes.skippedCount).toBe(0);
     });
   });
 
-  describe("convex/actions/agentMail: Inbound 1-Hour SLA Scheduling", () => {
-    it("schedules 1-hour SLA auto-pilot dispatch for DENIAL_UPHELD determination", async () => {
+  describe("convex/actions/agentMail: Inbound Mandatory Human Review Gate", () => {
+    it("does NOT schedule 1-hour SLA autonomous dispatch for DENIAL_UPHELD and stages draft for human review", async () => {
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_denial_1",
         inbox_id: "inbox_1",
@@ -424,6 +205,16 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
         attachments: [],
       });
 
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        determination: "DENIAL_UPHELD",
+        clinicalRationale: "Adverse determination upheld upon secondary appellate review.",
+        missingRecordsRequested: [],
+        authorizedSettlementAmount: undefined,
+        reviewerName: "Aetna Appellate Reviewer",
+        shouldAutoReply: true,
+        suggestedAutoReplyAddendum: "We formally contest this determination and request Independent External Review.",
+      } as any);
+
       const mockScheduler = {
         runAfter: vi.fn().mockResolvedValue("sched_ok"),
       };
@@ -433,7 +224,7 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
         runQuery: vi.fn().mockResolvedValue({
           _id: "claim_denial",
           claimNumber: "CLM-200",
-          autoPilotEnabled: true,
+          userId: "user_123",
           status: "dispatched",
         }),
         runMutation: vi.fn().mockResolvedValue("msg_db_id"),
@@ -446,12 +237,19 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
       });
 
       expect(res).toBeNull();
-      // Verify that 1 hour (3,600,000 ms) SLA dispatch was scheduled
-      expect(mockScheduler.runAfter).toHaveBeenCalledWith(
+      // Verify that autonomous 1-hour dispatch was NOT scheduled
+      expect(mockScheduler.runAfter).not.toHaveBeenCalledWith(
         3600000,
+        expect.anything(),
+        expect.anything()
+      );
+      // Verify that draft staging audit event was logged for human review
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
           claimId: "claim_denial",
+          eventType: "appeal_review_requested",
+          actor: "Sentinel AI Preparer",
         })
       );
     });
@@ -499,7 +297,6 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
         runQuery: vi.fn().mockResolvedValue({
           _id: "claim_won",
           claimNumber: "CLM-WON",
-          autoPilotEnabled: true,
           status: "dispatched",
         }),
         runMutation: vi.fn().mockResolvedValue("msg_won_db"),

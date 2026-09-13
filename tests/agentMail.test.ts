@@ -296,7 +296,7 @@ Paragraph text with **bold** and *italic*.
 
       // Complex payload with unicode, quotes, newlines, HTML
       const complexPayload = JSON.stringify({
-        text: "Middle dot: · and quotes: “hello” and emoji 🩺 and newlines:\r\nline2\nline3\t",
+        text: "Middle dot: · and quotes: “hello” and unicode symbols: § ¶ Δ and newlines:\r\nline2\nline3\t",
         html: "<p>Special chars & < > \" ' / </p>",
         longString: "a".repeat(15000),
       });
@@ -1441,8 +1441,8 @@ Paragraph text with **bold** and *italic*.
 
       expect(email.html).toContain("eGFR &lt; 30 mL/min and troponin &gt; 0.04 ng/mL");
       expect(email.text).toContain("eGFR < 30 mL/min and troponin > 0.04 ng/mL");
-      expect(email.html).toContain("Please log in to your ClaimHero console to review this communication.");
-      expect(email.text).toContain("Sentinel Auto-Pilot is currently OFF");
+      expect(email.html).toContain("Mandatory Human Review Gate:");
+      expect(email.text).toContain("Mandatory Human Review:");
     });
 
     it("formatPayerResponseAlertEmail fails loudly when SITE_URL is unset", () => {

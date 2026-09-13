@@ -188,12 +188,11 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
       );
     });
 
-    it("supports auto-pilot dispatch and durable step.sleep() cadence countdown", async () => {
+    it("enforces mandatory human review gate and transitions claim to ready_for_review without auto-dispatching", async () => {
       const mockClaim = {
         _id: "c1",
         userId: "user_123",
-        claimNumber: "CLM-AUTOPILOT-1",
-        autoPilotEnabled: true,
+        claimNumber: "CLM-MANDATORY-1",
         patient: { name: "Alice Blue", insurancePayer: "Cigna", state: "NY" },
         appealContext: {
           sender: {
@@ -209,7 +208,6 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
           if (opts?.name === "crawlInsurerPolicy") return Promise.resolve({ clausesExtracted: 3 });
           if (opts?.name === "computeOverturnScore") return Promise.resolve({ overturnProbabilityScore: 90 });
           if (opts?.name === "generateAppealBrief") return Promise.resolve({ appealId: "app_cadence" });
-          if (opts?.name === "autoDispatchAppealPacket") return Promise.resolve({ transmissionId: "tx_1" });
           return Promise.resolve([]);
         }),
         runMutation: vi.fn().mockResolvedValue(undefined),
@@ -224,12 +222,13 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
       });
 
       expect(result.success).toBe(true);
-      expect(result.dispatched).toBe(true);
-
-      // Verify sleep duration was calculated: 14 days * 86400 * 1000 ms = 1,209,600,000 ms
-      expect(mockStep.sleep).toHaveBeenCalledWith(
-        14 * 24 * 60 * 60 * 1000,
-        expect.objectContaining({ name: "erisaStatutoryFollowUpCadence" })
+      expect(result.dispatched).toBe(false);
+      expect(mockStep.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          claimId: "c1",
+          status: "ready_for_review",
+        })
       );
     });
   });

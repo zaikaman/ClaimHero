@@ -116,7 +116,6 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState("presets");
   const [patientState, setPatientState] = useState("California");
-  const [autoPilotEnabled, setAutoPilotEnabled] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pastedText, setPastedText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -535,7 +534,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       return;
     }
 
-    beginProcessing("saving", autoPilotEnabled ? "Saving context and opening workspace..." : "Saving case context...");
+    beginProcessing("saving", "Saving context and opening workspace...");
     try {
       await updateAppealContextMutation({
         claimId: extractedResult.claimId as Id<"claims">,
@@ -561,7 +560,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           maskedCategories: privacyRedactionState.categories,
           appliedAt: Date.now(),
         },
-        launchAutoPilot: autoPilotEnabled,
+        launchAutoPilot: true,
       });
 
       const claimId = extractedResult.claimId;
@@ -574,34 +573,29 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
         physicianNotes,
       };
 
-      if (autoPilotEnabled) {
-        // Enter the workspace instantly; the crawl / score / synthesis pipeline
-        // continues in the background with live status in Evidence Matrix.
-        setContextSubmitted(true);
-        setExtractedResult((current) => current ? { ...current, pipelineResult: null } : current);
-        endProcessing();
-        toast.info("Autonomous Sentinel activated. Indexing policy guidelines and compiling appeal brief...");
-        onSuccess(claimId, "evidence");
-        onClose();
-        void executePostExtractionPipeline(claimId, snapshot)
-          .then((pipelineResult) => {
-            if (pipelineResult && typeof pipelineResult === "object") {
-              soundEffects.play("appeal_synthesis_complete");
-              toast.success("Case indexed and appeal brief compiled. Review it in the Studio.");
-            }
-          })
-          .catch((pipelineErr) => {
-            toast.error(
-              pipelineErr instanceof Error
-                ? pipelineErr.message
-                : "Autonomous pipeline encountered an issue. Retry from the Evidence Matrix."
-            );
-          });
-        return;
-      }
-
-      setExtractedResult((current) => current ? { ...current, pipelineResult: null } : current);
+      // Enter the workspace instantly; the crawl / score / synthesis pipeline
+      // continues in the background with live status in Evidence Matrix.
       setContextSubmitted(true);
+      setExtractedResult((current) => current ? { ...current, pipelineResult: null } : current);
+      endProcessing();
+      toast.info("Sentinel pipeline activated. Indexing policy guidelines and compiling appeal brief...");
+      onSuccess(claimId, "evidence");
+      onClose();
+      void executePostExtractionPipeline(claimId, snapshot)
+        .then((pipelineResult) => {
+          if (pipelineResult && typeof pipelineResult === "object") {
+            soundEffects.play("appeal_synthesis_complete");
+            toast.success("Case indexed and appeal brief compiled. Review it in the Studio.");
+          }
+        })
+        .catch((pipelineErr) => {
+          toast.error(
+            pipelineErr instanceof Error
+              ? pipelineErr.message
+              : "Sentinel pipeline encountered an issue. Retry from the Evidence Matrix."
+          );
+        });
+      return;
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Could not save the case context. Please try again.");
     } finally {
@@ -665,7 +659,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           </div>
         </DialogHeader>
 
-        {/* State Jurisdiction & Autonomous Auto-Pilot Toggle */}
+        {/* State Jurisdiction & Mandatory Human Review Gate */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div className="flex items-center justify-between gap-2 bg-muted/40 border border-border p-2 rounded-lg text-xs">
             <span className="text-muted-foreground font-medium truncate">Jurisdiction:</span>
@@ -683,24 +677,16 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
             </Select>
           </div>
 
-          <div
-            onClick={() => setAutoPilotEnabled(!autoPilotEnabled)}
-            className={cn(
-              "flex items-center justify-between gap-2 border p-2 rounded-lg text-xs cursor-pointer transition-all",
-              autoPilotEnabled
-                ? "bg-primary/10 border-primary/40 text-primary font-medium"
-                : "bg-muted/30 border-border text-muted-foreground hover:text-foreground"
-            )}
-          >
+          <div className="flex items-center justify-between gap-2 border border-primary/30 bg-primary/5 p-2 rounded-lg text-xs">
             <div className="flex items-center gap-1.5 min-w-0">
-              <Lightning className="size-3.5 shrink-0 text-primary" weight="fill" />
-              <span className="truncate">Auto-Pilot Pipeline</span>
+              <ShieldCheck className="size-3.5 shrink-0 text-primary" />
+              <span className="truncate text-foreground font-medium">Human Review Gate</span>
             </div>
             <Badge
-              variant={autoPilotEnabled ? "default" : "outline"}
-              className="text-[9px] font-mono shrink-0 px-1.5 py-0"
+              variant="outline"
+              className="text-[9px] font-mono shrink-0 px-1.5 py-0 border-primary/40 text-primary"
             >
-              {autoPilotEnabled ? "ON (Auto-Solve)" : "OFF (Manual)"}
+              MANDATORY APPROVAL
             </Badge>
           </div>
         </div>
@@ -1265,22 +1251,20 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 {isProcessing ? (
                   <>
                     <CircleNotch className="size-3.5 animate-spin" />
-                    <span>{processingMessage || (autoPilotEnabled ? "Saving context and opening workspace..." : "Saving context...")}</span>
+                    <span>{processingMessage || "Saving context and opening workspace..."}</span>
                   </>
                 ) : (
                   <>
-                    <span>{autoPilotEnabled ? "Save context and open workspace" : "Save context"}</span>
+                    <span>Save Context &amp; Open Workspace</span>
                     <ArrowRight className="size-3.5" />
                   </>
                 )}
               </Button>
             </div>
-            {autoPilotEnabled && (
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                The evidence crawl, readiness audit, and brief synthesis run in the
-                background after save. You land in the Evidence Matrix instantly with live progress.
-              </p>
-            )}
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              The evidence crawl, readiness audit, and brief synthesis run in the
+              background. In accordance with clinical safety protocols, a human must approve every clinical assertion, legal assertion, recipient, and outbound message before dispatch.
+            </p>
           </Card>
         ) : (
           /* Extraction Result Card & Smart Multi-Vector Triage HUD */
@@ -1327,17 +1311,17 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <p className="mt-0.5 leading-relaxed">{extractedResult.denialReasonDescription}</p>
             </div>
 
-            {/* Pipeline Execution Banner when Auto-Pilot Was Off or Pending */}
+            {/* Pipeline Execution Banner when Analysis Pipeline Pending */}
             {!extractedResult.pipelineResult && (
               <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3.5 space-y-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-0.5">
                     <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                       <Lightning className="size-3.5 text-sky-400" />
-                      Auto-Pilot Was Disabled During Intake
+                      Sentinel Pipeline Ready
                     </span>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Case #{extractedResult.claimNumber} is indexed in the database with clinical facts confirmed. You can trigger the autonomous pipeline now to crawl insurer policy bulletins, audit Statutory Appeal Readiness, and draft the cited legal brief.
+                      Case #{extractedResult.claimNumber} is indexed with confirmed clinical facts. Run the pipeline now to crawl insurer policy bulletins, evaluate Statutory Appeal Readiness, and synthesize the cited legal brief for your review and approval.
                     </p>
                   </div>
                 </div>
@@ -1357,7 +1341,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     ) : (
                       <>
                         <Lightning className="size-3.5" />
-                        <span>Run Autonomous Sentinel Pipeline</span>
+                        <span>Run Sentinel Pipeline</span>
                       </>
                     )}
                   </Button>

@@ -233,12 +233,12 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
               {isPipelineActive ? (
                 <>
                   <CircleNotch className="size-3 animate-spin text-primary" />
-                  <span>{processingLabel && processingLabel !== "Processing..." ? processingLabel : "Auto-Pilot Running..."}</span>
+                  <span>{processingLabel && processingLabel !== "Processing..." ? processingLabel : "Pipeline Running..."}</span>
                 </>
               ) : (
                 <>
                   <Lightning className="size-3" weight="fill" />
-                  <span>{hasAppealContext ? "Auto-Pilot Appeal" : "Complete Context"}</span>
+                  <span>{hasAppealContext ? "Prepare Appeal" : "Complete Context"}</span>
                 </>
               )}
             </Button>

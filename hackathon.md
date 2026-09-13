@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-13T14:46:00Z
+- **Last updated:** 2026-09-13T15:02:00Z
 
 ## Log
 
@@ -1422,10 +1422,17 @@ Harmonized statutory appeal readiness terminology and dossier audit labels acros
 - Zero Emojis Compliance: Verified zero emoji characters across the entire production codebase, comments, strings, and markdown documentation.
 - Verification & Test Passing: Re-ran test suites and verified 964 passing tests across 61 test suites with 0 lint, typecheck, or build errors.
 
-### 2026-09-13 - working tree
+### 2026-09-13 - 791eca0
 Purged all multilingual and international legal adaptability claims and implemented strict English-only enforcement and US healthcare jurisdiction specialization across all AI prompts, document OCR classification, frontend UI, tests, and documentation (`AGENTS.md`, `README.md`, `convex/actions/opticalParser.ts`, `convex/actions/appealSynthesizer.ts`, `convex/actions/p2pDefenseGenerator.ts`, `convex/actions/p2pLiveCopilot.ts`, `convex/actions/payerContactResolver.ts`, `src/components/radar/IngestionModal.tsx`, `src/components/settings/SettingsPage.tsx`, `tests/actionsClinicalAndParser.test.ts`):
 - Document Ingestion & Optical OCR Rejection (`opticalParser.ts`): Updated `DENIAL_EXTRACTION_SCHEMA` and system prompt directives to explicitly reject non-English or foreign documents as non-claim documents (`isMedicalClaimDenial: false`). Added informative rejection reasons clarifying that ClaimHero strictly and exclusively supports English-language healthcare denial notices under US statutory frameworks (ERISA, ACA, CMS).
 - Model System Directives Hardening (`appealSynthesizer.ts`, `p2pDefenseGenerator.ts`, `p2pLiveCopilot.ts`): Enforced non-negotiable English-only rules prohibiting multilingual translation, non-English text generation, or foreign legal citations across appeal synthesis, P2P verbal tele-scripts, live fast answer rebuttals, and interactive medical director simulations.
 - Frontend Ingestion & System Notices (`IngestionModal.tsx`, `SettingsPage.tsx`): Added prominent "English Only • US Payers" badge and updated helper copy in `IngestionModal.tsx` for file and text intake. Added persistent "System Jurisdiction & Language: English Only (United States Healthcare • ERISA / ACA / CMS)" status banner in `SettingsPage.tsx`.
 - Documentation & Constitutional Alignment (`README.md`, `AGENTS.md`): Replaced previous multilingual adaptability claims with explicit English-language and US healthcare jurisdiction specialization in `README.md` and reinforced the strict single-language policy in `AGENTS.md`.
-- Automated Test Suite & Full Verification: Added unit test in `tests/actionsClinicalAndParser.test.ts` verifying rejection of non-English documents. Verified 100% clean with `npm run verify` (typecheck, lint, 965 passing unit tests across 61 suites, and production build).
+- Automated Test Suite & Full Verification: Added unit test in `tests/actionsClinicalAndParser.test.ts` verifying rejection of non-English documents. Verified 100% clean with `npm run verify` (typecheck, lint, 965 passing unit tests across 61 suites, and production build).
+
+### 2026-09-13 - working tree
+Enforced mandatory human review across all clinical, legal, and outbound communications and dismantled autonomous auto-pilot dispatch mechanisms (`README.md`, `convex/crons.ts`, `convex/workflows.ts`, `convex/actions/agentMail.ts`, `convex/actions/mailDispatcher.ts`, `convex/claims.ts`, `convex/lib/appealEmail.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/radar/IngestionModal.tsx`, `src/components/onboarding/OnboardingWizard.tsx`, `src/components/common/SentinelFlowStepper.tsx`, `tests/autopilotSLA.test.ts`, `tests/agentMail.test.ts`, `tests/workflows.test.ts`, `tests/judgeUxAndHardening.test.ts`, `tests/ingestionAndDeletionPipeline.test.ts`):
+- Mandatory Human Review Governance: Enforced the non-negotiable clinical safety standard across ClaimHero: AI may prepare, classify, cite, and recommend, but an authorized human must approve every clinical assertion, legal assertion, recipient, and outbound message prior to dispatch.
+- Autonomous Dispatch Elimination: Removed the 15-minute `sentinel-autopilot-sla-sweep` background cron and removed all 60-minute automated dispatch schedulers from inbound webhook adjudication. Stripped autonomous dispatch step 6 from the durable workflow pipeline so that synthesized appeals transition cleanly to `ready_for_review` with `dispatched: false`. Hardened scheduled dispatch endpoints to immediately reject unreviewed execution.
+- Clinical & Legal UX Alignment: Overhauled AgentMail Drawer, Ingestion Modal, Onboarding Wizard, and Sentinel Stepper to eliminate auto-pilot toggles and 1-hour countdown SLA timers. Replaced them with prominent "Human Review Mandatory" and "Human Review Gate Enforced" badges, clinical safety banners, and an explicit "Approve & Transmit Rebuttal" CTA.
+- Documentation & Quality Pass Verification: Updated `README.md` architecture diagrams, cron inventories, and communications sections. Authored and updated regression test suites verifying blocking of unapproved dispatches, absence of sweep crons, and mandatory review notices. Verified 100% clean with `npm run verify` across typecheck, lint, 962 unit tests across 61 suites, and production build with zero emojis.

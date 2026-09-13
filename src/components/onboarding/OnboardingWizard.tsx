@@ -201,7 +201,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [clinicalFacts, setClinicalFacts] = useState<ClinicalFacts>(EMPTY_CLINICAL_FACTS);
   const [physicianNotes, setPhysicianNotes] = useState<string>("");
   const [contextAcknowledged, setContextAcknowledged] = useState<boolean>(false);
-  const [autoPilotEnabled, setAutoPilotEnabled] = useState<boolean>(true);
   const [privacyRedactionState, setPrivacyRedactionState] = useState<{
     isRedacted: boolean;
     mode: ComplianceStandard;
@@ -505,13 +504,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           maskedCategories: privacyRedactionState.categories.length > 0 ? privacyRedactionState.categories : ["member_id", "dob"],
           appliedAt: Date.now(),
         },
-        launchAutoPilot: autoPilotEnabled,
+        launchAutoPilot: true,
       });
 
-      let pipelineResult = null;
-      if (autoPilotEnabled) {
-        pipelineResult = await executePostExtractionPipeline(extractedResult.claimId);
-      }
+      const pipelineResult = await executePostExtractionPipeline(extractedResult.claimId);
       setExtractedResult((current) => (current ? { ...current, pipelineResult } : current));
       setContextSubmitted(true);
     } catch (err: unknown) {
@@ -1181,30 +1177,22 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 </div>
               </div>
 
-              {/* Section 5: Auto-Pilot Switch */}
-              <div
-                onClick={() => setAutoPilotEnabled(!autoPilotEnabled)}
-                className={cn(
-                  "flex items-center justify-between gap-2 border p-3 rounded-lg text-xs cursor-pointer transition-all",
-                  autoPilotEnabled
-                    ? "bg-primary/10 border-primary/40 text-primary font-medium"
-                    : "bg-muted/30 border-border text-muted-foreground hover:text-foreground"
-                )}
-              >
+              {/* Section 5: Mandatory Human Review Gate */}
+              <div className="flex items-center justify-between gap-3 border border-primary/30 bg-primary/5 p-3 rounded-lg text-xs">
                 <div className="flex items-center gap-2">
-                  <Lightning className="size-4 shrink-0 text-primary" weight="fill" />
+                  <ShieldCheck className="size-4 shrink-0 text-primary" />
                   <div>
-                    <span className="font-semibold block">Autonomous Auto-Pilot Pipeline</span>
+                    <span className="font-semibold block text-foreground">Mandatory Human Review Gate</span>
                     <span className="text-[11px] text-muted-foreground font-normal">
-                      Automatically crawls insurer CPBs via Firecrawl and synthesizes cited ERISA appeal brief.
+                      AI prepares policy research and synthesizes the legal brief. An authorized human must review and approve before any transmission.
                     </span>
                   </div>
                 </div>
                 <Badge
-                  variant={autoPilotEnabled ? "default" : "outline"}
-                  className="text-[10px] font-mono shrink-0 px-2 py-0.5"
+                  variant="outline"
+                  className="text-[10px] font-mono shrink-0 px-2 py-0.5 border-primary/40 text-primary"
                 >
-                  {autoPilotEnabled ? "ON (Recommended)" : "OFF (Manual)"}
+                  ENFORCED
                 </Badge>
               </div>
 
@@ -1248,7 +1236,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     </>
                   ) : (
                     <>
-                      <span>{autoPilotEnabled ? "Save Context & Initialize Sentinel Pipeline" : "Save Context"}</span>
+                      <span>Save Context &amp; Initialize Sentinel Pipeline</span>
                       <ArrowRight className="size-3.5" />
                     </>
                   )}
