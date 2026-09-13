@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-13T16:22:00Z
+- **Last updated:** 2026-09-13T17:08:00Z
 
 ## Log
 
@@ -1443,10 +1443,19 @@ Repositioned ClaimHero from an autonomous sentinel to an evidence-grounded appea
 - Terminology Renames: Renamed "Overturn Probability" to "Evidence Coverage & Precedent Match", "Certificate of Service" to "Delivery Evidence Report" (HTML/print export: `Delivery-Evidence-Report-${claim.claimNumber}.html`), and "Autonomous dispatch" to "Review-gated dispatch".
 - Quality & Build Verification: Retained underlying database schema compatibility while updating user-facing badges, modals, tooltips, and document headers. Validated 100% clean with `npm run verify` across typecheck, lint, 962 passing unit tests across 61 test files, 80.44% code coverage, and production Vite build with zero emojis.
 
-### 2026-09-13 - working tree
+### 2026-09-13 - d7ed0a3
 Hardened backend human review gates in `dispatchAppealPacket`, added explicit appeal authorization schema and mutations, and synchronized test suite references across all project documentation and CI pipelines (`convex/schema.ts`, `convex/appeals.ts`, `convex/actions/mailDispatcher.ts`, `src/hooks/useCommunications.ts`, `src/components/communications/AgentMailDrawer.tsx`, `README.md`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`, `PRODUCT.md`, `IDEA.md`, `tests/securityComplianceHardening.test.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`, `tests/adversarialAdjudicator.test.ts`, `tests/formalPdfAttachments.test.ts`):
 - 2-Tier Backend Human Review Gate: Hardened `dispatchAppealPacket` and `performDispatchAppealPacket` to enforce two strict gates: Gate 1 verifies `claim.status === "ready_for_review"`, blocking dispatch on draft, analyzing, or already-resolved claims; Gate 2 enforces explicit human approval (`appeal.isHumanApproved` or `args.humanApproved`), immediately rejecting unreviewed outbound transmission attempts.
 - Explicit Human Approval Schema & Mutations: Added `isHumanApproved`, `approvedAt`, `approvedBy`, and `approvalNotes` to `appeals` and `claims` tables in `schema.ts`. Implemented `approveAppeal` mutation in `convex/appeals.ts` guarding claim editor permissions and emitting an immutable `appeal_approved` audit log event, and `recordHumanApprovalInternal` for transactional approval recording during review-gated dispatch.
 - Frontend Review-Gated UX Alignment: Updated `useCommunications.ts` to pass explicit `humanApproved: true` and `approvedBy` coordinates upon user transmission. Enhanced `AgentMailDrawer.tsx` to guard `canDispatch` with `isReadyForReview`, display an informative warning banner if a claim is not yet ready for review, and style the CTA as "Approve & Transmit".
 - Test Suite & CI Reference Synchronization: Synchronized test suite metrics across `README.md`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`, `PRODUCT.md`, and `IDEA.md` to accurately reflect the comprehensive suite of 967 passing automated tests across 61 test files with ~80.4% line coverage.
-- Test Suite & Quality Pass Verification: Added unit tests verifying rejection when claim status is not `ready_for_review`, rejection when human approval is missing, and successful approval recording and audit trail logging. Verified 100% clean with `npm run verify` across typecheck, lint, 967 passing unit tests across 61 test files, and production build with zero emojis.
+- Test Suite & Quality Pass Verification: Added unit tests verifying rejection when claim status is not `ready_for_review`, rejection when human approval is missing, and successful approval recording and audit trail logging. Verified 100% clean with `npm run verify` across typecheck, lint, 967 passing unit tests across 61 test files, and production build with zero emojis.
+
+### 2026-09-13 - working tree
+Implemented AWS Textract HIPAA optical intake gate and zero-PHI LLM bridge for multimodal document intake (`convex/lib/textract.ts`, `convex/actions/opticalParser.ts`, `convex/actions/agentMail.ts`, `tests/textract.test.ts`, `README.md`, `docs/THREAT_MODEL.md`, `package.json`):
+- Private BAA Optical Intake: Integrated `@aws-sdk/client-textract` to parse uploaded denial letters and Explanation of Benefits (EOB) under the signed AWS HIPAA BAA boundary. Extracted full linearized text, structured key-value pairs (via CHILD/VALUE block mappings), and 2D tables without sending binary files to external models.
+- Zero-PHI De-identification Bridge: Extracted authentic patient identifiers (`patientName`, `memberId`, `claimNumber`, `serviceDate`, amounts) directly into the secure Convex database vault. Enforced `redactBeforeLLM()` to scrub all direct identifiers from the OCR text prior to OpenAI completion. OpenAI receives zero binary images/PDFs and zero direct PHI.
+- Authentic Identifier Re-hydration: Re-hydrated authentic patient identifiers from Textract into the claim record, ensuring downstream appeal letters (`assembleProfessionalAppealEmail`) contain authentic patient credentials for insurer acceptance.
+- Resilient Dual-Mode Fallback: Preserved automatic fallback to direct multimodal vision parsing in demo/test environments when AWS keys are absent or when API errors occur. Added pipe escaping for markdown tables and asterisk-masked member ID re-hydration.
+- Verification & Test Suite: Authored 12 unit and integration tests in `tests/textract.test.ts`. Verified 100% clean with `npm run verify` (typecheck, lint, 979 unit tests across 62 test files, and production build).
+- Documentation Single-Source-of-Truth Consolidation: Consolidated exact test metrics (979 tests across 62 suites) exclusively into `README.md` as the authoritative single source of truth, replacing fragile hardcoded test snapshot counters across `IDEA.md`, `PRODUCT.md`, `.github/workflows/ci.yml`, and `deploy.yml` with clean, evergreen references to prevent documentation drift.

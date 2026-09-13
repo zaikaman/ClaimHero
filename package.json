@@ -19,6 +19,7 @@
   "dependencies": {
     "@agentmail/convex": "^0.1.0",
     "@ai-sdk/openai": "^4.0.26",
+    "@aws-sdk/client-textract": "^3.1131.0",
     "@convex-dev/agent": "^0.7.1",
     "@convex-dev/aggregate": "^0.3.0",
     "@convex-dev/auth": "^2.0.0-alpha.1",

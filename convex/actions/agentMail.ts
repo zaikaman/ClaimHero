@@ -15,6 +15,7 @@ import { extractEmailAddress, isInternalAgentMailAddress, normalizeAgentMailWebh
 import { formatPayerResponseAlertEmail, escapeHtml } from "../lib/appealEmail";
 import { requireAuthUser } from "../lib/auth";
 import { rateLimiter } from "../lib/rateLimiter";
+import { isTextractConfigured, extractDocumentWithTextract } from "../lib/textract";
 
 /**
  * Minimum interval between non-victory payer-response alert emails for the
@@ -430,6 +431,7 @@ async function handleInboundClaimReply(
       size: number;
     }> = [];
     const fileInputs: Array<{ fileData: string; filename: string }> = [];
+    const attachmentTexts: string[] = [];
 
     if (Array.isArray(normalized.attachments) && normalized.attachments.length > 0) {
       for (const att of normalized.attachments) {
@@ -452,14 +454,34 @@ async function handleInboundClaimReply(
             size: downloaded.size,
           });
 
-          // If the attachment is a PDF or document, prepare for multimodal structured evaluation
+          // If the attachment is a PDF or document, prepare for evaluation
           const lowerMime = downloaded.contentType.toLowerCase();
           const lowerName = downloaded.filename.toLowerCase();
-          if (lowerMime.includes("pdf") || lowerName.endsWith(".pdf")) {
-            fileInputs.push({
-              fileData: `data:application/pdf;base64,${downloaded.buffer.toString("base64")}`,
-              filename: downloaded.filename,
-            });
+          if (lowerMime.includes("pdf") || lowerName.endsWith(".pdf") || lowerMime.startsWith("image/")) {
+            if (isTextractConfigured()) {
+              try {
+                const textractRes = await extractDocumentWithTextract(downloaded.buffer);
+                if (!textractRes.fullText.trim()) {
+                  throw new Error("AWS Textract returned empty text for attachment");
+                }
+                attachmentTexts.push(
+                  `Attached Document (${downloaded.filename}) Extracted via AWS Textract:\n${textractRes.fullText}`
+                );
+              } catch (textractErr) {
+                console.warn(`AWS Textract inbound attachment parse failed for ${downloaded.filename}:`, textractErr);
+                if (lowerMime.includes("pdf") || lowerName.endsWith(".pdf")) {
+                  fileInputs.push({
+                    fileData: `data:application/pdf;base64,${downloaded.buffer.toString("base64")}`,
+                    filename: downloaded.filename,
+                  });
+                }
+              }
+            } else if (lowerMime.includes("pdf") || lowerName.endsWith(".pdf")) {
+              fileInputs.push({
+                fileData: `data:application/pdf;base64,${downloaded.buffer.toString("base64")}`,
+                filename: downloaded.filename,
+              });
+            }
           }
         } catch (attErr) {
           console.warn(`Failed to process inbound attachment ${att.attachmentId}:`, attErr);
@@ -567,7 +589,9 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
  4. If an attached Explanation of Benefits or settlement agreement is present, incorporate its formal claim decisions into your evaluation.
  5. For ANY determination other than OVERTURNED_APPROVED (especially PARTIAL_SETTLEMENT_OFFER, POLICY_CONFLICT_CITATION, DENIAL_UPHELD, ADDITIONAL_RECORDS_REQUIRED, or GENERAL_INQUIRY), synthesize a professional, court-ready clinical counter-rebuttal tailored to the countermove: decline discounted settlements and demand full payment with cure path for partial offers; distinguish the cited CPB clause on the facts for policy citations; formally demand Independent Review Organization (IRO) external review citing statutory ERISA 29 C.F.R. § 2560.503-1 rights if the denial is upheld; supply or commit the requested records for RFIs.
  6. CRITICAL RULE: If determination is "OVERTURNED_APPROVED" (claim won/approved), set shouldAutoReply to false and set suggestedAutoReplyAddendum to empty string "". For ALL other determinations, set shouldAutoReply to true and provide a non-empty suggestedAutoReplyAddendum.`,
-        userPrompt: `Evaluate the following inbound email from ${sender}:\n\nSubject: ${subject}\n\n${bodyContent}`,
+        userPrompt: `Evaluate the following inbound email from ${sender}:\n\nSubject: ${subject}\n\n${bodyContent}${
+          attachmentTexts.length > 0 ? `\n\n--- Extracted Attachment Content ---\n${attachmentTexts.join("\n\n")}` : ""
+        }`,
         schemaName: "InboundAnalysisResult",
         schema: INBOUND_ANALYSIS_SCHEMA,
         fileInputs: fileInputs.length > 0 ? fileInputs : undefined,

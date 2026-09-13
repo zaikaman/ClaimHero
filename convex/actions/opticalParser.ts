@@ -7,6 +7,29 @@ import { createStructuredCompletion } from "../lib/openai";
 import { api, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireAuthUser } from "../lib/auth";
+import {
+  isTextractConfigured,
+  extractDocumentWithTextract,
+  type TextractExtractionResult,
+} from "../lib/textract";
+
+function formatTablesAsMarkdown(tables: string[][][]): string {
+  if (!tables || tables.length === 0) return "";
+  return tables
+    .map((grid) => {
+      if (grid.length === 0) return "";
+      const header = grid[0].map((c) => c.replace(/\|/g, "\\|"));
+      const separator = header.map(() => "---");
+      const rows = grid.slice(1);
+      const lines = [
+        `| ${header.join(" | ")} |`,
+        `| ${separator.join(" | ")} |`,
+        ...rows.map((r) => `| ${r.map((c) => c.replace(/\|/g, "\\|")).join(" | ")} |`),
+      ];
+      return lines.join("\n");
+    })
+    .join("\n\n");
+}
 
 const DENIAL_EXTRACTION_SCHEMA = {
   type: "object",
@@ -207,6 +230,7 @@ export const parseDenialDocument = action({
     let documentContent = args.rawDocumentText?.trim() || "";
     const imageUrls: string[] = [];
     const fileInputs: Array<{ fileData: string; filename: string }> = [];
+    let textractIdentifiers: Partial<TextractExtractionResult> = {};
 
     let claimId: Id<"claims">;
     let extraction: DenialExtractionResult;
@@ -245,19 +269,56 @@ export const parseDenialDocument = action({
           const rawContentType = response.headers.get("content-type") || "";
           const detected = detectFileFormat(rawContentType, new Uint8Array(arrayBuffer));
 
-          if (detected.type === "image") {
+          if (detected.type === "image" || detected.type === "pdf") {
             const buffer = Buffer.from(arrayBuffer);
-            const base64 = buffer.toString("base64");
-            imageUrls.push(`data:${detected.mime};base64,${base64}`);
-            documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached image.`.trim();
-          } else if (detected.type === "pdf") {
-            const buffer = Buffer.from(arrayBuffer);
-            const base64 = buffer.toString("base64");
-            fileInputs.push({
-              fileData: `data:application/pdf;base64,${base64}`,
-              filename: "denial-document.pdf",
-            });
-            documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached document.`.trim();
+            if (isTextractConfigured()) {
+              try {
+                const textractRes = await extractDocumentWithTextract(buffer);
+                if (!textractRes.fullText.trim()) {
+                  throw new Error("AWS Textract returned empty text content");
+                }
+                textractIdentifiers = textractRes;
+                const tableMd = formatTablesAsMarkdown(textractRes.tables);
+                documentContent = [
+                  documentContent,
+                  "Extracted denial document text from AWS Textract (HIPAA BAA Optical Gate):",
+                  textractRes.fullText,
+                  tableMd ? `Structured Table Data:\n${tableMd}` : "",
+                ]
+                  .filter(Boolean)
+                  .join("\n\n");
+              } catch (textractErr) {
+                console.warn(
+                  "[OpticalParser] AWS Textract extraction failed, falling back to direct multimodal parsing:",
+                  textractErr
+                );
+                if (detected.type === "image") {
+                  const base64 = buffer.toString("base64");
+                  imageUrls.push(`data:${detected.mime};base64,${base64}`);
+                  documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached image.`.trim();
+                } else {
+                  const base64 = buffer.toString("base64");
+                  fileInputs.push({
+                    fileData: `data:application/pdf;base64,${base64}`,
+                    filename: "denial-document.pdf",
+                  });
+                  documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached document.`.trim();
+                }
+              }
+            } else {
+              if (detected.type === "image") {
+                const base64 = buffer.toString("base64");
+                imageUrls.push(`data:${detected.mime};base64,${base64}`);
+                documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached image.`.trim();
+              } else {
+                const base64 = buffer.toString("base64");
+                fileInputs.push({
+                  fileData: `data:application/pdf;base64,${base64}`,
+                  filename: "denial-document.pdf",
+                });
+                documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached document.`.trim();
+              }
+            }
           } else if (detected.type === "text") {
             const text = new TextDecoder("utf-8").decode(arrayBuffer);
             documentContent = [documentContent, text].filter(Boolean).join("\n\n");
@@ -300,6 +361,38 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         fileInputs: fileInputs.length > 0 ? fileInputs : undefined,
         temperature: 0.1,
       });
+
+      // Re-hydrate authentic patient identifiers extracted under BAA if Textract was used
+      if (textractIdentifiers.patientName && (!extraction.patientName || extraction.patientName.includes("REDACTED") || extraction.patientName.includes("*"))) {
+        extraction.patientName = textractIdentifiers.patientName;
+      }
+      if (textractIdentifiers.memberId && (!extraction.memberId || extraction.memberId.includes("REDACTED") || extraction.memberId.includes("*"))) {
+        extraction.memberId = textractIdentifiers.memberId;
+      }
+      if (textractIdentifiers.claimNumber && (!extraction.claimNumber || extraction.claimNumber.includes("REDACTED") || extraction.claimNumber.includes("*"))) {
+        extraction.claimNumber = textractIdentifiers.claimNumber;
+      }
+      if (textractIdentifiers.serviceDate && !extraction.serviceDate) {
+        extraction.serviceDate = textractIdentifiers.serviceDate;
+      }
+      if (textractIdentifiers.providerName && !extraction.providerName) {
+        extraction.providerName = textractIdentifiers.providerName;
+      }
+      if (textractIdentifiers.deniedAmount !== undefined && (!extraction.deniedAmount || extraction.deniedAmount === 0)) {
+        extraction.deniedAmount = textractIdentifiers.deniedAmount;
+      }
+      if (textractIdentifiers.patientOwedAmount !== undefined && (!extraction.patientOwedAmount || extraction.patientOwedAmount === 0)) {
+        extraction.patientOwedAmount = textractIdentifiers.patientOwedAmount;
+      }
+      if (textractIdentifiers.payerAppealsEmail && !extraction.payerAppealsEmail) {
+        extraction.payerAppealsEmail = textractIdentifiers.payerAppealsEmail;
+      }
+      if (textractIdentifiers.payerAppealsAddress && !extraction.payerAppealsAddress) {
+        extraction.payerAppealsAddress = textractIdentifiers.payerAppealsAddress;
+      }
+      if (textractIdentifiers.insurancePayer && (!extraction.insurancePayer || extraction.insurancePayer === "Unspecified Payer")) {
+        extraction.insurancePayer = textractIdentifiers.insurancePayer;
+      }
 
       // Enforce claim validation safeguards - reject non-claim documents
       if (extraction.isMedicalClaimDenial === false) {
