@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-13T17:08:00Z
+- **Last updated:** 2026-09-13T18:12:15Z
 
 ## Log
 
@@ -1451,11 +1451,14 @@ Hardened backend human review gates in `dispatchAppealPacket`, added explicit ap
 - Test Suite & CI Reference Synchronization: Synchronized test suite metrics across `README.md`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`, `PRODUCT.md`, and `IDEA.md` to accurately reflect the comprehensive suite of 967 passing automated tests across 61 test files with ~80.4% line coverage.
 - Test Suite & Quality Pass Verification: Added unit tests verifying rejection when claim status is not `ready_for_review`, rejection when human approval is missing, and successful approval recording and audit trail logging. Verified 100% clean with `npm run verify` across typecheck, lint, 967 passing unit tests across 61 test files, and production build with zero emojis.
 
-### 2026-09-13 - working tree
+### 2026-09-13 - 70865bc
 Implemented AWS Textract HIPAA optical intake gate and zero-PHI LLM bridge for multimodal document intake (`convex/lib/textract.ts`, `convex/actions/opticalParser.ts`, `convex/actions/agentMail.ts`, `tests/textract.test.ts`, `README.md`, `docs/THREAT_MODEL.md`, `package.json`):
 - Private BAA Optical Intake: Integrated `@aws-sdk/client-textract` to parse uploaded denial letters and Explanation of Benefits (EOB) under the signed AWS HIPAA BAA boundary. Extracted full linearized text, structured key-value pairs (via CHILD/VALUE block mappings), and 2D tables without sending binary files to external models.
 - Zero-PHI De-identification Bridge: Extracted authentic patient identifiers (`patientName`, `memberId`, `claimNumber`, `serviceDate`, amounts) directly into the secure Convex database vault. Enforced `redactBeforeLLM()` to scrub all direct identifiers from the OCR text prior to OpenAI completion. OpenAI receives zero binary images/PDFs and zero direct PHI.
 - Authentic Identifier Re-hydration: Re-hydrated authentic patient identifiers from Textract into the claim record, ensuring downstream appeal letters (`assembleProfessionalAppealEmail`) contain authentic patient credentials for insurer acceptance.
 - Resilient Dual-Mode Fallback: Preserved automatic fallback to direct multimodal vision parsing in demo/test environments when AWS keys are absent or when API errors occur. Added pipe escaping for markdown tables and asterisk-masked member ID re-hydration.
 - Verification & Test Suite: Authored 12 unit and integration tests in `tests/textract.test.ts`. Verified 100% clean with `npm run verify` (typecheck, lint, 979 unit tests across 62 test files, and production build).
-- Documentation Single-Source-of-Truth Consolidation: Consolidated exact test metrics (979 tests across 62 suites) exclusively into `README.md` as the authoritative single source of truth, replacing fragile hardcoded test snapshot counters across `IDEA.md`, `PRODUCT.md`, `.github/workflows/ci.yml`, and `deploy.yml` with clean, evergreen references to prevent documentation drift.
+- Documentation Single-Source-of-Truth Consolidation: Consolidated exact test metrics (979 tests across 62 suites) exclusively into `README.md` as the authoritative single source of truth, replacing fragile hardcoded test snapshot counters across `IDEA.md`, `PRODUCT.md`, `.github/workflows/ci.yml`, and `deploy.yml` with clean, evergreen references to prevent documentation drift.
+
+### 2026-09-13 - working tree
+Removed non-functional "Setup Guide" and "Interactive Setup Guide" CTA buttons and unused `onOpenOnboarding` prop from the landing page (`src/components/landing/CinematicHero.tsx`, `src/App.tsx`). Verified clean type safety with TypeScript compiler.

@@ -209,7 +209,6 @@ export default function App() {
               setCurrentView((view as NavigationView) || "radar");
             }
           }}
-          onOpenOnboarding={() => setIsOnboardingOpen(true)}
         />
         <Toaster position="bottom-right" richColors theme="dark" closeButton />
       </Suspense>
