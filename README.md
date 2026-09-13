@@ -32,20 +32,20 @@ scratch.
 2. **ClaimHero pulls the insurer's active policy bulletins via Firecrawl** and lifts the exact clause the denial turned on.
 3. **You review a cited brief**, one click away from the clause it cites, then approve dispatch from an AgentMail inbox. Claims under the ERISA §502(c) clock show the exposure as they age; you never send without approving.
 
-### Appeal Viability Index
+### Statutory Appeal Readiness Score (Dossier Audit)
 
-ClaimHero computes a deterministic 0–100 Appeal Viability Index (AVI) to help users prioritize appeal work.
+ClaimHero computes a deterministic 0–100 **Statutory Appeal Readiness Score** to audit evidentiary completeness and statutory compliance before an appeal is submitted.
 
-The index evaluates four evidence pillars:
+The audit evaluates four objective statutory pillars:
 
-- CPB and indication alignment: 35 points
-- Objective clinical documentation: 25 points
-- ERISA procedural protections: 20 points
-- Precedent parity: 20 points
+- **CPB and Indication Alignment** (Max: 35 points): Verifies patient record facts against published insurer clinical policy bulletins.
+- **Objective Clinical Documentation & Step-Therapy** (Max: 25 points): Audits diagnostic imaging, physical exam findings, and prior conservative therapy trials.
+- **ERISA § 2560.503-1 Procedural Standing** (Max: 20 points): Substantiates plan administrator disclosure omissions and adverse determination notice defects.
+- **Precedent Parity** (Max: 20 points): Evaluates relevance and outcomes of retrieved state IMR and judicial external review precedents.
 
-Before scoring, the durable Convex pipeline retrieves relevant precedent records using vector search, attaches those matches to the claim evidence record, and exposes their citations and outcomes in the Evidence Matrix. Precedent matches are retrieved and attached to the claim evidence record before AVI scoring.
+Before scoring, the durable Convex pipeline retrieves relevant precedent records using native vector search, attaches those matches to the claim evidence record, and exposes their authentic citations and outcomes in the Evidence Matrix.
 
-AVI is a transparent triage index, not a statistically calibrated probability of payment or appeal success.
+> **Regulatory Compliance Disclaimer:** The Statutory Appeal Readiness Score is an evidentiary completeness and procedural compliance audit evaluating documentation against published clinical guidelines and ERISA 29 CFR § 2560.503-1 standards. It functions as a pre-filing quality checklist and does not constitute an actuarial legal prediction or guarantee of payer approval.
 
 ### How a Case Spends Its Life
 
@@ -53,7 +53,7 @@ AVI is a transparent triage index, not a statistically calibrated probability of
 denial letter
   ->  scanned, OCR'd, CARC code pulled (OpenAI vision)
   ->  insurer's CPB and the exact clause it cites (Firecrawl)
-  ->  Appeal Viability Index (AVI), grounded in policy, clinical, statutory, and precedent evidence
+  ->  Statutory Appeal Readiness Score, grounded in policy, clinical, statutory, and precedent evidence
   ->  cited brief, with every claim bound to its clause
   ->  human approval gate
   ->  packet sent via AgentMail; insurer reply routed back in
@@ -76,7 +76,7 @@ To evaluate the complete end-to-end pipeline without uploading personal health r
    - **GeoBlue Worldwide — Lumbar Decompression**: $18,200 | CPT 63047 | CARC CO-197 (Pre-Authorization)
    - **Aetna International — Diagnostic Knee MRI**: $2,850 | CPT 73721 | CARC CO-16 (Prior Records Required)
 4. The application transitions directly into the **Case Workspace**, driving through the linear 3-step appellate spine:
-   - **Step 1: Evidence & CPB** — Review real insurer policy bulletins scraped via Firecrawl, visual proof screenshot exhibits, and the precedent-grounded 4-pillar Appeal Viability Index, shown as a transparent 0–100 score.
+   - **Step 1: Evidence & CPB** — Review real insurer policy bulletins scraped via Firecrawl, visual proof screenshot exhibits, and the precedent-grounded 4-pillar Statutory Appeal Readiness Score, shown as a transparent 0–100 audit checklist.
    - **Step 2: Appeal Brief** — Inspect the grounded legal brief strictly citing stored policy clauses; test real-time CRDT multi-user editing with live presence (`Share` button).
    - **Step 3: Payer Dispatch** — Transmit the packet via AgentMail with one click. For medical necessity denials (`CO-50`), review the contextual Physician Peer-to-Peer tele-script.
 5. Track the statutory stakes at all times: the case header monitors the active **ERISA §502(c) statutory liability exposure ($110/day)** alongside a slide-out **Audit Trail** drawer proving real-time pipeline execution.
@@ -125,7 +125,7 @@ ClaimHero organizes its capabilities into two clean surfaces designed for extrem
 │ • Directory Discovery (/map)  │ • Yjs CRDT Real-Time Collab   │ • ERISA Proof of Delivery   │
 │ • Visual Screenshot Exhibits  │ • Live Teammate Presence/RBAC │ • Inbound Webhook Triage    │
 │ • Multi-Source Scan (PubMed)  │ • Formal PDF Dossier Export   │ • P2P Live Call Copilot     │
-│ • 4-Pillar AVI Score          │ • Sentinel Copilot (9 Tools)  │ • Auto-Pilot 1-Hour SLA     │
+│ • 4-Pillar Readiness Score    │ • Sentinel Copilot (9 Tools)  │ • Auto-Pilot 1-Hour SLA     │
 └───────────────────────────────┴───────────────────────────────┴─────────────────────────────┘
 ```
 
@@ -146,7 +146,7 @@ Convex serves as the core persistence, real-time subscription, compute, and orch
 - **Case Collaborators & Role-Based Access Control (RBAC)**: The `claimCollaborators` table manages secure case sharing via invite codes, distinct `editor` and `viewer` permissions, and automated access revocation (`convex/claimCollaborators.ts`).
 - **Token-Bucket Rate Limiting**: The `@convex-dev/rate-limiter` component protects external OpenAI LLM/embedding inference and Firecrawl web crawling endpoints against quota exhaustion, burst traffic, and runaway execution (`convex/lib/rateLimiter.ts`).
 - **Authentication & Multi-Tenant Data Isolation**: The `@convex-dev/auth` component manages session state, password credentials, and Google OAuth. Server-side authorization helpers (`getAuthUserId`, `requireClaimOwner`) enforce document-level row security across all 23 domain tables (`convex/auth.ts`, `convex/lib/auth.ts`).
-- **Portfolio Analytics via Aggregate**: The `@convex-dev/aggregate` component computes real-time portfolio recovery statistics, resolution rates, Appeal Viability Index distributions, and aggregate financial yields.
+- **Portfolio Analytics via Aggregate**: The `@convex-dev/aggregate` component computes real-time portfolio recovery statistics, resolution rates, Statutory Appeal Readiness Score distributions, and aggregate financial yields.
 - **Sub-Second Pipeline Activity Telemetry**: Granular progress telemetry table `pipelineActivities` tracks real-time stage transitions (OCR extraction, Firecrawl crawling, precedent scoring, brief drafting), streaming live execution milestones to the frontend without polling (`convex/pipelineActivities.ts`).
 - **HTTP Routing & Svix Webhooks**: Authenticated endpoints handle inbound AgentMail and Firecrawl webhooks with Svix signature verification (`convex/http.ts`).
 
@@ -191,7 +191,7 @@ OpenAI powers clinical reasoning while operating within strict anti-hallucinatio
 | :--- | :--- | :--- |
 | **Real denial extraction** | Convex Storage + OpenAI structured vision extraction | [`convex/actions/opticalParser.ts`](./convex/actions/opticalParser.ts) |
 | **Current payer policy** | Firecrawl crawl and evidence persistence | [`convex/actions/policyCrawler.ts`](./convex/actions/policyCrawler.ts), [`convex/clinicalEvidences.ts`](./convex/clinicalEvidences.ts) |
-| **Precedent-grounded AVI** | Convex vector search + attached precedent evidence | [`convex/actions/precedentMatcher.ts`](./convex/actions/precedentMatcher.ts), [`convex/actions/precedentArchive.ts`](./convex/actions/precedentArchive.ts) |
+| **Precedent-grounded Readiness** | Convex vector search + attached precedent evidence | [`convex/actions/precedentMatcher.ts`](./convex/actions/precedentMatcher.ts), [`convex/actions/precedentArchive.ts`](./convex/actions/precedentArchive.ts) |
 | **Cited appeal brief** | OpenAI structured synthesis over stored evidence | [`convex/actions/appealSynthesizer.ts`](./convex/actions/appealSynthesizer.ts) |
 | **Human approval** | Claim-scoped mutation authorization before dispatch | [`convex/claims.ts`](./convex/claims.ts), [`convex/lib/auth.ts`](./convex/lib/auth.ts) |
 | **Two-way correspondence** | AgentMail send, webhook routing, and reactive threads | [`convex/actions/mailDispatcher.ts`](./convex/actions/mailDispatcher.ts), [`convex/http.ts`](./convex/http.ts) |
@@ -223,7 +223,7 @@ ClaimHero leverages 9 first-party and partner Convex components configured in [`
 - **HIPAA Safe Harbor Redaction Gate**: Mandatory server-side pre-submission de-identification (`redactBeforeLLM`) strips 18 direct identifiers (patient names, MRNs, SSNs, phone numbers, emails, addresses, dates of birth) across all textual prompt payloads, vector query embeddings, and Sentinel Copilot dialogs before dispatch to third-party LLM APIs (45 CFR § 164.514(b)(2)).
 - **Multimodal Intake Architecture**: Binary PDF and image uploads bypass pre-OCR text redaction because optical recognition and layout classification precede entity discovery. In enterprise production environments with live health records, a signed HIPAA Business Associate Agreement (BAA) with OpenAI is required; evaluation deployments strictly use de-identified Safe Harbor fixtures.
 - **Server-Side Authorization**: Every Convex query and mutation enforces strict document ownership (`claim.userId === authUser._id`) to prevent unauthorized cross-tenant data access (`convex/lib/auth.ts`).
-- **Deterministic 4-Pillar Appeal Viability Index (AVI)**: The 0–100 AVI is computed using an explainable deterministic evidence rubric (35 pts CPB Alignment, 25 pts Objective Clinical Documentation, 20 pts ERISA Procedural Protections, 20 pts Precedent Parity), never an uncalibrated probability or opaque hallucinated number. Precedent matches are retrieved and attached to the claim evidence record before AVI scoring (`convex/actions/precedentMatcher.ts`).
+- **Deterministic 4-Pillar Statutory Appeal Readiness Score (Dossier Audit)**: The 0–100 readiness score is computed using an explainable deterministic evidence rubric (35 pts CPB Alignment, 25 pts Objective Clinical Documentation, 20 pts ERISA Procedural Protections, 20 pts Precedent Parity), never an uncalibrated probability or opaque hallucinated number. Precedent matches are retrieved and attached to the claim evidence record before readiness scoring (`convex/actions/precedentMatcher.ts`).
 - **Human Approval Gate**: Real outbound email transmission strictly requires manual human confirmation; unreviewed messages are never silently sent to external payers.
 
 ---

@@ -113,12 +113,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   const handleRunCompleteAnalysis = async () => {
     setIsUnifiedAnalyzing(true);
     setErrorMessage(null);
-    const toastId = toast.loading("Crawling payer Clinical Policy Bulletin & computing Appeal Viability Index...");
+    const toastId = toast.loading("Crawling payer Clinical Policy Bulletin & auditing Statutory Appeal Readiness...");
     try {
       await onCrawlPolicy(claim._id);
       const result = await onComputeScore(claim._id);
       setScoringResult(result);
-      toast.success("Policy indexed & Appeal Viability Index evaluated successfully", { id: toastId });
+      toast.success("Policy indexed & Statutory Appeal Readiness evaluated successfully", { id: toastId });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to execute complete clinical policy analysis.";
       setErrorMessage(msg);
@@ -131,13 +131,13 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   const handleRunScoring = async () => {
     setIsScoring(true);
     setErrorMessage(null);
-    const toastId = toast.loading("Evaluating 4-pillar Appeal Viability Index (AVI)...");
+    const toastId = toast.loading("Auditing 4-pillar Statutory Appeal Readiness...");
     try {
       const result = await onComputeScore(claim._id);
       setScoringResult(result);
-      toast.success(`Appeal Viability Index: ${result.overturnProbabilityScore}/100 evaluated`, { id: toastId });
+      toast.success(`Statutory Appeal Readiness: ${result.overturnProbabilityScore}/100 evaluated`, { id: toastId });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to calculate Appeal Viability Index.";
+      const msg = err instanceof Error ? err.message : "Failed to calculate Statutory Appeal Readiness.";
       setErrorMessage(msg);
       toast.error(msg, { id: toastId });
     } finally {
@@ -228,7 +228,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                {pipelineStepLabel}. Evidence clauses, Appeal Viability Index (AVI), and the cited appeal brief
+                {pipelineStepLabel}. Evidence clauses, Statutory Appeal Readiness Score, and the cited appeal brief
                 stream in live below. You can keep working; no manual click required.
               </p>
               <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground" aria-hidden="true">
@@ -355,7 +355,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 onClick={handleRunCompleteAnalysis}
                 disabled={isUnifiedAnalyzing || isScoring}
                 className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
-                title="Automatically index Clinical Policy Bulletin and evaluate Appeal Viability Index (AVI)"
+                title="Automatically index Clinical Policy Bulletin and audit Statutory Appeal Readiness"
               >
                 {isUnifiedAnalyzing ? (
                   <>
@@ -382,9 +382,9 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
         </Alert>
       )}
 
-      {/* Appeal Viability Index Showcase Banner */}
+      {/* Statutory Appeal Readiness Showcase Banner */}
       {(claim.overturnProbabilityScore !== undefined || scoringResult) && (
-        <Card className="p-4 border-emerald-500/30 bg-emerald-500/5 space-y-4">
+        <Card className="p-4 border-emerald-500/30 bg-emerald-500/5 space-y-3">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border/60 pb-3">
             <div className="flex items-center gap-3.5">
               <div className="flex h-12 min-w-[5rem] shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 font-mono text-lg font-bold tracking-tight tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-xl">
@@ -394,25 +394,30 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 <span className="text-xs font-normal text-emerald-600/70 dark:text-emerald-400/70 ml-1">/100</span>
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-sm font-semibold text-foreground">
-                    Appeal Viability Index (AVI)
+                    Statutory Appeal Readiness Score
                   </h3>
                   <Badge variant="secondary" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">
-                    {scoringResult
-                      ? scoringResult.riskLevel.replace(/_/g, " ")
-                      : claim.riskLevel?.replace(/_/g, " ") || "HIGH CONFIDENCE"}
+                    {(scoringResult ? scoringResult.overturnProbabilityScore : (claim.overturnProbabilityScore ?? 0)) >= 80
+                      ? "Comprehensive Dossier"
+                      : (scoringResult ? scoringResult.overturnProbabilityScore : (claim.overturnProbabilityScore ?? 0)) >= 55
+                        ? "Evidence Gaps Identified"
+                        : "Incomplete Dossier"}
                   </Badge>
                   <Badge variant="outline" className="font-mono text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
-                    Precedent Grounded
+                    Statutory Audit
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Deterministic statutory reasoning engine evaluated 4 appeal pillars benchmarked against historical external review precedents.
+                  Evidentiary completeness audit evaluating 4 statutory pillars benchmarked against insurer CPBs and external review precedents.
                 </p>
               </div>
             </div>
           </div>
+          <p className="text-[11px] text-muted-foreground/80 italic leading-relaxed">
+            Statutory Dossier Audit: Evaluates documentation completeness and ERISA 29 CFR § 2560.503-1 disclosure requirements against published clinical criteria. Does not constitute actuarial legal prediction or guarantee of payer approval.
+          </p>
 
           {/* 4-Pillar Deterministic Rubric Criteria Breakdown */}
           {(!breakdown || breakdown.length === 0) && (
@@ -455,7 +460,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <div>
                           <h4 className="text-xs font-semibold text-foreground">
-                            How We Calculate Your Appeal Viability Index
+                            How We Calculate Your Statutory Appeal Readiness Score
                           </h4>
                           <p className="text-[11px] text-muted-foreground">
                             Evidence-based evaluation across 4 legal & clinical pillars
@@ -521,7 +526,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                       </div>
 
                       <div className="text-[10px] text-muted-foreground border-t border-border/50 pt-2 flex items-center justify-between">
-                        <span>Confidence Bands: 80+ High &bull; 55–79 Moderate &bull; &lt;55 Complex</span>
+                        <span>Readiness Tiers: Comprehensive Dossier (80+) &bull; Evidence Gaps Identified (55–79) &bull; Incomplete Dossier (&lt;55)</span>
                       </div>
                     </TooltipContent>
                   </Tooltip>

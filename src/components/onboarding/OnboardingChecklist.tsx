@@ -109,7 +109,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
     {
       id: "evidence",
       title: "Inspect Clinical Policy Precedents",
-      description: "Review indexed insurer CPB clauses and evaluate Appeal Viability Index (AVI).",
+      description: "Review indexed insurer CPB clauses and audit Statutory Appeal Readiness.",
       isDone: hasVisitedEvidence,
       icon: FileMagnifyingGlass,
       actionLabel: "View Matrix",

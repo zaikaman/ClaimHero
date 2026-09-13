@@ -73,7 +73,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
       number: 1,
       title: "1. Evidence & CPB",
       subtitle: hasEvidence
-        ? `${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}/100 AVI` : `${evidencesCount} Clauses`}`
+        ? `${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}/100 Readiness` : `${evidencesCount} Clauses`}`
         : "Pending analysis",
       view: "evidence" as FlowView,
       icon: FileMagnifyingGlass,
@@ -202,7 +202,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
             <div className="flex items-center gap-1 text-xs font-mono px-2 py-1 rounded bg-secondary/80 border border-border/60">
               <TrendUp className="size-3 text-emerald-500" />
               <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                {claim.overturnProbabilityScore}/100 Viability
+                {claim.overturnProbabilityScore}/100 Readiness
               </span>
             </div>
           ) : null}

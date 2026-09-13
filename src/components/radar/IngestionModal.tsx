@@ -1272,7 +1272,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
             </div>
             {autoPilotEnabled && (
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                The evidence crawl, win-score evaluation, and brief synthesis run in the
+                The evidence crawl, readiness audit, and brief synthesis run in the
                 background after save. You land in the Evidence Matrix instantly with live progress.
               </p>
             )}
@@ -1332,7 +1332,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                       Auto-Pilot Was Disabled During Intake
                     </span>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Case #{extractedResult.claimNumber} is indexed in the database with clinical facts confirmed. You can trigger the autonomous pipeline now to crawl insurer policy bulletins, evaluate the Appeal Viability Index (AVI), and draft the cited legal brief.
+                      Case #{extractedResult.claimNumber} is indexed in the database with clinical facts confirmed. You can trigger the autonomous pipeline now to crawl insurer policy bulletins, audit Statutory Appeal Readiness, and draft the cited legal brief.
                     </p>
                   </div>
                 </div>
@@ -1395,7 +1395,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   typeof (extractedResult.pipelineResult as { overturnProbabilityScore?: unknown }).overturnProbabilityScore === "number" && (
                     <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px]">
                       <TrendUp className="size-3 mr-1" />
-                      {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}/100 Viability Index
+                      {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}/100 Readiness Score
                     </Badge>
                   )}
               </div>

@@ -162,11 +162,11 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
           </div>
         </Card>
 
-        {/* Average Appeal Viability Index */}
+        {/* Average Statutory Appeal Readiness */}
         <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between text-foreground">
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Avg Appeal Viability
+              Avg Dossier Readiness
             </span>
             <TrendUp className="size-4 text-muted-foreground" />
           </div>
@@ -228,7 +228,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
                 <TableHead>Cases</TableHead>
                 <TableHead>Disputed</TableHead>
                 <TableHead>Won / Overturned</TableHead>
-                <TableHead className="text-right">Avg AVI</TableHead>
+                <TableHead className="text-right">Avg Readiness</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -267,7 +267,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="flex items-center gap-2">
               <Pulse className="size-4 text-muted-foreground" />
               <h3 className="text-xs font-semibold text-foreground">
-                Precedent Confidence Bands
+                Statutory Readiness Tiers
               </h3>
             </div>
           </div>
@@ -277,7 +277,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                  High Viability (85–100 AVI)
+                  Comprehensive Dossier (80–100 pts)
                 </span>
                 <span className="font-mono text-foreground font-semibold">
                   {stats.claimsByRisk.high_confidence || 0} Cases
@@ -302,7 +302,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-amber-500 dark:text-amber-400">
-                  Moderate (60–84 AVI)
+                  Evidence Gaps Identified (55–79 pts)
                 </span>
                 <span className="font-mono text-foreground font-semibold">
                   {stats.claimsByRisk.moderate || 0} Cases
@@ -327,7 +327,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-destructive">
-                  Complex Review (&lt;60 AVI)
+                  Incomplete Dossier (&lt;55 pts)
                 </span>
                 <span className="font-mono text-foreground font-semibold">
                   {stats.claimsByRisk.complex_litigation || 0} Cases

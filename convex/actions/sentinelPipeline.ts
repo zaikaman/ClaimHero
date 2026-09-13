@@ -24,7 +24,7 @@ export interface PipelineResult {
  * Convex workflow engine (@convex-dev/workflow) as the single, unified execution path:
  * 1. Payer Intake Gateway Discovery & Resolution
  * 2. Insurer Clinical Policy Bulletin (CPB) Crawling & Evidence Extraction (Firecrawl)
- * 3. Precedent Vector Search & Appeal Viability Index (AVI) Scoring
+ * 3. Precedent Vector Search & Statutory Appeal Readiness Scoring
  * 4. Cited ERISA 29 CFR § 2560.503-1 Legal Appeal Brief Synthesis
  * 5. Optional Auto-Pilot Transmission & Statutory Follow-Up Countdown (step.sleep)
  */

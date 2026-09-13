@@ -241,8 +241,8 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
         icon: Scales,
       },
       {
-        label: "Appeal Viability Index Rubric",
-        prompt: "How does ClaimHero calculate the deterministic 4-pillar Appeal Viability Index (AVI)?",
+        label: "Statutory Appeal Readiness Rubric",
+        prompt: "How does ClaimHero calculate the deterministic 4-pillar Statutory Appeal Readiness Score?",
         icon: Scales,
       },
     ];

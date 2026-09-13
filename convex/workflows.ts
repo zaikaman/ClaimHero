@@ -257,12 +257,12 @@ export async function executeDurableClaimPipeline(
         });
       }
 
-      // Step 3: Precedent-Grounded Appeal Viability Index (AVI) Scoring
+      // Step 3: Precedent-Grounded Statutory Appeal Readiness Scoring
       await step.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "precedent_matched",
         actor: "Durable Sentinel Workflow",
-        details: "Step 2b/4: Evaluating 4-pillar Appeal Viability Index (AVI) with matched precedent vectors...",
+        details: "Step 2b/4: Auditing 4-pillar Statutory Appeal Readiness with matched precedent vectors...",
       });
 
       const scoreResult = await step.runAction(
@@ -307,7 +307,7 @@ export async function executeDurableClaimPipeline(
         claimId: args.claimId,
         status: "ready_for_review",
         actor: "Durable Sentinel Workflow",
-        details: `Durable pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}/100 viability score computed, and formal brief synthesized.`,
+        details: `Durable pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}/100 readiness score computed, and formal brief synthesized.`,
         overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
         riskLevel: scoreResult?.riskLevel,
         scoringBreakdown: scoreResult?.scoringBreakdown,
@@ -318,7 +318,7 @@ export async function executeDurableClaimPipeline(
         runId: pipelineRunId,
         stage: "run",
         status: "completed",
-        message: `Review complete: ${scoreResult?.overturnProbabilityScore || 0}/100 viability score with the appeal brief drafted and ready.`,
+        message: `Review complete: ${scoreResult?.overturnProbabilityScore || 0}/100 readiness score with the appeal brief drafted and ready.`,
       });
 
       let wasDispatched = false;

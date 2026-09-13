@@ -142,7 +142,7 @@ export function getRiskBadgeConfig(riskLevel?: RiskLevel | string) {
   switch (riskLevel) {
     case "high_confidence":
       return {
-        label: "High Appeal Viability",
+        label: "Comprehensive Dossier",
         color: "text-emerald-300",
         bg: "bg-emerald-950/60",
         border: "border-emerald-500/50",
@@ -176,7 +176,7 @@ export function getRiskBadgeConfig(riskLevel?: RiskLevel | string) {
 }
 
 /**
- * Get color gradient for Appeal Viability Index (AVI) score (0-100)
+ * Get color gradient for Statutory Appeal Readiness score (0-100)
  */
 export function getScoreColor(score: number): {
   text: string;

@@ -368,7 +368,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
           </CardContent>
         </Card>
 
-        {/* Card 2: High Appeal Viability */}
+        {/* Card 2: High Win-Probability */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>
@@ -376,7 +376,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 <TrendUp className="size-4" />
               </div>
             </CardTitle>
-            <CardDescription className="text-xs">High Appeal Viability</CardDescription>
+            <CardDescription className="text-xs">High Dossier Readiness</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -384,7 +384,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 {highRiskCount} Cases
               </div>
               <Badge variant="outline" className="text-[10px] font-mono text-emerald-600 border-emerald-500/30">
-                &ge; 80 AVI Score
+                &ge; 80 Readiness
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs">
@@ -409,7 +409,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 {formatCurrency(totalWon)}
               </div>
               <Badge variant="secondary" className="text-[11px] font-mono">
-                {avgScore}/100 Avg AVI
+                {avgScore}/100 Avg Readiness
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs">
@@ -680,7 +680,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 <TableHead>CPT Code</TableHead>
                 <TableHead>Denial Reason</TableHead>
                 <TableHead>Disputed</TableHead>
-                <TableHead>Viability (AVI)</TableHead>
+                <TableHead>Readiness</TableHead>
                 <TableHead>Statutory Clock</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -860,7 +860,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                         </div>
                       </TableCell>
 
-                      {/* 6. Appeal Viability Index */}
+                      {/* 6. Statutory Appeal Readiness */}
                       <TableCell className="py-2.5">
                         {isWon ? (
                           <div className="flex items-center gap-1 font-mono">
@@ -873,7 +873,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                             </Badge>
                           </div>
                         ) : claim.overturnProbabilityScore !== undefined ? (
-                          <div className="flex items-center gap-1 font-mono">
+                          <div className="flex items-center gap-1 font-mono" title="Statutory Appeal Readiness Score: 4-pillar evidentiary completeness audit">
                             <span className="font-bold text-xs text-foreground">
                               {claim.overturnProbabilityScore}/100
                             </span>
@@ -885,7 +885,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                   : "text-amber-500"
                               }`}
                             >
-                              {claim.riskLevel === "high_confidence" ? "High" : "Mod"}
+                              {claim.riskLevel === "high_confidence" ? "Ready" : "Gaps"}
                             </Badge>
                           </div>
                         ) : (

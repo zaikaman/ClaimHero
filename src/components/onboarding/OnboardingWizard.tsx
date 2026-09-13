@@ -304,7 +304,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const executePostExtractionPipeline = async (claimId: string) => {
     if (!runPipelineAction) return;
 
-    setProcessingMessage("Step 2/3: Indexing Insurer CPB & Evaluating Appeal Viability Index...");
+    setProcessingMessage("Step 2/3: Indexing Insurer CPB & Auditing Statutory Appeal Readiness...");
     try {
       const pipelineRes = await runPipelineAction({
         claimId: claimId as Id<"claims">,
@@ -1311,7 +1311,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     typeof (extractedResult.pipelineResult as { overturnProbabilityScore?: unknown }).overturnProbabilityScore === "number" && (
                       <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px]">
                         <TrendUp className="size-3 mr-1" />
-                        {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}/100 Viability Index
+                        {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}/100 Readiness Score
                       </Badge>
                     )}
                 </div>

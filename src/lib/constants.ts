@@ -280,8 +280,8 @@ export const SIMULATION_STAGES = [
   {
     stage: 3,
     id: "matching",
-    title: "Precedent Cross-Examination & AVI Scoring",
-    description: "Cross-matching clinical evidence against 3 winning precedents -> 91/100 Appeal Viability Index (AVI)",
+    title: "Precedent Cross-Examination & Readiness Audit",
+    description: "Cross-matching clinical evidence against 3 winning precedents -> 91/100 Statutory Appeal Readiness",
     durationMs: 3000,
   },
   {

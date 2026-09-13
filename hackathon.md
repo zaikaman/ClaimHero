@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-13T10:36:00Z
+- **Last updated:** 2026-09-13T13:45:00Z
 
 ## Log
 
@@ -1406,3 +1406,18 @@ Refactored appeal scoring semantics from uncalibrated overturn probabilities to 
 - Reordered Durable Sentinel Workflow: Updated `executeDurableClaimPipeline` in `convex/workflows.ts` so that Convex native vector search against the Precedent Vector Archive (`retrieveTopPrecedentsInternal`) executes and attaches precedent vectors prior to scoring (`computeOverturnScoreInternal`), ensuring the rubric operates with full evidentiary context.
 - Frontend Score Presentation: Refactored `EvidenceMatrix.tsx`, `SentinelFlowStepper.tsx`, `CaseRadar.tsx`, `OnboardingWizard.tsx`, and `IngestionModal.tsx` to display `/100` viability index metrics with "Precedent Grounded" badges and "High Appeal Viability" KPI headers, eliminating misleading percent-probability claims.
 - Regression Coverage & Verification: Added unit tests in `tests/actionsPrecedentsAndPipeline.test.ts` verifying vector-grounded citations and the absence of uncalibrated percentages. Verified 100% clean with `npm run verify` across typecheck, lint, 964 passing unit tests across 61 suites, and production build.
+
+### 2026-09-13 - f702c9e
+Reframed appeal scoring semantics from outcome prediction to Statutory Appeal Readiness Score and integrated regulatory compliance disclaimers (`README.md`, `convex/actions/precedentMatcher.ts`, `convex/workflows.ts`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/common/SentinelFlowStepper.tsx`, `src/components/radar/CaseRadar.tsx`, `src/components/onboarding/OnboardingWizard.tsx`, `src/components/radar/IngestionModal.tsx`):
+- Evidentiary Completeness Rebranding: Reframed the 4-pillar index from "viability" (outcome prediction) to Statutory Appeal Readiness Score, establishing it as a pre-filing quality audit evaluating patient documentation against insurer CPBs and ERISA 29 CFR § 2560.503-1 statutory disclosure standards.
+- Regulatory Compliance Disclaimer: Integrated prominent legal and clinical disclaimers across `README.md` and `EvidenceMatrix.tsx` articulating that the score represents an objective evidentiary completeness checklist rather than an actuarial prediction or guarantee of payer approval.
+- Tiers & Checklist UX: Rebranded confidence bands across portfolio radar and evidence inspector to actionable readiness states: Comprehensive Dossier (80–100 pts), Evidence Gaps Identified (55–79 pts), and Incomplete Dossier (< 55 pts).
+- Documentation Alignment: Updated `README.md` core architecture diagrams, workflow summaries, and 60-second evaluation instructions to reflect the Statutory Appeal Readiness Score.
+
+### 2026-09-13 - working tree
+Harmonized statutory appeal readiness terminology and dossier audit labels across the entire frontend, analytics, chatbot, and export utilities (`README.md`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/analytics/AnalyticsMetrics.tsx`, `src/components/analytics/ExecutiveReportModal.tsx`, `src/components/chat/SentinelChatbot.tsx`, `src/components/communications/AuditTimeline.tsx`, `src/components/common/CommandDialog.tsx`, `src/components/common/DeleteCaseModal.tsx`, `src/components/settings/SettingsPage.tsx`, `src/components/p2p/P2PEncounterSummaryModal.tsx`, `src/components/onboarding/OnboardingChecklist.tsx`, `src/lib/constants.ts`, `src/lib/exportUtils.ts`, `src/lib/utils.ts`, `tests/utils.test.ts`):
+- Unified System Terminology: Replaced all legacy Appeal Viability Index (AVI) references across the full application surface with Statutory Appeal Readiness Score, Dossier Audit, and Comprehensive Dossier badges, ensuring 100% conceptual consistency.
+- Executive & Portfolio Reporting: Updated Executive Report Modal CSV headers, plaintext summaries, and KPI cards to report "Average Statutory Appeal Readiness" and "Average Dossier Readiness".
+- Command Palette & Copilot: Enhanced global search keywords and Sentinel Chatbot prompt suggestions to guide users through the 4-pillar Statutory Appeal Readiness Rubric.
+- Zero Emojis Compliance: Verified zero emoji characters across the entire production codebase, comments, strings, and markdown documentation.
+- Verification & Test Passing: Re-ran test suites and verified 964 passing tests across 61 test suites with 0 lint, typecheck, or build errors.

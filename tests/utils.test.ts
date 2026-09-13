@@ -93,7 +93,7 @@ describe("src/lib/utils Unit Tests", () => {
 
   it("getRiskBadgeConfig returns appropriate badge styles", () => {
     const high = getRiskBadgeConfig("high_confidence");
-    expect(high.label).toBe("High Appeal Viability");
+    expect(high.label).toBe("Comprehensive Dossier");
     expect(high.color).toBe("text-emerald-300");
 
     const mod = getRiskBadgeConfig("moderate");

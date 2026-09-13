@@ -82,7 +82,7 @@ export interface MatchedPrecedentInput {
 }
 
 /**
- * Deterministic Clinical Appeal Criteria Calculator (Appeal Viability Index - AVI)
+ * Deterministic Clinical Appeal Criteria Calculator (Statutory Appeal Readiness - Dossier Audit)
  * 
  * Evaluates the 4 statutory appeal pillars with mathematical precision based on objective case evidence and precedent vectors.
  * Corresponds to the deterministic 4-pillar appeal scoring rubric weighting tested in tests/claimhero.test.ts:114
@@ -326,7 +326,7 @@ export async function performComputeOverturnScore(
     runId: args.pipelineRunId,
     stage: "score",
     status: "running",
-    message: `Weighing ${evidences.length} evidence clauses across the 4-pillar statutory rubric to compute Appeal Viability Index (AVI).`,
+    message: `Weighing ${evidences.length} evidence clauses across the 4-pillar statutory rubric to audit Appeal Readiness.`,
   });
 
   // 3. Compute deterministic 4-pillar score
@@ -456,7 +456,7 @@ ${evidencesSummary}`,
     riskLevel: finalResult.riskLevel,
     scoringBreakdown: finalResult.scoringBreakdown,
     actor: "Precedent Matcher & Rubric Engine",
-    details: `Evaluated 4-pillar Appeal Viability Index: ${finalResult.overturnProbabilityScore}/100 (${finalResult.riskLevel.replace(/_/g, " ").toUpperCase()}). Found ${finalResult.keyPolicyContradictions.length} cited policy contradictions.`,
+    details: `Evaluated 4-pillar Statutory Appeal Readiness: ${finalResult.overturnProbabilityScore}/100 (${finalResult.riskLevel.replace(/_/g, " ").toUpperCase()}). Found ${finalResult.keyPolicyContradictions.length} cited policy contradictions.`,
   });
 
   const confidenceLabel =
@@ -470,7 +470,7 @@ ${evidencesSummary}`,
     runId: args.pipelineRunId,
     stage: "score",
     status: "completed",
-    message: `Appeal viability evaluated at ${finalResult.overturnProbabilityScore}/100 (${confidenceLabel}), with ${finalResult.keyPolicyContradictions.length} cited policy contradictions supporting statutory overturn.`,
+    message: `Statutory appeal readiness audited at ${finalResult.overturnProbabilityScore}/100 (${confidenceLabel}), with ${finalResult.keyPolicyContradictions.length} cited policy contradictions supporting statutory overturn.`,
   });
 
   return finalResult;

@@ -62,12 +62,12 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
     lines.push("--------------------------------------------------------------------------------");
     lines.push(`- Total Disputed Clinical Pipeline:  ${formatCurrency(stats.totalDisputedAmount)} (${stats.totalClaims} cases)`);
     lines.push(`- Overturned / Won Benefit Yield:     ${formatCurrency(stats.overturnedWonAmount)} (${stats.recoveryRatePercent}% net recovery)`);
-    lines.push(`- Portfolio Average Appeal Viability Index (AVI): ${stats.averageWinScore}/100`);
+    lines.push(`- Portfolio Average Statutory Appeal Readiness: ${stats.averageWinScore}/100`);
     lines.push(`- Critical Statutory Alarms (<14d):   ${stats.criticalDeadlinesCount} active claims`);
     lines.push("");
     lines.push("2. INSURER ACCOUNTABILITY & PERFORMANCE BREAKDOWN");
     lines.push("--------------------------------------------------------------------------------");
-    lines.push("Insurer / Payer               | Cases | Total Disputed | Recovered (Won) | Win % | Avg AVI");
+    lines.push("Insurer / Payer               | Cases | Total Disputed | Recovered (Won) | Win % | Avg Readiness");
     lines.push("--------------------------------------------------------------------------------");
     stats.payerBreakdown.forEach((p) => {
       const winRate = Math.round((p.wonCount / (p.totalClaims || 1)) * 100);
@@ -107,7 +107,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
       "Total Disputed ($)",
       "Overturned Won ($)",
       "Win Rate (%)",
-      "Average Appeal Viability Index (0-100)",
+      "Average Statutory Appeal Readiness (0-100)",
     ];
 
     const rows = stats.payerBreakdown.map((p) => [
@@ -254,7 +254,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                 </div>
 
                 <div className="p-3 rounded border border-slate-300 bg-slate-50">
-                  <div className="text-[10px] font-mono uppercase font-bold text-slate-500">Average Appeal Viability Index</div>
+                  <div className="text-[10px] font-mono uppercase font-bold text-slate-500">Average Dossier Readiness</div>
                   <div className="text-xl font-bold font-mono text-blue-700 mt-1">
                     {stats.averageWinScore}/100
                   </div>
@@ -291,7 +291,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                       <th className="p-2.5 border-r border-slate-300 text-right">Total Disputed</th>
                       <th className="p-2.5 border-r border-slate-300 text-right">Recovered (Won)</th>
                       <th className="p-2.5 border-r border-slate-300 text-center">Win Rate</th>
-                      <th className="p-2.5 text-center">Avg AVI</th>
+                      <th className="p-2.5 text-center">Avg Readiness</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
