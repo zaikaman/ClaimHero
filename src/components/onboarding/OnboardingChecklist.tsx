@@ -287,7 +287,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
           </div>
 
           <p className="text-[10px] text-muted-foreground">
-            You are ready to autonomously defend claims and overturn health insurance denials.
+            You are ready to prepare evidence-grounded appeals and challenge health insurance denials.
           </p>
         </div>
       )}

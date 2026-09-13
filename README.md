@@ -1,6 +1,6 @@
 # ClaimHero
 
-## Autonomous Medical & Health Insurance Appeal Sentinel
+## Evidence-Grounded Appeal Preparation Workspace for Denial Teams
 
 > **Your insurer denied a claim you paid for. ClaimHero finds the policy they're hiding behind, cites the clause, and drafts the appeal before the clock runs out — three steps, one human approval.**
 
@@ -16,11 +16,11 @@ Built for the **Convex All Gas Hackathon** (August 25 – September 22, 2026) us
 
 ---
 
-ClaimHero is a daily operations workspace for the people who keep denied-care
-appeals moving: patients, nurses, case managers, patient advocates, billing
-teams, and payer-relations staff. A denial is not just a letter to answer once;
-it creates a case that must be triaged, researched, explained, reviewed,
-dispatched, and followed until the payer commits to an outcome.
+ClaimHero is an evidence-grounded appeal preparation workspace for denial teams:
+patients, nurses, case managers, patient advocates, billing teams, and
+payer-relations staff. A denial is not just a letter to answer once; it creates a
+case that must be triaged, researched, explained, reviewed, dispatched, and
+followed until the payer commits to an outcome.
 
 The Case Radar gives a team one live portfolio view of those cases. The Case
 Workspace gives each denial a repeatable, source-linked path from intake to
@@ -32,20 +32,20 @@ scratch.
 2. **ClaimHero pulls the insurer's active policy bulletins via Firecrawl** and lifts the exact clause the denial turned on.
 3. **You review a cited brief**, one click away from the clause it cites, then approve dispatch from an AgentMail inbox. Claims under the ERISA §502(c) clock show the exposure as they age; you never send without approving.
 
-### Statutory Appeal Readiness Score (Dossier Audit)
+### Evidence Coverage & Precedent Match Score (Dossier Audit)
 
-ClaimHero computes a deterministic 0–100 **Statutory Appeal Readiness Score** to audit evidentiary completeness and statutory compliance before an appeal is submitted.
+ClaimHero computes an explainable 0–100 **Evidence Coverage & Precedent Match Score** to audit evidentiary completeness and statutory compliance before an appeal is submitted.
 
 The audit evaluates four objective statutory pillars:
 
 - **CPB and Indication Alignment** (Max: 35 points): Verifies patient record facts against published insurer clinical policy bulletins.
 - **Objective Clinical Documentation & Step-Therapy** (Max: 25 points): Audits diagnostic imaging, physical exam findings, and prior conservative therapy trials.
 - **ERISA § 2560.503-1 Procedural Standing** (Max: 20 points): Substantiates plan administrator disclosure omissions and adverse determination notice defects.
-- **Precedent Parity** (Max: 20 points): Evaluates relevance and outcomes of retrieved state IMR and judicial external review precedents.
+- **Precedent Match** (Max: 20 points): Evaluates relevance and outcomes of retrieved state IMR and judicial external review precedents.
 
 Before scoring, the durable Convex pipeline retrieves relevant precedent records using native vector search, attaches those matches to the claim evidence record, and exposes their authentic citations and outcomes in the Evidence Matrix.
 
-> **Regulatory Compliance Disclaimer:** The Statutory Appeal Readiness Score is an evidentiary completeness and procedural compliance audit evaluating documentation against published clinical guidelines and ERISA 29 CFR § 2560.503-1 standards. It functions as a pre-filing quality checklist and does not constitute an actuarial legal prediction or guarantee of payer approval.
+> **Regulatory Compliance Disclaimer:** The Evidence Coverage & Precedent Match Score is an evidentiary completeness and procedural compliance audit evaluating documentation against published clinical guidelines and ERISA 29 CFR § 2560.503-1 standards. It functions as a pre-filing quality checklist and does not constitute an actuarial legal prediction or guarantee of payer approval.
 
 ### How a Case Spends Its Life
 
@@ -53,7 +53,7 @@ Before scoring, the durable Convex pipeline retrieves relevant precedent records
 denial letter
   ->  scanned, OCR'd, CARC code pulled (OpenAI vision)
   ->  insurer's CPB and the exact clause it cites (Firecrawl)
-  ->  Statutory Appeal Readiness Score, grounded in policy, clinical, statutory, and precedent evidence
+  ->  Evidence Coverage & Precedent Match Score, grounded in policy, clinical, statutory, and precedent evidence
   ->  cited brief, with every claim bound to its clause
   ->  human approval gate
   ->  packet sent via AgentMail; insurer reply routed back in
@@ -141,7 +141,7 @@ Convex serves as the core persistence, real-time subscription, compute, and orch
 - **Native BM25 Full-Text Search Engine**: Convex native `.searchIndex("search_claims")` indexes unified `searchContent` (clinical denial terms, CARC codes, CPT/ICD-10 codes, patient names, and claim numbers) across the entire portfolio. Directly wired into the global command palette (`CommandDialog.tsx`, `Cmd+K` / `Ctrl+K`) with debounced reactive querying (`api.claims.search`) for real-time lexical discovery.
 - **Transactional Consistency, Cryptographic Merkle Chain & 1-Click Sealing**: Atomic mutations govern claim creation, evidence persistence, status transitions, and cascading purges to eliminate orphan records. Implements a tamper-evident rolling SHA-256 Merkle audit chain (`currentHash = sha256(previousHash + eventType + claimId + timestamp + details)`) under ERISA 29 CFR § 2560.503-1, with a 1-click database chain sealer (`sealClaimAuditChain`), interactive "Cryptographic Proof of Case Integrity" badge, and sub-10ms verification benchmark (`convex/auditLogs.ts`, `src/lib/auditCrypto.ts`).
 - **Crons & Scheduled Actions**: Automated crons sweep statutory 180-day ERISA deadlines, sync incoming AgentMail webhooks, and purge orphaned storage uploads without executing unapproved autonomous dispatches (`convex/crons.ts`).
-- **File Storage & Cryptographic Storage Metadata**: Native Convex storage securely hosts uploaded denial documents and compiled appeal PDF dossiers. In addition, the system queries the internal `_storage.sha256` metadata table to extract NIST-compliant SHA-256 file fingerprints for court-admissible electronic service affidavits (`convex/serviceCertificate.ts`).
+- **File Storage & Cryptographic Storage Metadata**: Native Convex storage securely hosts uploaded denial documents and compiled appeal PDF dossiers. In addition, the system queries the internal `_storage.sha256` metadata table to extract NIST-compliant SHA-256 file fingerprints for contemporaneous delivery evidence reports (`convex/serviceCertificate.ts`).
 - **Live Presence & CRDT Collaboration**: The `@convex-dev/presence` component tracks live teammates per appeal room while a Yjs operation log (`appealYjsUpdates`) merges concurrent brief edits keystroke-by-keystroke without merge conflicts (`convex/claimCollaborators.ts`, `convex/appealYjs.ts`).
 - **Case Collaborators & Role-Based Access Control (RBAC)**: The `claimCollaborators` table manages secure case sharing via invite codes, distinct `editor` and `viewer` permissions, and automated access revocation (`convex/claimCollaborators.ts`).
 - **Token-Bucket Rate Limiting**: The `@convex-dev/rate-limiter` component protects external OpenAI LLM/embedding inference and Firecrawl web crawling endpoints against quota exhaustion, burst traffic, and runaway execution (`convex/lib/rateLimiter.ts`).
@@ -168,17 +168,17 @@ AgentMail provides two-way programmatic email infrastructure for appellate dispa
 - **Svix HMAC-SHA256 Verification**: Cryptographically validates inbound webhook signatures at `/agentmail/webhook` (`convex/actions/agentMailWebhook.ts`).
 - **4-Step Inbound Routing Hierarchy**: Automatically correlates replies to active claims via AgentMail Thread ID, subject regex (`[ClaimHero #...]`), recipient matching, and bounded content parsing.
 - **Mandatory Human Review Gate & AI Draft Preparation**: Enforces the safer medical/legal standard: *AI may prepare, classify, cite, and recommend. A human must approve every clinical assertion, legal assertion, recipient, and outbound message.* When an insurer responds requesting additional records (`ADDITIONAL_RECORDS_REQUIRED`) or maintaining a denial, ClaimHero synthesizes a cited rebuttal draft and alerts the case manager, but strictly requires human review and sign-off before transmission, preventing unauthorized or unverified external communications (`convex/actions/agentMail.ts`, `src/components/communications/AgentMailDrawer.tsx`).
-- **Printable ERISA Certificate of Electronic Service (Proof of Delivery)**: In the AgentMail Drawer / Case Communications view, a 1-click modal generates a court-ready 1-page affidavit combining the live AgentMail message ID (RFC 5322), Amazon SES delivery receipt (`250 2.0.0 OK`), precise UTC/local timestamps, recipient server MX records (via live Node.js DNS resolution), and the immutable NIST SHA-256 attachment fingerprint from Convex storage (`convex/serviceCertificate.ts`, `convex/actions/serviceCertificateResolver.ts`). Solves the real-world healthcare appeal problem where insurers falsely assert non-receipt within the 180-day window, establishing conclusive proof of delivery under ERISA 29 U.S.C. § 1133, 29 C.F.R. § 2560.503-1, 28 U.S.C. § 1746, and Fed. R. Evid. 902(11) with single-click `@media print` 8.5" x 11" court-ready formatting.
+- **Printable ERISA Delivery Evidence Report**: In the AgentMail Drawer / Case Communications view, a 1-click modal generates a 1-page contemporaneous Delivery Evidence Report combining the live AgentMail message ID (RFC 5322), Amazon SES delivery receipt (`250 2.0.0 OK`), precise UTC/local timestamps, recipient server MX records (via live Node.js DNS resolution), and the immutable NIST SHA-256 attachment fingerprint from Convex storage (`convex/serviceCertificate.ts`, `convex/actions/serviceCertificateResolver.ts`). Helps resolve payer disputes where insurers assert non-receipt within the 180-day window, establishing contemporaneous electronic delivery verification under ERISA 29 U.S.C. § 1133, 29 C.F.R. § 2560.503-1, 28 U.S.C. § 1746, and Fed. R. Evid. 902(11) with single-click `@media print` 8.5" x 11" formatting.
 - **Multi-Channel Appellate Transmission Gateway & HIPAA Email Policy Enforcement**: Solves the real-world healthcare challenge where HIPAA prohibits transmitting unencrypted PHI appeals via public email for major US health plans. Dynamically checks payer submission policies: for payers with public appeals inboxes, transmits directly via AgentMail; for portal- or fax-mandated payers, provides 1-click official portal launch, formatted brief narrative copying, certified mail docket printing (`window.print()`), and appellate fax copying with zero fabricated email addresses (`src/components/communications/AgentMailDrawer.tsx`).
-- **Autonomous Inbound Adjudication & Decision Classification**: Automatically parses inbound payer replies to classify outcomes into 4 structured statuses: full overturn/settlement, partial settlement offer, Request for Information (RFI / `ADDITIONAL_RECORDS_REQUIRED`), or denial upheld, reactively updating the claim lifecycle, recalculating financial impact, and alerting case managers.
-- **Adversarial Insurer Adjudicator**: Evaluates counter-moves (partial settlements, RFI demands, denials upheld) to prove complete closed-loop autonomous communication in end-to-end demonstrations.
+- **Review-Gated Inbound Adjudication & Decision Classification**: Automatically parses inbound payer replies to classify outcomes into 4 structured statuses: full overturn/settlement, partial settlement offer, Request for Information (RFI / `ADDITIONAL_RECORDS_REQUIRED`), or denial upheld, reactively updating the claim lifecycle, recalculating financial impact, and staging drafts for human review.
+- **Adversarial Insurer Adjudicator**: Evaluates counter-moves (partial settlements, RFI demands, denials upheld) to prove closed-loop communication in end-to-end demonstrations.
 
 ### 4. OpenAI — Multi-Modal Clinical Intake & Grounded Synthesis
 OpenAI powers clinical reasoning while operating within strict anti-hallucination boundaries:
-- **Model Architecture & Strict JSON Schema Enforcement**: Powered by `gpt-5.4-nano` with strict Structured Outputs (`response_format: { type: "json_schema" }`) and two semantic retries with corrective JSON instructions (`convex/lib/openai.ts`), guaranteeing 100% deterministic schema adherence, zero hallucinated fields, and PHI-safe error masking.
+- **Model Architecture & Strict JSON Schema Enforcement**: Powered by `gpt-5.4-nano` with strict Structured Outputs (`response_format: { type: "json_schema" }`) and two semantic retries with corrective JSON instructions (`convex/lib/openai.ts`), enforcing schema validation where unsupported claims are rejected or marked for review, with PHI-safe error masking.
 - **Vision OCR Denial Parser**: Extracts structured CPT/HCPCS, ICD-10, CARC/RARC codes, disputed amounts, and payer contact info from raw multi-page PDF and image denial documents (`convex/actions/opticalParser.ts`).
 - **Grounded Legal Brief Synthesis & Anti-Hallucination Contracts**: Synthesizes formal ERISA legal memorandums using strictly human-confirmed clinical facts and stored policy clauses; fabricated policy text is prohibited by schema contracts (`convex/actions/appealSynthesizer.ts`).
-- **Strict English-Language & US Healthcare Jurisdiction Specialization**: Exclusively supports English-language denial letters, Explanations of Benefits (EOB), and medical records across US healthcare jurisdictions (ERISA 29 U.S.C. § 1133, ACA 45 C.F.R. § 147.136, and CMS NCD/LCD guidelines). Non-English documents and foreign legal frameworks are strictly rejected to ensure 100% statutory citation precision and zero regulatory hallucination.
+- **Strict English-Language & US Healthcare Jurisdiction Specialization**: Exclusively supports English-language denial letters, Explanations of Benefits (EOB), and medical records across US healthcare jurisdictions (ERISA 29 U.S.C. § 1133, ACA 45 C.F.R. § 147.136, and CMS NCD/LCD guidelines). Non-English documents and foreign legal frameworks are rejected to ensure statutory citation precision and avoid unsupported cross-jurisdictional citations.
 - **P2P Defense Playbook & Live Copilot**: Generates structured 4-phase clinical defense playbooks (Statutory Opening, Policy Citations, Trap Counters, Written Determination Demand), 1-page clipboard pocket sheets, real-time voice speech-to-text with rapid counter-strikes, and an interactive AI reviewer simulation for practicing oral arguments before the call (`convex/actions/p2pLiveCopilot.ts`, `src/components/p2p/`).
 - **Sentinel Case Copilot (9 Dedicated Tools)**: Grounded assistant powered by `@convex-dev/agent` with 9 dedicated inspection tools to query active claim details, search claims across the portfolio, retrieve clinical evidence clauses, inspect appeal briefs, fetch P2P defense scripts, review statutory audit trails, perform hybrid precedent search (1536-d vectors + BM25), execute live Firecrawl web searches, and scrape external policy URLs on demand (`convex/actions/sentinelAgent.ts`), complete with a 1-click 'Insert into Brief' studio action.
 - **Pre-Submission HIPAA Safe Harbor Redaction Gate**: Mandatory server-side de-identification (`redactBeforeLLM`) strips 18 direct identifiers (patient names, MRNs, SSNs, phone numbers, emails, addresses, dates of birth) across all textual prompt payloads, vector query embeddings, and Sentinel Copilot dialogs before dispatch to third-party LLM APIs (45 CFR § 164.514(b)(2)).
@@ -223,7 +223,7 @@ ClaimHero leverages 9 first-party and partner Convex components configured in [`
 - **HIPAA Safe Harbor Redaction Gate**: Mandatory server-side pre-submission de-identification (`redactBeforeLLM`) strips 18 direct identifiers (patient names, MRNs, SSNs, phone numbers, emails, addresses, dates of birth) across all textual prompt payloads, vector query embeddings, and Sentinel Copilot dialogs before dispatch to third-party LLM APIs (45 CFR § 164.514(b)(2)).
 - **Multimodal Intake Architecture**: Binary PDF and image uploads bypass pre-OCR text redaction because optical recognition and layout classification precede entity discovery. In enterprise production environments with live health records, a signed HIPAA Business Associate Agreement (BAA) with OpenAI is required; evaluation deployments strictly use de-identified Safe Harbor fixtures.
 - **Server-Side Authorization**: Every Convex query and mutation enforces strict document ownership (`claim.userId === authUser._id`) to prevent unauthorized cross-tenant data access (`convex/lib/auth.ts`).
-- **Deterministic 4-Pillar Statutory Appeal Readiness Score (Dossier Audit)**: The 0–100 readiness score is computed using an explainable deterministic evidence rubric (35 pts CPB Alignment, 25 pts Objective Clinical Documentation, 20 pts ERISA Procedural Protections, 20 pts Precedent Parity), never an uncalibrated probability or opaque hallucinated number. Precedent matches are retrieved and attached to the claim evidence record before readiness scoring (`convex/actions/precedentMatcher.ts`).
+- **4-Pillar Evidence Coverage Score (Dossier Audit)**: The 0–100 Evidence Coverage score is computed using an explainable evidence rubric (35 pts CPB Alignment, 25 pts Objective Clinical Documentation, 20 pts ERISA Procedural Protections, 20 pts Precedent Match), functioning as an evidentiary completeness checklist rather than an uncalibrated win probability. Precedent matches are retrieved and attached to the claim evidence record before scoring (`convex/actions/precedentMatcher.ts`).
 - **Mandatory Human Review Gate**: In a high-stakes healthcare and ERISA appellate workflow (29 U.S.C. § 1133), unreviewed autonomous outbound transmissions represent an unacceptable regulatory, clinical, and malpractice liability. ClaimHero enforces a strict architectural boundary: *AI may prepare, classify, cite, and recommend. A human must approve every clinical assertion, legal assertion, recipient, and outbound message.* Outbound emails, rebuttals, and appeal packets strictly require explicit manual human confirmation before transmission and are never silently dispatched to external payers.
 
 ---
@@ -268,7 +268,7 @@ npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate
 ```
 
-Test suites cover the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Certificate of Electronic Service proof-of-delivery affidavits (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
+Test suites cover the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Delivery Evidence Reports (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
 
 ---
 

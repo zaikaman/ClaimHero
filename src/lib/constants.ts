@@ -294,8 +294,8 @@ export const SIMULATION_STAGES = [
   {
     stage: 5,
     id: "dispatch",
-    title: "Autonomous Dispatch & Statutory Clock Lock",
-    description: "Transmitting appeal packet to payer grievance endpoint & initiating 30-day statutory response clock",
+    title: "Review-Gated Dispatch & Statutory Clock Lock",
+    description: "Staging appeal packet for authorized transmission & initiating statutory response clock",
     durationMs: 3000,
   },
 ];

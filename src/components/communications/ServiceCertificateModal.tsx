@@ -101,7 +101,7 @@ export const ServiceCertificateModal: React.FC<ServiceCertificateModalProps> = (
     if (!certificateData) return "";
     return `================================================================================
 UNITED STATES DEPARTMENT OF LABOR - EMPLOYEE BENEFITS SECURITY ADMINISTRATION
-CERTIFICATE OF ELECTRONIC SERVICE & TRANSMISSION AUDIT AFFIDAVIT
+DELIVERY EVIDENCE REPORT & TRANSMISSION AUDIT RECORD
 Pursuant to ERISA 29 U.S.C. § 1133, 29 C.F.R. § 2560.503-1, and 28 U.S.C. § 1746
 ================================================================================
 
@@ -118,6 +118,8 @@ DATE OF GENERATION: ${new Date().toISOString()}
 - Date of Medical Service: ${certificateData.serviceDate}
 - Disputed Claim Amount:   $${certificateData.deniedAmount.toLocaleString()}
 - Procedure (CPT) Codes:   ${certificateData.cptCodes.join(", ") || "N/A"}
+- Service Delivery Target: ${certificateData.recipientAddress}
+- Verification Authority:  ClaimHero Appellate Verification System
 - Adverse Reason Code:     ${certificateData.denialReasonCode} (${certificateData.denialReasonDescription})
 
 2. PROOF OF ELECTRONIC DELIVERY & TRANSMISSION AUDIT
@@ -151,7 +153,7 @@ ${certificateData.attestationText}
 
 6. VERIFICATION SUMMARY
 - Cryptographic Digest:    ${certificateData.verificationDigest}
-- Verification Authority:  ClaimHero Autonomous Appellate Sentinel System
+- Verification Authority:  ClaimHero Appellate Verification System
 - Regulatory Basis:        ERISA 29 U.S.C. § 1133; 29 C.F.R. § 2560.503-1(h); 28 U.S.C. § 1746
 ================================================================================`;
   };
@@ -202,7 +204,7 @@ ${certificateData.attestationText}
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ERISA Certificate of Electronic Service - Claim #${claim.claimNumber}</title>
+    <title>Delivery Evidence Report - Claim #${claim.claimNumber}</title>
     ${styles}
     <style>
       @page {
@@ -260,7 +262,7 @@ ${certificateData.attestationText}
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ERISA Certificate of Electronic Service - Claim #${claim.claimNumber}</title>
+    <title>Delivery Evidence Report - Claim #${claim.claimNumber}</title>
     ${styles}
     <style>
       @page { size: letter portrait; margin: 10mm 12mm; }
@@ -279,7 +281,7 @@ ${certificateData.attestationText}
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `ERISA-Certificate-Of-Service-${claim.claimNumber}.html`;
+    a.download = `Delivery-Evidence-Report-${claim.claimNumber}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -290,9 +292,9 @@ ${certificateData.attestationText}
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl p-0 overflow-hidden bg-background border-border max-h-[92vh] flex flex-col shadow-2xl">
         <DialogHeader className="sr-only">
-          <DialogTitle>ERISA Certificate of Electronic Service</DialogTitle>
+          <DialogTitle>ERISA Delivery Evidence Report</DialogTitle>
           <DialogDescription>
-            Contemporaneous proof of delivery and cryptographic transmission affidavit for Claim #{claim.claimNumber}.
+            Contemporaneous electronic service record and transmission verification for Claim #{claim.claimNumber}.
           </DialogDescription>
         </DialogHeader>
 
@@ -305,10 +307,10 @@ ${certificateData.attestationText}
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-bold text-foreground font-sans truncate">
-                  Certificate of Electronic Service
+                  Delivery Evidence Report
                 </span>
                 <Badge variant="outline" className="font-mono text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">
-                  Proof of Delivery
+                  Delivery Evidence
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground font-mono truncate">
@@ -350,7 +352,7 @@ ${certificateData.attestationText}
               size="sm"
               onClick={handleDownloadHtml}
               disabled={!certificateData}
-              title="Download standalone HTML certificate"
+              title="Download standalone HTML delivery evidence report"
               className="h-8 text-xs gap-1.5 px-2.5"
             >
               <DownloadSimple className="size-3.5" />
@@ -365,7 +367,7 @@ ${certificateData.attestationText}
               className="h-8 text-xs gap-1.5 px-3 bg-primary text-primary-foreground font-medium"
             >
               <Printer className="size-3.5" />
-              <span>Print Certificate</span>
+              <span>Print Report</span>
             </Button>
 
             <Button
@@ -386,7 +388,7 @@ ${certificateData.attestationText}
             <div className="py-16 text-center space-y-3">
               <div className="size-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
               <div className="text-xs font-mono text-muted-foreground">
-                Generating court-ready Certificate of Electronic Service...
+                Generating Delivery Evidence Report...
               </div>
             </div>
           ) : (
@@ -400,10 +402,10 @@ ${certificateData.attestationText}
                   </span>
                 </div>
                 <h1 className="text-base sm:text-lg font-bold uppercase tracking-tight text-slate-950 font-serif">
-                  Certificate of Electronic Service & Transmission Audit Affidavit
+                  Delivery Evidence Report & Transmission Audit Record
                 </h1>
                 <div className="text-[11px] text-slate-600 font-medium">
-                  Official Proof of Timely Appellate Filing Pursuant to ERISA 29 U.S.C. § 1133, 29 C.F.R. § 2560.503-1(h), and 28 U.S.C. § 1746
+                  Contemporaneous Electronic Service Record Pursuant to ERISA 29 U.S.C. § 1133, 29 C.F.R. § 2560.503-1(h), and 28 U.S.C. § 1746
                 </div>
                 <div className="flex items-center justify-center gap-3 pt-1 text-[10.5px] font-mono text-slate-600 flex-wrap">
                   <span className="font-semibold text-slate-950">
@@ -617,7 +619,7 @@ ${certificateData.attestationText}
               <div className="border border-slate-300 rounded-md p-3.5 bg-slate-50/80 space-y-2 text-xs">
                 <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[10.5px] text-slate-900">
                   <Scales className="size-3.5 text-slate-900" />
-                  <span>III. Statutory Affidavit & Attestation Under 28 U.S.C. § 1746</span>
+                  <span>III. Delivery Attestation & Record Under 28 U.S.C. § 1746</span>
                 </div>
                 <p className="text-[11px] text-slate-800 leading-relaxed font-serif italic text-justify">
                   "{certificateData.attestationText}"
@@ -655,7 +657,7 @@ ${certificateData.attestationText}
                     DIGEST: {certificateData.verificationDigest}
                   </div>
                   <div className="text-[9.5px] text-slate-500 font-mono">
-                    Constructed by ClaimHero Autonomous Appellate Sentinel System
+                    Constructed by ClaimHero Appellate Verification System
                   </div>
                 </div>
 

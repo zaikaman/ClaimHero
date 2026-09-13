@@ -194,7 +194,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Configure autonomous appeal dispatching, inbound determination routing, and advocate signature defaults.
+            Configure review-gated appeal dispatching, inbound determination routing, and advocate signature defaults.
           </p>
         </div>
 
@@ -257,7 +257,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
               <div className="space-y-0.5 max-w-lg">
                 <div className="text-xs font-semibold text-foreground">Approval mode</div>
                 <div className="text-[11px] text-muted-foreground leading-relaxed">
-                  Whether drafted appeals require clinician review in Appeal Studio or dispatch autonomously once Statutory Appeal Readiness is verified.
+                  Whether drafted appeals require clinician review in Appeal Studio or enter review-gated staging once Evidence Coverage is verified.
                 </div>
               </div>
               <div className="w-full sm:w-64">
@@ -273,12 +273,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
                 >
                   <option value="manual_review">I approve each appeal brief</option>
                   <option value="autonomous_high_confidence" disabled={!isSenderConfigured}>
-                    Autonomous dispatch (Score &ge; 80%){!isSenderConfigured ? " (Requires AgentMail sender env)" : ""}
+                    Review-gated dispatch (Score &ge; 80%){!isSenderConfigured ? " (Requires AgentMail sender env)" : ""}
                   </option>
                 </Select>
                 {!isSenderConfigured && (
                   <p className="text-[10px] text-amber-400 font-mono mt-1">
-                    Autonomous dispatch disabled: VITE_AGENTMAIL_SENDER_EMAIL is not configured in environment.
+                    Review-gated dispatch unconfigured: VITE_AGENTMAIL_SENDER_EMAIL is not configured in environment.
                   </p>
                 )}
               </div>

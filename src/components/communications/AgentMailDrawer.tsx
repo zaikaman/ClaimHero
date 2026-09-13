@@ -444,7 +444,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Transmit court-ready ERISA memorandum & clinical evidence packet directly to {payerName}.
+                  Transmit evidence-grounded ERISA memorandum & clinical evidence packet directly to {payerName}.
                 </p>
               </div>
             </div>
@@ -486,7 +486,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 variant="outline"
                 onClick={() => setIsExportDrawerOpen(true)}
                 disabled={!effectiveAppeal}
-                title={effectiveAppeal ? "Open formal court-ready appeal dossier & print docket" : "Synthesize appeal brief in studio first"}
+                title={effectiveAppeal ? "Open formal appeal dossier & print docket" : "Synthesize appeal brief in studio first"}
                 className="h-8 rounded-md text-xs px-2.5 gap-1.5 shrink-0"
               >
                 <Printer className="size-3.5" />
@@ -500,11 +500,11 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   setCertificateMessageId(undefined);
                   setIsCertificateModalOpen(true);
                 }}
-                title="Generate court-ready ERISA Certificate of Electronic Service & Proof of Delivery affidavit"
+                title="Generate ERISA Delivery Evidence Report & transmission audit record"
                 className="h-8 rounded-md text-xs px-2.5 gap-1.5 shrink-0 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
               >
                 <SealCheck className="size-3.5" />
-                <span>Certificate of Service</span>
+                <span>Delivery Evidence</span>
               </Button>
             </div>
           </div>
@@ -734,7 +734,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Autonomous two-way dedicated transmission channel
+                Review-gated two-way dedicated transmission channel
               </p>
             </div>
           </div>
@@ -1169,10 +1169,10 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                               setIsCertificateModalOpen(true);
                             }}
                             className="h-5 px-1.5 text-[9.5px] font-mono gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 rounded"
-                            title="Generate ERISA Certificate of Electronic Service for this transmission"
+                            title="Generate Delivery Evidence Report for this transmission"
                           >
                             <SealCheck className="size-3 text-emerald-500" />
-                            <span>Certificate of Service</span>
+                            <span>Delivery Evidence</span>
                           </Button>
                         )}
 
@@ -1317,7 +1317,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               {isSynthesizing && !activeAutoDraft ? (
                 <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground p-3 bg-background/80 rounded-md border border-border">
                   <CircleNotch className="size-3.5 animate-spin text-primary shrink-0" />
-                  <span>Synthesizing autonomous clinical rebuttal from latest payer reply...</span>
+                  <span>Synthesizing clinical rebuttal draft from latest payer reply...</span>
                 </div>
               ) : (
                 <div className="max-h-28 overflow-y-auto rounded-md bg-background/90 p-2.5 border border-border text-[11px] font-mono text-foreground/90 leading-relaxed whitespace-pre-wrap select-text">
@@ -1368,7 +1368,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   onClick={handleDismissDraft}
                   disabled={isDismissingDraft || isSynthesizing}
                   className="gap-1 text-muted-foreground hover:text-rose-400 h-7 px-2 text-xs"
-                  title="Dismiss autonomous rebuttal draft"
+                  title="Dismiss clinical rebuttal draft"
                 >
                   <X className="size-3.5" />
                   <span>Dismiss</span>

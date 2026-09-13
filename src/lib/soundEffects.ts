@@ -249,7 +249,7 @@ class SoundEffectsEngine {
 
   /**
    * Resonant low-mid pulse transitioning into a crystalline harmonic shimmer.
-   * Tailored for Court-Ready Dossier compilation and download.
+   * Tailored for Appeal Dossier compilation and download.
    */
   private synthesizeDossierCompiled(ctx: AudioContext, masterVolume: number): void {
     const now = ctx.currentTime;

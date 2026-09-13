@@ -56,6 +56,7 @@ export interface Claim {
   status: ClaimStatus;
   statutoryDeadline: number;
   daysRemaining: number;
+  /** Evidence Coverage & Precedent Match audit score (0-100) based on 4 statutory pillars */
   overturnProbabilityScore?: number;
   riskLevel?: RiskLevel;
   scoringBreakdown?: ScoringCriterion[];

@@ -125,7 +125,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
     const a = document.createElement("a");
     a.href = url;
     const prefix = isPublicExhibitRedacted ? "Redacted-" : "";
-    const suffix = viewMode === "binder" ? "Court-Ready-Dossier-" : "Appeal-Brief-";
+    const suffix = viewMode === "binder" ? "Appeal-Dossier-" : "Appeal-Brief-";
     a.download = `${prefix}${suffix}${claim.claimNumber}.txt`;
     document.body.appendChild(a);
     a.click();
@@ -147,7 +147,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Court-Ready Appeal Dossier - Claim #${claim.claimNumber}</title>
+    <title>Appeal Dossier - Claim #${claim.claimNumber}</title>
     ${styles}
     <style>
       @page { size: letter portrait; margin: 12mm 15mm; }
@@ -217,7 +217,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
       <html lang="en">
         <head>
           <meta charset="UTF-8" />
-          <title>Court-Ready Appeal Dossier - Claim #${claim.claimNumber}</title>
+          <title>Appeal Dossier - Claim #${claim.claimNumber}</title>
           ${styles}
           <style>
             @page { size: letter portrait; margin: 12mm 14mm; }
@@ -273,7 +273,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
               <div className="min-w-0 space-y-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <DialogTitle className="text-base font-bold text-foreground">
-                    Court-Ready Appeal Dossier & Exhibit Binder
+                    Appeal Dossier & Exhibit Binder
                   </DialogTitle>
                   <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary font-semibold">
                     Docket #{dossierData.docketNumber}
@@ -321,7 +321,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                       ? "bg-card text-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   )}
-                  title="Full multi-page court-ready legal binder with Cover Page, TOC, Statutory Summary, Exhibits A-C, and Attestation"
+                  title="Full multi-page legal exhibit binder with Cover Page, TOC, Statutory Summary, Exhibits A-C, and Attestation"
                 >
                   <FolderSimpleStar className="size-3.5" />
                   <span>Exhibit Binder</span>
@@ -408,7 +408,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 size="sm"
                 onClick={handleDownloadHtml}
                 className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
-                title="Download standalone court-ready HTML document (.html)"
+                title="Download standalone HTML document (.html)"
               >
                 <Code className="size-3" />
                 <span>.HTML</span>
@@ -419,7 +419,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                 size="sm"
                 onClick={handlePrint}
                 className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0"
-                title="Print court-ready US Letter / A4 physical binder or save as PDF"
+                title="Print US Letter / A4 physical binder or save as PDF"
               >
                 <Printer className="size-3.5" />
                 <span>Print / PDF</span>

@@ -1466,7 +1466,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                       Payer Dispatch
                     </span>
                     <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
-                      AgentMail autonomous delivery, tracking, and reply sentinel.
+                      AgentMail review-gated delivery, tracking, and reply sentinel.
                     </span>
                   </div>
                   <Button

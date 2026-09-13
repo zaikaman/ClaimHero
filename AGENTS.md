@@ -12,11 +12,11 @@ specs/001-appeal-sentinel/plan.md
 - **Scope & Domain**: ClaimHero strictly and exclusively supports **English-language** healthcare denial documents, Explanation of Benefits (EOB), clinical policies, and appeal briefs across US healthcare jurisdictions (ERISA, ACA, CMS). All multilingual or foreign legal frameworks are strictly excluded.
 
 ## 2. Project Architecture & Standards
-- **Project**: ClaimHero (Autonomous Medical & Health Insurance Appeal Sentinel)
+- **Project**: ClaimHero (Evidence-Grounded Appeal Preparation Workspace for Denial Teams)
 - **Core Stack**:
   - Backend: Convex (Real-time DB, Queries, Mutations, Actions, Crons, Vector Search)
   - Data Ingestion: Firecrawl (Insurer Clinical Policy Bulletins & Medical Guidelines Crawling)
-  - Communications: AgentMail (Autonomous Dedicated Appeal Inboxes & Payer Transmissions)
+  - Communications: AgentMail (Review-Gated Appeal Inboxes & Payer Transmissions)
   - Intelligence: OpenAI (Clinical Reason Extraction & Cited Appeal Brief Generation)
   - Frontend: React / TypeScript / Vite / TailwindCSS with Precision Medical Dark-Mode Theme
 - **Build Log**: Keep `hackathon.md` updated after meaningful build sessions using the `/hackathon` skill.

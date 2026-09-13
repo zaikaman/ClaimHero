@@ -270,7 +270,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       {
         id: "action-settings",
         label: "Sentinel Settings",
-        description: "Autonomous dispatch rules, API credentials & gateway configuration",
+        description: "Review-gated dispatch rules, API credentials & gateway configuration",
         icon: GearSix,
         category: "platform",
         categoryLabel: "Platform Command",
@@ -418,7 +418,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       {
         id: "action-communications",
         label: "Payer Communications",
-        description: "Autonomous AgentMail dispatch, payer thread tracking & incoming transmissions",
+        description: "Review-gated AgentMail dispatch, payer thread tracking & incoming transmissions",
         icon: Envelope,
         category: "workspace",
         categoryLabel: "Active Case Workspace",

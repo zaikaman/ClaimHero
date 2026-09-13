@@ -202,7 +202,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate, onSuccess }) => 
             </h2>
 
             <p className="text-xs sm:text-sm lg:text-base text-gray-200 leading-relaxed font-light max-w-md">
-              Autonomous clinical intelligence citing insurer policy bulletins and medical guidelines in real time to protect patient coverage rights under ERISA.
+              Evidence-grounded appeal preparation workspace citing insurer policy bulletins and medical guidelines in real time to protect patient coverage rights under ERISA.
             </p>
           </div>
         </div>

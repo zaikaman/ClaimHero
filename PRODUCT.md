@@ -14,14 +14,14 @@ web
 
 ## Product Purpose
 
-ClaimHero is an autonomous medical and health insurance appeal sentinel that transforms opaque, unfair denial letters into evidence-backed, legally cited appeal dossiers. It levels the playing field against automated payer rejections by extracting denial parameters, cross-referencing insurer Clinical Policy Bulletins (CPBs) and medical guidelines, tracking statutory deadlines, and managing end-to-end payer correspondence.
+ClaimHero is an evidence-grounded appeal preparation workspace for denial teams that transforms opaque denial letters into evidence-backed, cited appeal dossiers. It helps denial teams prepare defensible appeals by extracting denial parameters, cross-referencing insurer Clinical Policy Bulletins (CPBs) and medical guidelines, tracking statutory deadlines, and organizing end-to-end payer correspondence.
 
 ## Positioning
 
 Unlike generic AI document tools or manual template appeals, ClaimHero connects:
 1. **Real-time Clinical Policy Bulletin (CPB) crawling** to find contradictions between an insurer's published medical necessity guidelines and their denial reason.
 2. **Statutory ERISA (29 CFR § 2560.503-1) regulatory citations and strict countdown alarms**.
-3. **Autonomous two-way payer communication** via dedicated AgentMail claim inboxes with inbound settlement/decision detection.
+3. **Review-gated two-way payer communication** via dedicated AgentMail claim inboxes with inbound determination detection.
 4. **Sub-50ms reactive Convex data layer** syncing cases, evidence matrix, live studio edits, and portfolio analytics in real time.
 
 ## Operating Context
@@ -35,13 +35,13 @@ Unlike generic AI document tools or manual template appeals, ClaimHero connects:
 - **Reactive Backend**: Convex Cloud database with real-time queries, atomic mutations, crons for statutory deadline sweeps, and vector search.
 - **Vision & Clinical Ingestion**: OpenAI `gpt-5.4-nano` with Structured Outputs extracting CPT codes, ICD-10 codes, CARC/RARC denial reason codes (e.g., CO-50), and disputed dollar amounts.
 - **Evidence Crawling & Discovery**: Firecrawl for live scraping and indexing of payer CPBs, recursive policy directory discovery via the `/v1/map` endpoint, and PubMed clinical guidelines.
-- **Autonomous Dispatch**: AgentMail integration providing dedicated email addresses per claim for automated transmission and webhook ingestion (`/agentmail-webhook`).
-- **Proof of Electronic Delivery**: Contemporaneous ERISA Certificate of Electronic Service combining AgentMail message IDs (RFC 5322), Amazon SES delivery receipts, live DNS MX server resolution, and NIST SHA-256 Convex storage fingerprints into court-ready affidavits under 28 U.S.C. § 1746 and Fed. R. Evid. 902(11).
-- **Data Privacy & Compliance**: Built with HIPAA security guardrails, strict TypeScript validation across the stack, and zero mock/fake data fallback.
+- **Review-Gated Dispatch**: AgentMail integration providing dedicated email addresses per claim for verified transmission and webhook ingestion (`/agentmail-webhook`), with mandatory human review before dispatch.
+- **Delivery Evidence Report**: Contemporaneous ERISA Delivery Evidence Report combining AgentMail message IDs (RFC 5322), Amazon SES delivery receipts, live DNS MX server resolution, and NIST SHA-256 Convex storage fingerprints into verifiable electronic service records under 28 U.S.C. § 1746 and Fed. R. Evid. 902(11).
+- **Data Privacy & Compliance**: Built with HIPAA security guardrails, strict TypeScript validation across the stack, and validation gates where unsupported claims are rejected or marked for review.
 
 ## Brand Commitments
 
-- **Name**: ClaimHero (Autonomous Medical & Health Insurance Appeal Sentinel).
+- **Name**: ClaimHero (Evidence-Grounded Appeal Preparation Workspace for Denial Teams).
 - **Aesthetic Identity**: Precision Medical Dark-Mode theme (`#0b0f17` obsidian canvas, `#00e5ff` clinical cyan, `#10b981` victory emerald, `#f43f5e` denial crimson, `#f59e0b` deadline amber).
 - **Voice & Tone**: Authoritative, clinically rigorous, legally precise, yet empowering and fiercely protective of patient rights.
 

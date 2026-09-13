@@ -131,13 +131,13 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   const handleRunScoring = async () => {
     setIsScoring(true);
     setErrorMessage(null);
-    const toastId = toast.loading("Auditing 4-pillar Statutory Appeal Readiness...");
+    const toastId = toast.loading("Auditing 4-pillar Evidence Coverage & Precedent Match...");
     try {
       const result = await onComputeScore(claim._id);
       setScoringResult(result);
-      toast.success(`Statutory Appeal Readiness: ${result.overturnProbabilityScore}/100 evaluated`, { id: toastId });
+      toast.success(`Evidence Coverage: ${result.overturnProbabilityScore}/100 evaluated`, { id: toastId });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to calculate Statutory Appeal Readiness.";
+      const msg = err instanceof Error ? err.message : "Failed to calculate Evidence Coverage.";
       setErrorMessage(msg);
       toast.error(msg, { id: toastId });
     } finally {
@@ -221,14 +221,14 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             <div className="space-y-1.5 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold text-foreground">
-                  Autonomous Sentinel pipeline actively running
+                  Appeal preparation pipeline actively running
                 </span>
                 <Badge variant="outline" className="font-mono text-[10px] border-primary/40 text-primary">
                   {(claim.status || "analyzing").replace(/_/g, " ")}
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                {pipelineStepLabel}. Evidence clauses, Statutory Appeal Readiness Score, and the cited appeal brief
+                {pipelineStepLabel}. Evidence clauses, Evidence Coverage Score, and the cited appeal brief
                 stream in live below. You can keep working; no manual click required.
               </p>
               <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground" aria-hidden="true">
@@ -290,7 +290,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                   onClick={handleRunCompleteAnalysis}
                   disabled={isUnifiedAnalyzing || isScoring || isBackgroundPipelineRunning}
                   className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0"
-                  title={isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Re-crawl policy bulletin and recalculate 4-pillar score"}
+                  title={isBackgroundPipelineRunning ? "Pipeline already running in background" : "Re-crawl policy bulletin and recalculate 4-pillar score"}
                 >
                   {isUnifiedAnalyzing ? (
                     <>
@@ -396,27 +396,27 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-sm font-semibold text-foreground">
-                    Statutory Appeal Readiness Score
+                    Evidence Coverage & Precedent Match
                   </h3>
                   <Badge variant="secondary" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">
                     {(scoringResult ? scoringResult.overturnProbabilityScore : (claim.overturnProbabilityScore ?? 0)) >= 80
-                      ? "Comprehensive Dossier"
+                      ? "Comprehensive Coverage"
                       : (scoringResult ? scoringResult.overturnProbabilityScore : (claim.overturnProbabilityScore ?? 0)) >= 55
                         ? "Evidence Gaps Identified"
-                        : "Incomplete Dossier"}
+                        : "Incomplete Coverage"}
                   </Badge>
                   <Badge variant="outline" className="font-mono text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
-                    Statutory Audit
+                    Evidence Coverage
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Evidentiary completeness audit evaluating 4 statutory pillars benchmarked against insurer CPBs and external review precedents.
+                  Evidentiary completeness audit evaluating 4 objective statutory pillars benchmarked against insurer CPBs and external review precedents.
                 </p>
               </div>
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground/80 italic leading-relaxed">
-            Statutory Dossier Audit: Evaluates documentation completeness and ERISA 29 CFR § 2560.503-1 disclosure requirements against published clinical criteria. Does not constitute actuarial legal prediction or guarantee of payer approval.
+            Evidence Coverage Audit: Evaluates documentation completeness and ERISA 29 CFR § 2560.503-1 disclosure requirements against published clinical criteria. Does not constitute an actuarial legal prediction or guarantee of payer approval.
           </p>
 
           {/* 4-Pillar Deterministic Rubric Criteria Breakdown */}
@@ -748,7 +748,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               </TabsTrigger>
               <TabsTrigger value="precedents" className="gap-1.5">
                 <Medal className="size-3.5" />
-                <span>Overturned Precedents</span>
+                <span>Precedent Matches</span>
               </TabsTrigger>
             </TabsList>
 

@@ -162,7 +162,7 @@ Authorized Representative / Claimant: ___________________________   Date: ${eris
                 Statutory Financial Liability & ERISA Audit Statement
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground font-mono">
-                Court-ready print & legal exhibit packet for Claim #{claim.claimNumber}
+                Printable audit & legal exhibit packet for Claim #{claim.claimNumber}
               </DialogDescription>
             </div>
           </div>

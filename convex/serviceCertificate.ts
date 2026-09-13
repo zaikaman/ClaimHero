@@ -413,7 +413,7 @@ export async function buildCertificateData(
   ];
 
   const attestationText =
-    "I declare under penalty of perjury under the laws of the United States of America, pursuant to 28 U.S.C. § 1746, that the foregoing Certificate of Electronic Service and transmission audit record is true, complete, and correct. On the recorded transmission date and time, the ClaimHero Autonomous Appellate Sentinel successfully delivered the complete legal appeal brief and clinical evidence packet to the designated electronic intake gateway of the insurer/plan administrator. The transmission was accepted by the recipient's mail exchange server with the cryptographically authenticated Amazon SES receipt and SHA-256 attachment fingerprint documented herein.";
+    "I declare under penalty of perjury under the laws of the United States of America, pursuant to 28 U.S.C. § 1746, that the foregoing Delivery Evidence Report and transmission audit record is true, complete, and correct. On the recorded transmission date and time, the ClaimHero Appellate Verification System successfully transmitted the complete legal appeal brief and clinical evidence packet to the designated electronic intake gateway of the insurer/plan administrator. The transmission was accepted by the recipient's mail exchange server with the cryptographically authenticated Amazon SES receipt and SHA-256 attachment fingerprint documented herein.";
 
   return {
     certificateId,

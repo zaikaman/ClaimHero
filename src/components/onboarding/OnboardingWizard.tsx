@@ -546,7 +546,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   Sentinel Defense Setup
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  Configure your appellate profile and initialize your autonomous defense sentinel
+                  Configure your appellate profile and initialize your evidence-grounded appeal workspace
                 </DialogDescription>
               </div>
             </div>
@@ -777,7 +777,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Pick a sample medical denial notice to test the full autonomous defense engine, upload your own, or continue to an empty portfolio.
+                  Pick a sample medical denial notice to test the full appeal preparation engine, upload your own, or continue to an empty portfolio.
                 </p>
               </div>
 
@@ -1381,7 +1381,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         Payer Dispatch
                       </span>
                       <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
-                        AgentMail autonomous delivery, tracking, and reply sentinel.
+                        AgentMail review-gated delivery, tracking, and reply inbox.
                       </span>
                     </div>
                     <Button

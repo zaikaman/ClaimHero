@@ -241,8 +241,8 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
         icon: Scales,
       },
       {
-        label: "Statutory Appeal Readiness Rubric",
-        prompt: "How does ClaimHero calculate the deterministic 4-pillar Statutory Appeal Readiness Score?",
+        label: "Evidence Coverage Rubric",
+        prompt: "How does ClaimHero calculate the 4-pillar Evidence Coverage Score?",
         icon: Scales,
       },
     ];
@@ -360,7 +360,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
               <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-2.5">
                 <div className="flex items-center gap-2 text-primary font-semibold text-xs">
                   <ShieldCheck className="size-4" />
-                  <span>Autonomous Clinical & Statutory Sentinel</span>
+                  <span>Clinical & Statutory Appeal Copilot</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Sentinel Copilot cross-references clinical denial codes against crawled insurer Clinical Policy Bulletins (CPBs), active ERISA § 502(c) statutory exposure, and vector-matched precedent briefs.

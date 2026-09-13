@@ -45,7 +45,7 @@ const HERO_SLIDES: ShowcaseSlide[] = [
     titleLine1: "Overturn Denials.",
     titleLine2: "Defend Coverage.",
     description:
-      "Autonomous clinical intelligence cross-referencing Aetna, UHC, Cigna, and Anthem clinical bulletins with PubMed and FDA evidence to overturn wrongful medical claim denials.",
+      "Evidence-grounded appeal preparation workspace cross-referencing Aetna, UHC, Cigna, and Anthem clinical bulletins with PubMed and FDA evidence to challenge wrongful medical claim denials.",
     primaryCtaText: "Ingest Denial Notice",
     secondaryCtaText: "Explore Evidence Matrix",
     targetView: "radar",
@@ -66,10 +66,10 @@ const HERO_SLIDES: ShowcaseSlide[] = [
     badge1: { icon: Envelope, label: "Two-Way AgentMail Gateway" },
     badge2: { icon: Clock, label: "Statutory SLA Clocks" },
     badge3: { icon: CheckCircle, label: "Audit-Logged Dispatch" },
-    titleLine1: "Autonomous Dispatch.",
+    titleLine1: "Review-Gated Dispatch.",
     titleLine2: "Rapid Settlement.",
     description:
-      "Dedicated case inboxes automatically transmit cited briefs to grievance portals and record incoming payer determinations in real time.",
+      "Dedicated case inboxes route review-approved appeal briefs to grievance portals and record incoming payer determinations in real time.",
     primaryCtaText: "Open Payer Inbox",
     secondaryCtaText: "View Portfolio Analytics",
     targetView: "communications",

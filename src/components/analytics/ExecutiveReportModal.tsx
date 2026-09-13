@@ -363,7 +363,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
 
             {/* Governance & Certification Footer */}
             <div className="pt-3 border-t-2 border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-500 font-mono">
-              <div>ClaimHero Sentinel Autonomous Governance</div>
+              <div>ClaimHero Appellate Governance & Audit</div>
               <div>Verification Key: CH-{stats.totalClaims}-{stats.averageWinScore}-ERISA</div>
             </div>
           </div>

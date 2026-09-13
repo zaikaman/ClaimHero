@@ -197,7 +197,7 @@ describe("ERISA Certificate of Electronic Service (Proof of Delivery)", () => {
       // Verification Token & Attestation
       expect(cert.verificationDigest).toHaveLength(64);
       expect(cert.attestationText).toContain("28 U.S.C. § 1746");
-      expect(cert.attestationText).toContain("ClaimHero Autonomous Appellate Sentinel");
+      expect(cert.attestationText).toContain("ClaimHero Appellate Verification System");
     });
 
     it("computes deterministic fallback SHA-256 and identifiers when message has no attachments", async () => {

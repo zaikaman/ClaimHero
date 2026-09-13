@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-13T15:02:00Z
+- **Last updated:** 2026-09-13T15:16:00Z
 
 ## Log
 
@@ -1430,9 +1430,15 @@ Purged all multilingual and international legal adaptability claims and implemen
 - Documentation & Constitutional Alignment (`README.md`, `AGENTS.md`): Replaced previous multilingual adaptability claims with explicit English-language and US healthcare jurisdiction specialization in `README.md` and reinforced the strict single-language policy in `AGENTS.md`.
 - Automated Test Suite & Full Verification: Added unit test in `tests/actionsClinicalAndParser.test.ts` verifying rejection of non-English documents. Verified 100% clean with `npm run verify` (typecheck, lint, 965 passing unit tests across 61 suites, and production build).
 
-### 2026-09-13 - working tree
+### 2026-09-13 - fb5f7c0
 Enforced mandatory human review across all clinical, legal, and outbound communications and dismantled autonomous auto-pilot dispatch mechanisms (`README.md`, `convex/crons.ts`, `convex/workflows.ts`, `convex/actions/agentMail.ts`, `convex/actions/mailDispatcher.ts`, `convex/claims.ts`, `convex/lib/appealEmail.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/radar/IngestionModal.tsx`, `src/components/onboarding/OnboardingWizard.tsx`, `src/components/common/SentinelFlowStepper.tsx`, `tests/autopilotSLA.test.ts`, `tests/agentMail.test.ts`, `tests/workflows.test.ts`, `tests/judgeUxAndHardening.test.ts`, `tests/ingestionAndDeletionPipeline.test.ts`):
 - Mandatory Human Review Governance: Enforced the non-negotiable clinical safety standard across ClaimHero: AI may prepare, classify, cite, and recommend, but an authorized human must approve every clinical assertion, legal assertion, recipient, and outbound message prior to dispatch.
 - Autonomous Dispatch Elimination: Removed the 15-minute `sentinel-autopilot-sla-sweep` background cron and removed all 60-minute automated dispatch schedulers from inbound webhook adjudication. Stripped autonomous dispatch step 6 from the durable workflow pipeline so that synthesized appeals transition cleanly to `ready_for_review` with `dispatched: false`. Hardened scheduled dispatch endpoints to immediately reject unreviewed execution.
 - Clinical & Legal UX Alignment: Overhauled AgentMail Drawer, Ingestion Modal, Onboarding Wizard, and Sentinel Stepper to eliminate auto-pilot toggles and 1-hour countdown SLA timers. Replaced them with prominent "Human Review Mandatory" and "Human Review Gate Enforced" badges, clinical safety banners, and an explicit "Approve & Transmit Rebuttal" CTA.
-- Documentation & Quality Pass Verification: Updated `README.md` architecture diagrams, cron inventories, and communications sections. Authored and updated regression test suites verifying blocking of unapproved dispatches, absence of sweep crons, and mandatory review notices. Verified 100% clean with `npm run verify` across typecheck, lint, 962 unit tests across 61 suites, and production build with zero emojis.
+- Documentation & Quality Pass Verification: Updated `README.md` architecture diagrams, cron inventories, and communications sections. Authored and updated regression test suites verifying blocking of unapproved dispatches, absence of sweep crons, and mandatory review notices. Verified 100% clean with `npm run verify` across typecheck, lint, 962 unit tests across 61 suites, and production build with zero emojis.
+
+### 2026-09-13 - working tree
+Repositioned ClaimHero from an autonomous sentinel to an evidence-grounded appeal preparation workspace for denial teams, eliminating unprovable overclaims across documentation, UI, and communications (`README.md`, `PRODUCT.md`, `IDEA.md`, `AGENTS.md`, `index.html`, `src/components/communications/ServiceCertificateModal.tsx`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/studio/ExportDrawer.tsx`, `src/components/settings/SettingsPage.tsx`, `src/components/landing/CinematicHero.tsx`, `src/components/chat/SentinelChatbot.tsx`, `src/components/onboarding/OnboardingWizard.tsx`, `src/components/onboarding/OnboardingChecklist.tsx`, `src/components/common/CommandDialog.tsx`, `src/lib/constants.ts`):
+- Conservative Product Positioning: Repositioned ClaimHero to focus strictly on evidence-grounded appeal preparation, replacing unprovable assertions ("court-ready affidavit", "conclusive proof of delivery", "100% deterministic schema adherence", "zero hallucinations") with factual guarantees ("Delivery Evidence Report", "review-gated dispatch", schema validation rejection and review flags).
+- Terminology Renames: Renamed "Overturn Probability" to "Evidence Coverage & Precedent Match", "Certificate of Service" to "Delivery Evidence Report" (HTML/print export: `Delivery-Evidence-Report-${claim.claimNumber}.html`), and "Autonomous dispatch" to "Review-gated dispatch".
+- Quality & Build Verification: Retained underlying database schema compatibility while updating user-facing badges, modals, tooltips, and document headers. Validated 100% clean with `npm run verify` across typecheck, lint, 962 passing unit tests across 61 test files, 80.44% code coverage, and production Vite build with zero emojis.

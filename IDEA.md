@@ -1,7 +1,7 @@
-# ClaimHero — Autonomous Medical & Health Insurance Appeal Sentinel
+# ClaimHero — Evidence-Grounded Appeal Preparation Workspace for Denial Teams
 
-> **Autonomous Appeal Sentinel for Convex "All Gas" Hackathon**  
-> Built with **Convex** (Reactive Database, Native 1536-d Vector Search, Full-Text Search Indexes, Scheduled Crons, File Storage, Auth & Official Components), **Firecrawl** (Live Insurer Clinical Policy Bulletins, PubMed & FDA Indications Crawler), **AgentMail** (Dedicated Two-Way Inbound/Outbound Appellate Inboxes & Autonomous Payer Gateways), and **OpenAI** (Vision Denial Extraction, Deterministic 4-Pillar Scoring & Grounded Appeal Synthesis).
+> **Evidence-Grounded Appeal Preparation Workspace for Convex "All Gas" Hackathon**  
+> Built with **Convex** (Reactive Database, Native 1536-d Vector Search, Full-Text Search Indexes, Scheduled Crons, File Storage, Auth & Official Components), **Firecrawl** (Live Insurer Clinical Policy Bulletins, PubMed & FDA Indications Crawler), **AgentMail** (Dedicated Two-Way Inbound/Outbound Appellate Inboxes & Review-Gated Payer Gateways), and **OpenAI** (Vision Denial Extraction, 4-Pillar Evidence Coverage Scoring & Grounded Appeal Synthesis).
 
 ---
 
@@ -14,7 +14,7 @@ In the U.S. healthcare system, health insurers improperly deny approximately **1
 2. **Statutory Time Bombs**: Patients and healthcare providers have strict statutory appeal windows (**ERISA 180-day federal deadline** under 29 CFR § 2560.503-1, state 30-day external review clocks). Missing a deadline forfeits all rights to recover tens of thousands of dollars.
 3. **High Overturn Rate, Low Appeal Rate**: Over **70% of formally appealed denials are overturned and paid** when backed by specific payer policy citations, FDA package inserts, and peer-reviewed clinical guidelines. Yet less than **1% of patients appeal** due to administrative exhaustion and legal complexity.
 
-**ClaimHero** turns every denial into a cited, dispatch-ready appeal packet in under 90 seconds: an autonomous sentinel that ingests denial notices, crawls live insurer policy bulletins, matches 1536-d legal precedents, scores overturn probability with a deterministic 4-pillar rubric, synthesizes multi-tier ERISA briefs, arms physicians with real-time P2P Live Call Copilots, audits statutory $110/day failure-to-disclose penalties, de-identifies HIPAA PII, compiles court-ready exhibit binders, and autonomously transmits dossiers through dedicated AgentMail gateways.
+**ClaimHero** is an evidence-grounded appeal preparation workspace for denial teams: ingesting denial notices, crawling live insurer policy bulletins, matching 1536-d legal precedents, evaluating evidence coverage with a 4-pillar rubric, synthesizing multi-tier ERISA briefs, arming physicians with real-time P2P Live Call Copilots, auditing statutory failure-to-disclose exposure, de-identifying HIPAA PII, compiling structured exhibit binders, and staging briefs for review-gated transmission through dedicated AgentMail gateways.
 
 ---
 
@@ -45,7 +45,7 @@ flowchart TD
 
     subgraph Intelligence ["4. Clinical & Legal Reasoning (OpenAI)"]
         O1["Vision Extraction & Denial Parameter Normalization"]
-        O2["Deterministic 4-Pillar Overturn Probability Scoring (0–100)"]
+        O2["4-Pillar Evidence Coverage & Precedent Match Scoring (0–100)"]
         O3["Grounded 3-Tier ERISA Appeal Synthesis with Clause Citations"]
         O4["P2P Tele-Script & Real-Time Live Call Copilot (Web Speech STT)"]
     end
@@ -147,8 +147,8 @@ flowchart TD
    * **Doctor P2P Defense Studio (`P2PDefenseStudio.tsx`)**: 3-minute tele-script, bad-faith written denial demands, and Pocket Clinic Cheat Sheet with dedicated `@media print` styling.
    * **P2P Live Call Copilot (`P2PLiveCopilot.tsx`)**: Web Speech STT real-time transcription, AI Medical Director 3-stage challenge loop, Fast Answer rebuttal cards, win-score HUD, and copyable EHR Encounter Summary addendums (Epic/Cerner).
    * **Financial Liability Calculator (`FinancialLiabilityCalculator.tsx`)**: OOP-max capping, No Surprises Act balance billing protection, $110/day ERISA failure-to-disclose penalty trajectory, and printable audit statements.
-   * **Court-Ready Dossier Binder (`dossier/`)**: Complete 8-page packet (Cover, TOC, Statutory Summary, Exhibit Index, Exhibits A-C, Attestation) with US Letter / A4 print isolation.
-5. **Payer Communications Drawer (`AgentMailDrawer.tsx`)**: Multi-channel gateway (email / portal / fax / mail) with 3-mode recipient switching, verified payer routing, threaded two-way correspondence, and the 1-click Printable **ERISA Certificate of Electronic Service (Proof of Delivery)** (`ServiceCertificateModal.tsx`, `convex/serviceCertificate.ts`) generating court-ready 28 U.S.C. § 1746 affidavits with live RFC 5322 Message-IDs, Amazon SES MTA receipts, live Node.js DNS MX server resolution, and SHA-256 storage fingerprints to defeat payer non-receipt procedural defaults.
+   * **Appeal Dossier Binder (`dossier/`)**: Complete 8-page packet (Cover, TOC, Statutory Summary, Exhibit Index, Exhibits A-C, Attestation) with US Letter / A4 print isolation.
+5. **Payer Communications Drawer (`AgentMailDrawer.tsx`)**: Multi-channel gateway (email / portal / fax / mail) with 3-mode recipient switching, verified payer routing, threaded two-way correspondence, and the 1-click Printable **ERISA Delivery Evidence Report** (`ServiceCertificateModal.tsx`, `convex/serviceCertificate.ts`) generating contemporaneous electronic service records under 28 U.S.C. § 1746 with live RFC 5322 Message-IDs, Amazon SES MTA receipts, live Node.js DNS MX server resolution, and SHA-256 storage fingerprints to defeat payer non-receipt procedural defaults.
 6. **Portfolio Analytics (`AnalyticsMetrics.tsx`)**: Practice-wide disputed vs. recovered amounts, insurer win rates, confidence distribution, and printable Executive Report statements.
 7. **HIPAA Privacy Redaction Engine (`PrivacyRedactionFilter.tsx`)**: Deterministic PII masking across Safe Harbor, Balanced Appellate, and Public Exhibit standards.
 8. **Sentinel AI Copilot Widget (`SentinelChatbot.tsx`, `⌘J`)**: Autonomous clinical & legal chatbot with 10 agentic OpenAI tool calling capabilities across Convex database records (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) and live Firecrawl web intelligence (`firecrawl_web_search`, `firecrawl_scrape_url`, `crawl_and_attach_evidence`), persistent `chatbotSessions`/`chatbotMessages` Convex tables, rolling context window summarization, and collapsible tool execution traces.
