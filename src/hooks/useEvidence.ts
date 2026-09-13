@@ -265,7 +265,7 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
     [insertSingleEvidenceMutation]
   );
 
-  // Trigger Overturn Probability scoring
+  // Trigger Appeal Viability Index (AVI) scoring
   const computeOverturnScore = useCallback(
     async (targetClaimId?: string): Promise<OverturnScoringResult> => {
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;

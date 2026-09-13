@@ -209,9 +209,9 @@ export function calculateDeterministicRubric(
     } else {
       precedentScore = 16;
       if (legalCitation) {
-        precedentRationale = `Archived precedent (${legalCitation}) indicates strong likelihood of favorable adjudication under independent external review.`;
+        precedentRationale = `Archived precedent (${legalCitation}) establishes strong precedent support for favorable adjudication under independent external review.`;
       } else {
-        precedentRationale = `State appellate benchmarks indicate strong likelihood of favorable adjudication under independent external review.`;
+        precedentRationale = `State appellate benchmarks establish strong precedent support for favorable adjudication under independent external review.`;
       }
     }
   } else if (evidencesCount === 1) {

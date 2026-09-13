@@ -179,7 +179,7 @@ export function buildClaimCsvHeaders(): string[] {
     "Service Date",
     "Statutory Deadline",
     "Days Remaining",
-    "Overturn Probability (%)",
+    "Appeal Viability Index (AVI)",
     "Status",
     "Redaction Applied",
   ];

@@ -32,17 +32,38 @@ scratch.
 2. **ClaimHero pulls the insurer's active policy bulletins via Firecrawl** and lifts the exact clause the denial turned on.
 3. **You review a cited brief**, one click away from the clause it cites, then approve dispatch from an AgentMail inbox. Claims under the ERISA §502(c) clock show the exposure as they age; you never send without approving.
 
+### Appeal Viability Index
+
+ClaimHero computes a deterministic 0–100 Appeal Viability Index (AVI) to help users prioritize appeal work.
+
+The index evaluates four evidence pillars:
+
+- CPB and indication alignment: 35 points
+- Objective clinical documentation: 25 points
+- ERISA procedural protections: 20 points
+- Precedent parity: 20 points
+
+Before scoring, the durable Convex pipeline retrieves relevant precedent records using vector search, attaches those matches to the claim evidence record, and exposes their citations and outcomes in the Evidence Matrix. Precedent matches are retrieved and attached to the claim evidence record before AVI scoring.
+
+AVI is a transparent triage index, not a statistically calibrated probability of payment or appeal success.
+
 ### How a Case Spends Its Life
 
 ```text
 denial letter
-  ─▶  scanned, OCR'd, CARC code pulled (OpenAI vision)
-  ─▶  insurer's CPB and the exact clause it cites (Firecrawl)
-  ─▶  overturn likelihood, deterministic, no black box (4-pillar)
-  ─▶  cited brief, with every claim bound to its clause
-  ─▶  human approval gate
-  ─▶  packet sent via AgentMail; insurer reply routed back in
+  ->  scanned, OCR'd, CARC code pulled (OpenAI vision)
+  ->  insurer's CPB and the exact clause it cites (Firecrawl)
+  ->  Appeal Viability Index (AVI), grounded in policy, clinical, statutory, and precedent evidence
+  ->  cited brief, with every claim bound to its clause
+  ->  human approval gate
+  ->  packet sent via AgentMail; insurer reply routed back in
 ```
+
+### Real cases and demo cases use the same pipeline
+
+ClaimHero supports real denial PDFs, images, and denial text. The production path performs the same storage upload, structured extraction, policy research, precedent retrieval, scoring, drafting, collaboration, audit, and AgentMail operations used by the demo fixtures.
+
+Demo cases are only a privacy-safe shortcut for judges who do not want to upload a health record.
 
 ### Try It in 60 Seconds
 
@@ -55,7 +76,7 @@ To evaluate the complete end-to-end pipeline without uploading personal health r
    - **GeoBlue Worldwide — Lumbar Decompression**: $18,200 | CPT 63047 | CARC CO-197 (Pre-Authorization)
    - **Aetna International — Diagnostic Knee MRI**: $2,850 | CPT 73721 | CARC CO-16 (Prior Records Required)
 4. The application transitions directly into the **Case Workspace**, driving through the linear 3-step appellate spine:
-   - **Step 1: Evidence & CPB** — Review real insurer policy bulletins scraped via Firecrawl, visual proof screenshot exhibits, and the deterministic 4-pillar overturn likelihood score.
+   - **Step 1: Evidence & CPB** — Review real insurer policy bulletins scraped via Firecrawl, visual proof screenshot exhibits, and the precedent-grounded 4-pillar Appeal Viability Index, shown as a transparent 0–100 score.
    - **Step 2: Appeal Brief** — Inspect the grounded legal brief strictly citing stored policy clauses; test real-time CRDT multi-user editing with live presence (`Share` button).
    - **Step 3: Payer Dispatch** — Transmit the packet via AgentMail with one click. For medical necessity denials (`CO-50`), review the contextual Physician Peer-to-Peer tele-script.
 5. Track the statutory stakes at all times: the case header monitors the active **ERISA §502(c) statutory liability exposure ($110/day)** alongside a slide-out **Audit Trail** drawer proving real-time pipeline execution.
@@ -104,7 +125,7 @@ ClaimHero organizes its capabilities into two clean surfaces designed for extrem
 │ • Directory Discovery (/map)  │ • Yjs CRDT Real-Time Collab   │ • ERISA Proof of Delivery   │
 │ • Visual Screenshot Exhibits  │ • Live Teammate Presence/RBAC │ • Inbound Webhook Triage    │
 │ • Multi-Source Scan (PubMed)  │ • Formal PDF Dossier Export   │ • P2P Live Call Copilot     │
-│ • 4-Pillar Overturn Score     │ • Sentinel Copilot (9 Tools)  │ • Auto-Pilot 1-Hour SLA     │
+│ • 4-Pillar AVI Score          │ • Sentinel Copilot (9 Tools)  │ • Auto-Pilot 1-Hour SLA     │
 └───────────────────────────────┴───────────────────────────────┴─────────────────────────────┘
 ```
 
@@ -125,7 +146,7 @@ Convex serves as the core persistence, real-time subscription, compute, and orch
 - **Case Collaborators & Role-Based Access Control (RBAC)**: The `claimCollaborators` table manages secure case sharing via invite codes, distinct `editor` and `viewer` permissions, and automated access revocation (`convex/claimCollaborators.ts`).
 - **Token-Bucket Rate Limiting**: The `@convex-dev/rate-limiter` component protects external OpenAI LLM/embedding inference and Firecrawl web crawling endpoints against quota exhaustion, burst traffic, and runaway execution (`convex/lib/rateLimiter.ts`).
 - **Authentication & Multi-Tenant Data Isolation**: The `@convex-dev/auth` component manages session state, password credentials, and Google OAuth. Server-side authorization helpers (`getAuthUserId`, `requireClaimOwner`) enforce document-level row security across all 23 domain tables (`convex/auth.ts`, `convex/lib/auth.ts`).
-- **Portfolio Analytics via Aggregate**: The `@convex-dev/aggregate` component computes real-time portfolio recovery statistics, payer overturn percentages, and aggregate financial yields.
+- **Portfolio Analytics via Aggregate**: The `@convex-dev/aggregate` component computes real-time portfolio recovery statistics, resolution rates, Appeal Viability Index distributions, and aggregate financial yields.
 - **Sub-Second Pipeline Activity Telemetry**: Granular progress telemetry table `pipelineActivities` tracks real-time stage transitions (OCR extraction, Firecrawl crawling, precedent scoring, brief drafting), streaming live execution milestones to the frontend without polling (`convex/pipelineActivities.ts`).
 - **HTTP Routing & Svix Webhooks**: Authenticated endpoints handle inbound AgentMail and Firecrawl webhooks with Svix signature verification (`convex/http.ts`).
 
@@ -164,6 +185,21 @@ OpenAI powers clinical reasoning while operating within strict anti-hallucinatio
 
 ---
 
+## Judge Evidence Matrix
+
+| Judge-visible result | Implementation | Source |
+| :--- | :--- | :--- |
+| **Real denial extraction** | Convex Storage + OpenAI structured vision extraction | [`convex/actions/opticalParser.ts`](./convex/actions/opticalParser.ts) |
+| **Current payer policy** | Firecrawl crawl and evidence persistence | [`convex/actions/policyCrawler.ts`](./convex/actions/policyCrawler.ts), [`convex/clinicalEvidences.ts`](./convex/clinicalEvidences.ts) |
+| **Precedent-grounded AVI** | Convex vector search + attached precedent evidence | [`convex/actions/precedentMatcher.ts`](./convex/actions/precedentMatcher.ts), [`convex/actions/precedentArchive.ts`](./convex/actions/precedentArchive.ts) |
+| **Cited appeal brief** | OpenAI structured synthesis over stored evidence | [`convex/actions/appealSynthesizer.ts`](./convex/actions/appealSynthesizer.ts) |
+| **Human approval** | Claim-scoped mutation authorization before dispatch | [`convex/claims.ts`](./convex/claims.ts), [`convex/lib/auth.ts`](./convex/lib/auth.ts) |
+| **Two-way correspondence** | AgentMail send, webhook routing, and reactive threads | [`convex/actions/mailDispatcher.ts`](./convex/actions/mailDispatcher.ts), [`convex/http.ts`](./convex/http.ts) |
+| **Collaboration** | Yjs operation log plus Convex presence | [`convex/appealYjs.ts`](./convex/appealYjs.ts), [`convex/presence.ts`](./convex/presence.ts) |
+| **Deadline tracking** | Convex crons and durable workflows | [`convex/crons.ts`](./convex/crons.ts), [`convex/workflows.ts`](./convex/workflows.ts) |
+
+---
+
 ## Convex Component Architecture
 
 ClaimHero leverages 9 first-party and partner Convex components configured in [`convex/convex.config.ts`](./convex/convex.config.ts):
@@ -187,7 +223,7 @@ ClaimHero leverages 9 first-party and partner Convex components configured in [`
 - **HIPAA Safe Harbor Redaction Gate**: Mandatory server-side pre-submission de-identification (`redactBeforeLLM`) strips 18 direct identifiers (patient names, MRNs, SSNs, phone numbers, emails, addresses, dates of birth) across all textual prompt payloads, vector query embeddings, and Sentinel Copilot dialogs before dispatch to third-party LLM APIs (45 CFR § 164.514(b)(2)).
 - **Multimodal Intake Architecture**: Binary PDF and image uploads bypass pre-OCR text redaction because optical recognition and layout classification precede entity discovery. In enterprise production environments with live health records, a signed HIPAA Business Associate Agreement (BAA) with OpenAI is required; evaluation deployments strictly use de-identified Safe Harbor fixtures.
 - **Server-Side Authorization**: Every Convex query and mutation enforces strict document ownership (`claim.userId === authUser._id`) to prevent unauthorized cross-tenant data access (`convex/lib/auth.ts`).
-- **Deterministic 4-Pillar Scoring**: Overturn probability is computed using an explainable mathematical formula (0–100 scale: 35% CPB Alignment, 25% Step-Therapy, 20% ERISA, 20% Precedents), never an opaque hallucinated number (`convex/actions/precedentMatcher.ts`).
+- **Deterministic 4-Pillar Appeal Viability Index (AVI)**: The 0–100 AVI is computed using an explainable deterministic evidence rubric (35 pts CPB Alignment, 25 pts Objective Clinical Documentation, 20 pts ERISA Procedural Protections, 20 pts Precedent Parity), never an uncalibrated probability or opaque hallucinated number. Precedent matches are retrieved and attached to the claim evidence record before AVI scoring (`convex/actions/precedentMatcher.ts`).
 - **Human Approval Gate**: Real outbound email transmission strictly requires manual human confirmation; unreviewed messages are never silently sent to external payers.
 
 ---
@@ -221,12 +257,12 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **963 automated tests** across 61 test suites (verified via `npm run test`):
+ClaimHero is backed by **964 automated tests** across 61 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (963 tests across 61 suites)
+npm run test            # Comprehensive Vitest test suite (964 tests across 61 suites)
 npm run test:coverage   # Code coverage report (~81.2% lines)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate
@@ -281,7 +317,7 @@ ClaimHero/
 
 - **Everyday Apps**: If you got this in your mailbox today, this is the sequence you would want to see. No HIPAA-relevant front-end hurdles, no advocacy-degree onboarding. Fictional fixtures are for the evaluation; the exact same screen serves real cases once credentials are wired.
 - **Creativity & Usefulness**: One linear path to a defensible cited appeal; the hard part (which clause actually governs the denial) is solved by reading the issuer's own policy, not an opinion of it.
-- **Convex Depth**: 9 components, 23 tables, native BM25 full-text search in global ⌘K palette, vector search on prior wins, crons for the ERISA clock, durable workflows, real-time collab on briefs, and authentication with human approval gates on every outbound send. The stack is documented in [`PRODUCT.md`](./PRODUCT.md) and [`convex/convex.config.ts`](./convex/convex.config.ts); this README is the public face.
+- **Convex Depth**: 9 components, 23 tables, native BM25 full-text search in global `Cmd+K` / `Ctrl+K` palette, vector search on prior wins, crons for the ERISA clock, durable workflows, real-time collab on briefs, and authentication with human approval gates on every outbound send. The stack is documented in [`PRODUCT.md`](./PRODUCT.md) and [`convex/convex.config.ts`](./convex/convex.config.ts); this README is the public face.
 - **Sponsor Stack**: Firecrawl finds the policy, detects retroactive policy drift, and screenshots the page as evidence; AgentMail does the two-way dispatch with a Svix-verified webhook and a closed-loop demo inbox; OpenAI extracts the codes and synthesizes the brief inside a redaction gate and a schema that prohibits fabricating policy text.
 
 ---

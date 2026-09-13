@@ -304,7 +304,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const executePostExtractionPipeline = async (claimId: string) => {
     if (!runPipelineAction) return;
 
-    setProcessingMessage("Step 2/3: Indexing Insurer CPB & Evaluating Win Score...");
+    setProcessingMessage("Step 2/3: Indexing Insurer CPB & Evaluating Appeal Viability Index...");
     try {
       const pipelineRes = await runPipelineAction({
         claimId: claimId as Id<"claims">,

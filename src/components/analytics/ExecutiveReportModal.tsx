@@ -62,12 +62,12 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
     lines.push("--------------------------------------------------------------------------------");
     lines.push(`- Total Disputed Clinical Pipeline:  ${formatCurrency(stats.totalDisputedAmount)} (${stats.totalClaims} cases)`);
     lines.push(`- Overturned / Won Benefit Yield:     ${formatCurrency(stats.overturnedWonAmount)} (${stats.recoveryRatePercent}% net recovery)`);
-    lines.push(`- Portfolio Average Overturn Score:   ${stats.averageWinScore}%`);
+    lines.push(`- Portfolio Average Appeal Viability Index (AVI): ${stats.averageWinScore}/100`);
     lines.push(`- Critical Statutory Alarms (<14d):   ${stats.criticalDeadlinesCount} active claims`);
     lines.push("");
     lines.push("2. INSURER ACCOUNTABILITY & PERFORMANCE BREAKDOWN");
     lines.push("--------------------------------------------------------------------------------");
-    lines.push("Insurer / Payer               | Cases | Total Disputed | Recovered (Won) | Win % | Avg Score");
+    lines.push("Insurer / Payer               | Cases | Total Disputed | Recovered (Won) | Win % | Avg AVI");
     lines.push("--------------------------------------------------------------------------------");
     stats.payerBreakdown.forEach((p) => {
       const winRate = Math.round((p.wonCount / (p.totalClaims || 1)) * 100);
@@ -76,7 +76,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
       const disputed = formatCurrency(p.totalDisputed).padStart(14, " ");
       const won = formatCurrency(p.wonAmount).padStart(15, " ");
       const winStr = `${winRate}%`.padStart(5, " ");
-      const score = `${p.averageScore}%`.padStart(9, " ");
+      const score = `${p.averageScore}/100`.padStart(9, " ");
       lines.push(`${payerName} | ${count} | ${disputed} | ${won} | ${winStr} | ${score}`);
     });
     lines.push("");
@@ -107,7 +107,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
       "Total Disputed ($)",
       "Overturned Won ($)",
       "Win Rate (%)",
-      "Average Overturn Score (%)",
+      "Average Appeal Viability Index (0-100)",
     ];
 
     const rows = stats.payerBreakdown.map((p) => [
@@ -150,7 +150,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                 Executive Portfolio & Appellate Audit Statement
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Live practice management reconciliation & insurer overturn report
+                Live practice management reconciliation & insurer resolution report
               </DialogDescription>
             </div>
           </div>
@@ -254,11 +254,11 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                 </div>
 
                 <div className="p-3 rounded border border-slate-300 bg-slate-50">
-                  <div className="text-[10px] font-mono uppercase font-bold text-slate-500">Average Overturn Score</div>
+                  <div className="text-[10px] font-mono uppercase font-bold text-slate-500">Average Appeal Viability Index</div>
                   <div className="text-xl font-bold font-mono text-blue-700 mt-1">
-                    {stats.averageWinScore}%
+                    {stats.averageWinScore}/100
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">4-Pillar clinical rubric</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">4-Pillar evidence rubric</div>
                 </div>
 
                 <div className="p-3 rounded border border-red-300 bg-red-50">
@@ -275,7 +275,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
             <div>
               <div className="flex items-center justify-between mb-2.5">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
-                  2. Insurer Accountability & Overturn Performance Breakdown
+                  2. Insurer Accountability & Resolution Performance Breakdown
                 </h3>
                 <span className="text-[11px] font-mono text-slate-500">
                   {stats.payerBreakdown.length} Payers Tracked
@@ -291,7 +291,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                       <th className="p-2.5 border-r border-slate-300 text-right">Total Disputed</th>
                       <th className="p-2.5 border-r border-slate-300 text-right">Recovered (Won)</th>
                       <th className="p-2.5 border-r border-slate-300 text-center">Win Rate</th>
-                      <th className="p-2.5 text-center">Avg Score</th>
+                      <th className="p-2.5 text-center">Avg AVI</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -321,7 +321,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                           </span>
                         </td>
                         <td className="p-2.5 text-center font-bold text-slate-950">
-                          {payer.averageScore}%
+                          {payer.averageScore}/100
                         </td>
                       </tr>
                     ))}

@@ -75,7 +75,7 @@ PAYER: ${claim.patient?.insurancePayer || "Insurer"} | SERVICE DATE: ${encounter
 - Disputed CPT / ICD-10: CPT ${claim.cptCodes?.join(", ")} | ICD-10 ${claim.icd10Codes?.join(", ")}
 - Adverse Determination: Code ${claim.denialReasonCode} - ${claim.denialReasonDescription}
 - Disputed Balance:      ${formatCurrency(claim.deniedAmount)}
-- Defense Score Rating:  ${session?.winScore || 85}% Overturn Probability
+- Defense Score Rating:  ${session?.winScore || 85}/100 Appeal Viability Index (AVI)
 
 2. STATUTORY MANDATES ESTABLISHED UNDER 29 CFR § 2560.503-1
 --------------------------------------------------------------------------------
@@ -247,7 +247,7 @@ Date:   ${encounterDate}
                 <div className="text-xs font-bold text-emerald-800 mt-0.5">
                   {completedChecklistCount}/{totalChecklistCount} Items Verified
                 </div>
-                <div className="text-[10px] font-mono text-slate-600">Win Score: {session?.winScore || 85}%</div>
+                <div className="text-[10px] font-mono text-slate-600">AVI: {session?.winScore || 85}/100</div>
               </div>
             </div>
 

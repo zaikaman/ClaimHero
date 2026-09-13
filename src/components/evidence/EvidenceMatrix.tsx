@@ -113,12 +113,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   const handleRunCompleteAnalysis = async () => {
     setIsUnifiedAnalyzing(true);
     setErrorMessage(null);
-    const toastId = toast.loading("Crawling payer Clinical Policy Bulletin & computing Overturn Probability...");
+    const toastId = toast.loading("Crawling payer Clinical Policy Bulletin & computing Appeal Viability Index...");
     try {
       await onCrawlPolicy(claim._id);
       const result = await onComputeScore(claim._id);
       setScoringResult(result);
-      toast.success("Policy indexed & Overturn Probability calculated successfully", { id: toastId });
+      toast.success("Policy indexed & Appeal Viability Index evaluated successfully", { id: toastId });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to execute complete clinical policy analysis.";
       setErrorMessage(msg);
@@ -228,7 +228,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                {pipelineStepLabel}. Evidence clauses, win score, and the cited appeal brief
+                {pipelineStepLabel}. Evidence clauses, Appeal Viability Index (AVI), and the cited appeal brief
                 stream in live below. You can keep working; no manual click required.
               </p>
               <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground" aria-hidden="true">
@@ -355,7 +355,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 onClick={handleRunCompleteAnalysis}
                 disabled={isUnifiedAnalyzing || isScoring}
                 className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
-                title="Automatically index Clinical Policy Bulletin and calculate Overturn Probability Score"
+                title="Automatically index Clinical Policy Bulletin and evaluate Appeal Viability Index (AVI)"
               >
                 {isUnifiedAnalyzing ? (
                   <>
@@ -455,7 +455,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <div>
                           <h4 className="text-xs font-semibold text-foreground">
-                            How We Calculate Your Win Score
+                            How We Calculate Your Appeal Viability Index
                           </h4>
                           <p className="text-[11px] text-muted-foreground">
                             Evidence-based evaluation across 4 legal & clinical pillars

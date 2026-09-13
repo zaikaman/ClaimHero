@@ -368,7 +368,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
           </CardContent>
         </Card>
 
-        {/* Card 2: High Win-Probability */}
+        {/* Card 2: High Appeal Viability */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>
@@ -860,7 +860,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                         </div>
                       </TableCell>
 
-                      {/* 6. Win Likelihood */}
+                      {/* 6. Appeal Viability Index */}
                       <TableCell className="py-2.5">
                         {isWon ? (
                           <div className="flex items-center gap-1 font-mono">

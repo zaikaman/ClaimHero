@@ -241,8 +241,8 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
         icon: Scales,
       },
       {
-        label: "Overturn Score Rubric",
-        prompt: "How does ClaimHero calculate the deterministic 4-pillar Overturn Probability score?",
+        label: "Appeal Viability Index Rubric",
+        prompt: "How does ClaimHero calculate the deterministic 4-pillar Appeal Viability Index (AVI)?",
         icon: Scales,
       },
     ];

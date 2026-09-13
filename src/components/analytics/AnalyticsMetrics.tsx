@@ -162,16 +162,16 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
           </div>
         </Card>
 
-        {/* Average Overturn Probability */}
+        {/* Average Appeal Viability Index */}
         <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between text-foreground">
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Avg Win Probability
+              Avg Appeal Viability
             </span>
             <TrendUp className="size-4 text-muted-foreground" />
           </div>
           <div className="text-2xl font-bold font-mono text-foreground">
-            {stats.averageWinScore}%
+            {stats.averageWinScore}/100
           </div>
           <div className="text-[11px] text-muted-foreground font-mono">
             Across {stats.totalClaims} cross-examined cases
@@ -228,7 +228,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
                 <TableHead>Cases</TableHead>
                 <TableHead>Disputed</TableHead>
                 <TableHead>Won / Overturned</TableHead>
-                <TableHead className="text-right">Avg Score</TableHead>
+                <TableHead className="text-right">Avg AVI</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -253,7 +253,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
                     {formatCurrency(payer.wonAmount)} ({payer.wonCount})
                   </TableCell>
                   <TableCell className="font-mono font-bold text-right text-foreground">
-                    {payer.averageScore}%
+                    {payer.averageScore}/100
                   </TableCell>
                 </TableRow>
               ))}
@@ -277,7 +277,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                  High Confidence (85–100%)
+                  High Viability (85–100 AVI)
                 </span>
                 <span className="font-mono text-foreground font-semibold">
                   {stats.claimsByRisk.high_confidence || 0} Cases
@@ -302,7 +302,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-amber-500 dark:text-amber-400">
-                  Moderate (60–84%)
+                  Moderate (60–84 AVI)
                 </span>
                 <span className="font-mono text-foreground font-semibold">
                   {stats.claimsByRisk.moderate || 0} Cases
@@ -327,7 +327,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-destructive">
-                  Complex Review (&lt;60%)
+                  Complex Review (&lt;60 AVI)
                 </span>
                 <span className="font-mono text-foreground font-semibold">
                   {stats.claimsByRisk.complex_litigation || 0} Cases

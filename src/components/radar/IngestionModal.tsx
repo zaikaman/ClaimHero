@@ -1332,7 +1332,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                       Auto-Pilot Was Disabled During Intake
                     </span>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Case #{extractedResult.claimNumber} is indexed in the database with clinical facts confirmed. You can trigger the autonomous pipeline now to crawl insurer policy bulletins, calculate the overturn probability score, and draft the cited legal brief.
+                      Case #{extractedResult.claimNumber} is indexed in the database with clinical facts confirmed. You can trigger the autonomous pipeline now to crawl insurer policy bulletins, evaluate the Appeal Viability Index (AVI), and draft the cited legal brief.
                     </p>
                   </div>
                 </div>

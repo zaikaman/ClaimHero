@@ -244,7 +244,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
               <div className="space-y-0.5 max-w-lg">
                 <div className="text-xs font-semibold text-foreground">Approval mode</div>
                 <div className="text-[11px] text-muted-foreground leading-relaxed">
-                  Whether drafted appeals require clinician review in Appeal Studio or dispatch autonomously once overturn probability is verified.
+                  Whether drafted appeals require clinician review in Appeal Studio or dispatch autonomously once Appeal Viability Index (AVI) is verified.
                 </div>
               </div>
               <div className="w-full sm:w-64">
@@ -360,7 +360,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
               <div className="space-y-0.5 max-w-lg">
                 <div className="text-xs font-semibold text-foreground">Automatic clinical guideline rescan</div>
                 <div className="text-[11px] text-muted-foreground leading-relaxed">
-                  Regularly re-crawls Firecrawl CPB databases, PubMed, and legal precedents to update overturn probability scores for pending cases.
+                  Regularly re-crawls Firecrawl CPB databases, PubMed, and legal precedents to update Appeal Viability Index (AVI) scores for pending cases.
                 </div>
               </div>
               <Switch

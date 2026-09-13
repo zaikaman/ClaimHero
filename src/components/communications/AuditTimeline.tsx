@@ -75,12 +75,12 @@ const EVENT_CONFIGS: Record<
     icon: Warning,
   },
   status_changed_to_precedent_matched: {
-    label: "Win Score Computed",
+    label: "Appeal Viability Index Computed",
     badgeVariant: "default",
     icon: Medal,
   },
   overturn_score_computed: {
-    label: "Win Score Computed",
+    label: "Appeal Viability Index Computed",
     badgeVariant: "default",
     icon: Medal,
   },
