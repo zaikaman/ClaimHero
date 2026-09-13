@@ -155,6 +155,43 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
       expect(mockCtx.runMutation).not.toHaveBeenCalled();
     });
 
+    it("parseDenialDocument: rejects non-English or foreign documents with clear English-only notice", async () => {
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        isMedicalClaimDenial: false,
+        documentClassificationReason: "The uploaded file is not an English-language healthcare insurance claim denial or EOB. ClaimHero exclusively supports English-language documents under US healthcare jurisdictions.",
+        claimNumber: "",
+        patientName: "",
+        memberId: "",
+        insurancePayer: "",
+        serviceDate: "",
+        providerName: "",
+        deniedAmount: 0,
+        patientOwedAmount: 0,
+        cptCodes: [],
+        icd10Codes: [],
+        denialReasonCode: "",
+        denialReasonDescription: "",
+        appealFilingDeadlineDays: 180,
+        payerAppealsEmail: "",
+        payerAppealsAddress: "",
+      } as any);
+
+      const mockCtx: any = {
+        runMutation: vi.fn(),
+        runAction: vi.fn(),
+      };
+
+      await expect(
+        (actionOpticalParser.parseDenialDocument as any)._handler(mockCtx, {
+          rawDocumentText: "Thư từ chối chi trả bảo hiểm y tế...",
+          patientState: "CA",
+        })
+      ).rejects.toThrow(/ClaimHero exclusively supports English-language documents under US healthcare jurisdictions/);
+
+      expect(mockCtx.runMutation).not.toHaveBeenCalled();
+    });
+
     it("parseDenialDocument: rejects document when all core claim signals are empty", async () => {
       vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
       vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({

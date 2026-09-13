@@ -652,9 +652,14 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <CloudArrowUp className="size-4.5" />
             </div>
             <div>
-              <DialogTitle>Ingest Denial Document</DialogTitle>
+              <div className="flex items-center gap-2">
+                <DialogTitle>Ingest Denial Document</DialogTitle>
+                <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary bg-primary/5">
+                  English Only • US Payers
+                </Badge>
+              </div>
               <DialogDescription>
-                Automated clinical record extraction & real-time case indexing
+                Automated clinical record extraction & real-time case indexing (English-language EOBs and denial notices)
               </DialogDescription>
             </div>
           </div>
@@ -839,7 +844,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {selectedFile
                     ? `${(selectedFile.size / 1024).toFixed(1)} KB — Ready to upload`
-                    : "Supports multi-page PDF, PNG, JPG, JPEG, and TXT files"}
+                    : "Supports English-language PDF, PNG, JPG, JPEG, and TXT denial notices"}
                 </p>
               </div>
 
@@ -896,7 +901,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 <>
                   <Textarea
                     rows={6}
-                    placeholder="Paste the full text of the denial letter, including claim number, procedure codes (CPT), denial reason code (e.g. CO-50), and denied amounts..."
+                    placeholder="Paste the English text of the denial letter or Explanation of Benefits, including claim number, procedure codes (CPT), denial reason code (e.g. CO-50), and denied amounts..."
                     value={pastedText}
                     onChange={(e) => setPastedText(e.target.value)}
                     className="font-mono text-xs"

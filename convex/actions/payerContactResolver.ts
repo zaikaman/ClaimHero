@@ -452,7 +452,7 @@ export async function executeResolvePayerGateway(
 /**
  * Autonomous Payer Contact Resolver Action:
  * Discovers real insurer grievance, claims, and appeals intake gateways
- * using Firecrawl Web Search + LLM extraction for any domestic or international insurer.
+ * using Firecrawl Web Search + LLM extraction for any US healthcare insurer or health plan.
  */
 export const resolvePayerGateway = action({
   args: {

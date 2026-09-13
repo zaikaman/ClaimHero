@@ -392,6 +392,7 @@ Key Strategic Objectives:
 3. DIRECT COUNTERS TO INSURER TRAPS: Supply devastating verbal counter-strikes to common insurer trap questions (e.g. conservative therapy duration, step therapy, non-surgical alternatives, imaging thresholds).
 4. FORMAL BAD-FAITH DEMAND: Deliver an uncompromising closing demand for the medical director's name and license number on the record, a written denial letter within 24 hours, and notice of intent to file a State Insurance Commissioner bad-faith complaint.
 5. POCKET CLINIC CHEAT SHEET: Create a crisp, high-density checklist, must-say bullets, and do-not-concede red flags for rapid mobile glance or quick clinic printing.
+6. STRICT ENGLISH-ONLY MANDATE: ClaimHero operates exclusively in English for US healthcare jurisdictions. Generate all verbal scripts, clinical arguments, counter-strikes, and pocket cheat sheet points exclusively in English.
 
 Do NOT use emojis anywhere in the output. Keep verbal language natural, confident, assertive, and clinical.`,
         userPrompt: `Generate a 3-Minute Physician P2P Defense Tele-Script for the following case:

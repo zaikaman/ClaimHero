@@ -107,7 +107,8 @@ Rules:
 2. "chartProof": Identify the exact chart fact (dates, therapy durations, exam results) proving medical necessity.
 3. "cpbCitation": Cite the exact policy bulletin name and section clause.
 4. "regulatoryLeverage": Cite ERISA 29 CFR § 2560.503-1(h), same-specialty reviewer requirements, or state insurance bad-faith regulations.
-5. "confidenceScore": Integer between 85 and 99.`;
+5. "confidenceScore": Integer between 85 and 99.
+6. Strictly output all fields exclusively in English. Non-English output is prohibited.`;
 
     const userPrompt = `The insurer medical director just said on the live call:
 "${args.recentTranscript}"
@@ -318,6 +319,9 @@ CRITICAL GUIDELINES FOR REALISTIC P2P CALL SIMULATION:
 3. STRICT ANTI-REPETITION CONSTRAINT:
    - NEVER repeat the same objection, requirement, or phrase (e.g., do NOT repeat demands for "home exercise programs", "separate maintenance trials", or "longitudinal records" if already mentioned previously in the transcript history).
    - Acknowledge what the physician just stated and either probe a completely new aspect or grant authorization.
+
+4. STRICT ENGLISH-ONLY MANDATE:
+   - Always converse, push back, simulate dialogue, and output exclusively in English. Non-English speech is strictly prohibited.
 
 Case Details:
 - Patient: ${claim.patient?.name || "Patient"}

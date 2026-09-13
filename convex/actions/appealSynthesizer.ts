@@ -891,8 +891,7 @@ Evidence and safety rules:
 5. Do not state that a legal rule was violated or that ERISA, ACA, external review, a 180-day filing period, or a 30-day response period applies unless the case record establishes that applicability. Use conditional, review-oriented language when necessary.
 6. Be concise and practical: a salutation, short paragraphs, a clinical rationale grounded in the record, a specific request, and a professional closing. The application supplies the email subject separately. Do not use all-caps filler, exhibit indexes, markdown tables, horizontal rules, threats, or ceremonial language.
 7. The application assembles the final email from your structured fields. Return an empty string for fullAppealMarkdown; do not write a second full document there.
-
-Always write all structured fields exclusively in English.`,
+8. Strict English-Only Mandate: ClaimHero exclusively supports English and US healthcare jurisdictions (ERISA, ACA, CMS). Always write all structured fields, arguments, clinical rationale, and correspondence exclusively in English. Non-English text, multilingual translation, or foreign legal citations are strictly prohibited.`,
       userPrompt: `Draft the content for a ${appealLevel.replace(/_/g, " ")} medical appeal email for:
 
 Case Details:

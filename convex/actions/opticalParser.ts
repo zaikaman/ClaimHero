@@ -14,7 +14,7 @@ const DENIAL_EXTRACTION_SCHEMA = {
     isMedicalClaimDenial: {
       type: "boolean",
       description:
-        "Set to true ONLY IF this document or image is an actual healthcare insurance claim denial letter, Explanation of Benefits (EOB), adverse benefit determination, medical necessity denial, or medical bill denial. Set to false if the document or image is NOT a healthcare denial notice (e.g. photos of animals, pets, scenery, food, receipts, memes, general letters, non-medical invoices, or unrelated graphics).",
+        "Set to true ONLY IF this document or image is an actual English-language healthcare insurance claim denial letter, Explanation of Benefits (EOB), adverse benefit determination, medical necessity denial, or medical bill denial. Set to false if the document or image is NOT an English healthcare denial notice (e.g. photos of animals, pets, scenery, food, receipts, memes, general letters, non-medical invoices, non-English or foreign documents, or unrelated graphics).",
     },
     documentClassificationReason: {
       type: "string",
@@ -279,19 +279,19 @@ export const parseDenialDocument = action({
 Your job is to rigorously classify uploaded documents/images and extract structured medical claim denial data.
 
 CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
-1. First, determine whether the input document or image is an actual healthcare insurance claim denial, Explanation of Benefits (EOB), adverse benefit determination, or medical necessity denial letter.
-2. If the document or image is NOT a medical claim denial (for example: photographs of animals, pets, scenery, food, receipts, general letters, memes, non-medical invoices, or unreadable graphics):
+1. First, determine whether the input document or image is an actual English-language healthcare insurance claim denial, Explanation of Benefits (EOB), adverse benefit determination, or medical necessity denial letter.
+2. If the document or image is NOT a valid English healthcare claim denial (for example: photographs of animals, pets, scenery, food, receipts, general letters, memes, non-medical invoices, non-English or foreign documents, or unreadable graphics):
    - Set "isMedicalClaimDenial" to FALSE.
-   - Provide a clear, polite 1-sentence reason in "documentClassificationReason" (e.g. "The uploaded file is an image of an animal/non-medical subject, not a healthcare insurance claim denial or EOB.").
+   - Provide a clear, polite 1-sentence reason in "documentClassificationReason" (e.g. "The uploaded file is not an English-language healthcare insurance claim denial or EOB. ClaimHero exclusively supports English-language documents under US healthcare jurisdictions.").
    - Set all string fields to "", numbers to 0, and arrays to [].
-3. If the document IS a valid medical claim denial:
+3. If the document IS a valid English medical claim denial:
    - Set "isMedicalClaimDenial" to TRUE.
    - Extract patient legal name, member ID, treating provider name, insurer payer name, all financial amounts, clinical CPT procedure codes, ICD-10 diagnosis codes, denial reason codes (e.g. CO-50, CO-197, CO-16), and statutory appeal filing deadlines.
    - Extract dollar amounts as pure numbers without currency symbols (e.g. 24500 instead of "$24,500.00"). If missing, return 0.
    - If identifiers (patient name, member ID, provider, claim number, service date) are not explicitly mentioned, return "". NEVER invent or fabricate identifiers.
    - If CPT or ICD-10 codes are missing, return [].
    - If statutory appeal deadline is not explicitly mentioned, default appealFilingDeadlineDays to 180.
-4. Always extract and output all textual metadata, denial reasons, descriptions, and classification reasons exclusively in English.
+4. Strict English-Only Mandate: ClaimHero exclusively supports English-language documents and US healthcare jurisdictions (ERISA, ACA, CMS). All extracted textual metadata, denial reasons, descriptions, and classification reasons must be exclusively in English. Non-English and foreign insurance documents must be classified as non-claim documents.
 5. You must output all schema properties in the JSON response. If an attribute or identifier is not mentioned in the document, populate it with "" (empty string) for strings, 0 for numbers, and [] for arrays. Do not omit any properties.`,
         userPrompt: `Extract structured medical claim metadata from the following denial document:\n\n${documentContent}`,
         schemaName: "DenialExtractionResult",
@@ -305,9 +305,9 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
       if (extraction.isMedicalClaimDenial === false) {
         const reason =
           extraction.documentClassificationReason?.trim() ||
-          "The uploaded file is not a valid healthcare insurance claim denial letter or Explanation of Benefits (EOB).";
+          "The uploaded file is not a valid English-language healthcare insurance claim denial letter or Explanation of Benefits (EOB).";
         throw new ConvexError(
-          `Non-claim document detected: ${reason} Please upload a genuine adverse determination letter, medical denial notice, or EOB document.`
+          `Non-claim document detected: ${reason} Please upload a genuine English-language adverse determination letter, medical denial notice, or EOB document.`
         );
       }
 

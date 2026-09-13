@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-13T13:45:00Z
+- **Last updated:** 2026-09-13T14:46:00Z
 
 ## Log
 
@@ -1414,10 +1414,18 @@ Reframed appeal scoring semantics from outcome prediction to Statutory Appeal Re
 - Tiers & Checklist UX: Rebranded confidence bands across portfolio radar and evidence inspector to actionable readiness states: Comprehensive Dossier (80–100 pts), Evidence Gaps Identified (55–79 pts), and Incomplete Dossier (< 55 pts).
 - Documentation Alignment: Updated `README.md` core architecture diagrams, workflow summaries, and 60-second evaluation instructions to reflect the Statutory Appeal Readiness Score.
 
-### 2026-09-13 - working tree
+### 2026-09-13 - b95ad1d
 Harmonized statutory appeal readiness terminology and dossier audit labels across the entire frontend, analytics, chatbot, and export utilities (`README.md`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/analytics/AnalyticsMetrics.tsx`, `src/components/analytics/ExecutiveReportModal.tsx`, `src/components/chat/SentinelChatbot.tsx`, `src/components/communications/AuditTimeline.tsx`, `src/components/common/CommandDialog.tsx`, `src/components/common/DeleteCaseModal.tsx`, `src/components/settings/SettingsPage.tsx`, `src/components/p2p/P2PEncounterSummaryModal.tsx`, `src/components/onboarding/OnboardingChecklist.tsx`, `src/lib/constants.ts`, `src/lib/exportUtils.ts`, `src/lib/utils.ts`, `tests/utils.test.ts`):
 - Unified System Terminology: Replaced all legacy Appeal Viability Index (AVI) references across the full application surface with Statutory Appeal Readiness Score, Dossier Audit, and Comprehensive Dossier badges, ensuring 100% conceptual consistency.
 - Executive & Portfolio Reporting: Updated Executive Report Modal CSV headers, plaintext summaries, and KPI cards to report "Average Statutory Appeal Readiness" and "Average Dossier Readiness".
 - Command Palette & Copilot: Enhanced global search keywords and Sentinel Chatbot prompt suggestions to guide users through the 4-pillar Statutory Appeal Readiness Rubric.
 - Zero Emojis Compliance: Verified zero emoji characters across the entire production codebase, comments, strings, and markdown documentation.
 - Verification & Test Passing: Re-ran test suites and verified 964 passing tests across 61 test suites with 0 lint, typecheck, or build errors.
+
+### 2026-09-13 - working tree
+Purged all multilingual and international legal adaptability claims and implemented strict English-only enforcement and US healthcare jurisdiction specialization across all AI prompts, document OCR classification, frontend UI, tests, and documentation (`AGENTS.md`, `README.md`, `convex/actions/opticalParser.ts`, `convex/actions/appealSynthesizer.ts`, `convex/actions/p2pDefenseGenerator.ts`, `convex/actions/p2pLiveCopilot.ts`, `convex/actions/payerContactResolver.ts`, `src/components/radar/IngestionModal.tsx`, `src/components/settings/SettingsPage.tsx`, `tests/actionsClinicalAndParser.test.ts`):
+- Document Ingestion & Optical OCR Rejection (`opticalParser.ts`): Updated `DENIAL_EXTRACTION_SCHEMA` and system prompt directives to explicitly reject non-English or foreign documents as non-claim documents (`isMedicalClaimDenial: false`). Added informative rejection reasons clarifying that ClaimHero strictly and exclusively supports English-language healthcare denial notices under US statutory frameworks (ERISA, ACA, CMS).
+- Model System Directives Hardening (`appealSynthesizer.ts`, `p2pDefenseGenerator.ts`, `p2pLiveCopilot.ts`): Enforced non-negotiable English-only rules prohibiting multilingual translation, non-English text generation, or foreign legal citations across appeal synthesis, P2P verbal tele-scripts, live fast answer rebuttals, and interactive medical director simulations.
+- Frontend Ingestion & System Notices (`IngestionModal.tsx`, `SettingsPage.tsx`): Added prominent "English Only • US Payers" badge and updated helper copy in `IngestionModal.tsx` for file and text intake. Added persistent "System Jurisdiction & Language: English Only (United States Healthcare • ERISA / ACA / CMS)" status banner in `SettingsPage.tsx`.
+- Documentation & Constitutional Alignment (`README.md`, `AGENTS.md`): Replaced previous multilingual adaptability claims with explicit English-language and US healthcare jurisdiction specialization in `README.md` and reinforced the strict single-language policy in `AGENTS.md`.
+- Automated Test Suite & Full Verification: Added unit test in `tests/actionsClinicalAndParser.test.ts` verifying rejection of non-English documents. Verified 100% clean with `npm run verify` (typecheck, lint, 965 passing unit tests across 61 suites, and production build).
