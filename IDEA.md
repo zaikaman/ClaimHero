@@ -161,13 +161,13 @@ ClaimHero enforces rigorous automated test coverage (~81.3% lines across all mod
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (tsc --noEmit)
 npm run lint            # ESLint static code analysis
-npm run test            # Vitest automated test execution (920 tests across 57 suites)
+npm run test            # Vitest automated test execution (929 tests across 58 suites)
 npm run test:coverage   # Vitest with @vitest/coverage-v8 (~81.1% line coverage)
 npm run build           # Vite production bundle build
 npm run verify          # Full automated gate (typecheck + lint + test:coverage + build)
 ```
 
-### Verified Test Suites (920 Tests / 57 Suites)
+### Verified Test Suites (929 Tests / 58 Suites)
 * `tests/claimhero.test.ts` (70 tests): End-to-end integration, 4-pillar scoring rubric, ERISA deadline sweeps, and portfolio aggregates.
 * `tests/agentMail.test.ts` (67 tests): AgentMail outbound dispatch, webhook normalization, email styling, Svix signature verification, and AI adjudicator addressing.
 * `tests/authorization.test.ts` (40 tests): Convex multi-tenant document isolation, owner verification, cross-tenant IDOR guards, and spending protection.
@@ -220,6 +220,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/p2pDefense.test.ts` (6 tests): Tele-script generation, statutory openings, and pocket cheat sheet formatting.
 * `tests/sentinelChatbot.test.ts` (6 tests): Agentic tool schemas, Firecrawl live search/scrape parameters, and prompt construction.
 * `tests/pipelineActivity.test.ts` (5 tests): Real-time pipeline execution activity and milestone tracking.
+* `tests/commandPaletteSearch.test.ts` (5 tests): Convex BM25 full-text search index execution, debounced query triggers, and command palette result deduplication.
 * `tests/judgeUxAndHardening.test.ts` (5 tests): Hackathon judge preset validation and UX flow safeguards.
 * `tests/sentinelAgent.test.ts` (5 tests): Autonomous agent tool orchestration and multi-step reasoning.
 * `tests/sentinelDrawerAndTrigger.test.ts` (5 tests): Slide-out Sentinel Copilot drawer, keyboard shortcuts, focus trapping, and brief insertion.
@@ -234,7 +235,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 |---|---|
 | **Real-World Utility** | Directly tackles a $200B/year denial crisis. Produces production-ready, sendable artifacts (formal briefs, P2P call scripts, EHR clinical notes, and court dossiers) rather than generic chat summaries. |
 | **Full-Stack Integration Depth** | All 4 sponsor platforms are deeply integrated: **Convex** (reactive DB, 1536-d vector search, searchIndex, scheduled crons, components), **Firecrawl** (live CPB scraping, PubMed, FDA), **AgentMail** (inbound webhooks, outbound dispatch, AI adjudicator), and **OpenAI** (Vision extraction, 4-pillar scoring, grounded synthesis). |
-| **Technical Rigor & Polish** | 100% clean `npm run verify` gate, 920 automated tests across 57 test suites, strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
+| **Technical Rigor & Polish** | 100% clean `npm run verify` gate, 929 automated tests across 58 test suites, strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
 | **Transparency & Build Process** | Comprehensive `hackathon.md` log with UTC timestamps, reconciled 7-character commit hashes, and detailed milestone notes. |
 
 ---

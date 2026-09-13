@@ -19,6 +19,8 @@ import {
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import { NavigationView } from "../layout/Sidebar";
@@ -50,6 +52,85 @@ interface CommandAction {
   onExecute: () => void;
 }
 
+export interface ServerClaimSearchResult {
+  _id: string;
+  patientId?: string;
+  claimNumber?: string;
+  patientName?: string;
+  insurancePayer?: string;
+  providerName?: string;
+  deniedAmount?: number;
+  patientOwedAmount?: number;
+  cptCodes?: string[];
+  icd10Codes?: string[];
+  denialReasonCode?: string;
+  denialReasonDescription?: string;
+  status?: string;
+  statutoryDeadline?: number;
+  daysRemaining?: number;
+  createdAt?: number;
+  updatedAt?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Merges server-authoritative BM25 full-text search results with in-memory claims,
+ * applying safe fallbacks for patient/payer names, clinical codes, and financial amounts,
+ * and deduplicating by claim ID.
+ */
+export function mergeSearchResults(
+  serverSearchResults: ServerClaimSearchResult[] | undefined,
+  localMatches: Claim[],
+  allLocalClaims: Claim[]
+): Claim[] {
+  if (!serverSearchResults || !Array.isArray(serverSearchResults)) {
+    return localMatches;
+  }
+
+  const mergedMap = new Map<string, Claim>();
+
+  // Put server results first as they represent the authoritative BM25 search index
+  for (const raw of serverSearchResults) {
+    const id = String(raw._id);
+    const existingLocal = allLocalClaims.find((c) => String(c._id) === id);
+    const patientName =
+      raw.patientName || existingLocal?.patient?.name || existingLocal?.patientName || "Patient";
+    const insurancePayer =
+      raw.insurancePayer ||
+      existingLocal?.patient?.insurancePayer ||
+      existingLocal?.insurancePayer ||
+      "Health Insurer";
+
+    mergedMap.set(id, {
+      ...(existingLocal || {}),
+      ...raw,
+      patientName,
+      insurancePayer,
+      cptCodes: raw.cptCodes || existingLocal?.cptCodes || [],
+      icd10Codes: raw.icd10Codes || existingLocal?.icd10Codes || [],
+      deniedAmount: typeof raw.deniedAmount === "number" ? raw.deniedAmount : existingLocal?.deniedAmount || 0,
+      patient: existingLocal?.patient || {
+        _id: raw.patientId || raw._id,
+        name: patientName,
+        email: "",
+        memberId: "PENDING",
+        insurancePayer,
+        createdAt: raw.createdAt || Date.now(),
+      },
+    } as Claim);
+  }
+
+  // Append any local matches that also match
+  for (const local of localMatches) {
+    const id = String(local._id);
+    if (!mergedMap.has(id)) {
+      mergedMap.set(id, local);
+    }
+  }
+
+  return Array.from(mergedMap.values());
+}
+
 export const CommandDialog: React.FC<CommandDialogProps> = ({
   isOpen,
   onClose,
@@ -62,6 +143,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   onDeleteCase,
 }) => {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +151,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setQuery("");
+      setDebouncedQuery("");
       setActiveIndex(0);
     } else {
       setTimeout(() => {
@@ -76,6 +159,20 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       }, 50);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const trimmedDebounced = debouncedQuery.trim();
+  const shouldSearchServer = isOpen && trimmedDebounced.length > 0;
+  const serverSearchResults = useQuery(
+    api.claims.search,
+    shouldSearchServer ? { query: trimmedDebounced, limit: 25 } : "skip"
+  );
 
   useEffect(() => {
     setActiveIndex(0);
@@ -436,15 +533,18 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   );
 
   const normalizedQuery = query.trim().toLowerCase();
+  const isSearching = normalizedQuery.length > 0;
+  const isServerLoading = isSearching && serverSearchResults === undefined;
 
-  // Search logic for claims
-  const filteredClaims = useMemo(() => {
+  // Search logic for claims: combine native Convex BM25 full-text search with in-memory claims
+  const filteredClaims: Claim[] = useMemo(() => {
     if (!normalizedQuery) return claims.slice(0, 4);
 
-    return claims.filter((c) => {
+    // 1. In-memory filtered matches
+    const localMatches = claims.filter((c) => {
       const claimNum = c.claimNumber?.toLowerCase() || "";
       const patName = (c.patient?.name || c.patientName || "").toLowerCase();
-      const payer = c.patient?.insurancePayer?.toLowerCase() || "";
+      const payer = (c.patient?.insurancePayer || c.insurancePayer || "").toLowerCase();
       const denialCode = c.denialReasonCode?.toLowerCase() || "";
       const icd = (c.icd10Codes || []).join(" ").toLowerCase();
       const cpt = (c.cptCodes || []).join(" ").toLowerCase();
@@ -472,7 +572,10 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
 
       return false;
     });
-  }, [claims, normalizedQuery]);
+
+    // 2. Prioritize and merge authoritative BM25 server results
+    return mergeSearchResults(serverSearchResults, localMatches, claims);
+  }, [claims, normalizedQuery, serverSearchResults]);
 
   // Search logic for actions
   const isActionMatch = (action: CommandAction, q: string) => {
@@ -523,7 +626,6 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
     );
   }, [allActions, normalizedQuery]);
 
-  const isSearching = normalizedQuery.length > 0;
   const totalMatches =
     filteredClaims.length +
     matchedPlatformActions.length +
@@ -574,6 +676,12 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
     matchedWorkspaceActions,
     matchedSentinelActions,
   ]);
+
+  useEffect(() => {
+    if (flatNavItems.length > 0 && activeIndex >= flatNavItems.length) {
+      setActiveIndex(0);
+    }
+  }, [flatNavItems.length, activeIndex]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (flatNavItems.length === 0) return;
@@ -629,7 +737,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
             aria-controls="command-results-list"
             aria-autocomplete="list"
             aria-label="Search claims, clinical codes, or platform actions"
-            placeholder="Type a claim #, patient, CPT code, or action..."
+            placeholder="Search claims, clinical terms (e.g. subchondral, CO-50), or actions..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -662,7 +770,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                 No matching claims or actions found
               </div>
               <div className="text-[11px] text-muted-foreground max-w-sm mx-auto">
-                No results for &ldquo;{query}&rdquo;. Try searching by patient name, claim #, CPT code, or action keywords like &ldquo;radar&rdquo;, &ldquo;brief&rdquo;, &ldquo;p2p&rdquo;, &ldquo;ingest&rdquo;, or &ldquo;erisa&rdquo;.
+                No results for &ldquo;{query}&rdquo;. Try searching by patient name, claim #, clinical term (e.g. &ldquo;subchondral&rdquo;, &ldquo;arthroplasty&rdquo;), CARC code (&ldquo;CO-50&rdquo;), or action keywords like &ldquo;radar&rdquo;, &ldquo;brief&rdquo;, &ldquo;p2p&rdquo;, &ldquo;ingest&rdquo;, or &ldquo;erisa&rdquo;.
               </div>
             </div>
           )}
@@ -670,8 +778,21 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
           {/* Claims Section */}
           {filteredClaims.length > 0 && (
             <div className="space-y-1">
-              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                Medical Denial Claims ({filteredClaims.length})
+              <div className="flex items-center justify-between px-2 py-1">
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                  Medical Denial Claims ({filteredClaims.length})
+                </div>
+                {isSearching && (
+                  <span className="inline-flex items-center gap-1.5 text-[9px] font-mono text-primary/90 bg-primary/10 border border-primary/25 px-2 py-0.5 rounded-full">
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        isServerLoading ? "bg-primary animate-pulse" : "bg-emerald-400 shadow-xs"
+                      )}
+                    />
+                    <span>{isServerLoading ? "Querying BM25..." : "Convex BM25 Index"}</span>
+                  </span>
+                )}
               </div>
 
               {filteredClaims.map((claim) => {
@@ -707,18 +828,18 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                       </div>
                       <div className="text-left min-w-0">
                         <div className="font-semibold text-xs text-foreground flex items-center gap-1.5 truncate">
-                          <span>{claim.patient?.name}</span>
+                          <span>{claim.patient?.name || claim.patientName || "Patient"}</span>
                           <span className="font-mono text-[11px] text-muted-foreground">
-                            ({claim.claimNumber})
+                            ({claim.claimNumber || "PENDING"})
                           </span>
                         </div>
                         <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 font-mono truncate">
-                          <span>{claim.patient?.insurancePayer}</span>
+                          <span>{claim.patient?.insurancePayer || claim.insurancePayer || "Health Insurer"}</span>
                           <span>•</span>
-                          <span>CPT {claim.cptCodes.join(", ")}</span>
+                          <span>{(claim.cptCodes && claim.cptCodes.length > 0) ? `CPT ${claim.cptCodes.join(", ")}` : "No CPT"}</span>
                           <span>•</span>
                           <span className="text-destructive font-semibold">
-                            {formatCurrency(claim.deniedAmount)}
+                            {formatCurrency(claim.deniedAmount || 0)}
                           </span>
                         </div>
                       </div>

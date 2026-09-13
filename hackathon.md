@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-13T03:57:00Z
+- **Last updated:** 2026-09-13T04:22:00Z
 
 ## Log
 
@@ -1360,10 +1360,17 @@ Scoped Date of Service (DOS) redaction to de-identified public exports, protecti
 - Deployment Self-Healing: Added `healCorruptedServiceDatesInternal` mutation in `convex/claims.ts` and executed it on active development deployment (`peaceful-sparrow-520`), reconciling corrupted asterisks dates back to authentic dates (e.g. `CLM-6104-GEO-5094` restored to `July 4, 2026` across claim and appeal brief).
 - Added regression tests in `tests/redactionEngine.test.ts` asserting DOS preservation by default and conditional masking during public exports. Verified 100% clean across typecheck, lint, 922 unit tests across 57 suites, and production build with `npm run verify`.
 
-### 2026-09-13 - working tree
+### 2026-09-13 - 27e61d0
 Resolved workspace transition latency and eliminated misleading call-to-action button states during autonomous appeal generation (`convex/claims.ts`, `convex/workflows.ts`, `src/components/common/SentinelFlowStepper.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/studio/AppealStudio.tsx`, `src/components/radar/IngestionModal.tsx`, `src/components/onboarding/OnboardingWizard.tsx`, `src/types/index.ts`, `tests/ingestionAndDeletionPipeline.test.ts`):
 - Synchronous Backend State Transition: Added `launchAutoPilot` to `updateAppealContext` mutation (`convex/claims.ts`), atomically updating `claim.status` to `"analyzing"` and `workflowStatus` to `"inProgress"` upon intake form confirmation before modal unmount.
 - Workflow Status Normalization: Hardened `performStartDurablePipeline` (`convex/workflows.ts`) to immediately mark claims as `"analyzing"` upon workflow initiation, eliminating the multi-second delay before Step 2.
 - UI Button Morphing & State Guardrails: Replaced inviting primary blue CTAs ("Auto-Pilot Appeal", "1-Click Complete Analysis", "Synthesize Brief") across `SentinelFlowStepper`, `EvidenceMatrix`, and `AppealStudio` with disabled, informative status pills displaying active spinning indicators whenever auto-pilot is running.
 - Instant Progress HUD: Expanded `isBackgroundPipelineRunning` to check `workflowStatus === "inProgress"`, making the autonomous Sentinel progress card and pipeline steps visible the instant the user lands in the workspace.
 - Added regression tests in `tests/ingestionAndDeletionPipeline.test.ts` and verified 100% clean across typecheck, lint, 924 unit tests, and production build with `npm run verify`.
+
+### 2026-09-13 - working tree
+Wired Convex BM25 native full-text search into the global command palette with debounced reactive querying (`src/components/common/CommandDialog.tsx`, `tests/commandPaletteSearch.test.ts`, `README.md`, `PRODUCT.md`, `IDEA.md`):
+- Reactively queries `api.claims.search` with 200ms debouncing across Convex `.searchIndex("search_claims")` and direct `by_claim_number` indexes, executing server-side lexical discovery over clinical terms (e.g. subchondral, CO-50, arthroplasty), CPT/ICD codes, and claim numbers across the entire portfolio in real time.
+- Merges authoritative BM25 server results with in-memory records, prioritizing server matches with fallback patient/payer normalization and deduplicating by claim ID.
+- Added live visual indicators in palette header (`Convex BM25 Index` / `Querying BM25...`) without emojis, refined empty-state suggestions, and preserved unified keyboard navigation.
+- Added unit tests in `tests/commandPaletteSearch.test.ts` (5 tests) and verified 100% clean with `npm run verify` across typecheck, lint, 929 passing unit tests across 58 suites, and production build.
