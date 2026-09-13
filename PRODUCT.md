@@ -36,6 +36,7 @@ Unlike generic AI document tools or manual template appeals, ClaimHero connects:
 - **Vision & Clinical Ingestion**: OpenAI `gpt-5.4-nano` with Structured Outputs extracting CPT codes, ICD-10 codes, CARC/RARC denial reason codes (e.g., CO-50), and disputed dollar amounts.
 - **Evidence Crawling & Discovery**: Firecrawl for live scraping and indexing of payer CPBs, recursive policy directory discovery via the `/v1/map` endpoint, and PubMed clinical guidelines.
 - **Autonomous Dispatch**: AgentMail integration providing dedicated email addresses per claim for automated transmission and webhook ingestion (`/agentmail-webhook`).
+- **Proof of Electronic Delivery**: Contemporaneous ERISA Certificate of Electronic Service combining AgentMail message IDs (RFC 5322), Amazon SES delivery receipts, live DNS MX server resolution, and NIST SHA-256 Convex storage fingerprints into court-ready affidavits under 28 U.S.C. § 1746 and Fed. R. Evid. 902(11).
 - **Data Privacy & Compliance**: Built with HIPAA security guardrails, strict TypeScript validation across the stack, and zero mock/fake data fallback.
 
 ## Brand Commitments
@@ -47,7 +48,7 @@ Unlike generic AI document tools or manual template appeals, ClaimHero connects:
 ## Evidence on Hand
 
 - Verified domain models and regulatory rules in `src/lib/constants.ts` (ERISA regulations, CARC/RARC code sets, CPT procedure codes).
-- Comprehensive test suite in `tests/` (953 automated tests across 60 test suites).
+- Comprehensive test suite in `tests/` (963 automated tests across 61 test suites).
 - Production-grade schema in `convex/schema.ts` supporting patients, claims, clinical evidences, appeals, email threads, and audit logs.
 - Formal specifications in `specs/001-appeal-sentinel/` and hackathon build log in `hackathon.md`.
 

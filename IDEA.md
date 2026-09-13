@@ -148,7 +148,7 @@ flowchart TD
    * **P2P Live Call Copilot (`P2PLiveCopilot.tsx`)**: Web Speech STT real-time transcription, AI Medical Director 3-stage challenge loop, Fast Answer rebuttal cards, win-score HUD, and copyable EHR Encounter Summary addendums (Epic/Cerner).
    * **Financial Liability Calculator (`FinancialLiabilityCalculator.tsx`)**: OOP-max capping, No Surprises Act balance billing protection, $110/day ERISA failure-to-disclose penalty trajectory, and printable audit statements.
    * **Court-Ready Dossier Binder (`dossier/`)**: Complete 8-page packet (Cover, TOC, Statutory Summary, Exhibit Index, Exhibits A-C, Attestation) with US Letter / A4 print isolation.
-5. **Payer Communications Drawer (`AgentMailDrawer.tsx`)**: Multi-channel gateway (email / portal / fax / mail) with 3-mode recipient switching, verified payer routing, and threaded two-way correspondence.
+5. **Payer Communications Drawer (`AgentMailDrawer.tsx`)**: Multi-channel gateway (email / portal / fax / mail) with 3-mode recipient switching, verified payer routing, threaded two-way correspondence, and the 1-click Printable **ERISA Certificate of Electronic Service (Proof of Delivery)** (`ServiceCertificateModal.tsx`, `convex/serviceCertificate.ts`) generating court-ready 28 U.S.C. § 1746 affidavits with live RFC 5322 Message-IDs, Amazon SES MTA receipts, live Node.js DNS MX server resolution, and SHA-256 storage fingerprints to defeat payer non-receipt procedural defaults.
 6. **Portfolio Analytics (`AnalyticsMetrics.tsx`)**: Practice-wide disputed vs. recovered amounts, insurer win rates, confidence distribution, and printable Executive Report statements.
 7. **HIPAA Privacy Redaction Engine (`PrivacyRedactionFilter.tsx`)**: Deterministic PII masking across Safe Harbor, Balanced Appellate, and Public Exhibit standards.
 8. **Sentinel AI Copilot Widget (`SentinelChatbot.tsx`, `⌘J`)**: Autonomous clinical & legal chatbot with 10 agentic OpenAI tool calling capabilities across Convex database records (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) and live Firecrawl web intelligence (`firecrawl_web_search`, `firecrawl_scrape_url`, `crawl_and_attach_evidence`), persistent `chatbotSessions`/`chatbotMessages` Convex tables, rolling context window summarization, and collapsible tool execution traces.
@@ -162,14 +162,15 @@ ClaimHero enforces rigorous automated test coverage (~81.3% lines across all mod
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (tsc --noEmit)
 npm run lint            # ESLint static code analysis
-npm run test            # Vitest automated test execution (953 tests across 60 suites)
+npm run test            # Vitest automated test execution (963 tests across 61 suites)
 npm run test:coverage   # Vitest with @vitest/coverage-v8 (~81.2% line coverage)
 npm run build           # Vite production bundle build
 npm run verify          # Full automated gate (typecheck + lint + test:coverage + build)
 ```
 
-### Verified Test Suites (953 Tests / 60 Suites)
+### Verified Test Suites (963 Tests / 61 Suites)
 * `tests/claimhero.test.ts` (70 tests): End-to-end integration, 4-pillar scoring rubric, ERISA deadline sweeps, and portfolio aggregates.
+* `tests/serviceCertificate.test.ts` (10 tests): ERISA Certificate of Electronic Service generation, live AgentMail message IDs, Amazon SES delivery receipts, recipient MX resolution, and Convex storage SHA-256 fingerprints.
 * `tests/policyDriftSentinel.test.ts` (15 tests): Policy Drift Sentinel retroactive CPB alteration detection, cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, and Convex audit integration.
 * `tests/agentMail.test.ts` (67 tests): AgentMail outbound dispatch, webhook normalization, email styling, Svix signature verification, and AI adjudicator addressing.
 * `tests/authorization.test.ts` (40 tests): Convex multi-tenant document isolation, owner verification, cross-tenant IDOR guards, and spending protection.
@@ -238,7 +239,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 |---|---|
 | **Real-World Utility** | Directly tackles a $200B/year denial crisis. Produces production-ready, sendable artifacts (formal briefs, P2P call scripts, EHR clinical notes, and court dossiers) rather than generic chat summaries. |
 | **Full-Stack Integration Depth** | All 4 sponsor platforms are deeply integrated: **Convex** (reactive DB, 1536-d vector search, searchIndex, scheduled crons, components), **Firecrawl** (live CPB scraping, PubMed, FDA), **AgentMail** (inbound webhooks, outbound dispatch, AI adjudicator), and **OpenAI** (Vision extraction, 4-pillar scoring, grounded synthesis). |
-| **Technical Rigor & Polish** | 100% clean `npm run verify` gate, 953 automated tests across 60 test suites, strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
+| **Technical Rigor & Polish** | 100% clean `npm run verify` gate, 963 automated tests across 61 test suites, strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
 | **Transparency & Build Process** | Comprehensive `hackathon.md` log with UTC timestamps, reconciled 7-character commit hashes, and detailed milestone notes. |
 
 ---

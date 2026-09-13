@@ -25,6 +25,7 @@ import {
   WarningCircle,
   X,
   PhoneCall,
+  SealCheck,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
@@ -36,6 +37,7 @@ import { Badge } from "../ui/badge";
 import { Button, buttonVariants } from "../ui/button";
 import { Input } from "../ui/input";
 import { ExportDrawer } from "../studio/ExportDrawer";
+import { ServiceCertificateModal } from "./ServiceCertificateModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { soundEffects } from "../../lib/soundEffects";
 
@@ -83,6 +85,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const [copiedFax, setCopiedFax] = useState(false);
   const [copiedPoBox, setCopiedPoBox] = useState(false);
   const [isExportDrawerOpen, setIsExportDrawerOpen] = useState(false);
+  const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
+  const [certificateMessageId, setCertificateMessageId] = useState<string | undefined>(undefined);
 
   // Auto-Pilot & Smart Rebuttal State
   const setAutoPilotMutation = useMutation(api.emails.setClaimAutoPilot);
@@ -506,6 +510,20 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               >
                 <Printer className="size-3.5" />
                 <span>Print Docket</span>
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setCertificateMessageId(undefined);
+                  setIsCertificateModalOpen(true);
+                }}
+                title="Generate court-ready ERISA Certificate of Electronic Service & Proof of Delivery affidavit"
+                className="h-8 rounded-md text-xs px-2.5 gap-1.5 shrink-0 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+              >
+                <SealCheck className="size-3.5" />
+                <span>Certificate of Service</span>
               </Button>
             </div>
           </div>
@@ -1178,6 +1196,22 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                           </Badge>
                         )}
 
+                        {isOutbound && (
+                          <Button
+                            variant="outline"
+                            size="xs"
+                            onClick={() => {
+                              setCertificateMessageId(msg._id);
+                              setIsCertificateModalOpen(true);
+                            }}
+                            className="h-5 px-1.5 text-[9.5px] font-mono gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 rounded"
+                            title="Generate ERISA Certificate of Electronic Service for this transmission"
+                          >
+                            <SealCheck className="size-3 text-emerald-500" />
+                            <span>Certificate of Service</span>
+                          </Button>
+                        )}
+
                         <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
                           <Clock className="size-3" />
                           <span>{formatDate(msg.receivedAt)}</span>
@@ -1440,6 +1474,14 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         onProceedToDispatch={() => {
           setIsExportDrawerOpen(false);
         }}
+      />
+
+      {/* Printable ERISA Certificate of Electronic Service Modal */}
+      <ServiceCertificateModal
+        isOpen={isCertificateModalOpen}
+        onClose={() => setIsCertificateModalOpen(false)}
+        claim={claim}
+        messageId={certificateMessageId}
       />
     </div>
   );
