@@ -18,7 +18,7 @@ import {
   Info,
   Calculator,
 } from "@phosphor-icons/react";
-import { Claim, ClinicalEvidence, OverturnScoringResult, ScoringCriterion } from "../../types";
+import { Claim, ClinicalEvidence, OverturnScoringResult, ScoringCriterion, DiscoveredPolicy } from "../../types";
 import { PolicyViewer } from "./PolicyViewer";
 import { PrecedentFeed } from "./PrecedentFeed";
 import { ClinicalResearchConsole } from "./ClinicalResearchConsole";
@@ -37,12 +37,23 @@ import { toast } from "sonner";
 interface EvidenceMatrixProps {
   claim: Claim;
   evidences: ClinicalEvidence[];
+  discoveredPolicies?: DiscoveredPolicy[];
   isLoadingEvidences?: boolean;
   onCrawlPolicy: (claimId: string, customUrl?: string) => Promise<unknown>;
   onCrawlPubMed?: (claimId: string, query?: string, customUrl?: string) => Promise<unknown>;
   onCrawlFDA?: (claimId: string, customUrl?: string, deviceName?: string) => Promise<unknown>;
   onCrawlCustomUrl?: (claimId: string, url: string, category?: string, notes?: string) => Promise<unknown>;
   onCrawlMultiSource?: (claimId: string, customUrl?: string) => Promise<unknown>;
+  onDiscoverPolicyDirectory?: (
+    claimId: string,
+    options?: {
+      payer?: string;
+      specialty?: string;
+      customDomain?: string;
+      limit?: number;
+      saveToEvidenceMatrix?: boolean;
+    }
+  ) => Promise<unknown>;
   onDeleteEvidence?: (evidenceId: string) => Promise<unknown>;
   onComputeScore: (claimId: string) => Promise<OverturnScoringResult>;
   onNavigateToStudio: () => void;
@@ -55,12 +66,14 @@ interface EvidenceMatrixProps {
 export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   claim,
   evidences,
+  discoveredPolicies,
   isLoadingEvidences,
   onCrawlPolicy,
   onCrawlPubMed,
   onCrawlFDA,
   onCrawlCustomUrl,
   onCrawlMultiSource,
+  onDiscoverPolicyDirectory,
   onDeleteEvidence,
   onComputeScore,
   onNavigateToStudio,
@@ -742,11 +755,13 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               <ClinicalResearchConsole
                 claim={claim}
                 evidences={evidences}
+                discoveredPolicies={discoveredPolicies}
                 onCrawlCPB={onCrawlPolicy}
                 onCrawlPubMed={onCrawlPubMed || (async () => {})}
                 onCrawlFDA={onCrawlFDA || (async () => {})}
                 onCrawlCustomUrl={onCrawlCustomUrl || (async () => {})}
                 onCrawlMultiSource={onCrawlMultiSource || (async () => {})}
+                onDiscoverDirectory={onDiscoverPolicyDirectory}
                 onDeleteEvidence={onDeleteEvidence}
                 onComputeScore={onComputeScore}
                 onNavigateToStudio={onNavigateToStudio}

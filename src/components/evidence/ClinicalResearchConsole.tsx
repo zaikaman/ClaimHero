@@ -17,8 +17,9 @@ import {
   ShieldCheck,
   Lightning,
   Trash,
+  Compass,
 } from "@phosphor-icons/react";
-import { Claim, ClinicalEvidence, EvidenceSourceType, ResearchMode } from "../../types";
+import { Claim, ClinicalEvidence, EvidenceSourceType, ResearchMode, DiscoveredPolicy } from "../../types";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -26,10 +27,12 @@ import { Input } from "../ui/input";
 import { Select } from "../ui/select";
 import { Alert, AlertDescription } from "../ui/alert";
 import { stripMarkdownFormatting } from "../../lib/utils";
+import { getPayerClinicalDirectoryUrl } from "../../lib/constants";
 
 interface ClinicalResearchConsoleProps {
   claim: Claim;
   evidences: ClinicalEvidence[];
+  discoveredPolicies?: DiscoveredPolicy[];
   onCrawlCPB: (claimId: string, customUrl?: string) => Promise<unknown>;
   onCrawlPubMed: (claimId: string, query?: string, customUrl?: string) => Promise<unknown>;
   onCrawlFDA: (claimId: string, customUrl?: string, deviceName?: string) => Promise<unknown>;
@@ -40,6 +43,16 @@ interface ClinicalResearchConsoleProps {
     notes?: string
   ) => Promise<unknown>;
   onCrawlMultiSource: (claimId: string, customUrl?: string) => Promise<unknown>;
+  onDiscoverDirectory?: (
+    claimId: string,
+    options?: {
+      payer?: string;
+      specialty?: string;
+      customDomain?: string;
+      limit?: number;
+      saveToEvidenceMatrix?: boolean;
+    }
+  ) => Promise<unknown>;
   onDeleteEvidence?: (evidenceId: string) => Promise<unknown>;
   onComputeScore?: (claimId: string) => Promise<unknown>;
   onNavigateToStudio?: () => void;
@@ -92,6 +105,19 @@ export const RESEARCH_MODES: ResearchChannelConfig[] = [
     clinicalImpact:
       "Exposes when the payer's adverse determination contradicts its own published medical bulletin or imposes unwritten coverage restrictions prohibited under ERISA.",
     actionButtonLabel: "Crawl Insurer Policy Bulletin",
+  },
+  {
+    id: "directory_discovery",
+    shortLabel: "Directory Map",
+    fullLabel: "Insurer Policy Directory Discovery",
+    tagline: "Firecrawl /v1/map Sweep",
+    icon: Compass,
+    iconColor: "text-violet-400 bg-violet-500/15 border-violet-500/30",
+    description:
+      "Deploys Firecrawl's /v1/map domain discovery endpoint across the payer's clinical policy root directory (e.g. aetna.com/cpb, cigna.com/coveragePolicies) to rapidly discover all clinical bulletins for a given medical specialty (e.g. Orthopedics, Oncology, Cardiology) and save them to Convex.",
+    clinicalImpact:
+      "Uncovers companion clinical policies, cross-referenced diagnostic rules, and step-therapy bulletins across the payer's full domain structure that insurers omit from standard denial letters.",
+    actionButtonLabel: "Discover Insurer Policy Directory",
   },
   {
     id: "pubmed_trials",
@@ -160,11 +186,13 @@ export const PRESET_RESEARCH_URLS = [
 export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = ({
   claim,
   evidences,
+  discoveredPolicies,
   onCrawlCPB,
   onCrawlPubMed,
   onCrawlFDA,
   onCrawlCustomUrl,
   onCrawlMultiSource,
+  onDiscoverDirectory,
   onDeleteEvidence,
   onComputeScore,
   onNavigateToStudio,
@@ -173,6 +201,14 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
   const [customUrl, setCustomUrl] = useState<string>("");
   const [customCategory, setCustomCategory] = useState<string>("payer_cpb");
   const [customQuery, setCustomQuery] = useState<string>("");
+  const [directoryDomain, setDirectoryDomain] = useState<string>(
+    getPayerClinicalDirectoryUrl(claim.patient?.insurancePayer)
+  );
+  const [directorySpecialty, setDirectorySpecialty] = useState<string>("Orthopedics");
+  const [directoryLimit, setDirectoryLimit] = useState<number>(30);
+  const [saveDiscoveredToEvidence, setSaveDiscoveredToEvidence] = useState<boolean>(true);
+  const [discoveredList, setDiscoveredList] = useState<DiscoveredPolicy[]>(discoveredPolicies || []);
+
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [elapsedMs, setElapsedMs] = useState<number>(0);
   const [currentStageIndex, setCurrentStageIndex] = useState<number>(0);
@@ -185,7 +221,23 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
   const timerRef = useRef<number | null>(null);
   const terminalBottomRef = useRef<HTMLDivElement | null>(null);
 
-  const stages = [
+  useEffect(() => {
+    setDiscoveredList(discoveredPolicies || []);
+  }, [discoveredPolicies, claim._id]);
+
+  useEffect(() => {
+    setDirectoryDomain(getPayerClinicalDirectoryUrl(claim.patient?.insurancePayer));
+    setErrorMessage(null);
+    setSuccessSummary(null);
+  }, [claim._id, claim.patient?.insurancePayer]);
+
+  const stages = activeMode === "directory_discovery" ? [
+    { name: "Handshake", desc: "Firecrawl /v1/map gateway" },
+    { name: "Domain Map", desc: "Payer URL structure sweep" },
+    { name: "Filter Spec", desc: "Specialty bulletin match" },
+    { name: "Extract IDs", desc: "CPB bulletin identifiers" },
+    { name: "Ledger Save", desc: "Persisted to Convex DB" },
+  ] : [
     { name: "Handshake", desc: "Firecrawl v2 gateway auth" },
     { name: "Web Scrape", desc: "DOM to Markdown conversion" },
     { name: "Clinical AI", desc: "GPT criteria & indications" },
@@ -228,12 +280,18 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
     try {
       // Stage 1: Handshake
       setCurrentStageIndex(0);
-      addLog("Handshake", "Authenticating Firecrawl API gateway with clinical session credentials...", "info");
+      if (activeMode === "directory_discovery") {
+        addLog("Handshake", "Authenticating Firecrawl /v1/map API gateway for directory structure mapping...", "info");
+      } else {
+        addLog("Handshake", "Authenticating Firecrawl API gateway with clinical session credentials...", "info");
+      }
       await new Promise((r) => setTimeout(r, 400));
 
-      // Stage 2: Scraping
+      // Stage 2: Scraping / Mapping
       setCurrentStageIndex(1);
-      if (activeMode === "custom_url") {
+      if (activeMode === "directory_discovery") {
+        addLog("Domain Map", `Mapping payer clinical directory ${directoryDomain} for specialty [${directorySpecialty}]...`, "info");
+      } else if (activeMode === "custom_url") {
         if (!customUrl.trim()) {
           throw new Error("Please enter a valid web URL to scrape.");
         }
@@ -248,28 +306,50 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
         addLog("Scrape", "Initiating parallel multi-source crawl (CPB + PubMed + FDA)...", "info");
       }
 
-      // Stage 3 & 4: Clinical AI Extraction
+      // Stage 3 & 4: Clinical AI Extraction / Directory Processing
       setCurrentStageIndex(2);
-      addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
-
       let result: Record<string, unknown> | null = null;
-      if (activeMode === "multi_source") {
+
+      if (activeMode === "directory_discovery") {
+        if (!onDiscoverDirectory) {
+          throw new Error("Insurer policy directory discovery handler is not configured.");
+        }
+        result = (await onDiscoverDirectory(claim._id, {
+          payer: claim.patient?.insurancePayer,
+          specialty: directorySpecialty,
+          customDomain: directoryDomain.trim() || undefined,
+          limit: directoryLimit,
+          saveToEvidenceMatrix: saveDiscoveredToEvidence,
+        })) as unknown as Record<string, unknown>;
+
+        setCurrentStageIndex(3);
+        const count = Number(result?.totalDiscovered || 0);
+        if (Array.isArray(result?.bulletins)) {
+          setDiscoveredList(result.bulletins as DiscoveredPolicy[]);
+        }
+        addLog("Audit", `Discovered ${count} active policy bulletins for ${directorySpecialty} under ${directoryDomain}`, "success");
+      } else if (activeMode === "multi_source") {
+        addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
         result = (await onCrawlMultiSource(claim._id, customUrl || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Synthesized multi-source dossier: ${result?.cpbClauses || 0} CPB, ${result?.pubMedClauses || 0} PubMed, ${result?.fdaClauses || 0} FDA clauses`, "success");
       } else if (activeMode === "payer_cpb") {
+        addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
         result = (await onCrawlCPB(claim._id, customUrl || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} clinical policy clauses: "${result?.policyTitle || "Policy Bulletin"}"`, "success");
       } else if (activeMode === "pubmed_trials") {
+        addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
         result = (await onCrawlPubMed(claim._id, customQuery || undefined, customUrl || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} trial clauses from study: "${result?.studyTitle || "PubMed Study"}" (${result?.identifier || "PMID"})`, "success");
       } else if (activeMode === "fda_labels") {
+        addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
         result = (await onCrawlFDA(claim._id, customUrl || undefined, customQuery || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} FDA label clauses for: "${result?.productName || "Approved Medical Product"}" (${result?.applicationNumber || "NDA/PMA"})`, "success");
       } else if (activeMode === "custom_url") {
+        addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
         result = (await onCrawlCustomUrl(claim._id, customUrl.trim(), customCategory, customQuery || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} structured criteria clauses: "${result?.documentTitle || "Custom Guideline"}"`, "success");
@@ -277,16 +357,25 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
 
       // Stage 5: Persistence
       setCurrentStageIndex(4);
-      addLog("Convex DB", "Persisted structured criteria clauses to clinicalEvidences ledger.", "success");
+      if (activeMode === "directory_discovery") {
+        addLog("Convex DB", `Persisted discovered bulletins to discoveredPolicies and clinicalEvidences.`, "success");
+      } else {
+        addLog("Convex DB", "Persisted structured criteria clauses to clinicalEvidences ledger.", "success");
+      }
       await new Promise((r) => setTimeout(r, 300));
       setCurrentStageIndex(5);
 
       const totalExtracted =
+        result?.totalDiscovered ||
         result?.clausesExtracted ||
         (Number(result?.cpbClauses || 0) + Number(result?.pubMedClauses || 0) + Number(result?.fdaClauses || 0)) ||
         "multiple";
 
-      setSuccessSummary(`Successfully indexed ${totalExtracted} clinical evidence clauses in ${(Date.now() - startTime) / 1000}s.`);
+      if (activeMode === "directory_discovery") {
+        setSuccessSummary(`Successfully mapped insurer directory and discovered ${totalExtracted} policy bulletins in ${(Date.now() - startTime) / 1000}s.`);
+      } else {
+        setSuccessSummary(`Successfully indexed ${totalExtracted} clinical evidence clauses in ${(Date.now() - startTime) / 1000}s.`);
+      }
       addLog("Complete", "Research session completed successfully.", "success");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Clinical research crawl failed.";
@@ -381,20 +470,25 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
         </div>
 
         {/* Research Channel Selector */}
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-foreground font-sans">
-              Clinical Research Channel
-            </span>
-            <span className="text-[11px] font-mono text-muted-foreground">
-              Select ingestion pipeline
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-foreground font-sans tracking-wide">
+                Clinical Research Channel
+              </span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted/60 border border-border/60 text-muted-foreground">
+                6 Ingestion Channels
+              </span>
+            </div>
+            <span className="text-[11px] font-mono text-muted-foreground hidden sm:inline">
+              Select active workstation
             </span>
           </div>
 
           <div
             role="tablist"
             aria-label="Clinical research channels"
-            className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-muted/30 border border-border/70 w-full"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 w-full"
           >
             {RESEARCH_MODES.map((mode, index) => {
               const Icon = mode.icon;
@@ -408,40 +502,70 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                   aria-controls={`panel-${mode.id}`}
                   tabIndex={isSelected ? 0 : -1}
                   onKeyDown={(e) => {
-                    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                    let targetIndex = index;
+                    if (e.key === "ArrowRight") {
                       e.preventDefault();
-                      const nextIndex = (index + 1) % RESEARCH_MODES.length;
-                      setActiveMode(RESEARCH_MODES[nextIndex].id);
-                      document.getElementById(`tab-${RESEARCH_MODES[nextIndex].id}`)?.focus();
-                    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                      targetIndex = (index + 1) % RESEARCH_MODES.length;
+                    } else if (e.key === "ArrowLeft") {
                       e.preventDefault();
-                      const prevIndex = (index - 1 + RESEARCH_MODES.length) % RESEARCH_MODES.length;
-                      setActiveMode(RESEARCH_MODES[prevIndex].id);
-                      document.getElementById(`tab-${RESEARCH_MODES[prevIndex].id}`)?.focus();
+                      targetIndex = (index - 1 + RESEARCH_MODES.length) % RESEARCH_MODES.length;
+                    } else if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      targetIndex = (index + 3) % RESEARCH_MODES.length;
+                    } else if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      targetIndex = (index - 3 + RESEARCH_MODES.length) % RESEARCH_MODES.length;
+                    }
+                    if (targetIndex !== index) {
+                      setActiveMode(RESEARCH_MODES[targetIndex].id);
+                      document.getElementById(`tab-${RESEARCH_MODES[targetIndex].id}`)?.focus();
                     }
                   }}
                   onClick={() => setActiveMode(mode.id)}
                   disabled={isExecuting}
-                  className={`group relative flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer whitespace-nowrap min-w-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
+                  className={`group relative flex items-start gap-2.5 p-2.5 rounded-xl border text-left transition-all duration-150 cursor-pointer min-w-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
                     isSelected
-                      ? "border-primary/50 bg-card text-foreground shadow-xs ring-1 ring-primary/30"
-                      : "border-transparent bg-transparent hover:bg-card/60 text-muted-foreground hover:text-foreground"
+                      ? "border-primary/60 bg-primary/[0.08] text-foreground shadow-xs shadow-primary/10 ring-1 ring-primary/30"
+                      : "border-border/60 bg-card/50 hover:bg-card/90 hover:border-border text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <div
-                    className={`size-5 rounded flex items-center justify-center border transition-colors shrink-0 ${
+                    className={`size-7 rounded-lg flex items-center justify-center border transition-colors shrink-0 mt-0.5 ${
                       isSelected
                         ? mode.iconColor
                         : "border-border/60 bg-muted/40 text-muted-foreground group-hover:text-foreground"
                     }`}
                   >
-                    <Icon className="size-3" />
+                    <Icon className="size-3.5" />
                   </div>
-                  <span className="truncate">{mode.shortLabel}</span>
-                  {mode.badge && (
+
+                  <div className="min-w-0 flex-1 pr-3">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className={`text-xs font-semibold ${
+                          isSelected ? "text-foreground font-bold" : "text-foreground/90"
+                        }`}
+                      >
+                        {mode.shortLabel}
+                      </span>
+                      {mode.badge && (
+                        <span
+                          className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded-full border border-cyan-500/40 text-cyan-400 bg-cyan-500/10 shrink-0"
+                        >
+                          {mode.badge}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-mono text-muted-foreground block truncate mt-0.5">
+                      {mode.tagline}
+                    </span>
+                  </div>
+
+                  {/* Active Selection Indicator Pip */}
+                  {isSelected && (
                     <span
-                      className="size-1.5 rounded-full bg-primary shrink-0 ring-2 ring-primary/30"
-                      title="Recommended"
+                      className="absolute top-2.5 right-2.5 size-1.5 rounded-full bg-primary ring-2 ring-primary/30"
+                      aria-hidden="true"
                     />
                   )}
                 </button>
@@ -569,6 +693,139 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                         <p className="text-[11px] text-muted-foreground leading-tight">
                           Target: Approved indications & device safety specs to refute CARC <strong className="font-mono text-foreground">{claim.denialReasonCode}</strong>.
                         </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : activeMode === "directory_discovery" ? (
+                  <div className="space-y-2.5">
+                    {/* Panel 1: Target Payer Directory & Presets */}
+                    <div className="rounded-xl border border-border/70 bg-card/60 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="directory-root-url-input"
+                          className="text-xs font-semibold text-foreground font-sans flex items-center gap-1.5"
+                        >
+                          <Compass className="size-3.5 text-violet-400" />
+                          Payer Clinical Policy Root URL
+                        </label>
+                        <span className="text-[10px] font-mono text-violet-400 px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/25">
+                          Firecrawl /v1/map discovery
+                        </span>
+                      </div>
+
+                      <Input
+                        id="directory-root-url-input"
+                        type="url"
+                        placeholder="https://www.aetna.com/cpb or https://www.cigna.com/coveragePolicies"
+                        value={directoryDomain}
+                        onChange={(e) => setDirectoryDomain(e.target.value)}
+                        className="h-8 text-xs font-mono bg-muted/30 border-border/80 focus-visible:ring-violet-400/30"
+                        disabled={isExecuting}
+                      />
+
+                      {/* Clean Presets Row */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider shrink-0 mr-1">
+                          Payer Presets:
+                        </span>
+                        {[
+                          { label: "Aetna CPB", url: "https://www.aetna.com/cpb", spec: "Orthopedics", match: "aetna" },
+                          { label: "Cigna Policies", url: "https://www.cigna.com/coveragePolicies", spec: "Orthopedics", match: "cigna" },
+                          { label: "UHC Commercial", url: "https://www.uhcprovider.com/en/policies-protocols/commercial-policies.html", spec: "Orthopedics", match: "uhc" },
+                          { label: "Anthem / BCBS", url: "https://www.anthem.com/provider/policies", spec: "Orthopedics", match: "anthem" },
+                          { label: "Molina Guidelines", url: "https://www.molinahealthcare.com/providers/common/medicaid/clinical-guidelines.aspx", spec: "Orthopedics", match: "molina" },
+                        ].map((p, idx) => {
+                          const isMatch = directoryDomain.toLowerCase().includes(p.match);
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setDirectoryDomain(p.url);
+                                setDirectorySpecialty(p.spec);
+                              }}
+                              disabled={isExecuting}
+                              className={`text-[11px] font-sans px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                                isMatch
+                                  ? "border-violet-500/60 bg-violet-500/15 text-violet-300 font-medium shadow-xs shadow-violet-500/10"
+                                  : "border-border/70 bg-muted/40 hover:bg-muted hover:border-border text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Panel 2: Symmetrical 3-Column Parameter Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* Column 1: Medical Specialty */}
+                      <div className="rounded-xl border border-border/70 bg-card/60 p-2.5 space-y-1.5 flex flex-col justify-between">
+                        <label
+                          htmlFor="directory-specialty-select"
+                          className="text-[11px] font-semibold text-foreground font-sans block"
+                        >
+                          Medical Specialty
+                        </label>
+                        <Select
+                          id="directory-specialty-select"
+                          value={directorySpecialty}
+                          onChange={(e) => setDirectorySpecialty(e.target.value)}
+                          className="h-8 text-xs font-sans bg-muted/30 border-border/80 w-full"
+                          disabled={isExecuting}
+                        >
+                          <option value="Orthopedics">Orthopedics &amp; Musculoskeletal</option>
+                          <option value="Spine & Orthopedics">Spine &amp; Orthopedics</option>
+                          <option value="Oncology">Oncology &amp; Chemotherapy</option>
+                          <option value="Cardiology">Cardiology &amp; Vascular</option>
+                          <option value="Radiology">Radiology &amp; Imaging</option>
+                          <option value="Gastroenterology">Gastroenterology</option>
+                          <option value="General Surgery">General Surgery</option>
+                          <option value="Neurology">Neurology</option>
+                        </Select>
+                      </div>
+
+                      {/* Column 2: Discovery Limit */}
+                      <div className="rounded-xl border border-border/70 bg-card/60 p-2.5 space-y-1.5 flex flex-col justify-between">
+                        <label
+                          htmlFor="directory-limit-select"
+                          className="text-[11px] font-semibold text-foreground font-sans block"
+                        >
+                          Discovery Limit
+                        </label>
+                        <Select
+                          id="directory-limit-select"
+                          value={String(directoryLimit)}
+                          onChange={(e) => setDirectoryLimit(Number(e.target.value) || 30)}
+                          className="h-8 text-xs font-sans bg-muted/30 border-border/80 w-full"
+                          disabled={isExecuting}
+                        >
+                          <option value="15">15 URLs (Fast)</option>
+                          <option value="30">30 URLs (Balanced)</option>
+                          <option value="50">50 URLs (Comprehensive)</option>
+                          <option value="100">100 URLs (Deep Sweep)</option>
+                        </Select>
+                      </div>
+
+                      {/* Column 3: Evidence Matrix Linkage */}
+                      <div className="rounded-xl border border-border/70 bg-card/60 p-2.5 space-y-1.5 flex flex-col justify-between">
+                        <label
+                          htmlFor="directory-evidence-link-select"
+                          className="text-[11px] font-semibold text-foreground font-sans block"
+                        >
+                          Claim Evidence Link
+                        </label>
+                        <Select
+                          id="directory-evidence-link-select"
+                          value={saveDiscoveredToEvidence ? "true" : "false"}
+                          onChange={(e) => setSaveDiscoveredToEvidence(e.target.value === "true")}
+                          className="h-8 text-xs font-sans bg-muted/30 border-border/80 w-full"
+                          disabled={isExecuting}
+                        >
+                          <option value="true">Save to Evidence Matrix</option>
+                          <option value="false">Discovery Only (Do not link)</option>
+                        </Select>
                       </div>
                     </div>
                   </div>
@@ -712,7 +969,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                   size="sm"
                   onClick={handleExecuteResearch}
                   disabled={isExecuting}
-                  className="h-8.5 text-xs px-4 gap-2 bg-primary text-primary-foreground font-semibold shadow-xs hover:bg-primary/90 transition-all cursor-pointer shrink-0"
+                  className="h-8 text-xs px-4 gap-2 bg-primary text-primary-foreground font-semibold shadow-xs hover:bg-primary/90 transition-all cursor-pointer shrink-0"
                 >
                   {isExecuting ? (
                     <>
@@ -866,6 +1123,90 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
           </Card>
         );
       })()}
+
+      {/* Discovered Insurer Policy Directory Feed (Firecrawl /map) */}
+      {(activeMode === "directory_discovery" || discoveredList.length > 0) && (
+        <Card className="p-4 border-border/80 bg-card/80 space-y-3 shadow-sm border-l-4 border-l-violet-500/70">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-2.5">
+            <div className="flex items-center gap-2">
+              <Compass className="size-4 text-violet-400" />
+              <span className="text-xs font-semibold text-foreground font-sans">
+                Discovered Insurer Policy Directory ({discoveredList.length} Bulletins via Firecrawl /map)
+              </span>
+            </div>
+            <Badge variant="outline" className="font-mono text-[10px] text-violet-400 border-violet-500/30 self-start sm:self-auto">
+              Live Domain Map
+            </Badge>
+          </div>
+
+          {discoveredList.length === 0 ? (
+            <div className="py-6 text-center text-xs text-muted-foreground font-sans">
+              No insurer directory bulletins mapped yet. Click &quot;Discover Insurer Policy Directory&quot; above to sweep {claim.patient?.insurancePayer || "payer"} policies.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-80 overflow-y-auto pr-1">
+              {discoveredList.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-lg border border-border/70 bg-card/90 p-2.5 space-y-1.5 text-xs hover:border-violet-500/40 transition-colors shadow-2xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                      {item.bulletinNumber ? (
+                        <Badge variant="outline" className="font-mono text-[10px] border-violet-500/40 text-violet-400 shrink-0">
+                          CPB {item.bulletinNumber}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="font-mono text-[10px] border-border text-muted-foreground shrink-0">
+                          Policy Bulletin
+                        </Badge>
+                      )}
+                      <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[120px]">
+                        {item.payer || claim.patient?.insurancePayer}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => handleCopyCitation(item.url, `${item.title} (${item.url})`)}
+                        title="Copy policy URL"
+                      >
+                        {copiedId === item.url ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+                      </Button>
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        title="Open discovered bulletin"
+                      >
+                        <ArrowSquareOut className="size-3" />
+                      </a>
+                    </div>
+                  </div>
+
+                  <h5 className="font-semibold text-foreground text-xs leading-snug line-clamp-2">
+                    {item.title}
+                  </h5>
+
+                  {item.description && (
+                    <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                      {stripMarkdownFormatting(item.description)}
+                    </p>
+                  )}
+
+                  <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-muted-foreground border-t border-border/40">
+                    <span className="truncate max-w-[200px]" title={item.url}>{item.url}</span>
+                    <span className="text-violet-400 shrink-0">{item.specialty || "Orthopedics"}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Indexed Clinical Evidence Dossier View */}
       <Card className="p-4 border-border/80 bg-card/80 space-y-3 shadow-sm">

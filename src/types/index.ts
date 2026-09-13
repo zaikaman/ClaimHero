@@ -492,6 +492,7 @@ export interface DashboardStats {
 // Multi-Source Clinical Research Hub Types
 export type ResearchMode =
   | "multi_source"
+  | "directory_discovery"
   | "payer_cpb"
   | "pubmed_trials"
   | "fda_labels"
@@ -541,6 +542,34 @@ export interface FdaScrapeResult {
     extractedEvidenceMarkdown: string;
     relevanceScore: number;
   }>;
+}
+
+export interface DiscoveredPolicy {
+  _id?: string;
+  claimId?: string;
+  payer: string;
+  specialty: string;
+  domain: string;
+  url: string;
+  title: string;
+  description?: string;
+  bulletinNumber?: string;
+  discoveredAt?: number;
+}
+
+export interface DiscoverPolicyDirectoryResult {
+  success: boolean;
+  payer: string;
+  specialty: string;
+  domain: string;
+  totalDiscovered: number;
+  bulletins: Array<{
+    url: string;
+    title: string;
+    description?: string;
+    bulletinNumber?: string;
+  }>;
+  savedToEvidence: boolean;
 }
 
 // Case collaboration (Appeal Studio presence + invites)

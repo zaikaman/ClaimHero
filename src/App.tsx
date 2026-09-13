@@ -111,11 +111,13 @@ export default function App() {
   const {
     evidences,
     isLoadingEvidences,
+    discoveredPolicies,
     crawlPolicy,
     crawlPubMed,
     crawlFda,
     crawlCustomUrl,
     crawlMultiSourceHub,
+    discoverPolicyDirectory,
     deleteEvidence,
     computeOverturnScore,
     runFullPipeline,
@@ -330,12 +332,14 @@ export default function App() {
                 <EvidenceMatrix
                   claim={selectedClaim}
                   evidences={evidences}
+                  discoveredPolicies={discoveredPolicies}
                   isLoadingEvidences={isLoadingEvidences}
                   onCrawlPolicy={crawlPolicy}
                   onCrawlPubMed={crawlPubMed}
                   onCrawlFDA={crawlFda}
                   onCrawlCustomUrl={crawlCustomUrl}
                   onCrawlMultiSource={crawlMultiSourceHub}
+                  onDiscoverPolicyDirectory={discoverPolicyDirectory}
                   onDeleteEvidence={deleteEvidence}
                   onComputeScore={computeOverturnScore}
                   onNavigateToStudio={() => setCurrentView("studio")}

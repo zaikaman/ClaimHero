@@ -642,3 +642,185 @@ export const savePolicySnapshotInternal = internalMutation({
     });
   },
 });
+
+export const discoveredPolicyItemValidator = v.object({
+  url: v.string(),
+  title: v.string(),
+  description: v.optional(v.string()),
+  bulletinNumber: v.optional(v.string()),
+});
+
+/**
+ * Internal mutation to persist batch discovered policies from Firecrawl /map into Convex
+ * and optionally link them as clinical evidences for the active claim.
+ */
+export const saveDiscoveredPoliciesInternal = internalMutation({
+  args: {
+    claimId: v.optional(v.id("claims")),
+    payer: v.string(),
+    specialty: v.string(),
+    domain: v.string(),
+    policies: v.array(discoveredPolicyItemValidator),
+    saveToEvidenceMatrix: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const insertedIds: Id<"discoveredPolicies">[] = [];
+
+    for (const item of args.policies) {
+      const id = await ctx.db.insert("discoveredPolicies", {
+        claimId: args.claimId,
+        payer: args.payer,
+        specialty: args.specialty,
+        domain: args.domain,
+        url: item.url,
+        title: item.title,
+        description: item.description,
+        bulletinNumber: item.bulletinNumber,
+        discoveredAt: now,
+      });
+      insertedIds.push(id);
+    }
+
+    // Optionally index top discovered bulletins directly into clinicalEvidences for the claim
+    if (args.claimId && args.saveToEvidenceMatrix) {
+      const claim = await ctx.db.get(args.claimId);
+      if (claim) {
+        const existingEvidences = await ctx.db
+          .query("clinicalEvidences")
+          .withIndex("by_claim", (q) => q.eq("claimId", args.claimId!))
+          .collect();
+        const existingUrls = new Set(
+          existingEvidences
+            .map((e) => e.sourceUrl?.toLowerCase().trim())
+            .filter(Boolean)
+        );
+
+        let addedEvidenceCount = 0;
+        for (const item of args.policies.slice(0, 10)) {
+          const itemUrlNorm = item.url.toLowerCase().trim();
+          if (existingUrls.has(itemUrlNorm)) continue;
+          existingUrls.add(itemUrlNorm);
+
+          const citationClause = item.bulletinNumber
+            ? `CPB ${item.bulletinNumber}`
+            : sanitizeCitationClause(`${args.specialty} Policy`);
+
+          const extractedEvidence = item.description && item.description.trim().length > 20
+            ? item.description.trim()
+            : `Official ${args.payer} Clinical Policy Bulletin discovered for ${args.specialty} under ${args.domain}. Governs medical necessity criteria, step therapy, and utilization management.`;
+
+          await ctx.db.insert("clinicalEvidences", {
+            claimId: args.claimId,
+            sourceType: "payer_cpb",
+            title: item.title.replace(/\*\*/g, ""),
+            sourceUrl: item.url,
+            citationClause,
+            extractedEvidenceMarkdown: extractedEvidence,
+            relevanceScore: 92,
+            createdAt: now,
+          });
+          addedEvidenceCount++;
+        }
+
+        if (addedEvidenceCount > 0 && typeof ctx.db.patch === "function") {
+          await ctx.db.patch(args.claimId, {
+            evidenceCount: (claim.evidenceCount || 0) + addedEvidenceCount,
+            updatedAt: now,
+          });
+        }
+
+        await appendAuditLog(ctx, {
+          claimId: args.claimId,
+          userId: claim.userId,
+          eventType: "policy_crawled",
+          actor: "Firecrawl /map Directory Discovery",
+          details: `Discovered and indexed ${args.policies.length} policy directory bulletins from ${args.domain} (${args.specialty}).`,
+          timestamp: now,
+        });
+      }
+    }
+
+    return insertedIds;
+  },
+});
+
+/**
+ * List discovered policy directory bulletins for a claim or by payer & specialty
+ */
+export const listDiscoveredPolicies = query({
+  args: {
+    claimId: v.optional(v.id("claims")),
+    payer: v.optional(v.string()),
+    specialty: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<Doc<"discoveredPolicies">[]> => {
+    const maxItems = args.limit || 50;
+
+    if (args.claimId) {
+      const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+      if (!authorized) return [];
+
+      return await ctx.db
+        .query("discoveredPolicies")
+        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+        .order("desc")
+        .take(maxItems);
+    }
+
+    if (args.payer && args.specialty) {
+      return await ctx.db
+        .query("discoveredPolicies")
+        .withIndex("by_payer_and_specialty", (q) =>
+          q.eq("payer", args.payer!).eq("specialty", args.specialty!)
+        )
+        .order("desc")
+        .take(maxItems);
+    }
+
+    return await ctx.db
+      .query("discoveredPolicies")
+      .order("desc")
+      .take(maxItems);
+  },
+});
+
+/**
+ * Internal query for background actions to retrieve discovered policies
+ */
+export const listDiscoveredPoliciesInternal = internalQuery({
+  args: {
+    claimId: v.optional(v.id("claims")),
+    payer: v.optional(v.string()),
+    specialty: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<Doc<"discoveredPolicies">[]> => {
+    const maxItems = args.limit || 50;
+
+    if (args.claimId) {
+      return await ctx.db
+        .query("discoveredPolicies")
+        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+        .order("desc")
+        .take(maxItems);
+    }
+
+    if (args.payer && args.specialty) {
+      return await ctx.db
+        .query("discoveredPolicies")
+        .withIndex("by_payer_and_specialty", (q) =>
+          q.eq("payer", args.payer!).eq("specialty", args.specialty!)
+        )
+        .order("desc")
+        .take(maxItems);
+    }
+
+    return await ctx.db
+      .query("discoveredPolicies")
+      .order("desc")
+      .take(maxItems);
+  },
+});
+

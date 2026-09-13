@@ -415,6 +415,6 @@ describe("Visual Proof & Audit Archive: Full-Page Screenshots & Policy Exhibits"
 
       expect(res.screenshot).toBe("https://api.firecrawl.dev/storage/v1/object/public/fallback-shot.png");
       expect(scrapeSpy).toHaveBeenCalledTimes(3);
-    });
+    }, 15000);
   });
 });

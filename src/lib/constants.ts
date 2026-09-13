@@ -39,6 +39,55 @@ export const getPayerAppellateContact = (payerName?: string): PayerAppellateCont
   };
 };
 
+export const PAYER_CLINICAL_DIRECTORIES: Record<string, { name: string; domainUrl: string; defaultSpecialty: string }> = {
+  aetna: {
+    name: "Aetna",
+    domainUrl: "https://www.aetna.com/cpb",
+    defaultSpecialty: "Orthopedics",
+  },
+  cigna: {
+    name: "Cigna",
+    domainUrl: "https://www.cigna.com/coveragePolicies",
+    defaultSpecialty: "Orthopedics",
+  },
+  unitedhealthcare: {
+    name: "UnitedHealthcare",
+    domainUrl: "https://www.uhcprovider.com/en/policies-protocols/commercial-policies.html",
+    defaultSpecialty: "Orthopedics",
+  },
+  humana: {
+    name: "Humana",
+    domainUrl: "https://www.humana.com/provider/medical-resources/clinical-guidance/medical-policies",
+    defaultSpecialty: "Cardiology",
+  },
+  anthem: {
+    name: "Anthem / BCBS",
+    domainUrl: "https://www.anthem.com/provider/policies",
+    defaultSpecialty: "Orthopedics",
+  },
+  molina: {
+    name: "Molina Healthcare",
+    domainUrl: "https://www.molinahealthcare.com/providers/common/medicaid/clinical-guidelines.aspx",
+    defaultSpecialty: "Orthopedics",
+  },
+};
+
+export const getPayerClinicalDirectoryUrl = (payerName?: string): string => {
+  if (!payerName) return "https://www.aetna.com/cpb";
+  const norm = payerName.toLowerCase();
+  if (norm.includes("aetna")) return "https://www.aetna.com/cpb";
+  if (norm.includes("cigna")) return "https://www.cigna.com/coveragePolicies";
+  if (norm.includes("united") || norm.includes("uhc") || norm.includes("optum")) {
+    return "https://www.uhcprovider.com/en/policies-protocols/commercial-policies.html";
+  }
+  if (norm.includes("humana")) return "https://www.humana.com/provider/medical-resources/clinical-guidance/medical-policies";
+  if (norm.includes("anthem") || norm.includes("blue") || norm.includes("bcbs")) {
+    return "https://www.anthem.com/provider/policies";
+  }
+  if (norm.includes("molina")) return "https://www.molinahealthcare.com/providers/common/medicaid/clinical-guidelines.aspx";
+  return "https://www.aetna.com/cpb";
+};
+
 // Common CARC (Claim Adjustment Reason Codes) & Descriptions
 export const DENIAL_REASON_CODES: Record<string, { code: string; title: string; description: string; overturnCategory: string }> = {
   "CO-50": {

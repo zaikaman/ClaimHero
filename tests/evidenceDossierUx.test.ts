@@ -476,13 +476,14 @@ describe("Evidence Dossier UX & Quad-Solution Architecture", () => {
   });
 
   describe("Clinical Research Console Channel Architecture & Workstation Deck", () => {
-    it("verifies all 5 research modes have distinct, non-empty identifiers and labels", () => {
-      expect(RESEARCH_MODES.length).toBe(5);
+    it("verifies all 6 research modes have distinct, non-empty identifiers and labels", () => {
+      expect(RESEARCH_MODES.length).toBe(6);
       const ids = RESEARCH_MODES.map((m) => m.id);
-      expect(new Set(ids).size).toBe(5);
+      expect(new Set(ids).size).toBe(6);
       expect(ids).toEqual([
         "multi_source",
         "payer_cpb",
+        "directory_discovery",
         "pubmed_trials",
         "fda_labels",
         "custom_url",
@@ -545,7 +546,7 @@ describe("Evidence Dossier UX & Quad-Solution Architecture", () => {
     });
 
     it("verifies WAI-ARIA tab and station deck contract specifications", () => {
-      // Check tablist structure and mapping for the 5 channels
+      // Check tablist structure and mapping for the 6 channels
       const tabSpecs = RESEARCH_MODES.map((m, idx) => ({
         tabId: `tab-${m.id}`,
         panelId: `panel-${m.id}`,
@@ -553,11 +554,50 @@ describe("Evidence Dossier UX & Quad-Solution Architecture", () => {
         tabIndex: idx === 0 ? 0 : -1,
       }));
 
-      expect(tabSpecs.length).toBe(5);
+      expect(tabSpecs.length).toBe(6);
       expect(tabSpecs[0].tabId).toBe("tab-multi_source");
       expect(tabSpecs[0].panelId).toBe("panel-multi_source");
       expect(tabSpecs[0].tabIndex).toBe(0);
       expect(tabSpecs[1].tabIndex).toBe(-1);
+    });
+
+    it("verifies 4-way arrow key navigation transitions across all 6 channel tabs in 3-column grid", () => {
+      const getNextIndex = (current: number, key: "ArrowRight" | "ArrowLeft" | "ArrowDown" | "ArrowUp") => {
+        const len = RESEARCH_MODES.length;
+        if (key === "ArrowRight") return (current + 1) % len;
+        if (key === "ArrowLeft") return (current - 1 + len) % len;
+        if (key === "ArrowDown") return (current + 3) % len;
+        if (key === "ArrowUp") return (current - 3 + len) % len;
+        return current;
+      };
+
+      // 6 items in 2 rows of 3:
+      // Row 0: 0 (multi_source), 1 (payer_cpb), 2 (directory_discovery)
+      // Row 1: 3 (pubmed_trials), 4 (fda_labels), 5 (custom_url)
+
+      // Test horizontal navigation (ArrowRight & ArrowLeft)
+      expect(getNextIndex(0, "ArrowRight")).toBe(1);
+      expect(getNextIndex(1, "ArrowRight")).toBe(2);
+      expect(getNextIndex(5, "ArrowRight")).toBe(0); // wraps around to start
+
+      expect(getNextIndex(0, "ArrowLeft")).toBe(5); // wraps around to end
+      expect(getNextIndex(2, "ArrowLeft")).toBe(1);
+      expect(getNextIndex(1, "ArrowLeft")).toBe(0);
+
+      // Test vertical column navigation (ArrowDown & ArrowUp)
+      expect(getNextIndex(0, "ArrowDown")).toBe(3); // col 0, row 0 -> row 1
+      expect(getNextIndex(1, "ArrowDown")).toBe(4); // col 1, row 0 -> row 1
+      expect(getNextIndex(2, "ArrowDown")).toBe(5); // col 2, row 0 -> row 1
+      expect(getNextIndex(3, "ArrowDown")).toBe(0); // col 0, row 1 -> row 0 (wrap)
+      expect(getNextIndex(4, "ArrowDown")).toBe(1); // col 1, row 1 -> row 0 (wrap)
+      expect(getNextIndex(5, "ArrowDown")).toBe(2); // col 2, row 1 -> row 0 (wrap)
+
+      expect(getNextIndex(3, "ArrowUp")).toBe(0); // col 0, row 1 -> row 0
+      expect(getNextIndex(4, "ArrowUp")).toBe(1); // col 1, row 1 -> row 0
+      expect(getNextIndex(5, "ArrowUp")).toBe(2); // col 2, row 1 -> row 0
+      expect(getNextIndex(0, "ArrowUp")).toBe(3); // col 0, row 0 -> row 1 (wrap)
+      expect(getNextIndex(1, "ArrowUp")).toBe(4); // col 1, row 0 -> row 1 (wrap)
+      expect(getNextIndex(2, "ArrowUp")).toBe(5); // col 2, row 0 -> row 1 (wrap)
     });
   });
 });

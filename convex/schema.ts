@@ -562,6 +562,22 @@ export default defineSchema({
     .index("by_url_hash", ["urlHash"])
     .index("by_captured_at", ["capturedAt"]),
 
+  // Discovered Insurer CPB & Clinical Policy Directory Bulletins via Firecrawl /map
+  discoveredPolicies: defineTable({
+    claimId: v.optional(v.id("claims")),
+    payer: v.string(),
+    specialty: v.string(),
+    domain: v.string(),
+    url: v.string(),
+    title: v.string(),
+    description: v.optional(v.string()),
+    bulletinNumber: v.optional(v.string()),
+    discoveredAt: v.number(),
+  })
+    .index("by_claim", ["claimId"])
+    .index("by_payer_and_specialty", ["payer", "specialty"])
+    .index("by_domain", ["domain"]),
+
   // Live autonomous pipeline activity stream (human-language progress events).
   // Kept separate from the statutory audit trail so operational chatter never
   // pollutes the legal record. Entries contain no PHI: payer names, public

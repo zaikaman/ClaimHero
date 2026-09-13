@@ -74,6 +74,7 @@ flowchart TD
   * **Scheduled Crons & Actions**: Nightly statutory deadline sweepers recalculating remaining appeal days and emitting critical alerts.
   * **Convex File Storage**: Secure storage for uploaded denial letters, generated exhibit PDFs, and AgentMail attachments.
 * **Firecrawl**:
+  * **Insurer CPB Directory Discovery**: Maps entire payer policy directories via Firecrawl's `/v1/map` endpoint (`firecrawl.map`), discovering all related bulletins by clinical specialty (Orthopedics, Oncology, Cardiology, Spine, etc.) with automated bulletin code parsing and Convex persistence.
   * Scrapes live insurer Clinical Policy Bulletins (e.g. Molina, Carelon, Aetna, UHC, Cigna, BCBS) using `v2/search` and `v2/scrape`.
   * Multi-layer hardening: document windowing for 150KB+ clinical manuals, private MCG viewer rejection, payer domain verification, and Incapsula/CAPTCHA access-denied filtering.
   * Specialized secondary crawlers for PubMed/ClinicalTrials.gov literature and FDA package inserts (`accessdata.fda.gov`).
@@ -161,13 +162,13 @@ ClaimHero enforces rigorous automated test coverage (~81.3% lines across all mod
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (tsc --noEmit)
 npm run lint            # ESLint static code analysis
-npm run test            # Vitest automated test execution (929 tests across 58 suites)
+npm run test            # Vitest automated test execution (938 tests across 59 suites)
 npm run test:coverage   # Vitest with @vitest/coverage-v8 (~81.1% line coverage)
 npm run build           # Vite production bundle build
 npm run verify          # Full automated gate (typecheck + lint + test:coverage + build)
 ```
 
-### Verified Test Suites (929 Tests / 58 Suites)
+### Verified Test Suites (938 Tests / 59 Suites)
 * `tests/claimhero.test.ts` (70 tests): End-to-end integration, 4-pillar scoring rubric, ERISA deadline sweeps, and portfolio aggregates.
 * `tests/agentMail.test.ts` (67 tests): AgentMail outbound dispatch, webhook normalization, email styling, Svix signature verification, and AI adjudicator addressing.
 * `tests/authorization.test.ts` (40 tests): Convex multi-tenant document isolation, owner verification, cross-tenant IDOR guards, and spending protection.
@@ -176,7 +177,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/collaboration.test.ts` (26 tests): Case sharing invitations, collaborator roles (editor/viewer), and pending invite gating.
 * `tests/securityComplianceHardening.test.ts` (25 tests): Unauthenticated optical parsing denial, IDOR patient isolation, honest name resolution, and dispatch blocking.
 * `tests/actionsAgentMailAndDispatcher.test.ts` (25 tests): Outbound appeal packet compilation, inbound claim reply routing, and cooldown deduplication.
-* `tests/evidenceDossierUx.test.ts` (23 tests): Clinical research console modes, multi-source 3-pipeline telemetry, exhibit grouping, and clause inspector contracts.
+* `tests/evidenceDossierUx.test.ts` (24 tests): Clinical research console modes, multi-source 3-pipeline telemetry, exhibit grouping, 4-way arrow navigation, and clause inspector contracts.
 * `tests/convexChatbot.test.ts` (23 tests): Agentic tool definitions, chat sessions, rolling summarization, and token-bucket rate limits.
 * `tests/convexEmails.test.ts` (22 tests): Inbound/outbound email persistence, thread association, and security authorization.
 * `tests/openai.test.ts` (20 tests): Structured completions, Vision OCR extraction, 1536-d vector embeddings, and retry resilience.
@@ -213,6 +214,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/ingestionAndDeletionPipeline.test.ts` (9 tests): Denial document ingestion and cascading resource deletion.
 * `tests/convexP2P.test.ts` (9 tests): P2P call session records and defense script persistence.
 * `tests/formalPdfAttachments.test.ts` (8 tests): Formal PDF legal memorandum assembly and court attachment generation.
+* `tests/firecrawlDirectoryMap.test.ts` (8 tests): Firecrawl `/v1/map` insurer CPB directory discovery, specialty code deduction, bulletin identifier extraction, SSRF URL filtering, and rate limiting.
 * `tests/collabSync.test.ts` (8 tests): Multi-user collaborative state synchronization and presence tracking.
 * `tests/soundEffects.test.ts` (7 tests): Procedural Web Audio API sound synthesis, 10 acoustic sentinel cues, and volume controls.
 * `tests/routerAndUrlSync.test.ts` (7 tests): Deep-link URL routing, view synchronization, and browser history handling.
@@ -235,7 +237,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 |---|---|
 | **Real-World Utility** | Directly tackles a $200B/year denial crisis. Produces production-ready, sendable artifacts (formal briefs, P2P call scripts, EHR clinical notes, and court dossiers) rather than generic chat summaries. |
 | **Full-Stack Integration Depth** | All 4 sponsor platforms are deeply integrated: **Convex** (reactive DB, 1536-d vector search, searchIndex, scheduled crons, components), **Firecrawl** (live CPB scraping, PubMed, FDA), **AgentMail** (inbound webhooks, outbound dispatch, AI adjudicator), and **OpenAI** (Vision extraction, 4-pillar scoring, grounded synthesis). |
-| **Technical Rigor & Polish** | 100% clean `npm run verify` gate, 929 automated tests across 58 test suites, strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
+| **Technical Rigor & Polish** | 100% clean `npm run verify` gate, 938 automated tests across 59 test suites, strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
 | **Transparency & Build Process** | Comprehensive `hackathon.md` log with UTC timestamps, reconciled 7-character commit hashes, and detailed milestone notes. |
 
 ---

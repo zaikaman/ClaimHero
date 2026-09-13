@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Claim, ClinicalEvidence, OverturnScoringResult, AppealLevel } from "../types";
+import { Claim, ClinicalEvidence, OverturnScoringResult, AppealLevel, DiscoveredPolicy } from "../types";
 import { Id } from "../../convex/_generated/dataModel";
 
 export function validateClaimClinicalContext(claim?: Claim | null): {
@@ -69,6 +69,7 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
   const crawlFdaAction = useAction(api.actions.policyCrawler.crawlFdaIndications);
   const crawlCustomUrlAction = useAction(api.actions.policyCrawler.crawlCustomResearchUrl);
   const crawlMultiSourceHubAction = useAction(api.actions.policyCrawler.crawlMultiSourceHub);
+  const discoverDirectoryAction = useAction(api.actions.policyCrawler.discoverInsurerPolicyDirectory);
   const computeScoreAction = useAction(api.actions.precedentMatcher.computeOverturnScore);
   const runPipelineAction = useAction(api.actions.sentinelPipeline.runAutonomousPipeline);
   const deleteEvidenceMutation = useMutation(api.clinicalEvidences.deleteEvidence);
@@ -76,6 +77,12 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
   const startDurablePipelineMutation = useMutation(api.workflows.startDurablePipeline);
   const cancelDurableWorkflowMutation = useMutation(api.workflows.cancelDurableWorkflow);
   const startStatutoryCountdownMutation = useMutation(api.workflows.startStatutoryCountdown);
+
+  // Discovered policy directory bulletins query
+  const rawDiscoveredPolicies = useQuery(
+    api.clinicalEvidences.listDiscoveredPolicies,
+    isEnabled && claimId ? { claimId } : "skip"
+  ) as DiscoveredPolicy[] | undefined;
 
   // Real-time reactive query tracking durable workflow execution status
   const workflowExecutionStatus = useQuery(
@@ -191,6 +198,40 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
       });
     },
     [crawlMultiSourceHubAction, claim]
+  );
+
+  // Trigger Firecrawl /v1/map Insurer Policy Directory Discovery
+  const discoverPolicyDirectory = useCallback(
+    async (
+      targetClaimId?: string,
+      options?: {
+        payer?: string;
+        specialty?: string;
+        customDomain?: string;
+        limit?: number;
+        saveToEvidenceMatrix?: boolean;
+      }
+    ) => {
+      const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
+      if (!activeClaimId) throw new Error("No claim specified for policy directory discovery");
+
+      const payer = (
+        options?.payer ||
+        claim?.patient?.insurancePayer ||
+        (claim as { insurancePayer?: string } | undefined)?.insurancePayer ||
+        ""
+      ).trim();
+
+      return await discoverDirectoryAction({
+        claimId: activeClaimId,
+        payer: payer || undefined,
+        specialty: options?.specialty,
+        customDomain: options?.customDomain,
+        limit: options?.limit,
+        saveToEvidenceMatrix: options?.saveToEvidenceMatrix,
+      });
+    },
+    [discoverDirectoryAction, claim]
   );
 
   // Delete a single evidence clause
@@ -355,11 +396,13 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
     isLoadingEvidences: claimId ? rawEvidences === undefined : false,
     sourcesSummary,
     workflowExecutionStatus,
+    discoveredPolicies: rawDiscoveredPolicies || [],
     crawlPolicy,
     crawlPubMed,
     crawlFda,
     crawlCustomUrl,
     crawlMultiSourceHub,
+    discoverPolicyDirectory,
     deleteEvidence,
     insertSingleEvidence,
     computeOverturnScore,

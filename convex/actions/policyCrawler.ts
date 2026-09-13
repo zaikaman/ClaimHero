@@ -3879,3 +3879,312 @@ export const crawlMultiSourceHub = action({
     };
   },
 });
+
+/**
+ * Canonical payer clinical directory domains for Firecrawl /v1/map URL structure mapping.
+ * Discovers root policy directories where insurers publish clinical policy bulletins (CPBs).
+ */
+export function getPayerClinicalDirectoryDomain(payer: string): string {
+  const norm = (payer || "").toLowerCase().trim();
+  if (norm.includes("aetna")) {
+    return "https://www.aetna.com/cpb";
+  }
+  if (norm.includes("cigna")) {
+    return "https://www.cigna.com/coveragePolicies";
+  }
+  if (norm.includes("united") || norm.includes("uhc") || norm.includes("optum")) {
+    return "https://www.uhcprovider.com/en/policies-protocols/commercial-policies.html";
+  }
+  if (norm.includes("humana")) {
+    return "https://www.humana.com/provider/medical-resources/clinical-guidance/medical-policies";
+  }
+  if (norm.includes("anthem") || norm.includes("blue") || norm.includes("bcbs")) {
+    return "https://www.anthem.com/provider/policies";
+  }
+  if (norm.includes("molina")) {
+    return "https://www.molinahealthcare.com/providers/common/medicaid/clinical-guidelines.aspx";
+  }
+  if (norm.includes("kaiser")) {
+    return "https://healthy.kaiserpermanente.org/clinical-library";
+  }
+  // Default to Aetna CPB directory as the standard benchmark directory
+  return "https://www.aetna.com/cpb";
+}
+
+/**
+ * Extract bulletin or policy identifier from URL or title (e.g. "0736", "CPB 0736", "0512").
+ */
+export function extractBulletinIdentifier(url: string, title?: string): string | undefined {
+  if (title) {
+    const titleMatch = title.match(/(?:CPB|Policy|Bulletin|Guideline|LCD|NCD)[#\s:-]*([A-Z0-9.-]{3,12})/i);
+    if (titleMatch) return titleMatch[1].trim();
+  }
+  if (url) {
+    // Check filename / last path segment first to avoid parent range folders (e.g. /700_799/0736.html)
+    const pathPart = url.split("?")[0];
+    const lastSegment = pathPart.split("/").filter(Boolean).pop() || "";
+    const filenameMatch = lastSegment.match(/(?:cpb|policy|bulletin|lcd|guideline)?[-_]?([0-9]{3,6}|L[0-9]{4,6})(?:\.html|\.pdf|\.aspx|\.jsp)?$/i);
+    if (filenameMatch) return filenameMatch[1].trim();
+
+    // Secondary match on explicit cpb-123 or policy-123 within path
+    const urlMatch = pathPart.match(/(?:cpb|policy|bulletin|lcd)[-_/]([0-9]{3,6}|L[0-9]{4,6})/i);
+    if (urlMatch) return urlMatch[1].trim();
+  }
+  return undefined;
+}
+
+/**
+ * Deduce medical specialty from claim procedure and diagnosis codes
+ */
+export function deduceClaimSpecialty(cptCodes: string[] = [], icd10Codes: string[] = []): string {
+  const codes = cptCodes.concat(icd10Codes).join(" ").toLowerCase();
+
+  // Orthopedics & Musculoskeletal
+  if (
+    cptCodes.some((c) => ["27447", "29881", "29877", "29827", "23412", "27130", "20610"].includes(c)) ||
+    codes.includes("knee") || codes.includes("arthroplasty") || codes.includes("meniscus") || codes.includes("m17")
+  ) {
+    return "Orthopedics";
+  }
+
+  // Neurology & Spine
+  if (
+    cptCodes.some((c) => ["63047", "22633", "22558", "63030", "64483", "62322"].includes(c)) ||
+    codes.includes("lumbar") || codes.includes("spine") || codes.includes("decompression") || codes.includes("m54")
+  ) {
+    return "Spine & Orthopedics";
+  }
+
+  // Oncology & Hematology
+  if (
+    cptCodes.some((c) => c.startsWith("964") || c.startsWith("J9") || ["77427", "77301"].includes(c)) ||
+    codes.includes("cancer") || codes.includes("neoplasm") || codes.includes("chemo") || codes.includes("c50")
+  ) {
+    return "Oncology";
+  }
+
+  // Cardiology & Vascular
+  if (
+    cptCodes.some((c) => c.startsWith("93") || ["33533", "92928", "93458"].includes(c)) ||
+    codes.includes("cardiac") || codes.includes("stent") || codes.includes("angioplasty") || codes.includes("i25")
+  ) {
+    return "Cardiology";
+  }
+
+  // Radiology & Imaging
+  if (
+    cptCodes.some((c) => c.startsWith("7")) ||
+    codes.includes("mri") || codes.includes("ct scan") || codes.includes("ultrasound")
+  ) {
+    return "Radiology";
+  }
+
+  return "Orthopedics";
+}
+
+export const discoverInsurerPolicyDirectoryArgs = {
+  claimId: v.id("claims"),
+  payer: v.optional(v.string()),
+  specialty: v.optional(v.string()),
+  customDomain: v.optional(v.string()),
+  limit: v.optional(v.number()),
+  saveToEvidenceMatrix: v.optional(v.boolean()),
+};
+
+export interface DiscoveredPolicyBulletin {
+  url: string;
+  title: string;
+  description?: string;
+  bulletinNumber?: string;
+}
+
+export interface DiscoverInsurerPolicyDirectoryResult {
+  success: boolean;
+  payer: string;
+  specialty: string;
+  domain: string;
+  totalDiscovered: number;
+  bulletins: DiscoveredPolicyBulletin[];
+  savedToEvidence: boolean;
+}
+
+async function performDiscoverInsurerPolicyDirectory(
+  ctx: ActionCtx,
+  args: {
+    claimId: Id<"claims">;
+    payer?: string;
+    specialty?: string;
+    customDomain?: string;
+    limit?: number;
+    saveToEvidenceMatrix?: boolean;
+  },
+  claim: Doc<"claims">,
+  userId?: Id<"users">,
+): Promise<DiscoverInsurerPolicyDirectoryResult> {
+  const limitStatus = await rateLimiter.limit(ctx, "policyCrawler", {
+    key: userId || args.payer || claim.insurancePayer || "global",
+  });
+  if (!limitStatus.ok) {
+    throw new Error(
+      `Rate limit reached for policy directory discovery. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+    );
+  }
+
+  const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+  if (!firecrawlApiKey?.trim() && !process.env.CONVEX_TEST) {
+    throw new Error("Insurer policy directory discovery requires FIRECRAWL_API_KEY; no fallback directory source is available.");
+  }
+
+  const effectivePayer = (args.payer || claim.insurancePayer || "Insurer").trim();
+  const effectiveSpecialty = (
+    args.specialty?.trim() ||
+    deduceClaimSpecialty(claim.cptCodes || [], claim.icd10Codes || [])
+  );
+
+  let targetDomain = args.customDomain?.trim();
+  if (targetDomain) {
+    if (!isAcceptableSourceUrl(targetDomain)) {
+      throw new Error("The custom clinical domain must be a valid HTTP or HTTPS web URL.");
+    }
+  } else {
+    targetDomain = getPayerClinicalDirectoryDomain(effectivePayer);
+  }
+
+  const searchLimit = Math.min(Math.max(args.limit || 30, 5), 100);
+
+  await logPipelineActivity(ctx, {
+    claimId: args.claimId,
+    stage: "crawl",
+    status: "running",
+    message: `Firecrawl /v1/map: Mapping ${targetDomain} URL structure for ${effectiveSpecialty} bulletins...`,
+  });
+
+  let mapResult: { links?: unknown[] } | undefined;
+  try {
+    mapResult = (await firecrawl.map(ctx, targetDomain, {
+      search: effectiveSpecialty,
+      limit: searchLimit,
+      sitemap: "include",
+    })) as { links?: unknown[] };
+  } catch (err) {
+    console.warn(`firecrawl.map on ${targetDomain} encountered error:`, err);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("429") || msg.includes("rate limit")) {
+      throw new Error(`Firecrawl rate limit: ${msg}`);
+    }
+    throw err;
+  }
+
+  const rawLinks = Array.isArray(mapResult?.links) ? mapResult.links : [];
+  const seenUrls = new Set<string>();
+  const validPolicies: DiscoveredPolicyBulletin[] = [];
+
+  for (const raw of rawLinks) {
+    let rawUrl = "";
+    let rawTitle: string | undefined;
+    let rawDesc: string | undefined;
+
+    if (typeof raw === "string") {
+      rawUrl = raw;
+    } else if (raw && typeof raw === "object") {
+      const item = raw as Record<string, unknown>;
+      rawUrl = typeof item.url === "string" ? item.url : "";
+      rawTitle = typeof item.title === "string" ? item.title : undefined;
+      rawDesc = typeof item.description === "string" ? item.description : undefined;
+    }
+
+    const trimmedUrl = rawUrl.trim();
+    if (!trimmedUrl || !isAcceptableSourceUrl(trimmedUrl)) continue;
+
+    const normalizedUrl = trimmedUrl.split("#")[0];
+    if (seenUrls.has(normalizedUrl.toLowerCase())) continue;
+    seenUrls.add(normalizedUrl.toLowerCase());
+
+    const bulletinNumber = extractBulletinIdentifier(normalizedUrl, rawTitle);
+
+    let cleanTitle = rawTitle?.replace(/\*\*/g, "").trim();
+    if (!cleanTitle || cleanTitle.length < 5) {
+      if (bulletinNumber) {
+        cleanTitle = `${effectivePayer} CPB ${bulletinNumber}: ${effectiveSpecialty} Policy`;
+      } else {
+        try {
+          const parsed = new URL(normalizedUrl);
+          const pathSegments = parsed.pathname.split("/").filter(Boolean);
+          const lastSeg = pathSegments[pathSegments.length - 1] || effectiveSpecialty;
+          cleanTitle = `${effectivePayer} Policy: ${lastSeg.replace(/[-_]/g, " ").replace(/\.html|\.pdf/i, "")}`;
+        } catch {
+          cleanTitle = `${effectivePayer} ${effectiveSpecialty} Clinical Bulletin`;
+        }
+      }
+    }
+
+    validPolicies.push({
+      url: normalizedUrl,
+      title: cleanTitle,
+      description: rawDesc?.replace(/\*\*/g, "").trim(),
+      bulletinNumber,
+    });
+
+    if (validPolicies.length >= searchLimit) break;
+  }
+
+  // Persist discovered policy directory bulletins into Convex database
+  if (validPolicies.length > 0) {
+    await ctx.runMutation(internal.clinicalEvidences.saveDiscoveredPoliciesInternal, {
+      claimId: args.claimId,
+      payer: effectivePayer,
+      specialty: effectiveSpecialty,
+      domain: targetDomain,
+      policies: validPolicies,
+      saveToEvidenceMatrix: args.saveToEvidenceMatrix !== false,
+    });
+  }
+
+  await logPipelineActivity(ctx, {
+    claimId: args.claimId,
+    stage: "crawl",
+    status: "completed",
+    message: `Firecrawl /v1/map: Discovered ${validPolicies.length} policy directory bulletins from ${targetDomain} (${effectiveSpecialty}).`,
+  });
+
+  return {
+    success: true,
+    payer: effectivePayer,
+    specialty: effectiveSpecialty,
+    domain: targetDomain,
+    totalDiscovered: validPolicies.length,
+    bulletins: validPolicies,
+    savedToEvidence: Boolean(args.saveToEvidenceMatrix !== false),
+  };
+}
+
+/**
+ * Discover Insurer Policy Directory Action (User-facing):
+ * Deploys Firecrawl /v1/map on payer's clinical domain to map directory structure
+ * and discover all bulletins for a medical specialty.
+ */
+export const discoverInsurerPolicyDirectory = action({
+  args: discoverInsurerPolicyDirectoryArgs,
+  handler: async (ctx, args): Promise<DiscoverInsurerPolicyDirectoryResult> => {
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+    return await performDiscoverInsurerPolicyDirectory(ctx, args, claim as Doc<"claims">, userId);
+  },
+});
+
+/**
+ * Discover Insurer Policy Directory Action (Internal):
+ * For background jobs and durable workflow orchestration.
+ */
+export const discoverInsurerPolicyDirectoryInternal = internalAction({
+  args: discoverInsurerPolicyDirectoryArgs,
+  handler: async (ctx, args): Promise<DiscoverInsurerPolicyDirectoryResult> => {
+    const claim = (await ctx.runQuery(internal.claims.getByIdInternal, {
+      claimId: args.claimId,
+    })) as Doc<"claims"> | null;
+    if (!claim) {
+      throw new Error(`Claim ${args.claimId} not found`);
+    }
+    return await performDiscoverInsurerPolicyDirectory(ctx, args, claim, claim.userId);
+  },
+});
+
