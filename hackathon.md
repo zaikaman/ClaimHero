@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-13T03:11:00Z
+- **Last updated:** 2026-09-13T03:57:00Z
 
 ## Log
 
@@ -1350,7 +1350,7 @@ Enforced compulsory clinical intake and authorized submitter context form on new
 - Hardened pipeline execution in `src/hooks/useEvidence.ts` with a pre-flight guard asserting confirmed appeal context before dispatching the autonomous pipeline.
 - Quality pass completed by subagent with 0 emojis, defensive optional chaining, and verified 100% clean across typecheck, lint, 920 unit tests, and production build with `npm run verify`.
 
-### 2026-09-13 - working tree
+### 2026-09-13 - 6c1b744
 Scoped Date of Service (DOS) redaction to de-identified public exports, protecting live claim intake and outbound payer appeal briefs under HIPAA TPO (`convex/lib/redactionEngine.ts`, `src/lib/redactionEngine.ts`, `src/lib/exportUtils.ts`, `convex/actions/opticalParser.ts`, `convex/actions/appealSynthesizer.ts`, `convex/lib/appealEmail.ts`, `src/lib/dossierBuilder.ts`, `convex/claims.ts`, `tests/redactionEngine.test.ts`, `tests/radarExport.test.ts`):
 - Root Cause Elimination of Date of Service Redaction in Appeal Briefs: Identified that global Date of Service (DOS) pattern detection in `redactionEngine.ts` was executing unconditionally inside `redactBeforeLLM` during optical denial letter intake (`convex/actions/opticalParser.ts`). This prematurely transformed `Date of Service: 07/04/2026` into `**/**/****` before OpenAI extraction, saving corrupted dates into the database and rendering `Date of service: **/**/****` on outbound ERISA appeal briefs. Under HIPAA TPO (45 CFR § 164.506), health insurers require the genuine Date of Service to identify and adjudicate claims, making unconditioned DOS redaction fatal to appeal processing.
 - Scoped DOS Detection behind Explicit Configuration: Added `maskDateOfService?: boolean` to `RedactionEngineOptions` in both client and Convex backend redaction engines. DOS pattern detection now runs strictly when `maskDateOfService: true` or in `PUBLIC_EXHIBIT` mode, ensuring live intake, optical parsing, clinical LLM synthesis, and payer brief assembly preserve authentic service dates by default.
@@ -1359,3 +1359,11 @@ Scoped Date of Service (DOS) redaction to de-identified public exports, protecti
 - Enhanced Date Formatting: Extended `formatServiceDate` (`appealSynthesizer.ts`, `appealEmail.ts`) and `formatDossierDate` (`dossierBuilder.ts`) to seamlessly format both ISO (`YYYY-MM-DD`) and US (`MM/DD/YYYY`) formats into standardized appellate date strings (e.g., `July 4, 2026`).
 - Deployment Self-Healing: Added `healCorruptedServiceDatesInternal` mutation in `convex/claims.ts` and executed it on active development deployment (`peaceful-sparrow-520`), reconciling corrupted asterisks dates back to authentic dates (e.g. `CLM-6104-GEO-5094` restored to `July 4, 2026` across claim and appeal brief).
 - Added regression tests in `tests/redactionEngine.test.ts` asserting DOS preservation by default and conditional masking during public exports. Verified 100% clean across typecheck, lint, 922 unit tests across 57 suites, and production build with `npm run verify`.
+
+### 2026-09-13 - working tree
+Resolved workspace transition latency and eliminated misleading call-to-action button states during autonomous appeal generation (`convex/claims.ts`, `convex/workflows.ts`, `src/components/common/SentinelFlowStepper.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/studio/AppealStudio.tsx`, `src/components/radar/IngestionModal.tsx`, `src/components/onboarding/OnboardingWizard.tsx`, `src/types/index.ts`, `tests/ingestionAndDeletionPipeline.test.ts`):
+- Synchronous Backend State Transition: Added `launchAutoPilot` to `updateAppealContext` mutation (`convex/claims.ts`), atomically updating `claim.status` to `"analyzing"` and `workflowStatus` to `"inProgress"` upon intake form confirmation before modal unmount.
+- Workflow Status Normalization: Hardened `performStartDurablePipeline` (`convex/workflows.ts`) to immediately mark claims as `"analyzing"` upon workflow initiation, eliminating the multi-second delay before Step 2.
+- UI Button Morphing & State Guardrails: Replaced inviting primary blue CTAs ("Auto-Pilot Appeal", "1-Click Complete Analysis", "Synthesize Brief") across `SentinelFlowStepper`, `EvidenceMatrix`, and `AppealStudio` with disabled, informative status pills displaying active spinning indicators whenever auto-pilot is running.
+- Instant Progress HUD: Expanded `isBackgroundPipelineRunning` to check `workflowStatus === "inProgress"`, making the autonomous Sentinel progress card and pipeline steps visible the instant the user lands in the workspace.
+- Added regression tests in `tests/ingestionAndDeletionPipeline.test.ts` and verified 100% clean across typecheck, lint, 924 unit tests, and production build with `npm run verify`.

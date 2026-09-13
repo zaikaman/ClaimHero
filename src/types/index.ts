@@ -67,6 +67,8 @@ export interface Claim {
   autoPilotEnabled?: boolean;
   agentMailProvisioningStatus?: "pending" | "shared" | "provisioned" | "not_configured" | "failed" | string;
   agentMailProvisioningError?: string;
+  workflowId?: string;
+  workflowStatus?: string;
   denialLetterStorageId?: string;
   appealContext?: AppealContext;
   redactionMetadata?: RedactionMetadata;

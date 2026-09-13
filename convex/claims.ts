@@ -2880,6 +2880,7 @@ interface AppealContextUpdateArgs {
     maskedCategories: string[];
     appliedAt: number;
   };
+  launchAutoPilot?: boolean;
 }
 
 async function applyAppealContextUpdate(ctx: MutationCtx, args: AppealContextUpdateArgs) {
@@ -2964,6 +2965,12 @@ async function applyAppealContextUpdate(ctx: MutationCtx, args: AppealContextUpd
     patchPayload.origin = "demo-fixture";
   }
 
+  if (args.launchAutoPilot) {
+    patchPayload.status = "analyzing";
+    patchPayload.workflowStatus = "inProgress";
+    patchPayload.autoPilotEnabled = true;
+  }
+
   await ctx.db.patch(args.claimId, patchPayload);
 
   await appendAuditLog(ctx, {
@@ -2973,6 +2980,16 @@ async function applyAppealContextUpdate(ctx: MutationCtx, args: AppealContextUpd
     details: "Confirmed sender identity and documented clinical context before appeal drafting.",
     timestamp: now,
   });
+
+  if (args.launchAutoPilot) {
+    await appendAuditLog(ctx, {
+      claimId: args.claimId,
+      eventType: "autonomous_pipeline_initiated",
+      actor: "Autonomous Sentinel Master",
+      details: "Auto-Pilot dispatched: Resolving payer gateway, clinical policies, and cited ERISA brief synthesis.",
+      timestamp: now,
+    });
+  }
 
   if (args.redactionMetadata?.isRedacted) {
     await appendAuditLog(ctx, {
@@ -3018,6 +3035,7 @@ export const updateAppealContext = mutation({
         appliedAt: v.number(),
       })
     ),
+    launchAutoPilot: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     await requireClaimEditor(ctx, args.claimId);
@@ -3055,6 +3073,7 @@ export const updateAppealContextInternal = internalMutation({
         appliedAt: v.number(),
       })
     ),
+    launchAutoPilot: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     return await applyAppealContextUpdate(ctx, args);

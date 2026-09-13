@@ -561,6 +561,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           maskedCategories: privacyRedactionState.categories,
           appliedAt: Date.now(),
         },
+        launchAutoPilot: autoPilotEnabled,
       });
 
       const claimId = extractedResult.claimId;
@@ -579,6 +580,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
         setContextSubmitted(true);
         setExtractedResult((current) => current ? { ...current, pipelineResult: null } : current);
         endProcessing();
+        toast.info("Autonomous Sentinel activated. Indexing policy guidelines and compiling appeal brief...");
         onSuccess(claimId, "evidence");
         onClose();
         void executePostExtractionPipeline(claimId, snapshot)
@@ -615,6 +617,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     const claimId = extractedResult.claimId;
     // Manual-pipeline mode: enter the workspace instantly and run in background.
     setContextSubmitted(true);
+    toast.info("Autonomous Sentinel activated. Indexing policy guidelines and compiling appeal brief...");
     onSuccess(claimId, "evidence");
     onClose();
     void executePostExtractionPipeline(claimId)

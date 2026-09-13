@@ -323,7 +323,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   const isBackgroundPipelineRunning =
     !hasSynthesizedBrief &&
     !markdownContent.trim() &&
-    (claim.status === "analyzing" ||
+    (claim.workflowStatus === "inProgress" ||
+      claim.status === "analyzing" ||
+      claim.status === "precedent_matched" ||
       claim.status === "drafting" ||
       claim.status === "parsing");
 
@@ -741,7 +743,12 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   size="sm"
                   onClick={handleRunSynthesis}
                   disabled={isSynthesizing || isSaving || isEscalating || readOnly || isBackgroundPipelineRunning}
-                  className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
+                  className={cn(
+                    "h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 font-semibold shadow-xs transition-all",
+                    isBackgroundPipelineRunning
+                      ? "border border-primary/30 bg-primary/10 text-primary cursor-not-allowed shadow-none"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                  )}
                   title={readOnly ? "Viewers have read-only access" : isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Synthesize cited appeal brief with AI"}
                 >
                   {isSynthesizing || isEscalating ? (
@@ -751,8 +758,8 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                     </>
                   ) : isBackgroundPipelineRunning ? (
                     <>
-                      <CircleNotch className="size-3.5 animate-spin" />
-                      <span>Pipeline Running...</span>
+                      <CircleNotch className="size-3.5 animate-spin text-primary" />
+                      <span>Synthesizing in Background...</span>
                     </>
                   ) : (
                     <>
@@ -1006,12 +1013,17 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                     <Button
                       onClick={handleRunSynthesis}
                       disabled={isSynthesizing || isEscalating || readOnly || isBackgroundPipelineRunning}
-                      className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md mt-2"
+                      className={cn(
+                        "gap-2 text-xs font-semibold mt-2 transition-all",
+                        isBackgroundPipelineRunning
+                          ? "border border-primary/30 bg-primary/10 text-primary cursor-not-allowed shadow-none"
+                          : "bg-primary text-primary-foreground shadow-md hover:bg-primary/90 cursor-pointer"
+                      )}
                       title={isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : readOnly ? "Viewers have read-only access" : undefined}
                     >
                       {isSynthesizing || isEscalating || isBackgroundPipelineRunning ? (
                         <>
-                          <CircleNotch className="size-3.5 animate-spin" />
+                          <CircleNotch className="size-3.5 animate-spin text-primary" />
                           <span>{isBackgroundPipelineRunning && !isSynthesizing ? "Pipeline Running in Background..." : "Synthesizing Appeal Brief..."}</span>
                         </>
                       ) : (
@@ -1082,7 +1094,12 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             <Button
               onClick={handleRunSynthesis}
               disabled={isSynthesizing || isSaving || isEscalating || readOnly || isBackgroundPipelineRunning}
-              className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all h-8"
+              className={cn(
+                "gap-2 text-xs font-semibold transition-all h-8",
+                isBackgroundPipelineRunning
+                  ? "border border-primary/30 bg-primary/10 text-primary cursor-not-allowed shadow-none"
+                  : "bg-primary text-primary-foreground shadow-md hover:shadow-lg cursor-pointer"
+              )}
               title={readOnly ? "Viewers have read-only access" : isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Synthesize cited appeal brief with AI before dispatching"}
             >
               {isSynthesizing || isEscalating ? (
@@ -1092,7 +1109,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 </>
               ) : isBackgroundPipelineRunning ? (
                 <>
-                  <CircleNotch className="size-3.5 animate-spin" />
+                  <CircleNotch className="size-3.5 animate-spin text-primary" />
                   <span>Pipeline Running in Background...</span>
                 </>
               ) : (

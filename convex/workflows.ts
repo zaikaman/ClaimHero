@@ -590,6 +590,7 @@ export async function performStartDurablePipeline(
   await ctx.db.patch(args.claimId, {
     workflowId,
     workflowStatus: "inProgress",
+    status: "analyzing",
     updatedAt: Date.now(),
   });
 

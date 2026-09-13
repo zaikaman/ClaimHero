@@ -347,5 +347,99 @@ describe("Ingestion Pipeline & Cascading Deletion Hardening", () => {
       expect(insertCalls[0][1].evidences[0].title).toBe("ERISA Full & Fair Review Statutory Protocol");
       expect(crawlResult.clausesExtracted).toBe(1);
     });
+
+    it("updateAppealContext with launchAutoPilot: true immediately sets status to analyzing and workflowStatus to inProgress", async () => {
+      const mockClaim = {
+        _id: "claim_autopilot_1",
+        claimNumber: "CLM-AP-01",
+        patientId: "patient_1",
+        status: "ingested",
+        userId: "user_owner",
+      };
+
+      vi.spyOn(libAuth, "requireClaimEditor").mockResolvedValue({
+        userId: "user_owner" as any,
+        claim: mockClaim as any,
+      });
+
+      const patchSpy = vi.fn().mockResolvedValue(undefined);
+      const insertSpy = vi.fn().mockResolvedValue("audit_log_id");
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+          patch: patchSpy,
+          insert: insertSpy,
+        },
+      };
+
+      const result = await (claims.updateAppealContext as any)._handler(mockCtx, {
+        claimId: "claim_autopilot_1",
+        sender: {
+          name: "Dr. Sarah Lin",
+          email: "slin@ortho.example.org",
+        },
+        clinicalFacts: {
+          symptomsAndFunctionalImpact: "Persistent knee pain and locking.",
+          recordsAreIncomplete: false,
+        },
+        launchAutoPilot: true,
+      });
+
+      expect(result.confirmedAt).toBeDefined();
+      expect(patchSpy).toHaveBeenCalledWith(
+        "claim_autopilot_1",
+        expect.objectContaining({
+          status: "analyzing",
+          workflowStatus: "inProgress",
+          autoPilotEnabled: true,
+        })
+      );
+    });
+
+    it("updateAppealContext without launchAutoPilot does not alter status or workflowStatus", async () => {
+      const mockClaim = {
+        _id: "claim_manual_1",
+        claimNumber: "CLM-MAN-01",
+        patientId: "patient_1",
+        status: "ingested",
+        userId: "user_owner",
+      };
+
+      vi.spyOn(libAuth, "requireClaimEditor").mockResolvedValue({
+        userId: "user_owner" as any,
+        claim: mockClaim as any,
+      });
+
+      const patchSpy = vi.fn().mockResolvedValue(undefined);
+      const insertSpy = vi.fn().mockResolvedValue("audit_log_id");
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+          patch: patchSpy,
+          insert: insertSpy,
+        },
+      };
+
+      const result = await (claims.updateAppealContext as any)._handler(mockCtx, {
+        claimId: "claim_manual_1",
+        sender: {
+          name: "Dr. Sarah Lin",
+          email: "slin@ortho.example.org",
+        },
+        clinicalFacts: {
+          recordsAreIncomplete: true,
+        },
+        launchAutoPilot: false,
+      });
+
+      expect(result.confirmedAt).toBeDefined();
+      expect(patchSpy).toHaveBeenCalledWith(
+        "claim_manual_1",
+        expect.not.objectContaining({
+          status: "analyzing",
+          workflowStatus: "inProgress",
+        })
+      );
+    });
   });
 });

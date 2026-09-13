@@ -108,6 +108,14 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     },
   ];
 
+  const isPipelineActive =
+    isProcessing ||
+    claim.workflowStatus === "inProgress" ||
+    claim.status === "parsing" ||
+    claim.status === "analyzing" ||
+    claim.status === "precedent_matched" ||
+    claim.status === "drafting";
+
   return (
     <div className="rounded-xl border border-border bg-card/70 backdrop-blur-sm p-3 shadow-xs space-y-2.5">
       {/* Case Header & Quick Context Bar */}
@@ -203,6 +211,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
             <Button
               size="xs"
               onClick={() => {
+                if (isPipelineActive) return;
                 if (hasAppealContext) {
                   onRunAutonomousPipeline().catch((err) => {
                     console.warn("Autonomous pipeline execution notice:", err);
@@ -213,13 +222,18 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
                   onNavigateView("studio");
                 }
               }}
-              disabled={isProcessing}
-              className="gap-1.5 h-7 px-2.5 bg-primary text-primary-foreground text-xs shadow-2xs cursor-pointer font-medium"
+              disabled={isPipelineActive}
+              className={cn(
+                "gap-1.5 h-7 px-2.5 text-xs shadow-2xs font-medium transition-all",
+                isPipelineActive
+                  ? "bg-muted/70 text-muted-foreground border border-border/80 cursor-not-allowed shadow-none"
+                  : "bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90"
+              )}
             >
-              {isProcessing ? (
+              {isPipelineActive ? (
                 <>
-                  <CircleNotch className="size-3 animate-spin" />
-                  <span>{processingLabel}</span>
+                  <CircleNotch className="size-3 animate-spin text-primary" />
+                  <span>{processingLabel && processingLabel !== "Processing..." ? processingLabel : "Auto-Pilot Running..."}</span>
                 </>
               ) : (
                 <>

@@ -22,7 +22,7 @@ import { Claim, ClinicalEvidence, OverturnScoringResult, ScoringCriterion } from
 import { PolicyViewer } from "./PolicyViewer";
 import { PrecedentFeed } from "./PrecedentFeed";
 import { ClinicalResearchConsole } from "./ClinicalResearchConsole";
-import { formatCurrency, formatDate, stripMarkdownFormatting } from "../../lib/utils";
+import { formatCurrency, formatDate, stripMarkdownFormatting, cn } from "../../lib/utils";
 import { DENIAL_REASON_CODES } from "../../lib/constants";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { PipelineActivityFeed } from "../common/PipelineActivityFeed";
@@ -155,16 +155,20 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
 
   const isBackgroundPipelineRunning =
     !hasDraftedBrief &&
-    (claim.status === "parsing" ||
+    (claim.workflowStatus === "inProgress" ||
+      claim.status === "parsing" ||
       claim.status === "analyzing" ||
+      claim.status === "precedent_matched" ||
       claim.status === "drafting");
 
   const pipelineStepLabel =
     claim.status === "drafting"
       ? "Step 3/3: Synthesizing cited ERISA appeal brief"
-      : claim.status === "analyzing" || claim.status === "precedent_matched"
+      : claim.status === "precedent_matched"
       ? "Step 2/3: Evaluating clinical rubric & policy criteria"
-      : "Step 1/3: Crawling insurer Clinical Policy Bulletins";
+      : claim.status === "analyzing"
+      ? "Step 1/3: Resolving payer gateway & indexing Clinical Policy Bulletins"
+      : "Step 1/3: Initializing Autonomous Sentinel review";
 
   return (
     <div className="space-y-4 animate-fadeIn pb-24">
@@ -203,15 +207,15 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             <div className="space-y-1.5 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold text-foreground">
-                  Autonomous pipeline running in background
+                  Autonomous Sentinel pipeline actively running
                 </span>
                 <Badge variant="outline" className="font-mono text-[10px] border-primary/40 text-primary">
-                  {claim.status.replace(/_/g, " ")}
+                  {(claim.status || "analyzing").replace(/_/g, " ")}
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                {pipelineStepLabel}. Evidence clauses, win score, and the appeal brief
-                stream in live below. You can keep working; no need to wait.
+                {pipelineStepLabel}. Evidence clauses, win score, and the cited appeal brief
+                stream in live below. You can keep working; no manual click required.
               </p>
               <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground" aria-hidden="true">
                 <span className="text-emerald-500 inline-flex items-center gap-0.5">
@@ -219,7 +223,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                   <span>Ingested</span>
                 </span>
                 <span>→</span>
-                <span className={claim.status === "analyzing" || claim.status === "precedent_matched" || claim.status === "drafting" ? "text-primary font-semibold" : ""}>
+                <span className={claim.status === "analyzing" || claim.status === "precedent_matched" || claim.status === "drafting" || claim.workflowStatus === "inProgress" ? "text-primary font-semibold" : ""}>
                   Crawl + Score
                 </span>
                 <span>→</span>
@@ -287,26 +291,57 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                   )}
                 </Button>
 
-                {/* Primary Blue CTA: Next step in the Sentinel pipeline */}
+                {/* Primary CTA: Next step in the Sentinel pipeline */}
                 <Button
                   size="sm"
                   onClick={onNavigateToStudio}
-                  className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
-                  title="Proceed to Collaborative Appeal Studio to review or synthesize brief"
+                  disabled={isBackgroundPipelineRunning && !hasDraftedBrief}
+                  className={cn(
+                    "h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 font-semibold shadow-xs transition-all",
+                    isBackgroundPipelineRunning && !hasDraftedBrief
+                      ? "border border-primary/30 bg-primary/10 text-primary cursor-not-allowed shadow-none"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                  )}
+                  title={
+                    isBackgroundPipelineRunning && !hasDraftedBrief
+                      ? "Autonomous pipeline is actively synthesizing brief in background"
+                      : "Proceed to Collaborative Appeal Studio to review or synthesize brief"
+                  }
                 >
-                  <FileText className="size-3.5" />
-                  <span>{hasDraftedBrief ? "Review Appeal Brief" : "Draft Appeal Brief"}</span>
-                  <ArrowRight className="size-3" />
+                  {isBackgroundPipelineRunning && !hasDraftedBrief ? (
+                    <>
+                      <CircleNotch className="size-3.5 animate-spin text-primary" />
+                      <span>Synthesizing Brief...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="size-3.5" />
+                      <span>{hasDraftedBrief ? "Review Appeal Brief" : "Draft Appeal Brief"}</span>
+                      <ArrowRight className="size-3" />
+                    </>
+                  )}
                 </Button>
               </>
+            ) : isBackgroundPipelineRunning ? (
+              /* Informative Active Pipeline Status Pill (Neutral, not an enticing blue button) */
+              <Button
+                size="sm"
+                disabled
+                variant="outline"
+                className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 border-primary/40 bg-primary/10 text-primary cursor-not-allowed font-medium shadow-none"
+                title="Autonomous pipeline is actively analyzing policies and synthesizing the appeal brief"
+              >
+                <CircleNotch className="size-3.5 animate-spin text-primary" />
+                <span>Autonomous Pipeline Active</span>
+              </Button>
             ) : (
               /* 1-Click Unified Analysis Trigger (Primary Initial CTA) */
               <Button
                 size="sm"
                 onClick={handleRunCompleteAnalysis}
-                disabled={isUnifiedAnalyzing || isScoring || isBackgroundPipelineRunning}
-                className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
-                title={isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Automatically index Clinical Policy Bulletin and calculate Overturn Probability Score"}
+                disabled={isUnifiedAnalyzing || isScoring}
+                className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
+                title="Automatically index Clinical Policy Bulletin and calculate Overturn Probability Score"
               >
                 {isUnifiedAnalyzing ? (
                   <>

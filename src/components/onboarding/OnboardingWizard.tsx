@@ -505,6 +505,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           maskedCategories: privacyRedactionState.categories.length > 0 ? privacyRedactionState.categories : ["member_id", "dob"],
           appliedAt: Date.now(),
         },
+        launchAutoPilot: autoPilotEnabled,
       });
 
       let pipelineResult = null;
