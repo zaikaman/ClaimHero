@@ -797,8 +797,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground">
-                    <span className={processingStage === "extracting" ? "text-primary font-semibold" : "text-emerald-500"}>
-                      {processingStage === "extracting" ? "● Extracting" : "✓ Extracting"}
+                    <span className={cn("inline-flex items-center gap-1", processingStage === "extracting" ? "text-primary font-semibold" : "text-emerald-500")}>
+                      {processingStage !== "extracting" && <CheckCircle className="size-3 text-emerald-500 shrink-0" />}
+                      <span>{processingStage === "extracting" ? "Extracting" : "Extracted"}</span>
                     </span>
                     <span aria-hidden="true">→</span>
                     <span className={processingStage === "preparing_questions" ? "text-primary font-semibold" : ""}>
@@ -1394,7 +1395,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   typeof (extractedResult.pipelineResult as { overturnProbabilityScore?: unknown }).overturnProbabilityScore === "number" && (
                     <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px]">
                       <TrendUp className="size-3 mr-1" />
-                      {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}% Overturn Score
+                      {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}/100 Viability Index
                     </Badge>
                   )}
               </div>

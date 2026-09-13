@@ -131,13 +131,13 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   const handleRunScoring = async () => {
     setIsScoring(true);
     setErrorMessage(null);
-    const toastId = toast.loading("Calculating legal & clinical Overturn Probability Score...");
+    const toastId = toast.loading("Evaluating 4-pillar Appeal Viability Index (AVI)...");
     try {
       const result = await onComputeScore(claim._id);
       setScoringResult(result);
-      toast.success(`Score calculated: ${result.overturnProbabilityScore}% Overturn Probability`, { id: toastId });
+      toast.success(`Appeal Viability Index: ${result.overturnProbabilityScore}/100 evaluated`, { id: toastId });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to calculate Overturn Probability Score.";
+      const msg = err instanceof Error ? err.message : "Failed to calculate Appeal Viability Index.";
       setErrorMessage(msg);
       toast.error(msg, { id: toastId });
     } finally {
@@ -382,21 +382,21 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
         </Alert>
       )}
 
-      {/* Overturn Probability Win Score Showcase Banner */}
+      {/* Appeal Viability Index Showcase Banner */}
       {(claim.overturnProbabilityScore !== undefined || scoringResult) && (
         <Card className="p-4 border-emerald-500/30 bg-emerald-500/5 space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border/60 pb-3">
             <div className="flex items-center gap-3.5">
-              <div className="flex h-12 min-w-[4.5rem] shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 font-mono text-lg font-bold tracking-tight tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-xl">
+              <div className="flex h-12 min-w-[5rem] shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 font-mono text-lg font-bold tracking-tight tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-xl">
                 {scoringResult
                   ? scoringResult.overturnProbabilityScore
                   : claim.overturnProbabilityScore}
-                %
+                <span className="text-xs font-normal text-emerald-600/70 dark:text-emerald-400/70 ml-1">/100</span>
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-semibold text-foreground">
-                    Overturn Probability Score
+                    Appeal Viability Index (AVI)
                   </h3>
                   <Badge variant="secondary" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">
                     {scoringResult
@@ -404,11 +404,11 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                       : claim.riskLevel?.replace(/_/g, " ") || "HIGH CONFIDENCE"}
                   </Badge>
                   <Badge variant="outline" className="font-mono text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
-                    Deterministic Rubric
+                    Precedent Grounded
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Multi-factor clinical reasoning engine evaluated 4 statutory appeal pillars with reproducible, criteria-based weighting.
+                  Deterministic statutory reasoning engine evaluated 4 appeal pillars benchmarked against historical external review precedents.
                 </p>
               </div>
             </div>
@@ -797,7 +797,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           </Badge>
           <span className="text-xs text-muted-foreground">
             {evidences.length > 0
-              ? `${evidences.length} Clinical Clauses Indexed • Score: ${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}%` : "Calculated"}`
+              ? `${evidences.length} Clinical Clauses Indexed • Score: ${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}/100` : "Calculated"}`
               : "Review clinical evidence before proceeding to brief synthesis"}
           </span>
         </div>

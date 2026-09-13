@@ -206,28 +206,12 @@ export async function executeDurableClaimPipeline(
         };
       }
 
-      // Step 3: Precedent Matching & Overturn Probability Scoring
+      // Step 2: Native Convex Vector Search against Precedent Vector Archive
       await step.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
         status: "analyzing",
         actor: "Durable Sentinel Workflow",
-        details: "Step 2/4: Matching precedent vectors & evaluating 4-pillar overturn score...",
-      });
-
-      const scoreResult = await step.runAction(
-        internal.actions.precedentMatcher.computeOverturnScoreInternal,
-        { claimId: args.claimId, pipelineRunId },
-        {
-          retry: { maxAttempts: 2, initialBackoffMs: 1000, base: 2 },
-          name: "computeOverturnScore",
-        }
-      );
-
-      await step.runMutation(internal.claims.updateStatusInternal, {
-        claimId: args.claimId,
-        status: "precedent_matched",
-        actor: "Durable Sentinel Workflow",
-        details: "Step 2b/4: Running Convex native vector search against the Precedent Vector Archive...",
+        details: "Step 2/4: Running Convex native vector search against the Precedent Vector Archive...",
       });
 
       let vectorPrecedents: Array<{
@@ -273,6 +257,23 @@ export async function executeDurableClaimPipeline(
         });
       }
 
+      // Step 3: Precedent-Grounded Appeal Viability Index (AVI) Scoring
+      await step.runMutation(internal.claims.updateStatusInternal, {
+        claimId: args.claimId,
+        status: "precedent_matched",
+        actor: "Durable Sentinel Workflow",
+        details: "Step 2b/4: Evaluating 4-pillar Appeal Viability Index (AVI) with matched precedent vectors...",
+      });
+
+      const scoreResult = await step.runAction(
+        internal.actions.precedentMatcher.computeOverturnScoreInternal,
+        { claimId: args.claimId, pipelineRunId },
+        {
+          retry: { maxAttempts: 2, initialBackoffMs: 1000, base: 2 },
+          name: "computeOverturnScore",
+        }
+      );
+
       // Step 4: Formal ERISA Appeal Brief Synthesis
       await step.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
@@ -306,7 +307,7 @@ export async function executeDurableClaimPipeline(
         claimId: args.claimId,
         status: "ready_for_review",
         actor: "Durable Sentinel Workflow",
-        details: `Durable pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}% win score computed, and formal brief synthesized.`,
+        details: `Durable pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}/100 viability score computed, and formal brief synthesized.`,
         overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
         riskLevel: scoreResult?.riskLevel,
         scoringBreakdown: scoreResult?.scoringBreakdown,
@@ -317,7 +318,7 @@ export async function executeDurableClaimPipeline(
         runId: pipelineRunId,
         stage: "run",
         status: "completed",
-        message: `Review complete: ${scoreResult?.overturnProbabilityScore || 0}% win likelihood with the appeal brief drafted and ready.`,
+        message: `Review complete: ${scoreResult?.overturnProbabilityScore || 0}/100 viability score with the appeal brief drafted and ready.`,
       });
 
       let wasDispatched = false;

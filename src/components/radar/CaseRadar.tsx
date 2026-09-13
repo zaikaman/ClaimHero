@@ -376,7 +376,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 <TrendUp className="size-4" />
               </div>
             </CardTitle>
-            <CardDescription className="text-xs">High Overturn Probability</CardDescription>
+            <CardDescription className="text-xs">High Appeal Viability</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -384,7 +384,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 {highRiskCount} Cases
               </div>
               <Badge variant="outline" className="text-[10px] font-mono text-emerald-600 border-emerald-500/30">
-                &ge; 80% Win Score
+                &ge; 80 AVI Score
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs">
@@ -409,7 +409,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 {formatCurrency(totalWon)}
               </div>
               <Badge variant="secondary" className="text-[11px] font-mono">
-                {avgScore}% Avg Score
+                {avgScore}/100 Avg AVI
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs">
@@ -680,7 +680,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 <TableHead>CPT Code</TableHead>
                 <TableHead>Denial Reason</TableHead>
                 <TableHead>Disputed</TableHead>
-                <TableHead>Win Likelihood</TableHead>
+                <TableHead>Viability (AVI)</TableHead>
                 <TableHead>Statutory Clock</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -875,7 +875,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                         ) : claim.overturnProbabilityScore !== undefined ? (
                           <div className="flex items-center gap-1 font-mono">
                             <span className="font-bold text-xs text-foreground">
-                              {claim.overturnProbabilityScore}%
+                              {claim.overturnProbabilityScore}/100
                             </span>
                             <Badge
                               variant="secondary"

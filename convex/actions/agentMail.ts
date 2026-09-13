@@ -422,7 +422,7 @@ async function handleInboundClaimReply(
       subject,
     });
 
-    // ⚡ Process and persist inbound email attachments (EOB, denial notices, settlement agreements)
+    // Process and persist inbound email attachments (EOB, denial notices, settlement agreements)
     const storedAttachments: Array<{
       storageId: Id<"_storage">;
       filename: string;
@@ -467,7 +467,7 @@ async function handleInboundClaimReply(
       }
     }
 
-    // ⚡ ATOMIC REAL-TIME PERSISTENCE & LOCK: Atomically claim and insert message
+    // ATOMIC REAL-TIME PERSISTENCE & LOCK: Atomically claim and insert message
     const insertResult = await ctx.runMutation(internal.emails.insertInboundMessageInternal, {
       threadId,
       claimId: matchingClaim._id,

@@ -462,6 +462,40 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
       expect(precedentCriterion?.score).toBe(19);
       expect(precedentCriterion?.status).toBe("strong");
     });
+
+    it("calculateDeterministicRubric: grounds Pillar 4 rationale in matched vector archive precedents and avoids uncalibrated percentages", () => {
+      const claim = {
+        cptCodes: ["27447"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+      };
+      const evidences = [
+        {
+          sourceType: "payer_cpb",
+          citationClause: "Section 4.1",
+          extractedEvidenceMarkdown: "Arthroplasty indication met",
+        },
+      ];
+      const matchedPrecedents = [
+        {
+          citation: "California DMHC IMR Case 2024-4412",
+          title: "Total Knee Arthroplasty Overturn",
+          outcome: "Overturned. Full payment ordered.",
+          sourceKind: "court_overturn",
+          combinedScore: 0.89,
+        },
+      ];
+
+      const result = actionPrecedentMatcher.calculateDeterministicRubric(claim, evidences, matchedPrecedents);
+
+      const precedentCriterion = result.scoringBreakdown.find((c) => c.category === "precedent_strength");
+      expect(precedentCriterion?.score).toBe(19);
+      expect(precedentCriterion?.status).toBe("strong");
+      // Grounded citation present
+      expect(precedentCriterion?.rationale).toContain("California DMHC IMR Case 2024-4412");
+      // Uncalibrated fake percentage claims removed
+      expect(precedentCriterion?.rationale).not.toContain("88% historical overturn rate");
+    });
   });
 
   describe("convex/actions/sentinelPipeline", () => {

@@ -68,10 +68,23 @@ interface RawLLMAnalysisOutput {
   precedentStrengthRationale?: string;
 }
 
+export interface MatchedPrecedentInput {
+  _id?: string;
+  sourceKind?: string;
+  title?: string;
+  citation?: string;
+  jurisdiction?: string;
+  outcome?: string;
+  vectorScore?: number;
+  combinedScore?: number;
+  rrfScore?: number;
+  codeOverlap?: number;
+}
+
 /**
- * Deterministic Clinical Appeal Criteria Calculator
+ * Deterministic Clinical Appeal Criteria Calculator (Appeal Viability Index - AVI)
  * 
- * Evaluates the 4 statutory appeal pillars with mathematical precision based on objective case evidence.
+ * Evaluates the 4 statutory appeal pillars with mathematical precision based on objective case evidence and precedent vectors.
  * Corresponds to the deterministic 4-pillar appeal scoring rubric weighting tested in tests/claimhero.test.ts:114
  * ("Phase 4: Clinical Evidence & Precedent Structure Validation"):
  *   - Pillar 1: CPB & Indication Alignment (Max: 35 pts)
@@ -84,7 +97,7 @@ interface RawLLMAnalysisOutput {
  *   - Pillar 1 (Policy): hasCpb (29-34) | hasClinicalStudies/evidence>=2 (20-24) | evidence=1 (16-18) | 0 evidence (8)
  *   - Pillar 2 (Clinical): evidence>=3 (22-24) | evidence>=1 (20-22) | 0 evidence (5)
  *   - Pillar 3 (ERISA): hasLegalPrecedent/hasCpb/evidence>=2 (19) | evidence=1 (12) | 0 evidence (4)
- *   - Pillar 4 (Precedent): hasLegalPrecedent/hasCpb/evidence>=2 (16-19 by denial code) | evidence=1 (10-12) | 0 evidence (4)
+ *   - Pillar 4 (Precedent): hasLegalPrecedent/hasCpb/evidence>=2 (16-19 by denial code & precedents) | evidence=1 (10-12) | 0 evidence (4)
  */
 export function calculateDeterministicRubric(
   claim: {
@@ -93,7 +106,8 @@ export function calculateDeterministicRubric(
     denialReasonDescription: string;
     patient?: { insurancePayer?: string };
   },
-  evidences: Array<{ sourceType: string; citationClause?: string; extractedEvidenceMarkdown?: string }>
+  evidences: Array<{ sourceType: string; citationClause?: string; extractedEvidenceMarkdown?: string; title?: string }>,
+  matchedPrecedents: MatchedPrecedentInput[] = []
 ) {
   const evidencesCount = evidences.length;
   const hasCpb = evidences.some((e) => e.sourceType === "payer_cpb");
@@ -150,22 +164,55 @@ export function calculateDeterministicRubric(
   }
 
   // Pillar 4. External Review Precedents & Overturn Benchmark (Max: 20 points; rubric weight tested in tests/claimhero.test.ts:114)
-  // Scaled by corroborating evidence and indexed precedents rather than static assignment
+  // Grounded in retrieved precedent vectors and substantiated appellate records rather than static uncalibrated probabilities
   let precedentScore = 4;
   let precedentRationale = "No clinical evidence or indexed precedents available to establish external review parity.";
-  if (hasLegalPrecedent || hasCpb || evidencesCount >= 2) {
+
+  const hasMatchedPrecedents = matchedPrecedents && matchedPrecedents.length > 0;
+  const favorablePrecedentMatch = matchedPrecedents.find(
+    (p) =>
+      (p.outcome && (p.outcome.toLowerCase().includes("overturned") || p.outcome.toLowerCase().includes("recovered"))) ||
+      p.sourceKind === "winning_brief" ||
+      p.sourceKind === "court_overturn"
+  );
+  const matchedCitation =
+    favorablePrecedentMatch?.citation ||
+    favorablePrecedentMatch?.title ||
+    matchedPrecedents[0]?.citation ||
+    matchedPrecedents[0]?.title;
+
+  const legalEv = evidences.find((e) => e.sourceType === "legal_precedent");
+  const legalCitation = legalEv?.citationClause || matchedCitation;
+
+  if (hasLegalPrecedent || hasMatchedPrecedents || hasCpb || evidencesCount >= 2) {
     if (claim.denialReasonCode === "CO-50") {
       precedentScore = 19;
-      precedentRationale = `Independent Medical Review (IMR) decisions show an 88% historical overturn rate for CO-50 denials when objective diagnostic criteria are demonstrated.`;
+      if (legalCitation) {
+        precedentRationale = `External review precedent (${legalCitation}) establishes favorable adjudication parity for CO-50 medical necessity when objective diagnostic criteria are documented.`;
+      } else {
+        precedentRationale = `Independent Medical Review (IMR) decisions establish strong historical overturn parity for CO-50 denials when objective diagnostic criteria are demonstrated.`;
+      }
     } else if (claim.denialReasonCode === "CO-197") {
       precedentScore = 18;
-      precedentRationale = `State Insurance Commissioner rulings mandate retroactive claim authorization for CO-197 when urgency or specialist referral is documented.`;
+      if (legalCitation) {
+        precedentRationale = `Appellate rulings (${legalCitation}) mandate retroactive claim authorization for CO-197 when urgency or specialist referral is documented.`;
+      } else {
+        precedentRationale = `State Insurance Commissioner rulings mandate retroactive claim authorization for CO-197 when urgency or specialist referral is documented.`;
+      }
     } else if (claim.denialReasonCode === "CO-16" || claim.denialReasonCode === "CO-4") {
       precedentScore = 17;
-      precedentRationale = `External review precedents consistently overturn CO-16 administrative denials upon supplemental clinical submission.`;
+      if (legalCitation) {
+        precedentRationale = `External review precedent (${legalCitation}) confirms systematic overturn of CO-16 administrative denials upon supplemental clinical submission.`;
+      } else {
+        precedentRationale = `External review precedents consistently overturn CO-16 administrative denials upon supplemental clinical submission.`;
+      }
     } else {
       precedentScore = 16;
-      precedentRationale = `State appellate benchmarks indicate strong likelihood of favorable adjudication under independent external review.`;
+      if (legalCitation) {
+        precedentRationale = `Archived precedent (${legalCitation}) indicates strong likelihood of favorable adjudication under independent external review.`;
+      } else {
+        precedentRationale = `State appellate benchmarks indicate strong likelihood of favorable adjudication under independent external review.`;
+      }
     }
   } else if (evidencesCount === 1) {
     if (claim.denialReasonCode === "CO-50") {
@@ -279,7 +326,7 @@ export async function performComputeOverturnScore(
     runId: args.pipelineRunId,
     stage: "score",
     status: "running",
-    message: `Weighing ${evidences.length} evidence clauses across the 4-pillar rubric to estimate win likelihood.`,
+    message: `Weighing ${evidences.length} evidence clauses across the 4-pillar statutory rubric to compute Appeal Viability Index (AVI).`,
   });
 
   // 3. Compute deterministic 4-pillar score
@@ -409,7 +456,7 @@ ${evidencesSummary}`,
     riskLevel: finalResult.riskLevel,
     scoringBreakdown: finalResult.scoringBreakdown,
     actor: "Precedent Matcher & Rubric Engine",
-    details: `Evaluated 4-pillar overturn score: ${finalResult.overturnProbabilityScore}% (${finalResult.riskLevel.replace(/_/g, " ").toUpperCase()}). Found ${finalResult.keyPolicyContradictions.length} cited policy contradictions.`,
+    details: `Evaluated 4-pillar Appeal Viability Index: ${finalResult.overturnProbabilityScore}/100 (${finalResult.riskLevel.replace(/_/g, " ").toUpperCase()}). Found ${finalResult.keyPolicyContradictions.length} cited policy contradictions.`,
   });
 
   const confidenceLabel =
@@ -423,7 +470,7 @@ ${evidencesSummary}`,
     runId: args.pipelineRunId,
     stage: "score",
     status: "completed",
-    message: `Win likelihood looks ${confidenceLabel} at ${finalResult.overturnProbabilityScore}%, with ${finalResult.keyPolicyContradictions.length} policy contradictions working in your favor.`,
+    message: `Appeal viability evaluated at ${finalResult.overturnProbabilityScore}/100 (${confidenceLabel}), with ${finalResult.keyPolicyContradictions.length} cited policy contradictions supporting statutory overturn.`,
   });
 
   return finalResult;

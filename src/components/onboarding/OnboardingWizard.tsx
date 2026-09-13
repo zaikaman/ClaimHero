@@ -1311,7 +1311,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     typeof (extractedResult.pipelineResult as { overturnProbabilityScore?: unknown }).overturnProbabilityScore === "number" && (
                       <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px]">
                         <TrendUp className="size-3 mr-1" />
-                        {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}% Overturn Score
+                        {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}/100 Viability Index
                       </Badge>
                     )}
                 </div>
