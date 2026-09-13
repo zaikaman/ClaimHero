@@ -28,6 +28,7 @@ import {
   CaretRight,
   Flask,
   ShieldCheck,
+  ClipboardText,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
@@ -70,7 +71,7 @@ interface CaseRadarProps {
   claims: Claim[];
   selectedClaimId: string;
   onSelectClaim: (claimId: string) => void;
-  onOpenIngestion: () => void;
+  onOpenIngestion: (claim?: Claim) => void;
   onNavigateView: (
     view: "radar" | "evidence" | "studio" | "p2p" | "communications" | "audit"
   ) => void;
@@ -79,6 +80,12 @@ interface CaseRadarProps {
   includeDemo?: boolean;
   onToggleIncludeDemo?: () => void;
 }
+
+const hasCompletedIntakeContext = (claim: Claim): boolean => Boolean(
+  claim.appealContext?.confirmedAt &&
+    claim.appealContext.sender?.name?.trim() &&
+    (claim.appealContext.sender?.email?.trim() || claim.appealContext.sender?.phone?.trim())
+);
 
 const formatPayerName = (payer: string | undefined): string => {
   if (!payer) return "Insurer";
@@ -542,7 +549,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
 
               <Button
                 size="sm"
-                onClick={onOpenIngestion}
+                onClick={() => onOpenIngestion()}
                 className="h-8 gap-1.5 text-xs bg-primary text-primary-foreground font-semibold shadow-xs shrink-0 cursor-pointer"
               >
                 <PlusCircle className="size-3.5" />
@@ -945,6 +952,21 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                               <span>Review & Send</span>
                               <ArrowUpRight className="size-2.5 opacity-70" />
                             </Button>
+                          ) : !hasCompletedIntakeContext(claim) ? (
+                            <Button
+                              variant="default"
+                              size="xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectClaim(claim._id);
+                                onOpenIngestion(claim);
+                              }}
+                              title="Complete compulsory clinical intake and submitter form"
+                              className="h-7 px-2.5 text-xs gap-1 bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-2xs border border-amber-500/30"
+                            >
+                              <ClipboardText className="size-3" weight="bold" />
+                              <span>Complete Form</span>
+                            </Button>
                           ) : claim.status === "analyzing" || (claim.evidenceCount && claim.evidenceCount > 0) ? (
                             <Button
                               variant="default"
@@ -1018,6 +1040,18 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                               <DropdownMenuLabel className="text-[10px] font-mono text-muted-foreground uppercase">
                                 Case #{claim.claimNumber} {isWon && "• WON"}
                               </DropdownMenuLabel>
+                              {!hasCompletedIntakeContext(claim) && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    onSelectClaim(claim._id);
+                                    onOpenIngestion(claim);
+                                  }}
+                                  className="gap-2 text-xs cursor-pointer text-amber-500 font-medium"
+                                >
+                                  <ClipboardText className="size-3.5" />
+                                  <span>Complete Intake Form</span>
+                                </DropdownMenuItem>
+                              )}
                               {isWon ? (
                                 <>
                                   <DropdownMenuItem

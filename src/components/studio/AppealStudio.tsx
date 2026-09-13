@@ -46,6 +46,7 @@ interface AppealStudioProps {
   onNavigateView?: (view: FlowView) => void;
   onRunAutonomousPipeline?: (claimId?: string) => Promise<unknown>;
   onOpenAuditDrawer?: () => void;
+  onOpenIngestion?: (claim?: Claim) => void;
 }
 
 const TIER_METADATA_CONFIG = {
@@ -107,6 +108,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   onNavigateView,
   onRunAutonomousPipeline,
   onOpenAuditDrawer,
+  onOpenIngestion,
 }) => {
   const { user, userName } = useCurrentUser();
   const currentUserId = (user?._id as string | undefined) || "";
@@ -354,6 +356,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           onRunAutonomousPipeline ? () => onRunAutonomousPipeline(claim._id) : undefined
         }
         onOpenAuditDrawer={onOpenAuditDrawer}
+        onOpenIngestion={onOpenIngestion}
       />
 
       {/* Background pipeline notice: brief streams in live, evidence available meanwhile */}

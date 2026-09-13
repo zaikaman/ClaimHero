@@ -23,7 +23,7 @@ import {
 } from "@phosphor-icons/react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { ClinicalFacts, ClinicalIntakeQuestion, DenialExtractionResult } from "../../types";
+import { Claim, ClinicalFacts, ClinicalIntakeQuestion, DenialExtractionResult } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
 import { DEMO_CASE_FIXTURES, DemoCaseFixture, SampleCasePreset } from "../../lib/constants";
 import {
@@ -103,6 +103,7 @@ interface IngestionModalProps {
     origin?: string
   ) => Promise<DenialExtractionResult & { claimId: string }>;
   onSuccess: (claimId: string, directView?: string) => void;
+  initialClaim?: Claim | null;
 }
 
 export const IngestionModal: React.FC<IngestionModalProps> = ({
@@ -111,6 +112,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   onUploadFile,
   onParseText,
   onSuccess,
+  initialClaim,
 }) => {
   const [activeTab, setActiveTab] = useState("presets");
   const [patientState, setPatientState] = useState("California");
@@ -176,38 +178,6 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     });
   }, [pastedText, privacyRedactionState.mode]);
 
-  useEffect(() => {
-    if (isOpen) {
-      setActiveTab("presets");
-      setSelectedFile(null);
-      setPastedText("");
-      setIsProcessing(false);
-      setProcessingMessage("Analyzing denial document...");
-      setProcessingStage("idle");
-      setProcessingStartedAt(null);
-      setProcessingElapsedSec(0);
-      setErrorMessage(null);
-      setExtractedResult(null);
-      setActivePreset(null);
-      setContextSubmitted(false);
-      setIsPreparingContext(false);
-      setIntakeQuestions(DEFAULT_CLINICAL_QUESTIONS);
-      setSenderName("");
-      setSenderCredentials("");
-      setSenderEmail("");
-      setSenderPhone("");
-      setClinicalFacts(EMPTY_CLINICAL_FACTS);
-      setPhysicianNotes("");
-      setContextAcknowledged(false);
-      setShowPrivacyFilter(false);
-      setPrivacyRedactionState({
-        isRedacted: false,
-        mode: "HIPAA_SAFE_HARBOR",
-        count: 0,
-        categories: [],
-      });
-    }
-  }, [isOpen]);
 
   const runPipelineAction = useAction(api.actions.sentinelPipeline.runAutonomousPipeline);
   const generateIntakeQuestionsAction = useAction(api.actions.clinicalIntake.generateClinicalIntakeQuestions);
@@ -367,6 +337,113 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     setSenderPhone("");
     fetchIntakeQuestionsInBackground(result);
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialClaim) {
+        const result: DenialExtractionResult & { claimId: string; pipelineResult?: unknown } = {
+          claimId: initialClaim._id,
+          claimNumber: initialClaim.claimNumber,
+          patientName: initialClaim.patientName || initialClaim.patient?.name || "Patient Record",
+          memberId: initialClaim.patient?.memberId || "PENDING",
+          insurancePayer: initialClaim.insurancePayer || initialClaim.patient?.insurancePayer || "Health Insurer",
+          serviceDate: initialClaim.serviceDate || "",
+          providerName: initialClaim.providerName || "",
+          deniedAmount: initialClaim.deniedAmount || 0,
+          patientOwedAmount: initialClaim.patientOwedAmount || 0,
+          cptCodes: initialClaim.cptCodes || [],
+          icd10Codes: initialClaim.icd10Codes || [],
+          denialReasonCode: initialClaim.denialReasonCode || "CO-50",
+          denialReasonDescription: initialClaim.denialReasonDescription || "",
+          appealFilingDeadlineDays: initialClaim.daysRemaining || 180,
+          pipelineResult: null,
+        };
+
+        const matchedPreset =
+          initialClaim.isDemo ||
+          initialClaim.dataOrigin === "demo-fixture" ||
+          initialClaim.origin === "demo-fixture"
+            ? DEMO_CASE_FIXTURES.find((f) => {
+                const baseNum = f.content.match(/CLM-[A-Za-z0-9-]+/)?.[0];
+                if (baseNum && initialClaim.claimNumber.startsWith(baseNum.slice(0, 8))) return true;
+                if (f.cpt && initialClaim.cptCodes?.includes(f.cpt)) return true;
+                return false;
+              })
+            : null;
+
+        if (initialClaim.appealContext) {
+          const ctx = initialClaim.appealContext;
+          setExtractedResult(result);
+          setContextSubmitted(false);
+          setActivePreset(matchedPreset || null);
+          setIntakeQuestions(matchedPreset ? matchedPreset.questions : DEFAULT_CLINICAL_QUESTIONS);
+          setClinicalFacts({
+            symptomsAndFunctionalImpact: ctx.clinicalFacts?.symptomsAndFunctionalImpact || "",
+            examinationFindings: ctx.clinicalFacts?.examinationFindings || "",
+            imagingAndDiagnostics: ctx.clinicalFacts?.imagingAndDiagnostics || "",
+            treatmentHistoryAndResponse: ctx.clinicalFacts?.treatmentHistoryAndResponse || "",
+            otherDocumentedFacts: ctx.clinicalFacts?.otherDocumentedFacts || "",
+            recordsAreIncomplete: ctx.clinicalFacts?.recordsAreIncomplete ?? true,
+          });
+          setPhysicianNotes(ctx.physicianNotes || "");
+          setSenderName(ctx.sender?.name || "");
+          setSenderCredentials(ctx.sender?.credentials || "");
+          setSenderEmail(ctx.sender?.email || "");
+          setSenderPhone(ctx.sender?.phone || "");
+          setContextAcknowledged(Boolean(ctx.confirmedAt));
+          setIsPreparingContext(false);
+        } else {
+          prepareContextReview(result, matchedPreset || undefined);
+        }
+
+        setSelectedFile(null);
+        setPastedText("");
+        setIsProcessing(false);
+        setProcessingMessage("Analyzing denial document...");
+        setProcessingStage("idle");
+        setProcessingStartedAt(null);
+        setProcessingElapsedSec(0);
+        setErrorMessage(null);
+        setShowPrivacyFilter(false);
+        setPrivacyRedactionState({
+          isRedacted: Boolean(initialClaim.redactionMetadata?.isRedacted),
+          mode: (initialClaim.redactionMetadata?.mode as ComplianceStandard) || "BALANCED_APPELLATE",
+          count: initialClaim.redactionMetadata?.redactedEntityCount || 0,
+          categories: initialClaim.redactionMetadata?.maskedCategories || [],
+        });
+        return;
+      }
+
+      setActiveTab("presets");
+      setSelectedFile(null);
+      setPastedText("");
+      setIsProcessing(false);
+      setProcessingMessage("Analyzing denial document...");
+      setProcessingStage("idle");
+      setProcessingStartedAt(null);
+      setProcessingElapsedSec(0);
+      setErrorMessage(null);
+      setExtractedResult(null);
+      setActivePreset(null);
+      setContextSubmitted(false);
+      setIsPreparingContext(false);
+      setIntakeQuestions(DEFAULT_CLINICAL_QUESTIONS);
+      setSenderName("");
+      setSenderCredentials("");
+      setSenderEmail("");
+      setSenderPhone("");
+      setClinicalFacts(EMPTY_CLINICAL_FACTS);
+      setPhysicianNotes("");
+      setContextAcknowledged(false);
+      setShowPrivacyFilter(false);
+      setPrivacyRedactionState({
+        isRedacted: false,
+        mode: "HIPAA_SAFE_HARBOR",
+        count: 0,
+        categories: [],
+      });
+    }
+  }, [isOpen, initialClaim]);
 
   const handleProcessFile = async () => {
     if (!selectedFile) {

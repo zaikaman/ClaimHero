@@ -259,6 +259,10 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
 
       validateClaimClinicalContext(claim);
 
+      if (claim && (!claim.appealContext?.confirmedAt || !claim.appealContext.sender?.name?.trim() || (!claim.appealContext.sender?.email?.trim() && !claim.appealContext.sender?.phone?.trim()))) {
+        throw new Error("Compulsory clinical intake and submitter form must be completed before running the autonomous pipeline.");
+      }
+
       if (runPipelineAction) {
         try {
           return await runPipelineAction({

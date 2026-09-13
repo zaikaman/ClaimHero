@@ -80,6 +80,7 @@ export interface Claim {
   updatedAt: number;
   patient?: Patient;
   patientName?: string;
+  insurancePayer?: string;
   latestAppeal?: Appeal | null;
   evidenceCount?: number;
   payerContact?: PayerContact;

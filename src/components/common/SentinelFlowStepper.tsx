@@ -30,6 +30,7 @@ interface SentinelFlowStepperProps {
   processingLabel?: string;
   onRunAutonomousPipeline?: () => Promise<unknown>;
   onOpenAuditDrawer?: () => void;
+  onOpenIngestion?: (claim?: Claim) => void;
 }
 
 export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
@@ -42,6 +43,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
   processingLabel = "Processing...",
   onRunAutonomousPipeline,
   onOpenAuditDrawer,
+  onOpenIngestion,
 }) => {
   const isWon = claim.status === "won";
   const isDispatched = claim.status === "dispatched" || isWon;
@@ -61,8 +63,8 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     isDispatched;
   const hasAppealContext = Boolean(
     claim.appealContext?.confirmedAt &&
-      claim.appealContext.sender.name &&
-      (claim.appealContext.sender.email || claim.appealContext.sender.phone)
+      claim.appealContext.sender?.name?.trim() &&
+      (claim.appealContext.sender?.email?.trim() || claim.appealContext.sender?.phone?.trim())
   );
 
   const steps = [
@@ -200,7 +202,17 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
           {(!hasEvidence || !hasBrief) && onRunAutonomousPipeline && (
             <Button
               size="xs"
-              onClick={() => hasAppealContext ? onRunAutonomousPipeline() : onNavigateView("studio")}
+              onClick={() => {
+                if (hasAppealContext) {
+                  onRunAutonomousPipeline().catch((err) => {
+                    console.warn("Autonomous pipeline execution notice:", err);
+                  });
+                } else if (onOpenIngestion) {
+                  onOpenIngestion(claim);
+                } else {
+                  onNavigateView("studio");
+                }
+              }}
               disabled={isProcessing}
               className="gap-1.5 h-7 px-2.5 bg-primary text-primary-foreground text-xs shadow-2xs cursor-pointer font-medium"
             >

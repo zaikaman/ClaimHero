@@ -49,6 +49,7 @@ interface EvidenceMatrixProps {
   onNavigateView?: (view: FlowView) => void;
   onRunAutonomousPipeline?: (claimId?: string) => Promise<unknown>;
   onOpenAuditDrawer?: () => void;
+  onOpenIngestion?: (claim?: Claim) => void;
 }
 
 export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
@@ -66,6 +67,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   onNavigateView,
   onRunAutonomousPipeline,
   onOpenAuditDrawer,
+  onOpenIngestion,
 }) => {
   const [activeTab, setActiveTab] = useState<string>("policy");
   const [isScoring, setIsScoring] = useState(false);
@@ -190,6 +192,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           onRunAutonomousPipeline ? () => onRunAutonomousPipeline(claim._id) : undefined
         }
         onOpenAuditDrawer={onOpenAuditDrawer}
+        onOpenIngestion={onOpenIngestion}
       />
 
       {/* Background pipeline progress: visible the moment ingestion hands off */}

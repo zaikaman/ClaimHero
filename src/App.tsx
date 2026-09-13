@@ -13,6 +13,7 @@ import { useCurrentUser } from "./hooks/useCurrentUser";
 import { BrandIcon, BrandWordmark } from "./components/common/BrandLogo";
 import { CircleNotch } from "@phosphor-icons/react";
 import { Toaster } from "sonner";
+import { Claim } from "./types";
 
 // Lazy-load heavy views and standalone feature workspaces
 const CaseRadar = lazy(() => import("./components/radar/CaseRadar").then((m) => ({ default: m.CaseRadar })));
@@ -46,6 +47,7 @@ function ViewLoadingFallback({ message = "Connecting to Sentinel Engine..." }: {
 export default function App() {
   const { currentView, setCurrentView } = useRouterView();
   const [isIngestionOpen, setIsIngestionOpen] = useState<boolean>(false);
+  const [ingestionClaim, setIngestionClaim] = useState<Claim | null>(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
@@ -156,9 +158,10 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const handleOpenIngestion = () => {
+  const handleOpenIngestion = useCallback((claim?: Claim) => {
+    setIngestionClaim(claim || null);
     setIsIngestionOpen(true);
-  };
+  }, []);
 
   const handleIngestionSuccess = (claimId: string, directView?: string) => {
     setIncludeDemo(true);
@@ -339,6 +342,7 @@ export default function App() {
                   onNavigateView={setCurrentView}
                   onRunAutonomousPipeline={runFullPipeline}
                   onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
+                  onOpenIngestion={handleOpenIngestion}
                 />
               ) : selectedClaimId ? (
                 <ViewLoadingFallback message="Opening case dossier & clinical policy matrix..." />
@@ -363,6 +367,7 @@ export default function App() {
                   onNavigateView={setCurrentView}
                   onRunAutonomousPipeline={runFullPipeline}
                   onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
+                  onOpenIngestion={handleOpenIngestion}
                 />
               ) : selectedClaimId && isLoadingSelectedClaim ? (
                 <ViewLoadingFallback message="Opening appeal synthesis workspace..." />
@@ -492,10 +497,14 @@ export default function App() {
         <Suspense fallback={null}>
           <IngestionModal
             isOpen={isIngestionOpen}
-            onClose={() => setIsIngestionOpen(false)}
+            onClose={() => {
+              setIsIngestionOpen(false);
+              setIngestionClaim(null);
+            }}
             onUploadFile={uploadAndParseDocument}
             onParseText={parseDocumentText}
             onSuccess={handleIngestionSuccess}
+            initialClaim={ingestionClaim}
           />
         </Suspense>
 
