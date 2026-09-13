@@ -300,7 +300,10 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL
   );
 
+  const isReadyForReview = claim.status === "ready_for_review";
+
   const canDispatch =
+    isReadyForReview &&
     isSenderGatewayConfigured &&
     (!isPatientUnspecified || hasSender) &&
     (dispatchMode === "ai_adjudicator"
@@ -634,6 +637,18 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             </div>
           )}
 
+          {!isReadyForReview && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-500 flex items-start gap-2.5">
+              <Info className="size-4 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Mandatory Review Gate: Claim Status is {claim.status.replace(/_/g, " ").toUpperCase()}</p>
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
+                  Mandatory human review gate requires the case to be in &quot;Ready for Review&quot; status with a synthesized brief before appellate dispatch can be authorized.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Dedicated Transmission Launchpad Action Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl border border-primary/30 bg-primary/10">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -664,7 +679,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               onClick={handleRunDispatch}
               disabled={isDispatching || !canDispatch || !effectiveAppeal}
               title={
-                !isSenderGatewayConfigured
+                !isReadyForReview
+                  ? `Dispatch disabled: Claim status is "${claim.status}". Mandatory human review requires claim status to be "ready_for_review".`
+                  : !isSenderGatewayConfigured
                   ? "Dispatch disabled: AgentMail sender address is not configured. Set VITE_AGENTMAIL_SENDER_EMAIL in environment."
                   : isPatientUnspecified && !hasSender
                   ? "Patient name not specified in denial notice. Please supply sender details in Appeal Studio before dispatching."
@@ -682,10 +699,10 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <PaperPlaneTilt className="size-4" />
                   <span>
                     {dispatchMode === "ai_adjudicator"
-                      ? "Transmit to Demo AI Reviewer"
+                      ? "Approve & Transmit to Demo AI Reviewer"
                       : dispatchMode === "custom_email"
-                      ? "Transmit to Personal Test Inbox"
-                      : "Transmit to Official Gateway"}
+                      ? "Approve & Transmit to Personal Test Inbox"
+                      : "Approve & Transmit to Official Gateway"}
                   </span>
                 </>
               )}

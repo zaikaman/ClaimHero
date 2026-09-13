@@ -176,6 +176,9 @@ export default defineSchema({
     workflowId: v.optional(v.string()),
     workflowStatus: v.optional(v.string()),
     searchContent: v.optional(v.string()),
+    isHumanApproved: v.optional(v.boolean()),
+    approvedAt: v.optional(v.number()),
+    approvedBy: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -236,6 +239,10 @@ export default defineSchema({
     fullAppealMarkdown: v.string(),
     pdfExportStorageId: v.optional(v.id("_storage")),
     lastEditedBy: v.string(),
+    isHumanApproved: v.optional(v.boolean()),
+    approvedAt: v.optional(v.number()),
+    approvedBy: v.optional(v.string()),
+    approvalNotes: v.optional(v.string()),
     updatedAt: v.number(),
   })
     .index("by_claim", ["claimId"])

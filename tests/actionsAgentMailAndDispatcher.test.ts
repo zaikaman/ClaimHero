@@ -1039,12 +1039,14 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         claimNumber: "CLM-100",
         userId: "user_123",
         deniedAmount: 18450,
+        status: "ready_for_review",
         patient: { name: "Marcus Holloway", insurancePayer: "UnitedHealthcare" },
       };
       const mockAppeal = {
         _id: "a1",
         claimId: "c1",
         version: 1,
+        isHumanApproved: true,
         fullAppealMarkdown: "# Appeal Brief",
         medicalNecessityArguments: "Medical necessity argument",
       };

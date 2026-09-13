@@ -181,12 +181,14 @@ describe("Adjudicator dispatch with adversary countermoves", () => {
       userId: "user_123",
       deniedAmount: 10000,
       overturnProbabilityScore: 0.55,
+      status: "ready_for_review",
       patient: { name: "Jane Doe", insurancePayer: "UnitedHealthcare" },
     };
     const mockAppeal = {
       _id: "a1",
       claimId: "c1",
       version: 1,
+      isHumanApproved: true,
       fullAppealMarkdown: "# Appeal Brief",
       medicalNecessityArguments: "necessity",
     };

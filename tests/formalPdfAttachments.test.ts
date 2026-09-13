@@ -190,6 +190,7 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
           _id: "claim_outbound" as any,
           claimNumber: "CH-7788",
           patientName: "Robert Green",
+          status: "ready_for_review",
           patient: { insurancePayer: "Blue Cross Blue Shield", name: "Robert Green" },
           deniedAmount: 25000,
           payerContact: { officialAppealsEmail: "appeals@bcbs.com" },
@@ -213,6 +214,7 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
         runQuery: vi.fn().mockResolvedValue({
           _id: "appeal_outbound",
           claimId: "claim_outbound",
+          isHumanApproved: true,
           fullAppealMarkdown: "# Outbound Brief",
           pdfExportStorageId: "storage_pdf_brief",
         }),

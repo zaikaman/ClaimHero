@@ -138,7 +138,7 @@ describe("ERISA Certificate of Electronic Service (Proof of Delivery)", () => {
     };
 
     it("extracts live AgentMail message ID and Amazon SES receipt correctly", async () => {
-      const mockCtx: Partial<QueryCtx> = {
+      const mockCtx = {
         db: {
           get: vi.fn().mockImplementation(async (id: string) => {
             if (id === mockPatientId) return mockPatient;
@@ -162,8 +162,8 @@ describe("ERISA Certificate of Electronic Service (Proof of Delivery)", () => {
               sha256: "a1b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef",
             }),
           },
-        } as unknown as QueryCtx,
-      };
+        },
+      } as unknown as QueryCtx;
 
       const cert = await buildCertificateData(mockCtx as QueryCtx, mockClaim);
 
@@ -209,7 +209,7 @@ describe("ERISA Certificate of Electronic Service (Proof of Delivery)", () => {
         outboundId: "outbound_fallback_1",
       };
 
-      const mockCtx: Partial<QueryCtx> = {
+      const mockCtx = {
         db: {
           get: vi.fn().mockImplementation(async (id: string) => {
             if (id === mockPatientId) return mockPatient;
@@ -223,8 +223,8 @@ describe("ERISA Certificate of Electronic Service (Proof of Delivery)", () => {
               }),
             }),
           })),
-        } as unknown as QueryCtx,
-      };
+        },
+      } as unknown as QueryCtx;
 
       const cert = await buildCertificateData(mockCtx as QueryCtx, mockClaim);
 
@@ -282,6 +282,7 @@ describe("ERISA Certificate of Electronic Service (Proof of Delivery)", () => {
         userId: "user_test_123" as Id<"users">,
         patientId: "patient_1" as Id<"patients">,
         patientName: "John Late",
+        providerName: "Memorial Surgical Center",
         claimNumber: "CH-99999",
         serviceDate: "2026-01-01",
         deniedAmount: 5000,
@@ -298,7 +299,7 @@ describe("ERISA Certificate of Electronic Service (Proof of Delivery)", () => {
         updatedAt: Date.now(),
       };
 
-      const mockCtx: Partial<QueryCtx> = {
+      const mockCtx = {
         db: {
           get: vi.fn().mockResolvedValue(null),
           query: vi.fn().mockReturnValue({
@@ -309,8 +310,8 @@ describe("ERISA Certificate of Electronic Service (Proof of Delivery)", () => {
               }),
             }),
           }),
-        } as unknown as QueryCtx,
-      };
+        },
+      } as unknown as QueryCtx;
 
       const cert = await buildCertificateData(mockCtx as QueryCtx, lateClaim);
       expect(cert.isTimelyFiled).toBe(false);

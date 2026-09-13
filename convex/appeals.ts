@@ -437,3 +437,112 @@ export const updatePdfStorageIdInternal = internalMutation({
     });
   },
 });
+
+/**
+ * Record explicit human approval for an appeal brief internally (e.g. at dispatch gate)
+ */
+export const recordHumanApprovalInternal = internalMutation({
+  args: {
+    appealId: v.id("appeals"),
+    claimId: v.id("claims"),
+    approvedBy: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const appeal = await ctx.db.get(args.appealId);
+    if (!appeal) {
+      throw new Error(`Appeal ${args.appealId} not found`);
+    }
+
+    const now = Date.now();
+    const actor = args.approvedBy || "Authorized Human Reviewer";
+
+    await ctx.db.patch(args.appealId, {
+      isHumanApproved: true,
+      approvedAt: now,
+      approvedBy: actor,
+      approvalNotes: args.notes,
+      updatedAt: now,
+    });
+
+    await ctx.db.patch(args.claimId, {
+      isHumanApproved: true,
+      approvedAt: now,
+      approvedBy: actor,
+      updatedAt: now,
+    });
+
+    await appendAuditLog(ctx, {
+      claimId: args.claimId,
+      eventType: "appeal_approved",
+      actor,
+      details: `Mandatory human review verified: Appeal brief v${appeal.version} clinical assertions, legal citations, recipient, and outbound transmission approved by ${actor}.`,
+      timestamp: now,
+    });
+
+    return {
+      success: true,
+      appealId: args.appealId,
+      approvedAt: now,
+      approvedBy: actor,
+    };
+  },
+});
+
+/**
+ * Public mutation for explicit human approval of an appeal brief
+ */
+export const approveAppeal = mutation({
+  args: {
+    appealId: v.id("appeals"),
+    notes: v.optional(v.string()),
+    approvedBy: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const appeal = await ctx.db.get(args.appealId);
+    if (!appeal) {
+      throw new Error(`Appeal ${args.appealId} not found`);
+    }
+
+    const { claim, userId } = await requireClaimEditor(ctx, appeal.claimId);
+    if (claim.status !== "ready_for_review") {
+      throw new Error(
+        `Cannot approve appeal: claim status is "${claim.status}". Claim must be in "ready_for_review" status before formal approval.`
+      );
+    }
+
+    const user = await ctx.db.get(userId);
+    const actor = args.approvedBy || user?.name || user?.email || "Authorized Human Reviewer";
+    const now = Date.now();
+
+    await ctx.db.patch(args.appealId, {
+      isHumanApproved: true,
+      approvedAt: now,
+      approvedBy: actor,
+      approvalNotes: args.notes,
+      updatedAt: now,
+    });
+
+    await ctx.db.patch(appeal.claimId, {
+      isHumanApproved: true,
+      approvedAt: now,
+      approvedBy: actor,
+      updatedAt: now,
+    });
+
+    await appendAuditLog(ctx, {
+      claimId: appeal.claimId,
+      eventType: "appeal_approved",
+      actor,
+      details: `Mandatory human review verified: Appeal brief v${appeal.version} clinical assertions, legal citations, recipient, and outbound transmission approved by ${actor}.`,
+      timestamp: now,
+    });
+
+    return {
+      success: true,
+      appealId: args.appealId,
+      approvedAt: now,
+      approvedBy: actor,
+    };
+  },
+});

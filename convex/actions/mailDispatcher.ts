@@ -44,6 +44,9 @@ export interface DispatchReceipt {
   status: "delivered" | "queued";
   adjudicationDetermination?: string;
   pdfMissing?: boolean;
+  humanApproved?: boolean;
+  approvedBy?: string;
+  approvalNotes?: string;
 }
 
 interface ClaimMailboxes {
@@ -457,6 +460,9 @@ export const dispatchAppealPacketArgs = {
   customSubject: v.optional(v.string()),
   dispatchMode: v.optional(v.string()), // "ai_adjudicator" | "custom_email" | "official_payer"
   waiveRedaction: v.optional(v.boolean()),
+  humanApproved: v.optional(v.boolean()),
+  approvedBy: v.optional(v.string()),
+  approvalNotes: v.optional(v.string()),
   sender: v.optional(
     v.object({
       name: v.string(),
@@ -481,6 +487,9 @@ export async function performDispatchAppealPacket(
     customSubject?: string;
     dispatchMode?: string;
     waiveRedaction?: boolean;
+    humanApproved?: boolean;
+    approvedBy?: string;
+    approvalNotes?: string;
     sender?: {
       name: string;
       credentials?: string;
@@ -491,6 +500,13 @@ export async function performDispatchAppealPacket(
   claim: Doc<"claims"> & { patient?: Doc<"patients"> | null },
   userId?: string
 ): Promise<DispatchReceipt> {
+  // Mandatory Human Review Gate 1: Claim Status must be "ready_for_review"
+  if (claim.status !== "ready_for_review") {
+    throw new Error(
+      `Cannot dispatch appeal: claim status is "${claim.status}". Mandatory human review requires claim status to be "ready_for_review" before appellate dispatch.`
+    );
+  }
+
   const rawPatientName = claim.patient?.name || claim.patientName;
   const patientName = resolveClaimPatientName(rawPatientName, claim.claimNumber, claim.patient?.memberId);
   const isPatientUnspecified =
@@ -537,6 +553,34 @@ export async function performDispatchAppealPacket(
 
     if (!appeal) {
       throw new Error(`No appeal brief found for claim ${args.claimId}`);
+    }
+
+    // Mandatory Human Review Gate 2: Explicit Human Approval Record Required
+    const hasExistingApproval = Boolean(appeal.isHumanApproved);
+    const hasExplicitApprovalArg = Boolean(args.humanApproved);
+
+    if (!hasExistingApproval && !hasExplicitApprovalArg) {
+      throw new Error(
+        "Cannot dispatch appeal: explicit human approval is required. In accordance with clinical safety protocols, an authorized human must approve every clinical assertion, legal assertion, recipient, and outbound message before dispatch."
+      );
+    }
+
+    let effectiveApprover = appeal.approvedBy || args.approvedBy;
+
+    // Persist human approval record if not already recorded on the appeal
+    if (!hasExistingApproval) {
+      effectiveApprover =
+        args.approvedBy ||
+        (hasValidSender && senderDetails?.name ? senderDetails.name : null) ||
+        (patientName && !isPatientUnspecified ? `Authorized Representative for ${patientName}` : null) ||
+        "Authorized Human Reviewer";
+
+      await ctx.runMutation(internal.appeals.recordHumanApprovalInternal, {
+        appealId: appeal._id,
+        claimId: claim._id,
+        approvedBy: effectiveApprover,
+        notes: args.approvalNotes || "Human review and authorization confirmed at appellate dispatch gate.",
+      });
     }
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
@@ -771,6 +815,8 @@ export async function performDispatchAppealPacket(
       status: "delivered",
       pdfMissing,
       adjudicationDetermination: adjudicationResult?.determination,
+      humanApproved: true,
+      approvedBy: effectiveApprover,
     };
 }
 

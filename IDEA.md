@@ -157,18 +157,18 @@ flowchart TD
 
 ## 5. Verification & Test Engineering
 
-ClaimHero enforces rigorous automated test coverage (~81.3% lines across all modules, 100% across core libraries and utilities) and strict quality verification across every tier:
+ClaimHero enforces rigorous automated test coverage (~80.4% lines across all modules, 100% across core libraries and utilities) and strict quality verification across every tier:
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (tsc --noEmit)
 npm run lint            # ESLint static code analysis
-npm run test            # Vitest automated test execution (963 tests across 61 suites)
-npm run test:coverage   # Vitest with @vitest/coverage-v8 (~81.2% line coverage)
+npm run test            # Vitest automated test execution (967 tests across 61 suites)
+npm run test:coverage   # Vitest with @vitest/coverage-v8 (~80.4% line coverage)
 npm run build           # Vite production bundle build
 npm run verify          # Full automated gate (typecheck + lint + test:coverage + build)
 ```
 
-### Verified Test Suites (963 Tests / 61 Suites)
+### Verified Test Suites (967 Tests / 61 Suites)
 * `tests/claimhero.test.ts` (70 tests): End-to-end integration, 4-pillar scoring rubric, ERISA deadline sweeps, and portfolio aggregates.
 * `tests/serviceCertificate.test.ts` (10 tests): ERISA Certificate of Electronic Service generation, live AgentMail message IDs, Amazon SES delivery receipts, recipient MX resolution, and Convex storage SHA-256 fingerprints.
 * `tests/policyDriftSentinel.test.ts` (15 tests): Policy Drift Sentinel retroactive CPB alteration detection, cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, and Convex audit integration.
@@ -177,7 +177,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/actionsPolicyAndSynthesizer.test.ts` (30 tests): Firecrawl policy scraping, guideline fallback handling, and appeal synthesizer action contracts.
 * `tests/convexAppeals.test.ts` (30 tests): Multi-tier statutory appeal escalation, revision preservation, and draft lifecycle.
 * `tests/collaboration.test.ts` (26 tests): Case sharing invitations, collaborator roles (editor/viewer), and pending invite gating.
-* `tests/securityComplianceHardening.test.ts` (25 tests): Unauthenticated optical parsing denial, IDOR patient isolation, honest name resolution, and dispatch blocking.
+* `tests/securityComplianceHardening.test.ts` (30 tests): Unauthenticated optical parsing denial, IDOR patient isolation, honest name resolution, and dispatch blocking.
 * `tests/actionsAgentMailAndDispatcher.test.ts` (25 tests): Outbound appeal packet compilation, inbound claim reply routing, and cooldown deduplication.
 * `tests/evidenceDossierUx.test.ts` (24 tests): Clinical research console modes, multi-source 3-pipeline telemetry, exhibit grouping, 4-way arrow navigation, and clause inspector contracts.
 * `tests/convexChatbot.test.ts` (23 tests): Agentic tool definitions, chat sessions, rolling summarization, and token-bucket rate limits.
@@ -190,16 +190,16 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/demoIsolationAndHonestPipelines.test.ts` (18 tests): Synthetic demo isolation, honest clinical basis validation, and real patient protection.
 * `tests/workflows.test.ts` (18 tests): Durable background workflows, step resumption, and pipeline error recovery.
 * `tests/convexClinicalEvidences.test.ts` (17 tests): Clinical evidence persistence, batch ingestion, and claim linkage.
-* `tests/redactionEngine.test.ts` (17 tests): HIPAA Safe Harbor 18-identifier detection, boundary masking, street addresses, and custom terms.
+* `tests/redactionEngine.test.ts` (19 tests): HIPAA Safe Harbor 18-identifier detection, boundary masking, street addresses, and custom terms.
 * `tests/convexAuditLogsAndUsers.test.ts` (17 tests): Immutable statutory audit log timelines, ERISA Merkle verification query, and user profile persistence.
 * `tests/financialErisaCalculator.test.ts` (15 tests): ERISA § 502(c) statutory penalties ($110/day), cost-sharing calculations, and severity tiers.
 * `tests/visualProofArchive.test.ts` (15 tests): Firecrawl full-page screenshot archiving, signed URL resolution, and exhibit mapping.
-* `tests/actionsClinicalAndParser.test.ts` (15 tests): Optical PDF intake parsing, clinical question generation, and payer gateway discovery.
+* `tests/actionsClinicalAndParser.test.ts` (16 tests): Optical PDF intake parsing, clinical question generation, and payer gateway discovery.
 * `tests/auditCryptoChain.test.ts` (19 tests): NIST SHA-256 rolling hash chain, tamper detection (alterations, backdating, deletions), unsealed block detection, and < 10ms benchmark.
 * `tests/hybridSearchRRF.test.ts` (14 tests): Reciprocal Rank Fusion combining vector similarity and keyword search.
 * `tests/auditTrailDrawer.test.ts` (17 tests): Case Audit Drawer, Cryptographic Proof of Case Integrity HUD, 1-click Verify Hash Chain button, and block seals.
 * `tests/convexClaimsFull.test.ts` (14 tests): Comprehensive claim state machine transitions and cascading purge operations.
-* `tests/actionsPrecedentsAndPipeline.test.ts` (13 tests): Precedent archive search, vector matching, and autonomous pipeline orchestration.
+* `tests/actionsPrecedentsAndPipeline.test.ts` (14 tests): Precedent archive search, vector matching, and autonomous pipeline orchestration.
 * `tests/pendingUploads.test.ts` (13 tests): Secure file upload sessions and storage ownership verification.
 * `tests/radarExport.test.ts` (12 tests): HIPAA Safe Harbor export sanitization across 4 formats, entity masking, and technical audit exports.
 * `tests/clientStatsAndSearch.test.ts` (12 tests): In-memory client statistics aggregation and search filtering.
@@ -210,10 +210,10 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/convexSettings.test.ts` (11 tests): Adjudicator profile settings, practice credentials, and organization preferences.
 * `tests/backendOptimizationsD1D7.test.ts` (10 tests): Bounded pagination, aggregate safeguards, and performance optimizations.
 * `tests/appealYjs.test.ts` (10 tests): Yjs CRDT op-log transport, vector clocks, and snapshot persistence.
-* `tests/autopilotSLA.test.ts` (10 tests): Automated SLA enforcement and statutory countdown monitoring.
+* `tests/autopilotSLA.test.ts` (7 tests): Automated SLA enforcement and statutory countdown monitoring.
 * `tests/adversarialAdjudicator.test.ts` (10 tests): Adversarial payer response simulation and boundary validation.
 * `tests/actionsP2PAndChatbot.test.ts` (9 tests): Physician P2P script generation and chatbot retrieval actions.
-* `tests/ingestionAndDeletionPipeline.test.ts` (9 tests): Denial document ingestion and cascading resource deletion.
+* `tests/ingestionAndDeletionPipeline.test.ts` (11 tests): Denial document ingestion and cascading resource deletion.
 * `tests/convexP2P.test.ts` (9 tests): P2P call session records and defense script persistence.
 * `tests/formalPdfAttachments.test.ts` (8 tests): Formal PDF legal memorandum assembly and court attachment generation.
 * `tests/firecrawlDirectoryMap.test.ts` (8 tests): Firecrawl `/v1/map` insurer CPB directory discovery, specialty code deduction, bulletin identifier extraction, SSRF URL filtering, and rate limiting.
@@ -239,7 +239,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 |---|---|
 | **Real-World Utility** | Directly tackles a $200B/year denial crisis. Produces production-ready, sendable artifacts (formal briefs, P2P call scripts, EHR clinical notes, and court dossiers) rather than generic chat summaries. |
 | **Full-Stack Integration Depth** | All 4 sponsor platforms are deeply integrated: **Convex** (reactive DB, 1536-d vector search, searchIndex, scheduled crons, components), **Firecrawl** (live CPB scraping, PubMed, FDA), **AgentMail** (inbound webhooks, outbound dispatch, AI adjudicator), and **OpenAI** (Vision extraction, 4-pillar scoring, grounded synthesis). |
-| **Technical Rigor & Polish** | 100% clean `npm run verify` gate, 963 automated tests across 61 test suites, strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
+| **Technical Rigor & Polish** | 100% clean `npm run verify` gate, 967 automated tests across 61 test suites, strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
 | **Transparency & Build Process** | Comprehensive `hackathon.md` log with UTC timestamps, reconciled 7-character commit hashes, and detailed milestone notes. |
 
 ---

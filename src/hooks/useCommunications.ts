@@ -131,6 +131,8 @@ export function useCommunications(claim?: Claim | null, options?: UseCommunicati
         recipientEmail,
         dispatchMode,
         waiveRedaction: true,
+        humanApproved: true,
+        approvedBy: claim.appealContext?.sender?.name || "Authorized Advocate Reviewer",
       });
     },
     [claim, dispatchAction]

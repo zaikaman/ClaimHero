@@ -197,6 +197,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
         claim: {
           _id: "claim_1" as any,
           claimNumber: "CLM-100",
+          status: "ready_for_review",
           patient: { name: "Alice Smith", insurancePayer: "BlueCross" } as any,
           redactionMetadata: { isRedacted: false },
         } as any,
@@ -208,6 +209,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
         return {
           _id: "appeal_1",
           claimId: "claim_1",
+          isHumanApproved: true,
           fullAppealMarkdown: "# Legal Appeal\nPatient Alice Smith SSN 000-11-2222",
         };
       });
@@ -371,6 +373,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
           _id: "claim_unspecified" as any,
           claimNumber: "CLM-6104-GEO-9999",
           patientName: "",
+          status: "ready_for_review",
           patient: { insurancePayer: "Aetna", name: "" },
           deniedAmount: 15000,
         } as any,
@@ -380,6 +383,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       const mockCtx: any = {
         runQuery: vi.fn().mockResolvedValue({
           _id: "appeal_1",
+          isHumanApproved: true,
           fullAppealMarkdown: "# Brief",
         }),
       };
@@ -398,6 +402,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
           _id: "claim_unspecified" as any,
           claimNumber: "CLM-6104-GEO-9999",
           patientName: "",
+          status: "ready_for_review",
           patient: { insurancePayer: "Aetna", name: "" },
           deniedAmount: 15000,
           appealContext: {
@@ -423,6 +428,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       const mockCtx: any = {
         runQuery: vi.fn().mockResolvedValue({
           _id: "appeal_1",
+          isHumanApproved: true,
           fullAppealMarkdown: "# Brief",
         }),
         runMutation: vi.fn().mockResolvedValue("thread_1"),
@@ -443,6 +449,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
           _id: "claim_unverified_payer" as any,
           claimNumber: "CLM-9999-UHC-1111",
           patientName: "Jane Doe",
+          status: "ready_for_review",
           patient: { insurancePayer: "UnitedHealthcare", name: "Jane Doe" },
           deniedAmount: 8500,
           appealContext: {
@@ -464,6 +471,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       const mockCtx: any = {
         runQuery: vi.fn().mockResolvedValue({
           _id: "appeal_1",
+          isHumanApproved: true,
           fullAppealMarkdown: "# Brief",
         }),
         runAction: vi.fn().mockResolvedValue({
@@ -488,6 +496,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
           _id: "claim_live_verified" as any,
           claimNumber: "CLM-8888-MOL-2222",
           patientName: "Jane Doe",
+          status: "ready_for_review",
           patient: { insurancePayer: "Molina Healthcare", name: "Jane Doe" },
           deniedAmount: 4200,
           appealContext: {
@@ -504,6 +513,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       const mockCtx: any = {
         runQuery: vi.fn().mockResolvedValue({
           _id: "appeal_1",
+          isHumanApproved: true,
           fullAppealMarkdown: "# Brief",
         }),
         runAction: vi.fn().mockResolvedValue({
@@ -528,6 +538,207 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
           to: "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com",
         })
       );
+    });
+
+    it("dispatchAppealPacket: blocks dispatch when claim status is not ready_for_review", async () => {
+      vi.spyOn(auth, "requireClaimOwnerAction").mockResolvedValue({
+        claim: {
+          _id: "claim_drafting" as any,
+          claimNumber: "CLM-DRAFT-1234",
+          patientName: "Jane Doe",
+          status: "drafting",
+          patient: { insurancePayer: "Aetna", name: "Jane Doe" },
+          deniedAmount: 12000,
+        } as any,
+        userId: "user_123" as any,
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          _id: "appeal_1",
+          isHumanApproved: true,
+          fullAppealMarkdown: "# Brief",
+        }),
+      };
+
+      await expect(
+        (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
+          claimId: "claim_drafting",
+          dispatchMode: "ai_adjudicator",
+        })
+      ).rejects.toThrow(/claim status is "drafting". Mandatory human review requires claim status to be "ready_for_review"/i);
+    });
+
+    it("dispatchAppealPacket: blocks dispatch when explicit human approval is missing", async () => {
+      vi.spyOn(auth, "requireClaimOwnerAction").mockResolvedValue({
+        claim: {
+          _id: "claim_unapproved" as any,
+          claimNumber: "CLM-UNAPP-5678",
+          patientName: "Jane Doe",
+          status: "ready_for_review",
+          patient: { insurancePayer: "Aetna", name: "Jane Doe" },
+          deniedAmount: 12000,
+        } as any,
+        userId: "user_123" as any,
+      });
+
+      vi.spyOn(rateLimiterModule.rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          _id: "appeal_1",
+          isHumanApproved: false,
+          fullAppealMarkdown: "# Brief",
+        }),
+        runMutation: vi.fn(),
+      };
+
+      await expect(
+        (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
+          claimId: "claim_unapproved",
+          dispatchMode: "ai_adjudicator",
+        })
+      ).rejects.toThrow(/explicit human approval is required/i);
+    });
+
+    it("dispatchAppealPacket: records human approval and succeeds when humanApproved is explicitly provided", async () => {
+      vi.spyOn(auth, "requireClaimOwnerAction").mockResolvedValue({
+        claim: {
+          _id: "claim_approved_at_gate" as any,
+          claimNumber: "CLM-APP-9999",
+          patientName: "Jane Doe",
+          status: "ready_for_review",
+          patient: { insurancePayer: "Aetna", name: "Jane Doe" },
+          deniedAmount: 12000,
+          appealContext: {
+            sender: { name: "Dr. Sarah Chen, MD", email: "schen@clinic.org" },
+          },
+        } as any,
+        userId: "user_123" as any,
+      });
+
+      vi.spyOn(rateLimiterModule.rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      vi.spyOn(agentmail, "sendMessage").mockResolvedValue("msg_approved_gate_1" as any);
+      vi.spyOn(agentmail, "status").mockResolvedValue({ status: "pending" } as any);
+
+      const runMutationMock = vi.fn().mockResolvedValue("thread_approved_1");
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({
+          _id: "appeal_unapproved_before",
+          isHumanApproved: false,
+          fullAppealMarkdown: "# Brief",
+        }),
+        runMutation: runMutationMock,
+      };
+
+      const receipt = await (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
+        claimId: "claim_approved_at_gate",
+        dispatchMode: "custom_email",
+        recipientEmail: "reviewer@hospital.org",
+        humanApproved: true,
+        approvedBy: "Dr. Sarah Chen, MD",
+      });
+
+      expect(receipt.status).toBe("delivered");
+      expect(receipt.humanApproved).toBe(true);
+      expect(runMutationMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          appealId: "appeal_unapproved_before",
+          claimId: "claim_approved_at_gate",
+          approvedBy: "Dr. Sarah Chen, MD",
+        })
+      );
+    });
+
+    it("approveAppeal: rejects approval when claim status is not ready_for_review", async () => {
+      const appeals = await import("../convex/appeals");
+      const mockAppeal = {
+        _id: "appeal_1",
+        claimId: "claim_1",
+        version: 1,
+      };
+      const mockClaim = {
+        _id: "claim_1",
+        status: "drafting",
+        userId: "user_123",
+      };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockImplementation((id) => {
+            if (id === "appeal_1") return Promise.resolve(mockAppeal);
+            if (id === "claim_1") return Promise.resolve(mockClaim);
+            return Promise.resolve(null);
+          }),
+        },
+      };
+      vi.spyOn(auth, "requireClaimEditor").mockResolvedValue({
+        claim: mockClaim as any,
+        userId: "user_123" as any,
+        accessRole: "owner",
+      });
+
+      await expect(
+        (appeals.approveAppeal as any)._handler(mockCtx, { appealId: "appeal_1" })
+      ).rejects.toThrow(/Claim must be in "ready_for_review" status before formal approval/i);
+    });
+
+    it("approveAppeal: stamps isHumanApproved and creates audit log when status is ready_for_review", async () => {
+      const appeals = await import("../convex/appeals");
+      const mockAppeal = {
+        _id: "appeal_1",
+        claimId: "claim_1",
+        version: 2,
+      };
+      const mockClaim = {
+        _id: "claim_1",
+        status: "ready_for_review",
+        userId: "user_123",
+      };
+      const patchMock = vi.fn();
+      const insertMock = vi.fn();
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockImplementation((id) => {
+            if (id === "appeal_1") return Promise.resolve(mockAppeal);
+            if (id === "claim_1") return Promise.resolve(mockClaim);
+            if (id === "user_123") return Promise.resolve({ name: "Dr. Sarah Chen" });
+            return Promise.resolve(null);
+          }),
+          patch: patchMock,
+          insert: insertMock,
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              order: vi.fn().mockReturnValue({
+                first: vi.fn().mockResolvedValue(null),
+              }),
+            }),
+          }),
+        },
+      };
+      vi.spyOn(auth, "requireClaimEditor").mockResolvedValue({
+        claim: mockClaim as any,
+        userId: "user_123" as any,
+        accessRole: "owner",
+      });
+
+      const res = await (appeals.approveAppeal as any)._handler(mockCtx, {
+        appealId: "appeal_1",
+        notes: "Clinical assertions independently verified",
+      });
+
+      expect(res.success).toBe(true);
+      expect(patchMock).toHaveBeenCalledWith("appeal_1", expect.objectContaining({
+        isHumanApproved: true,
+        approvalNotes: "Clinical assertions independently verified",
+      }));
+      expect(patchMock).toHaveBeenCalledWith("claim_1", expect.objectContaining({
+        isHumanApproved: true,
+      }));
+      expect(insertMock).toHaveBeenCalledWith("appealAuditLogs", expect.objectContaining({
+        eventType: "appeal_approved",
+      }));
     });
 
     it("sendOutboundMessage: blocks transmission when payerContact is an unverified registry fallback", async () => {
