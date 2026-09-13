@@ -115,6 +115,7 @@ Convex serves as the core persistence, real-time subscription, compute, and orch
 - **Reactive State & Live Subscriptions**: Claims, clinical evidence, appeal versions, audit timelines, and communication threads update reactively across the entire UI without manual polling (`convex/schema.ts`).
 - **Durable Workflow Engine**: Multi-step pipeline execution (`@convex-dev/workflow`) powers reliable, idempotent background orchestration across crawls, scoring, and drafting (`convex/actions/sentinelPipeline.ts`).
 - **Vector Search Engine**: 1536-dimensional vector search on the `precedents` table powers semantic precedent retrieval against past won appeals (`convex/clinicalEvidences.ts`).
+- **Native BM25 Full-Text Search Engine**: Convex native `.searchIndex("search_claims")` indexes unified `searchContent` (clinical denial terms, CARC codes, CPT/ICD-10 codes, patient names, and claim numbers) across the entire portfolio. Directly wired into the global command palette (`CommandDialog.tsx`, `⌘K` / `Ctrl+K`) with debounced reactive querying (`api.claims.search`) for real-time lexical discovery.
 - **Transactional Consistency & Cryptographic Merkle Chain**: Atomic mutations govern claim creation, evidence persistence, status transitions, and cascading purges to eliminate orphan records. Implements a tamper-evident rolling SHA-256 Merkle audit chain (`currentHash = sha256(previousHash + eventType + claimId + timestamp + details)`) under ERISA 29 CFR § 2560.503-1, with an interactive "Cryptographic Proof of Case Integrity" badge and 1-click verification in under 10ms.
 - **Crons & Scheduled Actions**: Automated crons sweep statutory 180-day ERISA deadlines, track pending payer replies, and run the Sentinel Auto-Pilot 1-Hour SLA (`convex/crons.ts`).
 - **File Storage**: Native Convex storage securely hosts uploaded denial documents and compiled appeal PDF dossiers.
@@ -203,12 +204,12 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **920 automated tests** across 57 test suites (verified via `npm run test`):
+ClaimHero is backed by **929 automated tests** across 58 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (920 tests across 57 suites)
+npm run test            # Comprehensive Vitest test suite (929 tests across 58 suites)
 npm run test:coverage   # Code coverage report (~81.1% lines)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate
@@ -262,7 +263,7 @@ ClaimHero/
 
 - **Everyday Apps**: If you got this in your mailbox today, this is the sequence you would want to see. No HIPAA-relevant front-end hurdles, no advocacy-degree onboarding. Fictional fixtures are for the evaluation; the exact same screen serves real cases once credentials are wired.
 - **Creativity & Usefulness**: One linear path to a defensible cited appeal; the hard part (which clause actually governs the denial) is solved by reading the issuer's own policy, not an opinion of it.
-- **Convex Depth**: 9 components, 20 tables, vector search on prior wins, crons for the ERISA clock, durable workflows, real-time collab on briefs, and authentication with human approval gates on every outbound send. The stack is documented in [`PRODUCT.md`](./PRODUCT.md) and [`convex/convex.config.ts`](./convex/convex.config.ts); this README is the public face.
+- **Convex Depth**: 9 components, 20 tables, native BM25 full-text search in global ⌘K palette, vector search on prior wins, crons for the ERISA clock, durable workflows, real-time collab on briefs, and authentication with human approval gates on every outbound send. The stack is documented in [`PRODUCT.md`](./PRODUCT.md) and [`convex/convex.config.ts`](./convex/convex.config.ts); this README is the public face.
 - **Sponsor Stack**: Firecrawl finds the policy and screenshots the page as evidence; AgentMail does the two-way dispatch with a Svix-verified webhook and a closed-loop demo inbox; OpenAI extracts the codes and synthesizes the brief inside a redaction gate and a schema that prohibits fabricating policy text.
 
 ---
