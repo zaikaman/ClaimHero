@@ -10,6 +10,7 @@ export type ClaimStatus =
   | "drafting"
   | "ready_for_review"
   | "dispatched"
+  | "under_review"
   | "won"
   | "lost"
   | "escalated";

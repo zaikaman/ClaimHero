@@ -38,6 +38,7 @@ import { ExportDrawer } from "../studio/ExportDrawer";
 import { ServiceCertificateModal } from "./ServiceCertificateModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { soundEffects } from "../../lib/soundEffects";
+import { toast } from "sonner";
 
 type DispatchMode = "custom_email" | "official_payer";
 
@@ -85,6 +86,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const [isExportDrawerOpen, setIsExportDrawerOpen] = useState(false);
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
   const [certificateMessageId, setCertificateMessageId] = useState<string | undefined>(undefined);
+  const [isRedispatchOpen, setIsRedispatchOpen] = useState(false);
+  const [newlyArrivedMessageId, setNewlyArrivedMessageId] = useState<string | null>(null);
+
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const seenMessageIdsRef = useRef<Set<string>>(new Set(messages.map((m) => m._id)));
+  const isInitialMountRef = useRef<boolean>(true);
 
   // Smart Rebuttal State
   const dismissDraftMutation = useMutation(api.emails.dismissAutoReplyDraft);
@@ -105,7 +113,74 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     setActiveAutoDraft("");
     trackedInboundIdRef.current = null;
     evaluatingMessageIdRef.current = null;
+    seenMessageIdsRef.current = new Set(messages.map((m) => m._id));
+    setNewlyArrivedMessageId(null);
+    setIsRedispatchOpen(false);
   }, [claim._id]);
+
+  // Real-time message arrival detector (audio chime, toast notification, pulse highlight, and smooth scroll)
+  useEffect(() => {
+    if (isInitialMountRef.current) {
+      if (messages.length > 0) {
+        seenMessageIdsRef.current = new Set(messages.map((m) => m._id));
+        isInitialMountRef.current = false;
+      }
+      return;
+    }
+
+    const newMessages = messages.filter((m) => !seenMessageIdsRef.current.has(m._id));
+    if (newMessages.length === 0) return;
+
+    for (const msg of newMessages) {
+      seenMessageIdsRef.current.add(msg._id);
+    }
+
+    const latestNew = newMessages[newMessages.length - 1];
+
+    // Smoothly scroll the messages container strictly inside its own scrollable element
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+
+    if (latestNew.direction === "inbound") {
+      setNewlyArrivedMessageId(latestNew._id);
+      const timer = setTimeout(() => {
+        setNewlyArrivedMessageId((prev) => (prev === latestNew._id ? null : prev));
+      }, 4000);
+
+      const determination = latestNew.detectedDetermination;
+      const isVictory = determination === "OVERTURNED_APPROVED";
+
+      if (isVictory) {
+        soundEffects.play("p2p_overturned_victory");
+        toast.success("Payer Determination Overturned & Approved", {
+          description: `From ${latestNew.sender || "Payer"}: ${latestNew.subject || "Full Reversal Authorized"}`,
+        });
+      } else {
+        soundEffects.play("inbound_reply_received");
+
+        const label =
+          determination === "PARTIAL_SETTLEMENT_OFFER"
+            ? "Partial Settlement Offer Extended"
+            : determination === "ADDITIONAL_RECORDS_REQUIRED"
+            ? "Additional Clinical Records Demanded"
+            : determination === "POLICY_CONFLICT_CITATION"
+            ? "Conflicting Clinical Policy Cited"
+            : determination === "DENIAL_UPHELD"
+            ? "Level 1 Adverse Decision Upheld"
+            : "Inbound Correspondence Received";
+
+        toast.info("Inbound Payer Response Received", {
+          description: `${label} — from ${latestNew.sender || "Payer"}`,
+        });
+      }
+
+      return () => clearTimeout(timer);
+    }
+  }, [messages]);
 
   // Synchronize and auto-evaluate autonomous draft whenever messages update or new reply arrives
   useEffect(() => {
@@ -171,7 +246,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
       customPayerInquiry: latestInbound.bodyText,
     })
       .then((res) => {
-        if (res?.draftText) {
+        if (trackedInboundIdRef.current === currentInboundId && res?.draftText) {
           setActiveAutoDraft(res.draftText);
         }
       })
@@ -307,6 +382,20 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
       ? Boolean(customEmail.trim() && customEmail.includes("@") && !isCustomEmailLoopback)
       : Boolean(officialEmail));
 
+  const hasPriorTransmissions = Boolean(
+    messages.length > 0 ||
+    threads.length > 0 ||
+    claim.status === "dispatched" ||
+    claim.status === "under_review" ||
+    claim.status === "escalated" ||
+    claim.status === "won"
+  );
+
+  const shouldShowTransmissionBanner = Boolean(
+    onDispatchAppeal &&
+    (!hasPriorTransmissions || isRedispatchOpen)
+  );
+
   const handleCopyEmail = () => {
     if (!assignedEmail) return;
     navigator.clipboard.writeText(assignedEmail);
@@ -423,8 +512,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         </div>
       )}
 
-      {/* Prominent Multi-Channel Transmission Gateway Banner if not yet sent */}
-      {claim.status !== "dispatched" && claim.status !== "won" && onDispatchAppeal && (
+      {/* Prominent Multi-Channel Transmission Gateway Banner if not yet sent or explicitly opened */}
+      {shouldShowTransmissionBanner && (
         <Card className="p-4 border-primary/40 bg-primary/5 space-y-4">
           {/* Card Header: Title & Description on Left, Companion Utility Tools on Right */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
@@ -438,7 +527,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                     Multi-Channel Appellate Transmission
                   </h3>
                   <Badge variant="secondary" className="text-[10px] font-mono">
-                    Final Step
+                    {hasPriorTransmissions ? "Re-transmission" : "Final Step"}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -504,6 +593,19 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <SealCheck className="size-3.5" />
                 <span>Delivery Evidence</span>
               </Button>
+
+              {hasPriorTransmissions && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsRedispatchOpen(false)}
+                  className="h-8 rounded-md text-xs px-2.5 gap-1.5 shrink-0 text-muted-foreground hover:text-foreground"
+                  title="Close transmission options"
+                >
+                  <X className="size-3.5" />
+                  <span>Hide Gateway</span>
+                </Button>
+              )}
             </div>
           </div>
 
@@ -782,6 +884,24 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               </button>
             )}
 
+            {hasPriorTransmissions && onDispatchAppeal && (
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => setIsRedispatchOpen((prev) => !prev)}
+                className={cn(
+                  "gap-1 h-7 text-xs font-mono transition-colors cursor-pointer select-none",
+                  isRedispatchOpen
+                    ? "border-primary/50 text-primary bg-primary/10"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                )}
+                title={isRedispatchOpen ? "Hide transmission gateway" : "Open transmission options & guidelines"}
+              >
+                <PaperPlaneTilt className="size-3 text-primary" />
+                <span>{isRedispatchOpen ? "Hide Gateway" : "Re-dispatch Appeal"}</span>
+              </Button>
+            )}
+
             {claim.status === "won" ? (
               <Badge variant="secondary" className="gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1">
                 <CheckCircle className="size-3.5 text-emerald-500" />
@@ -791,6 +911,16 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               <Badge variant="secondary" className="gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 px-2.5 py-1">
                 <CheckCircle className="size-3.5" />
                 <span>Packet Transmitted to Insurer</span>
+              </Badge>
+            ) : claim.status === "under_review" ? (
+              <Badge variant="secondary" className="gap-1 text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10 px-2.5 py-1">
+                <Clock className="size-3.5 text-amber-500" />
+                <span>Payer Determination Under Review</span>
+              </Badge>
+            ) : claim.status === "escalated" ? (
+              <Badge variant="secondary" className="gap-1 text-rose-600 dark:text-rose-400 border-rose-500/30 bg-rose-500/10 px-2.5 py-1">
+                <WarningCircle className="size-3.5 text-rose-500" />
+                <span>Level 1 Upheld — Escalation Required</span>
               </Badge>
             ) : null}
           </div>
@@ -1067,7 +1197,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
           </div>
 
           {/* Messages Container */}
-          <div className="flex-1 p-4 space-y-3 overflow-y-auto max-h-[440px]">
+          <div ref={messagesContainerRef} className="flex-1 p-4 space-y-3 overflow-y-auto max-h-[440px] scroll-smooth">
             {isLoading ? (
               <div className="p-8 text-center text-xs font-mono text-muted-foreground animate-pulse">
                 Loading communication history...
@@ -1085,6 +1215,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             ) : (
               messages.map((msg) => {
                 const isOutbound = msg.direction === "outbound";
+                const isNewlyArrived = msg._id === newlyArrivedMessageId;
                 const isOverturned = msg.detectedDetermination === "OVERTURNED_APPROVED";
                 const isPartialOffer = msg.detectedDetermination === "PARTIAL_SETTLEMENT_OFFER";
                 const isRecordsReq = msg.detectedDetermination === "ADDITIONAL_RECORDS_REQUIRED";
@@ -1095,7 +1226,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <div
                     key={msg._id}
                       className={cn(
-                        "rounded-xl border p-3.5 space-y-2 transition-all",
+                        "rounded-xl border p-3.5 space-y-2 transition-all duration-300",
+                        isNewlyArrived && "ring-2 ring-primary ring-offset-2 ring-offset-background animate-pulse shadow-md",
                         isOutbound
                           ? "border-border bg-muted/30 ml-4"
                           : isOverturned
@@ -1294,6 +1426,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 );
               })
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Prepared Clinical Rebuttal Draft Card (Pending Human Approval) */}

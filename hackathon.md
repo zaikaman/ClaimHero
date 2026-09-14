@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-14T13:12:00Z
+- **Last updated:** 2026-09-14T13:42:00Z
 
 ## Log
 
@@ -1463,10 +1463,13 @@ Implemented AWS Textract HIPAA optical intake gate and zero-PHI LLM bridge for m
 ### 2026-09-13 - e66c852
 Removed non-functional "Setup Guide" and "Interactive Setup Guide" CTA buttons and unused `onOpenOnboarding` prop from the landing page (`src/components/landing/CinematicHero.tsx`, `src/App.tsx`). Verified clean type safety with TypeScript compiler.
 
-### 2026-09-14 - working tree
+### 2026-09-14 - bbb7ec8
 Removed simulated AI adjudicator mode and restructured appellate dispatch to support two production-ready destinations: typed-in email and official insurer reviewer gateway (`convex/lib/aiAdjudicator.ts`, `convex/actions/mailDispatcher.ts`, `convex/actions/agentMail.ts`, `convex/lib/agentMail.ts`, `convex/convex.config.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/settings/SettingsPage.tsx`, `src/types/index.ts`, `src/vite-env.d.ts`, `README.md`, `IDEA.md`, `.env.example`, `specs/001-appeal-sentinel/quickstart.md`, `tests/`):
 - Deleted synthetic `convex/lib/aiAdjudicator.ts` and removed `deliverAiAdjudication` and simulated adjudication schemas from `convex/actions/mailDispatcher.ts`.
 - Simplified AgentMail architecture to single verified outbound sender mailbox (`claimhero-sender@agentmail.to`), removing adjudicator inbox configs from `convex.config.ts`, `agentMail.ts`, `SettingsPage.tsx`, and `.env.example`.
 - Overhauled `AgentMailDrawer.tsx` dispatch UI into 2 distinct destinations: Mode 1 for typed-in custom email (interactive inbox testing and webhook reply verification) and Mode 2 for official payer reviewer gateway.
 - Preserved real inbound webhook parsing, structured LLM adjudication of genuine payer responses, and automated counter-rebuttal drafting.
-- Updated unit test suites across `tests/claimhero.test.ts`, `tests/agentMail.test.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`, `tests/adversarialAdjudicator.test.ts`, `tests/securityComplianceHardening.test.ts`, and verified 976 passing tests, typecheck, lint, and production build with `npm run verify`.
+- Updated unit test suites across `tests/claimhero.test.ts`, `tests/agentMail.test.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`, `tests/adversarialAdjudicator.test.ts`, `tests/securityComplianceHardening.test.ts`, and verified 976 passing tests, typecheck, lint, and production build with `npm run verify`.
+
+### 2026-09-14 - working tree
+Stabilized AgentMail communications inbox layout, eliminated layout shifts upon receiving inbound payer email replies, and introduced real-time feedback with Web Audio synthesis, Sonner toast notifications, message highlight pulses, and container-anchored smooth scrolling (`src/components/communications/AgentMailDrawer.tsx`, `src/lib/soundEffects.ts`, `src/components/common/SentinelFlowStepper.tsx`, `src/types/index.ts`, `tests/soundEffects.test.ts`). Fixed premature re-emergence of the 600px transmission banner on post-dispatch statuses (`under_review`, `escalated`), added `inbound_reply_received` acoustic chime, real-time toast alert with AI determination labeling, message highlight ring, and seamless scroll anchoring without jarring the viewport. Added test coverage and verified typecheck, lint, 976 passing tests, and production build with `npm run verify`.

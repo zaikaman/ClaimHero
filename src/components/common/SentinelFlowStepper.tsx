@@ -46,7 +46,11 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
   onOpenIngestion,
 }) => {
   const isWon = claim.status === "won";
-  const isDispatched = claim.status === "dispatched" || isWon;
+  const isDispatched =
+    claim.status === "dispatched" ||
+    claim.status === "under_review" ||
+    claim.status === "escalated" ||
+    isWon;
   const daysRemaining = claim.daysRemaining ?? 180;
   const isUrgent = daysRemaining <= 14 && !isWon && !isDispatched;
 
@@ -95,9 +99,19 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     {
       id: "communications",
       number: 3,
-      title: isWon ? "3. Case Won" : "3. Payer Dispatch",
+      title: isWon
+        ? "3. Case Won"
+        : claim.status === "under_review"
+        ? "3. Payer Review"
+        : claim.status === "escalated"
+        ? "3. Payer Escalation"
+        : "3. Payer Dispatch",
       subtitle: isWon
         ? "100% Payer Reversal"
+        : claim.status === "under_review"
+        ? "Payer Review Active"
+        : claim.status === "escalated"
+        ? "Adverse Escalation"
         : isDispatched
         ? "Transmitted to Payer"
         : "Ready to send",

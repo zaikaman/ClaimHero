@@ -8,7 +8,8 @@ export type SoundEffectType =
   | "mic_toggle_on"
   | "mic_toggle_off"
   | "tactile_click"
-  | "deadline_alert";
+  | "deadline_alert"
+  | "inbound_reply_received";
 
 export interface AudioSettings {
   enabled: boolean;
@@ -145,6 +146,9 @@ class SoundEffectsEngine {
           break;
         case "deadline_alert":
           this.synthesizeDeadlineAlert(ctx, baseVol);
+          break;
+        case "inbound_reply_received":
+          this.synthesizeInboundReply(ctx, baseVol);
           break;
       }
     } catch (err) {
@@ -487,6 +491,63 @@ class SoundEffectsEngine {
 
     playPulse(now);
     playPulse(now + 0.14);
+  }
+
+  /**
+   * Executive dual-tone acoustic chime with high-frequency harmonic sparkle.
+   * Tailored for incoming AgentMail payer replies and insurer determinations.
+   */
+  private synthesizeInboundReply(ctx: AudioContext, masterVolume: number): void {
+    const now = ctx.currentTime;
+    const duration = 0.45;
+
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(masterVolume * 0.4, now);
+    masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    masterGain.connect(ctx.destination);
+
+    // First bell tone: Eb5 (622.25 Hz)
+    const osc1 = ctx.createOscillator();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(622.25, now);
+    const gain1 = ctx.createGain();
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(0.7, now + 0.015);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc1.connect(gain1);
+    gain1.connect(masterGain);
+
+    // Second bell tone: Bb5 (932.33 Hz) after 75ms
+    const osc2 = ctx.createOscillator();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(932.33, now + 0.075);
+    const gain2 = ctx.createGain();
+    gain2.gain.setValueAtTime(0, now);
+    gain2.gain.setValueAtTime(0, now + 0.075);
+    gain2.gain.linearRampToValueAtTime(0.85, now + 0.09);
+    gain2.gain.exponentialRampToValueAtTime(0.0005, now + duration);
+    osc2.connect(gain2);
+    gain2.connect(masterGain);
+
+    // Harmonic crystalline shimmer: Eb6 (1244.5 Hz)
+    const osc3 = ctx.createOscillator();
+    osc3.type = "triangle";
+    osc3.frequency.setValueAtTime(1244.5, now + 0.08);
+    const gain3 = ctx.createGain();
+    gain3.gain.setValueAtTime(0, now);
+    gain3.gain.setValueAtTime(0, now + 0.08);
+    gain3.gain.linearRampToValueAtTime(0.2, now + 0.095);
+    gain3.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    osc3.connect(gain3);
+    gain3.connect(masterGain);
+
+    osc1.start(now);
+    osc2.start(now + 0.075);
+    osc3.start(now + 0.08);
+
+    osc1.stop(now + 0.35);
+    osc2.stop(now + duration);
+    osc3.stop(now + duration);
   }
 }
 

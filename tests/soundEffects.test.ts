@@ -164,6 +164,7 @@ describe("SoundEffectsEngine", () => {
       "mic_toggle_off",
       "tactile_click",
       "deadline_alert",
+      "inbound_reply_received",
     ];
 
     effectTypes.forEach((type) => {
