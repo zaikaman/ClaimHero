@@ -87,7 +87,6 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
   const [certificateMessageId, setCertificateMessageId] = useState<string | undefined>(undefined);
   const [isRedispatchOpen, setIsRedispatchOpen] = useState(false);
-  const [newlyArrivedMessageId, setNewlyArrivedMessageId] = useState<string | null>(null);
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -114,11 +113,10 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     trackedInboundIdRef.current = null;
     evaluatingMessageIdRef.current = null;
     seenMessageIdsRef.current = new Set(messages.map((m) => m._id));
-    setNewlyArrivedMessageId(null);
     setIsRedispatchOpen(false);
   }, [claim._id]);
 
-  // Real-time message arrival detector (audio chime, toast notification, pulse highlight, and smooth scroll)
+  // Real-time message arrival detector (audio chime, toast notification, and container-anchored smooth scroll)
   useEffect(() => {
     if (isInitialMountRef.current) {
       if (messages.length > 0) {
@@ -146,11 +144,6 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     }
 
     if (latestNew.direction === "inbound") {
-      setNewlyArrivedMessageId(latestNew._id);
-      const timer = setTimeout(() => {
-        setNewlyArrivedMessageId((prev) => (prev === latestNew._id ? null : prev));
-      }, 4000);
-
       const determination = latestNew.detectedDetermination;
       const isVictory = determination === "OVERTURNED_APPROVED";
 
@@ -177,8 +170,6 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
           description: `${label} — from ${latestNew.sender || "Payer"}`,
         });
       }
-
-      return () => clearTimeout(timer);
     }
   }, [messages]);
 
@@ -1215,7 +1206,6 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             ) : (
               messages.map((msg) => {
                 const isOutbound = msg.direction === "outbound";
-                const isNewlyArrived = msg._id === newlyArrivedMessageId;
                 const isOverturned = msg.detectedDetermination === "OVERTURNED_APPROVED";
                 const isPartialOffer = msg.detectedDetermination === "PARTIAL_SETTLEMENT_OFFER";
                 const isRecordsReq = msg.detectedDetermination === "ADDITIONAL_RECORDS_REQUIRED";
@@ -1225,19 +1215,18 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 return (
                   <div
                     key={msg._id}
-                      className={cn(
-                        "rounded-xl border p-3.5 space-y-2 transition-all duration-300",
-                        isNewlyArrived && "ring-2 ring-primary ring-offset-2 ring-offset-background animate-pulse shadow-md",
-                        isOutbound
-                          ? "border-border bg-muted/30 ml-4"
-                          : isOverturned
-                          ? "border-emerald-500/40 bg-emerald-500/10 mr-4 shadow-xs"
-                          : isRecordsReq || isPartialOffer
-                          ? "border-amber-500/40 bg-amber-500/5 mr-4"
-                          : isDenialUpheld || isPolicyConflict
-                          ? "border-rose-500/40 bg-rose-500/5 mr-4"
-                          : "border-primary/20 bg-primary/5 mr-4"
-                      )}
+                    className={cn(
+                      "rounded-xl border p-3.5 space-y-2 transition-all",
+                      isOutbound
+                        ? "border-border bg-muted/30 ml-4"
+                        : isOverturned
+                        ? "border-emerald-500/40 bg-emerald-500/10 mr-4 shadow-xs"
+                        : isRecordsReq || isPartialOffer
+                        ? "border-amber-500/40 bg-amber-500/5 mr-4"
+                        : isDenialUpheld || isPolicyConflict
+                        ? "border-rose-500/40 bg-rose-500/5 mr-4"
+                        : "border-primary/20 bg-primary/5 mr-4"
+                    )}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-14T13:42:00Z
+- **Last updated:** 2026-09-14T13:53:00Z
 
 ## Log
 
@@ -1471,5 +1471,8 @@ Removed simulated AI adjudicator mode and restructured appellate dispatch to sup
 - Preserved real inbound webhook parsing, structured LLM adjudication of genuine payer responses, and automated counter-rebuttal drafting.
 - Updated unit test suites across `tests/claimhero.test.ts`, `tests/agentMail.test.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`, `tests/adversarialAdjudicator.test.ts`, `tests/securityComplianceHardening.test.ts`, and verified 976 passing tests, typecheck, lint, and production build with `npm run verify`.
 
+### 2026-09-14 - 586f230
+Stabilized AgentMail communications inbox layout, eliminated layout shifts upon receiving inbound payer email replies, and introduced real-time feedback with Web Audio synthesis, Sonner toast notifications, message highlight pulses, and container-anchored smooth scrolling (`src/components/communications/AgentMailDrawer.tsx`, `src/lib/soundEffects.ts`, `src/components/common/SentinelFlowStepper.tsx`, `src/types/index.ts`, `tests/soundEffects.test.ts`). Fixed premature re-emergence of the 600px transmission banner on post-dispatch statuses (`under_review`, `escalated`), added `inbound_reply_received` acoustic chime, real-time toast alert with AI determination labeling, message highlight ring, and seamless scroll anchoring without jarring the viewport. Added test coverage and verified typecheck, lint, 976 passing tests, and production build with `npm run verify`.
+
 ### 2026-09-14 - working tree
-Stabilized AgentMail communications inbox layout, eliminated layout shifts upon receiving inbound payer email replies, and introduced real-time feedback with Web Audio synthesis, Sonner toast notifications, message highlight pulses, and container-anchored smooth scrolling (`src/components/communications/AgentMailDrawer.tsx`, `src/lib/soundEffects.ts`, `src/components/common/SentinelFlowStepper.tsx`, `src/types/index.ts`, `tests/soundEffects.test.ts`). Fixed premature re-emergence of the 600px transmission banner on post-dispatch statuses (`under_review`, `escalated`), added `inbound_reply_received` acoustic chime, real-time toast alert with AI determination labeling, message highlight ring, and seamless scroll anchoring without jarring the viewport. Added test coverage and verified typecheck, lint, 976 passing tests, and production build with `npm run verify`.
+Removed visual pulse/blur flashing animation from inbound payer message cards in `src/components/communications/AgentMailDrawer.tsx`. Dismantled `newlyArrivedMessageId` state, timer, and `animate-pulse` class to preserve steady, crisp card rendering without repeated opacity oscillations or blur effects upon message arrival. Verified 100% clean with `npm run verify` across typecheck, lint, 976 passing unit tests, and production build.
