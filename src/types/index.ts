@@ -63,8 +63,6 @@ export interface Claim {
   assignedAgentEmail: string;
   agentMailInboxId?: string;
   agentMailInboxEmail?: string;
-  agentMailAdjudicatorInboxId?: string;
-  agentMailAdjudicatorEmail?: string;
   autoPilotEnabled?: boolean;
   agentMailProvisioningStatus?: "pending" | "shared" | "provisioned" | "not_configured" | "failed" | string;
   agentMailProvisioningError?: string;

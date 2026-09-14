@@ -224,8 +224,6 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "inbox_sender";
       process.env.AGENTMAIL_SENDER_EMAIL = "claimhero-sender@agentmail.to";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "inbox_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "claimhero-adjudicator@agentmail.to";
 
       vi.spyOn(agentmail, "sendMessage").mockResolvedValue("outbound_1" as any);
       vi.spyOn(agentmail, "status").mockResolvedValue({
@@ -391,7 +389,8 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       await expect(
         (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
           claimId: "claim_unspecified",
-          dispatchMode: "ai_adjudicator",
+          dispatchMode: "custom_email",
+          recipientEmail: "advocate@test.com",
         })
       ).rejects.toThrow(/sender details before dispatching/i);
     });
@@ -422,8 +421,6 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "inbox_sender";
       process.env.AGENTMAIL_SENDER_EMAIL = "claimhero-sender@agentmail.to";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "inbox_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "claimhero-adjudicator@agentmail.to";
 
       const mockCtx: any = {
         runQuery: vi.fn().mockResolvedValue({
@@ -564,7 +561,8 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       await expect(
         (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
           claimId: "claim_drafting",
-          dispatchMode: "ai_adjudicator",
+          dispatchMode: "custom_email",
+          recipientEmail: "advocate@test.com",
         })
       ).rejects.toThrow(/claim status is "drafting". Mandatory human review requires claim status to be "ready_for_review"/i);
     });
@@ -596,7 +594,8 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       await expect(
         (mailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
           claimId: "claim_unapproved",
-          dispatchMode: "ai_adjudicator",
+          dispatchMode: "custom_email",
+          recipientEmail: "advocate@test.com",
         })
       ).rejects.toThrow(/explicit human approval is required/i);
     });

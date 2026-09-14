@@ -29,8 +29,6 @@ const app = defineApp({
     AGENTMAIL_API_KEY: v.string(),
     AGENTMAIL_SENDER_INBOX_ID: v.optional(v.string()),
     AGENTMAIL_SENDER_EMAIL: v.optional(v.string()),
-    AGENTMAIL_ADJUDICATOR_INBOX_ID: v.optional(v.string()),
-    AGENTMAIL_ADJUDICATOR_EMAIL: v.optional(v.string()),
     SITE_URL: v.string(),
   },
 });

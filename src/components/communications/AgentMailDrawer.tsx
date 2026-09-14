@@ -18,7 +18,6 @@ import {
   ArrowSquareOut,
   Printer,
   Info,
-  Robot,
   ArrowsClockwise,
   ShieldCheck,
   FileText,
@@ -30,7 +29,6 @@ import {
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
 import { getPayerAppellateContact } from "../../lib/constants";
-import { isAiAdjudicatorAddress } from "../../../convex/lib/aiAdjudicator";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -41,7 +39,7 @@ import { ServiceCertificateModal } from "./ServiceCertificateModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { soundEffects } from "../../lib/soundEffects";
 
-type DispatchMode = "ai_adjudicator" | "custom_email" | "official_payer";
+type DispatchMode = "custom_email" | "official_payer";
 
 interface AgentMailDrawerProps {
   claim: Claim;
@@ -77,7 +75,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
-  const [dispatchMode, setDispatchMode] = useState<DispatchMode>("ai_adjudicator");
+  const [dispatchMode, setDispatchMode] = useState<DispatchMode>("official_payer");
   const [customEmail, setCustomEmail] = useState<string>("");
 
   const [copiedRecipientEmail, setCopiedRecipientEmail] = useState(false);
@@ -264,22 +262,14 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const defaultPayerContact = getPayerAppellateContact(payerName);
   const payerContact = claim.payerContact || defaultPayerContact;
   const officialEmail = claim.payerContact?.officialAppealsEmail || payerContact.officialAppealsEmail;
-  const aiAdjudicatorEmail =
-    claim.agentMailAdjudicatorEmail ||
-    import.meta.env.VITE_AGENTMAIL_ADJUDICATOR_EMAIL ||
-    "";
-
   const effectiveRecipient =
-    dispatchMode === "ai_adjudicator"
-      ? aiAdjudicatorEmail
-      : dispatchMode === "custom_email"
+    dispatchMode === "custom_email"
       ? customEmail.trim()
       : officialEmail;
 
   const recipientEmail =
     threads[0]?.payerEmail ||
     effectiveRecipient;
-  const isAiAdjudicatorThread = isAiAdjudicatorAddress(recipientEmail);
 
   const rawPatientName = claim.patient?.name || claim.patientName;
   const isPatientUnspecified =
@@ -302,14 +292,19 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
   const isReadyForReview = claim.status === "ready_for_review";
 
+  const isCustomEmailLoopback = Boolean(
+    dispatchMode === "custom_email" &&
+    customEmail.trim() &&
+    assignedEmail &&
+    customEmail.trim().toLowerCase() === assignedEmail.toLowerCase()
+  );
+
   const canDispatch =
     isReadyForReview &&
     isSenderGatewayConfigured &&
     (!isPatientUnspecified || hasSender) &&
-    (dispatchMode === "ai_adjudicator"
-      ? Boolean(aiAdjudicatorEmail)
-      : dispatchMode === "custom_email"
-      ? Boolean(customEmail.trim() && customEmail.includes("@"))
+    (dispatchMode === "custom_email"
+      ? Boolean(customEmail.trim() && customEmail.includes("@") && !isCustomEmailLoopback)
       : Boolean(officialEmail));
 
   const handleCopyEmail = () => {
@@ -523,41 +518,25 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-              {/* Mode 1: AI Adjudicator */}
+            <div
+              role="radiogroup"
+              aria-label="Appellate recipient destination"
+              className="grid grid-cols-1 md:grid-cols-2 gap-2.5"
+            >
+              {/* Mode 1: Custom Typed-In Email */}
               <div
-                onClick={() => setDispatchMode("ai_adjudicator")}
-                className={cn(
-                  "cursor-pointer p-3 rounded-lg border text-left transition-all relative flex flex-col justify-between",
-                  dispatchMode === "ai_adjudicator"
-                    ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40"
-                    : "border-border bg-background/50 hover:bg-muted/40"
-                )}
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <Robot className={cn("size-4", dispatchMode === "ai_adjudicator" ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-xs font-semibold text-foreground">Demo AI Reviewer</span>
-                    </div>
-                    <Badge variant="outline" className="text-[9px] font-mono text-amber-500 border-amber-500/30">
-                      Evaluation Only
-                    </Badge>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-snug">
-                    Simulated clinical reviewer evaluates CPB criteria and responds with realistic determination for platform demo.
-                  </p>
-                </div>
-                <div className="mt-2.5 pt-2 border-t border-border/50 text-[10px] font-mono text-primary/90 truncate">
-                  {aiAdjudicatorEmail || "Simulated Reviewer Mailbox"}
-                </div>
-              </div>
-
-              {/* Mode 2: Custom Judge Email */}
-              <div
+                role="radio"
+                tabIndex={0}
+                aria-checked={dispatchMode === "custom_email"}
                 onClick={() => setDispatchMode("custom_email")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setDispatchMode("custom_email");
+                  }
+                }}
                 className={cn(
-                  "cursor-pointer p-3 rounded-lg border text-left transition-all relative flex flex-col justify-between",
+                  "cursor-pointer p-3 rounded-lg border text-left transition-all relative flex flex-col justify-between focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary",
                   dispatchMode === "custom_email"
                     ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40"
                     : "border-border bg-background/50 hover:bg-muted/40"
@@ -567,25 +546,31 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <div className="flex items-center justify-between gap-1.5 mb-1.5">
                     <div className="flex items-center gap-1.5">
                       <Envelope className={cn("size-4", dispatchMode === "custom_email" ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-xs font-semibold text-foreground">Interactive Test (My Email)</span>
+                      <span className="text-xs font-semibold text-foreground">Typed-In Email (Interactive Test)</span>
                     </div>
                     <Badge variant="outline" className="text-[9px] font-mono text-cyan-600 dark:text-cyan-400 border-cyan-500/30">
                       Personal Inbox
                     </Badge>
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-snug">
-                    Delivers complete brief to your mail client. Reply to trigger the live webhook.
+                    Delivers complete brief to your typed email address. Reply from your inbox to test real inbound webhook ingestion.
                   </p>
                 </div>
                 {dispatchMode === "custom_email" ? (
                   <div className="mt-2.5 pt-2 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
                     <Input
                       type="email"
-                      placeholder="Enter your email (e.g. judge@gmail.com)"
+                      aria-label="Custom recipient email address"
+                      placeholder="Enter your email (e.g. advocate@gmail.com)"
                       value={customEmail}
                       onChange={(e) => setCustomEmail(e.target.value)}
                       className="h-7 text-[11px] px-2 bg-background font-mono"
                     />
+                    {isCustomEmailLoopback && (
+                      <p className="mt-1 text-[10px] text-amber-500 font-medium">
+                        Cannot dispatch to ClaimHero's own sender inbox. Please enter a different recipient address.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="mt-2.5 pt-2 border-t border-border/50 text-[10px] font-mono text-muted-foreground truncate">
@@ -594,11 +579,20 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 )}
               </div>
 
-              {/* Mode 3: Official Insurer */}
+              {/* Mode 2: Official Insurer Reviewer */}
               <div
+                role="radio"
+                tabIndex={0}
+                aria-checked={dispatchMode === "official_payer"}
                 onClick={() => setDispatchMode("official_payer")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setDispatchMode("official_payer");
+                  }
+                }}
                 className={cn(
-                  "cursor-pointer p-3 rounded-lg border text-left transition-all relative flex flex-col justify-between",
+                  "cursor-pointer p-3 rounded-lg border text-left transition-all relative flex flex-col justify-between focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary",
                   dispatchMode === "official_payer"
                     ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40"
                     : "border-border bg-background/50 hover:bg-muted/40"
@@ -608,7 +602,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <div className="flex items-center justify-between gap-1.5 mb-1.5">
                     <div className="flex items-center gap-1.5">
                       <Buildings className={cn("size-4", dispatchMode === "official_payer" ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-xs font-semibold text-foreground">Official Insurer Gateway</span>
+                      <span className="text-xs font-semibold text-foreground">Official Payer Reviewer Gateway</span>
                     </div>
                     <Badge variant="outline" className="text-[9px] font-mono text-slate-400 border-slate-700">
                       Production
@@ -661,10 +655,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                     Ready for Appellate Dispatch
                   </span>
                   <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
-                    {dispatchMode === "ai_adjudicator"
-                      ? "Demo AI Simulation Mode"
-                      : dispatchMode === "custom_email"
-                      ? "Real Interactive Test Mode"
+                    {dispatchMode === "custom_email"
+                      ? "Interactive Test Mode"
                       : "Official Insurer Mode"}
                   </Badge>
                 </div>
@@ -685,6 +677,12 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   ? "Dispatch disabled: AgentMail sender address is not configured. Set VITE_AGENTMAIL_SENDER_EMAIL in environment."
                   : isPatientUnspecified && !hasSender
                   ? "Patient name not specified in denial notice. Please supply sender details in Appeal Studio before dispatching."
+                  : dispatchMode === "custom_email" && !customEmail.trim()
+                  ? "Enter a valid recipient email address to enable dispatch."
+                  : dispatchMode === "custom_email" && isCustomEmailLoopback
+                  ? "Cannot dispatch to ClaimHero's own sender inbox. Please enter a different recipient address."
+                  : dispatchMode === "official_payer" && !officialEmail
+                  ? "Insurer does not accept direct email under HIPAA safeguards; submit via official portal or appellate fax."
                   : undefined
               }
               className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9 px-4 cursor-pointer"
@@ -698,25 +696,14 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <>
                   <PaperPlaneTilt className="size-4" />
                   <span>
-                    {dispatchMode === "ai_adjudicator"
-                      ? "Approve & Transmit to Demo AI Reviewer"
-                      : dispatchMode === "custom_email"
-                      ? "Approve & Transmit to Personal Test Inbox"
+                    {dispatchMode === "custom_email"
+                      ? "Approve & Transmit to Typed-In Email"
                       : "Approve & Transmit to Official Gateway"}
                   </span>
                 </>
               )}
             </Button>
           </div>
-
-          {dispatchMode === "ai_adjudicator" && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
-              <Info className="size-4 shrink-0 mt-0.5" />
-              <p className="text-[11px] leading-relaxed">
-                <strong>Evaluation Disclosure:</strong> Mode 1 uses a simulated AI reviewer for self-contained demonstration. To verify live two-way email delivery to a real inbox and test inbound replies, select <strong>Interactive Test (My Email)</strong> or <strong>Official Insurer Gateway</strong>.
-              </p>
-            </div>
-          )}
 
           {/* Submission Instructions & Insurer Gateway Notice */}
           <div className="flex items-start gap-2.5 bg-background/70 border border-border/80 rounded-lg p-2.5 text-xs text-muted-foreground">
@@ -1399,20 +1386,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             onSubmit={handleSendReply}
             className="p-3 bg-muted/20 border-t border-border space-y-2"
           >
-            {isSending && isAiAdjudicatorThread ? (
-              <p className="text-[11px] text-muted-foreground font-mono">
-                Payer medical director is reviewing your addendum...
-              </p>
-            ) : null}
             <div className="flex items-center gap-2">
               <Input
                 type="text"
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder={
-                  isAiAdjudicatorThread
-                    ? "Reply to the AI payer reviewer with addenda or additional records..."
-                    : recipientEmail
+                  recipientEmail
                     ? "Type addendum or reply to payer..."
                     : "Log addendum note to case docket..."
                 }
@@ -1430,7 +1410,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 ) : (
                   <PaperPlaneTilt className="size-3.5" />
                 )}
-                <span>{isSending && isAiAdjudicatorThread ? "Reviewing" : "Send"}</span>
+                <span>{isSending ? "Sending" : "Send"}</span>
               </Button>
             </div>
           </form>

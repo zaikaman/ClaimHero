@@ -1,10 +1,9 @@
 /**
  * Autonomous Insurer Defense Adversary — countermove strategy engine.
  *
- * Pure, side-effect-free helpers shared by the adjudicator bot
- * (convex/actions/mailDispatcher.ts) and the inbound challenge pipeline
- * (convex/actions/agentMail.ts). All functions are deterministic and
- * safe to unit test without Convex or OpenAI dependencies.
+ * Pure, side-effect-free helpers used by the inbound challenge pipeline
+ * (convex/actions/agentMail.ts) for parsing insurer determinations and drafting rebuttals.
+ * All functions are deterministic and safe to unit test without external dependencies.
  */
 
 export type AdversaryCountermove =
@@ -245,7 +244,7 @@ export function buildCounterRebuttalFallback(args: {
   }
 }
 
-/** Strategy hint injected into the adjudicator LLM prompt for round-awareness. */
+/** Strategy hint for round-awareness in iterative appellate negotiation. */
 export function buildAdversaryStrategyHint(ctx: AdversaryClaimContext): string {
   const round = Math.max(0, ctx.negotiationRound ?? 0);
   const suggested = pickAdversaryCountermove(ctx);

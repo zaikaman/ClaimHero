@@ -24,7 +24,7 @@ In the U.S. healthcare system, health insurers improperly deny approximately **1
 flowchart TD
     subgraph Intake ["1. Ingestion & Communication (AgentMail + Vision)"]
         A1["Ingestion Modal (Presets / PDF Upload / Paste Text)"] --> A2["Vision Optical Parser (CPT / ICD-10 / CARC / Amounts)"]
-        A3["Outbound 3-Mode Dispatch (AI Adjudicator / Custom / Official Payer)"]
+        A3["Outbound 2-Mode Dispatch (Typed-In Email / Official Payer)"]
         A4["Inbound Payer Determination / Addendum Webhook (/agentmail-webhook)"]
     end
 
@@ -79,9 +79,9 @@ flowchart TD
   * Multi-layer hardening: document windowing for 150KB+ clinical manuals, private MCG viewer rejection, payer domain verification, and Incapsula/CAPTCHA access-denied filtering.
   * Specialized secondary crawlers for PubMed/ClinicalTrials.gov literature and FDA package inserts (`accessdata.fda.gov`).
 * **AgentMail**:
-  * Dedicated autonomous mailboxes: Outbound Sender (`claimhero-sender@agentmail.to`) and AI Adjudicator (`claimhero-adjudicator@agentmail.to`).
+  * Dedicated verified outbound sender: Outbound Sender (`claimhero-sender@agentmail.to`).
   * **Inbound**: Fast asynchronous webhook (`/agentmail-webhook`) processing insurer determinations and correspondence replies.
-  * **Outbound**: 3-mode appellate transmission gateway (AI Adjudicator simulation, custom test email, or verified official payer address with portal/fax/PO box routing).
+  * **Outbound**: 2-mode appellate transmission gateway (typed-in test email or verified official payer address with portal/fax/PO box routing).
 * **OpenAI**:
   * `gpt-5.4-nano` structured extraction for EOB parameters (claim number, provider, denied amount, patient liability, CPT, ICD-10, CARC codes, deadlines).
   * Deterministic 4-pillar scoring algorithm (35% CPB + 25% Step-Therapy + 20% ERISA + 20% Precedents = 100).
@@ -174,7 +174,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/claimhero.test.ts`: End-to-end integration, 4-pillar scoring rubric, ERISA deadline sweeps, and portfolio aggregates.
 * `tests/serviceCertificate.test.ts`: ERISA Certificate of Electronic Service generation, live AgentMail message IDs, Amazon SES delivery receipts, recipient MX resolution, and Convex storage SHA-256 fingerprints.
 * `tests/policyDriftSentinel.test.ts`: Policy Drift Sentinel retroactive CPB alteration detection, cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, and Convex audit integration.
-* `tests/agentMail.test.ts`: AgentMail outbound dispatch, webhook normalization, email styling, Svix signature verification, and AI adjudicator addressing.
+* `tests/agentMail.test.ts`: AgentMail outbound dispatch, webhook normalization, email styling, and Svix signature verification.
 * `tests/authorization.test.ts`: Convex multi-tenant document isolation, owner verification, cross-tenant IDOR guards, and spending protection.
 * `tests/actionsPolicyAndSynthesizer.test.ts`: Firecrawl policy scraping, guideline fallback handling, and appeal synthesizer action contracts.
 * `tests/convexAppeals.test.ts`: Multi-tier statutory appeal escalation, revision preservation, and draft lifecycle.
@@ -209,11 +209,11 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/utils.test.ts` (11 tests): Healthcare currency formatting, statutory countdown math, and risk badge resolvers.
 * `tests/p2pLiveCopilot.test.ts` (11 tests): AI Medical Director 3-turn lifecycle, Fast Answer cards, and STT tolerance.
 * `tests/convexPrecedents.test.ts` (11 tests): Precedent vector index retrieval, seeding, and deduplicated matching.
-* `tests/convexSettings.test.ts` (11 tests): Adjudicator profile settings, practice credentials, and organization preferences.
+* `tests/convexSettings.test.ts` (11 tests): Organization profile settings, practice credentials, and preferences.
 * `tests/backendOptimizationsD1D7.test.ts` (10 tests): Bounded pagination, aggregate safeguards, and performance optimizations.
 * `tests/appealYjs.test.ts` (10 tests): Yjs CRDT op-log transport, vector clocks, and snapshot persistence.
 * `tests/autopilotSLA.test.ts` (7 tests): Automated SLA enforcement and statutory countdown monitoring.
-* `tests/adversarialAdjudicator.test.ts` (10 tests): Adversarial payer response simulation and boundary validation.
+* `tests/adversarialAdjudicator.test.ts` (9 tests): Insurer adversary negotiation logic, partial settlement calculations, and counter-rebuttal fallbacks.
 * `tests/actionsP2PAndChatbot.test.ts` (9 tests): Physician P2P script generation and chatbot retrieval actions.
 * `tests/ingestionAndDeletionPipeline.test.ts` (11 tests): Denial document ingestion and cascading resource deletion.
 * `tests/convexP2P.test.ts` (9 tests): P2P call session records and defense script persistence.
@@ -240,7 +240,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 | Judging Criterion | Alignment & Technical Depth |
 |---|---|
 | **Real-World Utility** | Directly tackles a $200B/year denial crisis. Produces production-ready, sendable artifacts (formal briefs, P2P call scripts, EHR clinical notes, and court dossiers) rather than generic chat summaries. |
-| **Full-Stack Integration Depth** | All 4 sponsor platforms are deeply integrated: **Convex** (reactive DB, 1536-d vector search, searchIndex, scheduled crons, components), **Firecrawl** (live CPB scraping, PubMed, FDA), **AgentMail** (inbound webhooks, outbound dispatch, AI adjudicator), and **OpenAI** (Vision extraction, 4-pillar scoring, grounded synthesis). |
+| **Full-Stack Integration Depth** | All 4 sponsor platforms are deeply integrated: **Convex** (reactive DB, 1536-d vector search, searchIndex, scheduled crons, components), **Firecrawl** (live CPB scraping, PubMed, FDA), **AgentMail** (inbound webhooks, outbound dispatch), and **OpenAI** (Vision extraction, 4-pillar scoring, grounded synthesis). |
 | **Technical Rigor & Polish** | 100% clean `npm run verify` gate, comprehensive Vitest automated test suite (detailed in `README.md`), strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
 | **Transparency & Build Process** | Comprehensive `hackathon.md` log with UTC timestamps, reconciled 7-character commit hashes, and detailed milestone notes. |
 

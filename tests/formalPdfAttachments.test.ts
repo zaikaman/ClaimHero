@@ -17,8 +17,6 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
     process.env.AGENTMAIL_API_KEY = "test_agentmail_key";
     process.env.AGENTMAIL_SENDER_INBOX_ID = "inbox_sender";
     process.env.AGENTMAIL_SENDER_EMAIL = "claimhero-sender@agentmail.to";
-    process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "inbox_adjudicator";
-    process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "claimhero-adjudicator@agentmail.to";
   });
 
   describe("PDF Generation Engine (convex/lib/pdfGenerator)", () => {

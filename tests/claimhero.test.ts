@@ -933,69 +933,21 @@ describe("Phase 6: Autonomous AgentMail & Statutory Countdown Engine", () => {
     expect(isApprovalEmail("We acknowledge receipt of your appeal packet.")).toBe(false);
   });
 
-  it("validates 3-mode appellate recipient resolution rules", () => {
+  it("validates 2-mode appellate recipient resolution rules", () => {
     const resolveRecipient = (
-      mode: "ai_adjudicator" | "custom_email" | "official_payer",
+      mode: "custom_email" | "official_payer",
       customEmail: string,
-      payerName: string,
       officialEmail?: string
     ) => {
-      if (mode === "ai_adjudicator") {
-        return `${payerName.toLowerCase().replace(/[^a-z0-9]/g, "")}-adjudication@claimhero.agentmail.com`;
-      }
       if (mode === "custom_email") {
         return customEmail.trim();
       }
       return officialEmail || "prohibited";
     };
 
-    expect(resolveRecipient("ai_adjudicator", "", "Molina Healthcare")).toBe("molinahealthcare-adjudication@claimhero.agentmail.com");
-    expect(resolveRecipient("custom_email", "judge@hackathon.com", "Molina Healthcare")).toBe("judge@hackathon.com");
-    expect(resolveRecipient("official_payer", "", "Molina Healthcare", "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com")).toBe("MFLGrievanceandAppealsDepartment@MolinaHealthcare.com");
-  });
-
-  it("detects AI payer adjudicator inboxes so follow-up replies continue the review", async () => {
-    const {
-      isAiAdjudicatorAddress,
-      buildAiAdjudicatorAddress,
-      formatCorrespondenceTranscript,
-    } = await import("../convex/lib/aiAdjudicator");
-
-    expect(buildAiAdjudicatorAddress("Molina Healthcare")).toBe(
-      "molinahealthcare-adjudication@claimhero.agentmail.com"
-    );
-    expect(isAiAdjudicatorAddress("molinahealthcare-adjudication@claimhero.agentmail.com")).toBe(true);
-    expect(
-      isAiAdjudicatorAddress(
-        "Molina Healthcare Appellate Review Board <molinahealthcare-adjudication@claimhero.agentmail.com>"
-      )
-    ).toBe(true);
-    expect(isAiAdjudicatorAddress("judge@hackathon.com")).toBe(false);
-    expect(isAiAdjudicatorAddress(undefined)).toBe(false);
-    expect(isAiAdjudicatorAddress("molinahealthcare-adjudication-clm202688192@agentmail.to")).toBe(true);
-    expect(isAiAdjudicatorAddress("claimhero-adjudicator@agentmail.to")).toBe(true);
-
-    const transcript = formatCorrespondenceTranscript([
-      {
-        direction: "outbound",
-        subject: "Formal Appeal",
-        bodyText: "Please overturn this denial.",
-      },
-      {
-        direction: "inbound",
-        subject: "Records Requested",
-        bodyText: "Please send PT notes.",
-      },
-      {
-        direction: "outbound",
-        subject: "Addendum",
-        bodyText: "Attached 16 weeks of PT notes.",
-      },
-    ]);
-
-    expect(transcript).toContain("APPELLANT (Authorized Representative)");
-    expect(transcript).toContain("PAYER MEDICAL DIRECTOR");
-    expect(transcript).toContain("Attached 16 weeks of PT notes.");
+    expect(resolveRecipient("custom_email", "judge@hackathon.com")).toBe("judge@hackathon.com");
+    expect(resolveRecipient("official_payer", "", "MFLGrievanceandAppealsDepartment@MolinaHealthcare.com")).toBe("MFLGrievanceandAppealsDepartment@MolinaHealthcare.com");
+    expect(resolveRecipient("official_payer", "")).toBe("prohibited");
   });
 });
 

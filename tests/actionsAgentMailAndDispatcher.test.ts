@@ -46,8 +46,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       const mockCtx: any = {
         runQuery: vi.fn().mockResolvedValue({ _id: "c1" }),
@@ -323,8 +321,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_user_notify_1",
@@ -400,8 +396,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_user_self_test_1",
@@ -468,8 +462,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_inbound_phish_1",
@@ -562,8 +554,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_cooldown_1",
@@ -628,8 +618,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_cooldown_win",
@@ -706,13 +694,11 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
     it("processInboundClaimReply: drops internal @agentmail.to mail even when mailboxes are unconfigured", async () => {
       delete process.env.AGENTMAIL_SENDER_INBOX_ID;
       delete process.env.AGENTMAIL_SENDER_EMAIL;
-      delete process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID;
-      delete process.env.AGENTMAIL_ADJUDICATOR_EMAIL;
 
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_self_domain_1",
         inbox_id: "in_send",
-        from: "Adjudicator <claimhero-adjudicator@agentmail.to>",
+        from: "Internal <claimhero-internal@agentmail.to>",
         recipients: ["send@claimhero.com"],
         to: ["send@claimhero.com"],
         subject: "Re: [ClaimHero #CLM-SELF-1] Appeal overturned",
@@ -725,7 +711,7 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         eventId: "evt_self_domain_1",
         messageId: "msg_self_domain_1",
         inboxId: "in_send",
-        from: "Adjudicator <claimhero-adjudicator@agentmail.to>",
+        from: "Internal <claimhero-internal@agentmail.to>",
         recipients: ["send@claimhero.com"],
         subject: "Re: [ClaimHero #CLM-SELF-1] Appeal overturned",
         text: "We overturned the denial and approved the claim.",
@@ -766,8 +752,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_reply_header_1",
@@ -909,8 +893,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       const sendMailSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
         messageId: "msg_sent_out",
@@ -970,8 +952,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       vi.spyOn(libAgentMail, "listAgentMailMessages").mockResolvedValue([
         { id: "msg_existing_1", from: "payer@bcbs.com", to: ["send@claimhero.com"] },
@@ -1027,12 +1007,10 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
   });
 
   describe("convex/actions/mailDispatcher", () => {
-    it("dispatchAppealPacket: transmits appeal packet in ai_adjudicator mode", async () => {
+    it("dispatchAppealPacket: transmits appeal packet in custom_email mode", async () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       const mockClaim = {
         _id: "c1",
@@ -1050,16 +1028,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         fullAppealMarkdown: "# Appeal Brief",
         medicalNecessityArguments: "Medical necessity argument",
       };
-
-      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
-        determination: "OVERTURNED_APPROVED",
-        determinationSummary: "Approved under Section 3.B",
-        clinicalRationale: "MRI confirms stenosis",
-        formalDeterminationLetter: "We have overturned this claim.",
-        authorizedSettlementAmount: 18450,
-        reviewerName: "Dr. Arthur Vance, MD",
-        reviewerTitle: "Senior Medical Director",
-      } as any);
 
       vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
         messageId: "live_msg_1",
@@ -1079,29 +1047,26 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
 
       const receipt = await (actionMailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
         claimId: "c1",
-        dispatchMode: "ai_adjudicator",
+        dispatchMode: "custom_email",
+        recipientEmail: "advocate@test.com",
       });
 
       expect(receipt.status).toBe("delivered");
-      expect(receipt.adjudicationDetermination).toBe("OVERTURNED_APPROVED");
-      expect(receipt.subject).toContain("[ClaimHero #CLM-100]");
-      expect(libAgentMail.sendAgentMailMessage).toHaveBeenCalledWith(expect.objectContaining({
-        subject: expect.stringContaining("[ClaimHero #CLM-100]"),
-        text: expect.stringContaining("[ClaimHero #CLM-100]"),
-      }));
+      expect(receipt.recipient).toBe("advocate@test.com");
+      const callArgs = (libAgentMail.sendAgentMailMessage as any).mock.calls[0][0];
+      expect(callArgs.to).toBe("advocate@test.com");
+      expect(callArgs.subject).toContain("[ClaimHero #CLM-100]");
+      expect(callArgs.text).toContain("[ClaimHero #CLM-100]");
       expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
         claimId: "c1",
-        agentMailThreadId: "live_msg_1",
+        status: "dispatched",
       }));
-      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: "won" }));
     });
 
-    it("sendOutboundMessage: delivers AI follow-up adjudication", async () => {
+    it("sendOutboundMessage: transmits outbound message to custom recipient", async () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       const mockClaim = {
         _id: "c1",
@@ -1114,16 +1079,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         thread: { _id: "t1" },
         messages: [{ sender: "Doctor", recipient: "Payer", subject: "Addendum", bodyText: "Here is EMG" }],
       };
-
-      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
-        determination: "OVERTURNED_APPROVED",
-        determinationSummary: "Approved",
-        clinicalRationale: "EMG provided",
-        formalDeterminationLetter: "Approved following addendum.",
-        authorizedSettlementAmount: 5000,
-        reviewerName: "Dr. Vance",
-        reviewerTitle: "Medical Director",
-      } as any);
 
       vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
         messageId: "live_msg_2",
@@ -1139,24 +1094,18 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         runMutation: vi.fn().mockResolvedValue("t1"),
       };
 
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adjudicator@claimhero.agentmail.com";
-
       const res = await (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
         claimId: "c1",
         threadId: "t1",
         text: "Here is the EMG addendum",
-        customRecipient: "adjudicator@claimhero.agentmail.com",
+        customRecipient: "reviewer@aetna.com",
       });
 
       expect(res.success).toBe(true);
-      expect(res.adjudicationDetermination).toBe("OVERTURNED_APPROVED");
       expect(libAgentMail.sendAgentMailMessage).toHaveBeenCalledWith(expect.objectContaining({
+        to: "reviewer@aetna.com",
         subject: expect.stringContaining("[ClaimHero #CLM-100]"),
-        text: expect.stringContaining("[ClaimHero #CLM-100]"),
-      }));
-      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-        claimId: "c1",
-        agentMailThreadId: "live_msg_2",
+        text: expect.stringContaining("Here is the EMG addendum"),
       }));
     });
 
@@ -1164,8 +1113,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       const mockClaim = {
         _id: "c_self_route",
@@ -1205,8 +1152,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       const mockClaim = {
         _id: "c1",
@@ -1279,8 +1224,6 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
       process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-      process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-      process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
 
       const mockClaim = {
         _id: "c1",

@@ -39,7 +39,6 @@ import type * as lib_adversaryNegotiation from "../lib/adversaryNegotiation.js";
 import type * as lib_agentMail from "../lib/agentMail.js";
 import type * as lib_agentMailWebhook from "../lib/agentMailWebhook.js";
 import type * as lib_aggregates from "../lib/aggregates.js";
-import type * as lib_aiAdjudicator from "../lib/aiAdjudicator.js";
 import type * as lib_appealEmail from "../lib/appealEmail.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
@@ -104,7 +103,6 @@ declare const fullApi: ApiFromModules<{
   "lib/agentMail": typeof lib_agentMail;
   "lib/agentMailWebhook": typeof lib_agentMailWebhook;
   "lib/aggregates": typeof lib_aggregates;
-  "lib/aiAdjudicator": typeof lib_aiAdjudicator;
   "lib/appealEmail": typeof lib_appealEmail;
   "lib/auth": typeof lib_auth;
   "lib/embeddings": typeof lib_embeddings;

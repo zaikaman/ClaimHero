@@ -1,6 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-// @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { describe, it, expect } from "vitest";
 import {
   ADVERSARY_RFI_CHECKLIST,
   PARTIAL_SETTLEMENT_FRACTION,
@@ -13,10 +11,6 @@ import {
   getCountermoveLabel,
   pickAdversaryCountermove,
 } from "../convex/lib/adversaryNegotiation";
-
-vi.mock("@convex-dev/auth/server", () => ({
-  getAuthUserId: vi.fn(),
-}));
 
 describe("Insurer Defense Adversary negotiation engine", () => {
   it("prices partial settlement at 40% of the disputed amount", () => {
@@ -144,89 +138,5 @@ describe("Insurer Defense Adversary negotiation engine", () => {
       negotiationRound: 1,
     });
     expect(hint).toContain("Negotiation round 1");
-  });
-});
-
-describe("Adjudicator dispatch with adversary countermoves", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(getAuthUserId).mockResolvedValue("user_123" as never);
-  });
-
-  it("persists partial settlement with counter-rebuttal and under_review status", async () => {
-    const actionMailDispatcher = await import("../convex/actions/mailDispatcher");
-    const libOpenAI = await import("../convex/lib/openai");
-    const libAgentMail = await import("../convex/lib/agentMail");
-
-    vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
-      determination: "PARTIAL_SETTLEMENT_OFFER",
-      determinationSummary: "Compromise 40% settlement",
-      clinicalRationale: "Residual medical-necessity risk",
-      formalDeterminationLetter: "Dear Provider: we offer a partial settlement.",
-      authorizedSettlementAmount: 0,
-      requestedRecords: [],
-      citedPolicyClause: "",
-      settlementOfferPct: 0.4,
-      reviewerName: "Demo AI Reviewer",
-      reviewerTitle: "Independent Clinical Reviewer (Simulated)",
-    } as never);
-    vi.spyOn(libOpenAI, "createChatCompletion").mockResolvedValue("Tailored counter-rebuttal draft");
-    vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
-      messageId: "live_partial_1",
-    } as never);
-
-    const mockClaim = {
-      _id: "c1",
-      claimNumber: "CLM-100",
-      userId: "user_123",
-      deniedAmount: 10000,
-      overturnProbabilityScore: 0.55,
-      status: "ready_for_review",
-      patient: { name: "Jane Doe", insurancePayer: "UnitedHealthcare" },
-    };
-    const mockAppeal = {
-      _id: "a1",
-      claimId: "c1",
-      version: 1,
-      isHumanApproved: true,
-      fullAppealMarkdown: "# Appeal Brief",
-      medicalNecessityArguments: "necessity",
-    };
-    const { rateLimiter } = await import("../convex/lib/rateLimiter");
-    vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as never);
-
-    let queryCalls = 0;
-    const mutations: Array<{ args: Record<string, unknown> }> = [];
-    const mockCtx: unknown = {
-      runQuery: vi.fn().mockImplementation(() => {
-        queryCalls++;
-        if (queryCalls === 1) return Promise.resolve(mockClaim);
-        if (queryCalls === 2) return Promise.resolve(mockAppeal);
-        return Promise.resolve({ thread: null, messages: [] });
-      }),
-      runMutation: vi.fn().mockImplementation((_fn: unknown, args: Record<string, unknown>) => {
-        mutations.push({ args });
-        return Promise.resolve("id_1");
-      }),
-    };
-
-    process.env.AGENTMAIL_API_KEY = "test_key";
-    process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
-    process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
-    process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adj";
-    process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adj@payer.com";
-
-    const receipt = await (actionMailDispatcher.dispatchAppealPacket as unknown as { _handler: Function })._handler(
-      mockCtx,
-      { claimId: "c1", dispatchMode: "ai_adjudicator" }
-    ) as { adjudicationDetermination: string };
-
-    expect(receipt.adjudicationDetermination).toBe("PARTIAL_SETTLEMENT_OFFER");
-    const inboundInsert = mutations.find((m) => m.args.direction === "inbound");
-    expect(inboundInsert?.args.detectedDetermination).toBe("PARTIAL_SETTLEMENT_OFFER");
-    expect(inboundInsert?.args.settlementAmount).toBe(4000);
-    expect(inboundInsert?.args.autoReplyDraft).toContain("counter-rebuttal");
-    const statusUpdate = mutations.find((m) => m.args.status === "under_review");
-    expect(statusUpdate).toBeDefined();
   });
 });

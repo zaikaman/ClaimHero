@@ -21,8 +21,6 @@ describe("Sentinel Auto-Pilot 1-Hour SLA Engine", () => {
     process.env.AGENTMAIL_API_KEY = "test_key";
     process.env.AGENTMAIL_SENDER_INBOX_ID = "in_sender";
     process.env.AGENTMAIL_SENDER_EMAIL = "sender@claimhero.com";
-    process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "in_adjudicator";
-    process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adjudicator@claimhero.com";
     vi.clearAllMocks();
     vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
   });

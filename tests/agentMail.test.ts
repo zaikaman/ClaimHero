@@ -28,11 +28,6 @@ import {
   sanitizeAlertText,
   sanitizeAndEscapeHtml,
 } from "../convex/lib/appealEmail";
-import {
-  isAiAdjudicatorAddress,
-  buildAiAdjudicatorAddress,
-  formatCorrespondenceTranscript,
-} from "../convex/lib/aiAdjudicator";
 
 describe("convex/lib/agentMail Unit Tests", () => {
   const originalEnv = process.env;
@@ -56,14 +51,10 @@ describe("convex/lib/agentMail Unit Tests", () => {
   it("returns shared agent mailboxes when properly configured", () => {
     process.env.AGENTMAIL_SENDER_INBOX_ID = "inbox_sender_1";
     process.env.AGENTMAIL_SENDER_EMAIL = "sender@claimhero.agentmail.to";
-    process.env.AGENTMAIL_ADJUDICATOR_INBOX_ID = "inbox_adj_1";
-    process.env.AGENTMAIL_ADJUDICATOR_EMAIL = "adjudicator@claimhero.agentmail.to";
 
     const shared = getSharedAgentMailboxes();
     expect(shared.senderInboxId).toBe("inbox_sender_1");
     expect(shared.senderEmail).toBe("sender@claimhero.agentmail.to");
-    expect(shared.adjudicatorInboxId).toBe("inbox_adj_1");
-    expect(shared.adjudicatorEmail).toBe("adjudicator@claimhero.agentmail.to");
   });
 
   it("formats message IDs correctly for RFC 5322 In-Reply-To and References headers", () => {
@@ -239,23 +230,6 @@ Paragraph text with **bold** and *italic*.
 
     const correspondenceEmail = formatCorrespondenceEmail(markdown, context, "Custom Subject");
     expect(correspondenceEmail.html).toContain("Custom Subject");
-  });
-
-  it("handles aiAdjudicator helpers, addresses, and transcripts", () => {
-    expect(isAiAdjudicatorAddress("molina-adjudication@claimhero.agentmail.com")).toBe(true);
-    expect(isAiAdjudicatorAddress("Reviewer <adjudicator@molinahealthcare.com>")).toBe(true);
-    expect(isAiAdjudicatorAddress("<adjudication-specialist@payer.com>")).toBe(true);
-    expect(isAiAdjudicatorAddress("doctor@clinic.com")).toBe(false);
-    expect(isAiAdjudicatorAddress(null)).toBe(false);
-
-    expect(buildAiAdjudicatorAddress("Molina Healthcare")).toBe("molinahealthcare-adjudication@claimhero.agentmail.com");
-
-    const transcript = formatCorrespondenceTranscript([
-      { direction: "outbound", subject: "Initial Brief", bodyText: "Substantive clinical brief text." },
-      { direction: "inbound", subject: "Review Decision", bodyText: "Adverse determination overturned." },
-    ]);
-    expect(transcript).toContain("APPELLANT (Authorized Representative)");
-    expect(transcript).toContain("PAYER MEDICAL DIRECTOR");
   });
 
   describe("Svix Webhook Signature Cryptographic Verification", () => {
@@ -814,7 +788,6 @@ Paragraph text with **bold** and *italic*.
         claimNumber: "CLM-INTAKE-8849",
         assignedAgentEmail: "agent_general@claimhero.agentmail.to",
         agentMailInboxEmail: "claim_intake_8849@claimhero.agentmail.to",
-        agentMailAdjudicatorEmail: "adj_intake_8849@claimhero.agentmail.to",
       };
 
       const claimsList = [intakeClaim];
@@ -839,7 +812,6 @@ Paragraph text with **bold** and *italic*.
         claimNumber: "CLM-FREE-1002",
         assignedAgentEmail: "assigned_rep@claimhero.agentmail.to",
         agentMailInboxEmail: "inbox_free_1002@claimhero.agentmail.to",
-        agentMailAdjudicatorEmail: "adj_free_1002@claimhero.agentmail.to",
       };
 
       const recipient = "inbox_free_1002@claimhero.agentmail.to";
@@ -847,8 +819,7 @@ Paragraph text with **bold** and *italic*.
 
       const isMatch =
         intakeClaim.agentMailInboxEmail?.toLowerCase() === normalized ||
-        intakeClaim.assignedAgentEmail?.toLowerCase() === normalized ||
-        intakeClaim.agentMailAdjudicatorEmail?.toLowerCase() === normalized;
+        intakeClaim.assignedAgentEmail?.toLowerCase() === normalized;
 
       expect(isMatch).toBe(true);
     });

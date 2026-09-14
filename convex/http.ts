@@ -175,8 +175,8 @@ async function verifyAndParseSvixWebhook(
 }
 
 /**
- * AgentMail sends a lightweight event here. Case reply and adjudicator message
- * persistence run asynchronously so AgentMail receives a fast response.
+ * AgentMail sends a lightweight event here. Case reply message
+ * persistence runs asynchronously so AgentMail receives a fast response.
  * The action re-fetches the message from AgentMail before trusting its content.
  * Svix cryptographic signature headers (svix-id, svix-timestamp, svix-signature)
  * are verified against AGENTMAIL_WEBHOOK_SECRET before scheduling background tasks.

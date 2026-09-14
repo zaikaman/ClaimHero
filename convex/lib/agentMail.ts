@@ -10,8 +10,6 @@ export interface AgentMailSendResult {
 export interface SharedAgentMailboxes {
   senderInboxId: string;
   senderEmail: string;
-  adjudicatorInboxId: string;
-  adjudicatorEmail: string;
 }
 
 type SendContext = Parameters<AgentMail["sendMessage"]>[0];
@@ -89,7 +87,7 @@ async function readOutboundIdentifiers(
 }
 
 /**
- * Returns the two inboxes provisioned once for the application.
+ * Returns the shared outbound sender inbox provisioned for the application.
  * Claims are routed inside Convex by claim number; they do not create inboxes.
  */
 export function getSharedAgentMailboxes(): SharedAgentMailboxes {
@@ -99,16 +97,14 @@ export function getSharedAgentMailboxes(): SharedAgentMailboxes {
   const senderEmail =
     configuredValue("AGENTMAIL_SENDER_EMAIL") ||
     (senderInboxId?.includes("@") ? senderInboxId : undefined);
-  const adjudicatorInboxId = configuredValue("AGENTMAIL_ADJUDICATOR_INBOX_ID");
-  const adjudicatorEmail = configuredValue("AGENTMAIL_ADJUDICATOR_EMAIL");
 
-  if (!senderInboxId || !senderEmail || !adjudicatorInboxId || !adjudicatorEmail) {
+  if (!senderInboxId || !senderEmail) {
     throw new Error(
-      "Shared AgentMail is not configured. Set AGENTMAIL_SENDER_INBOX_ID, AGENTMAIL_SENDER_EMAIL, AGENTMAIL_ADJUDICATOR_INBOX_ID, and AGENTMAIL_ADJUDICATOR_EMAIL.",
+      "Shared AgentMail is not configured. Set AGENTMAIL_SENDER_INBOX_ID and AGENTMAIL_SENDER_EMAIL.",
     );
   }
 
-  return { senderInboxId, senderEmail, adjudicatorInboxId, adjudicatorEmail };
+  return { senderInboxId, senderEmail };
 }
 
 /**

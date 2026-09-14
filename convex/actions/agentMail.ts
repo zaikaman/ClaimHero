@@ -57,8 +57,6 @@ export const provisionClaimInboxes = internalAction({
         claimId: args.claimId,
         claimInboxId: mailboxes.senderInboxId,
         claimInboxEmail: mailboxes.senderEmail,
-        adjudicatorInboxId: mailboxes.adjudicatorInboxId,
-        adjudicatorEmail: mailboxes.adjudicatorEmail,
         status: "shared",
       });
     } catch (error) {
@@ -176,9 +174,7 @@ async function handleInboundClaimReply(
     const ownIdentities = sharedMailboxes
       ? {
           senderEmail: sharedMailboxes.senderEmail,
-          adjudicatorEmail: sharedMailboxes.adjudicatorEmail,
           senderInboxId: sharedMailboxes.senderInboxId,
-          adjudicatorInboxId: sharedMailboxes.adjudicatorInboxId,
         }
       : undefined;
     const senderClean = (extractEmailAddress(sender) || sender).toLowerCase();
@@ -928,15 +924,12 @@ async function performInboxSync(
         const fromStr = typeof msg.from === "string" ? msg.from.toLowerCase() : "";
         const senderEmail = (extractEmailAddress(fromStr) || fromStr).toLowerCase();
         const ownSenderEmail = mailboxes.senderEmail?.toLowerCase();
-        const ownAdjudicatorEmail = mailboxes.adjudicatorEmail?.toLowerCase();
 
         const isOwnInboxSender =
           (Boolean(ownSenderEmail) && (senderEmail === ownSenderEmail || fromStr.includes(ownSenderEmail!))) ||
-          (Boolean(ownAdjudicatorEmail) && (senderEmail === ownAdjudicatorEmail || fromStr.includes(ownAdjudicatorEmail!))) ||
           fromStr.includes(inboxId.toLowerCase()) ||
           isInternalAgentMailAddress(senderEmail, {
             senderEmail: mailboxes.senderEmail,
-            adjudicatorEmail: mailboxes.adjudicatorEmail,
           });
 
         const subjectStr = typeof msg.subject === "string" ? msg.subject.toLowerCase() : "";
@@ -983,15 +976,12 @@ async function performInboxSync(
       const fromStr = typeof msg.from === "string" ? msg.from.toLowerCase() : "";
       const senderEmail = (extractEmailAddress(fromStr) || fromStr).toLowerCase();
       const ownSenderEmail = mailboxes.senderEmail?.toLowerCase();
-      const ownAdjudicatorEmail = mailboxes.adjudicatorEmail?.toLowerCase();
 
       const isOwnInboxSender =
         (Boolean(ownSenderEmail) && (senderEmail === ownSenderEmail || fromStr.includes(ownSenderEmail!))) ||
-        (Boolean(ownAdjudicatorEmail) && (senderEmail === ownAdjudicatorEmail || fromStr.includes(ownAdjudicatorEmail!))) ||
         fromStr.includes(inboxId.toLowerCase()) ||
         isInternalAgentMailAddress(senderEmail, {
           senderEmail: mailboxes.senderEmail,
-          adjudicatorEmail: mailboxes.adjudicatorEmail,
         });
 
       const subjectStr = typeof msg.subject === "string" ? msg.subject.toLowerCase() : "";

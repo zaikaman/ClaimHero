@@ -52,7 +52,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [copiedSender, setCopiedSender] = useState(false);
-  const [copiedAdjudicator, setCopiedAdjudicator] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [resetConfirmInput, setResetConfirmInput] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
@@ -76,9 +75,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
   };
 
   const senderEmail = import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL || "";
-  const adjudicatorEmail = import.meta.env.VITE_AGENTMAIL_ADJUDICATOR_EMAIL || "";
   const isSenderConfigured = Boolean(senderEmail && senderEmail.trim().length > 0);
-  const isAdjudicatorConfigured = Boolean(adjudicatorEmail && adjudicatorEmail.trim().length > 0);
 
   // Initialize local form state once settings are loaded
   useEffect(() => {
@@ -126,11 +123,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
     setTimeout(() => setCopiedSender(false), 2000);
   };
 
-  const handleCopyAdjudicator = () => {
-    navigator.clipboard.writeText(adjudicatorEmail);
-    setCopiedAdjudicator(true);
-    setTimeout(() => setCopiedAdjudicator(false), 2000);
-  };
 
   const handleSync = async () => {
     setSyncFeedback(null);
@@ -490,7 +482,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
               <CardTitle className="text-sm font-semibold">AgentMail Communications Gateway</CardTitle>
             </div>
             <CardDescription className="text-xs">
-              Configured shared mailboxes for outbound appeal dispatch and two-way simulated payer correspondence.
+              Configured shared mailbox for outbound appeal dispatch and two-way payer correspondence.
             </CardDescription>
           </CardHeader>
 
@@ -552,62 +544,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/30">
-              <div className="space-y-0.5">
-                <div className="text-xs font-semibold text-foreground">Simulated Payer Review Inbox</div>
-                <div className="text-[11px] text-muted-foreground">
-                  AI adjudicator mailbox receiving simulated payer review requests.
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {isAdjudicatorConfigured ? (
-                  <>
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/70 bg-background/80 font-mono text-xs text-foreground shadow-2xs">
-                      <span className="size-2 rounded-full bg-sky-500" />
-                      <span>{adjudicatorEmail}</span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCopyAdjudicator}
-                      className="h-8 gap-1 text-xs cursor-pointer"
-                      title="Copy Adjudicator Address"
-                    >
-                      {copiedAdjudicator ? (
-                        <>
-                          <Check className="size-3.5 text-emerald-500" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="size-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/70 bg-background/80 font-mono text-xs shadow-2xs">
-                      <Badge variant="outline" className="text-[10px] font-mono text-amber-400 border-amber-500/30 bg-amber-500/10">
-                        Not configured
-                      </Badge>
-                      <span className="text-[11px] text-muted-foreground">VITE_AGENTMAIL_ADJUDICATOR_EMAIL absent</span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled
-                      className="h-8 gap-1 text-xs opacity-50 cursor-not-allowed"
-                      title="Adjudicator address not configured in environment"
-                    >
-                      <Copy className="size-3.5" />
-                      <span>Copy</span>
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-0.5">
