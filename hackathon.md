@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-14T13:53:00Z
+- **Last updated:** 2026-09-14T16:24:48Z
 
 ## Log
 
@@ -1475,4 +1475,10 @@ Removed simulated AI adjudicator mode and restructured appellate dispatch to sup
 Stabilized AgentMail communications inbox layout, eliminated layout shifts upon receiving inbound payer email replies, and introduced real-time feedback with Web Audio synthesis, Sonner toast notifications, message highlight pulses, and container-anchored smooth scrolling (`src/components/communications/AgentMailDrawer.tsx`, `src/lib/soundEffects.ts`, `src/components/common/SentinelFlowStepper.tsx`, `src/types/index.ts`, `tests/soundEffects.test.ts`). Fixed premature re-emergence of the 600px transmission banner on post-dispatch statuses (`under_review`, `escalated`), added `inbound_reply_received` acoustic chime, real-time toast alert with AI determination labeling, message highlight ring, and seamless scroll anchoring without jarring the viewport. Added test coverage and verified typecheck, lint, 976 passing tests, and production build with `npm run verify`.
 
 ### 2026-09-14 - working tree
-Removed visual pulse/blur flashing animation from inbound payer message cards in `src/components/communications/AgentMailDrawer.tsx`. Dismantled `newlyArrivedMessageId` state, timer, and `animate-pulse` class to preserve steady, crisp card rendering without repeated opacity oscillations or blur effects upon message arrival. Verified 100% clean with `npm run verify` across typecheck, lint, 976 passing unit tests, and production build.
+Removed visual pulse/blur flashing animation from inbound payer message cards in `src/components/communications/AgentMailDrawer.tsx`. Dismantled `newlyArrivedMessageId` state, timer, and `animate-pulse` class to preserve steady, crisp card rendering without repeated opacity oscillations or blur effects upon message arrival. Verified 100% clean with `npm run verify` across typecheck, lint, 976 passing unit tests, and production build.
+
+### 2026-09-14 - working tree
+Fixed landing page signed-out button flash for returning sessions. `CinematicHero` now accepts `isAuthenticated` and `isAuthLoading` from `App.tsx` and renders a neutral skeleton placeholder while Convex Auth resolves, then shows Sentinel Console or Sign In and Launch Sentinel without layout shift. Mobile dropdown mirrors the same loading state (`src/components/landing/CinematicHero.tsx`, `src/App.tsx`). Verified with typecheck and production build.
+
+### 2026-09-14 - working tree
+Upgraded landing auth to optimistic cached-session resolution so anonymous visitors render Sign In instantly while returning sessions hold a pixel-exact invisible reserve until Convex Auth verifies, eliminating both the signed-out flash and the skeleton delay (`src/lib/authSession.ts`, `src/hooks/useCurrentUser.ts`, `src/components/landing/CinematicHero.tsx`, `src/App.tsx`, `tests/authSession.test.ts`). Verified with typecheck, lint, 989 passing tests, and production build.

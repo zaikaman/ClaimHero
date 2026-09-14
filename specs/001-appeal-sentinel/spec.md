@@ -88,7 +88,7 @@ The system aggregates all active cases across the healthcare practice or individ
 - **Unpublished or Proprietary Insurer Guidelines**: If an insurer's specific policy bulletin is inaccessible, the system falls back to national standard-of-care guidelines (NCCN, FDA, PubMed clinical trials) and highlights the insurer's failure to disclose criteria under ERISA disclosure rules.
 - **Expired Statutory Window**: If a claim is ingested after the standard 180-day ERISA internal deadline has passed, the system automatically alerts the user and suggests alternative avenues (e.g., State Insurance Commissioner external complaints, equitable tolling arguments).
 - **Incomplete Patient Medical Records**: When key clinical history (e.g., conservative therapy duration) is missing from the denial, the appeal studio provides structured prompts to capture the missing details before dispatch.
-- **Payer Transmission Failure or Bounce**: In the event of an email bounce or delivery failure, the system alerts the user immediately, logs the failure in the audit trail, and provides alternative submission instructions (e.g., printable PDF dossier with fax cover sheet).
+- **Payer Transmission Failure or Bounce**: In the event of an email bounce or delivery failure, the system alerts the user immediately, logs the failure in the audit trail, and provides delivery status with a printable PDF dossier for records.
 
 ## Requirements *(mandatory)*
 

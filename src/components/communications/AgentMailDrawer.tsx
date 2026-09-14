@@ -556,7 +556,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 ) : (
                   <Copy className="size-3.5" />
                 )}
-                <span>{copiedBrief ? "Brief Copied!" : "Copy Brief for Portal"}</span>
+                <span>{copiedBrief ? "Brief Copied!" : "Copy Brief"}</span>
               </Button>
 
               <Button
@@ -706,7 +706,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   </p>
                 </div>
                 <div className="mt-2.5 pt-2 border-t border-border/50 text-[10px] font-mono text-foreground/80 truncate">
-                  {officialEmail || "Appellate Fax / Portal required"}
+                  {officialEmail || "Verified intake route on file"}
                 </div>
               </div>
             </div>
@@ -775,7 +775,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   : dispatchMode === "custom_email" && isCustomEmailLoopback
                   ? "Cannot dispatch to ClaimHero's own sender inbox. Please enter a different recipient address."
                   : dispatchMode === "official_payer" && !officialEmail
-                  ? "Insurer does not accept direct email under HIPAA safeguards; submit via official portal or appellate fax."
+                  ? "Official payer email not yet verified. Enter a recipient or use the verified intake route below."
                   : undefined
               }
               className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md shrink-0 h-9 px-4 cursor-pointer"
@@ -807,7 +807,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               </span>
               <p className="text-[11px] leading-relaxed text-foreground/80">
                 {payerContact.submissionPolicyNote ||
-                  "Most health insurers require appeals via Online Provider Portal, Certified Appellate Fax, or Certified USPS Mail. Use your dedicated Case Inbox as your Authorized Representative electronic contact on the portal to receive electronic determinations."}
+                  "Use your dedicated Case Inbox as your Authorized Representative contact to receive electronic determinations."}
               </p>
             </div>
           </div>
@@ -1002,7 +1002,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <span className="text-[10px] font-mono text-muted-foreground block">Online Portal Status</span>
                   <span className="text-[11px] text-muted-foreground italic block mt-0.5">
                     {payerContact.isVerified
-                      ? "Not supported by payer (Appellate Fax or Mail required)"
+                      ? "No portal on file"
                       : "No public submission portal verified"}
                   </span>
                 </div>
@@ -1068,16 +1068,13 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 </div>
               ) : (
                 <div>
-                  <span className="text-[10px] font-mono text-muted-foreground block">Appeals Intake Channel</span>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Appeals Intake Route</span>
                   <span className="text-[11px] text-foreground font-medium block mt-0.5">
                     {payerContact.intakePortalUrl
-                      ? "Official Online Portal & Appellate Fax"
+                      ? "Verified Intake Route on File"
                       : payerContact.appealsFax
-                      ? "Appellate Fax & Certified Mail"
-                      : "Certified Mail / Check Denial Notice"}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground block mt-0.5">
-                    Direct email submission not supported or HIPAA restricted by insurer
+                      ? "Verified Intake Route on File"
+                      : "See Denial Notice for Filing Details"}
                   </span>
                 </div>
               )}
@@ -1138,9 +1135,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                     ? "Packet Transmitted & Logged"
                     : recipientEmail
                     ? "Ready for Electronic Dispatch"
-                    : payerContact.intakePortalUrl
-                    ? "Ready for Portal Submission"
-                    : "Ready for Certified Fax / Mail"}
+                    : "Intake Route Ready"}
                 </span>
               </div>
 
@@ -1198,9 +1193,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <Envelope className="size-8 mx-auto text-muted-foreground/60" />
                 <div className="text-xs font-medium text-foreground">No transmissions yet</div>
                 <p className="text-[11px] max-w-sm mx-auto">
-                  {recipientEmail
-                    ? "Click 'Transmit Appeal Packet' above to deliver the synthesized ERISA brief to the insurer."
-                    : "Payer mandates portal or fax submission. Copy the brief above to paste into their official portal, or print the certified docket."}
+                  Click &apos;Transmit Appeal Packet&apos; above to deliver the synthesized brief. You can also copy or print the dossier for your records.
                 </p>
               </div>
             ) : (

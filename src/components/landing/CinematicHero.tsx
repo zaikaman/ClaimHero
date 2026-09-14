@@ -18,9 +18,16 @@ import {
 } from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
 import { BrandLogo } from "../common/BrandLogo";
+import {
+  hasCachedAuthToken,
+  shouldDeferLandingAuthActions,
+} from "../../lib/authSession";
 
 interface CinematicHeroProps {
   onEnterConsole: (view?: NavigationView) => void;
+  isAuthenticated?: boolean;
+  isAuthLoading?: boolean;
+  hasCachedSession?: boolean;
 }
 
 interface ShowcaseSlide {
@@ -76,8 +83,26 @@ const HERO_SLIDES: ShowcaseSlide[] = [
 
 export const CinematicHero: React.FC<CinematicHeroProps> = ({
   onEnterConsole,
+  isAuthenticated: isAuthenticatedProp,
+  isAuthLoading: isAuthLoadingProp,
+  hasCachedSession: hasCachedSessionProp,
 }) => {
-  const { isAuthenticated } = useCurrentUser();
+  const {
+    isAuthenticated: isAuthenticatedFromHook,
+    isAuthLoading: isAuthLoadingFromHook,
+  } = useCurrentUser();
+  // Prefer parent-provided session state (single source of truth in App.tsx).
+  // Defer auth actions only for a returning session that is still verifying;
+  // anonymous visitors render signed-out copy immediately so landing LCP
+  // never waits on auth and never flashes the wrong state.
+  const isAuthenticated = isAuthenticatedProp ?? isAuthenticatedFromHook;
+  const isAuthLoading = isAuthLoadingProp ?? isAuthLoadingFromHook;
+  const hasCachedSession = hasCachedSessionProp ?? hasCachedAuthToken();
+  const deferAuthActions = shouldDeferLandingAuthActions({
+    isAuthenticated,
+    isAuthLoading,
+    hasCachedSession,
+  });
 
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -207,8 +232,21 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
         </nav>
 
         {/* Right: Console Launch Actions */}
-        <div className="flex items-center gap-3">
-          {isAuthenticated ? (
+        <div className="flex items-center gap-3" aria-busy={deferAuthActions}>
+          {deferAuthActions ? (
+            /* Pixel-exact invisible reserve for a returning session that is
+               still verifying. Same padding, type, and icon as the Sentinel
+               Console button, so there is zero layout shift and zero wrong
+               copy when auth resolves. No shimmer on the marketing hero. */
+            <div
+              aria-hidden="true"
+              data-testid="landing-auth-placeholder"
+              className="hidden sm:flex liquid-glass items-center gap-2 rounded-md px-4 md:px-5 py-2 text-sm invisible select-none"
+            >
+              <span>Sentinel Console</span>
+              <Compass className="size-[18px]" />
+            </div>
+          ) : isAuthenticated ? (
             /* Open Console Button */
             <button
               onClick={() => onEnterConsole("radar")}
@@ -297,26 +335,52 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
 
           {/* Below sm Launch Console & Sign In button in dropdown */}
           <div className="sm:hidden pt-3 mt-2 border-t border-gray-800 flex flex-col gap-2">
-            <button
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                onEnterConsole("radar");
-              }}
-              className="w-full liquid-glass rounded-md py-2.5 px-4 text-xs font-medium flex items-center justify-center gap-2 text-white hover:bg-white/5"
-            >
-              <Compass className="size-4" />
-              <span>Launch Sentinel Console</span>
-            </button>
-            <button
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                onEnterConsole("login");
-              }}
-              className="w-full bg-white text-black rounded-md py-2.5 px-4 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-gray-200"
-            >
-              <User className="size-4 text-black" />
-              <span>Sign In / Create Account</span>
-            </button>
+            {deferAuthActions ? (
+              /* Exact-size invisible reserve for a verifying returning
+                 session. Matches the authenticated single-row action. */
+              <div
+                aria-hidden="true"
+                data-testid="landing-auth-placeholder-mobile"
+                className="w-full liquid-glass rounded-md py-2.5 px-4 text-xs font-medium flex items-center justify-center gap-2 invisible select-none"
+              >
+                <Compass className="size-4" />
+                <span>Sentinel Console</span>
+              </div>
+            ) : isAuthenticated ? (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onEnterConsole("radar");
+                }}
+                className="w-full liquid-glass rounded-md py-2.5 px-4 text-xs font-medium flex items-center justify-center gap-2 text-white hover:bg-white/5"
+              >
+                <Compass className="size-4" />
+                <span>Sentinel Console</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onEnterConsole("radar");
+                  }}
+                  className="w-full liquid-glass rounded-md py-2.5 px-4 text-xs font-medium flex items-center justify-center gap-2 text-white hover:bg-white/5"
+                >
+                  <Compass className="size-4" />
+                  <span>Launch Sentinel Console</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onEnterConsole("login");
+                  }}
+                  className="w-full bg-white text-black rounded-md py-2.5 px-4 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-gray-200"
+                >
+                  <User className="size-4 text-black" />
+                  <span>Sign In / Create Account</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

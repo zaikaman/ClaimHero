@@ -81,7 +81,7 @@ flowchart TD
 * **AgentMail**:
   * Dedicated verified outbound sender: Outbound Sender (`claimhero-sender@agentmail.to`).
   * **Inbound**: Fast asynchronous webhook (`/agentmail-webhook`) processing insurer determinations and correspondence replies.
-  * **Outbound**: 2-mode appellate transmission gateway (typed-in test email or verified official payer address with portal/fax/PO box routing).
+   * **Outbound**: 2-mode appellate transmission gateway (typed-in email or verified official payer address with verified intake routing).
 * **OpenAI**:
   * `gpt-5.4-nano` structured extraction for EOB parameters (claim number, provider, denied amount, patient liability, CPT, ICD-10, CARC codes, deadlines).
   * Deterministic 4-pillar scoring algorithm (35% CPB + 25% Step-Therapy + 20% ERISA + 20% Precedents = 100).
@@ -148,7 +148,7 @@ flowchart TD
    * **P2P Live Call Copilot (`P2PLiveCopilot.tsx`)**: Web Speech STT real-time transcription, AI Medical Director 3-stage challenge loop, Fast Answer rebuttal cards, win-score HUD, and copyable EHR Encounter Summary addendums (Epic/Cerner).
    * **Financial Liability Calculator (`FinancialLiabilityCalculator.tsx`)**: OOP-max capping, No Surprises Act balance billing protection, $110/day ERISA failure-to-disclose penalty trajectory, and printable audit statements.
    * **Appeal Dossier Binder (`dossier/`)**: Complete 8-page packet (Cover, TOC, Statutory Summary, Exhibit Index, Exhibits A-C, Attestation) with US Letter / A4 print isolation.
-5. **Payer Communications Drawer (`AgentMailDrawer.tsx`)**: Multi-channel gateway (email / portal / fax / mail) with 3-mode recipient switching, verified payer routing, threaded two-way correspondence, and the 1-click Printable **ERISA Delivery Evidence Report** (`ServiceCertificateModal.tsx`, `convex/serviceCertificate.ts`) generating contemporaneous electronic service records under 28 U.S.C. § 1746 with live RFC 5322 Message-IDs, Amazon SES MTA receipts, live Node.js DNS MX server resolution, and SHA-256 storage fingerprints to defeat payer non-receipt procedural defaults.
+5. **Payer Communications Drawer (`AgentMailDrawer.tsx`)**: Verified gateway with recipient switching, verified payer routing, threaded two-way correspondence, and the 1-click Printable **ERISA Delivery Evidence Report** (`ServiceCertificateModal.tsx`, `convex/serviceCertificate.ts`) generating contemporaneous electronic service records under 28 U.S.C. § 1746 with live RFC 5322 Message-IDs, Amazon SES MTA receipts, live Node.js DNS MX server resolution, and SHA-256 storage fingerprints to defeat payer non-receipt procedural defaults.
 6. **Portfolio Analytics (`AnalyticsMetrics.tsx`)**: Practice-wide disputed vs. recovered amounts, insurer win rates, confidence distribution, and printable Executive Report statements.
 7. **HIPAA Privacy Redaction Engine (`PrivacyRedactionFilter.tsx`)**: Deterministic PII masking across Safe Harbor, Balanced Appellate, and Public Exhibit standards.
 8. **Sentinel AI Copilot Widget (`SentinelChatbot.tsx`, `⌘J`)**: Autonomous clinical & legal chatbot with 10 agentic OpenAI tool calling capabilities across Convex database records (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) and live Firecrawl web intelligence (`firecrawl_web_search`, `firecrawl_scrape_url`, `crawl_and_attach_evidence`), persistent `chatbotSessions`/`chatbotMessages` Convex tables, rolling context window summarization, and collapsible tool execution traces.

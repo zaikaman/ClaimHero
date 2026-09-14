@@ -649,11 +649,11 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <div className="flex items-center gap-2">
                 <DialogTitle>Ingest Denial Document</DialogTitle>
                 <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary bg-primary/5">
-                  English Only • US Payers
+                  US Healthcare Appeals
                 </Badge>
               </div>
               <DialogDescription>
-                Automated clinical record extraction & real-time case indexing (English-language EOBs and denial notices)
+                Automated clinical record extraction & real-time case indexing (EOBs and denial notices)
               </DialogDescription>
             </div>
           </div>
@@ -830,7 +830,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {selectedFile
                     ? `${(selectedFile.size / 1024).toFixed(1)} KB — Ready to upload`
-                    : "Supports English-language PDF, PNG, JPG, JPEG, and TXT denial notices"}
+                    : "Supports PDF, PNG, JPG, JPEG, and TXT denial notices"}
                 </p>
               </div>
 

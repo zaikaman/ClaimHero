@@ -9,7 +9,7 @@ specs/001-appeal-sentinel/plan.md
 ## 1. Language Policy
 - **Code & Technical Assets**: Write all source code, identifiers, types, schemas, comments, commit messages, PR descriptions, test cases, and technical specifications exclusively in **English**.
 - **UI Content**: Default application UI copy, labels, and data must be in **English** (tailored for the international hackathon judges).
-- **Scope & Domain**: ClaimHero strictly and exclusively supports **English-language** healthcare denial documents, Explanation of Benefits (EOB), clinical policies, and appeal briefs across US healthcare jurisdictions (ERISA, ACA, CMS). All multilingual or foreign legal frameworks are strictly excluded.
+- **Scope & Domain**: ClaimHero focuses on healthcare denial documents, Explanation of Benefits (EOB), clinical policies, and appeal briefs under US healthcare frameworks (ERISA, ACA, CMS).
 
 ## 2. Project Architecture & Standards
 - **Project**: ClaimHero (Evidence-Grounded Appeal Preparation Workspace for Denial Teams)

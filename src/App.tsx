@@ -62,7 +62,7 @@ export default function App() {
     return new URLSearchParams(window.location.search).get("claim") || "";
   }, []);
 
-  const { isAuthenticated, isAuthLoading, user } = useCurrentUser();
+  const { isAuthenticated, isAuthLoading, hasCachedSession, user } = useCurrentUser();
   const isDashboardActive = isAuthenticated && currentView !== "landing" && currentView !== "login" && currentView !== "notFound";
 
   const {
@@ -201,6 +201,9 @@ export default function App() {
     return (
       <Suspense fallback={<div className="h-screen w-screen bg-black" />}>
         <CinematicHero
+          isAuthenticated={isAuthenticated}
+          isAuthLoading={isAuthLoading}
+          hasCachedSession={hasCachedSession}
           onEnterConsole={(view) => {
             if (!isAuthenticated) {
               setPendingTargetView((view as NavigationView) || "radar");

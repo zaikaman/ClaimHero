@@ -484,7 +484,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
           claimId: "claim_unverified_payer",
           dispatchMode: "official_payer",
         })
-      ).rejects.toThrow(/Automated dispatch to unverified registry fallbacks is prohibited under HIPAA safeguards/i);
+      ).rejects.toThrow(/Verified appeals email for .* could not be confirmed/i);
     });
 
     it("dispatchAppealPacket: succeeds in official_payer mode when live re-verification returns verified appeals email", async () => {
@@ -767,7 +767,7 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
           claimId: "claim_outbound_fallback",
           text: "Here is our clinical addendum.",
         })
-      ).rejects.toThrow(/unverified registry fallback/i);
+      ).rejects.toThrow(/Verified contact for .* could not be confirmed/i);
     });
 
     it("healRedactedPatientNamesInternal: rejects missing confirm flag before performing any database work", async () => {

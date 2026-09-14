@@ -223,8 +223,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3.5 py-2.5 rounded-lg border border-primary/20 bg-primary/5 text-xs">
           <div className="flex items-center gap-2 min-w-0">
             <ShieldCheck className="size-4 text-primary shrink-0" />
-            <span className="font-semibold text-foreground shrink-0">System Jurisdiction & Language:</span>
-            <span className="text-muted-foreground truncate">English Only (United States Healthcare • ERISA / ACA / CMS)</span>
+            <span className="font-semibold text-foreground shrink-0">System Jurisdiction:</span>
+            <span className="text-muted-foreground truncate">United States Healthcare • ERISA / ACA / CMS</span>
           </div>
           <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary bg-primary/10 shrink-0 self-start sm:self-auto">
             EN-US • ERISA 29 U.S.C. § 1133

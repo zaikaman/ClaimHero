@@ -45,7 +45,7 @@ Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel 
 | **III. UX Consistency & "Precision Medical Dark-Mode"** | PASS | Design tokens codified (`#0b0f17` canvas, `#00e5ff` cyan, `#10b981` emerald, `#f43f5e` crimson, `#f59e0b` amber) with zero-latency reactive Convex subscriptions (`useQuery`). |
 | **IV. High-Throughput & Low-Latency Performance** | PASS | Decoupled non-blocking asynchronous actions for Firecrawl and `gpt-5.4-nano`, sub-50ms reactive mutations, and optimized relational indexing. |
 | **V. Security, Data Privacy & HIPAA Guardrails** | PASS | Dual-tier privacy boundary: mandatory server-side Safe Harbor de-identification on all textual prompt streams (`systemPrompt`, `userPrompt`, embeddings, agent tools), documented multimodal intake exception (`fileInputs`, `imageUrls`) requiring enterprise HIPAA BAA for production OCR, file storage isolation, and immutable audit logging (`appealAuditLogs`). |
-| **VI. Development Workflow & Governance** | PASS | Single-branch workflow on `main`, continuous build logging in `hackathon.md`, and strict English-only communication and technical assets enforcement. |
+| **VI. Development Workflow & Governance** | PASS | Single-branch workflow on `main`, continuous build logging in `hackathon.md`, and English-language communication and technical assets. |
 
 ---
 

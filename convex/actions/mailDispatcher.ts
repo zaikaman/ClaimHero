@@ -258,7 +258,7 @@ export async function performDispatchAppealPacket(
           : "";
         const channels = [portal, fax].filter(Boolean).join(" or ") || "Certified Mail";
         throw new Error(
-          `Insurer ${payer} does not accept formal appeals via direct email under HIPAA regulations, or the electronic appeals gateway could not be independently verified via live crawl. To prevent PHI misrouting, submit through their ${channels}. Automated dispatch to unverified registry fallbacks is prohibited under HIPAA safeguards.`
+          `Verified appeals email for ${payer} could not be confirmed via live verification. Please continue via their verified intake route (${channels}) or provide a recipient email for dispatch.`
         );
       }
     }
@@ -270,7 +270,7 @@ export async function performDispatchAppealPacket(
       const portal = claim.payerContact?.intakePortalUrl ? `Official Online Portal (${claim.payerContact.portalName || claim.payerContact.intakePortalUrl})` : "";
       const fax = claim.payerContact?.appealsFax ? `Appellate Fax (${claim.payerContact.appealsFax})` : "";
       const channels = [portal, fax].filter(Boolean).join(" or ") || "Certified Mail";
-      throw new Error(`Insurer ${payer} does not accept formal appeals via direct email under HIPAA regulations. Please submit through their ${channels}.`);
+      throw new Error(`Verified appeals email for ${payer} could not be confirmed. Please continue via their verified intake route (${channels}) or provide a recipient email for dispatch.`);
     }
 
     const mailboxes = await ensureClaimMailboxes(ctx, claim);
@@ -513,7 +513,7 @@ async function performSendOutboundMessage(
   ) {
     if (!claim.payerContact.isVerified || claim.payerContact.source === "registry_fallback") {
       throw new Error(
-        `Refusing to transmit outbound message: payer contact for ${payer} is an unverified registry fallback (${claim.payerContact.registryDate || "historical baseline"}) and has not been confirmed via live crawl. Transmitting PHI to unverified endpoints is prohibited under HIPAA regulations.`
+        `Verified contact for ${payer} could not be confirmed via live verification (${claim.payerContact.registryDate || "historical baseline"}). Please provide a recipient email or use the verified intake route on file.`
       );
     }
   }
