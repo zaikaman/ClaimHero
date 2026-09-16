@@ -802,6 +802,39 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
   );
 };
 
+/* Tiny Firecrawl Native vs OpenAI Fallback extraction engine chip helper */
+export function getExtractionEngineChip(item: ClinicalEvidence) {
+  const isFirecrawl =
+    item.extractionEngine === "firecrawl_native" ||
+    (!item.extractionEngine && item.sourceType === "payer_cpb");
+  const isOpenAI =
+    item.extractionEngine === "openai_fallback" ||
+    (!item.extractionEngine && (item.sourceType === "pubmed_study" || item.sourceType === "fda_package_insert"));
+
+  if (!isFirecrawl && !isOpenAI && !item.extractionEngine) {
+    return null;
+  }
+
+  const timestamp = item.capturedAt || item.createdAt;
+  const timeStr = timestamp
+    ? new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
+    : "";
+
+  const engineName = isFirecrawl ? "Firecrawl" : "OpenAI";
+  const label = timeStr ? `${engineName} • ${timeStr}` : engineName;
+
+  return {
+    isFirecrawl,
+    label,
+    tooltip: isFirecrawl
+      ? `Extracted directly via Firecrawl Native Structured JSON extraction (zero LLM overhead)${timeStr ? ` • ${timeStr}` : ""}`
+      : `Extracted via OpenAI LLM completion fallback from scraped Markdown${timeStr ? ` • ${timeStr}` : ""}`,
+    className: isFirecrawl
+      ? "text-orange-400 bg-orange-500/10 border-orange-500/30 hover:bg-orange-500/20"
+      : "text-violet-400 bg-violet-500/10 border-violet-500/30 hover:bg-violet-500/20",
+  };
+}
+
 /* Solution 2 Sub-Component: Sleek Compact Clause Row (~42px height) */
 interface CompactClauseRowProps {
   item: ClinicalEvidence;
@@ -826,13 +859,14 @@ const CompactClauseRow: React.FC<CompactClauseRowProps> = ({
       : "text-blue-500 bg-blue-500/10 border-blue-500/20";
 
   const cleanPreview = stripMarkdownFormatting(item.extractedEvidenceMarkdown);
+  const extractionChip = getExtractionEngineChip(item);
 
   return (
     <div
       onClick={onInspect}
       className="px-3.5 py-2 flex items-center justify-between gap-3 text-xs hover:bg-muted/40 cursor-pointer transition-colors group select-none"
     >
-      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         {/* Match Percentage */}
         <Badge
           variant="secondary"
@@ -849,6 +883,17 @@ const CompactClauseRow: React.FC<CompactClauseRowProps> = ({
         >
           {item.citationClause}
         </Badge>
+
+        {/* Tiny Firecrawl • 12:04 Chip */}
+        {extractionChip && (
+          <Badge
+            variant="outline"
+            className={cn("font-mono text-[9px] sm:text-[10px] px-1.5 py-0 shrink-0 font-medium", extractionChip.className)}
+            title={extractionChip.tooltip}
+          >
+            {extractionChip.label}
+          </Badge>
+        )}
 
         {/* One-Line Text Snippet */}
         <span
@@ -936,6 +981,8 @@ const DetailedClauseCard: React.FC<DetailedClauseCardProps> = ({
   onInspectClause,
   onDelete,
 }) => {
+  const extractionChip = getExtractionEngineChip(item);
+
   return (
     <Card className="p-3.5 space-y-2.5 bg-card hover:bg-muted/20 transition-all">
       <div className="flex items-start justify-between gap-3">
@@ -954,6 +1001,15 @@ const DetailedClauseCard: React.FC<DetailedClauseCardProps> = ({
             <Badge variant="secondary" className="font-mono text-[10px] shrink-0">
               {item.relevanceScore}% Match
             </Badge>
+            {extractionChip && (
+              <Badge
+                variant="outline"
+                className={cn("font-mono text-[10px] shrink-0 font-medium", extractionChip.className)}
+                title={extractionChip.tooltip}
+              >
+                {extractionChip.label}
+              </Badge>
+            )}
             {item.screenshotUrl && (
               <Badge
                 variant="outline"

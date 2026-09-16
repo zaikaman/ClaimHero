@@ -183,6 +183,7 @@ interface ClinicalEvidenceItem {
   screenshotStorageId?: Id<"_storage">;
   screenshotUrl?: string;
   capturedAt?: number;
+  extractionEngine?: "firecrawl_native" | "openai_fallback" | string;
 }
 
 interface BatchInsertEvidenceArgs {
@@ -217,6 +218,7 @@ async function applyBatchInsert(ctx: MutationCtx, args: BatchInsertEvidenceArgs)
       screenshotStorageId: item.screenshotStorageId,
       screenshotUrl: cleanScreenshotUrl,
       capturedAt: item.capturedAt,
+      extractionEngine: item.extractionEngine,
       createdAt: now,
     });
     insertedIds.push(id);
@@ -254,6 +256,7 @@ const evidenceValidator = v.object({
   screenshotStorageId: v.optional(v.id("_storage")),
   screenshotUrl: v.optional(v.string()),
   capturedAt: v.optional(v.number()),
+  extractionEngine: v.optional(v.string()),
 });
 
 /**
@@ -433,6 +436,7 @@ async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArg
     screenshotStorageId: args.screenshotStorageId,
     screenshotUrl: cleanScreenshotUrl,
     capturedAt: args.capturedAt,
+    extractionEngine: args.extractionEngine,
     createdAt: now,
   });
 
@@ -467,6 +471,7 @@ const singleEvidenceArgs = {
   screenshotStorageId: v.optional(v.id("_storage")),
   screenshotUrl: v.optional(v.string()),
   capturedAt: v.optional(v.number()),
+  extractionEngine: v.optional(v.string()),
 };
 
 /**

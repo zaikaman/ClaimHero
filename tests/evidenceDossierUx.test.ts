@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PolicyViewer } from "../src/components/evidence/PolicyViewer";
+import { PolicyViewer, getExtractionEngineChip } from "../src/components/evidence/PolicyViewer";
 import { ClauseInspectorDrawer } from "../src/components/evidence/ClauseInspectorDrawer";
 import {
   RESEARCH_MODES,
@@ -598,6 +598,111 @@ describe("Evidence Dossier UX & Quad-Solution Architecture", () => {
       expect(getNextIndex(0, "ArrowUp")).toBe(3); // col 0, row 0 -> row 1 (wrap)
       expect(getNextIndex(1, "ArrowUp")).toBe(4); // col 1, row 0 -> row 1 (wrap)
       expect(getNextIndex(2, "ArrowUp")).toBe(5); // col 2, row 0 -> row 1 (wrap)
+    });
+  });
+
+  describe("Firecrawl Extraction Mode & Chip Surfacing (task c)", () => {
+    it("returns Firecrawl chip with formatted timestamp for firecrawl_native extraction", () => {
+      // Create a fixed timestamp: 2026-03-12T12:04:00Z
+      const fixedTime = new Date("2026-03-12T12:04:00Z").getTime();
+      const evidence: ClinicalEvidence = {
+        _id: "ev_fc_1",
+        claimId: "claim_1",
+        sourceType: "payer_cpb",
+        title: "Aetna CPB 0123: Hip Arthroplasty",
+        citationClause: "Section 1.A",
+        extractedEvidenceMarkdown: "Severe joint pain and loss of functional mobility.",
+        relevanceScore: 96,
+        extractionEngine: "firecrawl_native",
+        capturedAt: fixedTime,
+        createdAt: fixedTime,
+      };
+
+      const chip = getExtractionEngineChip(evidence);
+      expect(chip).not.toBeNull();
+      expect(chip?.isFirecrawl).toBe(true);
+      expect(chip?.label).toContain("Firecrawl");
+      expect(chip?.label).toMatch(/^Firecrawl • \d{2}:\d{2}$/);
+      expect(chip?.tooltip).toContain("Firecrawl Native Structured JSON extraction");
+      expect(chip?.className).toContain("text-orange-400");
+    });
+
+    it("returns OpenAI chip with formatted timestamp for openai_fallback extraction", () => {
+      const fixedTime = new Date("2026-03-12T14:30:00Z").getTime();
+      const evidence: ClinicalEvidence = {
+        _id: "ev_ai_1",
+        claimId: "claim_1",
+        sourceType: "payer_cpb",
+        title: "Cigna CPB 0500: Spinal Decompression",
+        citationClause: "Criteria §3",
+        extractedEvidenceMarkdown: "Radicular neurological deficit confirmed by EMG.",
+        relevanceScore: 91,
+        extractionEngine: "openai_fallback",
+        capturedAt: fixedTime,
+        createdAt: fixedTime,
+      };
+
+      const chip = getExtractionEngineChip(evidence);
+      expect(chip).not.toBeNull();
+      expect(chip?.isFirecrawl).toBe(false);
+      expect(chip?.label).toContain("OpenAI");
+      expect(chip?.label).toMatch(/^OpenAI • \d{2}:\d{2}$/);
+      expect(chip?.tooltip).toContain("OpenAI LLM completion fallback");
+      expect(chip?.className).toContain("text-violet-400");
+    });
+
+    it("infers Firecrawl for legacy payer_cpb evidence without explicit extractionEngine", () => {
+      const fixedTime = new Date("2026-03-12T09:15:00Z").getTime();
+      const evidence: ClinicalEvidence = {
+        _id: "ev_legacy_1",
+        claimId: "claim_1",
+        sourceType: "payer_cpb",
+        title: "UnitedHealthcare Medical Policy: Knee Surgery",
+        citationClause: "Section 2.1",
+        extractedEvidenceMarkdown: "Persistent joint locking and failed conservative therapy.",
+        relevanceScore: 93,
+        createdAt: fixedTime,
+      };
+
+      const chip = getExtractionEngineChip(evidence);
+      expect(chip).not.toBeNull();
+      expect(chip?.isFirecrawl).toBe(true);
+      expect(chip?.label).toContain("Firecrawl");
+      expect(chip?.className).toContain("text-orange-400");
+    });
+
+    it("returns null for statutory legal precedents that are not crawled policies", () => {
+      const evidence: ClinicalEvidence = {
+        _id: "ev_erisa_1",
+        claimId: "claim_1",
+        sourceType: "legal_precedent",
+        title: "ERISA Full & Fair Review Statutory Protocol",
+        citationClause: "29 CFR § 2560.503-1",
+        extractedEvidenceMarkdown: "Statutory disclosure requirement.",
+        relevanceScore: 95,
+        createdAt: Date.now(),
+      };
+
+      const chip = getExtractionEngineChip(evidence);
+      expect(chip).toBeNull();
+    });
+
+    it("formats chip without timestamp if no capturedAt or createdAt is available", () => {
+      const evidence: ClinicalEvidence = {
+        _id: "ev_notime",
+        claimId: "claim_1",
+        sourceType: "payer_cpb",
+        title: "Policy Title",
+        citationClause: "Section 1",
+        extractedEvidenceMarkdown: "Criteria text",
+        relevanceScore: 89,
+        extractionEngine: "firecrawl_native",
+        createdAt: 0,
+      };
+
+      const chip = getExtractionEngineChip(evidence);
+      expect(chip).not.toBeNull();
+      expect(chip?.label).toBe("Firecrawl");
     });
   });
 });

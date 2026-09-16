@@ -211,6 +211,7 @@ export default defineSchema({
     screenshotStorageId: v.optional(v.id("_storage")),
     screenshotUrl: v.optional(v.string()),
     capturedAt: v.optional(v.number()),
+    extractionEngine: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_claim", ["claimId"])

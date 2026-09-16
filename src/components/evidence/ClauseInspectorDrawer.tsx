@@ -21,9 +21,10 @@ import {
 import { ClinicalEvidence, EvidenceSourceType } from "../../types";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { stripMarkdownFormatting } from "../../lib/utils";
+import { stripMarkdownFormatting, cn } from "../../lib/utils";
 import { safeExternalHref } from "../../lib/urlUtils";
 import { useDetailMode } from "../../hooks/useDetailMode";
+import { getExtractionEngineChip } from "./PolicyViewer";
 
 export interface ClauseInspectorDrawerProps {
   isOpen: boolean;
@@ -309,6 +310,19 @@ export const ClauseInspectorDrawer: React.FC<ClauseInspectorDrawerProps> = ({
                 <Badge variant="outline" className="font-mono text-xs">
                   {evidence.citationClause}
                 </Badge>
+                {(() => {
+                  const chip = getExtractionEngineChip(evidence);
+                  if (!chip) return null;
+                  return (
+                    <Badge
+                      variant="outline"
+                      className={cn("font-mono text-xs font-medium", chip.className)}
+                      title={chip.tooltip}
+                    >
+                      {chip.label}
+                    </Badge>
+                  );
+                })()}
               </div>
 
               <Badge

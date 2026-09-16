@@ -1844,6 +1844,7 @@ export async function scrapeFirecrawlPolicySource(
     json: doc.json,
     screenshot: screenshot?.startsWith("http") ? screenshot : undefined,
     screenshotStorageId,
+    extractionEngine: doc.json ? "firecrawl_native" : "openai_fallback",
   };
 }
 
@@ -2699,6 +2700,7 @@ export interface CrawlInsurerPolicyResult {
     screenshotStorageId?: Id<"_storage">;
     screenshotUrl?: string;
     capturedAt?: number;
+    extractionEngine?: string;
   }>;
   extractionEngine: string;
 }
@@ -3231,7 +3233,18 @@ For each clause:
       }
     }
 
-    const evidencesToInsert = extractedData.clauses.map((clause) => ({
+    const evidencesToInsert: Array<{
+      sourceType: string;
+      title: string;
+      sourceUrl?: string;
+      citationClause: string;
+      extractedEvidenceMarkdown: string;
+      relevanceScore: number;
+      screenshotStorageId?: Id<"_storage">;
+      screenshotUrl?: string;
+      capturedAt?: number;
+      extractionEngine?: "firecrawl_native" | "openai_fallback" | string;
+    }> = extractedData.clauses.map((clause) => ({
       sourceType: clause.sourceType,
       title: (clause.title || extractedData.policyTitle).replace(/\*\*/g, ""),
       sourceUrl: cleanPolicySourceUrl,
@@ -3241,6 +3254,7 @@ For each clause:
       screenshotStorageId,
       screenshotUrl: policySource.screenshot?.startsWith("http") ? policySource.screenshot : undefined,
       capturedAt,
+      extractionEngine,
     }));
 
     // Add at least 1 legal precedent clause citing ERISA
@@ -3249,6 +3263,7 @@ For each clause:
       screenshotStorageId: undefined,
       screenshotUrl: undefined,
       capturedAt: undefined,
+      extractionEngine: undefined,
     });
 
     // Clear-after-success: atomically replace prior evidence only after new
@@ -3508,6 +3523,7 @@ Assign relevanceScore between 85 and 99.`,
         screenshotStorageId,
         screenshotUrl: sourceScreenshot?.startsWith("http") ? sourceScreenshot : undefined,
         capturedAt,
+        extractionEngine: "openai_fallback",
       };
     });
 
@@ -3645,6 +3661,7 @@ Assign relevanceScore between 88 and 99.`,
         screenshotStorageId,
         screenshotUrl: sourceScreenshot?.startsWith("http") ? sourceScreenshot : undefined,
         capturedAt,
+        extractionEngine: "openai_fallback",
       };
     });
 
@@ -3753,6 +3770,7 @@ Assign relevanceScore between 80 and 99.`,
       screenshotStorageId,
       screenshotUrl: scraped.screenshot?.startsWith("http") ? scraped.screenshot : undefined,
       capturedAt,
+      extractionEngine,
     }));
 
     if (evidencesToInsert.length > 0) {

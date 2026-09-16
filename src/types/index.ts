@@ -313,6 +313,7 @@ export interface ClinicalEvidence {
   screenshotStorageId?: string;
   screenshotUrl?: string;
   capturedAt?: number;
+  extractionEngine?: "firecrawl_native" | "openai_fallback" | string;
   createdAt: number;
 }
 
