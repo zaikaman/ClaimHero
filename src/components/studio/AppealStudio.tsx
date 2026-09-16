@@ -49,7 +49,7 @@ interface AppealStudioProps {
   onNavigateToEvidence?: () => void;
   onNavigateView?: (view: FlowView) => void;
   onRunAutonomousPipeline?: (claimId?: string) => Promise<unknown>;
-  onOpenAuditDrawer?: () => void;
+  onOpenAuditDrawer?: (tab?: "audit" | "pipeline") => void;
   onOpenIngestion?: (claim?: Claim) => void;
 }
 
@@ -446,7 +446,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       />
 
       {/* Live agent thought stream (self-hides for older runs) */}
-      <PipelineActivityFeed claimId={claim._id} />
+      <PipelineActivityFeed
+        claimId={claim._id}
+        onOpenTimeline={() => onOpenAuditDrawer?.("pipeline")}
+      />
 
       {/* Multi-Tier Statutory Escalation Stepper Bar */}
       <Card className="p-2 sm:p-2.5 shrink-0 overflow-visible bg-card/90 border-border/80 shadow-xs">

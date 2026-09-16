@@ -62,7 +62,7 @@ interface EvidenceMatrixProps {
   onNavigateToStudio: () => void;
   onNavigateView?: (view: FlowView) => void;
   onRunAutonomousPipeline?: (claimId?: string) => Promise<unknown>;
-  onOpenAuditDrawer?: () => void;
+  onOpenAuditDrawer?: (tab?: "audit" | "pipeline") => void;
   onOpenIngestion?: (claim?: Claim) => void;
 }
 
@@ -254,7 +254,10 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       )}
 
       {/* Live agent thought stream (self-hides for older runs) */}
-      <PipelineActivityFeed claimId={claim._id} />
+      <PipelineActivityFeed
+        claimId={claim._id}
+        onOpenTimeline={() => onOpenAuditDrawer?.("pipeline")}
+      />
 
       {/* Header & Main Control Toolbar */}
       <Card className="p-4">

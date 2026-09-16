@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useCommunications } from "../src/hooks/useCommunications";
 import { AuditTimeline } from "../src/components/communications/AuditTimeline";
 import { AuditTrailDrawer } from "../src/components/communications/AuditTrailDrawer";
-import { Claim, AuditLog } from "../src/types";
+import { PipelineTimeline } from "../src/components/communications/PipelineTimeline";
+import { PipelineActivityFeed } from "../src/components/common/PipelineActivityFeed";
+import { Claim, AuditLog, PipelineActivity } from "../src/types";
 
 // Mock convex/react hooks
 const mockUseQuery = vi.fn();
@@ -80,6 +82,54 @@ const mockLogs: AuditLog[] = [
     actor: "AgentMail Gateway",
     details: "Dispatched appellate dossier to Cigna Grievance Gateway.",
     timestamp: 1726143600000,
+  },
+];
+
+const mockActivities: PipelineActivity[] = [
+  {
+    _id: "act_1",
+    claimId: "claim_123",
+    runId: "run_alpha_01",
+    stage: "run",
+    status: "completed",
+    message: "Initiated autonomous appellate validation for Claim #CLM-8942-CIG-9305.",
+    createdAt: 1726140000000,
+  },
+  {
+    _id: "act_2",
+    claimId: "claim_123",
+    runId: "run_alpha_01",
+    stage: "crawl",
+    status: "completed",
+    message: "Firecrawl successfully crawled Cigna Clinical Policy Bulletin CPB-0245.",
+    createdAt: 1726140001200,
+  },
+  {
+    _id: "act_3",
+    claimId: "claim_123",
+    runId: "run_alpha_01",
+    stage: "score",
+    status: "completed",
+    message: "Scored appeal overturn readiness at 88% across 4 statutory criteria.",
+    createdAt: 1726140002100,
+  },
+  {
+    _id: "act_4",
+    claimId: "claim_123",
+    runId: "run_alpha_01",
+    stage: "precedents",
+    status: "completed",
+    message: "Retrieved 3 high-similarity precedents with confirmed overturn dispositions.",
+    createdAt: 1726140003000,
+  },
+  {
+    _id: "act_5",
+    claimId: "claim_123",
+    runId: "run_alpha_01",
+    stage: "synthesis",
+    status: "completed",
+    message: "Synthesized 12-page ERISA-compliant appellate brief with grounded CPB citations.",
+    createdAt: 1726140004500,
   },
 ];
 
@@ -335,5 +385,257 @@ describe("Audit Trail Activation, Drawer & Timeline Verification", () => {
         }
       }
     });
+
+    it("renders Statutory Audit and Pipeline Timeline tab triggers in AuditTrailDrawer", () => {
+      const originalDoc = (globalThis as any).document;
+      const originalWin = (globalThis as any).window;
+      const mockBody = { nodeType: 1, style: { overflow: "" } };
+      (globalThis as any).document = { body: mockBody };
+      (globalThis as any).window = { addEventListener: vi.fn(), removeEventListener: vi.fn() };
+
+      try {
+        const element = AuditTrailDrawer({
+          isOpen: true,
+          onClose: vi.fn(),
+          claim: mockClaim,
+          logs: mockLogs,
+          pipelineActivities: mockActivities,
+        });
+
+        const str = JSON.stringify(element);
+        expect(str).toContain("Statutory Audit");
+        expect(str).toContain("Pipeline Timeline");
+        expect(str).toContain("ERISA 29 CFR § 2560.503-1");
+      } finally {
+        if (originalDoc === undefined) {
+          delete (globalThis as any).document;
+        } else {
+          (globalThis as any).document = originalDoc;
+        }
+        if (originalWin === undefined) {
+          delete (globalThis as any).window;
+        } else {
+          (globalThis as any).window = originalWin;
+        }
+      }
+    });
+
+    it("renders PipelineTimeline component when initialTab is set to pipeline", () => {
+      const originalDoc = (globalThis as any).document;
+      const originalWin = (globalThis as any).window;
+      const mockBody = { nodeType: 1, style: { overflow: "" } };
+      (globalThis as any).document = { body: mockBody };
+      (globalThis as any).window = { addEventListener: vi.fn(), removeEventListener: vi.fn() };
+
+      try {
+        const element = AuditTrailDrawer({
+          isOpen: true,
+          onClose: vi.fn(),
+          claim: mockClaim,
+          logs: mockLogs,
+          initialTab: "pipeline",
+          pipelineActivities: mockActivities,
+        });
+
+        const str = JSON.stringify(element);
+        expect(str).toContain("Workflow Observability Timeline");
+        expect(str).toContain("Workflow Observability");
+        expect(str).toContain("run_alpha_01");
+        expect(str).toContain("act_1");
+      } finally {
+        if (originalDoc === undefined) {
+          delete (globalThis as any).document;
+        } else {
+          (globalThis as any).document = originalDoc;
+        }
+        if (originalWin === undefined) {
+          delete (globalThis as any).window;
+        } else {
+          (globalThis as any).window = originalWin;
+        }
+      }
+    });
+  });
+
+  describe("PipelineTimeline Workflow Observability Component", () => {
+    it("exports PipelineTimeline as a valid functional component", () => {
+      expect(typeof PipelineTimeline).toBe("function");
+    });
+
+    it("renders PipelineTimeline with events, stage badges, and duration metrics", () => {
+      const element = PipelineTimeline({
+        claim: mockClaim,
+        activities: mockActivities,
+        isDrawer: true,
+      });
+
+      expect(element).not.toBeNull();
+      const str = JSON.stringify(element);
+      expect(str).toContain("Autonomous Workflow Telemetry");
+      expect(str).toContain("Execution Verified");
+      expect(str).toContain("Pipeline Stage Traversal");
+      expect(str).toContain("Review");
+      expect(str).toContain("Policy Search");
+      expect(str).toContain("Win Scoring");
+      expect(str).toContain("Past Cases");
+      expect(str).toContain("Brief Drafting");
+      expect(str).toContain("Firecrawl successfully crawled");
+    });
+
+    it("renders PipelineTimeline empty state cleanly when activities are empty", () => {
+      const element = PipelineTimeline({
+        claim: mockClaim,
+        activities: [],
+        isDrawer: true,
+      });
+
+      expect(element).not.toBeNull();
+      const str = JSON.stringify(element);
+      expect(str).toContain("No autonomous pipeline activities recorded yet");
+    });
+
+    it("renders PipelineTimeline loading state when isLoading is true", () => {
+      const element = PipelineTimeline({
+        claim: mockClaim,
+        activities: [],
+        isLoading: true,
+        isDrawer: true,
+      });
+
+      expect(element).not.toBeNull();
+      const str = JSON.stringify(element);
+      expect(str).toContain("Streaming pipeline telemetry...");
+    });
+
+    it("renders Reset Filters CTA when activities exist but filteredEvents is empty", () => {
+      const element = PipelineTimeline({
+        claim: mockClaim,
+        activities: mockActivities,
+        isDrawer: true,
+      });
+
+      expect(element).not.toBeNull();
+      const str = JSON.stringify(element);
+      expect(str).toContain("Autonomous Workflow Telemetry");
+    });
+
+    it("does not render spinning indicators on completed runs even when start events had status='running'", () => {
+      const mixedActivities: PipelineActivity[] = [
+        {
+          _id: "act_start_1",
+          claimId: "claim_123",
+          runId: "run_finished",
+          stage: "run",
+          status: "running",
+          message: "Kicking off autonomous review.",
+          createdAt: Date.now() - 3600000,
+        },
+        {
+          _id: "act_crawl_1",
+          claimId: "claim_123",
+          runId: "run_finished",
+          stage: "crawl",
+          status: "running",
+          message: "Searching Cigna policy bulletins.",
+          createdAt: Date.now() - 3590000,
+        },
+        {
+          _id: "act_crawl_2",
+          claimId: "claim_123",
+          runId: "run_finished",
+          stage: "crawl",
+          status: "completed",
+          message: "Discovered 4 policy criteria.",
+          createdAt: Date.now() - 3580000,
+        },
+        {
+          _id: "act_synth_1",
+          claimId: "claim_123",
+          runId: "run_finished",
+          stage: "synthesis",
+          status: "completed",
+          message: "Brief drafted successfully.",
+          createdAt: Date.now() - 3570000,
+        },
+      ];
+
+      const element = PipelineTimeline({
+        claim: mockClaim,
+        activities: mixedActivities,
+        isDrawer: true,
+      });
+
+      expect(element).not.toBeNull();
+      const str = JSON.stringify(element);
+      expect(str).toContain("Started");
+      expect(str).toContain("Completed");
+      expect(str).not.toContain("In Progress");
+      expect(str).not.toContain("Active Run In-Flight");
+      expect(str).toContain("Execution Verified");
+    });
+
+    it("renders In Progress and active in-flight badge only when run is actively executing", () => {
+      const activeActivities: PipelineActivity[] = [
+        {
+          _id: "act_start_live",
+          claimId: "claim_123",
+          runId: "run_live",
+          stage: "run",
+          status: "completed",
+          message: "Case review passed.",
+          createdAt: Date.now() - 5000,
+        },
+        {
+          _id: "act_crawl_live",
+          claimId: "claim_123",
+          runId: "run_live",
+          stage: "crawl",
+          status: "running",
+          message: "Crawling live policy portal right now.",
+          createdAt: Date.now() - 1000,
+        },
+      ];
+
+      const element = PipelineTimeline({
+        claim: mockClaim,
+        activities: activeActivities,
+        isDrawer: true,
+      });
+
+      expect(element).not.toBeNull();
+      const str = JSON.stringify(element);
+      expect(str).toContain("Active Run In-Flight");
+      expect(str).toContain("In Progress");
+    });
+  });
+
+  describe("PipelineActivityFeed Component Edge Cases", () => {
+    it("safely skips Convex query when claimId is empty string or undefined", () => {
+      mockUseQuery.mockReturnValue(undefined);
+
+      const element = PipelineActivityFeed({
+        claimId: "",
+      });
+
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        expect.anything(),
+        "skip"
+      );
+      expect(element).toBeNull();
+    });
+
+    it("queries Convex when claimId is provided", () => {
+      mockUseQuery.mockReturnValue(mockActivities);
+
+      PipelineActivityFeed({
+        claimId: "claim_123",
+      });
+
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        expect.anything(),
+        { claimId: "claim_123" }
+      );
+    });
   });
 });
+

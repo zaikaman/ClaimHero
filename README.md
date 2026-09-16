@@ -82,7 +82,7 @@ To evaluate the complete end-to-end pipeline without uploading personal health r
      - **Official Insurer Gateway (Production)**: Dispatches directly to the verified public grievance and appeals intake email of the payer.
      - **Typed-In Email (Interactive Verification)**: Delivers the full cited brief and exhibits to a typed-in email address (such as your personal or reviewer inbox) so you can review the dossier and reply from your mail client to trigger the live inbound webhook.
      For medical necessity denials (`CO-50`), review the contextual Physician Peer-to-Peer tele-script.
-5. Track the statutory stakes at all times: the case header monitors the active **ERISA §502(c) statutory liability exposure ($110/day)** alongside a slide-out **Audit Trail** drawer proving real-time pipeline execution.
+5. Track the statutory stakes at all times: the case header monitors the active **ERISA §502(c) statutory liability exposure ($110/day)** alongside a dual-mode slide-out **Case Audit & Workflow Observability** drawer proving real-time pipeline execution milestones (step-by-step latency, run history, and milestone stages) and the cryptographic SHA-256 Merkle audit chain.
 
 *The demo cases are a privacy-preserving evaluation harness, not a substitute for the product workflow. They use the same intake, evidence, drafting, collaboration, deadline, audit, and dispatch path as a real case, are visibly marked as synthetic, are isolated from portfolio analytics, and can be purged at any time via the "Clear demo data" button.*
 
@@ -179,7 +179,7 @@ Convex serves as the core persistence, real-time subscription, compute, and orch
 - **Token-Bucket Rate Limiting**: The `@convex-dev/rate-limiter` component protects external OpenAI LLM/embedding inference and Firecrawl web crawling endpoints against quota exhaustion, burst traffic, and runaway execution (`convex/lib/rateLimiter.ts`).
 - **Authentication & Multi-Tenant Data Isolation**: The `@convex-dev/auth` component manages session state, password credentials, and Google OAuth. Server-side authorization helpers (`getAuthUserId`, `requireClaimOwner`) enforce document-level row security across all 23 domain tables (`convex/auth.ts`, `convex/lib/auth.ts`).
 - **Portfolio Analytics via Aggregate**: The `@convex-dev/aggregate` component computes real-time portfolio recovery statistics, resolution rates, Statutory Appeal Readiness Score distributions, and aggregate financial yields.
-- **Sub-Second Pipeline Activity Telemetry**: Granular progress telemetry table `pipelineActivities` tracks real-time stage transitions (OCR extraction, Firecrawl crawling, precedent scoring, brief drafting), streaming live execution milestones to the frontend without polling (`convex/pipelineActivities.ts`).
+- **Workflow Observability & Sub-Second Pipeline Activity Telemetry**: Granular progress telemetry table `pipelineActivities` tracks real-time stage transitions (OCR extraction, Firecrawl crawling, precedent scoring, brief drafting), streaming live execution milestones to the frontend without polling (`convex/pipelineActivities.ts`). Exposed directly to judges and advocates in the Audit Drawer via an interactive `PipelineTimeline` console featuring stage duration breakdowns, live ticking execution timers, execution run selectors, and filterable telemetry logs (`src/components/communications/PipelineTimeline.tsx`).
 - **HTTP Routing & Svix Webhooks**: Authenticated endpoints handle inbound AgentMail and Firecrawl webhooks with Svix signature verification (`convex/http.ts`).
 
 ### 2. Firecrawl — Real-Time Policy Discovery & Visual Proof Archiving
@@ -235,6 +235,7 @@ OpenAI powers clinical reasoning while operating within strict anti-hallucinatio
 | **Two-way correspondence** | AgentMail 2-mode dispatch (Official payer or typed-in email), webhook routing, and reactive threads | [`convex/actions/mailDispatcher.ts`](./convex/actions/mailDispatcher.ts), [`convex/http.ts`](./convex/http.ts) |
 | **Collaboration** | Yjs operation log plus Convex presence | [`convex/appealYjs.ts`](./convex/appealYjs.ts), [`convex/presence.ts`](./convex/presence.ts) |
 | **Deadline tracking** | Convex crons and durable workflows | [`convex/crons.ts`](./convex/crons.ts), [`convex/workflows.ts`](./convex/workflows.ts) |
+| **Workflow observability & telemetry trace** | Reactive `pipelineActivities` streaming + interactive stage timeline in Audit Drawer | [`convex/pipelineActivities.ts`](./convex/pipelineActivities.ts), [`src/components/communications/PipelineTimeline.tsx`](./src/components/communications/PipelineTimeline.tsx) |
 
 ---
 
@@ -296,18 +297,18 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **1037 automated tests** across 68 test suites (verified via `npm run test`):
+ClaimHero is backed by **1050 automated tests** across 68 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (1037 tests across 68 suites)
+npm run test            # Comprehensive Vitest test suite (1050 tests across 68 suites)
 npm run test:coverage   # Code coverage report (~81.6% statement coverage)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate
 ```
 
-Test suites cover Everyday Language vs. Expert Details dictionaries, cross-component custom events, and sandboxed storage resilience (`tests/detailMode.test.ts`), Firecrawl native structured extraction and OpenAI fallback provenance chips (`tests/evidenceDossierUx.test.ts`), AWS Textract HIPAA optical document parsing, fail-hard missing-credential and extraction-failure semantics with zero raw-PHI LLM egress, and inbound attachment quarantine (`tests/textract.test.ts`, `tests/formalPdfAttachments.test.ts`), the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Delivery Evidence Reports (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs on de-identified text (`redactBeforeLLM`), 1536-d embeddings, and semantic retries (`tests/openai.test.ts`), Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
+Test suites cover Everyday Language vs. Expert Details dictionaries, cross-component custom events, and sandboxed storage resilience (`tests/detailMode.test.ts`), Firecrawl native structured extraction and OpenAI fallback provenance chips (`tests/evidenceDossierUx.test.ts`), AWS Textract HIPAA optical document parsing, fail-hard missing-credential and extraction-failure semantics with zero raw-PHI LLM egress, and inbound attachment quarantine (`tests/textract.test.ts`, `tests/formalPdfAttachments.test.ts`), real-time pipeline milestone telemetry streaming, multi-run latency tracking, and workflow observability timeline drawer integration (`tests/pipelineActivity.test.ts`, `tests/auditTrailDrawer.test.ts`), the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Delivery Evidence Reports (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs on de-identified text (`redactBeforeLLM`), 1536-d embeddings, and semantic retries (`tests/openai.test.ts`), Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
 
 ---
 
@@ -326,6 +327,7 @@ ClaimHero/
 │   ├── clinicalEvidences.ts   # Evidence persistence and vector retrieval
 │   ├── appeals.ts             # Versioned briefs and escalation
 │   ├── emails.ts              # Threads, messages, and routing
+│   ├── pipelineActivities.ts  # Real-time pipeline milestone telemetry
 │   ├── auditLogs.ts           # Case audit trail & statutory timeline
 │   ├── crons.ts               # Deadline and reconciliation schedules
 │   ├── auth.ts / http.ts      # Auth and webhook routing

@@ -1,6 +1,6 @@
 import { internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { getClaimIfAuthorized } from "./lib/auth";
+import { getClaimIfAuthorized, getAuthUserId } from "./lib/auth";
 
 export const pipelineStageValidator = v.union(
   v.literal("run"),
@@ -86,5 +86,41 @@ export const listByClaim = query({
       .order("desc")
       .take(limit);
     return events.reverse();
+  },
+});
+
+/**
+ * List recent pipeline activities across recent claims for portfolio view.
+ */
+export const listRecent = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const limit = Math.max(1, Math.min(args.limit ?? 50, 100));
+    const userClaims = await ctx.db
+      .query("claims")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(10);
+
+    if (userClaims.length === 0) return [];
+
+    const activitiesPerClaim = await Promise.all(
+      userClaims.map((claim) =>
+        ctx.db
+          .query("pipelineActivities")
+          .withIndex("by_claim", (q) => q.eq("claimId", claim._id))
+          .order("desc")
+          .take(20)
+      )
+    );
+
+    const all = activitiesPerClaim.flat();
+    all.sort((a, b) => a.createdAt - b.createdAt);
+    return all.slice(-limit);
   },
 });

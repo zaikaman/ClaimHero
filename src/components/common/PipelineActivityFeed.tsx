@@ -39,12 +39,14 @@ function formatAgo(timestamp: number, now: number): string {
 
 interface PipelineActivityFeedProps {
   claimId: string;
+  onOpenTimeline?: () => void;
 }
 
-export const PipelineActivityFeed: React.FC<PipelineActivityFeedProps> = ({ claimId }) => {
-  const activities = useQuery(api.pipelineActivities.listByClaim, {
-    claimId: claimId as Id<"claims">,
-  }) as PipelineActivity[] | undefined;
+export const PipelineActivityFeed: React.FC<PipelineActivityFeedProps> = ({ claimId, onOpenTimeline }) => {
+  const activities = useQuery(
+    api.pipelineActivities.listByClaim,
+    claimId ? { claimId: claimId as Id<"claims"> } : "skip"
+  ) as PipelineActivity[] | undefined;
 
   const [now, setNow] = useState(() => Date.now());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -100,9 +102,21 @@ export const PipelineActivityFeed: React.FC<PipelineActivityFeedProps> = ({ clai
             Live agent activity
           </span>
         </div>
-        <Badge variant="outline" className="font-mono text-[10px] shrink-0">
-          {`${elapsedSec}s in`}
-        </Badge>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Badge variant="outline" className="font-mono text-[10px]">
+            {`${elapsedSec}s in`}
+          </Badge>
+          {onOpenTimeline && (
+            <button
+              type="button"
+              onClick={onOpenTimeline}
+              className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline underline-offset-2 cursor-pointer transition-colors"
+              title="View full pipeline telemetry in audit drawer"
+            >
+              Timeline
+            </button>
+          )}
+        </div>
       </div>
 
       <div ref={scrollRef} className="max-h-56 overflow-y-auto pt-2.5 pr-1">

@@ -87,6 +87,38 @@ describe("Convex Pipeline Activity Stream", () => {
       const res = await (pipelineActivities.listByClaim as any)._handler(mockCtx, { claimId: "c1" });
       expect(res.map((e: { _id: string }) => e._id)).toEqual(["a1", "a2"]);
     });
+
+    it("listRecent: returns empty array when unauthenticated", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const mockCtx: any = { db: {} };
+      const res = await (pipelineActivities.listRecent as any)._handler(mockCtx, {});
+      expect(res).toEqual([]);
+    });
+
+    it("listRecent: aggregates recent activities across user claims", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockClaims = [{ _id: "c1", userId: "user_123" }];
+      const mockCtx: any = {
+        db: {
+          query: vi.fn((table: string) => {
+            if (table === "claims") {
+              return chainableQuery(mockClaims);
+            }
+            if (table === "pipelineActivities") {
+              return chainableQuery([
+                { _id: "a1", createdAt: 100 },
+                { _id: "a2", createdAt: 200 },
+              ]);
+            }
+            return chainableQuery([]);
+          }),
+        },
+      };
+      const res = await (pipelineActivities.listRecent as any)._handler(mockCtx, { limit: 10 });
+      expect(res.length).toBe(2);
+      expect(res[0]._id).toBe("a1");
+      expect(res[1]._id).toBe("a2");
+    });
   });
 
   describe("convex/workflows durableClaimPipeline run scoping", () => {

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-16T07:42:00Z
+- **Last updated:** 2026-09-16T08:22:00Z
 
 ## Log
 
@@ -1502,7 +1502,7 @@ Surfaced Firecrawl native structured extraction versus OpenAI completion fallbac
 - UI Chips & Transparency: Implemented `getExtractionEngineChip` in `PolicyViewer.tsx` and surfaced a clean, high-contrast chip (e.g. `Firecrawl • 12:04` in orange or `OpenAI • 12:04` in violet) across `DetailedClauseCard`, `CompactClauseRow`, and `ClauseInspectorDrawer.tsx`. Provides explanatory tooltips proving Firecrawl's zero-hop native JSON extraction runs in production while OpenAI serves as resilient criteria fallback.
 - Regression Verification: Added unit tests in `tests/evidenceDossierUx.test.ts` and verified 100% clean with `npm run verify` across typecheck, lint, 1,024 passing tests across 67 test files, and production build.
 
-### 2026-09-16 - working tree
+### 2026-09-16 - bd8dc38
 Eliminated dark screen flash, perfected responsive split-card layout on laptops, and removed unwanted scrollbars on the authentication card (`src/components/landing/PublicExperience.tsx`, `src/components/landing/CinematicHero.tsx`, `src/components/auth/AuthPage.tsx`, `src/App.tsx`, `tests/publicExperienceTransition.test.ts`):
 - Unified Public Experience Surface: Introduced `PublicExperience` component wrapping public entry views (`landing` and `login`) with a shared, persistent `AmbientBackgroundVideo`. The ambient video remains continuously mounted and active across all transitions, preventing video pipeline teardown, black frames, and video buffering delays.
 - Smooth Non-Flashing Transitions: Coordinated `CinematicHero` and `AuthPage` using smooth 200ms opacity cross-fades with accessible focus isolation (`aria-hidden`, `pointer-events-none`, `invisible`) so inactive views never accept keyboard navigation or screen reader focus while preserving landing DOM and slide state without re-triggering 900ms intro animations on return.
@@ -1510,4 +1510,13 @@ Eliminated dark screen flash, perfected responsive split-card layout on laptops,
 - Scrollbar Elimination & Laptop Viewport Optimization: Applied `scrollbar-none` to the right form column to guarantee that no browser scrollbar track or thumb is displayed, and adjusted laptop vertical padding and margins (`lg:p-6 xl:p-10`, `space-y-3`, tightened divider and switcher) so all form controls sit naturally within standard 1366x768 / 1440x900 viewports without overflow.
 - Route & Navigation Hardening: Sanitized `pendingTargetView` in `PublicExperience` and `App.tsx` so `"login"` and `"landing"` safely resolve to `"radar"` after successful authentication, eliminating the login trap. Streamlined `AuthPage.tsx` success callbacks to prevent double-history pushes.
 - Regression Coverage: Added 13 unit tests in `tests/publicExperienceTransition.test.ts`. Verified 100% clean with `npm run verify` (0 typecheck errors, 0 lint warnings, 1,037 passing unit tests across 68 test files, and production build).
+
+### 2026-09-16 - working tree
+Exposed autonomous workflow observability telemetry from `pipelineActivities` as an interactive Pipeline Timeline in the case audit drawer (`convex/pipelineActivities.ts`, `src/components/communications/PipelineTimeline.tsx`, `src/components/communications/AuditTrailDrawer.tsx`, `src/components/common/PipelineActivityFeed.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/studio/AppealStudio.tsx`, `src/App.tsx`, `tests/pipelineActivity.test.ts`, `tests/auditTrailDrawer.test.ts`):
+- Added `listRecent` query in `convex/pipelineActivities.ts` to surface recent workflow activity across claims for portfolio-level observability with authenticated caller scoping.
+- Created `PipelineTimeline.tsx` component rendering real-time execution traces across all 5 autonomous appeal stages (Intake & Review, Policy Search & Crawl, Win Scoring, Precedent Match, Brief Drafting) with run duration timers, stage traversal stepper, latency deltas, search filtering, and stage/status selectors.
+- Hardened stage status and milestone lifecycle rendering in `PipelineTimeline.tsx`: resolved perpetual spinning indicators on finished runs by conditioning active stage execution on in-flight run status and verifying completion states, preventing start milestones from perpetually displaying animated spinners once succeeded.
+- Upgraded `AuditTrailDrawer.tsx` with a segmented navigation controller toggling between statutory ERISA cryptographic hash chain verification and live workflow observability telemetry, with live counts and direct deep-linking from `PipelineActivityFeed.tsx`.
+- Updated `README.md` to document the new dual-mode Case Audit & Workflow Observability Drawer, `pipelineActivities` telemetry in the Convex sponsor pillar, Judge Evidence Matrix, and updated test counts (1,050 tests across 68 suites).
+- Extended test coverage in `tests/auditTrailDrawer.test.ts` and `tests/pipelineActivity.test.ts` and verified 100% clean with `npm run verify` (1,050 passing tests across 68 files, 0 typecheck errors, 0 lint warnings, and production build).
 

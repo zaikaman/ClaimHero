@@ -52,8 +52,14 @@ export default function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState<boolean>(false);
   const [isAuditDrawerOpen, setIsAuditDrawerOpen] = useState<boolean>(false);
+  const [auditDrawerTab, setAuditDrawerTab] = useState<"audit" | "pipeline">("audit");
   const [isSentinelOpen, setIsSentinelOpen] = useState<boolean>(false);
   const [pendingTargetView, setPendingTargetView] = useState<NavigationView | null>(null);
+
+  const handleOpenAuditDrawer = useCallback((tab: "audit" | "pipeline" = "audit") => {
+    setAuditDrawerTab(tab);
+    setIsAuditDrawerOpen(true);
+  }, []);
 
   // Initial claim from URL search params (?claim=...)
   const initialClaimId = useMemo(() => {
@@ -313,7 +319,7 @@ export default function App() {
                   onNavigateToStudio={() => setCurrentView("studio")}
                   onNavigateView={setCurrentView}
                   onRunAutonomousPipeline={runFullPipeline}
-                  onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
+                  onOpenAuditDrawer={handleOpenAuditDrawer}
                   onOpenIngestion={handleOpenIngestion}
                 />
               ) : selectedClaimId ? (
@@ -338,7 +344,7 @@ export default function App() {
                   onNavigateToEvidence={() => setCurrentView("evidence")}
                   onNavigateView={setCurrentView}
                   onRunAutonomousPipeline={runFullPipeline}
-                  onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
+                  onOpenAuditDrawer={handleOpenAuditDrawer}
                   onOpenIngestion={handleOpenIngestion}
                 />
               ) : selectedClaimId && isLoadingSelectedClaim ? (
@@ -413,7 +419,7 @@ export default function App() {
                   onRunAutonomousPipeline={runFullPipeline}
                   onSyncInboxes={syncInboxes}
                   isSyncingInboxes={isSyncingInboxes}
-                  onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
+                  onOpenAuditDrawer={handleOpenAuditDrawer}
                 />
               ) : selectedClaimId ? (
                 <ViewLoadingFallback message="Connecting to secure AgentMail payer inbox..." />
@@ -541,6 +547,7 @@ export default function App() {
           claim={selectedClaim}
           logs={auditLogs}
           isLoading={isLoadingAudit}
+          initialTab={auditDrawerTab}
         />
       </Suspense>
 
