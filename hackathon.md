@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-16T13:14:00Z
+- **Last updated:** 2026-09-16T13:34:00Z
 
 ## Log
 
@@ -1520,7 +1520,7 @@ Exposed autonomous workflow observability telemetry from `pipelineActivities` as
 - Updated `README.md` to document the new dual-mode Case Audit & Workflow Observability Drawer, `pipelineActivities` telemetry in the Convex sponsor pillar, Judge Evidence Matrix, and updated test counts (1,050 tests across 68 suites).
 - Extended test coverage in `tests/auditTrailDrawer.test.ts` and `tests/pipelineActivity.test.ts` and verified 100% clean with `npm run verify` (1,050 passing tests across 68 files, 0 typecheck errors, 0 lint warnings, and production build).
 
-### 2026-09-16 - working tree
+### 2026-09-16 - 2fe2a15
 Added Convex Auth Anonymous authentication mode to `/login`, atomic transactional pre-seeding of 3 comprehensive evaluation cases populated with authentic data extracted directly from live pipeline runs, and updated evaluation documentation (`convex/convex.config.ts`, `convex/auth.ts`, `convex/users.ts`, `convex/demoSeeder.ts`, `src/components/auth/AuthPage.tsx`, `README.md`, `tests/anonymousAuthAndSeeder.test.ts`, `tests/publicExperienceTransition.test.ts`):
 - Component & Auth Configuration: Mounted `@convex-dev/auth/providers/anonymous/convex.config.js` (`authAnonymous`), wired `setupAnonymous` in `convex/auth.ts`, and exported `signInAnonymous`. Implemented `createAnonymousUser` in `convex/users.ts` with `isAnonymous: true` and `role: "advocate"`.
 - Live-Pipeline-Fidelity Pre-Seeder (`convex/demoSeeder.ts`): Replaced synthetic approximations with authentic, comprehensive datasets captured from full live pipeline executions (Firecrawl web crawling, vector precedent retrieval, 4-pillar appeal readiness scoring, 4-page cited briefs with Exhibit A proof of policy, 4-phase P2P scripts, 10-step pipeline activity traces, and realistic professional AgentMail communications):
@@ -1531,5 +1531,13 @@ Added Convex Auth Anonymous authentication mode to `/login`, atomic transactiona
 - Frontend Authentication Experience: Added "Explore as Anonymous Advocate" button below Google sign-in on `AuthPage.tsx` using `useAnonymousAuth(api.auth.signInAnonymous)` with matching white card aesthetic, loading spinner state, and instant routing to the workspace.
 - Documentation & Judge Guides: Updated `README.md` to document the 1-click Anonymous Advocate evaluation flow in "Try It in 60 Seconds", the Judge Evidence Matrix, Convex sponsor pillar, Component Architecture, and updated test suite totals (1,053 tests across 69 suites).
 - Regression Coverage: Added `tests/anonymousAuthAndSeeder.test.ts` and updated `tests/publicExperienceTransition.test.ts`. Verified 100% clean with `npm run verify` (1,053 passing unit tests across 69 test files, 0 typecheck errors, 0 lint warnings, and production build).
+
+### 2026-09-16 - working tree
+Redesigned the Transmission History and addendum composer layout in `src/components/communications/AgentMailDrawer.tsx` to eliminate empty space and strictly constrain its height to match the adjacent Recipient Insurer Gateway card:
+- Height Synchronization & Sizing Architecture: Positioned the Transmission History card with `lg:absolute lg:inset-0` inside a relative grid column track (`lg:col-span-8 relative`). This ensures the two-column grid row height is strictly governed by the natural height of the left Recipient Insurer Gateway card, preventing long appeal dossiers from expanding the card infinitely down the page.
+- Internal Flex Scrolling: Applied `flex-1 min-h-0 overflow-y-auto` to the messages container and `shrink-0` to the header, draft cards, and bottom console. Messages now scroll smoothly within the exact bounds of the left card while keeping the composer and audit footer firmly anchored at the bottom.
+- Streamlined Addendum Composer: Anchored a focused, streamlined addendum composer dock at the bottom with active target recipient indicator, inline keyboard submission hints, and direct carrier dispatch input.
+- Compliance & Transmission Footer: Integrated a persistent carrier relay status bar displaying live AgentMail connectivity, ERISA § 503 audit compliance, and instant shortcuts for Certificate of Electronic Service delivery evidence and dossier export.
+- Regression Verification: Verified 100% clean with typecheck, lint, 1,053 passing unit tests across 69 test suites, and production build.
 
 

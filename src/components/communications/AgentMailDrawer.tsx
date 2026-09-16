@@ -972,255 +972,272 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
       </Card>
 
       {/* Two-Column Communication Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         {/* Left Column: Payer Information & Thread Summary (4 Cols) */}
-        <div className="lg:col-span-4 space-y-3">
-          <Card className="p-4 space-y-3">
-            <div className="flex items-center justify-between border-b border-border pb-2.5">
-              <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <Buildings className="size-4 text-muted-foreground" />
-                <span>Recipient Insurer Gateway</span>
-              </div>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-[9px] font-mono",
-                  payerContact.isVerified
-                    ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+        <div className="lg:col-span-4 flex flex-col">
+          <Card className="p-4 flex-1 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-border pb-2.5">
+                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Buildings className="size-4 text-muted-foreground" />
+                  <span>Recipient Insurer Gateway</span>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[9px] font-mono",
+                    payerContact.isVerified
+                      ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                      : claim.payerContact?.source === "document_ocr"
+                      ? "text-cyan-600 dark:text-cyan-400 border-cyan-500/30"
+                      : claim.payerContact?.source === "firecrawl_live"
+                      ? "text-indigo-600 dark:text-indigo-400 border-indigo-500/30"
+                      : claim.payerContact?.source === "registry_fallback"
+                      ? "text-amber-600 dark:text-amber-400 border-amber-500/30"
+                      : "text-rose-600 dark:text-rose-400 border-rose-500/30"
+                  )}
+                >
+                  {payerContact.isVerified
+                    ? "Live-Verified Gateway"
                     : claim.payerContact?.source === "document_ocr"
-                    ? "text-cyan-600 dark:text-cyan-400 border-cyan-500/30"
+                    ? "Extracted from Document"
                     : claim.payerContact?.source === "firecrawl_live"
-                    ? "text-indigo-600 dark:text-indigo-400 border-indigo-500/30"
+                    ? "Firecrawl Discovered"
                     : claim.payerContact?.source === "registry_fallback"
-                    ? "text-amber-600 dark:text-amber-400 border-amber-500/30"
-                    : "text-rose-600 dark:text-rose-400 border-rose-500/30"
+                    ? `Registry Baseline (${claim.payerContact.registryDate || "Unverified"})`
+                    : "Unresolved Gateway"}
+                </Badge>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">Payer</span>
+                  <span className="font-semibold text-foreground">{payerName}</span>
+                </div>
+
+                {/* Official Submission Portal */}
+                {payerContact.intakePortalUrl ? (
+                  <div>
+                    <span className="text-[10px] font-mono text-muted-foreground block">Appeals & Dispute Portal</span>
+                    <a
+                      href={payerContact.intakePortalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 mt-0.5 text-[11px] font-medium text-primary hover:underline"
+                    >
+                      <span>{payerContact.portalName || "Launch Official Payer Portal"}</span>
+                      <ArrowSquareOut className="size-3 shrink-0" />
+                    </a>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-[10px] font-mono text-muted-foreground block">Online Portal Status</span>
+                    <span className="text-[11px] text-muted-foreground italic block mt-0.5">
+                      {payerContact.isVerified
+                        ? "No portal on file"
+                        : "No public submission portal verified"}
+                    </span>
+                  </div>
                 )}
-              >
-                {payerContact.isVerified
-                  ? "Live-Verified Gateway"
-                  : claim.payerContact?.source === "document_ocr"
-                  ? "Extracted from Document"
-                  : claim.payerContact?.source === "firecrawl_live"
-                  ? "Firecrawl Discovered"
-                  : claim.payerContact?.source === "registry_fallback"
-                  ? `Registry Baseline (${claim.payerContact.registryDate || "Unverified"})`
-                  : "Unresolved Gateway"}
-              </Badge>
+
+                {/* Official Appellate Fax Line */}
+                {payerContact.appealsFax ? (
+                  <div>
+                    <span className="text-[10px] font-mono text-muted-foreground block">Appellate Fax Line</span>
+                    <div className="flex items-center justify-between gap-1 mt-0.5">
+                      <span className="font-mono text-[11px] text-foreground font-medium">
+                        {payerContact.appealsFax}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={handleCopyFax}
+                        title="Copy appeals fax line"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                      >
+                        {copiedFax ? (
+                          <Check className="size-3 text-emerald-500" />
+                        ) : (
+                          <Copy className="size-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-[10px] font-mono text-muted-foreground block">Appellate Fax Line</span>
+                    <span className="text-[11px] text-muted-foreground italic block mt-0.5">
+                      Not specified on record
+                    </span>
+                  </div>
+                )}
+
+                {/* Direct Electronic Appeals Inbox */}
+                {officialEmail ? (
+                  <div>
+                    <span className="text-[10px] font-mono text-muted-foreground block">Electronic Appeals Email</span>
+                    <div className="flex items-center justify-between gap-1 mt-0.5">
+                      <span className="text-foreground font-medium text-[11px] font-mono truncate">
+                        {officialEmail}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => {
+                          navigator.clipboard.writeText(officialEmail);
+                          setCopiedRecipientEmail(true);
+                          setTimeout(() => setCopiedRecipientEmail(false), 2000);
+                        }}
+                        title="Copy official appeals email"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                      >
+                        {copiedRecipientEmail ? (
+                          <Check className="size-3 text-emerald-500" />
+                        ) : (
+                          <Copy className="size-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-[10px] font-mono text-muted-foreground block">Appeals Intake Route</span>
+                    <span className="text-[11px] text-foreground font-medium block mt-0.5">
+                      {payerContact.intakePortalUrl
+                        ? "Verified Intake Route on File"
+                        : payerContact.appealsFax
+                        ? "Verified Intake Route on File"
+                        : "See Denial Notice for Filing Details"}
+                    </span>
+                  </div>
+                )}
+
+                {payerContact.statutoryPoBox ? (
+                  <div>
+                    <span className="text-[10px] font-mono text-muted-foreground block">Statutory Appeals P.O. Box</span>
+                    <div className="flex items-start justify-between gap-1 mt-0.5">
+                      <span className="text-foreground text-[11px] font-mono leading-tight">
+                        {payerContact.statutoryPoBox}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={handleCopyPoBox}
+                        title="Copy P.O. Box address"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                      >
+                        {copiedPoBox ? (
+                          <Check className="size-3 text-emerald-500" />
+                        ) : (
+                          <Copy className="size-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-[10px] font-mono text-muted-foreground block">Statutory Appeals P.O. Box</span>
+                    <span className="text-[11px] text-muted-foreground italic block mt-0.5">
+                      Address not specified on record
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
+                  <div>
+                    <span className="text-[10px] font-mono text-muted-foreground block">Electronic Payer ID</span>
+                    <span className="font-mono text-[11px] text-foreground font-semibold">
+                      {payerContact.ediPayerId || "Not Registered"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono text-muted-foreground block">Appeals Helpline</span>
+                    <span className="font-mono text-[11px] text-foreground">
+                      {payerContact.tollFreeHelpline || "Not Available"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-1 border-t border-border/50">
+                  <span className="text-[10px] font-mono text-muted-foreground block">Delivery Channel</span>
+                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium text-[11px]">
+                    <CheckCircle className="size-3.5" />
+                    {claim.status === "won"
+                      ? "Overturned / Settlement Authorized"
+                      : claim.status === "dispatched"
+                      ? "Packet Transmitted & Logged"
+                      : recipientEmail
+                      ? "Ready for Electronic Dispatch"
+                      : "Intake Route Ready"}
+                  </span>
+                </div>
+
+                {payerContact.submissionPolicyNote && (
+                  <div className="pt-2 border-t border-border/50">
+                    <div className="p-2 rounded bg-muted/40 border border-border/60 text-[10px] text-muted-foreground leading-relaxed">
+                      <span className="font-semibold text-foreground block mb-0.5">Payer Policy Notice:</span>
+                      {payerContact.submissionPolicyNote}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <span className="text-[10px] font-mono text-muted-foreground block">Payer</span>
-                <span className="font-semibold text-foreground">{payerName}</span>
-              </div>
-
-              {/* Official Submission Portal */}
-              {payerContact.intakePortalUrl ? (
-                <div>
-                  <span className="text-[10px] font-mono text-muted-foreground block">Appeals & Dispute Portal</span>
-                  <a
-                    href={payerContact.intakePortalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 mt-0.5 text-[11px] font-medium text-primary hover:underline"
-                  >
-                    <span>{payerContact.portalName || "Launch Official Payer Portal"}</span>
-                    <ArrowSquareOut className="size-3 shrink-0" />
-                  </a>
-                </div>
-              ) : (
-                <div>
-                  <span className="text-[10px] font-mono text-muted-foreground block">Online Portal Status</span>
-                  <span className="text-[11px] text-muted-foreground italic block mt-0.5">
-                    {payerContact.isVerified
-                      ? "No portal on file"
-                      : "No public submission portal verified"}
-                  </span>
-                </div>
-              )}
-
-              {/* Official Appellate Fax Line */}
-              {payerContact.appealsFax ? (
-                <div>
-                  <span className="text-[10px] font-mono text-muted-foreground block">Appellate Fax Line</span>
-                  <div className="flex items-center justify-between gap-1 mt-0.5">
-                    <span className="font-mono text-[11px] text-foreground font-medium">
-                      {payerContact.appealsFax}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={handleCopyFax}
-                      title="Copy appellate fax number"
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                    >
-                      {copiedFax ? (
-                        <Check className="size-3 text-emerald-500" />
-                      ) : (
-                        <Copy className="size-3" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <span className="text-[10px] font-mono text-muted-foreground block">Appellate Fax Line</span>
-                  <span className="text-[11px] text-muted-foreground italic block mt-0.5">
-                    Not specified on record
-                  </span>
-                </div>
-              )}
-
-              {officialEmail ? (
-                <div>
-                  <span className="text-[10px] font-mono text-muted-foreground block">Electronic Appeals Email</span>
-                  <div className="flex items-center justify-between gap-1 mt-0.5">
-                    <span className="font-mono text-[11px] text-foreground font-medium break-all">
-                      {officialEmail}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={() => {
-                        navigator.clipboard.writeText(officialEmail);
-                        setCopiedRecipientEmail(true);
-                        setTimeout(() => setCopiedRecipientEmail(false), 2000);
-                      }}
-                      title="Copy official appeals email"
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                    >
-                      {copiedRecipientEmail ? (
-                        <Check className="size-3 text-emerald-500" />
-                      ) : (
-                        <Copy className="size-3" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <span className="text-[10px] font-mono text-muted-foreground block">Appeals Intake Route</span>
-                  <span className="text-[11px] text-foreground font-medium block mt-0.5">
-                    {payerContact.intakePortalUrl
-                      ? "Verified Intake Route on File"
-                      : payerContact.appealsFax
-                      ? "Verified Intake Route on File"
-                      : "See Denial Notice for Filing Details"}
-                  </span>
-                </div>
-              )}
-
-              {payerContact.statutoryPoBox ? (
-                <div>
-                  <span className="text-[10px] font-mono text-muted-foreground block">Statutory Appeals P.O. Box</span>
-                  <div className="flex items-start justify-between gap-1 mt-0.5">
-                    <span className="text-foreground text-[11px] font-mono leading-tight">
-                      {payerContact.statutoryPoBox}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={handleCopyPoBox}
-                      title="Copy P.O. Box address"
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                    >
-                      {copiedPoBox ? (
-                        <Check className="size-3 text-emerald-500" />
-                      ) : (
-                        <Copy className="size-3" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <span className="text-[10px] font-mono text-muted-foreground block">Statutory Appeals P.O. Box</span>
-                  <span className="text-[11px] text-muted-foreground italic block mt-0.5">
-                    Address not specified on record
-                  </span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
-                <div>
-                  <span className="text-[10px] font-mono text-muted-foreground block">Electronic Payer ID</span>
-                  <span className="font-mono text-[11px] text-foreground font-semibold">
-                    {payerContact.ediPayerId || "Not Registered"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-mono text-muted-foreground block">Appeals Helpline</span>
-                  <span className="font-mono text-[11px] text-foreground">
-                    {payerContact.tollFreeHelpline || "Not Available"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-1 border-t border-border/50">
-                <span className="text-[10px] font-mono text-muted-foreground block">Delivery Channel</span>
-                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium text-[11px]">
-                  <CheckCircle className="size-3.5" />
-                  {claim.status === "won"
-                    ? "Overturned / Settlement Authorized"
-                    : claim.status === "dispatched"
-                    ? "Packet Transmitted & Logged"
-                    : recipientEmail
-                    ? "Ready for Electronic Dispatch"
-                    : "Intake Route Ready"}
+            <div className="pt-3 mt-3 border-t border-border/50 space-y-2">
+              <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+                <span>Gateway Source:</span>
+                <span className="text-foreground font-medium">
+                  {claim.payerContact?.source === "firecrawl_live"
+                    ? "Firecrawl Live Discovery"
+                    : claim.payerContact?.source === "document_ocr"
+                    ? "Extracted from Document"
+                    : claim.payerContact?.source === "registry_fallback"
+                    ? `Statutory Registry Baseline (${claim.payerContact.registryDate || "Offline"})`
+                    : payerContact.isVerified
+                    ? "Live-Verified Gateway"
+                    : "Unresolved / Manual Verification"}
                 </span>
-              </div>
-
-              {payerContact.submissionPolicyNote && (
-                <div className="pt-2 border-t border-border/50">
-                  <div className="p-2 rounded bg-muted/40 border border-border/60 text-[10px] text-muted-foreground leading-relaxed">
-                    <span className="font-semibold text-foreground block mb-0.5">Payer Policy Notice:</span>
-                    {payerContact.submissionPolicyNote}
-                  </div>
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-border/50 space-y-2">
-                <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground">
-                  <span>Gateway Source:</span>
-                  <span className="text-foreground font-medium">
-                    {claim.payerContact?.source === "firecrawl_live"
-                      ? "Firecrawl Live Discovery"
-                      : claim.payerContact?.source === "document_ocr"
-                      ? "Extracted from Document"
-                      : claim.payerContact?.source === "registry_fallback"
-                      ? `Statutory Registry Baseline (${claim.payerContact.registryDate || "Offline"})`
-                      : payerContact.isVerified
-                      ? "Live-Verified Gateway"
-                      : "Unresolved / Manual Verification"}
-                  </span>
-                </div>
               </div>
             </div>
           </Card>
         </div>
 
         {/* Right Column: Live Message Feed & Reply Composer (8 Cols) */}
-        <Card className="lg:col-span-8 flex flex-col p-0 overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border px-4 py-2.5 bg-muted/30 shrink-0">
-            <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-              <Tray className="size-4 text-muted-foreground" />
-              <span>Transmission History ({messages.length})</span>
+        <div className="lg:col-span-8 relative flex flex-col min-h-[520px] h-[620px] lg:h-auto">
+          <Card className="lg:absolute lg:inset-0 flex flex-col gap-0 p-0 overflow-hidden h-full border border-border bg-card/60 backdrop-blur-xl">
+            <div className="flex items-center justify-between border-b border-border px-4 py-2.5 bg-muted/30 shrink-0">
+              <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Tray className="size-4 text-primary" />
+                <span>Transmission History ({messages.length})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {onSyncInboxes && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => onSyncInboxes()}
+                    disabled={isSyncingInboxes}
+                    className="h-6 px-2 text-[10px] font-mono gap-1 text-muted-foreground hover:text-foreground"
+                    title="Force refresh inbound replies from AgentMail inboxes"
+                  >
+                    <ArrowsClockwise className={cn("size-3", isSyncingInboxes && "animate-spin text-primary")} />
+                    <span>{isSyncingInboxes ? "Syncing..." : "Sync Inbox"}</span>
+                  </Button>
+                )}
+                <Badge variant="outline" size="sm" className="text-[10px] font-mono text-primary border-primary/30">
+                  Human Review Gate Enforced
+                </Badge>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" size="sm" className="text-[10px] font-mono text-primary border-primary/30">
-                Human Review Gate Enforced
-              </Badge>
-            </div>
-          </div>
 
-          {/* Messages Container */}
-          <div ref={messagesContainerRef} className="flex-1 p-4 space-y-3 overflow-y-auto max-h-[440px] scroll-smooth">
+            {/* Messages Container */}
+            <div ref={messagesContainerRef} className="flex-1 min-h-0 p-4 space-y-3 overflow-y-auto scroll-smooth">
             {isLoading ? (
               <div className="p-8 text-center text-xs font-mono text-muted-foreground animate-pulse">
                 Loading communication history...
               </div>
             ) : messages.length === 0 ? (
-              <div className="p-8 text-center items-center justify-center space-y-2 text-muted-foreground">
+              <div className="p-8 text-center flex flex-col items-center justify-center h-full min-h-[260px] space-y-2 text-muted-foreground">
                 <Envelope className="size-8 mx-auto text-muted-foreground/60" />
                 <div className="text-xs font-medium text-foreground">No transmissions yet</div>
                 <p className="text-[11px] max-w-sm mx-auto">
@@ -1446,7 +1463,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
           {/* Prepared Clinical Rebuttal Draft Card (Pending Human Approval) */}
           {(activeAutoDraft || isSynthesizing) && claim.status !== "won" && !isAwaitingPayer && (
-            <div className="p-3 bg-muted/20 border-t border-border space-y-2.5">
+            <div className="p-3 bg-muted/20 border-t border-border space-y-2.5 shrink-0">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <ShieldCheck className="size-4 text-primary shrink-0" />
@@ -1529,41 +1546,105 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             </div>
           )}
 
-          {/* Reply Composer */}
-          <form
-            onSubmit={handleSendReply}
-            className="p-3 bg-muted/20 border-t border-border space-y-2"
-          >
-            <div className="flex items-center gap-2">
-              <Input
-                type="text"
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder={
-                  recipientEmail
-                    ? "Type addendum or reply to payer..."
-                    : "Log addendum note to case docket..."
-                }
-                className="flex-1 bg-background"
-                disabled={isSending}
-              />
-              <Button
-                type="submit"
-                size="sm"
-                disabled={isSending || !replyText.trim()}
-                className="gap-1"
-              >
-                {isSending ? (
-                  <CircleNotch className="size-3.5 animate-spin" />
-                ) : (
-                  <PaperPlaneTilt className="size-3.5" />
+          {/* Dedicated Addendum & Transmission Console */}
+          <div className="mt-auto shrink-0 border-t border-border/80 bg-muted/20 backdrop-blur-sm">
+
+            {/* Reply Composer Form */}
+            <form onSubmit={handleSendReply} className="p-3 space-y-2">
+              <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+                <span className="truncate max-w-[320px]">
+                  {recipientEmail ? (
+                    <span>
+                      Target: <strong className="text-foreground">{recipientEmail}</strong>
+                    </span>
+                  ) : (
+                    <span>
+                      Target: <strong className="text-foreground">Case Docket Addendum</strong>
+                    </span>
+                  )}
+                </span>
+                <span className="text-[9.5px] text-muted-foreground/70 hidden sm:inline">
+                  Press Enter to send
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Input
+                  type="text"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={
+                    recipientEmail
+                      ? `Type addendum or reply to ${recipientEmail}...`
+                      : "Log addendum note to case docket..."
+                  }
+                  className="flex-1 bg-background text-xs h-8"
+                  disabled={isSending}
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isSending || !replyText.trim()}
+                  className="gap-1.5 h-8 px-3 text-xs shrink-0 cursor-pointer"
+                >
+                  {isSending ? (
+                    <CircleNotch className="size-3.5 animate-spin" />
+                  ) : (
+                    <PaperPlaneTilt className="size-3.5" />
+                  )}
+                  <span>{isSending ? "Sending..." : "Send"}</span>
+                </Button>
+              </div>
+            </form>
+
+            {/* Integrated Transmission Audit & Compliance Footer Dock */}
+            <div className="px-3 py-2 bg-muted/40 border-t border-border/60 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span className="inline-flex items-center gap-1 text-emerald-500 font-medium">
+                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Direct Carrier Relay
+                </span>
+                <span className="text-border">•</span>
+                <span>ERISA § 503 Audited</span>
+                <span className="text-border hidden sm:inline">•</span>
+                <span className="hidden sm:inline">Review Gate Active</span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    setCertificateMessageId(undefined);
+                    setIsCertificateModalOpen(true);
+                  }}
+                  className="h-6 px-2 text-[10px] font-mono gap-1 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10 rounded cursor-pointer"
+                  title="Generate ERISA Certificate of Electronic Service & transmission evidence report"
+                >
+                  <SealCheck className="size-3 text-emerald-500" />
+                  <span>Delivery Evidence</span>
+                </Button>
+
+                {effectiveAppeal?.fullAppealMarkdown && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => setIsExportDrawerOpen(true)}
+                    className="h-6 px-2 text-[10px] font-mono gap-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded cursor-pointer"
+                    title="Export appeal dossier and exhibits"
+                  >
+                    <FileText className="size-3 text-primary" />
+                    <span>Export Dossier</span>
+                  </Button>
                 )}
-                <span>{isSending ? "Sending" : "Send"}</span>
-              </Button>
+              </div>
             </div>
-          </form>
+          </div>
         </Card>
       </div>
+    </div>
 
       {/* Formal Appeal Dossier Export & Print Modal */}
       <ExportDrawer
