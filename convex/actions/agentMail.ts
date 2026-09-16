@@ -426,7 +426,6 @@ async function handleInboundClaimReply(
       contentType: string;
       size: number;
     }> = [];
-    const fileInputs: Array<{ fileData: string; filename: string }> = [];
     const attachmentTexts: string[] = [];
 
     if (Array.isArray(normalized.attachments) && normalized.attachments.length > 0) {
@@ -450,11 +449,21 @@ async function handleInboundClaimReply(
             size: downloaded.size,
           });
 
-          // If the attachment is a PDF or document, prepare for evaluation
+          // Fail-hard HIPAA gate: PDF/image attachments are OCR'd only inside the
+          // AWS HIPAA BAA via Textract. Raw binary is stored in Convex Storage for
+          // human review but NEVER forwarded to the LLM as fileInputs, since that
+          // would bypass redactBeforeLLM and egress raw PHI.
           const lowerMime = downloaded.contentType.toLowerCase();
           const lowerName = downloaded.filename.toLowerCase();
           if (lowerMime.includes("pdf") || lowerName.endsWith(".pdf") || lowerMime.startsWith("image/")) {
-            if (isTextractConfigured()) {
+            if (!isTextractConfigured()) {
+              console.warn(
+                `AWS Textract not configured; quarantining inbound attachment ${downloaded.filename} without OCR. Attachment preserved in storage for human review.`
+              );
+              attachmentTexts.push(
+                `[Attachment ${downloaded.filename} stored but not OCR'd: AWS Textract credentials (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY) are not configured. Human review of the stored file is required; attachment content was not sent to the LLM.]`
+              );
+            } else {
               try {
                 const textractRes = await extractDocumentWithTextract(downloaded.buffer);
                 if (!textractRes.fullText.trim()) {
@@ -464,19 +473,13 @@ async function handleInboundClaimReply(
                   `Attached Document (${downloaded.filename}) Extracted via AWS Textract:\n${textractRes.fullText}`
                 );
               } catch (textractErr) {
+                // Fail closed: quarantine the attachment, keep it in storage, and
+                // continue adjudication on the email body alone. No rawBytes fallback.
                 console.warn(`AWS Textract inbound attachment parse failed for ${downloaded.filename}:`, textractErr);
-                if (lowerMime.includes("pdf") || lowerName.endsWith(".pdf")) {
-                  fileInputs.push({
-                    fileData: `data:application/pdf;base64,${downloaded.buffer.toString("base64")}`,
-                    filename: downloaded.filename,
-                  });
-                }
+                attachmentTexts.push(
+                  `[Attachment ${downloaded.filename} stored but not OCR'd: AWS Textract extraction failed (${textractErr instanceof Error ? textractErr.message : String(textractErr)}). Human review of the stored file is required; attachment content was not sent to the LLM.]`
+                );
               }
-            } else if (lowerMime.includes("pdf") || lowerName.endsWith(".pdf")) {
-              fileInputs.push({
-                fileData: `data:application/pdf;base64,${downloaded.buffer.toString("base64")}`,
-                filename: downloaded.filename,
-              });
             }
           }
         } catch (attErr) {
@@ -590,7 +593,6 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
         }`,
         schemaName: "InboundAnalysisResult",
         schema: INBOUND_ANALYSIS_SCHEMA,
-        fileInputs: fileInputs.length > 0 ? fileInputs : undefined,
         temperature: 0.1,
       });
     } catch (llmError) {

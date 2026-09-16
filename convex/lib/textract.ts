@@ -5,9 +5,12 @@
  * Benefits (EOB), medical bills, and denial notices.
  *
  * HIPAA Safe Harbor / BAA Compliance:
- * When AWS credentials are configured, documents are analyzed within the AWS HIPAA BAA
- * boundary. Extracted text is de-identified via redactBeforeLLM prior to external model
+ * Documents are analyzed exclusively within the AWS HIPAA BAA boundary.
+ * Extracted text is de-identified via redactBeforeLLM prior to external model
  * dispatch, and direct patient identifiers are preserved securely in Convex database.
+ * Callers must fail hard when credentials are absent: binary PDF/image intake has
+ * no direct-vision fallback, since forwarding raw PHI bytes to a third-party LLM
+ * would bypass de-identification.
  */
 
 import {

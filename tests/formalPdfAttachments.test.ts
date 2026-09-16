@@ -264,7 +264,9 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
   });
 
   describe("Inbound PDF Attachment Storage & Parsing (convex/actions/agentMail)", () => {
-    it("downloads inbound PDF attachments, saves to Convex Storage, and feeds into structured multimodal parser", async () => {
+    it("downloads inbound PDF attachments, saves to Convex Storage, and quarantines binary without raw-PHI LLM egress when Textract is unconfigured", async () => {
+      delete process.env.AWS_ACCESS_KEY_ID;
+      delete process.env.AWS_SECRET_ACCESS_KEY;
       const mockPdfBytes = Buffer.from("%PDF-1.4 Inbound Explanation of Benefits (EOB) Overturn %%EOF");
 
       vi.spyOn(agentMailLib, "getAgentMailMessage").mockResolvedValue({
@@ -340,17 +342,16 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
       // Assert attachment was stored in Convex Storage
       expect(mockCtx.storage.store).toHaveBeenCalled();
 
-      // Assert multimodal structured completion was called with PDF file inputs
-      expect(mockStructuredCompletion).toHaveBeenCalledWith(
-        expect.objectContaining({
-          fileInputs: [
-            {
-              fileData: `data:application/pdf;base64,${mockPdfBytes.toString("base64")}`,
-              filename: "Explanation-of-Benefits-CH-9900.pdf",
-            },
-          ],
-        })
-      );
+      // Fail-hard HIPAA gate: raw PDF bytes must NEVER be forwarded to the LLM.
+      // The attachment is quarantined in storage with a human-review note instead.
+      expect(mockStructuredCompletion).toHaveBeenCalledOnce();
+      const completionArgs = mockStructuredCompletion.mock.calls[0][0] as {
+        userPrompt: string;
+        fileInputs?: unknown;
+      };
+      expect(completionArgs.fileInputs).toBeUndefined();
+      expect("fileInputs" in completionArgs).toBe(false);
+      expect(completionArgs.userPrompt).toContain("stored but not OCR'd");
 
       // Assert stored message analysis was updated with attachments and authorized settlement amount
       expect(mockCtx.runMutation).toHaveBeenCalledWith(
@@ -386,6 +387,91 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
           eventType: "inbound_attachment_processed",
         })
       );
+    });
+
+    it("quarantines inbound PDF attachments without raw-PHI LLM egress when Textract extraction fails", async () => {
+      process.env.AWS_ACCESS_KEY_ID = "MOCK_KEY";
+      process.env.AWS_SECRET_ACCESS_KEY = "MOCK_SECRET";
+      try {
+        const mockPdfBytes = Buffer.from("%PDF-1.4 Inbound EOB with failing OCR %%EOF");
+        const libTextract = await import("../convex/lib/textract");
+        vi.spyOn(libTextract, "extractDocumentWithTextract").mockRejectedValue(
+          new Error("Textract ThrottlingException")
+        );
+
+        vi.spyOn(agentMailLib, "getAgentMailMessage").mockResolvedValue({
+          message_id: "msg_inbound_eob_fail",
+          inbox_id: "inbox_adjudicator",
+          from: "appeals-adjudicator@aetna.com",
+          to: ["claimhero-sender@agentmail.to"],
+          subject: "Determination regarding Claim #CH-9901",
+          text: "Please find attached formal Explanation of Benefits.",
+          attachments: [
+            {
+              attachment_id: "att_eob_fail",
+              filename: "Explanation-of-Benefits-CH-9901.pdf",
+              content_type: "application/pdf",
+              size: mockPdfBytes.byteLength,
+            },
+          ],
+        });
+
+        vi.spyOn(agentMailLib, "downloadAgentMailAttachment").mockResolvedValue({
+          buffer: mockPdfBytes,
+          contentType: "application/pdf",
+          filename: "Explanation-of-Benefits-CH-9901.pdf",
+          size: mockPdfBytes.byteLength,
+        });
+
+        const mockStructuredCompletion = vi.spyOn(openaiLib, "createStructuredCompletion").mockResolvedValue({
+          determination: "GENERAL_INQUIRY",
+          clinicalRationale: "Inbound correspondence received and recorded.",
+          missingRecordsRequested: [],
+          shouldAutoReply: true,
+          suggestedAutoReplyAddendum: "Counter-rebuttal draft.",
+        });
+
+        const mockCtx: any = {
+          runQuery: vi.fn().mockImplementation((fn: any, args: any) => {
+            if (args && "agentMailMessageId" in args) return false;
+            return {
+              _id: "claim_inbound_eob_fail",
+              claimNumber: "CH-9901",
+              patientName: "David Miller",
+              insurancePayer: "Aetna",
+              deniedAmount: 32000,
+            };
+          }),
+          runMutation: vi.fn().mockImplementation((fn: any) => {
+            if (fn === internal.emails.getOrCreateThreadInternal) return "thread_inbound_fail";
+            if (fn === internal.emails.insertInboundMessageInternal) return { messageId: "msg_db_fail", isNew: true };
+            return null;
+          }),
+          storage: {
+            store: vi.fn().mockResolvedValue("storage_inbound_eob_pdf_fail"),
+          },
+        };
+
+        await (processInboundClaimReply as any)._handler(mockCtx, {
+          inboxId: "inbox_adjudicator",
+          messageId: "msg_inbound_eob_fail",
+          eventId: "evt_inbound_fail",
+        });
+
+        // Attachment preserved in storage, but raw bytes never reach the LLM.
+        expect(mockCtx.storage.store).toHaveBeenCalled();
+        expect(mockStructuredCompletion).toHaveBeenCalledOnce();
+        const completionArgs = mockStructuredCompletion.mock.calls[0][0] as {
+          userPrompt: string;
+          fileInputs?: unknown;
+        };
+        expect(completionArgs.fileInputs).toBeUndefined();
+        expect("fileInputs" in completionArgs).toBe(false);
+        expect(completionArgs.userPrompt).toContain("stored but not OCR'd");
+      } finally {
+        delete process.env.AWS_ACCESS_KEY_ID;
+        delete process.env.AWS_SECRET_ACCESS_KEY;
+      }
     });
   });
 

@@ -228,8 +228,6 @@ export const parseDenialDocument = action({
     }
 
     let documentContent = args.rawDocumentText?.trim() || "";
-    const imageUrls: string[] = [];
-    const fileInputs: Array<{ fileData: string; filename: string }> = [];
     let textractIdentifiers: Partial<TextractExtractionResult> = {};
 
     let claimId: Id<"claims">;
@@ -270,54 +268,37 @@ export const parseDenialDocument = action({
           const detected = detectFileFormat(rawContentType, new Uint8Array(arrayBuffer));
 
           if (detected.type === "image" || detected.type === "pdf") {
+            // Fail-hard HIPAA gate: binary PDF/image intake requires AWS Textract
+            // under the AWS HIPAA BAA. Direct multimodal vision fallback would send
+            // raw PHI bytes to a third-party LLM and bypass redactBeforeLLM.
+            if (!isTextractConfigured()) {
+              throw new Error(
+                "AWS Textract credentials not configured. PDF/image denial intake requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in the Convex deployment environment. Upload a text extraction instead, or configure Textract and retry."
+              );
+            }
             const buffer = Buffer.from(arrayBuffer);
-            if (isTextractConfigured()) {
-              try {
-                const textractRes = await extractDocumentWithTextract(buffer);
-                if (!textractRes.fullText.trim()) {
-                  throw new Error("AWS Textract returned empty text content");
-                }
-                textractIdentifiers = textractRes;
-                const tableMd = formatTablesAsMarkdown(textractRes.tables);
-                documentContent = [
-                  documentContent,
-                  "Extracted denial document text from AWS Textract (HIPAA BAA Optical Gate):",
-                  textractRes.fullText,
-                  tableMd ? `Structured Table Data:\n${tableMd}` : "",
-                ]
-                  .filter(Boolean)
-                  .join("\n\n");
-              } catch (textractErr) {
-                console.warn(
-                  "[OpticalParser] AWS Textract extraction failed, falling back to direct multimodal parsing:",
-                  textractErr
-                );
-                if (detected.type === "image") {
-                  const base64 = buffer.toString("base64");
-                  imageUrls.push(`data:${detected.mime};base64,${base64}`);
-                  documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached image.`.trim();
-                } else {
-                  const base64 = buffer.toString("base64");
-                  fileInputs.push({
-                    fileData: `data:application/pdf;base64,${base64}`,
-                    filename: "denial-document.pdf",
-                  });
-                  documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached document.`.trim();
-                }
+            try {
+              const textractRes = await extractDocumentWithTextract(buffer);
+              if (!textractRes.fullText.trim()) {
+                throw new Error("AWS Textract returned empty text content");
               }
-            } else {
-              if (detected.type === "image") {
-                const base64 = buffer.toString("base64");
-                imageUrls.push(`data:${detected.mime};base64,${base64}`);
-                documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached image.`.trim();
-              } else {
-                const base64 = buffer.toString("base64");
-                fileInputs.push({
-                  fileData: `data:application/pdf;base64,${base64}`,
-                  filename: "denial-document.pdf",
-                });
-                documentContent = `${documentContent}\nExtract medical claim denial and Explanation of Benefits (EOB) information from the attached document.`.trim();
-              }
+              textractIdentifiers = textractRes;
+              const tableMd = formatTablesAsMarkdown(textractRes.tables);
+              documentContent = [
+                documentContent,
+                "Extracted denial document text from AWS Textract (HIPAA BAA Optical Gate):",
+                textractRes.fullText,
+                tableMd ? `Structured Table Data:\n${tableMd}` : "",
+              ]
+                .filter(Boolean)
+                .join("\n\n");
+            } catch (textractErr) {
+              // Fail closed: never fall back to direct multimodal parsing with raw
+              // PHI bytes. Surface the Textract failure so the caller can retry once
+              // AWS recovers. The outer handler cleans up the orphaned storage file.
+              throw new Error(
+                `AWS Textract document extraction failed: ${textractErr instanceof Error ? textractErr.message : String(textractErr)}. No fallback parsing was attempted to protect PHI. Please retry once AWS Textract recovers.`
+              );
             }
           } else if (detected.type === "text") {
             const text = new TextDecoder("utf-8").decode(arrayBuffer);
@@ -330,7 +311,7 @@ export const parseDenialDocument = action({
         }
       }
 
-      if (!documentContent && imageUrls.length === 0) {
+      if (!documentContent) {
         throw new Error("No document content or file provided for optical extraction.");
       }
 
@@ -357,8 +338,6 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         userPrompt: `Extract structured medical claim metadata from the following denial document:\n\n${documentContent}`,
         schemaName: "DenialExtractionResult",
         schema: DENIAL_EXTRACTION_SCHEMA,
-        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-        fileInputs: fileInputs.length > 0 ? fileInputs : undefined,
         temperature: 0.1,
       });
 

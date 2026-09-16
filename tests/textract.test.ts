@@ -342,7 +342,7 @@ describe("AWS Textract Integration & HIPAA Optical Parser", () => {
       );
     });
 
-    it("falls back to multimodal vision when Textract extraction throws an error", async () => {
+    it("fails hard without multimodal fallback when Textract extraction throws an error", async () => {
       process.env.AWS_ACCESS_KEY_ID = "MOCK_KEY";
       process.env.AWS_SECRET_ACCESS_KEY = "MOCK_SECRET";
 
@@ -354,28 +354,8 @@ describe("AWS Textract Integration & HIPAA Optical Parser", () => {
       vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
       vi.spyOn(libTextract, "extractDocumentWithTextract").mockRejectedValue(new Error("Textract ThrottlingException"));
 
-      let capturedCompletionOptions: any = null;
-      vi.spyOn(libOpenAI, "createStructuredCompletion").mockImplementation(async (opts: any) => {
-        capturedCompletionOptions = opts;
-        return {
-          isMedicalClaimDenial: true,
-          documentClassificationReason: "Valid claim denial letter.",
-          claimNumber: "CLM-FALLBACK-1",
-          patientName: "Alice Walker",
-          memberId: "MEM-FB-1",
-          insurancePayer: "UnitedHealthcare",
-          serviceDate: "2026-02-15",
-          providerName: "Dr. Amanda Vance",
-          deniedAmount: 10000,
-          patientOwedAmount: 10000,
-          cptCodes: ["63047"],
-          icd10Codes: ["M51.16"],
-          denialReasonCode: "CO-50",
-          denialReasonDescription: "Not medically necessary",
-          appealFilingDeadlineDays: 180,
-          payerAppealsEmail: "appeals@uhc.com",
-          payerAppealsAddress: "PO Box 200",
-        } as any;
+      const completionSpy = vi.spyOn(libOpenAI, "createStructuredCompletion").mockImplementation(async () => {
+        throw new Error("createStructuredCompletion must not be called when Textract fails");
       });
 
       const fakeImageBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0x00]);
@@ -393,15 +373,51 @@ describe("AWS Textract Integration & HIPAA Optical Parser", () => {
         runAction: vi.fn().mockResolvedValue({ officialAppealsEmail: "appeals@uhc.com", isVerified: true }),
       };
 
-      const result = await (actionOpticalParser.parseDenialDocument as any)._handler(mockCtx, {
-        storageId: "storage_file_123" as any,
-        patientState: "CA",
-      });
+      // Fail closed: Textract errors surface descriptively with no raw-PHI vision fallback.
+      await expect(
+        (actionOpticalParser.parseDenialDocument as any)._handler(mockCtx, {
+          storageId: "storage_file_123" as any,
+          patientState: "CA",
+        })
+      ).rejects.toThrow(/AWS Textract document extraction failed.*ThrottlingException/);
 
-      // Should have fallen back to imageUrls since Textract threw an error
-      expect(capturedCompletionOptions.imageUrls).toBeDefined();
-      expect(capturedCompletionOptions.imageUrls.length).toBeGreaterThan(0);
-      expect(result.claimNumber).toBe("CLM-FALLBACK-1");
+      // OpenAI must never receive raw image bytes when the HIPAA gate fails.
+      expect(completionSpy).not.toHaveBeenCalled();
+    });
+
+    it("fails hard with actionable error when PDF/image intake is attempted without Textract credentials", async () => {
+      delete process.env.AWS_ACCESS_KEY_ID;
+      delete process.env.AWS_SECRET_ACCESS_KEY;
+
+      const actionOpticalParser = await import("../convex/actions/opticalParser");
+      const libOpenAI = await import("../convex/lib/openai");
+      const { rateLimiter } = await import("../convex/lib/rateLimiter");
+
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      const completionSpy = vi.spyOn(libOpenAI, "createStructuredCompletion");
+
+      const fakePdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x00]);
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: { get: () => "application/pdf" },
+        arrayBuffer: async () => fakePdfBytes.buffer,
+      } as any);
+
+      const mockCtx: any = {
+        auth: { getUserId: vi.fn().mockResolvedValue("user_123") },
+        storage: { getUrl: vi.fn().mockResolvedValue("https://storage.convex.cloud/file123") },
+        runMutation: vi.fn().mockResolvedValue("claim_no_keys"),
+        runAction: vi.fn(),
+      };
+
+      await expect(
+        (actionOpticalParser.parseDenialDocument as any)._handler(mockCtx, {
+          storageId: "storage_file_123" as any,
+          patientState: "CA",
+        })
+      ).rejects.toThrow(/AWS Textract credentials not configured/);
+
+      expect(completionSpy).not.toHaveBeenCalled();
     });
 
     it("re-hydrates memberId even when model returned asterisk masked placeholder", async () => {

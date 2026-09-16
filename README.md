@@ -50,7 +50,7 @@ Before scoring, the durable Convex pipeline retrieves relevant precedent records
 
 ```text
 denial letter
-  ->  scanned, OCR'd via AWS Textract under HIPAA BAA (with direct multimodal fallback)
+  ->  scanned, OCR'd exclusively via AWS Textract under HIPAA BAA (fail-hard, no raw-PHI vision fallback)
   ->  patient identifiers vaulted in Convex DB; text de-identified via redactBeforeLLM
   ->  insurer's CPB and the exact clause it cites (Firecrawl)
   ->  Evidence Coverage & Precedent Match Score, grounded in policy, clinical, statutory, and precedent evidence
@@ -206,7 +206,7 @@ AgentMail provides two-way programmatic email infrastructure for appellate dispa
 ### 4. OpenAI — Multi-Modal Clinical Intake & Grounded Synthesis
 OpenAI powers clinical reasoning while operating within strict anti-hallucination boundaries:
 - **Model Architecture & Strict JSON Schema Enforcement**: Powered by `gpt-5.4-nano` with strict Structured Outputs (`response_format: { type: "json_schema" }`) and two semantic retries with corrective JSON instructions (`convex/lib/openai.ts`), enforcing schema validation where unsupported claims are rejected or marked for review, with PHI-safe error masking.
-- **Vision OCR Denial Parser**: Extracts structured CPT/HCPCS, ICD-10, CARC/RARC codes, disputed amounts, and payer contact info from raw multi-page PDF and image denial documents (`convex/actions/opticalParser.ts`).
+- **Vision OCR Denial Parser**: Extracts structured CPT/HCPCS, ICD-10, CARC/RARC codes, disputed amounts, and payer contact info from PDF and image denial documents exclusively through AWS Textract under the HIPAA BAA (`convex/actions/opticalParser.ts`, `convex/lib/textract.ts`). PDF/image intake without `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` fails hard with an actionable error; Textract failures never fall back to raw-PHI vision. Raw-text intake remains available without Textract.
 - **Grounded Legal Brief Synthesis & Anti-Hallucination Contracts**: Synthesizes formal ERISA legal memorandums using strictly human-confirmed clinical facts and stored policy clauses; fabricated policy text is prohibited by schema contracts (`convex/actions/appealSynthesizer.ts`).
 - **Tuned for US Healthcare Appeals**: Optimized for denial letters, Explanations of Benefits (EOB), and medical records under US healthcare frameworks (ERISA 29 U.S.C. § 1133, ACA 45 C.F.R. § 147.136, and CMS NCD/LCD guidelines) for precise statutory citation.
 - **P2P Defense Playbook & Live Copilot**: Generates structured 4-phase clinical defense playbooks (Statutory Opening, Policy Citations, Trap Counters, Written Determination Demand), 1-page clipboard pocket sheets, real-time voice speech-to-text with rapid counter-strikes, and an interactive AI reviewer simulation for practicing oral arguments before the call (`convex/actions/p2pLiveCopilot.ts`, `src/components/p2p/`).
@@ -252,7 +252,7 @@ ClaimHero leverages 9 first-party and partner Convex components configured in [`
 ## Trust, Privacy & Legal Architecture
 
 - **HIPAA Safe Harbor Redaction Gate**: Mandatory server-side pre-submission de-identification (`redactBeforeLLM`) strips 18 direct identifiers (patient names, MRNs, SSNs, phone numbers, emails, addresses, dates of birth) across all textual prompt payloads, vector query embeddings, and Sentinel Copilot dialogs before dispatch to third-party LLM APIs (45 CFR § 164.514(b)(2)).
-- **AWS Textract HIPAA Optical Intake & Zero-PHI LLM Bridge**: Binary PDF and image uploads are parsed within the AWS HIPAA Business Associate Agreement (BAA) boundary using AWS Textract (`convex/lib/textract.ts`). Direct patient identifiers (`patientName`, `memberId`, `claimNumber`) are extracted into the private Convex database vault, and OCR text is sanitized via `redactBeforeLLM()` before dispatch to OpenAI. OpenAI receives zero binary images and zero direct PHI, while the appellate generator safely re-hydrates authentic patient data for outbound payer letters. In evaluation/demo environments without AWS credentials, the system automatically falls back to direct multimodal parsing on synthetic Safe Harbor fixtures.
+- **AWS Textract HIPAA Optical Intake & Zero-PHI LLM Bridge**: Binary PDF and image uploads are parsed exclusively within the AWS HIPAA Business Associate Agreement (BAA) boundary using AWS Textract (`convex/lib/textract.ts`). Direct patient identifiers (`patientName`, `memberId`, `claimNumber`) are extracted into the private Convex database vault, and OCR text is sanitized via `redactBeforeLLM()` before dispatch to OpenAI. OpenAI receives zero binary images and zero direct PHI, while the appellate generator safely re-hydrates authentic patient data for outbound payer letters. PDF/image intake without Textract credentials fails hard with an actionable configuration error; inbound payer attachments that cannot be OCR'd are quarantined in Convex Storage with a human-review note and never forwarded as raw bytes to the LLM. Synthetic demo fixtures use the text intake path and require no PHI upload.
 - **Server-Side Authorization**: Every Convex query and mutation enforces strict document ownership (`claim.userId === authUser._id`) to prevent unauthorized cross-tenant data access (`convex/lib/auth.ts`).
 - **4-Pillar Evidence Coverage Score (Dossier Audit)**: The 0–100 Evidence Coverage score is computed using an explainable evidence rubric (35 pts CPB Alignment, 25 pts Objective Clinical Documentation, 20 pts ERISA Procedural Protections, 20 pts Precedent Match), functioning as an evidentiary completeness checklist rather than an uncalibrated win probability. Precedent matches are retrieved and attached to the claim evidence record before scoring (`convex/actions/precedentMatcher.ts`).
 - **Mandatory Human Review Gate**: In a high-stakes healthcare and ERISA appellate workflow (29 U.S.C. § 1133), unreviewed autonomous outbound transmissions represent an unacceptable regulatory, clinical, and malpractice liability. ClaimHero enforces a strict architectural boundary: *AI may prepare, classify, cite, and recommend. A human must approve every clinical assertion, legal assertion, recipient, and outbound message.* Outbound emails, rebuttals, and appeal packets strictly require explicit manual human confirmation before transmission and are never silently dispatched to external payers.
@@ -267,6 +267,7 @@ ClaimHero leverages 9 first-party and partner Convex components configured in [`
 - npm
 - A Convex account
 - OpenAI, Firecrawl, and AgentMail credentials for live integrations
+- AWS Textract credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) for PDF/image denial intake (fail-hard without them; raw-text intake works without)
 
 ### Install and Run
 
@@ -288,18 +289,18 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **999 automated tests** across 64 test suites (verified via `npm run test`):
+ClaimHero is backed by **1001 automated tests** across 64 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (999 tests across 64 suites)
+npm run test            # Comprehensive Vitest test suite (1001 tests across 64 suites)
 npm run test:coverage   # Code coverage report (~81% lines)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate
 ```
 
-Test suites cover Everyday Language vs. Expert Details dictionaries, cross-component custom events, and sandboxed storage resilience (`tests/detailMode.test.ts`), AWS Textract HIPAA optical document parsing and key-value block mapping (`tests/textract.test.ts`), the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Delivery Evidence Reports (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
+Test suites cover Everyday Language vs. Expert Details dictionaries, cross-component custom events, and sandboxed storage resilience (`tests/detailMode.test.ts`), AWS Textract HIPAA optical document parsing, fail-hard missing-credential and extraction-failure semantics with zero raw-PHI LLM egress, and inbound attachment quarantine (`tests/textract.test.ts`, `tests/formalPdfAttachments.test.ts`), the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Delivery Evidence Reports (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
 
 ---
 
