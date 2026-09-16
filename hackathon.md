@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-14T16:24:48Z
+- **Last updated:** 2026-09-16T02:38:19Z
 
 ## Log
 
@@ -1474,11 +1474,11 @@ Removed simulated AI adjudicator mode and restructured appellate dispatch to sup
 ### 2026-09-14 - 586f230
 Stabilized AgentMail communications inbox layout, eliminated layout shifts upon receiving inbound payer email replies, and introduced real-time feedback with Web Audio synthesis, Sonner toast notifications, message highlight pulses, and container-anchored smooth scrolling (`src/components/communications/AgentMailDrawer.tsx`, `src/lib/soundEffects.ts`, `src/components/common/SentinelFlowStepper.tsx`, `src/types/index.ts`, `tests/soundEffects.test.ts`). Fixed premature re-emergence of the 600px transmission banner on post-dispatch statuses (`under_review`, `escalated`), added `inbound_reply_received` acoustic chime, real-time toast alert with AI determination labeling, message highlight ring, and seamless scroll anchoring without jarring the viewport. Added test coverage and verified typecheck, lint, 976 passing tests, and production build with `npm run verify`.
 
-### 2026-09-14 - working tree
+### 2026-09-14 - ba65320
 Removed visual pulse/blur flashing animation from inbound payer message cards in `src/components/communications/AgentMailDrawer.tsx`. Dismantled `newlyArrivedMessageId` state, timer, and `animate-pulse` class to preserve steady, crisp card rendering without repeated opacity oscillations or blur effects upon message arrival. Verified 100% clean with `npm run verify` across typecheck, lint, 976 passing unit tests, and production build.
 
-### 2026-09-14 - working tree
-Fixed landing page signed-out button flash for returning sessions. `CinematicHero` now accepts `isAuthenticated` and `isAuthLoading` from `App.tsx` and renders a neutral skeleton placeholder while Convex Auth resolves, then shows Sentinel Console or Sign In and Launch Sentinel without layout shift. Mobile dropdown mirrors the same loading state (`src/components/landing/CinematicHero.tsx`, `src/App.tsx`). Verified with typecheck and production build.
+### 2026-09-14 - cc1cac5
+Upgraded landing auth to optimistic cached-session resolution so anonymous visitors render Sign In instantly while returning sessions hold a pixel-exact invisible reserve until Convex Auth verifies, eliminating both the signed-out flash and the skeleton delay (`src/lib/authSession.ts`, `src/hooks/useCurrentUser.ts`, `src/components/landing/CinematicHero.tsx`, `src/App.tsx`, `tests/authSession.test.ts`). Synchronized documentation and UI components. Verified with typecheck, lint, 989 passing tests, and production build.
 
-### 2026-09-14 - working tree
-Upgraded landing auth to optimistic cached-session resolution so anonymous visitors render Sign In instantly while returning sessions hold a pixel-exact invisible reserve until Convex Auth verifies, eliminating both the signed-out flash and the skeleton delay (`src/lib/authSession.ts`, `src/hooks/useCurrentUser.ts`, `src/components/landing/CinematicHero.tsx`, `src/App.tsx`, `tests/authSession.test.ts`). Verified with typecheck, lint, 989 passing tests, and production build.
+### 2026-09-16 - working tree
+Implemented dual-mode Plain Language vs Expert Details system across the entire application, presenting everyday patient-friendly terminology by default while preserving full statutory citations and clinical codes via an on-demand toggle (`README.md`, `src/hooks/useDetailMode.ts`, `src/lib/plainCopy.ts`, `src/components/common/DetailModeToggle.tsx`, `src/components/common/ExpertDetail.tsx`). Converted all 28 core UI surfaces including Case Radar, Ingestion Modal, Evidence Matrix, Appeal Studio, Sentinel Stepper, Header, Sidebar, Command Dialog, AgentMail Drawer, Audit Timeline, Financial Liability Calculator, Sentinel Chatbot, P2P Defense Studio & Live Copilot, Analytics Metrics, Policy Viewer, Clinical Research Console, Precedent Feed, Clause Inspector, Policy Drift Sentinel, Citation Sidebar, Export Drawer, P2P Encounter Summary, Settings Page, Onboarding Wizard, Onboarding Checklist, Delete Case Modal, and Not Found Workspace. Updated project documentation with dual-mode architecture positioning and synchronized test counts (999 tests across 64 suites). Added comprehensive test coverage (`tests/detailMode.test.ts`), updated regex matchers in `tests/auditTrailDrawer.test.ts`, hardened live DNS action timeout in `tests/serviceCertificate.test.ts`, and verified 100% clean with `npm run verify` across typecheck, lint, 999 passing tests across 64 test files, and production build with zero emojis.

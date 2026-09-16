@@ -262,7 +262,7 @@ describe("ERISA Certificate of Electronic Service (Proof of Delivery)", () => {
       expect(result.priority).toBe(10);
       expect(result.tlsCipher).toContain("TLS 1.3");
       expect(result.authentication.spf).toContain("Pass");
-    });
+    }, 15000);
 
     it("handles domain fallback gracefully for non-standard inputs", async () => {
       const result = await (resolveLiveRecipientMx as unknown as { _handler: (ctx: unknown, args: unknown) => Promise<{ exchange: string }> })._handler({}, {

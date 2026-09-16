@@ -29,6 +29,7 @@ import {
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
 import { getPayerAppellateContact } from "../../lib/constants";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -72,6 +73,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   isSyncingInboxes,
   onOpenAuditDrawer,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -515,14 +517,16 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-semibold text-foreground">
-                    Multi-Channel Appellate Transmission
+                    {isDetailed ? "Multi-Channel Appellate Transmission" : "Send your appeal"}
                   </h3>
                   <Badge variant="secondary" className="text-[10px] font-mono">
-                    {hasPriorTransmissions ? "Re-transmission" : "Final Step"}
+                    {hasPriorTransmissions ? (isDetailed ? "Re-transmission" : "Send again") : (isDetailed ? "Final Step" : "Last step")}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Transmit evidence-grounded ERISA memorandum & clinical evidence packet directly to {payerName}.
+                  {isDetailed
+                    ? `Transmit evidence-grounded ERISA memorandum & clinical evidence packet directly to ${payerName}.`
+                    : `Send your letter and proof to ${payerName}. You approve everything first.`}
                 </p>
               </div>
             </div>
@@ -639,14 +643,16 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <div className="flex items-center justify-between gap-1.5 mb-1.5">
                     <div className="flex items-center gap-1.5">
                       <Envelope className={cn("size-4", dispatchMode === "custom_email" ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-xs font-semibold text-foreground">Typed-In Email (Interactive Test)</span>
+                      <span className="text-xs font-semibold text-foreground">{isDetailed ? "Typed-In Email (Interactive Test)" : "Send to my email to test"}</span>
                     </div>
                     <Badge variant="outline" className="text-[9px] font-mono text-cyan-600 dark:text-cyan-400 border-cyan-500/30">
                       Personal Inbox
                     </Badge>
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-snug">
-                    Delivers complete brief to your typed email address. Reply from your inbox to test real inbound webhook ingestion.
+                    {isDetailed
+                      ? "Delivers complete brief to your typed email address. Reply from your inbox to test real inbound webhook ingestion."
+                      : "Sends your letter to your own email. Reply from there to see how replies appear here."}
                   </p>
                 </div>
                 {dispatchMode === "custom_email" ? (
@@ -695,14 +701,16 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   <div className="flex items-center justify-between gap-1.5 mb-1.5">
                     <div className="flex items-center gap-1.5">
                       <Buildings className={cn("size-4", dispatchMode === "official_payer" ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-xs font-semibold text-foreground">Official Payer Reviewer Gateway</span>
+                      <span className="text-xs font-semibold text-foreground">{isDetailed ? "Official Payer Reviewer Gateway" : "Send to insurer directly"}</span>
                     </div>
                     <Badge variant="outline" className="text-[9px] font-mono text-slate-400 border-slate-700">
                       Production
                     </Badge>
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-snug">
-                    Dispatches directly to {payerName}'s verified public grievance and appeals intake address.
+                    {isDetailed
+                      ? `Dispatches directly to ${payerName}'s verified public grievance and appeals intake address.`
+                      : `Sends directly to ${payerName}. Use this when your letter is final.`}
                   </p>
                 </div>
                 <div className="mt-2.5 pt-2 border-t border-border/50 text-[10px] font-mono text-foreground/80 truncate">
@@ -745,12 +753,12 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-foreground">
-                    Ready for Appellate Dispatch
+                    {isDetailed ? "Ready for Appellate Dispatch" : "Ready to send"}
                   </span>
                   <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
                     {dispatchMode === "custom_email"
-                      ? "Interactive Test Mode"
-                      : "Official Insurer Mode"}
+                      ? (isDetailed ? "Interactive Test Mode" : "Test mode")
+                      : (isDetailed ? "Official Insurer Mode" : "To insurer")}
                   </Badge>
                 </div>
                 <p className="text-[11px] text-muted-foreground truncate">
@@ -783,15 +791,15 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               {isDispatching ? (
                 <>
                   <CircleNotch className="size-4 animate-spin" />
-                  <span>Transmitting Appeal Packet...</span>
+                  <span>{isDetailed ? "Transmitting Appeal Packet..." : "Sending..."}</span>
                 </>
               ) : (
                 <>
                   <PaperPlaneTilt className="size-4" />
                   <span>
                     {dispatchMode === "custom_email"
-                      ? "Approve & Transmit to Typed-In Email"
-                      : "Approve & Transmit to Official Gateway"}
+                      ? (isDetailed ? "Approve & Transmit to Typed-In Email" : "Send to my email")
+                      : (isDetailed ? "Approve & Transmit to Official Gateway" : "Send to insurer")}
                   </span>
                 </>
               )}
@@ -803,7 +811,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             <Info className="size-4 text-primary shrink-0 mt-0.5" />
             <div className="space-y-1">
               <span className="font-semibold text-foreground text-[11px] block">
-                Appellate Submission Guidelines for {payerName}:
+                {isDetailed ? `Appellate Submission Guidelines for ${payerName}:` : `How to send to ${payerName}:`}
               </span>
               <p className="text-[11px] leading-relaxed text-foreground/80">
                 {payerContact.submissionPolicyNote ||
@@ -822,17 +830,19 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               <Envelope className="size-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-foreground font-sans">
-                  Payer Communications Inbox
-                </h2>
-                <Badge variant="outline" className="font-mono text-[10px]">
-                  Claim #{claim.claimNumber}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Review-gated two-way dedicated transmission channel
-              </p>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-foreground font-sans">
+                    {isDetailed ? "Payer Communications Inbox" : "Messages"}
+                  </h2>
+                  <Badge variant="outline" className="font-mono text-[10px]">
+                    {isDetailed ? `Claim #${claim.claimNumber}` : `Case #${claim.claimNumber}`}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {isDetailed
+                    ? "Review-gated two-way dedicated transmission channel"
+                    : "Letters you sent and replies from your insurer"}
+                </p>
             </div>
           </div>
 
@@ -843,7 +853,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <TooltipTrigger asChild>
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border bg-primary/10 text-primary border-primary/30 select-none cursor-default">
                     <ShieldCheck className="size-3.5 text-primary shrink-0" />
-                    <span>Human Review Mandatory</span>
+                    <span>{isDetailed ? "Human Review Mandatory" : "You approve before anything sends"}</span>
                     <Info className="size-3 opacity-60 hover:opacity-100 transition-opacity ml-0.5" />
                   </div>
                 </TooltipTrigger>

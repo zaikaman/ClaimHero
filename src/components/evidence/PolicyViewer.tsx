@@ -32,6 +32,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { stripMarkdownFormatting, cn } from "../../lib/utils";
 import { safeExternalHref } from "../../lib/urlUtils";
 import { ClauseInspectorDrawer } from "./ClauseInspectorDrawer";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 interface PolicyViewerProps {
   evidences: ClinicalEvidence[];
@@ -89,6 +90,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
   onOpenResearchConsole,
   onOpenPolicyDrift,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterSource, setFilterSource] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -259,13 +261,13 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
   const allCategoryTabs = useMemo(
     () => [
       { id: "all", label: "All Evidence", icon: BookOpen, count: sourceCounts.all },
-      { id: "payer_cpb", label: "Insurer CPB", icon: BookOpen, count: sourceCounts.payer_cpb },
-      { id: "nccn_guideline", label: "Clinical Guidelines", icon: Stethoscope, count: sourceCounts.nccn_guideline },
-      { id: "legal_precedent", label: "ERISA Law", icon: Scales, count: sourceCounts.legal_precedent },
-      { id: "pubmed_study", label: "PubMed Trials", icon: Flask, count: sourceCounts.pubmed_study },
-      { id: "fda_package_insert", label: "FDA Labels", icon: ShieldCheck, count: sourceCounts.fda_package_insert },
+      { id: "payer_cpb", label: isDetailed ? "Insurer CPB" : "Insurer Rules", icon: BookOpen, count: sourceCounts.payer_cpb },
+      { id: "nccn_guideline", label: isDetailed ? "Clinical Guidelines" : "Medical Guidelines", icon: Stethoscope, count: sourceCounts.nccn_guideline },
+      { id: "legal_precedent", label: isDetailed ? "ERISA Law" : "Legal Rights", icon: Scales, count: sourceCounts.legal_precedent },
+      { id: "pubmed_study", label: isDetailed ? "PubMed Trials" : "Clinical Studies", icon: Flask, count: sourceCounts.pubmed_study },
+      { id: "fda_package_insert", label: isDetailed ? "FDA Labels" : "FDA Approvals", icon: ShieldCheck, count: sourceCounts.fda_package_insert },
     ],
-    [sourceCounts]
+    [sourceCounts, isDetailed]
   );
 
   const emptySourcesCount = useMemo(() => {
@@ -480,7 +482,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
                   <span className="inline-flex size-2 rounded-full bg-blue-500 animate-pulse" />
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-400">
                     <Camera className="size-3.5 text-blue-400" />
-                    <span>Payer Clinical Policy Bulletin Verification</span>
+                    <span>{isDetailed ? "Payer Clinical Policy Bulletin Verification" : "Insurer Policy Verification"}</span>
                     {proof.capturedAt && (
                       <span className="text-[10px] text-muted-foreground font-normal">
                         ({new Date(proof.capturedAt).toLocaleDateString()})
@@ -503,12 +505,14 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
                   className="h-6 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 gap-1"
                 >
                   <Eye className="size-3.5" />
-                  <span>Inspect Capture</span>
+                  <span>{isDetailed ? "Inspect Capture" : "View Capture"}</span>
                 </Button>
               </div>
 
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Visual archive of the published coverage policy captured on date of clinical verification. Preserves policy metadata, effective dates, and published criteria headers against administrative alterations.
+                {isDetailed
+                  ? "Visual archive of the published coverage policy captured on date of clinical verification. Preserves policy metadata, effective dates, and published criteria headers against administrative alterations."
+                  : "Verified visual record of the insurer's policy on the date it was checked. Preserves the exact text and date so rules cannot be quietly changed later."}
               </p>
 
               <div
@@ -532,7 +536,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <span className="bg-background/95 text-foreground text-xs font-medium px-3 py-1.5 rounded-md shadow-md border border-border flex items-center gap-1.5">
                     <Eye className="size-3.5 text-primary" />
-                    <span>Click to Expand Visual Proof Screenshot</span>
+                    <span>Click to Expand Screenshot</span>
                   </span>
                 </div>
               </div>
@@ -544,7 +548,9 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
       {/* Evidence Items View Area */}
       {isLoading ? (
         <Card className="p-8 text-center text-xs font-mono text-muted-foreground animate-pulse bg-muted/20">
-          Indexing Clinical Policy Bulletins & extracting medical criteria...
+          {isDetailed
+            ? "Indexing Clinical Policy Bulletins & extracting medical criteria..."
+            : "Reading insurer rules & medical criteria..."}
         </Card>
       ) : filtered.length === 0 ? (
         <Card className="p-8 text-center items-center justify-center space-y-3 bg-muted/20 border-dashed">

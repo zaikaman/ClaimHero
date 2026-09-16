@@ -20,6 +20,7 @@ import {
   SpeakerSimpleSlash,
   Play,
   ShieldCheck,
+  GraduationCap,
 } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -33,12 +34,15 @@ import { Select } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import { cn } from "../../lib/utils";
+import { useDetailMode } from "../../hooks/useDetailMode";
+import { DetailModeToggle } from "../common/DetailModeToggle";
 
 interface SettingsPageProps {
   onNavigateToRadar?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar }) => {
+  const { isDetailed, setDetailMode } = useDetailMode();
   const { settings, isLoading, isSaving, isSyncing, isResetting, saveSettings, syncNow, resetPortfolio } = useSettings();
   const {
     isEnabled: isAudioEnabled,
@@ -179,7 +183,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-foreground tracking-tight font-sans">
-              Sentinel Settings
+              {isDetailed ? "Sentinel Settings" : "App Settings"}
             </h1>
             <Badge variant="outline" className="font-mono text-[10px] text-primary border-primary/30">
               v1.45 Engine
@@ -224,7 +228,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
           <div className="flex items-center gap-2 min-w-0">
             <ShieldCheck className="size-4 text-primary shrink-0" />
             <span className="font-semibold text-foreground shrink-0">System Jurisdiction:</span>
-            <span className="text-muted-foreground truncate">United States Healthcare • ERISA / ACA / CMS</span>
+            <span className="text-muted-foreground truncate">
+              {isDetailed ? "United States Healthcare • ERISA / ACA / CMS" : "United States Healthcare Plans"}
+            </span>
           </div>
           <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary bg-primary/10 shrink-0 self-start sm:self-auto">
             EN-US • ERISA 29 U.S.C. § 1133
@@ -279,9 +285,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
             {/* Follow-up Delay */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/30">
               <div className="space-y-0.5 max-w-lg">
-                <div className="text-xs font-semibold text-foreground">Statutory follow-up delay</div>
+                <div className="text-xs font-semibold text-foreground">
+                  {isDetailed ? "Statutory follow-up delay" : "Follow-up reminder delay"}
+                </div>
                 <div className="text-[11px] text-muted-foreground leading-relaxed">
-                  After this many quiet days post-submission, Sentinel prepares a statutory 29 CFR § 2560.503-1 bad-faith demand.
+                  {isDetailed
+                    ? "After this many quiet days post-submission, Sentinel prepares a statutory 29 CFR § 2560.503-1 bad-faith demand."
+                    : "After this many days without an insurer response, an escalation reminder is prepared."}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -305,9 +315,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
             {/* Default Legal Posture */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-0.5 max-w-lg">
-                <div className="text-xs font-semibold text-foreground">Default statutory posture</div>
+                <div className="text-xs font-semibold text-foreground">
+                  {isDetailed ? "Default statutory posture" : "Default appeal tone"}
+                </div>
                 <div className="text-[11px] text-muted-foreground leading-relaxed">
-                  Baseline legal aggressiveness applied when generating new appeal briefs.
+                  {isDetailed
+                    ? "Baseline legal aggressiveness applied when generating new appeal briefs."
+                    : "Tone and legal urgency applied when drafting new appeal letters."}
                 </div>
               </div>
               <div className="w-full sm:w-64">
@@ -326,7 +340,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
                 >
                   <option value="administrative_reconsideration">Standard Reconsideration</option>
                   <option value="procedural_grievance_bad_faith">Elevated Bad-Faith Grievance</option>
-                  <option value="external_iro_erisa_502_petition">ERISA § 502 / State IRO Petition</option>
+                  <option value="external_iro_erisa_502_petition">
+                    {isDetailed ? "ERISA § 502 / State IRO Petition" : "External State Review / Legal Petition"}
+                  </option>
                 </Select>
               </div>
             </div>
@@ -365,7 +381,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
               <div className="space-y-0.5 max-w-lg">
                 <div className="text-xs font-semibold text-foreground">Automatic clinical guideline rescan</div>
                 <div className="text-[11px] text-muted-foreground leading-relaxed">
-                  Regularly re-crawls Firecrawl CPB databases, PubMed, and legal precedents to update Statutory Appeal Readiness scores for pending cases.
+                  {isDetailed
+                    ? "Regularly re-crawls Firecrawl CPB databases, PubMed, and legal precedents to update Statutory Appeal Readiness scores for pending cases."
+                    : "Regularly checks insurer rules, medical studies, and legal wins to update case strength scores."}
                 </div>
               </div>
               <Switch
@@ -565,6 +583,68 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
                 <ArrowsClockwise className={cn("size-3.5", isSyncing && "animate-spin")} />
                 <span>{isSyncing ? "Synchronizing..." : "Sync Inboxes & Sweep Deadlines"}</span>
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card: Interface Language & Terminology Mode */}
+        <Card className="border-border/60 bg-card/60 backdrop-blur-md">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="size-4 text-primary" />
+                <CardTitle className="text-sm font-semibold">
+                  {isDetailed ? "Interface Language & Terminology Mode" : "Language & Details"}
+                </CardTitle>
+              </div>
+              <DetailModeToggle />
+            </div>
+            <CardDescription className="text-xs">
+              {isDetailed
+                ? "Configure plain language translation layer. Simple mode presents everyday advocate language; Detailed mode displays clinical and statutory citations (CPT codes, CARC reason, CPB bulletins, ERISA 29 CFR § 2560)."
+                : "Choose whether you want everyday simple words or expert medical billing codes and law citations."}
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="pt-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setDetailMode("simple")}
+                className={cn(
+                  "flex flex-col text-left p-3.5 rounded-lg border transition-all cursor-pointer",
+                  !isDetailed
+                    ? "border-primary bg-primary/10 shadow-xs"
+                    : "border-border/60 bg-muted/20 hover:border-border hover:bg-muted/40"
+                )}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-foreground">Simple Mode (Everyday Language)</span>
+                  {!isDetailed && <Badge variant="default" className="text-[10px] h-4 px-1.5">Active</Badge>}
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Clear, human language designed for patients and everyday advocates. Labels say &ldquo;My Cases&rdquo;, &ldquo;Your proof&rdquo;, and &ldquo;Fees they may owe&rdquo;.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDetailMode("detailed")}
+                className={cn(
+                  "flex flex-col text-left p-3.5 rounded-lg border transition-all cursor-pointer",
+                  isDetailed
+                    ? "border-primary bg-primary/10 shadow-xs"
+                    : "border-border/60 bg-muted/20 hover:border-border hover:bg-muted/40"
+                )}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-foreground">Detailed Mode (Expert & Statutory)</span>
+                  {isDetailed && <Badge variant="default" className="text-[10px] h-4 px-1.5">Active</Badge>}
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Reveals exact medical billing codes (CPT/HCPCS, CARC/RARC), published Clinical Policy Bulletins (CPB), and federal citations (ERISA 29 CFR § 2560.503-1).
+                </p>
+              </button>
             </div>
           </CardContent>
         </Card>

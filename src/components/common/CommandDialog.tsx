@@ -27,6 +27,7 @@ import { NavigationView } from "../layout/Sidebar";
 import { BrandIcon } from "./BrandLogo";
 import { DeleteCaseModal } from "./DeleteCaseModal";
 import { soundEffects } from "../../lib/soundEffects";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 interface CommandDialogProps {
   isOpen: boolean;
@@ -142,6 +143,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
   onOpenShortcuts,
   onDeleteCase,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -197,8 +199,8 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       // Platform Command Actions
       {
         id: "action-radar",
-        label: "Case Radar Feed",
-        description: "Intake queue, statutory deadline alarms & denial monitoring",
+        label: isDetailed ? "Case Radar Feed" : "My Cases",
+        description: isDetailed ? "Intake queue, statutory deadline alarms & denial monitoring" : "Your denied bills and time left to act",
         icon: Broadcast,
         category: "platform",
         categoryLabel: "Platform Command",
@@ -269,8 +271,8 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       },
       {
         id: "action-settings",
-        label: "Sentinel Settings",
-        description: "Review-gated dispatch rules, API credentials & gateway configuration",
+        label: isDetailed ? "Sentinel Settings" : "Settings",
+        description: isDetailed ? "Review-gated dispatch rules, API credentials & gateway configuration" : "Sending rules and preferences",
         icon: GearSix,
         category: "platform",
         categoryLabel: "Platform Command",
@@ -316,8 +318,8 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       // Active Case Workspace Tools
       {
         id: "action-evidence",
-        label: "Evidence Matrix",
-        description: "Clinical Policy Bulletins (CPBs), PubMed research & Statutory Appeal Readiness",
+        label: isDetailed ? "Evidence Matrix" : "Your proof",
+        description: isDetailed ? "Clinical Policy Bulletins (CPBs), PubMed research & Statutory Appeal Readiness" : "Why your denial can be challenged",
         icon: FileMagnifyingGlass,
         category: "workspace",
         categoryLabel: "Active Case Workspace",
@@ -342,8 +344,8 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       },
       {
         id: "action-studio",
-        label: "Appeal Brief (Step 2)",
-        description: "Synthesize AI clinical rebuttal briefs with formal statutory citations",
+        label: isDetailed ? "Appeal Brief (Step 2)" : "Your letter (Step 2)",
+        description: isDetailed ? "Synthesize AI clinical rebuttal briefs with formal statutory citations" : "Your appeal letter with proof included",
         icon: FileText,
         category: "workspace",
         categoryLabel: "Active Case Workspace",
@@ -365,8 +367,8 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       },
       {
         id: "action-p2p",
-        label: "Doctor P2P Copilot",
-        description: "3-minute peer-to-peer physician rebuttal script & live call speech simulator",
+        label: isDetailed ? "Doctor P2P Copilot" : "Doctor call prep",
+        description: isDetailed ? "3-minute peer-to-peer physician rebuttal script & live call speech simulator" : "What to say when the doctor calls the insurer",
         icon: PhoneCall,
         category: "workspace",
         categoryLabel: "Companion Tooling",
@@ -390,8 +392,8 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       },
       {
         id: "action-calculator",
-        label: "ERISA & Liability Audit",
-        description: "Patient out-of-pocket exposure & $110/day statutory non-disclosure penalty audit",
+        label: isDetailed ? "ERISA & Liability Audit" : "What do I owe?",
+        description: isDetailed ? "Patient out-of-pocket exposure & $110/day statutory non-disclosure penalty audit" : "What you might owe and possible late fees",
         icon: Calculator,
         category: "workspace",
         categoryLabel: "Companion Tooling",
@@ -417,8 +419,8 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       },
       {
         id: "action-communications",
-        label: "Payer Communications",
-        description: "Review-gated AgentMail dispatch, payer thread tracking & incoming transmissions",
+        label: isDetailed ? "Payer Communications" : "Messages",
+        description: isDetailed ? "Review-gated AgentMail dispatch, payer thread tracking & incoming transmissions" : "Letters sent and insurer replies",
         icon: Envelope,
         category: "workspace",
         categoryLabel: "Active Case Workspace",
@@ -444,8 +446,8 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       // Quick Sentinel Actions
       {
         id: "action-ingest",
-        label: "Ingest Denial Document",
-        description: "Upload PDF, paste EOB text, select presets, or inspect AgentMail inbox",
+        label: isDetailed ? "Ingest Denial Document" : "Add denial letter",
+        description: isDetailed ? "Upload PDF, paste EOB text, select presets, or inspect AgentMail inbox" : "Upload a photo, PDF, or paste your denial text",
         icon: CloudArrowUp,
         category: "sentinel",
         categoryLabel: "Quick Sentinel Actions",
@@ -530,7 +532,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
           ]
         : []),
     ],
-    [onClose, onOpenIngestion, onOpenOnboarding, onOpenShortcuts]
+    [onClose, onOpenIngestion, onOpenOnboarding, onOpenShortcuts, isDetailed]
   );
 
   const normalizedQuery = query.trim().toLowerCase();

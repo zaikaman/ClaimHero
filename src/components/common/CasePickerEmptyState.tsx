@@ -10,6 +10,8 @@ import {
 
 import { Claim } from "../../types";
 import { formatCurrency, formatDate, cn } from "../../lib/utils";
+import { useDetailMode } from "../../hooks/useDetailMode";
+import { statusSimple } from "../../lib/plainCopy";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -25,22 +27,31 @@ interface CasePickerEmptyStateProps {
 
 const VIEW_META = {
   evidence: {
-    title: "Clinical Evidence & Policy Matrix",
-    subtitle: "Select an active claim below to cross-examine insurer Clinical Policy Bulletins (CPBs) and compute overturn win probabilities.",
+    titleSimple: "Your proof",
+    titleDetailed: "Clinical Evidence & Policy Matrix",
+    subtitleSimple: "Pick a case below to see why the denial can be challenged.",
+    subtitleDetailed: "Select an active claim below to cross-examine insurer Clinical Policy Bulletins (CPBs) and compute overturn win probabilities.",
     icon: FileMagnifyingGlass,
-    actionText: "Inspect Evidence",
+    actionTextSimple: "See proof",
+    actionTextDetailed: "Inspect Evidence",
   },
   studio: {
-    title: "Collaborative Appeal Studio",
-    subtitle: "Select an active claim below to synthesize an ERISA 29 CFR § 2560.503-1 legal brief citing policy clauses and physician records.",
+    titleSimple: "Your appeal letter",
+    titleDetailed: "Collaborative Appeal Studio",
+    subtitleSimple: "Pick a case below to write your appeal letter.",
+    subtitleDetailed: "Select an active claim below to synthesize an ERISA 29 CFR § 2560.503-1 legal brief citing policy clauses and physician records.",
     icon: FileText,
-    actionText: "Open Studio",
+    actionTextSimple: "Open letter",
+    actionTextDetailed: "Open Studio",
   },
   communications: {
-    title: "Dedicated Payer Communications Inbox",
-    subtitle: "Select an active claim below to monitor two-way transmissions and deliver appeal packets to the payer.",
+    titleSimple: "Messages",
+    titleDetailed: "Dedicated Payer Communications Inbox",
+    subtitleSimple: "Pick a case below to see letters sent and replies.",
+    subtitleDetailed: "Select an active claim below to monitor two-way transmissions and deliver appeal packets to the payer.",
     icon: Envelope,
-    actionText: "View Inbox",
+    actionTextSimple: "View messages",
+    actionTextDetailed: "View Inbox",
   },
 };
 
@@ -51,8 +62,12 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
   onOpenIngestion,
   onNavigateToRadar,
 }) => {
+  const { isDetailed } = useDetailMode();
   const meta = VIEW_META[viewType];
   const IconComponent = meta.icon;
+  const title = isDetailed ? meta.titleDetailed : meta.titleSimple;
+  const subtitle = isDetailed ? meta.subtitleDetailed : meta.subtitleSimple;
+  const actionText = isDetailed ? meta.actionTextDetailed : meta.actionTextSimple;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto py-6 animate-fadeIn font-sans">
@@ -65,14 +80,14 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
           <div className="space-y-1">
             <div className="flex items-center gap-2 justify-center sm:justify-start">
               <h2 className="text-lg font-semibold text-foreground tracking-tight">
-                {meta.title}
+                {title}
               </h2>
               <Badge variant="outline" className="font-mono text-[10px]">
-                Case Context Required
+                {isDetailed ? "Case Context Required" : "Pick a case"}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-              {meta.subtitle}
+              {subtitle}
             </p>
           </div>
         </div>
@@ -84,7 +99,7 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
             onClick={onNavigateToRadar}
             className="gap-1 text-xs"
           >
-            <span>Case Radar</span>
+            <span>{isDetailed ? "Case Radar" : "My Cases"}</span>
             <ArrowRight className="size-3" />
           </Button>
           <Button
@@ -93,7 +108,7 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
             className="gap-1.5 text-xs shadow-xs"
           >
             <PlusCircle className="size-3.5" />
-            <span>Ingest New Claim</span>
+            <span>{isDetailed ? "Ingest New Claim" : "Add denial"}</span>
           </Button>
         </div>
       </Card>
@@ -103,10 +118,10 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-foreground uppercase tracking-wider font-mono">
-              Available Active Claims ({claims.length})
+              {isDetailed ? `Available Active Claims (${claims.length})` : `Your cases (${claims.length})`}
             </span>
             <span className="text-[11px] text-muted-foreground">
-              — Choose a case to load into {meta.title.split(" ")[0]} {meta.title.split(" ")[1]}
+              — {isDetailed ? `Choose a case to load into ${title}` : `Pick one to continue`}
             </span>
           </div>
         </div>
@@ -118,15 +133,17 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
             </div>
             <div className="space-y-1 max-w-sm mx-auto">
               <h3 className="text-sm font-semibold text-foreground">
-                No Medical Denial Claims Found
+                {isDetailed ? "No Medical Denial Claims Found" : "No cases yet"}
               </h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Ingest a denial letter (PDF/image/text) or load a high-value sample case into ClaimHero to start analyzing evidence and generating appeals.
+                {isDetailed
+                  ? "Ingest a denial letter (PDF/image/text) or load a high-value sample case into ClaimHero to start analyzing evidence and generating appeals."
+                  : "Add a denial letter (photo, PDF, or text) to see why it can be challenged and get your letter."}
               </p>
             </div>
             <Button onClick={onOpenIngestion} className="gap-2 text-xs shadow-xs">
               <PlusCircle className="size-3.5" />
-              <span>Ingest First Denial Notice</span>
+              <span>{isDetailed ? "Ingest First Denial Notice" : "Add your first denial"}</span>
             </Button>
 
           </Card>
@@ -178,29 +195,29 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
                         )}
                       >
                         {isWon
-                          ? "Won / Overturned"
+                          ? (isDetailed ? "Won / Overturned" : "Won")
                           : isUrgent
-                          ? `${claim.daysRemaining}d Left`
-                          : claim.status.replace(/_/g, " ")}
+                          ? `${claim.daysRemaining}d left`
+                          : (isDetailed ? claim.status.replace(/_/g, " ") : statusSimple(claim.status))}
                       </Badge>
                     </div>
 
                     {/* Insurer & Procedure Details */}
                     <div className="space-y-1.5 text-xs">
                       <div className="flex items-center justify-between text-muted-foreground">
-                        <span className="text-[11px]">Payer:</span>
+                        <span className="text-[11px]">{isDetailed ? "Payer:" : "Insurer:"}</span>
                         <span className="font-medium text-foreground truncate max-w-[140px]">
                           {claim.patient?.insurancePayer || "Insurer"}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-muted-foreground">
-                        <span className="text-[11px]">CPT Code:</span>
+                        <span className="text-[11px]">{isDetailed ? "CPT Code:" : "Care:"}</span>
                         <Badge variant="secondary" className="font-mono text-[10px] h-4.5 px-1.5">
-                          {claim.cptCodes[0] ? `CPT ${claim.cptCodes[0]}` : "No CPT"}
+                          {claim.cptCodes[0] ? `CPT ${claim.cptCodes[0]}` : (isDetailed ? "No CPT" : "Not listed")}
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between text-muted-foreground">
-                        <span className="text-[11px]">{isWon ? "Recovered Amount:" : "Disputed Amount:"}</span>
+                        <span className="text-[11px]">{isWon ? (isDetailed ? "Recovered Amount:" : "Saved:") : (isDetailed ? "Disputed Amount:" : "Bill:")}</span>
                         <span
                           className={cn(
                             "font-mono font-bold text-xs",
@@ -223,7 +240,7 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
                       size="xs"
                       className="gap-1 text-[11px] font-medium text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all"
                     >
-                      <span>{meta.actionText}</span>
+                      <span>{actionText}</span>
                       <ArrowRight className="size-2.5 group-hover:translate-x-0.5 transition-transform" />
                     </Button>
                   </div>

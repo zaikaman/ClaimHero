@@ -27,6 +27,7 @@ import { Badge } from "../ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
 import { formatDateTime, formatDate, cn } from "../../lib/utils";
 import { toast } from "sonner";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 interface PolicyDriftSentinelProps {
   claim: Claim;
@@ -39,6 +40,7 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
   evidences = [],
   onNavigateToStudio,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [isScanning, setIsScanning] = useState(false);
   const [scanStage, setScanStage] = useState<string>("");
   const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
@@ -177,7 +179,7 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
             <div className="flex items-center gap-2">
               <Scales className="size-4 text-cyan-400" />
               <h3 className="font-semibold text-sm text-foreground tracking-tight">
-                Policy Drift Sentinel
+                {isDetailed ? "Policy Drift Sentinel" : "Policy Change Detector"}
               </h3>
               <span className="text-xs text-cyan-400/80 font-mono truncate max-w-xs">
                 &bull; {activePolicyTitle}
@@ -185,7 +187,9 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
             </div>
 
             <p className="text-xs text-muted-foreground max-w-2xl leading-relaxed">
-              Insurers frequently alter online Clinical Policy Bulletins (CPBs) after issuing a denial, retroactively inserting stricter step-therapy or experimental exclusions. Firecrawl compares the live policy against the cryptographically hashed snapshot from the date of denial.
+              {isDetailed
+                ? "Insurers frequently alter online Clinical Policy Bulletins (CPBs) after issuing a denial, retroactively inserting stricter step-therapy or experimental exclusions. Firecrawl compares the live policy against the cryptographically hashed snapshot from the date of denial."
+                : "Insurers sometimes change their coverage rules online after rejecting a claim. We compare today's live insurer policy against the verified copy on your denial date to catch sneaky rule changes."}
             </p>
           </div>
 
@@ -201,12 +205,12 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
               {isScanning ? (
                 <>
                   <CircleNotch className="size-3.5 animate-spin text-cyan-400" />
-                  <span>Scanning Live CPB...</span>
+                  <span>{isDetailed ? "Scanning Live CPB..." : "Checking Live Rules..."}</span>
                 </>
               ) : (
                 <>
                   <ArrowsClockwise className="size-3.5" />
-                  <span>Detect Policy Drift</span>
+                  <span>{isDetailed ? "Detect Policy Drift" : "Check for Rule Changes"}</span>
                 </>
               )}
             </Button>
@@ -280,7 +284,7 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
                   className="text-xs gap-1.5 border-rose-500/30 text-rose-300 hover:bg-rose-500/15"
                 >
                   <FileText className="size-3.5 text-rose-400" />
-                  <span>Inspect ERISA Violation Notice</span>
+                  <span>{isDetailed ? "Inspect ERISA Violation Notice" : "View Legal Notice"}</span>
                 </Button>
               </div>
             )}
@@ -471,9 +475,13 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
             <Fingerprint className="size-5" />
           </div>
           <div className="space-y-1 max-w-md mx-auto">
-            <h4 className="text-xs font-semibold text-foreground">No Policy Drift Scans Executed Yet</h4>
+            <h4 className="text-xs font-semibold text-foreground">
+              {isDetailed ? "No Policy Drift Scans Executed Yet" : "No Policy Change Checks Run Yet"}
+            </h4>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Verify whether {claim.insurancePayer || "the insurer"} quietly updated their clinical policy criteria after denying Claim #{claim.claimNumber}. Click "Detect Policy Drift" to initiate a real-time Firecrawl audit.
+              {isDetailed
+                ? `Verify whether ${claim.insurancePayer || "the insurer"} quietly updated their clinical policy criteria after denying Claim #${claim.claimNumber}. Click "Detect Policy Drift" to initiate a real-time Firecrawl audit.`
+                : `Check if ${claim.insurancePayer || "the insurer"} changed their coverage rules after turning down Claim #${claim.claimNumber}. Click below to verify their live policy against your original denial.`}
             </p>
           </div>
           <Button
@@ -482,7 +490,7 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
             className="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold text-xs gap-1.5"
           >
             <ArrowsClockwise className="size-3.5" />
-            <span>Run Initial Policy Audit</span>
+            <span>{isDetailed ? "Run Initial Policy Audit" : "Check for Rule Changes"}</span>
           </Button>
         </Card>
       )}

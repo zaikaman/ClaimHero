@@ -20,6 +20,8 @@ import {
 } from "@phosphor-icons/react";
 import { Claim, ClinicalEvidence, AppealLevel, StudioPresenceData } from "../../types";
 import { cn } from "../../lib/utils";
+import { useDetailMode } from "../../hooks/useDetailMode";
+import { PLAIN_TIERS } from "../../lib/plainCopy";
 import { useAppealStudio } from "../../hooks/useAppealStudio";
 import { useClaimCollaborators } from "../../hooks/useClaimCollaborators";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
@@ -111,6 +113,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
   onOpenIngestion,
 }) => {
   const { user, userName } = useCurrentUser();
+  const { isDetailed } = useDetailMode();
   const currentUserId = (user?._id as string | undefined) || "";
   const {
     collaborators,
@@ -389,6 +392,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 p-1 rounded-lg bg-muted/40 border border-border/60 flex-1">
             {(["level_1_internal", "level_2_grievance", "level_3_external_state_review"] as AppealLevel[]).map((tierKey) => {
               const tier = TIER_METADATA_CONFIG[tierKey];
+              const plain = PLAIN_TIERS[tierKey];
               const isActive = appealLevel === tierKey;
               const hasRevisionForTier = appealVersions.some((v) => v.appealLevel === tierKey);
 
@@ -397,6 +401,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   key={tierKey}
                   type="button"
                   onClick={() => setAppealLevel(tierKey)}
+                  title={isDetailed ? tier.title : `${plain.simple} — ${plain.who}`}
                   className={cn(
                     "flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border text-left transition-all",
                     isActive
@@ -415,10 +420,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                     </span>
                     <div className="min-w-0">
                       <div className={cn("text-xs truncate font-medium", isActive && "font-semibold text-foreground")}>
-                        {tier.shortTitle}
+                        {isDetailed ? tier.shortTitle : plain.simple}
                       </div>
                       <div className="text-[10px] text-muted-foreground/80 truncate hidden xl:block">
-                        {tier.postureLabel}
+                        {isDetailed ? tier.postureLabel : plain.who}
                       </div>
                     </div>
                   </div>
@@ -440,10 +445,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               size="sm"
               onClick={() => setShowVersionHistory(!showVersionHistory)}
               className="h-9 rounded-md px-3 text-xs gap-1.5 shrink-0 border-border/80"
-              title="Browse historical appeal revisions across tiers"
+              title={isDetailed ? "Browse historical appeal revisions across tiers" : "See past versions of your letter"}
             >
               <ClockCounterClockwise className="size-3.5 text-muted-foreground" />
-              <span>Revisions ({appealVersions.length})</span>
+              <span>{isDetailed ? `Revisions (${appealVersions.length})` : `Past versions (${appealVersions.length})`}</span>
             </Button>
 
             {/* 1-Click Escalate Tier Button */}
@@ -453,35 +458,35 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 onClick={() => setShowEscalationModal(true)}
                 disabled={isEscalating || isSynthesizing || readOnly}
                 className="h-9 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-xs transition-all"
-                title={readOnly ? "Viewers have read-only access" : `Escalate dispute to ${currentTierConfig.nextTierLabel}`}
+                title={readOnly ? "Viewers have read-only access" : (isDetailed ? `Escalate dispute to ${currentTierConfig.nextTierLabel}` : `Take it to the next level: ${PLAIN_TIERS[currentTierConfig.nextTier]?.simple}`)}
               >
                 <TrendUp className="size-3.5" />
-                <span>Escalate to Tier {TIER_METADATA_CONFIG[currentTierConfig.nextTier].levelNumber}</span>
+                <span>{isDetailed ? `Escalate to Tier ${TIER_METADATA_CONFIG[currentTierConfig.nextTier].levelNumber}` : "Take it further"}</span>
               </Button>
             ) : (
               <Badge variant="destructive" className="h-9 px-3 text-xs gap-1.5 font-sans font-medium flex items-center">
                 <Scales className="size-3.5" />
-                <span>Tier 3 Max Enforcement</span>
+                <span>{isDetailed ? "Tier 3 Max Enforcement" : "Highest level"}</span>
               </Badge>
             )}
           </div>
         </div>
 
-        {/* Active Statutory Posture Pill Ribbon */}
+        {/* Active appeal level ribbon */}
         <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between gap-2 flex-wrap text-[11px] text-muted-foreground">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             <span className="font-semibold text-foreground flex items-center gap-1 shrink-0">
               <Gavel className="size-3 text-primary" />
-              Target Authority:
+              {isDetailed ? "Target Authority:" : "Who reads this:"}
             </span>
-            <span className="text-foreground font-medium truncate">{currentTierConfig.targetAuthority}</span>
+            <span className="text-foreground font-medium truncate">{isDetailed ? currentTierConfig.targetAuthority : (PLAIN_TIERS[appealLevel]?.who ?? currentTierConfig.targetAuthority)}</span>
             <span className="text-border hidden sm:inline">•</span>
-            <span className="font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20 text-[10px]">
+            <span className="font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20 text-[10px]" title={isDetailed ? undefined : "Law cited in your letter"}>
               {currentTierConfig.keyStatute}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] font-mono shrink-0">
-            <span className="text-muted-foreground">Aggressiveness:</span>
+            <span className="text-muted-foreground">{isDetailed ? "Aggressiveness:" : "Tone:"}</span>
             <span className={cn(
               "font-semibold px-1.5 py-0.5 rounded",
               appealLevel === "level_3_external_state_review"
@@ -564,14 +569,14 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-sm font-semibold text-foreground font-sans">
-                  Collaborative Appeal Studio
+                  {isDetailed ? "Collaborative Appeal Studio" : "Your appeal letter"}
                 </h2>
                 <Badge variant="outline" className="font-mono text-[10px]">
-                  Claim #{claim.claimNumber}
+                  {isDetailed ? `Claim #${claim.claimNumber}` : `Case #${claim.claimNumber}`}
                 </Badge>
                 {hasSynthesizedBrief && (
                   <Badge variant="outline" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
-                    Brief Ready (v{appeal?.version || claim.latestAppeal?.version || 1})
+                    {isDetailed ? `Brief Ready (v${appeal?.version || claim.latestAppeal?.version || 1})` : `Ready (v${appeal?.version || claim.latestAppeal?.version || 1})`}
                   </Badge>
                 )}
                 {claim.isShared && (
@@ -588,7 +593,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 {claim.status === "won" && (
                   <Badge variant="default" className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 text-[10px] font-semibold gap-1">
                     <Check className="size-3 text-emerald-500" />
-                    <span>Overturned & Won</span>
+                    <span>{isDetailed ? "Overturned & Won" : "Won"}</span>
                   </Badge>
                 )}
                 {saveStatus === "saving" && (
@@ -629,7 +634,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
-                Patient: <span className="text-foreground font-medium">{claim.patient?.name}</span> • Payer:{" "}
+                {isDetailed ? "Patient:" : "For:"} <span className="text-foreground font-medium">{claim.patient?.name}</span> • {isDetailed ? "Payer:" : "Insurer:"}{" "}
                 <span className="text-foreground font-medium">{claim.patient?.insurancePayer}</span>
               </p>
             </div>
@@ -655,7 +660,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               size="sm"
               onClick={() => setIsShareOpen(true)}
               className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
-              title="Invite teammates to collaborate live on this case"
+              title={isDetailed ? "Invite teammates to collaborate live on this case" : "Invite family or helpers to view this case"}
             >
               <UsersThree className="size-3.5" />
               <span>Share</span>
@@ -674,17 +679,17 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   onClick={handleRunSynthesis}
                   disabled={isSynthesizing || isSaving || isEscalating || readOnly || isBackgroundPipelineRunning}
                   className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
-                  title={readOnly ? "Viewers have read-only access" : isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Re-generate appeal brief with AI"}
+                  title={readOnly ? "Viewers have read-only access" : isBackgroundPipelineRunning ? (isDetailed ? "Autonomous pipeline already running in background" : "Your letter is already being written") : (isDetailed ? "Re-generate appeal brief with AI" : "Rewrite your letter")}
                 >
                   {isSynthesizing || isEscalating ? (
                     <>
                       <CircleNotch className="size-3.5 animate-spin" />
-                      <span>Re-synthesizing...</span>
+                      <span>{isDetailed ? "Re-synthesizing..." : "Rewriting..."}</span>
                     </>
                   ) : (
                     <>
                       <ArrowsClockwise className="size-3.5" />
-                      <span>Re-synthesize</span>
+                      <span>{isDetailed ? "Re-synthesize" : "Rewrite"}</span>
                     </>
                   )}
                 </Button>
@@ -695,10 +700,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   size="sm"
                   onClick={() => setIsExportOpen(true)}
                   className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
-                  title="Preview printable appeal brief"
+                  title={isDetailed ? "Preview printable appeal brief" : "See how your letter will look"}
                 >
                   <Printer className="size-3.5" />
-                  <span>Preview Email</span>
+                  <span>{isDetailed ? "Preview Email" : "Preview"}</span>
                 </Button>
 
                 {/* Primary Blue CTA: Next step in the Sentinel pipeline */}
@@ -707,9 +712,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                     size="sm"
                     onClick={onNavigateToDispatch}
                     className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
-                    title="Proceed to Payer Dispatch to review transmission and send appeal"
+                    title={isDetailed ? "Proceed to Payer Dispatch to review transmission and send appeal" : "Go to send your letter"}
                   >
-                    <span>Proceed to Dispatch</span>
+                    <span>{isDetailed ? "Proceed to Dispatch" : "Next: Send it"}</span>
                     <ArrowRight className="size-3.5" />
                   </Button>
                 ) : (
@@ -717,10 +722,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                     size="sm"
                     onClick={() => setIsExportOpen(true)}
                     className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
-                    title="Preview printable appeal brief"
+                    title={isDetailed ? "Preview printable appeal brief" : "See how your letter will look"}
                   >
                     <Printer className="size-3.5" />
-                    <span>Preview Email</span>
+                    <span>{isDetailed ? "Preview Email" : "Preview"}</span>
                   </Button>
                 )}
               </>
@@ -732,10 +737,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   size="sm"
                   onClick={() => setIsExportOpen(true)}
                   className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
-                  title="Preview printable appeal brief"
+                  title={isDetailed ? "Preview printable appeal brief" : "See how your letter will look"}
                 >
                   <Printer className="size-3.5" />
-                  <span>Preview Email</span>
+                  <span>{isDetailed ? "Preview Email" : "Preview"}</span>
                 </Button>
 
                 {/* Synthesize Appeal Brief (Primary Initial Action) */}
@@ -749,22 +754,22 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                       ? "border border-primary/30 bg-primary/10 text-primary cursor-not-allowed shadow-none"
                       : "bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
                   )}
-                  title={readOnly ? "Viewers have read-only access" : isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Synthesize cited appeal brief with AI"}
+                  title={readOnly ? "Viewers have read-only access" : isBackgroundPipelineRunning ? (isDetailed ? "Autonomous pipeline already running in background" : "Your letter is already being written") : (isDetailed ? "Synthesize cited appeal brief with AI" : "Write your letter with proof included")}
                 >
                   {isSynthesizing || isEscalating ? (
                     <>
                       <CircleNotch className="size-3.5 animate-spin" />
-                      <span>Synthesizing...</span>
+                      <span>{isDetailed ? "Synthesizing..." : "Writing..."}</span>
                     </>
                   ) : isBackgroundPipelineRunning ? (
                     <>
                       <CircleNotch className="size-3.5 animate-spin text-primary" />
-                      <span>Synthesizing in Background...</span>
+                      <span>{isDetailed ? "Synthesizing in Background..." : "Writing in background..."}</span>
                     </>
                   ) : (
                     <>
                       <FileText className="size-3.5" />
-                      <span>Synthesize Brief</span>
+                      <span>{isDetailed ? "Synthesize Brief" : "Write my letter"}</span>
                     </>
                   )}
                 </Button>
@@ -832,7 +837,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 className="gap-1 font-medium h-7 text-xs"
               >
                 <PencilSimpleLine className="size-3" />
-                <span>Editor</span>
+                <span>{isDetailed ? "Editor" : "Write"}</span>
               </Button>
               <Button
                 variant={activeTab === "split" ? "secondary" : "ghost"}
@@ -840,7 +845,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 onClick={() => setActiveTab("split")}
                 className="hidden md:inline-flex font-medium h-7 text-xs"
               >
-                <span>Split View</span>
+                <span>{isDetailed ? "Split View" : "Side-by-side"}</span>
               </Button>
               <Button
                 variant={activeTab === "preview" ? "secondary" : "ghost"}
@@ -849,7 +854,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 className="gap-1 font-medium h-7 text-xs"
               >
                 <Eye className="size-3" />
-                <span>Preview</span>
+                <span>{isDetailed ? "Preview" : "Read"}</span>
               </Button>
               <div className="h-4 w-px bg-border mx-1 hidden sm:block" />
               <Button
@@ -858,17 +863,17 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 onClick={handleInjectErisaPenalties}
                 disabled={readOnly}
                 className="gap-1 text-xs text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 h-7 disabled:opacity-50"
-                title={readOnly ? "Viewers have read-only access" : "Inject accrued ERISA 29 U.S.C. § 1132(c) statutory non-disclosure penalties into Section IV"}
+                title={readOnly ? "Viewers have read-only access" : (isDetailed ? "Inject accrued ERISA 29 U.S.C. § 1132(c) statutory non-disclosure penalties into Section IV" : "Add a warning about fees the insurer may owe")}
               >
                 {injectedPenaltiesSuccess ? (
                   <>
                     <Check className="size-3 text-emerald-400" />
-                    <span className="text-emerald-400 font-mono">Penalties Embedded</span>
+                    <span className="text-emerald-400 font-mono">{isDetailed ? "Penalties Embedded" : "Warning added"}</span>
                   </>
                 ) : (
                   <>
                     <Scales className="size-3" />
-                    <span>Embed $110/d Penalties</span>
+                    <span>{isDetailed ? "Embed $110/d Penalties" : "Add fee warning"}</span>
                   </>
                 )}
               </Button>
@@ -885,15 +890,15 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           {markdownContent.trim().length > 0 && (
             <div className="h-8 shrink-0 flex items-center gap-1.5 overflow-x-auto overflow-y-hidden px-4 bg-muted/20 border-b border-border/60 scrollbar-none text-[11px] font-mono select-none">
               <span className="text-muted-foreground uppercase text-[9px] font-semibold tracking-wider shrink-0 mr-1">
-                Jump To:
+                {isDetailed ? "Jump To:" : "Go to:"}
               </span>
               {[
-                { label: "Header", pattern: /appeal of adverse|claim reference|^# /i, id: "jump-trans" },
-                { label: "Case Details", pattern: /claim details|patient\/member|date of service/i, id: "jump-meta" },
-                { label: "Clinical Basis", pattern: /clinical basis|additional clinical|medical necessity|treating provider/i, id: "jump-facts" },
-                { label: "Supporting Evidence", pattern: /supporting documentation|review references|policy materials|evidence/i, id: "jump-cpb" },
-                { label: "Review & ERISA", pattern: /review requested|if erisa applies|statutory remedies|statutory rights/i, id: "jump-remedies" },
-                { label: "Signature", pattern: /sincerely|submitted by|treating provider:|authorized representative|attending physician/i, id: "jump-attest" },
+                { label: isDetailed ? "Header" : "Top", pattern: /appeal of adverse|claim reference|^# /i, id: "jump-trans" },
+                { label: isDetailed ? "Case Details" : "Your details", pattern: /claim details|patient\/member|date of service/i, id: "jump-meta" },
+                { label: isDetailed ? "Clinical Basis" : "Medical reasons", pattern: /clinical basis|additional clinical|medical necessity|treating provider/i, id: "jump-facts" },
+                { label: isDetailed ? "Supporting Evidence" : "Proof", pattern: /supporting documentation|review references|policy materials|evidence/i, id: "jump-cpb" },
+                { label: isDetailed ? "Review & ERISA" : "Rights & requests", pattern: /review requested|if erisa applies|statutory remedies|statutory rights/i, id: "jump-remedies" },
+                { label: isDetailed ? "Signature" : "Sign", pattern: /sincerely|submitted by|treating provider:|authorized representative|attending physician/i, id: "jump-attest" },
               ].map((sec) => (
                 <button
                   key={sec.id}
@@ -1000,13 +1005,13 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                     <div className="space-y-1 max-w-sm">
                       <div className="text-sm font-semibold text-foreground">
                         {isBackgroundPipelineRunning
-                          ? "Pipeline Running — Brief Arriving Shortly"
-                          : `Ready to Synthesize ${currentTierConfig.shortTitle} Brief`}
+                          ? (isDetailed ? "Pipeline Running — Brief Arriving Shortly" : "Working — your letter is on its way")
+                          : (isDetailed ? `Ready to Synthesize ${currentTierConfig.shortTitle} Brief` : "Ready to write your letter")}
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">
                         {isBackgroundPipelineRunning
-                          ? `Background synthesis in progress for ${claim.claimNumber}. The brief streams in automatically; review ${evidences.length} clinical policy clauses meanwhile.`
-                          : `Generate a formal cited appeal brief referencing ${evidences.length} clinical policy clauses and ${currentTierConfig.keyStatute} federal requirements.`}
+                          ? (isDetailed ? `Background synthesis in progress for ${claim.claimNumber}. The brief streams in automatically; review ${evidences.length} clinical policy clauses meanwhile.` : `Writing your letter for case ${claim.claimNumber}. It appears here automatically — check your proof meanwhile.`)
+                          : (isDetailed ? `Generate a formal cited appeal brief referencing ${evidences.length} clinical policy clauses and ${currentTierConfig.keyStatute} federal requirements.` : `We write a formal letter using your ${evidences.length} proof documents. You approve it before anything sends.`)}
                       </p>
                     </div>
 
@@ -1019,17 +1024,17 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                           ? "border border-primary/30 bg-primary/10 text-primary cursor-not-allowed shadow-none"
                           : "bg-primary text-primary-foreground shadow-md hover:bg-primary/90 cursor-pointer"
                       )}
-                      title={isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : readOnly ? "Viewers have read-only access" : undefined}
+                      title={isBackgroundPipelineRunning ? (isDetailed ? "Autonomous pipeline already running in background" : "Your letter is already being written") : readOnly ? "Viewers have read-only access" : undefined}
                     >
                       {isSynthesizing || isEscalating || isBackgroundPipelineRunning ? (
                         <>
                           <CircleNotch className="size-3.5 animate-spin text-primary" />
-                          <span>{isBackgroundPipelineRunning && !isSynthesizing ? "Pipeline Running in Background..." : "Synthesizing Appeal Brief..."}</span>
+                          <span>{isBackgroundPipelineRunning && !isSynthesizing ? (isDetailed ? "Pipeline Running in Background..." : "Working in background...") : (isDetailed ? "Synthesizing Appeal Brief..." : "Writing your letter...")}</span>
                         </>
                       ) : (
                         <>
                           <FileText className="size-3.5" />
-                          <span>1-Click Synthesize Appeal Brief</span>
+                          <span>{isDetailed ? "1-Click Synthesize Appeal Brief" : "Write my letter"}</span>
                         </>
                       )}
                     </Button>
@@ -1058,12 +1063,12 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md p-3 px-4 sm:px-8 flex items-center justify-between shadow-lg print:hidden">
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="font-mono text-xs hidden sm:inline-flex">
-            Step 2 of 3: Appeal Brief
+            {isDetailed ? "Step 2 of 3: Appeal Brief" : "Step 2 of 3: Your letter"}
           </Badge>
           <span className="text-xs text-muted-foreground">
             {markdownContent
               ? `${markdownContent.split(/\s+/).filter(Boolean).length} words • ${currentTierConfig.keyStatute} Cited`
-              : "Synthesize the appeal brief before dispatching to insurer"}
+              : (isDetailed ? "Synthesize the appeal brief before dispatching to insurer" : "Write your letter before sending it")}
           </span>
         </div>
 
@@ -1073,10 +1078,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             size="sm"
             onClick={() => setIsExportOpen(true)}
             className="gap-1.5 text-xs h-8 hidden sm:inline-flex"
-            title="Export printable PDF brief and statutory exhibits"
+            title={isDetailed ? "Export printable PDF brief and statutory exhibits" : "Save or print your letter"}
           >
             <Printer className="size-3.5" />
-            <span>Export PDF Dossier</span>
+            <span>{isDetailed ? "Export PDF Dossier" : "Save / Print"}</span>
           </Button>
 
           {hasSynthesizedBrief ? (
@@ -1085,9 +1090,9 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 if (onNavigateToDispatch) onNavigateToDispatch();
               }}
               className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all h-8"
-              title="Proceed to Payer Dispatch to review transmission and send appeal"
+              title={isDetailed ? "Proceed to Payer Dispatch to review transmission and send appeal" : "Go to send your letter"}
             >
-              <span>Next: Dispatch Appeal Packet</span>
+              <span>{isDetailed ? "Next: Dispatch Appeal Packet" : "Next: Send it"}</span>
               <ArrowRight className="size-3.5" />
             </Button>
           ) : (
@@ -1100,22 +1105,22 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   ? "border border-primary/30 bg-primary/10 text-primary cursor-not-allowed shadow-none"
                   : "bg-primary text-primary-foreground shadow-md hover:shadow-lg cursor-pointer"
               )}
-              title={readOnly ? "Viewers have read-only access" : isBackgroundPipelineRunning ? "Autonomous pipeline already running in background" : "Synthesize cited appeal brief with AI before dispatching"}
+              title={readOnly ? "Viewers have read-only access" : isBackgroundPipelineRunning ? (isDetailed ? "Autonomous pipeline already running in background" : "Your letter is already being written") : (isDetailed ? "Synthesize cited appeal brief with AI before dispatching" : "Write your letter before sending it")}
             >
               {isSynthesizing || isEscalating ? (
                 <>
                   <CircleNotch className="size-3.5 animate-spin" />
-                  <span>Synthesizing Brief...</span>
+                  <span>{isDetailed ? "Synthesizing Brief..." : "Writing..."}</span>
                 </>
               ) : isBackgroundPipelineRunning ? (
                 <>
                   <CircleNotch className="size-3.5 animate-spin text-primary" />
-                  <span>Pipeline Running in Background...</span>
+                  <span>{isDetailed ? "Pipeline Running in Background..." : "Writing in background..."}</span>
                 </>
               ) : (
                 <>
                   <FileText className="size-3.5" />
-                  <span>Next: Synthesize Appeal Brief</span>
+                  <span>{isDetailed ? "Next: Synthesize Appeal Brief" : "Next: Write my letter"}</span>
                   <ArrowRight className="size-3.5" />
                 </>
               )}
@@ -1135,10 +1140,12 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">
-                    Escalate Statutory Appeal Tier
+                    {isDetailed ? "Escalate Statutory Appeal Tier" : "Take it to the next level?"}
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Elevate dispute to Tier {TIER_METADATA_CONFIG[currentTierConfig.nextTier].levelNumber}
+                    {isDetailed
+                      ? `Elevate dispute to Tier ${TIER_METADATA_CONFIG[currentTierConfig.nextTier].levelNumber}`
+                      : `Ask ${PLAIN_TIERS[currentTierConfig.nextTier]?.who ?? "the next reviewers"} to look again`}
                   </p>
                 </div>
               </div>
@@ -1172,7 +1179,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <ShieldCheck className="size-3.5 text-primary" />
-                  Statutory Escalation Grounds & Reason (Optional)
+                  {isDetailed ? "Statutory Escalation Grounds & Reason (Optional)" : "Why are you asking again? (optional)"}
                 </label>
                 <Textarea
                   rows={3}

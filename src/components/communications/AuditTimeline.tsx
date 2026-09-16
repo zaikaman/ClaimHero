@@ -33,6 +33,7 @@ import {
 } from "../../lib/auditCrypto";
 import { toast } from "sonner";
 import { useSoundEffects } from "../../hooks/useSoundEffects";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Select } from "../ui/select";
@@ -43,6 +44,56 @@ export interface AuditTimelineProps {
   logs: AuditLog[];
   isLoading?: boolean;
   isDrawer?: boolean;
+}
+
+// Everyday wording for the same events. Expert labels stay in EVENT_CONFIGS.
+const PLAIN_EVENT_LABELS: Record<string, string> = {
+  denial_ingested: "Denial added",
+  policy_crawled: "Their rules checked",
+  multi_source_crawl_started: "Research started",
+  precedent_vectors_retrieved: "Similar wins found",
+  precedents_retrieval_warning: "Similar wins warning",
+  status_changed_to_precedent_matched: "Case strength scored",
+  overturn_score_computed: "Case strength scored",
+  appeal_draft_updated: "Letter updated",
+  brief_synthesized: "Letter written",
+  appeal_context_completed: "Your details added",
+  appeal_dispatched: "Appeal sent",
+  appeal_packet_dispatched: "Appeal sent",
+  payer_response_received: "Reply from insurer",
+  inbound_reply_adjudicated: "Reply reviewed",
+  inbound_attachment_processed: "Attachment processed",
+  outbound_delivery_failed: "Send failed",
+  appeal_review_requested: "Review requested",
+  payer_contact_resolved: "Insurer contact found",
+  payer_contact_reverified_for_dispatch: "Insurer contact verified",
+  peer_to_peer_defense_generated: "Call script written",
+  p2p_script_generated: "Call script written",
+  p2p_live_call_completed: "Doctor call done",
+  statutory_deadline_sweep: "Deadline check",
+  statutory_countdown_started: "Clock started",
+  statutory_tier_escalated: "Escalated to next level",
+  statutory_alarm_critical: "Deadline warning",
+  financial_liability_calculated: "Costs calculated",
+  erisa_penalties_assessed: "Fees they may owe",
+  hipaa_redaction_applied: "Privacy filter applied",
+  hipaa_redaction_waived: "Privacy filter skipped",
+  phi_placeholder_healed: "Private data restored",
+  collaborator_invited: "Helper invited",
+  collaborator_accepted: "Helper joined",
+  collaborator_declined: "Helper declined",
+  collaborator_invite_canceled: "Invite canceled",
+  collaborator_role_changed: "Access changed",
+  collaborator_removed: "Helper removed",
+  collaborator_left: "Helper left",
+  case_tombstoned: "Case archived",
+  case_deleted: "Case deleted",
+  durable_workflow_started: "Background job started",
+  durable_workflow_canceled: "Background job stopped",
+};
+
+export function plainEventLabel(eventType: string, fallback: string): string {
+  return PLAIN_EVENT_LABELS[eventType] ?? fallback;
 }
 
 const EVENT_CONFIGS: Record<
@@ -272,6 +323,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
   isLoading = false,
   isDrawer = false,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [filterType, setFilterType] = useState<string>("all");
   const [verificationResult, setVerificationResult] = useState<AuditChainVerificationResult | null>(null);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
@@ -410,7 +462,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
         const label = config
           ? config.label
           : eventType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-        return { eventType, count, label };
+        return { eventType, count, label, plainLabel: plainEventLabel(eventType, label) };
       })
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [logs]);
@@ -447,9 +499,9 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
               aria-label="Filter events by type"
             >
               <option value="all">All Events ({logs.length})</option>
-              {availableEventOptions.map(({ eventType, count, label }) => (
+              {availableEventOptions.map(({ eventType, count, label, plainLabel }) => (
                 <option key={eventType} value={eventType}>
-                  {label} ({count})
+                  {isDetailed ? label : plainLabel} ({count})
                 </option>
               ))}
             </Select>
@@ -472,9 +524,9 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
               aria-label="Filter events by type"
             >
               <option value="all">All Events ({logs.length})</option>
-              {availableEventOptions.map(({ eventType, count, label }) => (
+              {availableEventOptions.map(({ eventType, count, label, plainLabel }) => (
                 <option key={eventType} value={eventType}>
-                  {label} ({count})
+                  {isDetailed ? label : plainLabel} ({count})
                 </option>
               ))}
             </Select>
@@ -517,7 +569,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-xs font-bold text-foreground font-sans tracking-wide">
-                  Cryptographic Proof of Case Integrity
+                  {isDetailed ? "Cryptographic Proof of Case Integrity" : "Tamper-Proof Case Log"}
                 </h3>
                 {verificationResult?.isValid && !verificationResult?.needsReseal ? (
                   <Badge
@@ -777,7 +829,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
                           size="sm"
                           className="font-mono text-[10px]"
                         >
-                          {config.label}
+                          {isDetailed ? config.label : plainEventLabel(log.eventType, config.label)}
                         </Badge>
                         <span className="font-mono text-xs text-muted-foreground">
                           Actor: <strong className="text-foreground">{log.actor}</strong>

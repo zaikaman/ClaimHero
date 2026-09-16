@@ -49,6 +49,7 @@ import { Select } from "../ui/select";
 import { Input } from "../ui/input";
 
 import { Id } from "../../../convex/_generated/dataModel";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { toast } from "sonner";
 
 type IngestionStage = "idle" | "extracting" | "preparing_questions" | "saving";
@@ -114,6 +115,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   onSuccess,
   initialClaim,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [activeTab, setActiveTab] = useState("presets");
   const [patientState, setPatientState] = useState("California");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -647,13 +649,15 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <DialogTitle>Ingest Denial Document</DialogTitle>
+                <DialogTitle>{isDetailed ? "Ingest Denial Document" : "Add denial letter"}</DialogTitle>
                 <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary bg-primary/5">
-                  US Healthcare Appeals
+                  {isDetailed ? "US Healthcare Appeals" : "Takes ~1 min"}
                 </Badge>
               </div>
               <DialogDescription>
-                Automated clinical record extraction & real-time case indexing (EOBs and denial notices)
+                {isDetailed
+                  ? "Automated clinical record extraction & real-time case indexing (EOBs and denial notices)"
+                  : "Upload a photo or PDF of your denial — we pull out the important parts for you."}
               </DialogDescription>
             </div>
           </div>

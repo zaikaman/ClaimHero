@@ -16,6 +16,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { stripMarkdownFormatting } from "../../lib/utils";
 import { usePrecedents } from "../../hooks/usePrecedents";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 interface PrecedentFeedProps {
   claim: Claim;
@@ -27,9 +28,9 @@ function similarityPercent(score: number): number {
 
 function sourceKindLabel(kind: string): string {
   switch (kind) {
-    case "winning_brief":
-      return "Winning Brief";
-    case "commissioner_ruling":
+    case "erisa_precedent":
+      return "ERISA Precedent";
+    case "state_insurance_commissioner":
       return "Commissioner Ruling";
     case "court_overturn":
       return "Court Overturn";
@@ -45,6 +46,7 @@ function citationCopyText(item: VectorPrecedentMatch): string {
 }
 
 export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
+  const { isDetailed } = useDetailMode();
   const { matches, isLoading, error, retrievePrecedents } = usePrecedents(claim);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const primaryCpt = claim.cptCodes[0] || "N/A";
@@ -61,11 +63,13 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
         <div className="flex items-center gap-2">
           <Medal className="size-4 text-emerald-500" />
           <span className="text-xs font-semibold text-foreground">
-            Hybrid-Matched Precedents ({matches.length})
+            {isDetailed ? "Hybrid-Matched Precedents" : "Similar Case Wins"} ({matches.length})
           </span>
-          <Badge variant="secondary" className="font-mono text-[9px] bg-primary/10 text-primary border-primary/20">
-            Vector + BM25 RRF
-          </Badge>
+          {isDetailed && (
+            <Badge variant="secondary" className="font-mono text-[9px] bg-primary/10 text-primary border-primary/20">
+              Vector + BM25 RRF
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           <Badge variant="outline" className="font-mono text-[10px]">
@@ -76,7 +80,7 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
             size="icon-xs"
             onClick={() => retrievePrecedents(claim._id, true).catch(() => undefined)}
             disabled={isLoading}
-            title="Re-run hybrid precedent search"
+            title={isDetailed ? "Re-run hybrid precedent search" : "Check for similar cases again"}
           >
             {isLoading ? (
               <CircleNotch className="size-3 animate-spin" />
@@ -97,13 +101,19 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
       {isLoading && matches.length === 0 && (
         <Card className="p-6 flex flex-col items-center justify-center gap-2 text-muted-foreground">
           <CircleNotch className="size-5 animate-spin text-primary" />
-          <p className="text-xs">Running Hybrid Search (Vector + Full-Text RRF Fusion) across the Precedent Archive...</p>
+          <p className="text-xs">
+            {isDetailed
+              ? "Running Hybrid Search (Vector + Full-Text RRF Fusion) across the Precedent Archive..."
+              : "Searching past winning cases and legal decisions..."}
+          </p>
         </Card>
       )}
 
       {!isLoading && matches.length === 0 && !error && (
         <Card className="p-4 text-center text-xs text-muted-foreground bg-muted/20 border-dashed">
-          No precedent matches yet. Run evidence analysis or synthesize a brief to execute hybrid search by ICD-10, CPT, and CARC.
+          {isDetailed
+            ? "No precedent matches yet. Run evidence analysis or synthesize a brief to execute hybrid search by ICD-10, CPT, and CARC."
+            : "No matching past cases found yet. Research rules or write an appeal letter to find similar wins."}
         </Card>
       )}
 
@@ -195,7 +205,11 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
 
               <div className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 pt-0.5 font-medium">
                 <CheckCircle className="size-3" />
-                <span>Auto-Injected into AI Appeal Synthesis Context</span>
+                <span>
+                  {isDetailed
+                    ? "Auto-Injected into AI Appeal Synthesis Context"
+                    : "Included automatically in your appeal letter"}
+                </span>
               </div>
             </Card>
           );

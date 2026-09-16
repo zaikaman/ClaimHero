@@ -28,6 +28,7 @@ import { Select } from "../ui/select";
 import { Alert, AlertDescription } from "../ui/alert";
 import { stripMarkdownFormatting } from "../../lib/utils";
 import { getPayerClinicalDirectoryUrl } from "../../lib/constants";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 interface ClinicalResearchConsoleProps {
   claim: Claim;
@@ -197,6 +198,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
   onComputeScore,
   onNavigateToStudio,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [activeMode, setActiveMode] = useState<ResearchMode>("multi_source");
   const [customUrl, setCustomUrl] = useState<string>("");
   const [customCategory, setCustomCategory] = useState<string>("payer_cpb");
@@ -430,14 +432,16 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-1.5">
                 <h3 className="text-sm font-semibold text-foreground font-sans truncate">
-                  Multi-Source Clinical Research Hub
+                  {isDetailed ? "Multi-Source Clinical Research Hub" : "Evidence Research Hub"}
                 </h3>
                 <Badge variant="outline" className="font-mono text-[9px] h-4 px-1.5 text-primary border-primary/30 shrink-0">
                   Live Telemetry
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
-                Dynamically crawling insurer bulletins, PubMed study abstracts & FDA package inserts
+                {isDetailed
+                  ? "Dynamically crawling insurer bulletins, PubMed study abstracts & FDA package inserts"
+                  : "Find insurer coverage rules, medical studies & FDA drug approvals"}
               </p>
             </div>
           </div>
@@ -624,7 +628,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                   <ShieldCheck className="size-4 text-primary shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
                     <span className="text-[11px] font-semibold text-primary block">
-                      Clinical & Statutory Leverage:
+                      {isDetailed ? "Clinical & Statutory Leverage:" : "Key Evidence Value:"}
                     </span>
                     <p className="text-[11px] text-foreground/85 leading-relaxed">
                       {currentModeConfig.clinicalImpact}
@@ -652,7 +656,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
                             <BookOpen className="size-3.5 text-blue-400" />
-                            Insurer Policy (CPB)
+                            {isDetailed ? "Insurer Policy (CPB)" : "Insurer Policy Rules"}
                           </span>
                           <Badge variant="outline" className="text-[9px] font-mono border-blue-500/30 text-blue-400">
                             Payer Rules
@@ -668,7 +672,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
                             <Flask className="size-3.5 text-emerald-400" />
-                            PubMed RCT Database
+                            {isDetailed ? "PubMed RCT Database" : "Medical Studies (PubMed)"}
                           </span>
                           <Badge variant="outline" className="text-[9px] font-mono border-emerald-500/30 text-emerald-400">
                             Medical Literature
@@ -1214,7 +1218,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
           <div className="flex items-center gap-2">
             <Article className="size-4 text-primary" />
             <span className="text-xs font-semibold text-foreground font-sans">
-              Indexed Multi-Source Evidence Dossier ({filteredEvidences.length} clauses)
+              {isDetailed ? "Indexed Multi-Source Evidence Dossier" : "Found Evidence List"} ({filteredEvidences.length} clauses)
             </span>
           </div>
 
@@ -1222,10 +1226,10 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
           <div className="flex items-center gap-1.5 flex-wrap">
             {[
               { id: "all", label: `All (${evidences.length})` },
-              { id: "payer_cpb", label: "Insurer CPB" },
-              { id: "pubmed_study", label: "PubMed Studies" },
-              { id: "fda_package_insert", label: "FDA Labels" },
-              { id: "legal_precedent", label: "ERISA Precedents" },
+              { id: "payer_cpb", label: isDetailed ? "Insurer CPB" : "Insurer Rules" },
+              { id: "pubmed_study", label: isDetailed ? "PubMed Studies" : "Medical Studies" },
+              { id: "fda_package_insert", label: isDetailed ? "FDA Labels" : "FDA Approvals" },
+              { id: "legal_precedent", label: isDetailed ? "ERISA Precedents" : "Legal Rights" },
             ].map((f) => (
               <button
                 key={f.id}

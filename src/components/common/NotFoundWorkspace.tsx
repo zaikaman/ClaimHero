@@ -2,6 +2,7 @@ import React from "react";
 import { ArrowRight, House, WarningCircle } from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 interface NotFoundWorkspaceProps {
   pathname?: string;
@@ -14,6 +15,7 @@ export const NotFoundWorkspace: React.FC<NotFoundWorkspaceProps> = ({
   onNavigateToRadar,
   onNavigateHome,
 }) => {
+  const { isDetailed } = useDetailMode();
   const currentPath =
     pathname || (typeof window !== "undefined" ? window.location.pathname : "");
 
@@ -32,10 +34,12 @@ export const NotFoundWorkspace: React.FC<NotFoundWorkspaceProps> = ({
             <span className="text-xs font-mono text-muted-foreground">Sentinel Core</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground font-sans">
-            Workspace Route Not Found
+            {isDetailed ? "Workspace Route Not Found" : "Page Not Found"}
           </h1>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            The requested deep link or route does not match any known Sentinel workspace or clinical module.
+            {isDetailed
+              ? "The requested deep link or route does not match any known Sentinel workspace or clinical module."
+              : "The link or page you were looking for doesn't exist or has moved."}
           </p>
         </div>
 
@@ -51,7 +55,7 @@ export const NotFoundWorkspace: React.FC<NotFoundWorkspaceProps> = ({
             onClick={onNavigateToRadar}
             className="w-full sm:w-1/2 h-9 text-xs gap-2 cursor-pointer font-medium"
           >
-            <span>Case Radar</span>
+            <span>{isDetailed ? "Case Radar" : "All Cases"}</span>
             <ArrowRight className="size-3.5" />
           </Button>
           <Button
@@ -59,8 +63,8 @@ export const NotFoundWorkspace: React.FC<NotFoundWorkspaceProps> = ({
             variant="outline"
             className="w-full sm:w-1/2 h-9 text-xs gap-2 cursor-pointer border-border/70"
           >
-            <House className="size-3.5" />
-            <span>Return Home</span>
+            <House className="size-3.5 text-muted-foreground" />
+            <span>Home</span>
           </Button>
         </div>
       </div>

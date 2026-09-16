@@ -25,6 +25,8 @@ import { ClinicalResearchConsole } from "./ClinicalResearchConsole";
 import { PolicyDriftSentinel } from "./PolicyDriftSentinel";
 import { formatCurrency, formatDate, stripMarkdownFormatting, cn } from "../../lib/utils";
 import { DENIAL_REASON_CODES } from "../../lib/constants";
+import { useDetailMode } from "../../hooks/useDetailMode";
+import { pillarPlainTitle } from "../../lib/plainCopy";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { PipelineActivityFeed } from "../common/PipelineActivityFeed";
 import { Card } from "../ui/card";
@@ -83,6 +85,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
   onOpenAuditDrawer,
   onOpenIngestion,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [activeTab, setActiveTab] = useState<string>("policy");
   const [isScoring, setIsScoring] = useState(false);
   const [isUnifiedAnalyzing, setIsUnifiedAnalyzing] = useState(false);
@@ -263,19 +266,23 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-semibold text-foreground font-sans">
-                  Clinical Evidence Matrix & Policy Inspector
+                  {isDetailed ? "Clinical Evidence Matrix & Policy Inspector" : "Your proof"}
                 </h2>
-                <Badge variant="outline" className="font-mono text-[10px]">
-                  Deterministic 4-Pillar Rubric
-                </Badge>
+                {isDetailed && (
+                  <Badge variant="outline" className="font-mono text-[10px]">
+                    Deterministic 4-Pillar Rubric
+                  </Badge>
+                )}
                 {hasAnalyzedEvidence && (
                   <Badge variant="outline" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
-                    Analysis Complete
+                    {isDetailed ? "Analysis Complete" : "Checked"}
                   </Badge>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Cross-referencing denial codes against official Clinical Policy Bulletins and legal precedents
+                {isDetailed
+                  ? "Cross-referencing denial codes against official Clinical Policy Bulletins and legal precedents"
+                  : "Why this denial can be challenged — in plain language"}
               </p>
             </div>
           </div>
@@ -290,17 +297,17 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                   onClick={handleRunCompleteAnalysis}
                   disabled={isUnifiedAnalyzing || isScoring || isBackgroundPipelineRunning}
                   className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0"
-                  title={isBackgroundPipelineRunning ? "Pipeline already running in background" : "Re-crawl policy bulletin and recalculate 4-pillar score"}
+                  title={isBackgroundPipelineRunning ? (isDetailed ? "Pipeline already running in background" : "Already working in the background") : (isDetailed ? "Re-crawl policy bulletin and recalculate 4-pillar score" : "Check again for new proof")}
                 >
                   {isUnifiedAnalyzing ? (
                     <>
                       <CircleNotch className="size-3.5 animate-spin" />
-                      <span>Re-analyzing...</span>
+                      <span>{isDetailed ? "Re-analyzing..." : "Checking..."}</span>
                     </>
                   ) : (
                     <>
                       <ArrowsClockwise className="size-3.5" />
-                      <span>Re-run Analysis</span>
+                      <span>{isDetailed ? "Re-run Analysis" : "Refresh check"}</span>
                     </>
                   )}
                 </Button>
@@ -318,19 +325,19 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                   )}
                   title={
                     isBackgroundPipelineRunning && !hasDraftedBrief
-                      ? "Autonomous pipeline is actively synthesizing brief in background"
-                      : "Proceed to Collaborative Appeal Studio to review or synthesize brief"
+                      ? (isDetailed ? "Autonomous pipeline is actively synthesizing brief in background" : "Your letter is being written in the background")
+                      : (isDetailed ? "Proceed to Collaborative Appeal Studio to review or synthesize brief" : "Go to your letter")
                   }
                 >
                   {isBackgroundPipelineRunning && !hasDraftedBrief ? (
                     <>
                       <CircleNotch className="size-3.5 animate-spin text-primary" />
-                      <span>Synthesizing Brief...</span>
+                      <span>{isDetailed ? "Synthesizing Brief..." : "Writing letter..."}</span>
                     </>
                   ) : (
                     <>
                       <FileText className="size-3.5" />
-                      <span>{hasDraftedBrief ? "Review Appeal Brief" : "Draft Appeal Brief"}</span>
+                      <span>{hasDraftedBrief ? (isDetailed ? "Review Appeal Brief" : "Review your letter") : (isDetailed ? "Draft Appeal Brief" : "Write my letter")}</span>
                       <ArrowRight className="size-3" />
                     </>
                   )}
@@ -343,10 +350,10 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 disabled
                 variant="outline"
                 className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 border-primary/40 bg-primary/10 text-primary cursor-not-allowed font-medium shadow-none"
-                title="Autonomous pipeline is actively analyzing policies and synthesizing the appeal brief"
+                title={isDetailed ? "Autonomous pipeline is actively analyzing policies and synthesizing the appeal brief" : "Gathering proof and writing your letter in the background"}
               >
                 <CircleNotch className="size-3.5 animate-spin text-primary" />
-                <span>Autonomous Pipeline Active</span>
+                <span>{isDetailed ? "Autonomous Pipeline Active" : "Working on it..."}</span>
               </Button>
             ) : (
               /* 1-Click Unified Analysis Trigger (Primary Initial CTA) */
@@ -355,17 +362,17 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 onClick={handleRunCompleteAnalysis}
                 disabled={isUnifiedAnalyzing || isScoring}
                 className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
-                title="Automatically index Clinical Policy Bulletin and audit Statutory Appeal Readiness"
+                title={isDetailed ? "Automatically index Clinical Policy Bulletin and audit Statutory Appeal Readiness" : "Check insurer rules, gather proof, and score your case"}
               >
                 {isUnifiedAnalyzing ? (
                   <>
                     <CircleNotch className="size-3.5 animate-spin" />
-                    <span>Analyzing Policy...</span>
+                    <span>{isDetailed ? "Analyzing Policy..." : "Checking..."}</span>
                   </>
                 ) : (
                   <>
                     <Lightning className="size-3.5" weight="fill" />
-                    <span>1-Click Complete Analysis</span>
+                    <span>{isDetailed ? "1-Click Complete Analysis" : "Check how strong my case is"}</span>
                   </>
                 )}
               </Button>
@@ -382,7 +389,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
         </Alert>
       )}
 
-      {/* Statutory Appeal Readiness Showcase Banner */}
+      {/* Case strength showcase banner */}
       {(claim.overturnProbabilityScore !== undefined || scoringResult) && (
         <Card className="p-4 border-emerald-500/30 bg-emerald-500/5 space-y-3">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border/60 pb-3">
@@ -396,34 +403,40 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-sm font-semibold text-foreground">
-                    Evidence Coverage & Precedent Match
+                    {isDetailed ? "Evidence Coverage & Precedent Match" : "Your case strength"}
                   </h3>
                   <Badge variant="secondary" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">
                     {(scoringResult ? scoringResult.overturnProbabilityScore : (claim.overturnProbabilityScore ?? 0)) >= 80
-                      ? "Comprehensive Coverage"
+                      ? (isDetailed ? "Comprehensive Coverage" : "Strong case")
                       : (scoringResult ? scoringResult.overturnProbabilityScore : (claim.overturnProbabilityScore ?? 0)) >= 55
-                        ? "Evidence Gaps Identified"
-                        : "Incomplete Coverage"}
+                        ? (isDetailed ? "Evidence Gaps Identified" : "Missing some proof")
+                        : (isDetailed ? "Incomplete Coverage" : "Needs more proof")}
                   </Badge>
-                  <Badge variant="outline" className="font-mono text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
-                    Evidence Coverage
-                  </Badge>
+                  {isDetailed && (
+                    <Badge variant="outline" className="font-mono text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                      Evidence Coverage
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Evidentiary completeness audit evaluating 4 objective statutory pillars benchmarked against insurer CPBs and external review precedents.
+                  {isDetailed
+                    ? "Evidentiary completeness audit evaluating 4 objective statutory pillars benchmarked against insurer CPBs and external review precedents."
+                    : "How complete your proof is — based on insurer rules, your records, your rights, and similar wins."}
                 </p>
               </div>
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground/80 italic leading-relaxed">
-            Evidence Coverage Audit: Evaluates documentation completeness and ERISA 29 CFR § 2560.503-1 disclosure requirements against published clinical criteria. Does not constitute an actuarial legal prediction or guarantee of payer approval.
+            {isDetailed
+              ? "Evidence Coverage Audit: Evaluates documentation completeness and ERISA 29 CFR § 2560.503-1 disclosure requirements against published clinical criteria. Does not constitute an actuarial legal prediction or guarantee of payer approval."
+              : "This score shows how complete your proof is. It is not a guarantee the insurer will pay."}
           </p>
 
-          {/* 4-Pillar Deterministic Rubric Criteria Breakdown */}
+          {/* Case strength breakdown */}
           {(!breakdown || breakdown.length === 0) && (
             <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 p-4 text-center space-y-2">
               <p className="text-xs text-muted-foreground">
-                Scoring breakdown unavailable — re-run scoring to evaluate 4-pillar criteria.
+                {isDetailed ? "Scoring breakdown unavailable — re-run scoring to evaluate 4-pillar criteria." : "Breakdown not ready yet — check again to score your proof."}
               </p>
               <Button
                 variant="outline"
@@ -433,7 +446,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 className="h-7 text-xs gap-1.5"
               >
                 <Calculator className="size-3.5" />
-                <span>{isScoring ? "Computing..." : "Run 4-Pillar Scoring"}</span>
+                <span>{isScoring ? (isDetailed ? "Computing..." : "Checking...") : (isDetailed ? "Run 4-Pillar Scoring" : "Score my proof")}</span>
               </Button>
             </div>
           )}
@@ -443,7 +456,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <Scales className="size-3.5 text-primary" />
-                  Deterministic Scoring Criteria (100-Point Appeal Rubric):
+                  {isDetailed ? "Deterministic Scoring Criteria (100-Point Appeal Rubric):" : "What makes up your score:"}
                 </span>
                 <TooltipProvider>
                   <Tooltip>
@@ -453,17 +466,17 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                         className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors border border-dashed border-border/80 hover:border-primary/50 cursor-help"
                       >
                         <Info className="size-3.5 text-primary shrink-0" />
-                        <span>How is this score calculated? ({breakdown.reduce((acc, c) => acc + c.score, 0)} / 100 pts)</span>
+                        <span>{isDetailed ? `How is this score calculated? (${breakdown.reduce((acc, c) => acc + c.score, 0)} / 100 pts)` : "How is this scored?"}</span>
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" align="end" className="w-88 max-w-md space-y-3 p-3.5 font-sans shadow-xl border-border/80 bg-popover text-foreground">
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <div>
                           <h4 className="text-xs font-semibold text-foreground">
-                            How We Calculate Your Statutory Appeal Readiness Score
+                            {isDetailed ? "How We Calculate Your Statutory Appeal Readiness Score" : "How we score your case"}
                           </h4>
                           <p className="text-[11px] text-muted-foreground">
-                            Evidence-based evaluation across 4 legal & clinical pillars
+                            {isDetailed ? "Evidence-based evaluation across 4 legal & clinical pillars" : "4 checks that make an appeal strong"}
                           </p>
                         </div>
                         <Badge variant="outline" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30 shrink-0">
@@ -476,12 +489,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                           <div className="flex items-center justify-between font-semibold text-foreground text-[11px]">
                             <span className="flex items-center gap-1.5">
                               <BookOpen className="size-3 text-primary" />
-                              1. Insurer Policy Criteria
+                              {isDetailed ? "1. Insurer Policy Criteria" : "1. Their own rules"}
                             </span>
                             <span className="font-mono text-[10px] text-primary">Max 35 pts</span>
                           </div>
                           <p className="text-muted-foreground text-[10.5px]">
-                            Verified against published insurer Clinical Policy Bulletins (CPBs) and national coverage guidelines.
+                            {isDetailed ? "Verified against published insurer Clinical Policy Bulletins (CPBs) and national coverage guidelines." : "Their published rules say when they should pay."}
                           </p>
                         </div>
 
@@ -489,12 +502,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                           <div className="flex items-center justify-between font-semibold text-foreground text-[11px]">
                             <span className="flex items-center gap-1.5">
                               <Stethoscope className="size-3 text-primary" />
-                              2. Clinical Records & Step-Therapy
+                              {isDetailed ? "2. Clinical Records & Step-Therapy" : "2. Your medical records"}
                             </span>
                             <span className="font-mono text-[10px] text-primary">Max 25 pts</span>
                           </div>
                           <p className="text-muted-foreground text-[10.5px]">
-                            Diagnostic imaging reports, conservative care history, and treating physician clinical necessity letters.
+                            {isDetailed ? "Diagnostic imaging reports, conservative care history, and treating physician clinical necessity letters." : "Visits, tests, and treatments you already tried."}
                           </p>
                         </div>
 
@@ -502,12 +515,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                           <div className="flex items-center justify-between font-semibold text-foreground text-[11px]">
                             <span className="flex items-center gap-1.5">
                               <Shield className="size-3 text-primary" />
-                              3. Federal ERISA Protections
+                              {isDetailed ? "3. Federal ERISA Protections" : "3. Your appeal rights"}
                             </span>
                             <span className="font-mono text-[10px] text-primary">Max 20 pts</span>
                           </div>
                           <p className="text-muted-foreground text-[10.5px]">
-                            Procedural rights under 29 CFR § 2560.503-1 requiring insurers to disclose internal clinical review standards.
+                            {isDetailed ? "Procedural rights under 29 CFR § 2560.503-1 requiring insurers to disclose internal clinical review standards." : "The law that forces them to show the rules they used."}
                           </p>
                         </div>
 
@@ -515,18 +528,18 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                           <div className="flex items-center justify-between font-semibold text-foreground text-[11px]">
                             <span className="flex items-center gap-1.5">
                               <Scales className="size-3 text-primary" />
-                              4. Independent Precedent Rulings
+                              {isDetailed ? "4. Independent Precedent Rulings" : "4. Similar cases that won"}
                             </span>
                             <span className="font-mono text-[10px] text-primary">Max 20 pts</span>
                           </div>
                           <p className="text-muted-foreground text-[10.5px]">
-                            Historical overturn benchmarks from state insurance commissions and Independent Medical Reviews (IMR).
+                            {isDetailed ? "Historical overturn benchmarks from state insurance commissions and Independent Medical Reviews (IMR)." : "Other people who won with the same issue."}
                           </p>
                         </div>
                       </div>
 
                       <div className="text-[10px] text-muted-foreground border-t border-border/50 pt-2 flex items-center justify-between">
-                        <span>Readiness Tiers: Comprehensive Dossier (80+) &bull; Evidence Gaps Identified (55–79) &bull; Incomplete Dossier (&lt;55)</span>
+                        <span>{isDetailed ? "Readiness Tiers: Comprehensive Dossier (80+) • Evidence Gaps Identified (55–79) • Incomplete Dossier (<55)" : "Strong (80+) • Missing some proof (55–79) • Needs more proof (<55)"}</span>
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -546,10 +559,10 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                           {getCriteriaIcon(crit.category)}
                           <div>
                             <span className="font-semibold text-foreground block leading-tight">
-                              {crit.criterion}
+                              {isDetailed ? crit.criterion : pillarPlainTitle(crit.category, crit.criterion)}
                             </span>
                             <span className="text-[10px] text-muted-foreground font-mono uppercase">
-                              {crit.category.replace(/_/g, " ")} (Max {crit.maxScore} pts)
+                              {isDetailed ? `${crit.category.replace(/_/g, " ")} (Max ${crit.maxScore} pts)` : `Max ${crit.maxScore} pts`}
                             </span>
                           </div>
                         </div>
@@ -590,7 +603,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             <div className="space-y-2 pt-1">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <FileMagnifyingGlass className="size-3.5 text-primary" />
-                Key Insurer Contradictions Identified:
+                {isDetailed ? "Key Insurer Contradictions Identified:" : "Where their letter disagrees with their rules:"}
               </span>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -612,7 +625,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs flex items-start gap-2">
               <Medal className="size-4 text-amber-500 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
-                <span className="font-semibold text-foreground block">Winning Precedent Summary:</span>
+                <span className="font-semibold text-foreground block">{isDetailed ? "Winning Precedent Summary:" : "Similar cases that won:"}</span>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   {stripMarkdownFormatting(scoringResult.winningPrecedentSummary)}
                 </p>
@@ -630,7 +643,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <Warning className="size-3.5 text-destructive" />
-                Original Denial Baseline
+                {isDetailed ? "Original Denial Baseline" : "What the insurer said"}
               </span>
               <Badge variant="outline" className="font-mono">
                 {claim.claimNumber}
@@ -650,24 +663,24 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                   <span className="font-mono text-foreground">{claim.patient?.memberId || "N/A"}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-muted-foreground font-mono block">Insurance Payer</span>
+                  <span className="text-[10px] text-muted-foreground font-mono block">{isDetailed ? "Insurance Payer" : "Insurer"}</span>
                   <span className="font-semibold text-foreground">{claim.patient?.insurancePayer}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-muted-foreground font-mono block">Service Date</span>
+                  <span className="text-[10px] text-muted-foreground font-mono block">{isDetailed ? "Service Date" : "Date of care"}</span>
                   <span className="font-mono text-muted-foreground">{formatDate(claim.serviceDate)}</span>
                 </div>
               </div>
 
               <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-mono text-muted-foreground">Disputed Charge</span>
+                  <span className="text-[10px] uppercase font-mono text-muted-foreground">{isDetailed ? "Disputed Charge" : "Bill amount"}</span>
                   <span className="text-sm font-mono font-bold text-destructive">
                     {formatCurrency(claim.deniedAmount)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>Patient Responsibility:</span>
+                  <span>{isDetailed ? "Patient Responsibility:" : "They say you owe:"}</span>
                   <span className="font-mono font-semibold text-foreground">
                     {formatCurrency(claim.patientOwedAmount)}
                   </span>
@@ -678,7 +691,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               <div className="space-y-2 pt-1">
                 <div>
                   <span className="text-[10px] text-muted-foreground font-mono block mb-1">
-                    CPT Procedure Codes:
+                    {isDetailed ? "CPT Procedure Codes:" : "Care received:"}
                   </span>
                   <div className="flex flex-wrap gap-1">
                     {claim.cptCodes.map((cpt) => (
@@ -691,7 +704,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
 
                 <div>
                   <span className="text-[10px] text-muted-foreground font-mono block mb-1">
-                    Denial Reason (CARC):
+                    {isDetailed ? "Denial Reason (CARC):" : "Why they said no:"}
                   </span>
                   <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs space-y-1.5">
                     <div className="flex items-center gap-1.5 font-mono font-bold text-destructive text-xs">
@@ -713,7 +726,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               <div className="pt-1">
                 <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <Stethoscope className="size-3.5" />
-                  <span>Treating Provider: {claim.providerName}</span>
+                  <span>{isDetailed ? `Treating Provider: ${claim.providerName}` : `Your doctor: ${claim.providerName}`}</span>
                 </div>
               </div>
             </div>
@@ -722,10 +735,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           <Card className="p-3.5 space-y-1.5 bg-muted/30">
             <div className="flex items-center gap-1.5 font-semibold text-xs text-foreground">
               <Shield className="size-3.5" />
-              <span>ERISA Regulatory Protection</span>
+              <span>{isDetailed ? "ERISA Regulatory Protection" : "You have a right to see their rules"}</span>
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Under 29 CFR § 2560.503-1, the insurer is legally required to disclose all internal Clinical Policy Bulletins and guidelines used in issuing this adverse determination.
+              {isDetailed
+                ? "Under 29 CFR § 2560.503-1, the insurer is legally required to disclose all internal Clinical Policy Bulletins and guidelines used in issuing this adverse determination."
+                : "The law says the insurer must show the rules they used to deny you. We use those rules to challenge them."}
             </p>
           </Card>
         </div>
@@ -736,19 +751,19 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             <TabsList variant="line" className="w-full">
               <TabsTrigger value="policy" className="gap-1.5">
                 <BookOpen className="size-3.5" />
-                <span>Evidence Dossier ({evidences.length})</span>
+                <span>{isDetailed ? `Evidence Dossier (${evidences.length})` : `Proof (${evidences.length})`}</span>
               </TabsTrigger>
               <TabsTrigger value="drift" className="gap-1.5">
                 <Scales className="size-3.5 text-cyan-400" />
-                <span>Policy Drift Sentinel</span>
+                <span>{isDetailed ? "Policy Drift Sentinel" : "Policy changes"}</span>
               </TabsTrigger>
               <TabsTrigger value="research" className="gap-1.5">
                 <Globe className="size-3.5 text-primary" />
-                <span>Research Hub</span>
+                <span>{isDetailed ? "Research Hub" : "Deeper research"}</span>
               </TabsTrigger>
               <TabsTrigger value="precedents" className="gap-1.5">
                 <Medal className="size-3.5" />
-                <span>Precedent Matches</span>
+                <span>{isDetailed ? "Precedent Matches" : "Similar wins"}</span>
               </TabsTrigger>
             </TabsList>
 
@@ -798,24 +813,24 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md p-3 px-4 sm:px-8 flex items-center justify-between shadow-lg print:hidden">
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="font-mono text-xs hidden sm:inline-flex">
-            Step 1 of 3: Evidence & CPB
+            {isDetailed ? "Step 1 of 3: Evidence & CPB" : "Step 1 of 3: Your proof"}
           </Badge>
           <span className="text-xs text-muted-foreground">
             {evidences.length > 0
-              ? `${evidences.length} Clinical Clauses Indexed • Score: ${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}/100` : "Calculated"}`
-              : "Review clinical evidence before proceeding to brief synthesis"}
+              ? `${evidences.length} ${isDetailed ? "Clinical Clauses Indexed" : "proof documents"} • Score: ${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}/100` : "Calculated"}`
+              : (isDetailed ? "Review clinical evidence before proceeding to brief synthesis" : "Check your proof before writing your letter")}
           </span>
         </div>
 
         <Button
           onClick={onNavigateToStudio}
           className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all"
-          title="Proceed to Collaborative Appeal Studio to review and synthesize appeal brief"
+          title={isDetailed ? "Proceed to Collaborative Appeal Studio to review and synthesize appeal brief" : "Go to your appeal letter"}
         >
           <span>
             {hasDraftedBrief
-              ? "Next: Review Synthesized Appeal Brief in Studio"
-              : "Next: Review & Synthesize Appeal Brief in Studio"}
+              ? (isDetailed ? "Next: Review Synthesized Appeal Brief in Studio" : "Next: Review your letter")
+              : (isDetailed ? "Next: Review & Synthesize Appeal Brief in Studio" : "Next: Write your letter")}
           </span>
           <ArrowRight className="size-3.5" />
         </Button>

@@ -16,11 +16,10 @@ Built for the **Convex All Gas Hackathon** (August 25 – September 22, 2026) us
 
 ---
 
-ClaimHero is an evidence-grounded appeal preparation workspace for denial teams:
-patients, nurses, case managers, patient advocates, billing teams, and
-payer-relations staff. A denial is not just a letter to answer once; it creates a
-case that must be triaged, researched, explained, reviewed, dispatched, and
-followed until the payer commits to an outcome.
+ClaimHero is an evidence-grounded appeal preparation workspace that starts with
+patients and families, then scales to teams. A denial is not just a letter to
+answer once; it creates a case that must be understood, researched, explained,
+reviewed, dispatched, and followed until the payer commits to an outcome.
 
 The Case Radar gives a team one live portfolio view of those cases. The Case
 Workspace gives each denial a repeatable, source-linked path from intake to
@@ -89,8 +88,15 @@ To evaluate the complete end-to-end pipeline without uploading personal health r
 
 ### Why this is an everyday app
 
-ClaimHero is designed for recurring operational use, not only for a one-time
-consumer emergency:
+Start with the family who got the letter yesterday:
+
+Your knee arthroscopy was denied — $6,400 (CPT 29881, CO-50). You upload a
+photo or PDF, ClaimHero explains in plain English what happened and what to do
+by when (including the 180-day ERISA appeal clock), pulls the insurer's own
+policy clause behind the denial, and drafts a cited appeal. You review and
+approve exactly what gets sent — no billing expertise required.
+
+The same workspace scales to team triage second:
 
 - A nurse or case manager can turn a denial into a structured case, see the
   governing policy clause, and hand a cited brief to the next reviewer.
@@ -105,6 +111,22 @@ consumer emergency:
 The demo fixtures make that recurring workflow easy and safe to evaluate. They
 do not define the target user or imply that ClaimHero is limited to fictional
 cases.
+
+### Everyday Language vs. Expert Details Architecture (Dual-Mode Interface)
+
+Healthcare denial letters and appellate procedures are deliberately obscured by insurer acronyms, billing codes, and procedural hurdles. For patients and families, this creates immediate confusion and despair; for advocates, nurses, and billing teams, precise statutory codes are non-negotiable.
+
+ClaimHero resolves this dilemma with a built-in **Everyday Language vs. Expert Details** dual-mode architecture:
+
+- **Everyday Language (Default / Patient-Friendly)**:
+  - Jargon-free labels across all 28 UI surfaces: CARC codes become plain-language denial causes (e.g., *"Coverage rules require trying other treatments first"*), statutory postures translate to clear action summaries, and navigation uses intuitive concepts (*"1. Your proof • 2. Your letter • 3. Send & track"*).
+  - Patients and caregivers understand their rights, deadlines, and appeal strategy instantly without requiring a medical billing certification.
+- **Expert Details (On-Demand Clinical & Legal Precision)**:
+  - An instant toggle in the persistent header, sidebar, or case settings reveals the complete technical apparatus: full CPT/HCPCS procedure codes, ICD-10 diagnostic codes, CARC/RARC remark codes, ERISA 29 CFR § 2560.503-1 statutory disclosure citations, exact Clinical Policy Bulletin (CPB) clause numbers, and cryptographic SHA-256 Merkle block fingerprints.
+  - Appeals teams, clinical staff, and attorneys retain the exact forensic citations needed for administrative law judges and external reviews.
+- **Global Zero-Friction Synchronization**:
+  - Managed via `useDetailMode` and stored in `localStorage` with resilient in-memory fallback for sandboxed or private browsing environments.
+  - Broadcasts immediate `claimhero:detail-mode` custom events across decoupled React components and listens to `storage` events for seamless multi-tab synchronization with zero layout shift.
 
 ---
 
@@ -173,6 +195,7 @@ AgentMail provides two-way programmatic email infrastructure for appellate dispa
   1. **Official Insurer Reviewer (Production Gateway)**: Dispatches the formal appeal brief directly to the payer's verified grievance and appeals intake address (e.g., Molina Healthcare, GeoBlue Worldwide, BCBS Global Core) with delivery confirmation and audit trail.
   2. **Typed-In Email / Reviewer Gateway (Interactive Test)**: Enables advocates or reviewers to enter a specific destination address (e.g., their personal inbox or external testing address). ClaimHero transmits the complete, formatted cited brief and exhibits directly via the AgentMail REST API. Replying directly from that email client triggers ClaimHero's live Svix webhook to verify two-way thread matching and counter-rebuttal drafting in real time.
 - **Dedicated Outbound Sender**: Routes outbound appellate packets through the verified sender mailbox (`claimhero-sender@agentmail.to`).
+- **Why shared inboxes (AgentMail free-tier constraint):** AgentMail free tier caps at 3 inboxes per account, so per-claim inboxes would `403` on claim 4 — ClaimHero reuses the shared sender inbox and routes by claim number/thread ID.
 - **Svix HMAC-SHA256 Verification**: Cryptographically validates inbound webhook signatures at `/agentmail/webhook` (`convex/actions/agentMailWebhook.ts`).
 - **4-Step Inbound Routing Hierarchy**: Automatically correlates replies to active claims via AgentMail Thread ID, subject regex (`[ClaimHero #...]`), recipient matching, and bounded content parsing.
 - **Mandatory Human Review Gate & AI Draft Preparation**: Enforces the safer medical/legal standard: *AI may prepare, classify, cite, and recommend. A human must approve every clinical assertion, legal assertion, recipient, and outbound message.* When an insurer responds requesting additional records (`ADDITIONAL_RECORDS_REQUIRED`) or maintaining a denial, ClaimHero synthesizes a cited rebuttal draft and alerts the case manager, but strictly requires human review and sign-off before transmission, preventing unauthorized or unverified external communications (`convex/actions/agentMail.ts`, `src/components/communications/AgentMailDrawer.tsx`).
@@ -200,6 +223,7 @@ OpenAI powers clinical reasoning while operating within strict anti-hallucinatio
 | **Current payer policy** | Firecrawl crawl and evidence persistence | [`convex/actions/policyCrawler.ts`](./convex/actions/policyCrawler.ts), [`convex/clinicalEvidences.ts`](./convex/clinicalEvidences.ts) |
 | **Precedent-grounded Readiness** | Convex vector search + attached precedent evidence | [`convex/actions/precedentMatcher.ts`](./convex/actions/precedentMatcher.ts), [`convex/actions/precedentArchive.ts`](./convex/actions/precedentArchive.ts) |
 | **Cited appeal brief** | OpenAI structured synthesis over stored evidence | [`convex/actions/appealSynthesizer.ts`](./convex/actions/appealSynthesizer.ts) |
+| **Everyday vs Expert Mode** | Dual-mode language architecture with reactive sync across 28 surfaces | [`src/hooks/useDetailMode.ts`](./src/hooks/useDetailMode.ts), [`src/lib/plainCopy.ts`](./src/lib/plainCopy.ts) |
 | **Human approval** | Claim-scoped mutation authorization before dispatch | [`convex/claims.ts`](./convex/claims.ts), [`convex/lib/auth.ts`](./convex/lib/auth.ts) |
 | **Two-way correspondence** | AgentMail 2-mode dispatch (Official payer or typed-in email), webhook routing, and reactive threads | [`convex/actions/mailDispatcher.ts`](./convex/actions/mailDispatcher.ts), [`convex/http.ts`](./convex/http.ts) |
 | **Collaboration** | Yjs operation log plus Convex presence | [`convex/appealYjs.ts`](./convex/appealYjs.ts), [`convex/presence.ts`](./convex/presence.ts) |
@@ -264,18 +288,18 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **979 automated tests** across 62 test suites (verified via `npm run test`):
+ClaimHero is backed by **999 automated tests** across 64 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (979 tests across 62 suites)
-npm run test:coverage   # Code coverage report (~80.4% lines)
+npm run test            # Comprehensive Vitest test suite (999 tests across 64 suites)
+npm run test:coverage   # Code coverage report (~81% lines)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate
 ```
 
-Test suites cover AWS Textract HIPAA optical document parsing and key-value block mapping (`tests/textract.test.ts`), the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Delivery Evidence Reports (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
+Test suites cover Everyday Language vs. Expert Details dictionaries, cross-component custom events, and sandboxed storage resilience (`tests/detailMode.test.ts`), AWS Textract HIPAA optical document parsing and key-value block mapping (`tests/textract.test.ts`), the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Delivery Evidence Reports (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
 
 ---
 
@@ -322,7 +346,7 @@ ClaimHero/
 
 ### Alignment with Official Judging Criteria (BRIEF.md §6)
 
-- **Everyday Apps**: If you got this in your mailbox today, this is the sequence you would want to see. No HIPAA-relevant front-end hurdles, no advocacy-degree onboarding. Fictional fixtures are for the evaluation; the exact same screen serves real cases once credentials are wired.
+- **Everyday Apps**: If you got this in your mailbox today, this is the sequence you would want to see. Built from the ground up with an **Everyday Language / Simple Mode** default so patients and families understand their denial, their rights, and their timeline without medical billing jargon, while providing an instant **Expert Details** toggle for advocates and clinical teams requiring formal ERISA citations and CPT/CARC codes. No HIPAA-relevant front-end hurdles, no advocacy-degree onboarding. Fictional fixtures are for the evaluation; the exact same screen serves real cases once credentials are wired.
 - **Creativity & Usefulness**: One linear path to a defensible cited appeal; the hard part (which clause actually governs the denial) is solved by reading the issuer's own policy, not an opinion of it.
 - **Convex Depth**: 9 components, 23 tables, native BM25 full-text search in global `Cmd+K` / `Ctrl+K` palette, vector search on prior wins, crons for the ERISA clock, durable workflows, real-time collab on briefs, and authentication with human approval gates on every outbound send. The stack is documented in [`PRODUCT.md`](./PRODUCT.md) and [`convex/convex.config.ts`](./convex/convex.config.ts); this README is the public face.
 - **Sponsor Stack**: Firecrawl finds the policy, detects retroactive policy drift, and screenshots the page as evidence; AgentMail powers two-way appellate dispatch across two destinations (official production payer email or typed-in email verification) with Svix-verified webhooks; OpenAI extracts the codes and synthesizes the brief inside a redaction gate and a schema that prohibits fabricating policy text.

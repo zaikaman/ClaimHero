@@ -35,6 +35,7 @@ import {
 import { fastSanitizeText } from "../../lib/redactionEngine";
 import { cn } from "../../lib/utils";
 import { soundEffects } from "../../lib/soundEffects";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -61,6 +62,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
   onNavigateView,
   defaultViewMode = "brief",
 }) => {
+  const { isDetailed } = useDetailMode();
   const [copied, setCopied] = useState(false);
   const [isPublicExhibitRedacted, setIsPublicExhibitRedacted] = useState(false);
   const [viewMode, setViewMode] = useState<"binder" | "brief">(defaultViewMode);
@@ -273,7 +275,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
               <div className="min-w-0 space-y-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <DialogTitle className="text-base font-bold text-foreground">
-                    Appeal Dossier & Exhibit Binder
+                    {isDetailed ? "Appeal Dossier & Exhibit Binder" : "Appeal Packet & Documents"}
                   </DialogTitle>
                   <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary font-semibold">
                     Docket #{dossierData.docketNumber}
@@ -307,10 +309,10 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                       ? "bg-card text-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   )}
-                  title="Concise medical necessity brief tailored for direct email or portal transmission"
+                  title={isDetailed ? "Concise medical necessity brief tailored for direct email or portal transmission" : "View single appeal letter"}
                 >
                   <FileText className="size-3.5" />
-                  <span>Appeal Brief</span>
+                  <span>{isDetailed ? "Appeal Brief" : "Appeal Letter"}</span>
                 </button>
                 <button
                   type="button"
@@ -321,10 +323,10 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                       ? "bg-card text-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   )}
-                  title="Full multi-page legal exhibit binder with Cover Page, TOC, Statutory Summary, Exhibits A-C, and Attestation"
+                  title={isDetailed ? "Full multi-page legal exhibit binder with Cover Page, TOC, Statutory Summary, Exhibits A-C, and Attestation" : "Complete appeal packet with cover page, table of contents, evidence exhibits, and signature"}
                 >
                   <FolderSimpleStar className="size-3.5" />
-                  <span>Exhibit Binder</span>
+                  <span>{isDetailed ? "Exhibit Binder" : "Full Packet"}</span>
                 </button>
               </div>
 
@@ -339,10 +341,14 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                     ? "bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
                 )}
-                title="De-identify all patient direct identifiers, SSN, and member suffixes for public legal exhibits (HIPAA Safe Harbor 45 CFR § 164.514)"
+                title={isDetailed ? "De-identify all patient direct identifiers, SSN, and member suffixes for public legal exhibits (HIPAA Safe Harbor 45 CFR § 164.514)" : "Hide private patient names and identifiers"}
               >
                 <ShieldCheck className="size-3.5" />
-                <span>{isPublicExhibitRedacted ? "Exhibit Redacted" : "Redact Exhibit"}</span>
+                <span>
+                  {isPublicExhibitRedacted
+                    ? (isDetailed ? "Exhibit Redacted" : "Privacy Protected")
+                    : (isDetailed ? "Redact Exhibit" : "Hide Private Info")}
+                </span>
               </Button>
 
               {/* Companion Deliverables Navigation */}
@@ -463,7 +469,9 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                   <AppealBriefRenderer content={processedContent} isPrintMode={true} />
                 ) : (
                   <div className="text-center py-12 text-slate-400 italic">
-                    No appeal email generated yet. Click &quot;Synthesize Brief&quot; in the studio to generate the brief.
+                    {isDetailed
+                      ? 'No appeal email generated yet. Click "Synthesize Brief" in the studio to generate the brief.'
+                      : 'No appeal letter generated yet. Click "Write Appeal Letter" in the studio to create your letter.'}
                   </div>
                 )}
               </div>

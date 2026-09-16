@@ -17,6 +17,7 @@ import { Claim } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 export type FlowView = "radar" | "evidence" | "studio" | "p2p" | "calculator" | "communications" | "audit";
 
@@ -65,6 +66,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     Boolean(claim.latestAppeal) ||
     claim.status === "ready_for_review" ||
     isDispatched;
+  const { isDetailed } = useDetailMode();
   const hasAppealContext = Boolean(
     claim.appealContext?.confirmedAt &&
       claim.appealContext.sender?.name?.trim() &&
@@ -75,10 +77,10 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     {
       id: "evidence",
       number: 1,
-      title: "1. Evidence & CPB",
+      title: isDetailed ? "1. Evidence & CPB" : "1. Your proof",
       subtitle: hasEvidence
-        ? `${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}/100 Readiness` : `${evidencesCount} Clauses`}`
-        : "Pending analysis",
+        ? `${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}/100 ${isDetailed ? "Readiness" : "Strength"}` : `${evidencesCount} ${isDetailed ? "Clauses" : "documents"}`}`
+        : isDetailed ? "Pending analysis" : "Not checked yet",
       view: "evidence" as FlowView,
       icon: FileMagnifyingGlass,
       isCompleted: hasEvidence,
@@ -87,10 +89,10 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     {
       id: "studio",
       number: 2,
-      title: "2. Appeal Brief",
+      title: isDetailed ? "2. Appeal Brief" : "2. Your letter",
       subtitle: hasBrief
-        ? `Brief v${claim.latestAppeal?.version || 1} Ready`
-        : "AI synthesis ready",
+        ? `Letter v${claim.latestAppeal?.version || 1} ready`
+        : isDetailed ? "AI synthesis ready" : "Ready to write",
       view: "studio" as FlowView,
       icon: FileText,
       isCompleted: hasBrief,
@@ -102,18 +104,18 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
       title: isWon
         ? "3. Case Won"
         : claim.status === "under_review"
-        ? "3. Payer Review"
+        ? isDetailed ? "3. Payer Review" : "3. Waiting for reply"
         : claim.status === "escalated"
-        ? "3. Payer Escalation"
-        : "3. Payer Dispatch",
+        ? isDetailed ? "3. Payer Escalation" : "3. Needs next step"
+        : isDetailed ? "3. Payer Dispatch" : "3. Send & track",
       subtitle: isWon
-        ? "100% Payer Reversal"
+        ? isDetailed ? "100% Payer Reversal" : "Insurer agreed to pay"
         : claim.status === "under_review"
-        ? "Payer Review Active"
+        ? isDetailed ? "Payer Review Active" : "Insurer is reviewing"
         : claim.status === "escalated"
-        ? "Adverse Escalation"
+        ? isDetailed ? "Adverse Escalation" : "Denied again — next step ready"
         : isDispatched
-        ? "Transmitted to Payer"
+        ? isDetailed ? "Transmitted to Payer" : "Sent to insurer"
         : "Ready to send",
       view: "communications" as FlowView,
       icon: isWon ? CheckCircle : isDispatched ? PaperPlaneTilt : Envelope,
@@ -177,7 +179,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
                 ? "bg-destructive/15 border-destructive/40 text-destructive hover:bg-destructive/20 animate-pulse"
                 : "bg-muted/40 border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/60"
             )}
-            title="Click to view statutory ERISA 29 U.S.C. § 1132(c) penalty exposure and liability breakdown"
+            title={isDetailed ? "Click to view statutory ERISA 29 U.S.C. § 1132(c) penalty exposure and liability breakdown" : "Click to see time left and possible late fees"}
           >
             {isUrgent ? (
               <HourglassHigh className="size-3.5 shrink-0 text-destructive" />
@@ -185,7 +187,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
               <Scales className="size-3.5 shrink-0 text-primary" />
             )}
             <span className="font-semibold">
-              $110/day ERISA exposure
+              {isDetailed ? "$110/day ERISA exposure" : "Fees they may owe"}
             </span>
             <span className="text-[10px] text-muted-foreground">•</span>
             <span className={cn("font-medium", isUrgent ? "text-destructive font-bold" : "text-foreground/80")}>
@@ -199,24 +201,24 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
             size="xs"
             onClick={() => onOpenAuditDrawer ? onOpenAuditDrawer() : onNavigateView("audit")}
             className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground border-border/70 cursor-pointer"
-            title="Open real-time 29 CFR case audit trail drawer"
+            title={isDetailed ? "Open real-time 29 CFR case audit trail drawer" : "Open full history of this case"}
           >
             <Clock className="size-3 text-cyan-400" />
-            <span>Audit Trail</span>
+            <span>{isDetailed ? "Audit Trail" : "History"}</span>
           </Button>
 
           {isWon ? (
             <div className="flex items-center gap-1 text-xs font-mono px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20">
               <CheckCircle className="size-3.5 text-emerald-500" />
               <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                Overturned & Won
+                {isDetailed ? "Overturned & Won" : "Won"}
               </span>
             </div>
           ) : claim.overturnProbabilityScore !== undefined ? (
             <div className="flex items-center gap-1 text-xs font-mono px-2 py-1 rounded bg-secondary/80 border border-border/60">
               <TrendUp className="size-3 text-emerald-500" />
               <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                {claim.overturnProbabilityScore}/100 Readiness
+                {claim.overturnProbabilityScore}/100 {isDetailed ? "Readiness" : "Strength"}
               </span>
             </div>
           ) : null}
@@ -247,12 +249,12 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
               {isPipelineActive ? (
                 <>
                   <CircleNotch className="size-3 animate-spin text-primary" />
-                  <span>{processingLabel && processingLabel !== "Processing..." ? processingLabel : "Pipeline Running..."}</span>
+                  <span>{processingLabel && processingLabel !== "Processing..." ? processingLabel : isDetailed ? "Pipeline Running..." : "Working on it..."}</span>
                 </>
               ) : (
                 <>
                   <Lightning className="size-3" weight="fill" />
-                  <span>{hasAppealContext ? "Prepare Appeal" : "Complete Context"}</span>
+                  <span>{hasAppealContext ? (isDetailed ? "Prepare Appeal" : "Build my appeal") : (isDetailed ? "Complete Context" : "Add your details")}</span>
                 </>
               )}
             </Button>
@@ -271,6 +273,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
               key={step.id}
               onClick={() => isClickable && onNavigateView(step.view)}
               disabled={isProcessing}
+              aria-current={step.isActive ? "step" : undefined}
               className={cn(
                 "flex items-center gap-2.5 p-2 rounded-lg text-left transition-all border cursor-pointer group",
                 step.isActive

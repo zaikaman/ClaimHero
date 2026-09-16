@@ -21,6 +21,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Progress } from "../ui/progress";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { cn } from "../../lib/utils";
 
 interface OnboardingChecklistProps {
@@ -37,6 +38,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
   onOpenIngestion,
 }) => {
   const { user } = useCurrentUser();
+  const { isDetailed } = useDetailMode();
   const getUserKey = (key: string) => user?._id ? `${key}_${user._id}` : key;
 
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
@@ -95,42 +97,42 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
     }
   }, [currentView, hasVisitedEvidence, hasVisitedStudio, hasVisitedCommunications, user?._id]);
 
-  // Tasks definitions
+  // Tasks definitions — plain by default, expert wording behind Details toggle
   const tasks = [
     {
       id: "ingest",
-      title: "Ingest First Denial Letter",
-      description: "Upload a PDF or load a high-value sample case into Radar.",
+      title: isDetailed ? "Ingest First Denial Letter" : "Add your first denial",
+      description: isDetailed ? "Upload a PDF or load a high-value sample case into Radar." : "Take a photo or upload your denial letter.",
       isDone: claims.length > 0,
       icon: Lightning,
-      actionLabel: "Ingest Case",
+      actionLabel: isDetailed ? "Ingest Case" : "Add case",
       onClick: onOpenIngestion,
     },
     {
       id: "evidence",
-      title: "Inspect Clinical Policy Precedents",
-      description: "Review indexed insurer CPB clauses and audit Statutory Appeal Readiness.",
+      title: isDetailed ? "Inspect Clinical Policy Precedents" : "See why you can win",
+      description: isDetailed ? "Review indexed insurer CPB clauses and audit Statutory Appeal Readiness." : "We compare their letter against their own rules.",
       isDone: hasVisitedEvidence,
       icon: FileMagnifyingGlass,
-      actionLabel: "View Matrix",
+      actionLabel: isDetailed ? "View Matrix" : "See proof",
       onClick: () => onNavigate("evidence"),
     },
     {
       id: "studio",
-      title: "Synthesize ERISA Appeal Brief",
-      description: "Review statutory legal arguments and cited medical clauses.",
+      title: isDetailed ? "Synthesize ERISA Appeal Brief" : "Get your appeal letter",
+      description: isDetailed ? "Review statutory legal arguments and cited medical clauses." : "We write it with proof included. You approve it.",
       isDone: hasVisitedStudio,
       icon: FileText,
-      actionLabel: "Open Studio",
+      actionLabel: isDetailed ? "Open Studio" : "Open letter",
       onClick: () => onNavigate("studio"),
     },
     {
       id: "dispatch",
-      title: "Review Payer Communications Inbox",
-      description: "Inspect dedicated claim transmission gateway and audit timeline.",
+      title: isDetailed ? "Review Payer Communications Inbox" : "Send and track replies",
+      description: isDetailed ? "Inspect dedicated claim transmission gateway and audit timeline." : "Send your letter and see insurer replies here.",
       isDone: hasVisitedCommunications,
       icon: Envelope,
-      actionLabel: "Open Inbox",
+      actionLabel: isDetailed ? "Open Inbox" : "Open messages",
       onClick: () => onNavigate("communications"),
     },
   ];
@@ -155,9 +157,9 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
           className="shadow-xl bg-card/95 border-border backdrop-blur-md gap-2 h-9 px-3 text-xs"
         >
           <Shield className="size-3.5 text-primary" />
-          <span className="font-medium text-foreground">
-            Sentinel Checklist
-          </span>
+            <span className="font-medium text-foreground">
+              {isDetailed ? "Sentinel Checklist" : "Checklist"}
+            </span>
           <Badge variant="secondary" className="font-mono text-[10px] h-4.5 px-1.5">
             {completedCount}/{tasks.length}
           </Badge>
@@ -183,7 +185,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-foreground">
-              Sentinel Onboarding
+              {isDetailed ? "Sentinel Onboarding" : "Getting started"}
             </span>
             <Badge variant="outline" className="font-mono text-[10px] h-4.5 px-1.5">
               {completedCount}/{tasks.length}
@@ -283,11 +285,13 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
         <div className="p-3 bg-emerald-500/10 border-t border-emerald-500/20 text-center space-y-1">
           <div className="text-xs font-semibold text-emerald-500 flex items-center justify-center gap-1.5">
             <Medal className="size-3.5 text-amber-500" />
-            <span>Sentinel Readiness: 100% Certified</span>
+            <span>{isDetailed ? "Sentinel Readiness: 100% Certified" : "You're ready"}</span>
           </div>
 
           <p className="text-[10px] text-muted-foreground">
-            You are ready to prepare evidence-grounded appeals and challenge health insurance denials.
+            {isDetailed
+              ? "You are ready to prepare evidence-grounded appeals and challenge health insurance denials."
+              : "You know how to add a denial, check your proof, get your letter, and send it."}
           </p>
         </div>
       )}

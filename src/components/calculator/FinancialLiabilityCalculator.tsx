@@ -17,6 +17,7 @@ import {
   TableCell,
 } from "../ui/table";
 import { formatCurrency, cn } from "../../lib/utils";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { getSeverityTierMeta, STATUTORY_DISCLOSURE_GRACE_DAYS } from "../../lib/liabilityCalculator";
 import {
   Calculator,
@@ -69,6 +70,7 @@ export const FinancialLiabilityCalculator: React.FC<FinancialLiabilityCalculator
   } = useLiabilityCalculator(claim);
 
   // 2-Mode Architecture: "savings" (Patient Bill & Savings) vs "penalties" (ERISA $110/Day Sentinel)
+  const { isDetailed } = useDetailMode();
   const [activeMode, setActiveMode] = useState<"savings" | "penalties">("savings");
   const [isPlanAdjustOpen, setIsPlanAdjustOpen] = useState<boolean>(false);
   const [isErisaAdjustOpen, setIsErisaAdjustOpen] = useState<boolean>(false);
@@ -119,9 +121,11 @@ export const FinancialLiabilityCalculator: React.FC<FinancialLiabilityCalculator
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center border border-dashed border-border/70 rounded-xl bg-card/30">
         <Scales className="size-10 text-muted-foreground mb-3" />
-        <h3 className="text-base font-semibold text-foreground">No Case Dossier Selected</h3>
+        <h3 className="text-base font-semibold text-foreground">{isDetailed ? "No Case Dossier Selected" : "Pick a case first"}</h3>
         <p className="text-xs text-muted-foreground mt-1 max-w-sm leading-relaxed">
-          Select an active denial case from the Case Radar or sidebar to audit financial liability and compute statutory ERISA penalties.
+          {isDetailed
+            ? "Select an active denial case from the Case Radar or sidebar to audit financial liability and compute statutory ERISA penalties."
+            : "Pick one of your cases to see what you might owe and what you could save."}
         </p>
         {onNavigateView && (
           <Button
@@ -130,7 +134,7 @@ export const FinancialLiabilityCalculator: React.FC<FinancialLiabilityCalculator
             size="sm"
             className="mt-4 text-xs cursor-pointer"
           >
-            Open Case Radar
+            {isDetailed ? "Open Case Radar" : "My Cases"}
           </Button>
         )}
       </div>
@@ -245,7 +249,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             className="text-[10px] font-mono border-amber-500/30 text-amber-400 bg-amber-500/10 gap-1 h-6 px-2"
           >
             <Scales className="size-3" />
-            <span>ERISA § 502(c) Sentinel</span>
+            <span>{isDetailed ? "ERISA § 502(c) Sentinel" : "Possible fees"}</span>
           </Badge>
 
           <Button
@@ -253,10 +257,10 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             size="xs"
             onClick={() => onNavigateView?.("p2p")}
             className="text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 h-7 px-2 gap-1 cursor-pointer"
-            title="Switch to Doctor P2P Copilot"
+            title={isDetailed ? "Switch to Doctor P2P Copilot" : "Switch to doctor call prep"}
           >
             <PhoneCall className="size-3" />
-            <span className="hidden sm:inline">P2P Copilot</span>
+            <span className="hidden sm:inline">{isDetailed ? "P2P Copilot" : "Call prep"}</span>
           </Button>
 
           <Button
@@ -264,10 +268,10 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             size="xs"
             onClick={() => onNavigateView?.("communications")}
             className="text-xs text-muted-foreground hover:text-foreground h-7 px-2 gap-1 cursor-pointer"
-            title="Jump to Payer Dispatch"
+            title={isDetailed ? "Jump to Payer Dispatch" : "Go to send"}
           >
             <Envelope className="size-3" />
-            <span className="hidden sm:inline">Dispatch</span>
+            <span className="hidden sm:inline">{isDetailed ? "Dispatch" : "Send"}</span>
           </Button>
         </div>
       </div>
@@ -283,7 +287,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-bold text-foreground tracking-tight">
-                  Financial Recovery & Statutory Leverage Audit
+                  {isDetailed ? "Financial Recovery & Statutory Leverage Audit" : "What you could save"}
                 </h2>
                 {isSaving && (
                   <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground animate-pulse">
@@ -299,7 +303,9 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                Audit how much you will save when this denial is overturned, and track statutory ERISA penalties (${dailyPenaltyRate.toFixed(0)}/day) against the insurer.
+                {isDetailed
+                  ? `Audit how much you will save when this denial is overturned, and track statutory ERISA penalties ($${dailyPenaltyRate.toFixed(0)}/day) against the insurer.`
+                  : `See what you'd save if you win — plus daily fees the insurer may owe ($${dailyPenaltyRate.toFixed(0)}/day).`}
               </p>
             </div>
           </div>
@@ -368,7 +374,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
           <div className="p-3 rounded-lg bg-background/50 border border-border/40">
             <div className="text-[10px] uppercase font-mono text-muted-foreground flex items-center gap-1">
               <CurrencyDollar className="size-3 text-cyan-400" />
-              <span>Total Medical Bill</span>
+              <span>{isDetailed ? "Total Medical Bill" : "The bill"}</span>
             </div>
             <div className="text-base font-mono font-bold text-foreground mt-1">
               {formatCurrency(liabilityResult.data.billedAmount)}
@@ -381,33 +387,33 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
           <div className="p-3 rounded-lg bg-background/50 border border-border/40">
             <div className="text-[10px] uppercase font-mono text-rose-400/90 flex items-center gap-1">
               <Receipt className="size-3 text-rose-400" />
-              <span>You Owe If Denied</span>
+              <span>{isDetailed ? "You Owe If Denied" : "You pay if you lose"}</span>
             </div>
             <div className="text-base font-mono font-bold text-rose-400 mt-1">
               {formatCurrency(liabilityResult.totalPatientExposureDenied)}
             </div>
             <div className="text-[10px] text-muted-foreground truncate">
-              Without overturning denial
+              {isDetailed ? "Without overturning denial" : "If nothing changes"}
             </div>
           </div>
 
           <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-500/30">
             <div className="text-[10px] uppercase font-mono text-emerald-400 flex items-center gap-1 font-semibold">
               <TrendUp className="size-3" />
-              <span>You Save If Won</span>
+              <span>{isDetailed ? "You Save If Won" : "You save if you win"}</span>
             </div>
             <div className="text-base font-mono font-black text-emerald-400 mt-1">
               {formatCurrency(liabilityResult.netPatientSavings)}
             </div>
             <div className="text-[10px] text-emerald-400/80 truncate">
-              Relief from overturned claim
+              {isDetailed ? "Relief from overturned claim" : "Stays in your pocket"}
             </div>
           </div>
 
           <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-500/30">
             <div className="text-[10px] uppercase font-mono text-amber-400 flex items-center gap-1">
               <Scales className="size-3" />
-              <span>Insurer Penalty</span>
+              <span>{isDetailed ? "Insurer Penalty" : "Fees they owe"}</span>
             </div>
             <div className="text-base font-mono font-bold text-amber-400 mt-1">
               {formatCurrency(erisaResult.data.accruedPenaltyAmount)}
@@ -443,7 +449,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             )}
           >
             <Coins className="size-4" />
-            <span>1. Patient Savings & Bill Breakdown</span>
+            <span>{isDetailed ? "1. Patient Savings & Bill Breakdown" : "1. Your bill & savings"}</span>
             <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/30 text-emerald-400 ml-1">
               Save {formatCurrency(liabilityResult.netPatientSavings)}
             </Badge>
@@ -463,14 +469,14 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             )}
           >
             <Scales className="size-4" />
-            <span>2. Insurer Penalty Sentinel</span>
+            <span>{isDetailed ? "2. Insurer Penalty Sentinel" : "2. Fees they may owe"}</span>
             {erisaResult.data.daysInDefault > 0 ? (
               <Badge variant="destructive" className="h-5 px-1.5 text-[9px] font-mono">
                 {erisaResult.data.daysInDefault}d in Default (${dailyPenaltyRate.toFixed(0)}/d)
               </Badge>
             ) : (
               <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground">
-                {STATUTORY_DISCLOSURE_GRACE_DAYS}-Day Window Active
+                {isDetailed ? `${STATUTORY_DISCLOSURE_GRACE_DAYS}-Day Window Active` : `${STATUTORY_DISCLOSURE_GRACE_DAYS} days to reply`}
               </Badge>
             )}
           </button>
@@ -478,13 +484,13 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
 
         <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
           <Info className="size-3.5 text-primary" />
-          <span>Need full legal statement?</span>
+          <span>{isDetailed ? "Need full legal statement?" : "Want a printable copy?"}</span>
           <button
             type="button"
             onClick={() => setIsPrintModalOpen(true)}
             className="text-primary hover:underline font-medium cursor-pointer"
           >
-            Preview Exhibit
+            {isDetailed ? "Preview Exhibit" : "Preview it"}
           </button>
         </div>
       </div>
@@ -499,28 +505,30 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-mono uppercase text-rose-400 font-semibold tracking-wider">
-                    If Denial Stands
+                    {isDetailed ? "If Denial Stands" : "If you do nothing"}
                   </span>
                   <Badge variant="outline" className="text-[10px] border-rose-500/30 text-rose-400 font-mono">
-                    Worst Case
+                    {isDetailed ? "Worst Case" : "Worst case"}
                   </Badge>
                 </div>
                 <div className="text-2xl font-mono font-bold text-rose-400 pt-1">
                   {formatCurrency(liabilityResult.totalPatientExposureDenied)}
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Your total out-of-pocket responsibility if the insurer refuses to cover this claim.
+                  {isDetailed
+                    ? "Your total out-of-pocket responsibility if the insurer refuses to cover this claim."
+                    : "What lands on you if the insurer won't pay."}
                 </p>
               </div>
 
               <div className="pt-2.5 border-t border-rose-500/20 space-y-1 text-xs font-mono">
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Insurance Pays:</span>
+                  <span>{isDetailed ? "Insurance Pays:" : "Insurer pays:"}</span>
                   <span className="text-rose-400 font-semibold">$0.00 (0%)</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Patient Responsibility:</span>
-                  <span className="text-rose-400 font-semibold">100% of Allowed</span>
+                  <span>{isDetailed ? "Patient Responsibility:" : "You pay:"}</span>
+                  <span className="text-rose-400 font-semibold">{isDetailed ? "100% of Allowed" : "All of it"}</span>
                 </div>
               </div>
             </Card>
@@ -530,27 +538,29 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-mono uppercase text-cyan-400 font-semibold tracking-wider">
-                    If Appeal Overturned
+                    {isDetailed ? "If Appeal Overturned" : "If you win"}
                   </span>
                   <Badge variant="outline" className="text-[10px] border-cyan-500/30 text-cyan-300 font-mono">
-                    Target Goal
+                    {isDetailed ? "Target Goal" : "Goal"}
                   </Badge>
                 </div>
                 <div className="text-2xl font-mono font-bold text-cyan-300 pt-1">
                   {formatCurrency(liabilityResult.totalPatientLiabilityOverturned)}
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Your out-of-pocket obligation is reduced strictly to standard in-network cost-sharing.
+                  {isDetailed
+                    ? "Your out-of-pocket obligation is reduced strictly to standard in-network cost-sharing."
+                    : "You're left with just your normal copay and deductible."}
                 </p>
               </div>
 
               <div className="pt-2.5 border-t border-cyan-500/20 space-y-1 text-xs font-mono">
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Insurance Obligation:</span>
+                  <span>{isDetailed ? "Insurance Obligation:" : "Insurer pays:"}</span>
                   <span className="text-cyan-300 font-semibold">{formatCurrency(liabilityResult.payerExpectedObligation)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Your Cost Share:</span>
+                  <span>{isDetailed ? "Your Cost Share:" : "You pay:"}</span>
                   <span className="text-foreground font-semibold">{formatCurrency(liabilityResult.coveredPatientShare)}</span>
                 </div>
               </div>
@@ -562,17 +572,19 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold tracking-wider flex items-center gap-1">
                     <TrendUp className="size-3.5" />
-                    <span>Your Net Relief</span>
+                    <span>{isDetailed ? "Your Net Relief" : "What you keep"}</span>
                   </span>
                   <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-400 font-mono font-bold">
-                    Direct Savings
+                    {isDetailed ? "Direct Savings" : "Savings"}
                   </Badge>
                 </div>
                 <div className="text-2xl font-mono font-black text-emerald-400 pt-1">
                   {formatCurrency(liabilityResult.netPatientSavings)}
                 </div>
                 <p className="text-xs text-emerald-400/90 leading-relaxed font-medium">
-                  Actual money retained in your bank account when ClaimHero overturns this denial.
+                  {isDetailed
+                    ? "Actual money retained in your bank account when ClaimHero overturns this denial."
+                    : "The money you don't have to pay if this appeal succeeds."}
                 </p>
               </div>
 
@@ -641,7 +653,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               <div className="flex items-center gap-2">
                 <Receipt className="size-4 text-primary" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground font-mono">
-                  Itemized Cost Breakdown & Overturn Impact
+                    {isDetailed ? "Itemized Cost Breakdown & Overturn Impact" : "What makes up your bill"}
                 </h3>
               </div>
               <Badge variant="outline" className="text-[10px] font-mono">
@@ -654,9 +666,9 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
                 <TableHeader className="bg-muted/40">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="text-[11px] font-mono py-2">Item</TableHead>
-                    <TableHead className="text-[11px] font-mono py-2 text-right">If Denied</TableHead>
-                    <TableHead className="text-[11px] font-mono py-2 text-right">If Overturned</TableHead>
-                    <TableHead className="text-[11px] font-mono py-2 text-right">Difference</TableHead>
+                    <TableHead className="text-[11px] font-mono py-2 text-right">{isDetailed ? "If Denied" : "Now"}</TableHead>
+                    <TableHead className="text-[11px] font-mono py-2 text-right">{isDetailed ? "If Overturned" : "If you win"}</TableHead>
+                    <TableHead className="text-[11px] font-mono py-2 text-right">{isDetailed ? "Difference" : "You save"}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -904,7 +916,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             <div className="flex items-center gap-2 flex-wrap">
               <Scales className="size-5 text-amber-400 shrink-0" />
               <h3 className="text-sm font-bold text-foreground font-sans">
-                The ERISA {STATUTORY_DISCLOSURE_GRACE_DAYS}-Day Disclosure Rule & Your Legal Leverage
+                {isDetailed ? `The ERISA ${STATUTORY_DISCLOSURE_GRACE_DAYS}-Day Disclosure Rule & Your Legal Leverage` : `They have ${STATUTORY_DISCLOSURE_GRACE_DAYS} days to show their rules`}
               </h3>
               <Badge variant={severityMeta.badgeVariant} className="text-[10px] font-mono">
                 {severityMeta.label}
@@ -921,42 +933,42 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
           {/* 4-Stat Metric Box & Total Exposure Hero Pill */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="p-3.5 rounded-xl bg-card/75 border border-border/60">
-              <div className="text-[10px] font-mono uppercase text-muted-foreground">Days in Default</div>
+              <div className="text-[10px] font-mono uppercase text-muted-foreground">{isDetailed ? "Days in Default" : "Days overdue"}</div>
               <div className="text-xl font-mono font-bold text-rose-400 mt-1">
-                {erisaResult.data.daysInDefault} calendar days
+                {erisaResult.data.daysInDefault} {isDetailed ? "calendar days" : erisaResult.data.daysInDefault === 1 ? "day" : "days"}
               </div>
               <div className="text-[10px] text-muted-foreground mt-0.5">
-                Past {STATUTORY_DISCLOSURE_GRACE_DAYS}-day statutory grace
+                {isDetailed ? `Past ${STATUTORY_DISCLOSURE_GRACE_DAYS}-day statutory grace` : `Past the ${STATUTORY_DISCLOSURE_GRACE_DAYS}-day reply window`}
               </div>
             </div>
 
             <div className="p-3.5 rounded-xl bg-card/75 border border-border/60">
-              <div className="text-[10px] font-mono uppercase text-muted-foreground">Accrued § 502(c) Penalties</div>
+              <div className="text-[10px] font-mono uppercase text-muted-foreground">{isDetailed ? "Accrued § 502(c) Penalties" : "Fees owed so far"}</div>
               <div className="text-xl font-mono font-bold text-amber-400 mt-1">
                 {formatCurrency(erisaResult.data.accruedPenaltyAmount)}
               </div>
               <div className="text-[10px] text-muted-foreground mt-0.5">
-                ${dailyPenaltyRate.toFixed(0)} / day statutory rate
+                ${dailyPenaltyRate.toFixed(0)} / day{isDetailed ? " statutory rate" : ""}
               </div>
             </div>
 
             <div className="p-3.5 rounded-xl bg-card/75 border border-border/60">
-              <div className="text-[10px] font-mono uppercase text-muted-foreground">Prompt-Pay Interest</div>
+              <div className="text-[10px] font-mono uppercase text-muted-foreground">{isDetailed ? "Prompt-Pay Interest" : "Late interest"}</div>
               <div className="text-xl font-mono font-bold text-cyan-400 mt-1">
                 {formatCurrency(erisaResult.data.accruedInterestAmount)}
               </div>
               <div className="text-[10px] text-muted-foreground mt-0.5">
-                {erisaResult.data.statutoryInterestRate}% annual interest
+                {erisaResult.data.statutoryInterestRate}% {isDetailed ? "annual interest" : "per year"}
               </div>
             </div>
 
             <div className="p-3.5 rounded-xl bg-card/75 border border-border/60">
-              <div className="text-[10px] font-mono uppercase text-muted-foreground">Lodestar Legal Fees</div>
+              <div className="text-[10px] font-mono uppercase text-muted-foreground">{isDetailed ? "Lodestar Legal Fees" : "Lawyer fees"}</div>
               <div className="text-xl font-mono font-bold text-emerald-400 mt-1">
                 {formatCurrency(erisaResult.data.estimatedAttorneysFees)}
               </div>
               <div className="text-[10px] text-muted-foreground mt-0.5">
-                Fee shifting (ERISA § 502(g)(1))
+                {isDetailed ? "Fee shifting (ERISA § 502(g)(1))" : "They may have to pay these"}
               </div>
             </div>
           </div>
@@ -966,7 +978,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             <div className="space-y-1">
               <div className="text-xs font-mono uppercase tracking-wider text-amber-400 font-bold flex items-center gap-1.5">
                 <Lightning className="size-4" />
-                <span>Total Insurer Statutory Exposure</span>
+                <span>{isDetailed ? "Total Insurer Statutory Exposure" : "Total they may owe"}</span>
               </div>
               <p className="text-xs text-muted-foreground max-w-xl">
                 Total financial exposure facing the plan administrator: disputed claim principal + accrued daily statutory fines + prompt-pay interest + mandatory attorney fees.
@@ -986,7 +998,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               <div className="flex items-center gap-2">
                 <FileText className="size-4 text-cyan-400" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground font-mono">
-                  Formal Statutory Notice of Default & Demand
+                  {isDetailed ? "Formal Statutory Notice of Default & Demand" : "Letter demanding their records"}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
@@ -997,7 +1009,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
                   className="gap-1.5 text-xs font-mono h-7 cursor-pointer"
                 >
                   {copiedDemand ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
-                  <span>{copiedDemand ? "Copied Demand" : "Copy Demand"}</span>
+                  <span>{copiedDemand ? (isDetailed ? "Copied Demand" : "Copied") : (isDetailed ? "Copy Demand" : "Copy letter")}</span>
                 </Button>
                 <Button
                   size="sm"
@@ -1006,13 +1018,15 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
                   className="gap-1.5 text-xs font-semibold h-7 bg-primary text-primary-foreground cursor-pointer"
                 >
                   <FileText className="size-3" />
-                  <span>Embed in Brief</span>
+                  <span>{isDetailed ? "Embed in Brief" : "Add to my letter"}</span>
                 </Button>
               </div>
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Include this formal demand paragraph in your appeal brief or send it as a certified letter to compel immediate document production and prompt settlement:
+              {isDetailed
+                ? "Include this formal demand paragraph in your appeal brief or send it as a certified letter to compel immediate document production and prompt settlement:"
+                : "Add this to your letter or send it to force them to share their records:"}
             </p>
 
             <div className="p-3.5 rounded-lg bg-background/80 border border-border/60 font-mono text-[11px] text-foreground/90 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto select-text">
@@ -1025,14 +1039,16 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground font-mono">
-                  Projected Penalty Compounding Trajectory
+                  {isDetailed ? "Projected Penalty Compounding Trajectory" : "What the fees grow to over time"}
                 </h4>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  How the insurer's liability compounds at ${dailyPenaltyRate.toFixed(0)}/day for each additional month of non-compliance.
+                  {isDetailed
+                    ? `How the insurer's liability compounds at $${dailyPenaltyRate.toFixed(0)}/day for each additional month of non-compliance.`
+                    : `Fees keep adding up at $${dailyPenaltyRate.toFixed(0)}/day until they respond.`}
                 </p>
               </div>
               <Badge variant="outline" className="text-[10px] font-mono text-amber-400 border-amber-500/30">
-                ${dailyPenaltyRate.toFixed(0)} / Day Escalation
+                +${dailyPenaltyRate.toFixed(0)} / day
               </Badge>
             </div>
 
@@ -1040,11 +1056,11 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               <Table>
                 <TableHeader className="bg-muted/40">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-[10px] font-mono py-1.5">Horizon</TableHead>
-                    <TableHead className="text-[10px] font-mono py-1.5">Future Date</TableHead>
-                    <TableHead className="text-[10px] font-mono py-1.5 text-right">Default Days</TableHead>
-                    <TableHead className="text-[10px] font-mono py-1.5 text-right">Penalties Accrued</TableHead>
-                    <TableHead className="text-[10px] font-mono py-1.5 text-right">Total Insurer Exposure</TableHead>
+                    <TableHead className="text-[10px] font-mono py-1.5">{isDetailed ? "Horizon" : "In"}</TableHead>
+                    <TableHead className="text-[10px] font-mono py-1.5">{isDetailed ? "Future Date" : "Date"}</TableHead>
+                    <TableHead className="text-[10px] font-mono py-1.5 text-right">{isDetailed ? "Default Days" : "Days late"}</TableHead>
+                    <TableHead className="text-[10px] font-mono py-1.5 text-right">{isDetailed ? "Penalties Accrued" : "Fees"}</TableHead>
+                    <TableHead className="text-[10px] font-mono py-1.5 text-right">{isDetailed ? "Total Insurer Exposure" : "They may owe"}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1077,10 +1093,12 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
                 <Clock className="size-4 text-primary" />
                 <div>
                   <span className="text-xs font-semibold text-foreground">
-                    Fine-Tune Statutory Request Dates & Penalty Rate
+                    {isDetailed ? "Fine-Tune Statutory Request Dates & Penalty Rate" : "Adjust dates and daily fee"}
                   </span>
                   <p className="text-[11px] text-muted-foreground">
-                    Customize document request date, audit calculation date, and statutory daily fine rate (${dailyPenaltyRate.toFixed(0)}).
+                    {isDetailed
+                      ? `Customize document request date, audit calculation date, and statutory daily fine rate ($${dailyPenaltyRate.toFixed(0)}).`
+                      : `Change when you asked and the daily fee amount ($${dailyPenaltyRate.toFixed(0)}).`}
                   </p>
                 </div>
               </div>
@@ -1178,7 +1196,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
 
                 <div className="space-y-1.5 pt-2 border-t border-border/40">
                   <div className="text-[11px] font-medium text-muted-foreground">
-                    Required Statutory Documents Requested (29 CFR § 2560.503-1(h)(2)(iii))
+                    {isDetailed ? "Required Statutory Documents Requested (29 CFR § 2560.503-1(h)(2)(iii))" : "Records they must hand over"}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
                     {erisaResult.data.requestedDocuments.map((doc) => (
@@ -1201,17 +1219,19 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
           <div className="flex items-center gap-2">
             <ShieldCheck className="size-4 text-emerald-400" />
             <h4 className="text-sm font-bold text-foreground">
-              Total Appellate Settlement Leverage
+              {isDetailed ? "Total Appellate Settlement Leverage" : "Your total leverage"}
             </h4>
           </div>
           <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-            By citing your net out-of-pocket recovery ({formatCurrency(liabilityResult.netPatientSavings)}) alongside accrued statutory ERISA penalties ({formatCurrency(erisaResult.data.accruedPenaltyAmount)}), you establish maximum legal pressure to compel the insurer to overturn this denial immediately.
+            {isDetailed
+              ? `By citing your net out-of-pocket recovery (${formatCurrency(liabilityResult.netPatientSavings)}) alongside accrued statutory ERISA penalties (${formatCurrency(erisaResult.data.accruedPenaltyAmount)}), you establish maximum legal pressure to compel the insurer to overturn this denial immediately.`
+              : `What you'd save (${formatCurrency(liabilityResult.netPatientSavings)}) plus what they may owe in fees (${formatCurrency(erisaResult.data.accruedPenaltyAmount)}) is your strongest argument.`}
           </p>
         </div>
 
         <div className="flex items-center gap-4 shrink-0">
           <div className="text-right">
-            <div className="text-[10px] font-mono uppercase text-muted-foreground">Combined Leverage</div>
+            <div className="text-[10px] font-mono uppercase text-muted-foreground">{isDetailed ? "Combined Leverage" : "Combined"}</div>
             <div className="text-xl font-mono font-black text-emerald-400">
               {formatCurrency(liabilityResult.netPatientSavings + erisaResult.data.totalStatutoryDamages)}
             </div>
@@ -1223,7 +1243,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             disabled={isSaving}
             className="h-9 px-3 text-xs bg-primary text-primary-foreground font-semibold cursor-pointer shadow-xs gap-1.5"
           >
-            <span>Embed in Brief</span>
+            <span>{isDetailed ? "Embed in Brief" : "Add to my letter"}</span>
             <ArrowRight className="size-3.5" />
           </Button>
         </div>

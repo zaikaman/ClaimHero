@@ -41,6 +41,7 @@ import {
   triggerFileDownload,
 } from "../../lib/exportUtils";
 import { CPT_CODES, DENIAL_REASON_CODES } from "../../lib/constants";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { DeadlineCountdown } from "./DeadlineCountdown";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -116,6 +117,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   includeDemo = true,
   onToggleIncludeDemo,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [payerFilter, setPayerFilter] = useState("all");
@@ -305,22 +307,22 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   };
 
   const statusTabs = [
-    { id: "all", label: "All Cases", count: statusCounts.all },
+    { id: "all", label: isDetailed ? "All Cases" : "All", count: statusCounts.all },
     {
       id: "critical_deadline",
-      label: "Urgent Alarms (<14d)",
+      label: isDetailed ? "Urgent Alarms (<14d)" : "Needs attention",
       count: statusCounts.critical_deadline,
       isUrgent: true,
     },
-    { id: "ingested", label: "Intake / OCR", count: statusCounts.ingested },
-    { id: "analyzing", label: "Evidence Crawl", count: statusCounts.analyzing },
+    { id: "ingested", label: isDetailed ? "Intake / OCR" : "New", count: statusCounts.ingested },
+    { id: "analyzing", label: isDetailed ? "Evidence Crawl" : "Gathering proof", count: statusCounts.analyzing },
     {
       id: "ready_for_review",
-      label: "Ready for Dispatch",
+      label: isDetailed ? "Ready for Dispatch" : "Ready to send",
       count: statusCounts.ready_for_review,
     },
-    { id: "dispatched", label: "Transmitted", count: statusCounts.dispatched },
-    { id: "won", label: "Won / Overturned", count: statusCounts.won, isWon: true },
+    { id: "dispatched", label: isDetailed ? "Transmitted" : "Sent", count: statusCounts.dispatched },
+    { id: "won", label: isDetailed ? "Won / Overturned" : "Won", count: statusCounts.won, isWon: true },
   ];
 
   const handleExportCsv = (redactMode: boolean) => {
@@ -351,7 +353,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 <CurrencyDollar className="size-4" />
               </div>
             </CardTitle>
-            <CardDescription className="text-xs">Total Disputed Pipeline</CardDescription>
+            <CardDescription className="text-xs">{isDetailed ? "Total Disputed Pipeline" : "Total you're challenging"}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -359,11 +361,11 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 {formatCurrency(totalDisputed)}
               </div>
               <Badge variant="outline" className="text-[11px] font-mono">
-                {claims.length} Cases
+                {claims.length} {claims.length === 1 ? "Case" : "Cases"}
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs">
-              Under active ERISA statutory review
+              {isDetailed ? "Under active ERISA statutory review" : "Across all your bills"}
             </p>
           </CardContent>
         </Card>
@@ -376,19 +378,19 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 <TrendUp className="size-4" />
               </div>
             </CardTitle>
-            <CardDescription className="text-xs">High Dossier Readiness</CardDescription>
+            <CardDescription className="text-xs">{isDetailed ? "High Dossier Readiness" : "Strong cases"}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
               <div className="font-medium text-2xl sm:text-3xl tabular-nums leading-none tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
-                {highRiskCount} Cases
+                {highRiskCount} {highRiskCount === 1 ? "Case" : "Cases"}
               </div>
               <Badge variant="outline" className="text-[10px] font-mono text-emerald-600 border-emerald-500/30">
-                &ge; 80 Readiness
+                {isDetailed ? "≥ 80 Readiness" : "Likely to win"}
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs">
-              Strong precedent alignment detected
+              {isDetailed ? "Strong precedent alignment detected" : "Good proof found so far"}
             </p>
           </CardContent>
         </Card>
@@ -401,7 +403,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 <UserCheck className="size-4" />
               </div>
             </CardTitle>
-            <CardDescription className="text-xs">Recovered Viable Funds</CardDescription>
+            <CardDescription className="text-xs">{isDetailed ? "Recovered Viable Funds" : "Money saved"}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -409,11 +411,11 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 {formatCurrency(totalWon)}
               </div>
               <Badge variant="secondary" className="text-[11px] font-mono">
-                {avgScore}/100 Avg Readiness
+                {avgScore}/100 {isDetailed ? "Avg Readiness" : "Avg strength"}
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs">
-              Across {claims.length} cross-examined CPBs
+              {isDetailed ? `Across ${claims.length} cross-examined CPBs` : "Won back from insurers"}
             </p>
           </CardContent>
         </Card>
@@ -430,7 +432,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 )}
               </div>
             </CardTitle>
-            <CardDescription className="text-xs">Statutory Alarms (&lt;14d)</CardDescription>
+            <CardDescription className="text-xs">{isDetailed ? "Statutory Alarms (<14d)" : "Need attention soon"}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -439,14 +441,16 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                   criticalCount > 0 ? "text-destructive font-mono" : "text-foreground font-mono"
                 }`}
               >
-                {criticalCount} Urgent
+                {criticalCount} {isDetailed ? "Urgent" : criticalCount === 1 ? "Case" : "Cases"}
               </div>
-              <Badge variant="outline" className="text-[10px] font-mono">
-                29 CFR § 2560.503-1
-              </Badge>
+              {isDetailed && (
+                <Badge variant="outline" className="text-[10px] font-mono">
+                  29 CFR § 2560.503-1
+                </Badge>
+              )}
             </div>
             <p className="text-muted-foreground text-xs">
-              Deadlines expiring within statutory window
+              {isDetailed ? "Deadlines expiring within statutory window" : "Less than 14 days left to act"}
             </p>
           </CardContent>
         </Card>
@@ -460,14 +464,16 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <CardTitle className="text-base font-semibold text-foreground">
-                  Case Ingestion & Adjudication Radar
+                  {isDetailed ? "Case Ingestion & Adjudication Radar" : "Your denied bills"}
                 </CardTitle>
                 <Badge variant="outline" className="font-mono text-[10px]">
-                  {filtered.length} of {claims.length} Cases
+                  {filtered.length} of {claims.length} {claims.length === 1 ? "Case" : "Cases"}
                 </Badge>
               </div>
               <CardDescription className="text-xs mt-0.5">
-                Active medical denial records with plan coverage, CPT codes, CARC reason, and statutory ERISA clock.
+                {isDetailed
+                  ? "Active medical denial records with plan coverage, CPT codes, CARC reason, and statutory ERISA clock."
+                  : "What the insurer refused to pay, why, and how much time you have left."}
               </CardDescription>
             </div>
 
@@ -553,7 +559,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 className="h-8 gap-1.5 text-xs bg-primary text-primary-foreground font-semibold shadow-xs shrink-0 cursor-pointer"
               >
                 <PlusCircle className="size-3.5" />
-                <span>Ingest Denial</span>
+                <span>{isDetailed ? "Ingest Denial" : "Add denial"}</span>
               </Button>
             </div>
           </div>
@@ -606,9 +612,9 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 <MagnifyingGlass className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="claim-search-input"
-                  aria-label="Search claims by patient, CPT code, or insurer"
+                  aria-label={isDetailed ? "Search claims by patient, CPT code, or insurer" : "Search by name, insurer, or treatment"}
                   className="h-8 pl-8 text-xs bg-background"
-                  placeholder="Search claim, patient, CPT, insurer..."
+                  placeholder={isDetailed ? "Search claim, patient, CPT, insurer..." : "Search name, insurer, treatment..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -618,12 +624,12 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
               <div className="flex items-center gap-1.5">
                 <Buildings className="size-3.5 text-muted-foreground hidden sm:inline" />
                 <Select
-                  aria-label="Filter by insurance payer"
+                  aria-label={isDetailed ? "Filter by insurance payer" : "Filter by insurer"}
                   value={payerFilter}
                   onChange={(e) => setPayerFilter(e.target.value)}
                   className="h-8 text-xs font-sans"
                 >
-                  <option value="all">All Insurers</option>
+                  <option value="all">{isDetailed ? "All Insurers" : "All insurers"}</option>
                   {availablePayers.map((payerName) => (
                     <option key={payerName} value={payerName}>
                       {payerName}
@@ -665,7 +671,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
             </div>
 
             <div className="text-[11px] font-mono text-muted-foreground self-end sm:self-auto">
-              Showing {filtered.length} claims
+              Showing {filtered.length} {filtered.length === 1 ? "case" : "cases"}
             </div>
           </div>
         </CardHeader>
@@ -675,13 +681,13 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
           <Table>
             <TableHeader className="bg-muted/30">
               <TableRow>
-                <TableHead>Claim & Patient</TableHead>
-                <TableHead>Payer</TableHead>
-                <TableHead>CPT Code</TableHead>
-                <TableHead>Denial Reason</TableHead>
-                <TableHead>Disputed</TableHead>
-                <TableHead>Readiness</TableHead>
-                <TableHead>Statutory Clock</TableHead>
+                <TableHead>{isDetailed ? "Claim & Patient" : "Case"}</TableHead>
+                <TableHead>{isDetailed ? "Payer" : "Insurer"}</TableHead>
+                <TableHead>{isDetailed ? "CPT Code" : "Care received"}</TableHead>
+                <TableHead>{isDetailed ? "Denial Reason" : "Why they said no"}</TableHead>
+                <TableHead>{isDetailed ? "Disputed" : "Bill amount"}</TableHead>
+                <TableHead>{isDetailed ? "Readiness" : "Strength"}</TableHead>
+                <TableHead>{isDetailed ? "Statutory Clock" : "Time left"}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -692,10 +698,10 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                     <div className="flex flex-col items-center justify-center space-y-2 py-4">
                       <Funnel className="size-6 text-muted-foreground/60" />
                       <div className="text-xs font-semibold text-foreground">
-                        No claims match your current filter
+                        {isDetailed ? "No claims match your current filter" : "No cases match your filters"}
                       </div>
                       <p className="text-[11px] text-muted-foreground max-w-xs">
-                        Try resetting your search query or switching to &quot;All Cases&quot;.
+                        Try resetting your search query or switching to &quot;{isDetailed ? "All Cases" : "All"}&quot;.
                       </p>
                       {hasActiveFilters && (
                         <Button
@@ -794,11 +800,11 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                         </Badge>
                       </TableCell>
 
-                      {/* 3. CPT Procedure */}
+                      {/* 3. Care received (CPT code preserved for search) */}
                       <TableCell className="py-2.5">
                         <div className="flex flex-col min-w-0">
-                          <Badge variant="secondary" className="font-mono text-[11px] w-fit px-1.5 py-0">
-                            {primaryCpt ? `CPT ${primaryCpt}` : "No CPT"}
+                          <Badge variant="secondary" className="font-mono text-[11px] w-fit px-1.5 py-0" title={primaryCpt ? `CPT ${primaryCpt}` : undefined}>
+                            {primaryCpt ? `CPT ${primaryCpt}` : (isDetailed ? "No CPT" : "Not listed")}
                           </Badge>
                           {cptInfo && (
                             <span className="text-[10px] text-muted-foreground truncate max-w-[110px] mt-0.5" title={cptInfo.name}>
@@ -860,7 +866,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                         </div>
                       </TableCell>
 
-                      {/* 6. Statutory Appeal Readiness */}
+                      {/* 6. Case strength */}
                       <TableCell className="py-2.5">
                         {isWon ? (
                           <div className="flex items-center gap-1 font-mono">
@@ -873,7 +879,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                             </Badge>
                           </div>
                         ) : claim.overturnProbabilityScore !== undefined ? (
-                          <div className="flex items-center gap-1 font-mono" title="Statutory Appeal Readiness Score: 4-pillar evidentiary completeness audit">
+                          <div className="flex items-center gap-1 font-mono" title={isDetailed ? "Statutory Appeal Readiness Score: 4-pillar evidentiary completeness audit" : "Case strength: how complete your proof is"}>
                             <span className="font-bold text-xs text-foreground">
                               {claim.overturnProbabilityScore}/100
                             </span>
@@ -917,7 +923,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 onSelectClaim(claim._id);
                                 onNavigateView("communications");
                               }}
-                              title="Open Insurer Reversal Notice & Communications"
+                              title={isDetailed ? "Open Insurer Reversal Notice & Communications" : "See insurer's reply"}
                               className="h-7 px-2.5 text-xs gap-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
                             >
                               <CheckCircle className="size-3 text-emerald-500" />
@@ -931,7 +937,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 onSelectClaim(claim._id);
                                 onNavigateView("communications");
                               }}
-                              title="Open Payer Communications Inbox"
+                              title={isDetailed ? "Open Payer Communications Inbox" : "Open messages"}
                               className="h-7 px-2.5 text-xs gap-1"
                             >
                               <Envelope className="size-3" />
@@ -945,7 +951,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 onSelectClaim(claim._id);
                                 onNavigateView("studio");
                               }}
-                              title="Review Drafted Appeal Brief"
+                              title={isDetailed ? "Review Drafted Appeal Brief" : "Review your letter and send it"}
                               className="h-7 px-2.5 text-xs gap-1 bg-primary text-primary-foreground font-semibold shadow-2xs"
                             >
                               <FileText className="size-3" />
@@ -961,11 +967,11 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 onSelectClaim(claim._id);
                                 onOpenIngestion(claim);
                               }}
-                              title="Complete compulsory clinical intake and submitter form"
+                              title={isDetailed ? "Complete compulsory clinical intake and submitter form" : "Add your contact details to continue"}
                               className="h-7 px-2.5 text-xs gap-1 bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-2xs border border-amber-500/30"
                             >
                               <ClipboardText className="size-3" weight="bold" />
-                              <span>Complete Form</span>
+                              <span>{isDetailed ? "Complete Form" : "Add your details"}</span>
                             </Button>
                           ) : claim.status === "analyzing" || (claim.evidenceCount && claim.evidenceCount > 0) ? (
                             <Button
@@ -975,11 +981,11 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 onSelectClaim(claim._id);
                                 onNavigateView("studio");
                               }}
-                              title="Synthesize Appeal Brief"
+                              title={isDetailed ? "Synthesize Appeal Brief" : "Write your appeal letter"}
                               className="h-7 px-2.5 text-xs gap-1"
                             >
                               <FileText className="size-3" />
-                              <span>Draft Brief</span>
+                              <span>{isDetailed ? "Draft Brief" : "Write letter"}</span>
                             </Button>
                           ) : (
                             <Button
@@ -991,10 +997,10 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 onSelectClaim(claim._id);
                                 if (onRunAutonomousPipeline) {
                                   setRunningPipelineClaimId(claim._id);
-                                  const toastId = toast.loading(`Running Autonomous Sentinel Pipeline for Case #${claim.claimNumber}...`);
+                                  const toastId = toast.loading(isDetailed ? `Running Autonomous Sentinel Pipeline for Case #${claim.claimNumber}...` : `Building your appeal for case #${claim.claimNumber}...`);
                                   try {
                                     await onRunAutonomousPipeline(claim._id);
-                                    toast.success(`Pipeline resolved Case #${claim.claimNumber}: Evidence indexed & brief compiled`, { id: toastId });
+                                    toast.success(isDetailed ? `Pipeline resolved Case #${claim.claimNumber}: Evidence indexed & brief compiled` : `Your appeal for case #${claim.claimNumber} is ready to review`, { id: toastId });
                                     onNavigateView("studio");
                                   } catch (err) {
                                     toast.error(err instanceof Error ? err.message : "Pipeline execution failed", { id: toastId });
@@ -1005,18 +1011,18 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                   onNavigateView("evidence");
                                 }
                               }}
-                              title="Run Full Autonomous Sentinel Pipeline (Analyze + Score + Synthesize)"
+                              title={isDetailed ? "Run Full Autonomous Sentinel Pipeline (Analyze + Score + Synthesize)" : "Check your case, gather proof, and write your letter"}
                               className="h-7 px-2.5 text-xs gap-1 bg-primary text-primary-foreground font-semibold shadow-2xs"
                             >
                               {runningPipelineClaimId === claim._id ? (
                                 <>
                                   <CircleNotch className="size-3 animate-spin" />
-                                  <span>Solving...</span>
+                                  <span>{isDetailed ? "Solving..." : "Working..."}</span>
                                 </>
                               ) : (
                                 <>
                                   <Lightning className="size-3" weight="fill" />
-                                  <span>Auto-Solve</span>
+                                  <span>{isDetailed ? "Auto-Solve" : "Build my appeal"}</span>
                                 </>
                               )}
                             </Button>
@@ -1049,7 +1055,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                   className="gap-2 text-xs cursor-pointer text-amber-500 font-medium"
                                 >
                                   <ClipboardText className="size-3.5" />
-                                  <span>Complete Intake Form</span>
+                                  <span>{isDetailed ? "Complete Intake Form" : "Add your details"}</span>
                                 </DropdownMenuItem>
                               )}
                               {isWon ? (
@@ -1062,7 +1068,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                     className="gap-2 text-xs cursor-pointer text-emerald-600 dark:text-emerald-400 font-medium"
                                   >
                                     <CheckCircle className="size-3.5 text-emerald-500" />
-                                    <span>View Reversal Notice</span>
+                                    <span>{isDetailed ? "View Reversal Notice" : "See insurer's reply"}</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => {
@@ -1072,7 +1078,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                     className="gap-2 text-xs cursor-pointer"
                                   >
                                     <FileText className="size-3.5 text-primary" />
-                                    <span>View Victorious Brief</span>
+                                    <span>{isDetailed ? "View Victorious Brief" : "See winning letter"}</span>
                                   </DropdownMenuItem>
                                 </>
                               ) : (
@@ -1085,7 +1091,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                     className="gap-2 text-xs cursor-pointer"
                                   >
                                     <FileText className="size-3.5" />
-                                    <span>Open Appeal Studio</span>
+                                    <span>{isDetailed ? "Open Appeal Studio" : "Open your letter"}</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => {
@@ -1095,7 +1101,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                     className="gap-2 text-xs cursor-pointer text-primary font-medium"
                                   >
                                     <PhoneCall className="size-3.5" />
-                                    <span>P2P Defense Tele-Script</span>
+                                    <span>{isDetailed ? "P2P Defense Tele-Script" : "Doctor call prep"}</span>
                                   </DropdownMenuItem>
                                 </>
                               )}
@@ -1107,7 +1113,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 className="gap-2 text-xs cursor-pointer"
                               >
                                 <Pulse className="size-3.5" />
-                                <span>Evidence Matrix</span>
+                                <span>{isDetailed ? "Evidence Matrix" : "Your proof"}</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => {
@@ -1117,7 +1123,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 className="gap-2 text-xs cursor-pointer"
                               >
                                 <Envelope className="size-3.5" />
-                                <span>Payer Communications</span>
+                                <span>{isDetailed ? "Payer Communications" : "Messages"}</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => {
@@ -1127,7 +1133,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 className="gap-2 text-xs cursor-pointer"
                               >
                                 <Clock className="size-3.5" />
-                                <span>Audit Timeline</span>
+                                <span>{isDetailed ? "Audit Timeline" : "History"}</span>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -1135,7 +1141,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                 className="gap-2 text-xs text-destructive focus:text-destructive cursor-pointer font-medium"
                               >
                                 <Trash className="size-3.5" />
-                                <span>Delete Case</span>
+                                <span>{isDetailed ? "Delete Case" : "Delete"}</span>
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1154,7 +1160,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 border-t border-border bg-muted/10 text-xs">
             <div className="text-muted-foreground font-mono text-[11px]">
               Showing {filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–
-              {Math.min(filtered.length, currentPage * pageSize)} of {filtered.length} claims
+              {Math.min(filtered.length, currentPage * pageSize)} of {filtered.length} {isDetailed ? "claims" : "cases"}
               {filtered.length >= 100 && " (top 100)"}
             </div>
             <div className="flex items-center gap-1.5">

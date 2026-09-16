@@ -23,6 +23,7 @@ import {
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 interface DeleteCaseModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export const DeleteCaseModal: React.FC<DeleteCaseModalProps> = ({
   onConfirmDelete,
   onSuccess,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,88 +51,78 @@ export const DeleteCaseModal: React.FC<DeleteCaseModalProps> = ({
     setError(null);
     try {
       await onConfirmDelete(claim._id);
-      setIsDeleting(false);
       onClose();
-      onSuccess?.();
+      if (onSuccess) onSuccess();
     } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete case.");
+    } finally {
       setIsDeleting(false);
-      setError(err instanceof Error ? err.message : "Failed to delete case. Please try again.");
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && !isDeleting && onClose()}>
-      <DialogContent className="max-w-md border-border bg-card/95 backdrop-blur-xl shadow-2xl p-6 sm:rounded-2xl gap-5">
-        <DialogHeader className="gap-2 text-left">
-          <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-destructive/15 border border-destructive/30 text-destructive shadow-xs shrink-0">
-              <WarningOctagon className="size-6" weight="duotone" />
-            </div>
-            <div>
-              <DialogTitle className="text-base font-semibold text-foreground">
-                Delete Case Permanently
-              </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                This action is irreversible and will purge all related clinical evidence and appeal history.
-              </DialogDescription>
-            </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md p-6 space-y-4">
+        <DialogHeader className="space-y-2">
+          <div className="flex items-center gap-2 text-destructive">
+            <WarningOctagon className="size-5" weight="fill" />
+            <DialogTitle className="text-base font-bold text-destructive">
+              Delete Case Record Permanently
+            </DialogTitle>
           </div>
+          <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
+            This action cannot be undone. All clinical policy extractions, AI generated appeal briefs, and transmission logs associated with this claim will be permanently removed.
+          </DialogDescription>
         </DialogHeader>
 
-        {/* Claim Summary Overview Card */}
-        <div className="rounded-xl border border-border/80 bg-muted/30 p-3.5 space-y-2.5">
+        {/* Claim Summary Badge */}
+        <div className="p-3 rounded-lg border border-destructive/20 bg-destructive/5 space-y-1.5">
           <div className="flex items-center justify-between">
-            <div className="flex flex-col min-w-0">
-              <span className="font-semibold text-xs text-foreground truncate">
-                {claim.patient?.name || "Patient Record"}
-              </span>
-              <span className="font-mono text-[10px] text-muted-foreground">
-                #{claim.claimNumber}
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="font-mono text-xs font-bold text-destructive">
-                {formatCurrency(claim.deniedAmount)}
-              </span>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                Disputed
-              </div>
-            </div>
+            <span className="font-mono text-xs font-semibold text-foreground">
+              Claim #{claim.claimNumber}
+            </span>
+            <Badge variant="destructive" className="font-mono text-[10px]">
+              {formatCurrency(claim.deniedAmount)} Disputed
+            </Badge>
           </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-border/50">
-            <Badge variant="outline" className="text-[10px] gap-1 px-2 py-0.5">
+          <div className="text-xs text-muted-foreground flex items-center justify-between">
+            <span className="truncate">{claim.patient?.name || "Patient Record"}</span>
+            <span className="font-mono flex items-center gap-1">
               <Buildings className="size-3 text-muted-foreground" />
-              <span>{claim.patient?.insurancePayer || "Insurer"}</span>
-            </Badge>
-            <Badge variant="destructive" className="font-mono text-[10px] px-2 py-0.5">
-              Code {claim.denialReasonCode}
-            </Badge>
-            {claim.cptCodes?.[0] && (
-              <Badge variant="secondary" className="font-mono text-[10px] px-2 py-0.5">
-                CPT {claim.cptCodes[0]}
-              </Badge>
-            )}
+              {claim.insurancePayer}
+            </span>
           </div>
         </div>
 
-        {/* Cascading Purge Items Notice */}
-        <div className="space-y-2">
-          <div className="text-[11px] font-semibold text-foreground tracking-wide font-mono uppercase">
+        {/* What gets deleted list */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-semibold text-foreground uppercase tracking-wider font-mono">
             Permanently Purged Artifacts
           </div>
           <div className="grid grid-cols-1 gap-1.5 text-xs text-muted-foreground">
             <div className="flex items-center gap-2 rounded-lg bg-background/50 border border-border/40 px-2.5 py-1.5">
               <HardDrives className="size-3.5 text-muted-foreground shrink-0" />
-              <span>Case record & ERISA statutory countdown clock</span>
+              <span>
+                {isDetailed
+                  ? "Case record & ERISA statutory countdown clock"
+                  : "Case record & deadline countdown clock"}
+              </span>
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-background/50 border border-border/40 px-2.5 py-1.5">
               <FileText className="size-3.5 text-muted-foreground shrink-0" />
-              <span>Synthesized legal appeal dossiers & drafted arguments</span>
+              <span>
+                {isDetailed
+                  ? "Synthesized legal appeal dossiers & drafted arguments"
+                  : "Generated appeal letters & arguments"}
+              </span>
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-background/50 border border-border/40 px-2.5 py-1.5">
               <Pulse className="size-3.5 text-muted-foreground shrink-0" />
-              <span>Indexed Clinical Policy Bulletins (CPBs) & Statutory Appeal Readiness scores</span>
+              <span>
+                {isDetailed
+                  ? "Indexed Clinical Policy Bulletins (CPBs) & Statutory Appeal Readiness scores"
+                  : "Indexed insurer rules & case strength scores"}
+              </span>
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-background/50 border border-border/40 px-2.5 py-1.5">
               <Envelope className="size-3.5 text-muted-foreground shrink-0" />
@@ -138,7 +130,11 @@ export const DeleteCaseModal: React.FC<DeleteCaseModalProps> = ({
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-background/50 border border-border/40 px-2.5 py-1.5">
               <Clock className="size-3.5 text-muted-foreground shrink-0" />
-              <span>Attached denial letter files (Case audit trail sealed & retained for ERISA compliance)</span>
+              <span>
+                {isDetailed
+                  ? "Attached denial letter files (Case audit trail sealed & retained for ERISA compliance)"
+                  : "Attached denial letter files (activity log sealed & retained for compliance)"}
+              </span>
             </div>
           </div>
         </div>

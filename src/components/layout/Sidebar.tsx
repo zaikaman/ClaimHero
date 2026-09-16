@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import {
   Broadcast,
   PlusCircle,
@@ -15,6 +16,7 @@ import {
   PaperPlaneTilt,
   ChartPieSlice,
   ShieldCheck,
+  GraduationCap,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
@@ -31,6 +33,7 @@ import {
 } from "../ui/dropdown-menu";
 import { DeleteCaseModal } from "../common/DeleteCaseModal";
 import { BrandLogo, BrandIcon } from "../common/BrandLogo";
+import { DetailModeToggle } from "../common/DetailModeToggle";
 
 export type NavigationView =
   | "landing"
@@ -71,6 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSentinel,
 }) => {
   const { viewer, isAuthenticated, userName, userEmail, userInitial, signOut } = useCurrentUser();
+  const { isDetailed, toggleDetailMode } = useDetailMode();
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
 
   const isCaseWorkspaceActive =
@@ -103,7 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             "w-full flex items-center gap-2.5 px-2 py-1 rounded-md hover:bg-muted/60 transition-all text-left group cursor-pointer",
             isCollapsed && "justify-center px-0"
           )}
-          title="ClaimHero Sentinel Home"
+          title="ClaimHero home"
         >
           {isCollapsed ? (
             <BrandIcon size="sm" glow interactive />
@@ -120,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground h-9 px-3 text-xs font-semibold hover:bg-primary/90 transition-all shadow-xs cursor-pointer active:scale-[0.98]"
             >
               <PlusCircle className="size-4" weight="bold" />
-              <span>Ingest Denial</span>
+              <span>{isDetailed ? "Ingest Denial" : "Add denial letter"}</span>
             </button>
           </div>
         ) : (
@@ -129,18 +133,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               size="icon"
               onClick={() => onOpenIngestion?.()}
               className="size-9 rounded-lg shadow-xs"
-              title="Ingest Denial Notice"
+              title={isDetailed ? "Ingest Denial Notice" : "Add a denial letter"}
             >
               <PlusCircle className="size-4" weight="bold" />
             </Button>
           </div>
         )}
 
-        {/* Primary Navigation: Case Radar (List / Portfolio View) */}
+        {/* Primary Navigation: My Cases (List / Portfolio View) */}
         <div className="space-y-1">
           <button
             onClick={() => onSelectView("radar")}
-            title={isCollapsed ? "Case Radar — Claims Ingestion & Alarms" : undefined}
+            title={isCollapsed ? (isDetailed ? "Case Radar — Claims Ingestion & Alarms" : "My Cases — bills the insurer refused to pay") : undefined}
             className={cn(
               "w-full flex items-center rounded-lg text-xs font-medium transition-colors text-left group cursor-pointer",
               isCollapsed ? "justify-center p-2" : "justify-between px-2.5 py-2",
@@ -156,7 +160,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   currentView === "radar" ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )}
               />
-              {!isCollapsed && <span className="truncate">Case Radar</span>}
+              {!isCollapsed && <span className="truncate">{isDetailed ? "Case Radar" : "My Cases"}</span>}
             </div>
             {!isCollapsed && claims.length > 0 && (
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
@@ -170,9 +174,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="space-y-1.5 pt-1">
           {!isCollapsed && (
             <div className="px-2 flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-              <span>Active Cases</span>
+              <span>{isDetailed ? "Active Cases" : "Your cases"}</span>
               <span className="text-[9px] text-muted-foreground/80 font-mono">
-                ERISA Clock
+                {isDetailed ? "ERISA Clock" : "Time left"}
               </span>
             </div>
           )}
@@ -210,8 +214,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="space-y-1 overflow-y-auto max-h-[calc(100vh-360px)] pr-0.5">
               {claims.length === 0 ? (
                 <div className="p-3 text-center rounded-lg border border-dashed border-border/60 bg-card/20 text-muted-foreground text-xs space-y-1">
-                  <p className="font-medium">No claims ingested</p>
-                  <p className="text-[10px]">Upload an EOB to launch the 3-step appeal Sentinel.</p>
+                  <p className="font-medium">{isDetailed ? "No claims ingested" : "No cases yet"}</p>
+                  <p className="text-[10px]">{isDetailed ? "Upload an EOB to launch the 3-step appeal Sentinel." : "Add a denial letter to see what you can do next."}</p>
                 </div>
               ) : (
                 claims.map((c) => {
@@ -271,7 +275,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <Badge
                             variant="destructive"
                             className="text-[9px] font-mono h-4 px-1.5 font-bold animate-pulse"
-                            title={`Statutory appeal deadline expires in ${c.daysRemaining} days`}
+                            title={isDetailed ? `Statutory appeal deadline expires in ${c.daysRemaining} days` : `${c.daysRemaining} days left to act`}
                           >
                             <HourglassHigh className="size-2.5 mr-0.5" />
                             {c.daysRemaining}d
@@ -280,7 +284,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <Badge
                             variant="outline"
                             className="text-[9px] font-mono h-4 px-1.5 border-border/80 text-muted-foreground"
-                            title={`${c.daysRemaining} days remaining on statutory ERISA clock`}
+                            title={isDetailed ? `${c.daysRemaining} days remaining on statutory ERISA clock` : `${c.daysRemaining} days left`}
                           >
                             {c.daysRemaining}d
                           </Badge>
@@ -356,9 +360,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   currentView === "settings" ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )}
               />
-              {!isCollapsed && <span className="truncate">Settings & Platform</span>}
+              {!isCollapsed && <span className="truncate">{isDetailed ? "Settings & Platform" : "Settings"}</span>}
             </div>
-            {!isCollapsed && (
+            {!isCollapsed && isDetailed && (
               <span className="text-[9px] font-mono text-muted-foreground">
                 Config
               </span>
@@ -371,24 +375,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
             type="button"
             onClick={onOpenSentinel}
             className="w-full text-left rounded-lg border border-border/60 bg-card/60 hover:bg-card/90 hover:border-primary/50 backdrop-blur-md px-2.5 py-2 space-y-1 text-xs shadow-2xs transition-all cursor-pointer group"
-            title="Open ERISA Sentinel Copilot (⌘J / Ctrl+J)"
+            title={isDetailed ? "Open ERISA Sentinel Copilot (⌘J / Ctrl+J)" : "Open appeal helper (⌘J / Ctrl+J)"}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="size-3.5 text-primary group-hover:scale-110 transition-transform" />
                 <span className="font-semibold text-foreground text-[11px] group-hover:text-primary transition-colors">
-                  ERISA Sentinel
+                  {isDetailed ? "ERISA Sentinel" : "Appeal helper"}
                 </span>
               </div>
-              <Badge
-                variant="outline"
-                className="h-3.5 px-1 text-[8px] border-emerald-500/30 text-emerald-500 font-mono"
-              >
-                29 CFR § 2560
-              </Badge>
+              {isDetailed && (
+                <Badge
+                  variant="outline"
+                  className="h-3.5 px-1 text-[8px] border-emerald-500/30 text-emerald-500 font-mono"
+                >
+                  29 CFR § 2560
+                </Badge>
+              )}
             </div>
             <div className="flex items-center justify-between text-[10px] text-muted-foreground leading-tight">
-              <span>Statutory deadline & evidence guard active.</span>
+              <span>{isDetailed ? "Statutory deadline & evidence guard active." : "We track deadlines and gather proof for you."}</span>
               <kbd className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity font-mono text-[9px] text-primary bg-primary/10 border border-primary/20 px-1 rounded">
                 ⌘J
               </kbd>
@@ -399,11 +405,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             type="button"
             onClick={onOpenSentinel}
             className="w-full flex justify-center p-2 rounded-lg hover:bg-muted/60 transition-colors text-primary cursor-pointer"
-            title="Open ERISA Sentinel Copilot (⌘J / Ctrl+J)"
+            title={isDetailed ? "Open ERISA Sentinel Copilot (⌘J / Ctrl+J)" : "Open appeal helper (⌘J / Ctrl+J)"}
           >
             <ShieldCheck className="size-4" />
           </button>
         )}
+
+        {/* Global Language / Detail Mode Switch */}
+        <div className="w-full">
+          {!isCollapsed ? (
+            <DetailModeToggle className="w-full justify-between py-1.5 px-2.5 text-xs border-border/60" />
+          ) : (
+            <div className="flex justify-center">
+              <DetailModeToggle compact className="p-1.5" />
+            </div>
+          )}
+        </div>
 
         {/* User Profile Dropdown */}
         <DropdownMenu>
@@ -442,19 +459,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[10px] text-muted-foreground font-normal truncate">{userEmail}</span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={toggleDetailMode} className="gap-2 cursor-pointer font-medium text-xs">
+              <GraduationCap className="size-3.5 text-primary" />
+              <span>{isDetailed ? "Switch to Simple Mode" : "Switch to Expert Details"}</span>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onSelectView("settings")} className="gap-2 cursor-pointer font-medium text-xs">
               <GearSix className="size-3.5 text-primary" />
-              <span>Sentinel Settings</span>
+              <span>Settings</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onSelectView("analytics")} className="gap-2 cursor-pointer font-medium text-xs">
               <ChartPieSlice className="size-3.5 text-cyan-400" />
-              <span>Portfolio Analytics</span>
+              <span>{isDetailed ? "Portfolio Analytics" : "Savings overview"}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {isAuthenticated ? (
               <DropdownMenuItem onClick={() => signOut()} className="gap-2 text-destructive focus:text-destructive cursor-pointer text-xs">
                 <SignOut className="size-3.5" />
-                <span>Sign Out of Sentinel</span>
+                <span>Sign Out</span>
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem onClick={() => onSelectView("login")} className="gap-2 font-medium text-primary cursor-pointer text-xs">
@@ -465,7 +486,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onOpenIngestion?.()} className="gap-2 cursor-pointer text-xs">
               <CloudArrowUp className="size-3.5" />
-              <span>Ingest Denial Notice</span>
+              <span>{isDetailed ? "Ingest Denial Notice" : "Add denial letter"}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
@@ -474,7 +495,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="gap-2 cursor-pointer text-xs"
             >
               <BookOpen className="size-3.5" />
-              <span>ERISA 29 CFR § 2560.503-1</span>
+              <span>{isDetailed ? "ERISA 29 CFR § 2560.503-1" : "Your appeal rights (law)"}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

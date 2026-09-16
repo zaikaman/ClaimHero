@@ -11,10 +11,12 @@ import {
   ShieldWarning,
 } from "@phosphor-icons/react";
 import { useSoundEffects } from "../../hooks/useSoundEffects";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { formatCurrency } from "../../lib/utils";
 import { NavigationView } from "./Sidebar";
+import { DetailModeToggle } from "../common/DetailModeToggle";
 
 interface HeaderProps {
   onSelectView?: (view: NavigationView) => void;
@@ -38,6 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { isAuthenticated } = useCurrentUser();
   const { isMuted, toggleMute, playSound } = useSoundEffects();
+  const { isDetailed } = useDetailMode();
 
   const handleToggleAudio = () => {
     const nextActive = toggleMute();
@@ -64,10 +67,10 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onOpenCommandPalette}
             className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 backdrop-blur-sm px-3 py-1 text-xs text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors w-56 sm:w-72"
-            title="Search claims, CPT, or ask Sentinel (⌘K / Ctrl+K)"
+            title={isDetailed ? "Search claims, CPT, or ask Sentinel (⌘K / Ctrl+K)" : "Search your cases or ask for help (⌘K / Ctrl+K)"}
           >
             <MagnifyingGlass className="size-3.5" />
-            <span className="flex-1 text-left truncate">Search claims, CPT, or ask Sentinel...</span>
+            <span className="flex-1 text-left truncate">{isDetailed ? "Search claims, CPT, or ask Sentinel..." : "Search your cases or ask for help..."}</span>
             <kbd className="pointer-events-none hidden sm:inline-flex h-4 items-center gap-0.5 rounded border border-border/60 bg-muted/60 px-1.5 font-mono text-[9px] font-medium text-muted-foreground">
               ⌘K
             </kbd>
@@ -79,12 +82,12 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Subtle Live Stats on Header */}
           <div className="hidden xl:flex items-center gap-3 text-xs text-muted-foreground pr-2">
             <div className="flex items-center gap-1.5">
-              <span>Pipeline:</span>
+              <span>{isDetailed ? "Pipeline:" : "At stake:"}</span>
               <strong className="text-foreground font-mono">{formatCurrency(totalDisputedAmount)}</strong>
             </div>
             <Separator orientation="vertical" className="h-3" />
             <div className="flex items-center gap-1.5">
-              <span>Recovered:</span>
+              <span>{isDetailed ? "Recovered:" : "Saved:"}</span>
               <strong className="text-emerald-600 dark:text-emerald-400 font-mono">
                 {formatCurrency(totalWonAmount)}
               </strong>
@@ -98,17 +101,18 @@ export const Header: React.FC<HeaderProps> = ({
                     onSelectView?.("radar");
                   }}
                   className="flex items-center gap-1.5 text-destructive font-semibold hover:opacity-80 transition-opacity cursor-pointer text-xs"
-                  title="Critical statutory deadline alarms (click to view and play alert tone)"
-                  aria-label={`${criticalDeadlinesCount} urgent alarms`}
+                  title={isDetailed ? "Critical statutory deadline alarms (click to view and play alert tone)" : "Cases running out of time — click to view"}
+                  aria-label={`${criticalDeadlinesCount} ${isDetailed ? "urgent alarms" : "cases need attention"}`}
                 >
                   <ShieldWarning className="size-3.5 animate-pulse" />
-                  <span>{criticalDeadlinesCount} Urgent Alarms</span>
+                  <span>{criticalDeadlinesCount} {isDetailed ? "Urgent Alarms" : "Needs attention"}</span>
                 </button>
               </>
             )}
           </div>
 
           <div className="flex items-center gap-1">
+            <DetailModeToggle compact className="inline-flex" />
             {/* Quick Ingest Button */}
             <Button
               size="sm"
@@ -116,7 +120,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="gap-1.5 text-xs h-8 shadow-xs"
             >
               <PlusCircle className="size-3.5" />
-              <span className="hidden sm:inline">Ingest Denial</span>
+              <span className="hidden sm:inline">{isDetailed ? "Ingest Denial" : "Add denial"}</span>
             </Button>
 
             {/* GitHub Repo */}
@@ -134,8 +138,8 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={handleToggleAudio}
               className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title={isMuted ? "Acoustic sentinel cues muted (click to enable)" : "Acoustic sentinel cues active (click to mute)"}
-              aria-label={isMuted ? "Unmute acoustic cues" : "Mute acoustic cues"}
+              title={isMuted ? "Sound off (click to enable)" : "Sound on (click to mute)"}
+              aria-label={isMuted ? "Unmute sounds" : "Mute sounds"}
             >
               {isMuted ? (
                 <SpeakerSimpleSlash className="size-4 text-muted-foreground/60" />

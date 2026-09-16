@@ -35,6 +35,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 import { cn } from "../../lib/utils";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { P2PEncounterSummaryModal } from "./P2PEncounterSummaryModal";
 
 interface P2PLiveCopilotProps {
@@ -42,6 +43,7 @@ interface P2PLiveCopilotProps {
 }
 
 export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
+  const { isDetailed } = useDetailMode();
   const {
     session,
     isCallLive,
@@ -165,7 +167,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-foreground tracking-tight">
-                  Live Defense Copilot
+                  {isDetailed ? "Live Defense Copilot" : "Live call help"}
                 </h2>
                 <Badge
                   variant="outline"
@@ -181,14 +183,14 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   )}
                 >
                   {isOverturned
-                    ? "Overturned & Won"
+                    ? (isDetailed ? "Overturned & Won" : "Won")
                     : isCallLive
                     ? callResolutionStage === "probing"
-                      ? "Live: Probing Phase"
-                      : "Live Call Active"
+                      ? (isDetailed ? "Live: Probing Phase" : "Live: early questions")
+                      : (isDetailed ? "Live Call Active" : "On the call")
                     : isSimulating
-                    ? "Practice Simulation"
-                    : "Standby"}
+                    ? (isDetailed ? "Practice Simulation" : "Practicing")
+                    : (isDetailed ? "Standby" : "Ready")}
                 </Badge>
               </div>
 
@@ -226,7 +228,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               })}
             </div>
             <span className="text-[10px] font-mono text-muted-foreground ml-1.5">
-              {isCallLive ? (isWaitingForDoctor ? "Listening to You" : "Mic Active") : isSimulating ? "Simulation Mode" : "Mic Standby"}
+              {isCallLive ? (isWaitingForDoctor ? "Listening to You" : "Mic Active") : isSimulating ? (isDetailed ? "Simulation Mode" : "Practicing") : (isDetailed ? "Mic Standby" : "Mic ready")}
             </span>
           </div>
 
@@ -627,24 +629,24 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   <h3 className="text-sm font-bold text-foreground font-sans flex items-center gap-1.5">
                     <span>
                       {isOverturned
-                        ? "Denial Overturned &bull; Prior Authorization Granted"
+                        ? (isDetailed ? "Denial Overturned &bull; Prior Authorization Granted" : "You won the call")
                         : authorizationNumber === "Simulation only — no authorization granted"
-                        ? "Simulation Complete"
-                        : "Instant Verbal Counter-Strike"}
+                        ? (isDetailed ? "Simulation Complete" : "Practice over")
+                        : (isDetailed ? "Instant Verbal Counter-Strike" : "What to say now")}
                     </span>
                     {isGeneratingAnswer && (
                       <span className="flex items-center gap-1 text-[10px] font-mono text-primary animate-pulse font-normal">
                         <CircleNotch className="size-3 animate-spin" />
-                        <span>Synthesizing Answer...</span>
+                        <span>{isDetailed ? "Synthesizing Answer..." : "Thinking..."}</span>
                       </span>
                     )}
                   </h3>
                   <p className="text-[11px] text-muted-foreground font-sans">
                     {isOverturned
-                      ? "Verbal authorization granted on the record. Read aloud final confirmation."
+                      ? (isDetailed ? "Verbal authorization granted on the record. Read aloud final confirmation." : "They agreed — read this closing line.")
                       : authorizationNumber === "Simulation only — no authorization granted"
-                      ? "Practice simulation complete. Practice again or launch live microphone call."
-                      : "Read aloud into microphone the instant reviewer presents this objection"}
+                      ? (isDetailed ? "Practice simulation complete. Practice again or launch live microphone call." : "Practice over. Try again or start a live call.")
+                      : (isDetailed ? "Read aloud into microphone the instant reviewer presents this objection" : "Read this out loud right now")}
                   </p>
                 </div>
               </div>
@@ -705,7 +707,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                           isOverturned ? "text-emerald-300" : "text-destructive"
                         )}
                       >
-                        {isOverturned ? "Reviewer Status: " : "Insurer Objection: "}
+                        {isOverturned ? (isDetailed ? "Reviewer Status: " : "They said: ") : (isDetailed ? "Insurer Objection: " : "Their objection: ")}
                       </span>
                       <span className="italic">&ldquo;{activeFastAnswer.trapQuestion}&rdquo;</span>
                     </div>
@@ -731,7 +733,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                       className={cn("size-2.5", isOverturned ? "text-emerald-400" : "text-primary")}
                       weight="fill"
                     />
-                    <span>{isOverturned ? "SAY TO CONCLUDE CALL:" : "SAY THIS RIGHT NOW:"}</span>
+                    <span>{isOverturned ? (isDetailed ? "SAY TO CONCLUDE CALL:" : "SAY TO FINISH:") : (isDetailed ? "SAY THIS RIGHT NOW:" : "SAY THIS NOW:")}</span>
                   </div>
                   <div className="text-foreground text-sm font-semibold leading-relaxed">
                     &ldquo;{activeFastAnswer.suggestedQuote}&rdquo;
@@ -743,7 +745,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   <div className="p-2.5 rounded-md bg-card/60 border border-border/70 space-y-1">
                     <div className="text-[10px] font-mono uppercase text-muted-foreground font-bold flex items-center gap-1">
                       <Stethoscope className="size-3 text-primary" />
-                      <span>Chart Proof Evidence</span>
+                      <span>{isDetailed ? "Chart Proof Evidence" : "Your records"}</span>
                     </div>
                     <p className="text-foreground/90 text-xs leading-snug">
                       {activeFastAnswer.chartProof}
@@ -753,7 +755,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   <div className="p-2.5 rounded-md bg-card/60 border border-border/70 space-y-1">
                     <div className="text-[10px] font-mono uppercase text-muted-foreground font-bold flex items-center gap-1">
                       <ShieldCheck className="size-3 text-emerald-400" />
-                      <span>Exact Policy Citation</span>
+                      <span>{isDetailed ? "Exact Policy Citation" : "Their rule"}</span>
                     </div>
                     <p className="text-foreground/90 text-xs leading-snug font-medium text-primary">
                       {activeFastAnswer.cpbCitation}
@@ -773,7 +775,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   >
                     <Scales className="size-3.5 shrink-0" />
                     <span>
-                      <strong className="font-semibold">Statutory Leverage:</strong>{" "}
+                      <strong className="font-semibold">{isDetailed ? "Statutory Leverage:" : "Your leverage:"}</strong>{" "}
                       {activeFastAnswer.regulatoryLeverage}
                     </span>
                   </div>
@@ -785,16 +787,16 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   <Headset className="size-5" />
                 </div>
                 <p className="text-xs font-sans text-foreground font-medium">
-                  Awaiting insurer objection or question on the live call.
+                  {isDetailed ? "Awaiting insurer objection or question on the live call." : "Waiting for the other side to speak."}
                 </p>
                 <p className="text-[11px] font-sans opacity-75">
-                  The moment the medical director speaks, ClaimHero will flash the exact spoken counter-strike and policy citation here.
+                  {isDetailed ? "The moment the medical director speaks, ClaimHero will flash the exact spoken counter-strike and policy citation here." : "When they speak, your reply appears here."}
                 </p>
               </div>
             )}
           </div>
 
-          {/* BOTTOM ROW: Fast Answer History & Spoken Statutory Checklist */}
+          {/* BOTTOM ROW: Fast answers & call checklist */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1">
             {/* Dynamic Spoken Legal Checklist */}
             <div className="rounded-xl border border-border/80 bg-card/60 backdrop-blur-xl p-3.5 space-y-2.5 flex flex-col justify-between shadow-xs">
@@ -802,7 +804,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                 <div className="flex items-center gap-1.5">
                   <ShieldCheck className="size-4 text-emerald-400" />
                   <h4 className="text-xs font-bold text-foreground font-sans">
-                    Live Statutory Checklist
+                    {isDetailed ? "Live Statutory Checklist" : "Call checklist"}
                   </h4>
                 </div>
                 <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/40 text-emerald-400">
@@ -839,8 +841,8 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               {/* Call Win Momentum Gauge */}
               <div className="pt-2 border-t border-border/50 space-y-1">
                 <div className="flex items-center justify-between text-[11px] font-sans">
-                  <span className="text-muted-foreground font-medium">Physician Call Momentum:</span>
-                  <span className="font-bold font-mono text-primary">{winScore}% Leverage</span>
+                  <span className="text-muted-foreground font-medium">{isDetailed ? "Physician Call Momentum:" : "How you're doing:"}</span>
+                  <span className="font-bold font-mono text-primary">{winScore}% {isDetailed ? "Leverage" : "Strong"}</span>
                 </div>
                 <div className="w-full bg-secondary/80 h-1.5 rounded-full overflow-hidden">
                   <div
@@ -864,7 +866,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                 <div className="flex items-center gap-1.5">
                   <ChatCenteredDots className="size-4 text-primary" weight="fill" />
                   <h4 className="text-xs font-bold text-foreground font-sans">
-                    Fast Answers Generated
+                    {isDetailed ? "Fast Answers Generated" : "Your replies"}
                   </h4>
                 </div>
 
@@ -876,7 +878,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               <div className="space-y-1.5 overflow-y-auto max-h-[160px] pr-1 flex-1">
                 {fastAnswers.length === 0 ? (
                   <p className="text-xs text-muted-foreground italic my-auto text-center py-6">
-                    No objection cards generated yet.
+                    {isDetailed ? "No objection cards generated yet." : "No replies yet — they appear here as they speak."}
                   </p>
                 ) : (
                   fastAnswers.map((ans: LiveFastAnswer) => (
@@ -899,7 +901,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
               </div>
 
               <div className="text-[10px] font-mono text-muted-foreground pt-2 border-t border-border/50">
-                Click any objection card above to inspect exact quote & CPB proof.
+                {isDetailed ? "Click any objection card above to inspect exact quote & CPB proof." : "Tap a reply to see their exact words and the rule behind it."}
               </div>
             </div>
           </div>

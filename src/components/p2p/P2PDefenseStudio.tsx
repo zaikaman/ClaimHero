@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Claim } from "../../types";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { useP2PDefense } from "../../hooks/useP2PDefense";
 import { NavigationView } from "../layout/Sidebar";
 import { Card } from "../ui/card";
@@ -37,6 +38,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
   claim,
   onNavigateView,
 }) => {
+  const { isDetailed } = useDetailMode();
   const {
     script,
     isLoadingScript,
@@ -310,7 +312,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
               )}
             >
               <BookOpen className="size-3.5" />
-              <span>Defense Playbook</span>
+              <span>{isDetailed ? "Defense Playbook" : "Call script"}</span>
             </button>
             <button
               onClick={() => setActiveMode("copilot")}
@@ -322,7 +324,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
               )}
             >
               <Headset className="size-3.5" />
-              <span>Live Call Copilot</span>
+              <span>{isDetailed ? "Live Call Copilot" : "Live practice"}</span>
               <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
             </button>
           </div>
@@ -365,14 +367,14 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
             }
             disabled={isSynthesizing}
             className="h-7 rounded-md px-2.5 text-xs gap-1.5 border-border/70 text-foreground cursor-pointer"
-            title="Regenerate defense script from clinical policy data"
+            title={isDetailed ? "Regenerate defense script from clinical policy data" : "Rewrite the call script"}
           >
             {isSynthesizing ? (
               <CircleNotch className="size-3 animate-spin text-primary" />
             ) : (
               <ArrowsClockwise className="size-3" />
             )}
-            <span>{isSynthesizing ? "Synthesizing..." : "Re-Synthesize"}</span>
+            <span>{isSynthesizing ? (isDetailed ? "Synthesizing..." : "Writing...") : (isDetailed ? "Re-Synthesize" : "Rewrite")}</span>
           </Button>
         </div>
       </div>
@@ -382,7 +384,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
         <Card className="p-8 flex flex-col items-center justify-center space-y-3 bg-card/60 backdrop-blur-md border-border/80">
           <CircleNotch className="size-6 text-primary animate-spin" />
           <div className="text-xs font-mono text-muted-foreground">
-            Synthesizing grounded P2P defense playbook and clinical policy rebuttals...
+            {isDetailed ? "Synthesizing grounded P2P defense playbook and clinical policy rebuttals..." : "Writing your call script..."}
           </div>
         </Card>
       )}
@@ -396,7 +398,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
                 <div>
                   <span className="text-muted-foreground block text-[10px] uppercase font-semibold">
-                    Adverse Code
+                    {isDetailed ? "Adverse Code" : "They said"}
                   </span>
                   <span className="font-bold text-destructive">
                     {claim.denialReasonCode || "CO-50"}
@@ -404,13 +406,13 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-[10px] uppercase font-semibold">
-                    Disputed CPT
+                    {isDetailed ? "Disputed CPT" : "Treatment code"}
                   </span>
                   <span className="font-semibold text-primary">{cptList || "N/A"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-[10px] uppercase font-semibold">
-                    Diagnosis ICD-10
+                    {isDetailed ? "Diagnosis ICD-10" : "Diagnosis code"}
                   </span>
                   <span className="font-semibold text-primary">{icdList || "N/A"}</span>
                 </div>
@@ -431,7 +433,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
                   className="h-8 rounded-lg px-3 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs cursor-pointer"
                 >
                   <PhoneCall className="size-3.5" />
-                  <span>Launch Live Call Copilot</span>
+                  <span>{isDetailed ? "Launch Live Call Copilot" : "Practice the call"}</span>
                 </Button>
               </div>
             </div>
@@ -443,10 +445,10 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
               <div className="flex items-center justify-between">
                 <div className="text-xs font-bold font-sans uppercase tracking-wider text-foreground flex items-center gap-1.5">
                   <ShieldCheck className="size-4 text-emerald-400" />
-                  <span>Pre-Flight Checklist (Statutory Mandates)</span>
+                  <span>{isDetailed ? "Pre-Flight Checklist (Statutory Mandates)" : "Before you call"}</span>
                 </div>
                 <span className="text-[11px] text-muted-foreground">
-                  Tap to verify before dialing
+                  {isDetailed ? "Tap to verify before dialing" : "Tap each item when done"}
                 </span>
               </div>
 
@@ -488,7 +490,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
                   Phase 1 &bull; 0:00 - 0:45
                 </span>
                 <h2 className="text-sm font-semibold text-foreground font-sans">
-                  Statutory Opening & Reviewer Credential Inquest
+                  {isDetailed ? "Statutory Opening & Reviewer Credential Inquest" : "What to say first"}
                 </h2>
               </div>
               <Button
@@ -507,7 +509,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Read directly upon line connection to establish legal footing under ERISA 29 CFR &sect; 2560.503-1 and state utilization review laws:
+              {isDetailed ? <>Read directly upon line connection to establish legal footing under ERISA 29 CFR &sect; 2560.503-1 and state utilization review laws:</> : <>Read this when the call connects:</>}
             </p>
 
             <div className="p-3.5 rounded-lg bg-secondary/60 border border-border/80 text-foreground text-sm leading-relaxed">
@@ -517,7 +519,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
             <div className="flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-md leading-relaxed">
               <ShieldWarning className="size-4 shrink-0" />
               <span>
-                <strong>Tactical Note:</strong> If the reviewer admits they are not board-certified in this exact specialty, note their full name and license state immediately for state same-specialty grievance complaints.
+                <strong>{isDetailed ? "Tactical Note:" : "Tip:"}</strong> If the reviewer admits they are not board-certified in this exact specialty, note their full name and license state immediately{isDetailed ? " for state same-specialty grievance complaints." : "."}
               </span>
             </div>
           </Card>
@@ -530,11 +532,11 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
                   Phase 2 &bull; 0:45 - 2:00
                 </span>
                 <h2 className="text-sm font-semibold text-foreground font-sans">
-                  Exact Policy Citations & Patient Chart Proof
+                  {isDetailed ? "Exact Policy Citations & Patient Chart Proof" : "Their rules + your proof"}
                 </h2>
               </div>
               <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-                {script.clinicalPolicyCitations.length} Grounded Points
+                {script.clinicalPolicyCitations.length} {isDetailed ? "Grounded Points" : "Proof points"}
               </Badge>
             </div>
 
@@ -573,9 +575,9 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
                     &ldquo;{cit.rebuttalBullet}&rdquo;
                   </div>
 
-                  <div className="text-xs text-muted-foreground leading-relaxed pt-1">
-                    <strong className="text-foreground">Patient Chart Evidence:</strong> {cit.criteriaMetText}
-                  </div>
+                    <div className="text-xs text-muted-foreground leading-relaxed pt-1">
+                      <strong className="text-foreground">{isDetailed ? "Patient Chart Evidence:" : "Your records show:"}</strong> {cit.criteriaMetText}
+                    </div>
                 </div>
               ))}
             </div>
@@ -589,11 +591,11 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
                   Phase 3 &bull; 2:00 - 2:45
                 </span>
                 <h2 className="text-sm font-semibold text-foreground font-sans">
-                  Insurer Trap Questions & Direct Verbal Rebuttals
+                  {isDetailed ? "Insurer Trap Questions & Direct Verbal Rebuttals" : "Tricky questions + what to say"}
                 </h2>
               </div>
               <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">
-                {script.disqualificationCounters.length} Trap Counters
+                {script.disqualificationCounters.length} {isDetailed ? "Trap Counters" : "Rebuttals"}
               </Badge>
             </div>
 
@@ -607,7 +609,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-1.5 text-destructive font-semibold text-xs">
                         <WarningCircle className="size-3.5 shrink-0" />
-                        <span>Insurer Trap #{idx + 1}</span>
+                        <span>{isDetailed ? `Insurer Trap #${idx + 1}` : `Tricky question ${idx + 1}`}</span>
                       </div>
                       <Button
                         variant="ghost"
@@ -630,7 +632,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
 
                     <div className="space-y-1">
                       <div className="text-[10px] font-mono text-primary font-bold uppercase tracking-wider">
-                        Physician Verbal Counter:
+                        {isDetailed ? "Physician Verbal Counter:" : "Say this:"}
                       </div>
                       <div className="text-xs text-foreground bg-secondary/70 border border-border/70 p-2.5 rounded-md leading-relaxed font-medium">
                         &ldquo;{trap.physicianDirectRebuttal}&rdquo;
@@ -640,11 +642,11 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
 
                   <div className="pt-2 border-t border-border/40 space-y-1 text-xs text-muted-foreground leading-relaxed">
                     <div>
-                      <strong className="text-foreground">Clinical Rationale:</strong> {trap.clinicalRationale}
+                      <strong className="text-foreground">{isDetailed ? "Clinical Rationale:" : "Why it works:"}</strong> {trap.clinicalRationale}
                     </div>
                     {trap.regulatoryLeverage && (
                       <div className="text-primary font-medium">
-                        <strong>Regulatory Leverage:</strong> {trap.regulatoryLeverage}
+                        <strong>{isDetailed ? "Regulatory Leverage:" : "Your leverage:"}</strong> {trap.regulatoryLeverage}
                       </div>
                     )}
                   </div>
@@ -661,7 +663,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
                   Phase 4 &bull; 2:45 - 3:30
                 </span>
                 <h2 className="text-sm font-semibold text-foreground font-sans">
-                  Closing Salvo & Written Determination Demand
+                  {isDetailed ? "Closing Salvo & Written Determination Demand" : "How to end the call"}
                 </h2>
               </div>
               <Button
@@ -680,7 +682,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Deliver firmly before hanging up if the medical director indicates reluctance to overturn the denial immediately:
+              {isDetailed ? "Deliver firmly before hanging up if the medical director indicates reluctance to overturn the denial immediately:" : "Say this before hanging up if they still say no:"}
             </p>
 
             <div className="p-3.5 rounded-lg bg-destructive/10 border border-destructive/30 text-foreground text-sm leading-relaxed">
@@ -708,17 +710,17 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-bold text-foreground">
               <Sliders className="size-4 text-primary" />
-              <span>Customize P2P Defense Strategy</span>
+              <span>{isDetailed ? "Customize P2P Defense Strategy" : "Customize call script"}</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Adjust physician credentials, reviewer specialty assumptions, and strategic focus for Claim #{claim.claimNumber}.
+              {isDetailed ? `Adjust physician credentials, reviewer specialty assumptions, and strategic focus for Claim #${claim.claimNumber}.` : `Adjust doctor details and focus points for case #${claim.claimNumber}.`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-2 text-xs font-sans">
             <div className="space-y-1">
               <label className="text-[11px] font-mono uppercase text-muted-foreground font-semibold">
-                Treating Physician Name
+                {isDetailed ? "Treating Physician Name" : "Doctor's name"}
               </label>
               <Input
                 value={customPhysicianName}
@@ -730,7 +732,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
 
             <div className="space-y-1">
               <label className="text-[11px] font-mono uppercase text-muted-foreground font-semibold">
-                Physician Board Specialty / Subspecialty
+                {isDetailed ? "Physician Board Specialty / Subspecialty" : "Doctor's specialty"}
               </label>
               <Input
                 value={customPhysicianSpecialty}
@@ -742,7 +744,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
 
             <div className="space-y-1">
               <label className="text-[11px] font-mono uppercase text-muted-foreground font-semibold">
-                Payer Medical Director Role
+                {isDetailed ? "Payer Medical Director Role" : "Insurer reviewer's role"}
               </label>
               <Input
                 value={customMedicalDirectorRole}
@@ -754,7 +756,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
 
             <div className="space-y-1">
               <label className="text-[11px] font-mono uppercase text-muted-foreground font-semibold">
-                Custom Tactical Notes / Case Emphasis
+                {isDetailed ? "Custom Tactical Notes / Case Emphasis" : "Points to emphasize"}
               </label>
               <textarea
                 value={customStrategyNotes}
@@ -788,7 +790,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
               }}
               className="text-xs h-8 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
             >
-              Apply & Re-Synthesize
+              {isDetailed ? "Apply & Re-Synthesize" : "Save & rewrite"}
             </Button>
           </DialogFooter>
         </DialogContent>

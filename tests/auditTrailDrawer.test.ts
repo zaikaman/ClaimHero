@@ -277,9 +277,9 @@ describe("Audit Trail Activation, Drawer & Timeline Verification", () => {
       });
 
       expect(element).not.toBeNull();
-      // Check that Cryptographic Proof HUD is rendered in children
+      // Check that Cryptographic Proof / Tamper-Proof Case Log HUD is rendered in children
       const str = JSON.stringify(element);
-      expect(str).toContain("Cryptographic Proof of Case Integrity");
+      expect(str).toMatch(/Cryptographic Proof of Case Integrity|Tamper-Proof Case Log/);
       expect(str).toContain("Verify Hash Chain");
     });
 

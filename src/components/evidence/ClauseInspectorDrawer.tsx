@@ -23,6 +23,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { stripMarkdownFormatting } from "../../lib/utils";
 import { safeExternalHref } from "../../lib/urlUtils";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 export interface ClauseInspectorDrawerProps {
   isOpen: boolean;
@@ -74,7 +75,8 @@ export const ClauseInspectorDrawer: React.FC<ClauseInspectorDrawerProps> = ({
   onInspectScreenshot,
   onDeleteEvidence,
 }) => {
-  const [copiedClause, setCopiedClause] = useState(false);
+  const { isDetailed } = useDetailMode();
+  const [copiedClause, setCopiedClause] = useState<boolean>(false);
   const [copiedRule, setCopiedRule] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -380,32 +382,42 @@ export const ClauseInspectorDrawer: React.FC<ClauseInspectorDrawerProps> = ({
           <div className="rounded-xl bg-muted/30 border border-border p-4 space-y-2 text-xs">
             <div className="flex items-center gap-1.5 font-semibold text-foreground">
               <Shield className="size-3.5 text-primary" />
-              <span>Statutory Legal Significance</span>
+              <span>{isDetailed ? "Statutory Legal Significance" : "Legal Significance"}</span>
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               {evidence.sourceType === "payer_cpb" && (
                 <>
-                  Under federal ERISA guidelines (29 CFR § 2560.503-1), plan administrators are legally bound by their published Clinical Policy Bulletins. Demonstrating patient compliance with this exact published clause establishes that the adverse determination was arbitrary and contrary to plan documents.
+                  {isDetailed
+                    ? "Under federal ERISA guidelines (29 CFR § 2560.503-1), plan administrators are legally bound by their published Clinical Policy Bulletins. Demonstrating patient compliance with this exact published clause establishes that the adverse determination was arbitrary and contrary to plan documents."
+                    : "Under federal law (ERISA), insurers are legally bound by their own written coverage rules. Proving that your treatment met this clause shows their denial went against their own published guidelines."}
                 </>
               )}
               {evidence.sourceType === "pubmed_study" && (
                 <>
-                  Peer-reviewed clinical evidence establishes contemporary medical standard of care, invalidating insurer claims of experimental or unproven treatment.
+                  {isDetailed
+                    ? "Peer-reviewed clinical evidence establishes contemporary medical standard of care, invalidating insurer claims of experimental or unproven treatment."
+                    : "Medical research shows this care is standard medical practice, defeating insurer arguments that it was unproven or experimental."}
                 </>
               )}
               {evidence.sourceType === "fda_package_insert" && (
                 <>
-                  FDA regulatory label indications represent the national standard for pharmaceutical and device necessity, refuting categorical coverage denials.
+                  {isDetailed
+                    ? "FDA regulatory label indications represent the national standard for pharmaceutical and device necessity, refuting categorical coverage denials."
+                    : "Official FDA label approval confirms the treatment is necessary and appropriate for this condition."}
                 </>
               )}
               {evidence.sourceType === "legal_precedent" && (
                 <>
-                  Binding statutory mandate requiring full and fair review, procedural disclosures, and prompt disclosure of all internal clinical criteria.
+                  {isDetailed
+                    ? "Binding statutory mandate requiring full and fair review, procedural disclosures, and prompt disclosure of all internal clinical criteria."
+                    : "Federal regulations require the insurer to provide a fair review and share all medical criteria used to deny your claim."}
                 </>
               )}
               {evidence.sourceType === "nccn_guideline" && (
                 <>
-                  National Comprehensive Cancer Network guidelines are recognized by federal Medicare and commercial payers as the authoritative standard of care.
+                  {isDetailed
+                    ? "National Comprehensive Cancer Network guidelines are recognized by federal Medicare and commercial payers as the authoritative standard of care."
+                    : "Recognized national medical guidelines establish this care as the standard of treatment."}
                 </>
               )}
             </p>

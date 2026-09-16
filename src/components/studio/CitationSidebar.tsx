@@ -14,6 +14,7 @@ import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { stripMarkdownFormatting } from "../../lib/utils";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 interface CitationSidebarProps {
   evidences: ClinicalEvidence[];
@@ -110,6 +111,7 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
   isLoadingPrecedents = false,
   appealLevel = "level_1_internal",
 }) => {
+  const { isDetailed } = useDetailMode();
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const policyEvidences = evidences.filter((item) => item.sourceType !== "legal_precedent");
   const activeAuthorities =
@@ -129,7 +131,7 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
           <div className="flex items-center gap-2">
             <BookOpen className="size-4 text-muted-foreground" />
             <span className="font-semibold text-foreground">
-              Cited Authorities & Evidence
+              {isDetailed ? "Cited Authorities & Evidence" : "Evidence & Citations"}
             </span>
           </div>
           <Badge variant="success" size="sm" className="font-mono text-[10px]">
@@ -137,7 +139,9 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
           </Badge>
         </div>
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Convex vector search injects the top 3 historical winning arguments. Statutory protections and CPB criteria are auto-cited in the brief.
+          {isDetailed
+            ? "Convex vector search injects the top 3 historical winning arguments. Statutory protections and CPB criteria are auto-cited in the brief."
+            : "Top winning arguments, legal protections, and insurer policy rules are cited directly in your letter."}
         </p>
       </div>
 
@@ -145,21 +149,31 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
         <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Medal className="size-3" />
-            <span>Hybrid Precedent Archive Top 3 ({vectorMatches.length})</span>
+            <span>
+              {isDetailed ? "Hybrid Precedent Archive Top 3" : "Top Winning Arguments"} ({vectorMatches.length})
+            </span>
           </div>
-          <Badge variant="secondary" className="font-mono text-[9px] bg-primary/10 text-primary border-primary/20">
-            RRF Fusion
-          </Badge>
+          {isDetailed && (
+            <Badge variant="secondary" className="font-mono text-[9px] bg-primary/10 text-primary border-primary/20">
+              RRF Fusion
+            </Badge>
+          )}
         </div>
 
         {isLoadingPrecedents && vectorMatches.length === 0 ? (
           <Card className="p-4 flex items-center gap-2 text-xs text-muted-foreground">
             <CircleNotch className="size-3.5 animate-spin text-primary" />
-            <span>Running Hybrid Precedent Retrieval (Vector + BM25 RRF)...</span>
+            <span>
+              {isDetailed
+                ? "Running Hybrid Precedent Retrieval (Vector + BM25 RRF)..."
+                : "Finding similar winning cases..."}
+            </span>
           </Card>
         ) : vectorMatches.length === 0 ? (
           <Card className="p-4 text-center text-xs text-muted-foreground bg-muted/20 border-dashed">
-            Synthesize a brief or open this case to retrieve controlling authorities by ICD-10, CPT, and CARC via Hybrid RRF.
+            {isDetailed
+              ? "Synthesize a brief or open this case to retrieve controlling authorities by ICD-10, CPT, and CARC via Hybrid RRF."
+              : "Generate an appeal letter or explore evidence to find similar past wins and citations."}
           </Card>
         ) : (
           <div className="space-y-2">
@@ -224,7 +238,9 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
                   </p>
                   <div className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 pt-0.5 font-medium">
                     <CheckCircle className="size-3" />
-                    <span>Auto-Injected as LLM Synthesis Context</span>
+                    <span>
+                      {isDetailed ? "Auto-Injected as LLM Synthesis Context" : "Included automatically in letter"}
+                    </span>
                   </div>
                 </Card>
               );
@@ -238,7 +254,9 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
         <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Scales className="size-3" />
-            <span>Statutory Authorities ({activeAuthorities.length})</span>
+            <span>
+              {isDetailed ? "Statutory Authorities" : "Legal Rights & Protections"} ({activeAuthorities.length})
+            </span>
           </div>
           <Badge variant="outline" className="text-[9px] font-mono capitalize">
             {appealLevel === "level_2_grievance"
@@ -297,12 +315,16 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
       <div className="space-y-2">
         <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
           <Shield className="size-3" />
-          <span>Insurer CPB Criteria & Exhibits ({policyEvidences.length})</span>
+          <span>
+            {isDetailed ? "Insurer CPB Criteria & Exhibits" : "Insurer Policy Rules & Evidence"} ({policyEvidences.length})
+          </span>
         </div>
 
         {policyEvidences.length === 0 ? (
           <Card className="p-4 text-center text-xs text-muted-foreground bg-muted/20 border-dashed leading-relaxed">
-            No payer-specific policy clauses were retrievable for this claim. The crawler ran but no source passed payer-domain and clinical relevance checks — common when the payer publishes no public CPB for the procedure (all 3 candidates were off-payer or non-clinical). The brief will proceed on ERISA procedural protections and vector precedents. Check Evidence Matrix for crawler diagnostics or paste a direct public policy URL to re-crawl.
+            {isDetailed
+              ? "No payer-specific policy clauses were retrievable for this claim. The crawler ran but no source passed payer-domain and clinical relevance checks — common when the payer publishes no public CPB for the procedure (all 3 candidates were off-payer or non-clinical). The brief will proceed on ERISA procedural protections and vector precedents. Check Evidence Matrix for crawler diagnostics or paste a direct public policy URL to re-crawl."
+              : "No insurer policy rules were found online for this claim. The appeal will rely on your legal rights and similar winning cases. You can also paste an insurer policy link in Evidence to check it."}
           </Card>
         ) : (
           <div className="space-y-2">

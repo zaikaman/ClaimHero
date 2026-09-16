@@ -10,7 +10,6 @@ import {
   CircleNotch,
   Stethoscope,
   ShieldWarning,
-  User,
   FileText,
   X,
   Shield,
@@ -43,6 +42,7 @@ import {
   fastSanitizeText,
   ComplianceStandard,
 } from "../../lib/redactionEngine";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
 
 interface OnboardingWizardProps {
@@ -166,6 +166,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onParseText,
   onSuccess,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [step, setStep] = useState<number>(1);
   const [selectedRole, setSelectedRole] = useState<string>("provider");
   const [advocateName, setAdvocateName] = useState<string>("Dr. Sarah Chen, MD, FACP");
@@ -303,7 +304,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const executePostExtractionPipeline = async (claimId: string) => {
     if (!runPipelineAction) return;
 
-    setProcessingMessage("Step 2/3: Indexing Insurer CPB & Auditing Statutory Appeal Readiness...");
+    setProcessingMessage(
+      isDetailed
+        ? "Step 2/3: Indexing Insurer CPB & Auditing Statutory Appeal Readiness..."
+        : "Step 2/3: Checking Insurer Rules & Scoring Case Strength..."
+    );
     try {
       const pipelineRes = await runPipelineAction({
         claimId: claimId as Id<"claims">,
@@ -316,7 +321,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         clinicalFacts,
         physicianNotes: physicianNotes.trim() || undefined,
       });
-      setProcessingMessage("Step 3/3: Synthesizing cited ERISA medical appeal brief...");
+      setProcessingMessage(
+        isDetailed
+          ? "Step 3/3: Synthesizing cited ERISA medical appeal brief..."
+          : "Step 3/3: Writing evidence-backed appeal letter..."
+      );
       return pipelineRes;
     } catch (pipelineErr) {
       const errStr = pipelineErr instanceof Error ? pipelineErr.message : String(pipelineErr);
@@ -590,9 +599,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           {!extractedResult && step === 1 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="space-y-1">
-                <h3 className="text-sm font-semibold text-foreground">Choose Your Primary Appellate Role</h3>
+                <h3 className="text-sm font-semibold text-foreground">
+                  {isDetailed ? "Choose Your Primary Appellate Role" : "How Will You Use ClaimHero?"}
+                </h3>
                 <p className="text-xs text-muted-foreground">
-                  Tailors legal posture, ERISA statutory notice templates, and signature blocks.
+                  {isDetailed
+                    ? "Tailors legal posture, ERISA statutory notice templates, and signature blocks."
+                    : "Tailors letters, rights notices, and signature blocks for you."}
                 </p>
               </div>
 
@@ -612,70 +625,86 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     >
                       <div className="flex items-center justify-between">
                         <div
-                          className={`size-8 rounded-lg flex items-center justify-center ${
+                          className={`size-8 rounded-lg flex items-center justify-center border ${
                             isSelected
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground border border-border"
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-muted text-muted-foreground border-border"
                           }`}
                         >
                           <Icon className="size-4" />
                         </div>
-                        {isSelected && <CheckCircle className="size-4 text-primary shrink-0" />}
+                        {isSelected && (
+                          <Badge variant="default" className="text-[10px] h-5 px-1.5 font-mono">
+                            Active
+                          </Badge>
+                        )}
                       </div>
                       <div>
-                        <span className="text-xs font-semibold block text-foreground">{role.title}</span>
-                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{role.description}</p>
+                        <span className="text-xs font-semibold text-foreground block font-sans">
+                          {role.title}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground block leading-tight mt-1">
+                          {role.description}
+                        </span>
                       </div>
                     </Card>
                   );
                 })}
               </div>
 
-              {/* Profile Coordinates Form */}
-              <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-3">
+              <div className="space-y-3 pt-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <User className="size-3.5 text-primary" />
-                    Appellate Submitter Coordinates
+                  <span className="text-xs font-semibold text-foreground">
+                    Advocate Signature & Organization Defaults
                   </span>
-                  <span className="text-[10px] text-muted-foreground font-mono">Used for Brief Signatures</span>
+                  <span className="text-[11px] text-muted-foreground font-mono">
+                    Editable on every brief
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                  <div>
-                    <label className="text-[10px] text-muted-foreground mb-1 block">Advocate / Clinician Name</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">
+                      Full Name & Title
+                    </label>
                     <Input
                       value={advocateName}
                       onChange={(e) => setAdvocateName(e.target.value)}
                       placeholder="e.g. Dr. Sarah Chen, MD"
-                      className="h-8 text-xs"
+                      className="h-8 text-xs font-sans"
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] text-muted-foreground mb-1 block">Credentials & Title</label>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">
+                      Professional Credentials
+                    </label>
                     <Input
                       value={advocateCredentials}
                       onChange={(e) => setAdvocateCredentials(e.target.value)}
-                      placeholder="e.g. MD, Board Certified Orthopedics"
-                      className="h-8 text-xs"
+                      placeholder="e.g. Board Certified Oncology"
+                      className="h-8 text-xs font-sans"
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] text-muted-foreground mb-1 block">Organization / Clinic</label>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">
+                      Practice / Advocacy Organization
+                    </label>
                     <Input
                       value={advocateOrg}
                       onChange={(e) => setAdvocateOrg(e.target.value)}
-                      placeholder="e.g. Spine & Neurosurgery Associates"
-                      className="h-8 text-xs"
+                      placeholder="e.g. Bay Area Patient Rights Law"
+                      className="h-8 text-xs font-sans"
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] text-muted-foreground mb-1 block">Official Contact Phone</label>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">
+                      Direct Contact Phone (Optional)
+                    </label>
                     <Input
                       value={advocatePhone}
                       onChange={(e) => setAdvocatePhone(e.target.value)}
-                      placeholder="e.g. +1 (800) 555-0199"
-                      className="h-8 text-xs"
+                      placeholder="e.g. (415) 890-2341"
+                      className="h-8 text-xs font-sans"
                     />
                   </div>
                 </div>
@@ -688,9 +717,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             <div className="space-y-4 animate-fadeIn">
               <div className="space-y-2">
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">Primary State Jurisdiction</h3>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {isDetailed ? "Primary State Jurisdiction" : "Your State or Region"}
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Governs statutory review timelines (ERISA 180-day clock vs. California DMHC/CDI standards).
+                    {isDetailed
+                      ? "Governs statutory review timelines (ERISA 180-day clock vs. California DMHC/CDI standards)."
+                      : "Sets appeal deadlines and state consumer protection rules."}
                   </p>
                 </div>
 
@@ -725,9 +758,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
               <div className="space-y-2 pt-3 border-t border-border/60">
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">Frequently Targeted Payers</h3>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {isDetailed ? "Frequently Targeted Payers" : "Common Health Insurers"}
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Pre-indexes insurer Clinical Policy Bulletins (CPBs) and overturn precedents.
+                    {isDetailed
+                      ? "Pre-indexes insurer Clinical Policy Bulletins (CPBs) and overturn precedents."
+                      : "Helps quickly find insurer rules and similar past wins."}
                   </p>
                 </div>
 
@@ -959,55 +996,64 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-foreground">
-                      Confirm Case Context & Clinical Records
+                      {isDetailed ? "Confirm Case Context & Clinical Records" : "Case Details & Doctor Notes"}
                     </h3>
                     <Badge variant="outline" className="border-amber-500/40 text-amber-500 text-[10px] font-mono px-2 py-0.5">
-                      Drafting Paused
+                      Required for AI Brief
                     </Badge>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                    {activePreset
-                      ? "Verified clinical records and appellate submitter coordinates have been loaded for this case preset. Review findings or edit any field before generating the appeal."
-                      : "The denial has been extracted. Document what the medical charts explicitly state; leave fields blank when unrecorded to avoid unsupported assertions."}
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Provide treating provider coordinates and clinical facts so the AI can draft an evidence-grounded appeal.
                   </p>
                 </div>
+                {activePreset && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSenderName(advocateName || activePreset.sender.name);
+                      setSenderCredentials(advocateCredentials || activePreset.sender.credentials || "");
+                      setSenderEmail(activePreset.sender.email || "");
+                      setSenderPhone(advocatePhone || activePreset.sender.phone || "");
+                      setClinicalFacts({ ...activePreset.clinicalFacts });
+                      setPhysicianNotes(activePreset.physicianNotes || "");
+                    }}
+                    className="h-7 text-xs gap-1.5 font-mono text-primary border-primary/30 hover:bg-primary/10"
+                  >
+                    <Lightning className="size-3 text-primary" />
+                    Reset to Preset
+                  </Button>
+                )}
               </div>
 
-              {/* Section 1: Authorized Submitter */}
+              {/* Section 1: Submitter / Treating Provider Coordinates */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-[11px]">
-                      Authorized Submitter
-                    </h4>
-                    <p className="text-[11px] text-muted-foreground">
-                      Person or coordinator submitting the formal appeal.
-                    </p>
-                  </div>
-                  <Badge variant="secondary" className="text-[10px] font-mono shrink-0">
-                    Required
-                  </Badge>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-[11px]">
+                    Treating Provider / Submitter Coordinates
+                  </h4>
+                  <span className="text-[11px] text-muted-foreground font-mono">Appears in letterhead & signature block</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div>
                     <label htmlFor="onboard-sender-name" className="mb-1 block text-[11px] font-medium text-foreground">
-                      Full Name
+                      Full Name & Title <span className="text-destructive">*</span>
                     </label>
                     <Input
                       id="onboard-sender-name"
                       value={senderName}
                       onChange={(e) => setSenderName(e.target.value)}
-                      placeholder="Jordan Lee"
-                      maxLength={200}
-                      required
+                      placeholder="Dr. Jordan Lee, MD"
+                      maxLength={120}
                     />
                   </div>
                   <div>
-                    <label htmlFor="onboard-sender-role" className="mb-1 block text-[11px] font-medium text-foreground">
-                      Credentials or Role
+                    <label htmlFor="onboard-sender-cred" className="mb-1 block text-[11px] font-medium text-foreground">
+                      Credentials / Role
                     </label>
                     <Input
-                      id="onboard-sender-role"
+                      id="onboard-sender-cred"
                       value={senderCredentials}
                       onChange={(e) => setSenderCredentials(e.target.value)}
                       placeholder="Appeals Coordinator"
@@ -1048,7 +1094,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-[11px]">
-                      Documented Clinical Findings
+                      {isDetailed ? "Documented Clinical Findings" : "Medical Details"}
                     </h4>
                     <p className="text-[11px] text-muted-foreground">
                       {activePreset
@@ -1085,8 +1131,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                             }))
                           }
                           placeholder="Leave blank if this is not documented in available records."
-                          maxLength={10000}
-                          className="bg-background text-xs leading-relaxed"
+                          className="bg-background text-xs"
+                          maxLength={4000}
                         />
                       </div>
                     ))}
@@ -1099,7 +1145,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-[11px]">
-                      Treating Physician Notes & Clinical Addendum
+                      {isDetailed ? "Treating Physician Notes & Clinical Addendum" : "Doctor Notes & Extra Details"}
                     </h4>
                     <p className="text-[11px] text-muted-foreground">
                       {activePreset
@@ -1348,10 +1394,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         </Badge>
                       </div>
                       <span className="text-xs font-semibold text-foreground block">
-                        Appeal Brief
+                        {isDetailed ? "Appeal Brief" : "Appeal Letter"}
                       </span>
                       <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
-                        ERISA 29 CFR § 2560.503-1 cited appeal brief with CPB evidence.
+                        {isDetailed
+                          ? "ERISA 29 CFR § 2560.503-1 cited appeal brief with CPB evidence."
+                          : "Formal appeal letter backed by insurer rules and medical law."}
                       </span>
                     </div>
                     <Button
@@ -1360,7 +1408,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                       onClick={() => handleDone("studio")}
                       className="w-full text-[11px] h-6 justify-between text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 px-1.5 cursor-pointer"
                     >
-                      <span>Open Brief</span>
+                      <span>{isDetailed ? "Open Brief" : "Open Letter"}</span>
                       <ArrowRight className="size-3" />
                     </Button>
                   </div>
@@ -1419,7 +1467,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                       className="h-6 px-2 text-[11px] gap-1 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 cursor-pointer"
                     >
                       <Scales className="size-3" />
-                      <span>ERISA Audit</span>
+                      <span>{isDetailed ? "ERISA Audit" : "Cost & Rights"}</span>
                     </Button>
                   </div>
                 </div>

@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "../ui/dia
 import { Button } from "../ui/button";
 import { Claim, CallTranscriptItem, LiveCallChecklistItem, P2PCallSession } from "../../types";
 import { formatCurrency } from "../../lib/utils";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 interface P2PEncounterSummaryModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export const P2PEncounterSummaryModal: React.FC<P2PEncounterSummaryModalProps> =
   claim,
   session,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [copied, setCopied] = useState(false);
 
   const durationMin = Math.floor((session?.durationSeconds || 0) / 60);
@@ -206,7 +208,9 @@ Date:   ${encounterDate}
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 mt-1">
-                  Treating Physician vs Payer Medical Director Clinical Defense Record
+                  {isDetailed
+                    ? "Treating Physician vs Payer Medical Director Clinical Defense Record"
+                    : "Doctor Discussion & Case Defense Record"}
                 </p>
               </div>
 
@@ -243,7 +247,9 @@ Date:   ${encounterDate}
               </div>
 
               <div>
-                <div className="text-[10px] font-mono uppercase font-bold text-slate-500">Statutory Adherence</div>
+                <div className="text-[10px] font-mono uppercase font-bold text-slate-500">
+                  {isDetailed ? "Statutory Adherence" : "Key Points Covered"}
+                </div>
                 <div className="text-xs font-bold text-emerald-800 mt-0.5">
                   {completedChecklistCount}/{totalChecklistCount} Items Verified
                 </div>
@@ -255,7 +261,11 @@ Date:   ${encounterDate}
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2.5 flex items-center gap-1.5 font-mono">
                 <Scales className="size-4 text-slate-900" />
-                <span>Procedural Mandates Established During Call</span>
+                <span>
+                  {isDetailed
+                    ? "Procedural Mandates Established During Call"
+                    : "Defense Points Established During Call"}
+                </span>
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {session?.checklistProgress && session.checklistProgress.length > 0 ? (

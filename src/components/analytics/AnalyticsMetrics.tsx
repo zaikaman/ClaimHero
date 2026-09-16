@@ -25,6 +25,7 @@ import {
   TableCell,
 } from "../ui/table";
 import { ExecutiveReportModal } from "./ExecutiveReportModal";
+import { useDetailMode } from "../../hooks/useDetailMode";
 
 interface PayerStatItem {
   payer: string;
@@ -62,12 +63,15 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
   onSelectPayerFilter,
   onNavigateToRadar,
 }) => {
+  const { isDetailed } = useDetailMode();
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   if (isLoading) {
     return (
       <div className="p-12 text-center text-xs font-mono text-muted-foreground animate-pulse">
-        Computing portfolio financial recovery metrics & win benchmarks...
+        {isDetailed
+          ? "Computing portfolio financial recovery metrics & win benchmarks..."
+          : "Loading financial recovery numbers & case benchmarks..."}
       </div>
     );
   }
@@ -84,14 +88,16 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-semibold text-foreground">
-                  Portfolio Financial & Overturn Analytics
+                  {isDetailed ? "Portfolio Financial & Overturn Analytics" : "Financial & Recovery Overview"}
                 </h2>
                 <Badge variant="outline" className="font-mono text-[10px]">
                   Live Aggregation
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Financial recovery tracking, insurer overturn benchmarks, and statutory dials
+                {isDetailed
+                  ? "Financial recovery tracking, insurer overturn benchmarks, and statutory dials"
+                  : "Track recovered money, win rates, and upcoming deadlines"}
               </p>
             </div>
           </div>
@@ -103,7 +109,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
               className="gap-1.5 bg-primary text-primary-foreground shadow-xs text-xs h-8"
             >
               <FileText className="size-3.5" />
-              <span>Executive Audit Statement</span>
+              <span>{isDetailed ? "Executive Audit Statement" : "Summary Report"}</span>
             </Button>
 
             <Button
@@ -112,7 +118,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
               onClick={onNavigateToRadar}
               className="gap-1.5 text-xs h-8"
             >
-              <span>View Case Radar</span>
+              <span>{isDetailed ? "View Case Radar" : "View All Cases"}</span>
               <ArrowUpRight className="size-3.5 text-muted-foreground" />
             </Button>
           </div>
@@ -166,7 +172,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between text-foreground">
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Avg Dossier Readiness
+              {isDetailed ? "Avg Dossier Readiness" : "Avg Case Strength"}
             </span>
             <TrendUp className="size-4 text-muted-foreground" />
           </div>
@@ -174,7 +180,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             {stats.averageWinScore}/100
           </div>
           <div className="text-[11px] text-muted-foreground font-mono">
-            Across {stats.totalClaims} cross-examined cases
+            Across {stats.totalClaims} {isDetailed ? "cross-examined cases" : "cases"}
           </div>
         </Card>
 
@@ -182,7 +188,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-[11px] font-medium uppercase tracking-wider">
-              Urgent Alarms
+              {isDetailed ? "Urgent Alarms" : "Urgent Deadlines"}
             </span>
             {stats.criticalDeadlinesCount > 0 ? (
               <ShieldWarning className="size-4 text-destructive" />
@@ -213,7 +219,9 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="flex items-center gap-2">
               <Buildings className="size-4 text-muted-foreground" />
               <h3 className="text-xs font-semibold text-foreground">
-                Insurer Denial & Recovery Accountability Matrix
+                {isDetailed
+                  ? "Insurer Denial & Recovery Accountability Matrix"
+                  : "Breakdown by Insurer"}
               </h3>
             </div>
             <span className="text-[11px] font-mono text-muted-foreground">
@@ -228,7 +236,9 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
                 <TableHead>Cases</TableHead>
                 <TableHead>Disputed</TableHead>
                 <TableHead>Won / Overturned</TableHead>
-                <TableHead className="text-right">Avg Readiness</TableHead>
+                <TableHead className="text-right">
+                  {isDetailed ? "Avg Readiness" : "Avg Strength"}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -267,7 +277,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="flex items-center gap-2">
               <Pulse className="size-4 text-muted-foreground" />
               <h3 className="text-xs font-semibold text-foreground">
-                Statutory Readiness Tiers
+                {isDetailed ? "Statutory Readiness Tiers" : "Case Strength Tiers"}
               </h3>
             </div>
           </div>
@@ -277,7 +287,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                  Comprehensive Dossier (80–100 pts)
+                  {isDetailed ? "Comprehensive Dossier (80–100 pts)" : "Strong Cases (80–100 pts)"}
                 </span>
                 <span className="font-mono text-foreground font-semibold">
                   {stats.claimsByRisk.high_confidence || 0} Cases
@@ -294,7 +304,9 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
                 indicatorClassName="bg-emerald-500"
               />
               <p className="text-[10px] text-muted-foreground">
-                Clear CPB contradictions and established precedent
+                {isDetailed
+                  ? "Clear CPB contradictions and established precedent"
+                  : "Clear insurer rule contradictions and strong precedent"}
               </p>
             </div>
 
@@ -302,7 +314,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-amber-500 dark:text-amber-400">
-                  Evidence Gaps Identified (55–79 pts)
+                  {isDetailed ? "Evidence Gaps Identified (55–79 pts)" : "Moderate Cases (55–79 pts)"}
                 </span>
                 <span className="font-mono text-foreground font-semibold">
                   {stats.claimsByRisk.moderate || 0} Cases
@@ -319,7 +331,9 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
                 indicatorClassName="bg-amber-500"
               />
               <p className="text-[10px] text-muted-foreground">
-                Administrative exceptions or secondary conservative therapy
+                {isDetailed
+                  ? "Administrative exceptions or secondary conservative therapy"
+                  : "Needs supporting doctor notes or trial treatment history"}
               </p>
             </div>
 
@@ -327,7 +341,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-destructive">
-                  Incomplete Dossier (&lt;55 pts)
+                  {isDetailed ? "Incomplete Dossier (<55 pts)" : "Needs Work (<55 pts)"}
                 </span>
                 <span className="font-mono text-foreground font-semibold">
                   {stats.claimsByRisk.complex_litigation || 0} Cases
@@ -344,7 +358,9 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
                 indicatorClassName="bg-destructive"
               />
               <p className="text-[10px] text-muted-foreground">
-                Requires state external review or legal tolling
+                {isDetailed
+                  ? "Requires state external review or legal tolling"
+                  : "Needs deeper records or external state appeal"}
               </p>
             </div>
           </div>

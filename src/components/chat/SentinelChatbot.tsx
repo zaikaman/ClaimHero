@@ -23,6 +23,7 @@ import {
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { BrandIcon } from "../common/BrandLogo";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { useSentinelChat } from "../../hooks/useSentinelChat";
 import { Claim } from "../../types";
 import { NavigationView } from "../layout/Sidebar";
@@ -58,6 +59,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
     onOpenChange,
   });
 
+  const { isDetailed } = useDetailMode();
   const [input, setInput] = useState<string>("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [insertedIndex, setInsertedIndex] = useState<number | null>(null);
@@ -202,27 +204,27 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
     isMouseDownOnBackdrop.current = false;
   };
 
-  // Context-aware quick prompt chips
+  // Context-aware quick prompt chips — labels are plain, prompts keep expert detail for the model
   const quickPrompts = useMemo(() => {
     if (selectedClaim) {
       return [
         {
-          label: "Analyze Denial Reason",
+          label: isDetailed ? "Analyze Denial Reason" : "Why was this denied?",
           prompt: `Analyze the denial reason code ${selectedClaim.denialReasonCode || "CO-50"} for CPT ${selectedClaim.cptCodes?.[0] || "procedure"} on claim ${selectedClaim.claimNumber} and outline our clinical rebuttal strategy.`,
           icon: FileMagnifyingGlass,
         },
         {
-          label: "Inspect Policy Evidence",
+          label: isDetailed ? "Inspect Policy Evidence" : "Check their rules",
           prompt: `Inspect the Clinical Policy Bulletins (CPBs) and evidence clauses retrieved for claim ${selectedClaim.claimNumber}.`,
           icon: Globe,
         },
         {
-          label: "ERISA Statutory Exposure",
+          label: isDetailed ? "ERISA Statutory Exposure" : "My deadlines & rights",
           prompt: `What ERISA 29 CFR § 2560.503-1 statutory deadlines, rights notices, and penalty exposures apply to claim ${selectedClaim.claimNumber}?`,
           icon: Scales,
         },
         {
-          label: "P2P Tele-Script Defense",
+          label: isDetailed ? "P2P Tele-Script Defense" : "Doctor call prep",
           prompt: `Draft a targeted 3-point Peer-to-Peer tele-script defense for Dr. Reviewer regarding claim ${selectedClaim.claimNumber}.`,
           icon: ShieldCheck,
         },
@@ -231,25 +233,43 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
 
     return [
       {
-        label: "Search High Risk Claims",
+        label: isDetailed ? "Search High Risk Claims" : "Cases needing attention",
         prompt: "Search and list any active claims in my workspace that require urgent appeal attention or have deadlines within 14 days.",
         icon: FileMagnifyingGlass,
       },
       {
-        label: "ERISA 180-Day Rules",
+        label: isDetailed ? "ERISA 180-Day Rules" : "Time limits & rights",
         prompt: "Explain the mandatory 180-day appeal rules and full and fair review standards under ERISA 29 CFR § 2560.503-1.",
         icon: Scales,
       },
       {
-        label: "Evidence Coverage Rubric",
+        label: isDetailed ? "Evidence Coverage Rubric" : "How is my case scored?",
         prompt: "How does ClaimHero calculate the 4-pillar Evidence Coverage Score?",
         icon: Scales,
       },
     ];
-  }, [selectedClaim]);
+  }, [selectedClaim, isDetailed]);
 
   // Format tool name into clean user-facing title
   const formatToolName = (toolName: string) => {
+    if (!isDetailed) {
+      switch (toolName) {
+        case "get_active_claim_details":
+          return "Looked up your case";
+        case "get_clinical_evidence":
+          return "Checked insurer rules";
+        case "get_appeal_brief":
+          return "Loaded your letter";
+        case "get_audit_trail":
+          return "Checked case history";
+        case "search_claims":
+          return "Searched your cases";
+        case "search_precedents":
+          return "Found similar cases";
+        default:
+          return toolName.replace(/_/g, " ");
+      }
+    }
     switch (toolName) {
       case "get_active_claim_details":
         return "Retrieved Claim & Clinical Facts";
@@ -289,7 +309,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Sentinel Clinical Copilot"
+      aria-label={isDetailed ? "Sentinel Clinical Copilot" : "Appeal helper"}
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex justify-end animate-fadeIn no-print print:hidden"
       onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
@@ -309,7 +329,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-foreground tracking-tight">
-                  Sentinel Clinical Copilot
+                  {isDetailed ? "Sentinel Clinical Copilot" : "Appeal helper"}
                 </span>
                 <Badge variant="outline" className="font-mono text-[10px] text-primary border-primary/30 bg-primary/10 hidden sm:inline-flex">
                   ⌘J
@@ -317,11 +337,11 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
               </div>
               <span className="text-[11px] text-muted-foreground truncate">
                 {isStreaming ? (
-                  <span className="text-primary font-medium">Synthesizing clinical response...</span>
+                  <span className="text-primary font-medium">{isDetailed ? "Synthesizing clinical response..." : "Thinking..."}</span>
                 ) : selectedClaim ? (
-                  `Case #${selectedClaim.claimNumber} • ${selectedClaim.patient?.insurancePayer || "Insurer"}`
+                  `${isDetailed ? "Case" : "Case"} #${selectedClaim.claimNumber} • ${selectedClaim.patient?.insurancePayer || "Insurer"}`
                 ) : (
-                  "Clinical Policy & ERISA Statutory Intelligence"
+                  isDetailed ? "Clinical Policy & ERISA Statutory Intelligence" : "Ask about your cases"
                 )}
               </span>
             </div>
@@ -360,22 +380,24 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
               <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-2.5">
                 <div className="flex items-center gap-2 text-primary font-semibold text-xs">
                   <ShieldCheck className="size-4" />
-                  <span>Clinical & Statutory Appeal Copilot</span>
+                  <span>{isDetailed ? "Clinical & Statutory Appeal Copilot" : "How I can help"}</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Sentinel Copilot cross-references clinical denial codes against crawled insurer Clinical Policy Bulletins (CPBs), active ERISA § 502(c) statutory exposure, and vector-matched precedent briefs.
+                  {isDetailed
+                    ? "Sentinel Copilot cross-references clinical denial codes against crawled insurer Clinical Policy Bulletins (CPBs), active ERISA § 502(c) statutory exposure, and vector-matched precedent briefs."
+                    : "Ask why something was denied, what your time limit is, or what to say next. I look up your case and the insurer's own rules."}
                 </p>
                 {selectedClaim && (
                   <div className="pt-1 flex flex-wrap gap-1.5">
                     <Badge variant="secondary" className="font-mono text-[10px]">
-                      Patient: {selectedClaim.patient?.name || "Anonymous"}
+                      {isDetailed ? "Patient" : "For"}: {selectedClaim.patient?.name || "Anonymous"}
                     </Badge>
                     <Badge variant="secondary" className="font-mono text-[10px]">
-                      Payer: {selectedClaim.patient?.insurancePayer || "Insurer"}
+                      {isDetailed ? "Payer" : "Insurer"}: {selectedClaim.patient?.insurancePayer || "Insurer"}
                     </Badge>
                     {selectedClaim.denialReasonCode && (
                       <Badge variant="destructive" className="font-mono text-[10px]">
-                        Denial: {selectedClaim.denialReasonCode}
+                        {isDetailed ? "Denial" : "They said"}: {selectedClaim.denialReasonCode}
                       </Badge>
                     )}
                   </div>
@@ -386,9 +408,9 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
               <div className="space-y-2">
                 <div className="flex items-center justify-between px-1">
                   <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-wider">
-                    Suggested Inquiries
+                    {isDetailed ? "Suggested Inquiries" : "Suggested questions"}
                   </span>
-                  <span className="text-[10px] text-muted-foreground/60">Click to execute</span>
+                  <span className="text-[10px] text-muted-foreground/60">{isDetailed ? "Click to execute" : "Tap to ask"}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-2">
                   {quickPrompts.map((item, idx) => {
@@ -406,7 +428,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                           </span>
                         </div>
                         <span className="text-[10px] font-mono text-muted-foreground/60 shrink-0 group-hover:text-primary transition-colors">
-                          Inquire &rarr;
+                          {isDetailed ? <>Inquire &rarr;</> : <>Ask &rarr;</>}
                         </span>
                       </button>
                     );
@@ -501,8 +523,8 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                               <CircleNotch className="size-3.5 animate-spin text-primary shrink-0" />
                               <span className="text-primary/90">
                                 {msg.toolCalls && msg.toolCalls.length > 0
-                                  ? `Executing ${formatToolName(msg.toolCalls[msg.toolCalls.length - 1].name)}...`
-                                  : "Analyzing clinical guidelines & precedents..."}
+                                  ? `${isDetailed ? "Executing" : "Doing"} ${formatToolName(msg.toolCalls[msg.toolCalls.length - 1].name)}...`
+                                  : (isDetailed ? "Analyzing clinical guidelines & precedents..." : "Checking your proof...")}
                               </span>
                             </div>
                           ) : null}
@@ -522,18 +544,18 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                             type="button"
                             onClick={() => handleInsertIntoBrief(msg.content, index)}
                             className="bg-muted/60 hover:bg-muted border border-border/70 rounded px-2 py-1 text-[10px] font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors cursor-pointer"
-                            title="Insert cited argument into active Appeal Brief"
-                            aria-label="Insert cited argument into active Appeal Brief"
+                            title={isDetailed ? "Insert cited argument into active Appeal Brief" : "Add this to your letter"}
+                            aria-label={isDetailed ? "Insert cited argument into active Appeal Brief" : "Add this to your letter"}
                           >
                             {insertedIndex === index ? (
                               <>
                                 <Check className="size-3 text-emerald-500" />
-                                <span className="text-emerald-500 font-semibold">Inserted into Brief</span>
+                                <span className="text-emerald-500 font-semibold">{isDetailed ? "Inserted into Brief" : "Added to letter"}</span>
                               </>
                             ) : (
                               <>
                                 <ArrowElbowDownRight className="size-3 text-primary" />
-                                <span>Insert into Brief</span>
+                                <span>{isDetailed ? "Insert into Brief" : "Add to my letter"}</span>
                               </>
                             )}
                           </button>
@@ -575,7 +597,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                   >
                     <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-mono py-0.5">
                       <CircleNotch className="size-3.5 animate-spin text-primary shrink-0" />
-                      <span className="text-primary/90">Analyzing clinical guidelines & precedents...</span>
+                      <span className="text-primary/90">{isDetailed ? "Analyzing clinical guidelines & precedents..." : "Checking your proof..."}</span>
                     </div>
                   </div>
                 </div>
@@ -592,7 +614,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
               ref={textareaRef}
               rows={1}
               value={input}
-              aria-label="Ask Sentinel clinical, legal, or CPB questions"
+              aria-label={isDetailed ? "Ask Sentinel clinical, legal, or CPB questions" : "Ask about your case"}
               onChange={(e) => {
                 setInput(e.target.value);
                 e.target.style.height = "auto";
@@ -601,8 +623,8 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
               onKeyDown={handleTextareaKeyDown}
               placeholder={
                 selectedClaim
-                  ? `Ask about ${selectedClaim.claimNumber} or ERISA statutes...`
-                  : "Ask clinical, legal, or CPB questions..."
+                  ? (isDetailed ? `Ask about ${selectedClaim.claimNumber} or ERISA statutes...` : `Ask about case ${selectedClaim.claimNumber}...`)
+                  : (isDetailed ? "Ask clinical, legal, or CPB questions..." : "Ask about your denial...")
               }
               className="flex-1 max-h-32 resize-none bg-transparent py-1 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none leading-relaxed font-sans scrollbar-none"
               style={{ minHeight: "24px" }}
@@ -630,11 +652,11 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                 <>
                   <span className="size-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
                   <span className="truncate">
-                    Linked: Case #{selectedClaim.claimNumber} ({selectedClaim.patient?.insurancePayer || "Insurer"})
+                    {isDetailed ? "Linked" : "Looking at"}: Case #{selectedClaim.claimNumber} ({selectedClaim.patient?.insurancePayer || "Insurer"})
                   </span>
                 </>
               ) : (
-                <span>Global Clinical & ERISA Sentinel Active</span>
+                <span>{isDetailed ? "Global Clinical & ERISA Sentinel Active" : "Ready to help with any case"}</span>
               )}
             </div>
             <span className="shrink-0 text-muted-foreground/50">Enter to send &bull; Shift+Enter for newline</span>
