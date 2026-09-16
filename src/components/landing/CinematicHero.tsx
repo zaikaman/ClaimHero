@@ -28,6 +28,8 @@ interface CinematicHeroProps {
   isAuthenticated?: boolean;
   isAuthLoading?: boolean;
   hasCachedSession?: boolean;
+  embedBackground?: boolean;
+  active?: boolean;
 }
 
 export interface ShowcaseSlide {
@@ -101,6 +103,8 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
   isAuthenticated: isAuthenticatedProp,
   isAuthLoading: isAuthLoadingProp,
   hasCachedSession: hasCachedSessionProp,
+  embedBackground = true,
+  active = true,
 }) => {
   const {
     isAuthenticated: isAuthenticatedFromHook,
@@ -147,6 +151,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
 
   // Keyboard arrow navigation for showcase slides
   useEffect(() => {
+    if (!active) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (
@@ -166,12 +171,12 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [active]);
 
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
+    if (!embedBackground || typeof window === "undefined" || !window.matchMedia) return;
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const syncMotionPreference = (matches: boolean) => {
       if (videoRef.current) {
@@ -188,7 +193,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
     const listener = (e: MediaQueryListEvent) => syncMotionPreference(e.matches);
     mediaQuery.addEventListener("change", listener);
     return () => mediaQuery.removeEventListener("change", listener);
-  }, []);
+  }, [embedBackground]);
 
   const navLinks = LANDING_NAV_LINKS;
 
@@ -197,23 +202,27 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
   const Badge3Icon = slide.badge3.icon;
 
   return (
-    <div className="h-screen h-[100dvh] w-screen overflow-hidden relative bg-black text-white font-sans select-none flex flex-col justify-between">
+    <div className={`h-screen h-[100dvh] w-screen overflow-hidden relative ${embedBackground ? "bg-black" : "bg-transparent"} text-white font-sans select-none flex flex-col justify-between`}>
       {/* 1. Full-Screen Ambient Background Video (z-index 0) */}
-      <div className="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none bg-radial from-slate-900 to-black">
-        <video
-          ref={videoRef}
-          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260406_094145_4a271a6c-3869-4f1c-8aa7-aeb0cb227994.mp4"
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="metadata"
-          className="w-full h-full object-cover"
-        />
-      </div>
+      {embedBackground && (
+        <>
+          <div className="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none bg-radial from-slate-900 to-black">
+            <video
+              ref={videoRef}
+              src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260406_094145_4a271a6c-3869-4f1c-8aa7-aeb0cb227994.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="metadata"
+              className="w-full h-full object-cover"
+            />
+          </div>
 
-      {/* 2. Bottom Optical Blur Overlay (no dark artificial gradient, pure backdrop-blur-xl masked) */}
-      <div className="fixed inset-0 w-full h-full z-[1] pointer-events-none backdrop-blur-xl bottom-blur-mask" />
+          {/* 2. Bottom Optical Blur Overlay (no dark artificial gradient, pure backdrop-blur-xl masked) */}
+          <div className="fixed inset-0 w-full h-full z-[1] pointer-events-none backdrop-blur-xl bottom-blur-mask" />
+        </>
+      )}
 
       {/* 3. Horizontal Navbar (z-index 50) */}
       <header className="relative z-50 px-4 sm:px-6 md:px-12 py-4 md:py-6 flex items-center justify-between">
@@ -279,7 +288,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
 
               {/* Enter Console Button */}
               <button
-                onClick={() => onEnterConsole("login")}
+                onClick={() => onEnterConsole("radar")}
                 className="hidden sm:flex animate-blur-fade-up bg-white text-black hover:bg-gray-200 transition-all rounded-md font-medium px-4 md:px-5 py-2 text-sm flex items-center gap-2 shadow-lg active:scale-95 cursor-pointer"
                 style={{ animationDelay: "350ms" }}
               >
@@ -295,6 +304,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
             className="lg:hidden animate-blur-fade-up liquid-glass w-10 h-10 rounded-md flex items-center justify-center text-white transition-all cursor-pointer hover:bg-white/5 active:scale-95 relative"
             style={{ animationDelay: "350ms" }}
             aria-label="Toggle Menu"
+            aria-expanded={isMobileMenuOpen}
           >
             <div className="relative size-[18px] flex items-center justify-center">
               <List

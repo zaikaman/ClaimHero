@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-16T07:09:00Z
+- **Last updated:** 2026-09-16T07:42:00Z
 
 ## Log
 
@@ -1495,9 +1495,19 @@ Unified every model call on `@convex-dev/agent` and deleted the duplicate direct
 ### 2026-09-16 - 763e7c4
 Aligned the optical ingestion narrative and codebase to AWS Textract reality: established OCR exclusively via AWS Textract under HIPAA BAA (fail-hard, zero raw-PHI vision fallback) with mandatory server-side Safe Harbor de-identification (`redactBeforeLLM`) before OpenAI structured parameter extraction across all documentation (`README.md`, `PRODUCT.md`, `IDEA.md`, `BRIEF.md`, `specs/001-appeal-sentinel/`). Removed dead OpenAI vision and binary file input parameters and handlers (`imageUrls`, `fileInputs`, `responses.create` in `convex/lib/openai.ts`, `convex/lib/redactionEngine.ts`, `convex/actions/opticalParser.ts`). Cleaned and extended test coverage (`tests/openai.test.ts`, `tests/visualProofArchive.test.ts`, `tests/textract.test.ts`, `tests/formalPdfAttachments.test.ts`). Verified with `npm run verify`: 0 typecheck errors, 0 lint warnings, 1,019 passing unit tests across 67 test files, and production build.
 
-### 2026-09-16 - working tree
+### 2026-09-16 - 36dd606
 Surfaced Firecrawl native structured extraction versus OpenAI completion fallback paths in the clinical evidence dossier (`src/components/evidence/PolicyViewer.tsx`, `src/components/evidence/ClauseInspectorDrawer.tsx`, `convex/schema.ts`, `convex/clinicalEvidences.ts`, `convex/actions/policyCrawler.ts`, `src/types/index.ts`, `tests/evidenceDossierUx.test.ts`):
 - Schema & Persistence: Added `extractionEngine` field to `clinicalEvidences` table and Convex mutations (`insertBatch`, `insertBatchInternal`, `insertSingle`, `applyInsertSingle`), preserving whether each evidence clause was extracted directly via Firecrawl native structured JSON (`firecrawl_native`) or synthesized from scraped markdown via OpenAI structured fallback (`openai_fallback`).
 - Pipeline Ingestion Tagging: Updated crawler functions in `policyCrawler.ts` (`performCrawlInsurerPolicy`, `crawlCustomResearchUrl`, `crawlPubMedTrials`, `crawlFdaIndications`, `scrapeFirecrawlPolicySource`) to tag and persist the exact extraction engine alongside timestamps for every extracted clause.
 - UI Chips & Transparency: Implemented `getExtractionEngineChip` in `PolicyViewer.tsx` and surfaced a clean, high-contrast chip (e.g. `Firecrawl • 12:04` in orange or `OpenAI • 12:04` in violet) across `DetailedClauseCard`, `CompactClauseRow`, and `ClauseInspectorDrawer.tsx`. Provides explanatory tooltips proving Firecrawl's zero-hop native JSON extraction runs in production while OpenAI serves as resilient criteria fallback.
 - Regression Verification: Added unit tests in `tests/evidenceDossierUx.test.ts` and verified 100% clean with `npm run verify` across typecheck, lint, 1,024 passing tests across 67 test files, and production build.
+
+### 2026-09-16 - working tree
+Eliminated dark screen flash, perfected responsive split-card layout on laptops, and removed unwanted scrollbars on the authentication card (`src/components/landing/PublicExperience.tsx`, `src/components/landing/CinematicHero.tsx`, `src/components/auth/AuthPage.tsx`, `src/App.tsx`, `tests/publicExperienceTransition.test.ts`):
+- Unified Public Experience Surface: Introduced `PublicExperience` component wrapping public entry views (`landing` and `login`) with a shared, persistent `AmbientBackgroundVideo`. The ambient video remains continuously mounted and active across all transitions, preventing video pipeline teardown, black frames, and video buffering delays.
+- Smooth Non-Flashing Transitions: Coordinated `CinematicHero` and `AuthPage` using smooth 200ms opacity cross-fades with accessible focus isolation (`aria-hidden`, `pointer-events-none`, `invisible`) so inactive views never accept keyboard navigation or screen reader focus while preserving landing DOM and slide state without re-triggering 900ms intro animations on return.
+- Responsive Split-Card & Middle Seam Architecture: Moved the desktop "Back to Overview" button inside the left column header (aligned with Sentinel badge) to eliminate border intersection on laptops, added a dedicated mobile back button, aligned inner corners flush (`rounded-r-none` and `lg:rounded-l-none`), and set the right column to 100% solid fully opaque white (`bg-white`) with high-elevation cast shadow (`lg:shadow-[-20px_0_40px_-10px_rgba(0,0,0,0.35)]`), eliminating translucent background bleed and inner corner notches.
+- Scrollbar Elimination & Laptop Viewport Optimization: Applied `scrollbar-none` to the right form column to guarantee that no browser scrollbar track or thumb is displayed, and adjusted laptop vertical padding and margins (`lg:p-6 xl:p-10`, `space-y-3`, tightened divider and switcher) so all form controls sit naturally within standard 1366x768 / 1440x900 viewports without overflow.
+- Route & Navigation Hardening: Sanitized `pendingTargetView` in `PublicExperience` and `App.tsx` so `"login"` and `"landing"` safely resolve to `"radar"` after successful authentication, eliminating the login trap. Streamlined `AuthPage.tsx` success callbacks to prevent double-history pushes.
+- Regression Coverage: Added 13 unit tests in `tests/publicExperienceTransition.test.ts`. Verified 100% clean with `npm run verify` (0 typecheck errors, 0 lint warnings, 1,037 passing unit tests across 68 test files, and production build).
+

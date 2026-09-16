@@ -28,7 +28,7 @@ one after that, without requiring staff to rebuild the evidence trail from
 scratch.
 
 1. **Upload the denial.** Real PDF and image intake is supported. Synthetic demo fixtures are also available so a judge can test the complete workflow without uploading personal health information.
-2. **ClaimHero pulls the insurer's active policy bulletins via Firecrawl** and lifts the exact clause the denial turned on.
+2. **ClaimHero pulls the insurer's active policy bulletins via Firecrawl** and lifts the exact clause the denial turned on. Each extracted clause explicitly surfaces its extraction engine provenance (`Firecrawl • HH:mm` native structured extraction vs. `OpenAI • HH:mm` structured fallback) alongside visual proof screenshot exhibits.
 3. **You review a cited brief**, one click away from the clause it cites, then approve dispatch from an AgentMail inbox across **two dispatch paths**: transmit directly to the **official production payer reviewer email**, or dispatch to a **typed-in email** (such as your personal inbox) to inspect the packet in your mail client and test replying. Claims under the ERISA §502(c) clock show the exposure as they age; you never send without approving.
 
 ### Evidence Coverage & Precedent Match Score (Dossier Audit)
@@ -76,7 +76,7 @@ To evaluate the complete end-to-end pipeline without uploading personal health r
    - **GeoBlue Worldwide — Lumbar Decompression**: $18,200 | CPT 63047 | CARC CO-197 (Pre-Authorization)
    - **Aetna International — Diagnostic Knee MRI**: $2,850 | CPT 73721 | CARC CO-16 (Prior Records Required)
 4. The application transitions directly into the **Case Workspace**, driving through the linear 3-step appellate spine:
-   - **Step 1: Evidence & CPB** — Review real insurer policy bulletins scraped via Firecrawl, visual proof screenshot exhibits, and the precedent-grounded 4-pillar Statutory Appeal Readiness Score, shown as a transparent 0–100 audit checklist.
+   - **Step 1: Evidence & CPB** — Review real insurer policy bulletins scraped via Firecrawl with extraction engine provenance badges (`Firecrawl • 12:04` native zero-hop extraction vs. `OpenAI • 12:04` fallback), visual proof screenshot exhibits, and the precedent-grounded 4-pillar Statutory Appeal Readiness Score, shown as a transparent 0–100 audit checklist.
    - **Step 2: Appeal Brief** — Inspect the grounded legal brief strictly citing stored policy clauses; test real-time CRDT multi-user editing with live presence (`Share` button).
    - **Step 3: Payer Dispatch** — Transmit the packet via AgentMail with one click. Select from two dispatch destinations:
      - **Official Insurer Gateway (Production)**: Dispatches directly to the verified public grievance and appeals intake email of the payer.
@@ -227,7 +227,7 @@ OpenAI powers clinical reasoning while operating within strict anti-hallucinatio
 | Judge-visible result | Implementation | Source |
 | :--- | :--- | :--- |
 | **Real denial extraction** | Convex Storage + AWS Textract OCR (HIPAA BAA) + OpenAI redacted structured extraction | [`convex/actions/opticalParser.ts`](./convex/actions/opticalParser.ts) |
-| **Current payer policy** | Firecrawl crawl and evidence persistence | [`convex/actions/policyCrawler.ts`](./convex/actions/policyCrawler.ts), [`convex/clinicalEvidences.ts`](./convex/clinicalEvidences.ts) |
+| **Current payer policy** | Firecrawl native structured extraction with OpenAI fallback provenance | [`convex/actions/policyCrawler.ts`](./convex/actions/policyCrawler.ts), [`convex/clinicalEvidences.ts`](./convex/clinicalEvidences.ts), [`src/components/evidence/PolicyViewer.tsx`](./src/components/evidence/PolicyViewer.tsx) |
 | **Precedent-grounded Readiness** | Convex vector search + attached precedent evidence | [`convex/actions/precedentMatcher.ts`](./convex/actions/precedentMatcher.ts), [`convex/actions/precedentArchive.ts`](./convex/actions/precedentArchive.ts) |
 | **Cited appeal brief** | Agent-component streaming synthesis over stored evidence | [`convex/actions/appealSynthesizer.ts`](./convex/actions/appealSynthesizer.ts), [`convex/lib/agentDraft.ts`](./convex/lib/agentDraft.ts) |
 | **Everyday vs Expert Mode** | Dual-mode language architecture with reactive sync across 28 surfaces | [`src/hooks/useDetailMode.ts`](./src/hooks/useDetailMode.ts), [`src/lib/plainCopy.ts`](./src/lib/plainCopy.ts) |
@@ -246,7 +246,7 @@ ClaimHero leverages 9 first-party and partner Convex components configured in [`
 | :--- | :--- | :--- |
 | **Auth** | `@convex-dev/auth` | User authentication via password, username, and Google OAuth |
 | **AgentMail** | `@agentmail/convex` | Isolated transactional email dispatch and message management |
-| **Firecrawl** | `@firecrawl/firecrawl-convex` | Dedicated component for web crawling and policy ingestion |
+| **Firecrawl** | `@firecrawl/firecrawl-convex` | Dedicated component for web crawling, modal terms handling, and zero-hop native structured policy criteria extraction |
 | **Workflow** | `@convex-dev/workflow` | Durable, step-based execution for long-running appeal pipelines |
 | **Agent** | `@convex-dev/agent` | Component-backed agentic reasoning, copilot tool coordination, and durable token streaming for chat and long-form drafting |
 | **Aggregate** | `@convex-dev/aggregate` | High-performance reactive portfolio statistics and recovery metrics |
@@ -296,18 +296,18 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **1019 automated tests** across 67 test suites (verified via `npm run test`):
+ClaimHero is backed by **1037 automated tests** across 68 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (1019 tests across 67 suites)
+npm run test            # Comprehensive Vitest test suite (1037 tests across 68 suites)
 npm run test:coverage   # Code coverage report (~81.6% statement coverage)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate
 ```
 
-Test suites cover Everyday Language vs. Expert Details dictionaries, cross-component custom events, and sandboxed storage resilience (`tests/detailMode.test.ts`), AWS Textract HIPAA optical document parsing, fail-hard missing-credential and extraction-failure semantics with zero raw-PHI LLM egress, and inbound attachment quarantine (`tests/textract.test.ts`, `tests/formalPdfAttachments.test.ts`), the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Delivery Evidence Reports (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs on de-identified text (`redactBeforeLLM`), 1536-d embeddings, and semantic retries (`tests/openai.test.ts`), Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
+Test suites cover Everyday Language vs. Expert Details dictionaries, cross-component custom events, and sandboxed storage resilience (`tests/detailMode.test.ts`), Firecrawl native structured extraction and OpenAI fallback provenance chips (`tests/evidenceDossierUx.test.ts`), AWS Textract HIPAA optical document parsing, fail-hard missing-credential and extraction-failure semantics with zero raw-PHI LLM egress, and inbound attachment quarantine (`tests/textract.test.ts`, `tests/formalPdfAttachments.test.ts`), the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Delivery Evidence Reports (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs on de-identified text (`redactBeforeLLM`), 1536-d embeddings, and semantic retries (`tests/openai.test.ts`), Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
 
 ---
 

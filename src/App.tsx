@@ -27,8 +27,7 @@ const AuditTimeline = lazy(() => import("./components/communications/AuditTimeli
 const AuditTrailDrawer = lazy(() => import("./components/communications/AuditTrailDrawer").then((m) => ({ default: m.AuditTrailDrawer })));
 const AnalyticsMetrics = lazy(() => import("./components/analytics/AnalyticsMetrics").then((m) => ({ default: m.AnalyticsMetrics })));
 const SettingsPage = lazy(() => import("./components/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })));
-const CinematicHero = lazy(() => import("./components/landing/CinematicHero").then((m) => ({ default: m.CinematicHero })));
-const AuthPage = lazy(() => import("./components/auth/AuthPage").then((m) => ({ default: m.AuthPage })));
+import { PublicExperience } from "./components/landing/PublicExperience";
 const OnboardingWizard = lazy(() => import("./components/onboarding/OnboardingWizard").then((m) => ({ default: m.OnboardingWizard })));
 const OnboardingChecklist = lazy(() => import("./components/onboarding/OnboardingChecklist").then((m) => ({ default: m.OnboardingChecklist })));
 const SentinelChatbot = lazy(() => import("./components/chat/SentinelChatbot").then((m) => ({ default: m.SentinelChatbot })));
@@ -174,7 +173,12 @@ export default function App() {
   // Automatic redirect only if user is actively on the login page while authenticated
   useEffect(() => {
     if (currentView === "login" && isAuthenticated) {
-      const nextView = pendingTargetView || "radar";
+      const nextView =
+        pendingTargetView &&
+        pendingTargetView !== "login" &&
+        pendingTargetView !== "landing"
+          ? pendingTargetView
+          : "radar";
       setPendingTargetView(null);
       setCurrentView(nextView);
     }
@@ -197,27 +201,6 @@ export default function App() {
     }
   }, [isAuthenticated, currentView, user?._id]);
 
-  if (currentView === "landing") {
-    return (
-      <Suspense fallback={<div className="h-screen w-screen bg-black" />}>
-        <CinematicHero
-          isAuthenticated={isAuthenticated}
-          isAuthLoading={isAuthLoading}
-          hasCachedSession={hasCachedSession}
-          onEnterConsole={(view) => {
-            if (!isAuthenticated) {
-              setPendingTargetView((view as NavigationView) || "radar");
-              setCurrentView("login");
-            } else {
-              setCurrentView((view as NavigationView) || "radar");
-            }
-          }}
-        />
-        <Toaster position="bottom-right" richColors theme="dark" closeButton />
-      </Suspense>
-    );
-  }
-
   // Handle unauthenticated Not Found route
   if (currentView === "notFound" && !isAuthenticated) {
     return (
@@ -233,19 +216,18 @@ export default function App() {
     );
   }
 
-  if (currentView === "login") {
+  // Public Landing & Auth Experience (persistent ambient video background, zero dark-screen flash)
+  if (currentView === "landing" || currentView === "login" || !isAuthenticated) {
     return (
-      <Suspense fallback={<div className="h-screen w-screen bg-black" />}>
-        <AuthPage
-          onNavigate={setCurrentView}
-          onSuccess={() => {
-            const nextView = pendingTargetView || "radar";
-            setPendingTargetView(null);
-            setCurrentView(nextView);
-          }}
-        />
-        <Toaster position="bottom-right" richColors theme="dark" closeButton />
-      </Suspense>
+      <PublicExperience
+        currentView={currentView}
+        onNavigate={setCurrentView}
+        isAuthenticated={isAuthenticated}
+        isAuthLoading={isAuthLoading}
+        hasCachedSession={hasCachedSession}
+        pendingTargetView={pendingTargetView}
+        setPendingTargetView={setPendingTargetView}
+      />
     );
   }
 
@@ -262,22 +244,6 @@ export default function App() {
           <CircleNotch className="size-4 animate-spin text-muted-foreground mt-1" />
         </div>
       </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <Suspense fallback={<div className="h-screen w-screen bg-black" />}>
-        <AuthPage
-          onNavigate={setCurrentView}
-          onSuccess={() => {
-            const nextView = pendingTargetView || currentView || "radar";
-            setPendingTargetView(null);
-            setCurrentView(nextView);
-          }}
-        />
-        <Toaster position="bottom-right" richColors theme="dark" closeButton />
-      </Suspense>
     );
   }
 
