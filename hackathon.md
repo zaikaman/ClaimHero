@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-16T08:22:00Z
+- **Last updated:** 2026-09-16T13:14:00Z
 
 ## Log
 
@@ -1511,7 +1511,7 @@ Eliminated dark screen flash, perfected responsive split-card layout on laptops,
 - Route & Navigation Hardening: Sanitized `pendingTargetView` in `PublicExperience` and `App.tsx` so `"login"` and `"landing"` safely resolve to `"radar"` after successful authentication, eliminating the login trap. Streamlined `AuthPage.tsx` success callbacks to prevent double-history pushes.
 - Regression Coverage: Added 13 unit tests in `tests/publicExperienceTransition.test.ts`. Verified 100% clean with `npm run verify` (0 typecheck errors, 0 lint warnings, 1,037 passing unit tests across 68 test files, and production build).
 
-### 2026-09-16 - working tree
+### 2026-09-16 - 4f785ea
 Exposed autonomous workflow observability telemetry from `pipelineActivities` as an interactive Pipeline Timeline in the case audit drawer (`convex/pipelineActivities.ts`, `src/components/communications/PipelineTimeline.tsx`, `src/components/communications/AuditTrailDrawer.tsx`, `src/components/common/PipelineActivityFeed.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/studio/AppealStudio.tsx`, `src/App.tsx`, `tests/pipelineActivity.test.ts`, `tests/auditTrailDrawer.test.ts`):
 - Added `listRecent` query in `convex/pipelineActivities.ts` to surface recent workflow activity across claims for portfolio-level observability with authenticated caller scoping.
 - Created `PipelineTimeline.tsx` component rendering real-time execution traces across all 5 autonomous appeal stages (Intake & Review, Policy Search & Crawl, Win Scoring, Precedent Match, Brief Drafting) with run duration timers, stage traversal stepper, latency deltas, search filtering, and stage/status selectors.
@@ -1519,4 +1519,17 @@ Exposed autonomous workflow observability telemetry from `pipelineActivities` as
 - Upgraded `AuditTrailDrawer.tsx` with a segmented navigation controller toggling between statutory ERISA cryptographic hash chain verification and live workflow observability telemetry, with live counts and direct deep-linking from `PipelineActivityFeed.tsx`.
 - Updated `README.md` to document the new dual-mode Case Audit & Workflow Observability Drawer, `pipelineActivities` telemetry in the Convex sponsor pillar, Judge Evidence Matrix, and updated test counts (1,050 tests across 68 suites).
 - Extended test coverage in `tests/auditTrailDrawer.test.ts` and `tests/pipelineActivity.test.ts` and verified 100% clean with `npm run verify` (1,050 passing tests across 68 files, 0 typecheck errors, 0 lint warnings, and production build).
+
+### 2026-09-16 - working tree
+Added Convex Auth Anonymous authentication mode to `/login`, atomic transactional pre-seeding of 3 comprehensive evaluation cases populated with authentic data extracted directly from live pipeline runs, and updated evaluation documentation (`convex/convex.config.ts`, `convex/auth.ts`, `convex/users.ts`, `convex/demoSeeder.ts`, `src/components/auth/AuthPage.tsx`, `README.md`, `tests/anonymousAuthAndSeeder.test.ts`, `tests/publicExperienceTransition.test.ts`):
+- Component & Auth Configuration: Mounted `@convex-dev/auth/providers/anonymous/convex.config.js` (`authAnonymous`), wired `setupAnonymous` in `convex/auth.ts`, and exported `signInAnonymous`. Implemented `createAnonymousUser` in `convex/users.ts` with `isAnonymous: true` and `role: "advocate"`.
+- Live-Pipeline-Fidelity Pre-Seeder (`convex/demoSeeder.ts`): Replaced synthetic approximations with authentic, comprehensive datasets captured from full live pipeline executions (Firecrawl web crawling, vector precedent retrieval, 4-pillar appeal readiness scoring, 4-page cited briefs with Exhibit A proof of policy, 4-phase P2P scripts, 10-step pipeline activity traces, and realistic professional AgentMail communications):
+  1. **Eleanor Vance** (`cignaglobal_meniscus`): Knee Meniscectomy (CPT 29881), Cigna Global Health Benefits, $6,400 denied under CO-50. Status: `ready_for_review`, Overturn Score: 96/100 (high confidence). Pre-populated with 10 clinical evidence items (Carelon joint surgery guidelines, ERISA 29 CFR § 2560.503-1 statutory requirements, winning hybrid vector + BM25 brief precedents), full 4-page synthesized appeal brief with Exhibit A Proof of Policy visual capture link, 4-phase P2P Defense Tele-Script, 10-stage `pipelineActivities` execution trace, and rolling SHA-256 case audit trail. Leaves zero pre-seeded emails so evaluators and judges can review and trigger the outbound appeal dispatch flow firsthand.
+  2. **Marcus Sterling** (`geoblue_spine`): Lumbar Spine Decompression (CPT 63047), GeoBlue Worldwide Medical Insurance, $18,200 denied under CO-197. Status: `drafting`, Overturn Score: 94/100 (high confidence). Pre-populated with 6 clinical evidence items (Carelon spine surgery guidelines, ERISA 29 CFR § 2560.503-1, 3 winning hybrid vector precedents), full synthesized appeal brief citing emergency motor paralysis exception, 4-phase emergency neurosurgical P2P defense script, 10-stage `pipelineActivities` trace, and rolling SHA-256 audit log.
+  3. **Michael Patel** (`aetnaintl_mri`): Knee MRI (CPT 73721), Aetna International, $2,850 denied under CO-16. Status: `won`, Overturn Score: 91/100 (high confidence). Pre-populated with 5 clinical evidence items (Aetna CPB 0171, CMS NCD 220.2, ERISA statutory rules), approved 4-page appeal brief, 4-phase P2P script, 10-stage `pipelineActivities` trace, full financial liability resolution ($2,850 recovered, $0 patient liability), and realistic multi-paragraph healthcare appellate correspondence between professionals (formal Level 1 appeal dossier packet with clinical workup, radiograph accession citations, and ERISA demand, followed by Aetna International medical director determination overturning the denial in full with $2,850.00 EFT authorization and $0 balance).
+  - Linked all seeded claims to `claimsAggregate` for instant real-time portfolio statistics.
+- Frontend Authentication Experience: Added "Explore as Anonymous Advocate" button below Google sign-in on `AuthPage.tsx` using `useAnonymousAuth(api.auth.signInAnonymous)` with matching white card aesthetic, loading spinner state, and instant routing to the workspace.
+- Documentation & Judge Guides: Updated `README.md` to document the 1-click Anonymous Advocate evaluation flow in "Try It in 60 Seconds", the Judge Evidence Matrix, Convex sponsor pillar, Component Architecture, and updated test suite totals (1,053 tests across 69 suites).
+- Regression Coverage: Added `tests/anonymousAuthAndSeeder.test.ts` and updated `tests/publicExperienceTransition.test.ts`. Verified 100% clean with `npm run verify` (1,053 passing unit tests across 69 test files, 0 typecheck errors, 0 lint warnings, and production build).
+
 

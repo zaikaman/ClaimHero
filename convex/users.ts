@@ -72,6 +72,33 @@ export const createGoogleUser = internalMutation({
   },
 });
 
+import { seedDemoCasesForUser } from "./demoSeeder";
+
+/**
+ * Creates an anonymous user row and atomically seeds 3 comprehensive demo cases.
+ */
+export const createAnonymousUser = internalMutation({
+  args: {
+    provider: v.literal("anonymous"),
+    providerAccountId: v.string(),
+    profile: v.object({}),
+  },
+  returns: v.id("users"),
+  handler: async (ctx, _args) => {
+    const userId = await ctx.db.insert("users", {
+      name: "Anonymous Advocate",
+      role: "advocate",
+      isAnonymous: true,
+      createdAt: Date.now(),
+    });
+
+    // Atomically pre-seed 3 demo cases with full evidence, brief, and audit trail
+    await seedDemoCasesForUser(ctx, userId);
+
+    return userId;
+  },
+});
+
 /**
  * Returns the currently authenticated user record from Convex database, or null if unauthenticated.
  */

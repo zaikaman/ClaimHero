@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useMutation } from "convex/react";
 import { useSignInWithPassword, useSignUpWithPassword } from "@convex-dev/auth/providers/password/react";
 import { useSignInWithGoogle, useOauth } from "@convex-dev/auth/providers/oauth/react";
+import { useAnonymousAuth } from "@convex-dev/auth/providers/anonymous/react";
 import { api } from "../../../convex/_generated/api";
 import {
   Eye,
@@ -9,6 +10,7 @@ import {
   ArrowLeft,
   CircleNotch,
   WarningCircle,
+  Flask,
 } from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
 import { BrandLogo } from "../common/BrandLogo";
@@ -27,10 +29,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const { signIn: signInPassword, pending: isSigningIn } = useSignInWithPassword(api.auth.signInWithPassword);
   const { signUp: signUpPassword, pending: isSigningUp } = useSignUpWithPassword(api.auth.signUpWithPassword);
   const { signInGoogle } = useSignInWithGoogle(api.auth);
+  const { signInAnonymous } = useAnonymousAuth(api.auth.signInAnonymous);
   const { flowError } = useOauth();
   const updateProfile = useMutation(api.users.updateProfile);
 
   const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
+  const [isAnonymousLoading, setIsAnonymousLoading] = useState<boolean>(false);
 
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [name, setName] = useState<string>("");
@@ -152,6 +156,26 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       setIsGoogleLoading(false);
       console.error("Google sign-in error:", err);
       const msg = err instanceof Error ? err.message : "Google sign-in encountered an error.";
+      setError(msg);
+    }
+  };
+
+  const handleAnonymousAuth = async () => {
+    setError(null);
+    setIsAnonymousLoading(true);
+
+    try {
+      await signInAnonymous();
+      setIsAnonymousLoading(false);
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        onNavigate("radar");
+      }
+    } catch (err: unknown) {
+      setIsAnonymousLoading(false);
+      console.error("Anonymous sign-in error:", err);
+      const msg = err instanceof Error ? err.message : "Anonymous sign-in encountered an error.";
       setError(msg);
     }
   };
@@ -377,7 +401,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <button
                 type="button"
                 onClick={handleGoogleAuth}
-                disabled={isLoading || isSigningIn || isSigningUp || isGoogleLoading}
+                disabled={isLoading || isSigningIn || isSigningUp || isGoogleLoading || isAnonymousLoading}
                 className="w-full h-10 sm:h-11 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-medium text-sm transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 {isGoogleLoading ? (
@@ -403,6 +427,26 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   </svg>
                 )}
                 <span>Continue with Google</span>
+              </button>
+
+              {/* Anonymous Instant Access Button */}
+              <button
+                type="button"
+                onClick={handleAnonymousAuth}
+                disabled={isLoading || isSigningIn || isSigningUp || isGoogleLoading || isAnonymousLoading}
+                className="w-full h-10 sm:h-11 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-medium text-sm transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs mt-2"
+              >
+                {isAnonymousLoading ? (
+                  <CircleNotch className="w-4 h-4 animate-spin text-zinc-700" />
+                ) : (
+                  <Flask className="w-4 h-4 text-zinc-600" />
+                )}
+                <span>
+                  {isAnonymousLoading ? "Entering Demo Workspace..." : "Explore as Anonymous Advocate"}
+                </span>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">
+                  Demo
+                </span>
               </button>
             </form>
           </div>

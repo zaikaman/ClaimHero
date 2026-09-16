@@ -2,6 +2,7 @@ import { components, internal } from "./_generated/api";
 import { setupCore } from "@convex-dev/auth/core/setup";
 import { setupUsernamePassword } from "@convex-dev/auth/providers/password/setup";
 import { setupGoogle } from "@convex-dev/auth/providers/oauth/google";
+import { setupAnonymous } from "@convex-dev/auth/providers/anonymous/setup";
 
 const core = setupCore({
   component: components.auth,
@@ -58,5 +59,9 @@ export const { startSignInGoogle, completeSignInGoogle } = setupGoogle(
     allowedRedirectOrigins: getAllowedRedirectOrigins(),
   }
 ).attachUserCallbacks({ createUser: internal.users.createGoogleUser });
+
+export const { signInAnonymous } = setupAnonymous(core, {
+  component: components.authAnonymous,
+}).attachUserCallbacks({ createUser: internal.users.createAnonymousUser });
 
 

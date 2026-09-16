@@ -23,6 +23,10 @@ vi.mock("@convex-dev/auth/providers/oauth/react", () => ({
   useOauth: () => ({ flowError: null }),
 }));
 
+vi.mock("@convex-dev/auth/providers/anonymous/react", () => ({
+  useAnonymousAuth: () => ({ signInAnonymous: vi.fn() }),
+}));
+
 import {
   PublicExperience,
   AmbientBackgroundVideo,
@@ -101,6 +105,17 @@ describe("PublicExperience & Seamless Landing-Auth Transition", () => {
       expect(html).toContain("bg-black");
       expect(html).toContain("<video");
       expect(html).toContain(AMBIENT_VIDEO_SRC);
+    });
+
+    it("renders the Explore as Anonymous Advocate button under Google auth", () => {
+      const html = renderToStaticMarkup(
+        React.createElement(AuthPage, {
+          onNavigate: vi.fn(),
+        })
+      );
+      expect(html).toContain("Continue with Google");
+      expect(html).toContain("Explore as Anonymous Advocate");
+      expect(html).toContain("Demo");
     });
   });
 

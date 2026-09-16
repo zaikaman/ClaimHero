@@ -32,6 +32,7 @@ import type * as claimCollaborators from "../claimCollaborators.js";
 import type * as claims from "../claims.js";
 import type * as clinicalEvidences from "../clinicalEvidences.js";
 import type * as crons from "../crons.js";
+import type * as demoSeeder from "../demoSeeder.js";
 import type * as draftStreams from "../draftStreams.js";
 import type * as emails from "../emails.js";
 import type * as http from "../http.js";
@@ -99,6 +100,7 @@ declare const fullApi: ApiFromModules<{
   claims: typeof claims;
   clinicalEvidences: typeof clinicalEvidences;
   crons: typeof crons;
+  demoSeeder: typeof demoSeeder;
   draftStreams: typeof draftStreams;
   emails: typeof emails;
   http: typeof http;
@@ -170,6 +172,7 @@ export declare const components: {
   auth: import("@convex-dev/auth/core/_generated/component.js").ComponentApi<"auth">;
   authUsername: import("@convex-dev/auth/username/_generated/component.js").ComponentApi<"authUsername">;
   authPasswordProvider: import("@convex-dev/auth/providers/password/_generated/component.js").ComponentApi<"authPasswordProvider">;
+  authAnonymous: import("@convex-dev/auth/providers/anonymous/_generated/component.js").ComponentApi<"authAnonymous">;
   oauthGoogle: import("@convex-dev/auth/providers/oauth/_generated/component.js").ComponentApi<"oauthGoogle">;
   agentmail: import("@agentmail/convex/_generated/component.js").ComponentApi<"agentmail">;
   workflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"workflow">;
