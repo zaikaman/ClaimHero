@@ -360,12 +360,13 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
           detectedDetermination: "OVERTURNED_APPROVED",
           settlementAmount: 32000,
           attachments: [
-            {
+            expect.objectContaining({
               storageId: "storage_inbound_eob_pdf",
               filename: "Explanation-of-Benefits-CH-9900.pdf",
               contentType: "application/pdf",
               size: mockPdfBytes.byteLength,
-            },
+              ocrStatus: "needs_client_ocr",
+            }),
           ],
         })
       );

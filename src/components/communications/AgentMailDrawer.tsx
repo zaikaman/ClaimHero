@@ -26,6 +26,7 @@ import {
   PhoneCall,
   SealCheck,
   ArrowLeft,
+  Lightning,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
@@ -40,6 +41,7 @@ import { ExportDrawer } from "../studio/ExportDrawer";
 import { ServiceCertificateModal } from "./ServiceCertificateModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { soundEffects } from "../../lib/soundEffects";
+import { extractDocumentInBrowser } from "../../lib/clientOcr";
 import { toast } from "sonner";
 
 type DispatchMode = "custom_email" | "official_payer";
@@ -98,12 +100,51 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
   // Smart Rebuttal State
   const dismissDraftMutation = useMutation(api.emails.dismissAutoReplyDraft);
+  const updateAttachmentClientOcrMutation = useMutation(api.emails.updateAttachmentClientOcr);
   const generateDraftAction = useAction(api.actions.mailDispatcher.generateAutoReplyDraft);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [isDismissingDraft, setIsDismissingDraft] = useState(false);
   const [activeAutoDraft, setActiveAutoDraft] = useState<string>("");
+  const [extractingStorageIds, setExtractingStorageIds] = useState<Set<string>>(new Set());
   const trackedInboundIdRef = useRef<string | null>(null);
   const evaluatingMessageIdRef = useRef<string | null>(null);
+
+  const handleExtractLocally = async (
+    messageId: string,
+    att: { storageId: string; filename: string; contentType: string; size: number; url?: string | null }
+  ) => {
+    if (!att.url) {
+      toast.error("Attachment download URL not available");
+      return;
+    }
+    setExtractingStorageIds((prev) => new Set(prev).add(att.storageId));
+    toast.info(`Extracting ${att.filename} locally in browser...`);
+    try {
+      const res = await fetch(att.url);
+      if (!res.ok) throw new Error("Failed to download attachment for local extraction");
+      const blob = await res.blob();
+      const result = await extractDocumentInBrowser(blob, att.filename);
+
+      await updateAttachmentClientOcrMutation({
+        claimId: claim._id as Id<"claims">,
+        messageId: messageId as Id<"emailMessages">,
+        storageId: att.storageId as Id<"_storage">,
+        extractedText: result.sanitizedText,
+      });
+
+      soundEffects.play("extraction_complete");
+      toast.success(`Extracted ${att.filename} locally in browser (zero PHI egress)!`);
+    } catch (err) {
+      console.error("Local OCR extraction failed:", err);
+      toast.error(`Local extraction failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setExtractingStorageIds((prev) => {
+        const next = new Set(prev);
+        next.delete(att.storageId);
+        return next;
+      });
+    }
+  };
 
   // Identify latest message in thread and latest inbound message
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
@@ -1431,6 +1472,33 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                                       </span>
                                     )}
                                   </div>
+                                  {att.ocrStatus === "needs_client_ocr" && (
+                                    <button
+                                      type="button"
+                                      disabled={extractingStorageIds.has(att.storageId)}
+                                      onClick={() => handleExtractLocally(msg._id, att)}
+                                      className="ml-auto inline-flex items-center gap-1 rounded bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50"
+                                      title="Extract text locally in browser (zero keys, zero PHI egress)"
+                                    >
+                                      {extractingStorageIds.has(att.storageId) ? (
+                                        <>
+                                          <CircleNotch className="size-3 animate-spin" />
+                                          <span>Extracting...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Lightning className="size-3 text-primary" />
+                                          <span>Extract locally</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                  {att.ocrStatus === "extracted" && (
+                                    <span className="ml-auto inline-flex items-center gap-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] font-mono">
+                                      <Check className="size-3" />
+                                      <span>Extracted</span>
+                                    </span>
+                                  )}
                                   {att.url && (
                                     <a
                                       href={att.url}

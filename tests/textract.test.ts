@@ -479,5 +479,118 @@ describe("AWS Textract Integration & HIPAA Optical Parser", () => {
       // Authentic memberId from Textract replaces the asterisk-masked placeholder
       expect(result.memberId).toBe("GEO-994411");
     });
+
+    it("accepts in-browser extractedText with sourceProvenance client_text and skips Textract when AWS credentials are not configured", async () => {
+      delete process.env.AWS_ACCESS_KEY_ID;
+      delete process.env.AWS_SECRET_ACCESS_KEY;
+
+      const actionOpticalParser = await import("../convex/actions/opticalParser");
+      const libOpenAI = await import("../convex/lib/openai");
+      const { rateLimiter } = await import("../convex/lib/rateLimiter");
+
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      const completionSpy = vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        isMedicalClaimDenial: true,
+        documentClassificationReason: "Valid EOB.",
+        claimNumber: "CLM-CLIENT-001",
+        patientName: "Jane Doe",
+        memberId: "MEM-774411",
+        insurancePayer: "UnitedHealthcare",
+        serviceDate: "2026-03-01",
+        providerName: "General Hospital",
+        deniedAmount: 14500,
+        patientOwedAmount: 14500,
+        cptCodes: ["27447"],
+        icd10Codes: ["M17.11"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+        appealFilingDeadlineDays: 180,
+      } as any);
+
+      const fakePdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x00]);
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: { get: () => "application/pdf" },
+        arrayBuffer: async () => fakePdfBytes.buffer,
+      } as any);
+
+      const mockCtx: any = {
+        auth: { getUserId: vi.fn().mockResolvedValue("user_123") },
+        storage: { getUrl: vi.fn().mockResolvedValue("https://storage.convex.cloud/file_client_text") },
+        runMutation: vi.fn().mockResolvedValue("claim_client_text_123"),
+        runAction: vi.fn().mockResolvedValue({ officialAppealsEmail: "appeals@uhc.com", isVerified: true }),
+      };
+
+      const result = await (actionOpticalParser.parseDenialDocument as any)._handler(mockCtx, {
+        storageId: "storage_file_123" as any,
+        extractedText: "UnitedHealthcare Denial Notice. Member: Jane Doe. CPT: 27447. Amount: $14,500. CO-50.",
+        sourceProvenance: "client_text",
+        patientState: "NY",
+      });
+
+      // Textract was skipped cleanly without throwing missing-credential error
+      expect(result.claimId).toBe("claim_client_text_123");
+      expect(result.claimNumber).toBe("CLM-CLIENT-001");
+      expect(completionSpy).toHaveBeenCalled();
+    });
+
+    it("accepts in-browser client_ocr with clientIdentifiers and vaults authentic identifiers into Convex DB without Textract", async () => {
+      delete process.env.AWS_ACCESS_KEY_ID;
+      delete process.env.AWS_SECRET_ACCESS_KEY;
+
+      const actionOpticalParser = await import("../convex/actions/opticalParser");
+      const libOpenAI = await import("../convex/lib/openai");
+      const { rateLimiter } = await import("../convex/lib/rateLimiter");
+
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        isMedicalClaimDenial: true,
+        documentClassificationReason: "Valid adverse determination notice.",
+        claimNumber: "CLM-9999",
+        patientName: "[REDACTED_PATIENT]",
+        memberId: "[REDACTED_MEMBER]",
+        insurancePayer: "Cigna",
+        serviceDate: "2026-02-20",
+        providerName: "Metro Orthopedics",
+        deniedAmount: 8500,
+        patientOwedAmount: 8500,
+        cptCodes: ["29881"],
+        icd10Codes: ["M23.22"],
+        denialReasonCode: "CO-197",
+        denialReasonDescription: "Precertification absent",
+        appealFilingDeadlineDays: 180,
+      } as any);
+
+      const fakeImageBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0x00]);
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: { get: () => "image/png" },
+        arrayBuffer: async () => fakeImageBytes.buffer,
+      } as any);
+
+      const mockCtx: any = {
+        auth: { getUserId: vi.fn().mockResolvedValue("user_123") },
+        storage: { getUrl: vi.fn().mockResolvedValue("https://storage.convex.cloud/file_client_ocr") },
+        runMutation: vi.fn().mockResolvedValue("claim_client_ocr_123"),
+        runAction: vi.fn().mockResolvedValue({ officialAppealsEmail: "appeals@cigna.com", isVerified: true }),
+      };
+
+      const result = await (actionOpticalParser.parseDenialDocument as any)._handler(mockCtx, {
+        storageId: "storage_file_123" as any,
+        extractedText: "Cigna adverse benefit determination notice. Disputed procedure CPT 29881.",
+        sourceProvenance: "client_ocr",
+        clientIdentifiers: {
+          patientName: "Robert Vance",
+          memberId: "CIG-998811",
+          claimNumber: "CLM-9999",
+        },
+        patientState: "TX",
+      });
+
+      // Authentic identifiers vaulted into Convex DB from client identifiers
+      expect(result.patientName).toBe("Robert Vance");
+      expect(result.memberId).toBe("CIG-998811");
+      expect(result.claimId).toBe("claim_client_ocr_123");
+    });
   });
 });

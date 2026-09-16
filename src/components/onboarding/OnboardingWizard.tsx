@@ -51,7 +51,8 @@ interface OnboardingWizardProps {
   onClose: () => void;
   onUploadFile?: (
     file: File,
-    patientState?: string
+    patientState?: string,
+    onProgress?: (progressText: string) => void
   ) => Promise<DenialExtractionResult & { claimId: string }>;
   onParseText: (
     text: string,

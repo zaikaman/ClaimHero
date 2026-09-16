@@ -191,7 +191,18 @@ function detectFileFormat(
  */
 export const parseDenialDocument = action({
   args: {
+    sourceProvenance: v.optional(
+      v.union(v.literal("client_text"), v.literal("client_ocr"), v.literal("textract"))
+    ),
+    extractedText: v.optional(v.string()),
     rawDocumentText: v.optional(v.string()),
+    clientIdentifiers: v.optional(
+      v.object({
+        patientName: v.optional(v.string()),
+        memberId: v.optional(v.string()),
+        claimNumber: v.optional(v.string()),
+      })
+    ),
     storageId: v.optional(v.id("_storage")),
     patientState: v.optional(v.string()),
     patientEmail: v.optional(v.string()),
@@ -203,7 +214,8 @@ export const parseDenialDocument = action({
   handler: async (ctx, args): Promise<DenialExtractionResult & { claimId: string; pipelineResult?: Record<string, unknown> }> => {
     const userId = await requireAuthUser(ctx);
 
-    if (args.rawDocumentText && args.rawDocumentText.length > MAX_RAW_DOCUMENT_CHARS) {
+    const inputText = (args.extractedText || args.rawDocumentText || "").trim();
+    if (inputText.length > MAX_RAW_DOCUMENT_CHARS) {
       throw new Error(`Submitted raw document text exceeds the ${MAX_RAW_DOCUMENT_CHARS.toLocaleString()} character limit.`);
     }
 
@@ -228,7 +240,7 @@ export const parseDenialDocument = action({
       }
     }
 
-    let documentContent = args.rawDocumentText?.trim() || "";
+    let documentContent = inputText;
     let textractIdentifiers: Partial<TextractExtractionResult> = {};
 
     let claimId: Id<"claims">;
@@ -269,37 +281,43 @@ export const parseDenialDocument = action({
           const detected = detectFileFormat(rawContentType, new Uint8Array(arrayBuffer));
 
           if (detected.type === "image" || detected.type === "pdf") {
-            // Fail-hard HIPAA gate: binary PDF/image intake requires AWS Textract
-            // under the AWS HIPAA BAA. Direct multimodal vision fallback would send
-            // raw PHI bytes to a third-party LLM and bypass redactBeforeLLM.
-            if (!isTextractConfigured()) {
-              throw new Error(
-                "AWS Textract credentials not configured. PDF/image denial intake requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in the Convex deployment environment. Upload a text extraction instead, or configure Textract and retry."
-              );
-            }
-            const buffer = Buffer.from(arrayBuffer);
-            try {
-              const textractRes = await extractDocumentWithTextract(buffer);
-              if (!textractRes.fullText.trim()) {
-                throw new Error("AWS Textract returned empty text content");
+            if (isTextractConfigured()) {
+              const buffer = Buffer.from(arrayBuffer);
+              try {
+                const textractRes = await extractDocumentWithTextract(buffer);
+                if (textractRes.fullText.trim()) {
+                  textractIdentifiers = textractRes;
+                  const tableMd = formatTablesAsMarkdown(textractRes.tables);
+                  documentContent = [
+                    documentContent,
+                    "Extracted denial document text from AWS Textract (HIPAA BAA Optical Gate):",
+                    textractRes.fullText,
+                    tableMd ? `Structured Table Data:\n${tableMd}` : "",
+                  ]
+                    .filter(Boolean)
+                    .join("\n\n");
+                }
+              } catch (textractErr) {
+                // If client-extracted text was already supplied, log warning and use client text
+                if (documentContent.trim()) {
+                  console.warn("AWS Textract extraction failed; falling back to client-extracted text:", textractErr);
+                } else {
+                  // Fail closed: never fall back to direct multimodal parsing with raw PHI bytes
+                  throw new Error(
+                    `AWS Textract document extraction failed: ${textractErr instanceof Error ? textractErr.message : String(textractErr)}. No fallback parsing was attempted to protect PHI. Please retry once AWS Textract recovers.`
+                  );
+                }
               }
-              textractIdentifiers = textractRes;
-              const tableMd = formatTablesAsMarkdown(textractRes.tables);
-              documentContent = [
-                documentContent,
-                "Extracted denial document text from AWS Textract (HIPAA BAA Optical Gate):",
-                textractRes.fullText,
-                tableMd ? `Structured Table Data:\n${tableMd}` : "",
-              ]
-                .filter(Boolean)
-                .join("\n\n");
-            } catch (textractErr) {
-              // Fail closed: never fall back to direct multimodal parsing with raw
-              // PHI bytes. Surface the Textract failure so the caller can retry once
-              // AWS recovers. The outer handler cleans up the orphaned storage file.
-              throw new Error(
-                `AWS Textract document extraction failed: ${textractErr instanceof Error ? textractErr.message : String(textractErr)}. No fallback parsing was attempted to protect PHI. Please retry once AWS Textract recovers.`
-              );
+            } else {
+              // AWS Textract is not configured.
+              // If client extractedText was provided (client_text / client_ocr), accept it and skip Textract!
+              if (documentContent.trim()) {
+                // Client-side in-browser text extraction accepted (zero PHI egress, zero BAA required)
+              } else {
+                throw new Error(
+                  "AWS Textract credentials not configured. PDF/image denial intake requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in the Convex deployment environment, or in-browser client text extraction (sourceProvenance: 'client_text' | 'client_ocr'). Upload a text extraction instead, or configure Textract and retry."
+                );
+              }
             }
           } else if (detected.type === "text") {
             const text = new TextDecoder("utf-8").decode(arrayBuffer);
@@ -343,15 +361,18 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         temperature: 0.1,
       });
 
-      // Re-hydrate authentic patient identifiers extracted under BAA if Textract was used
-      if (textractIdentifiers.patientName && (!extraction.patientName || extraction.patientName.includes("REDACTED") || extraction.patientName.includes("*"))) {
-        extraction.patientName = textractIdentifiers.patientName;
+      // Re-hydrate authentic patient identifiers extracted under BAA (Textract) or client vault
+      const authenticPatientName = args.clientIdentifiers?.patientName || textractIdentifiers.patientName;
+      if (authenticPatientName && (!extraction.patientName || extraction.patientName.includes("REDACTED") || extraction.patientName.includes("*"))) {
+        extraction.patientName = authenticPatientName;
       }
-      if (textractIdentifiers.memberId && (!extraction.memberId || extraction.memberId.includes("REDACTED") || extraction.memberId.includes("*"))) {
-        extraction.memberId = textractIdentifiers.memberId;
+      const authenticMemberId = args.clientIdentifiers?.memberId || textractIdentifiers.memberId;
+      if (authenticMemberId && (!extraction.memberId || extraction.memberId.includes("REDACTED") || extraction.memberId.includes("*"))) {
+        extraction.memberId = authenticMemberId;
       }
-      if (textractIdentifiers.claimNumber && (!extraction.claimNumber || extraction.claimNumber.includes("REDACTED") || extraction.claimNumber.includes("*"))) {
-        extraction.claimNumber = textractIdentifiers.claimNumber;
+      const authenticClaimNumber = args.clientIdentifiers?.claimNumber || textractIdentifiers.claimNumber;
+      if (authenticClaimNumber && (!extraction.claimNumber || extraction.claimNumber.includes("REDACTED") || extraction.claimNumber.includes("*"))) {
+        extraction.claimNumber = authenticClaimNumber;
       }
       if (textractIdentifiers.serviceDate && !extraction.serviceDate) {
         extraction.serviceDate = textractIdentifiers.serviceDate;

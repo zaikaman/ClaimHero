@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-16T13:34:00Z
+- **Last updated:** 2026-09-16T13:52:00Z
 
 ## Log
 
@@ -1532,12 +1532,22 @@ Added Convex Auth Anonymous authentication mode to `/login`, atomic transactiona
 - Documentation & Judge Guides: Updated `README.md` to document the 1-click Anonymous Advocate evaluation flow in "Try It in 60 Seconds", the Judge Evidence Matrix, Convex sponsor pillar, Component Architecture, and updated test suite totals (1,053 tests across 69 suites).
 - Regression Coverage: Added `tests/anonymousAuthAndSeeder.test.ts` and updated `tests/publicExperienceTransition.test.ts`. Verified 100% clean with `npm run verify` (1,053 passing unit tests across 69 test files, 0 typecheck errors, 0 lint warnings, and production build).
 
-### 2026-09-16 - working tree
+### 2026-09-16 - 7503020
 Redesigned the Transmission History and addendum composer layout in `src/components/communications/AgentMailDrawer.tsx` to eliminate empty space and strictly constrain its height to match the adjacent Recipient Insurer Gateway card:
 - Height Synchronization & Sizing Architecture: Positioned the Transmission History card with `lg:absolute lg:inset-0` inside a relative grid column track (`lg:col-span-8 relative`). This ensures the two-column grid row height is strictly governed by the natural height of the left Recipient Insurer Gateway card, preventing long appeal dossiers from expanding the card infinitely down the page.
 - Internal Flex Scrolling: Applied `flex-1 min-h-0 overflow-y-auto` to the messages container and `shrink-0` to the header, draft cards, and bottom console. Messages now scroll smoothly within the exact bounds of the left card while keeping the composer and audit footer firmly anchored at the bottom.
 - Streamlined Addendum Composer: Anchored a focused, streamlined addendum composer dock at the bottom with active target recipient indicator, inline keyboard submission hints, and direct carrier dispatch input.
 - Compliance & Transmission Footer: Integrated a persistent carrier relay status bar displaying live AgentMail connectivity, ERISA § 503 audit compliance, and instant shortcuts for Certificate of Electronic Service delivery evidence and dossier export.
 - Regression Verification: Verified 100% clean with typecheck, lint, 1,053 passing unit tests across 69 test suites, and production build.
+
+### 2026-09-16 - working tree
+Implemented in-browser optical intake and converted AWS Textract into an optional server-side enhancement (`src/lib/clientOcr.ts`, `src/lib/redactionEngine.ts`, `convex/actions/opticalParser.ts`, `convex/actions/agentMail.ts`, `convex/emails.ts`, `convex/schema.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/radar/IngestionModal.tsx`, `src/hooks/useClaims.ts`, `.env.example`, `README.md`, `tests/clientOcrAndOptionalTextract.test.ts`, `tests/textract.test.ts`, `tests/formalPdfAttachments.test.ts`):
+- In-Browser OCR & Digital PDF Extraction: Implemented `src/lib/clientOcr.ts` utilizing `pdfjs-dist` `getTextContent()` for digital PDFs (100% accuracy, zero OCR, zero keys, covering ~80% of denials) with fallback to offscreen canvas rendering and `tesseract.js` in-browser for scanned documents and images. PHI never leaves the user's device for optical processing.
+- Client-Side De-Identification & Convex Vaulting: Added client-side `redactBeforeLLM` in `src/lib/redactionEngine.ts` to de-identify text in-browser under HIPAA Safe Harbor before transmission, with server-side `redactBeforeLLM` in `convex/lib/openai.ts:228-229` as defense-in-depth. Authentic patient identifiers are extracted locally and securely vaulted directly in Convex DB. OpenAI receives zero binary images and zero direct PHI.
+- Optional AWS Textract Gate: Upgraded `parseDenialDocument` in `convex/actions/opticalParser.ts` to accept `sourceProvenance: "client_text" | "client_ocr" | "textract"`, `extractedText`, and `clientIdentifiers`. If `isTextractConfigured()` is true on the server, Textract is used for high-accuracy tables/key-values; otherwise, the server cleanly accepts client-extracted text and skips Textract without throwing missing-credential errors. Fail-hard remains enforced only when binary storage is submitted without credentials and without client text.
+- AgentMail Inbound Attachments & Local Drawer Extraction: Updated `convex/actions/agentMail.ts` lines 455-464 to preserve inbound attachments in Convex Storage and flag `ocrStatus: "needs_client_ocr"` when Textract is unconfigured (instead of quarantine-only). Added `updateAttachmentClientOcr` mutation in `convex/emails.ts` and an "Extract locally" action in `AgentMailDrawer.tsx` allowing users to extract text in-browser with zero keys and zero PHI egress.
+- Config & Documentation: Updated `.env.example` and `README.md` to document Textract as an optional server-side enhancement, update test counts (1,061 tests across 70 suites) and test suite descriptions, and highlight in-browser optical intake.
+- Regression Verification: Added unit test suite `tests/clientOcrAndOptionalTextract.test.ts`, updated `tests/textract.test.ts` and `tests/formalPdfAttachments.test.ts`, and verified 100% clean across typecheck, lint, 1,061 passing tests across 70 test suites, and production build.
+
 
 

@@ -425,6 +425,8 @@ async function handleInboundClaimReply(
       filename: string;
       contentType: string;
       size: number;
+      ocrStatus?: string;
+      extractedText?: string;
     }> = [];
     const attachmentTexts: string[] = [];
 
@@ -442,26 +444,25 @@ async function handleInboundClaimReply(
           const blob = new Blob([new Uint8Array(downloaded.buffer)], { type: downloaded.contentType });
           const storageId = await ctx.storage.store(blob);
 
-          storedAttachments.push({
-            storageId,
-            filename: downloaded.filename,
-            contentType: downloaded.contentType,
-            size: downloaded.size,
-          });
-
-          // Fail-hard HIPAA gate: PDF/image attachments are OCR'd only inside the
-          // AWS HIPAA BAA via Textract. Raw binary is stored in Convex Storage for
-          // human review but NEVER forwarded to the LLM as raw binary files/images, since that
-          // would bypass redactBeforeLLM and egress raw PHI.
           const lowerMime = downloaded.contentType.toLowerCase();
           const lowerName = downloaded.filename.toLowerCase();
-          if (lowerMime.includes("pdf") || lowerName.endsWith(".pdf") || lowerMime.startsWith("image/")) {
+          const isDocumentOrImage = lowerMime.includes("pdf") || lowerName.endsWith(".pdf") || lowerMime.startsWith("image/");
+
+          let ocrStatus: string | undefined = undefined;
+          let extractedText: string | undefined = undefined;
+
+          // Fail-hard HIPAA gate: PDF/image attachments are OCR'd only inside the
+          // AWS HIPAA BAA via Textract or flagged for client-side local OCR in the browser.
+          // Raw binary is stored in Convex Storage for human review and local extraction,
+          // but NEVER forwarded to the LLM as raw binary files/images.
+          if (isDocumentOrImage) {
             if (!isTextractConfigured()) {
               console.warn(
-                `AWS Textract not configured; quarantining inbound attachment ${downloaded.filename} without OCR. Attachment preserved in storage for human review.`
+                `AWS Textract not configured; flagging inbound attachment ${downloaded.filename} with needs_client_ocr. Attachment preserved in storage for local in-browser extraction in drawer.`
               );
+              ocrStatus = "needs_client_ocr";
               attachmentTexts.push(
-                `[Attachment ${downloaded.filename} stored but not OCR'd: AWS Textract credentials (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY) are not configured. Human review of the stored file is required; attachment content was not sent to the LLM.]`
+                `[Attachment ${downloaded.filename} stored but not OCR'd: AWS Textract credentials (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY) are not configured. Flagged for in-browser client OCR ("Extract locally" in drawer); attachment content was not sent to the LLM.]`
               );
             } else {
               try {
@@ -469,19 +470,31 @@ async function handleInboundClaimReply(
                 if (!textractRes.fullText.trim()) {
                   throw new Error("AWS Textract returned empty text for attachment");
                 }
+                ocrStatus = "extracted";
+                extractedText = textractRes.fullText;
                 attachmentTexts.push(
                   `Attached Document (${downloaded.filename}) Extracted via AWS Textract:\n${textractRes.fullText}`
                 );
               } catch (textractErr) {
-                // Fail closed: quarantine the attachment, keep it in storage, and
+                // Fail closed: flag for client OCR, keep in storage, and
                 // continue adjudication on the email body alone. No rawBytes fallback.
                 console.warn(`AWS Textract inbound attachment parse failed for ${downloaded.filename}:`, textractErr);
+                ocrStatus = "needs_client_ocr";
                 attachmentTexts.push(
-                  `[Attachment ${downloaded.filename} stored but not OCR'd: AWS Textract extraction failed (${textractErr instanceof Error ? textractErr.message : String(textractErr)}). Human review of the stored file is required; attachment content was not sent to the LLM.]`
+                  `[Attachment ${downloaded.filename} stored but not OCR'd: AWS Textract extraction failed (${textractErr instanceof Error ? textractErr.message : String(textractErr)}). Flagged for in-browser client OCR ("Extract locally" in drawer); attachment content was not sent to the LLM.]`
                 );
               }
             }
           }
+
+          storedAttachments.push({
+            storageId,
+            filename: downloaded.filename,
+            contentType: downloaded.contentType,
+            size: downloaded.size,
+            ocrStatus,
+            extractedText,
+          });
         } catch (attErr) {
           console.warn(`Failed to process inbound attachment ${att.attachmentId}:`, attErr);
         }

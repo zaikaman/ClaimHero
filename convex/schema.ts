@@ -281,6 +281,8 @@ export default defineSchema({
           filename: v.string(),
           contentType: v.string(),
           size: v.number(),
+          ocrStatus: v.optional(v.string()), // needs_client_ocr, extracted, not_required, failed
+          extractedText: v.optional(v.string()),
         })
       )
     ),

@@ -459,6 +459,8 @@ export const updateMessageAnalysisInternal = internalMutation({
           filename: v.string(),
           contentType: v.string(),
           size: v.number(),
+          ocrStatus: v.optional(v.string()),
+          extractedText: v.optional(v.string()),
         })
       )
     ),
@@ -495,6 +497,8 @@ export const insertInboundMessageInternal = internalMutation({
           filename: v.string(),
           contentType: v.string(),
           size: v.number(),
+          ocrStatus: v.optional(v.string()),
+          extractedText: v.optional(v.string()),
         })
       )
     ),
@@ -1033,6 +1037,66 @@ export const dismissAutoReplyDraft = mutation({
     return { success: true };
   },
 });
+
+/**
+ * Update an attachment with in-browser client OCR extracted text (zero PHI egress).
+ * Enrich inbound email message record and audit trail.
+ */
+export const updateAttachmentClientOcr = mutation({
+  args: {
+    claimId: v.id("claims"),
+    messageId: v.id("emailMessages"),
+    storageId: v.id("_storage"),
+    extractedText: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await requireClaimEditor(ctx, args.claimId);
+
+    const msg = await ctx.db.get(args.messageId);
+    if (!msg || msg.claimId !== args.claimId) {
+      throw new Error("Message not found or mismatch with claim");
+    }
+
+    if (!msg.attachments || msg.attachments.length === 0) {
+      throw new Error("Message has no attachments");
+    }
+
+    const updatedAttachments = msg.attachments.map((att) => {
+      if (att.storageId === args.storageId) {
+        return {
+          ...att,
+          ocrStatus: "extracted",
+          extractedText: args.extractedText,
+        };
+      }
+      return att;
+    });
+
+    const sanitizedAddition = args.extractedText.trim();
+    const updatedBodyText = [
+      msg.bodyText,
+      `[In-Browser Client OCR Extracted Text for Attachment]:\n${sanitizedAddition}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    await ctx.db.patch(args.messageId, {
+      attachments: updatedAttachments,
+      bodyText: updatedBodyText,
+    });
+
+    await appendAuditLog(ctx, {
+      claimId: args.claimId,
+      userId,
+      actor: "Claim Reviewer",
+      eventType: "attachment_client_ocr_extracted",
+      details: `In-browser client OCR text applied for storageId ${args.storageId} (zero PHI egress).`,
+    });
+
+    return { success: true };
+  },
+});
+
 
 /**
  * Hook invoked by the AgentMail component when an inbound message lands.

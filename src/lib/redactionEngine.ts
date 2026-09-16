@@ -625,3 +625,18 @@ export function fastSanitizeText(
   const entities = detectPiiEntities(text, options);
   return applyRedaction(text, entities, standard);
 }
+
+/**
+ * Client-Side Text Redaction Gate:
+ * Enforces mandatory HIPAA Safe Harbor de-identification (45 CFR § 164.514(b)(2))
+ * in-browser before transmitting text extracted from digital PDFs or OCR to the server.
+ */
+export function redactBeforeLLM(text: string, options?: RedactionEngineOptions): string {
+  if (!text || typeof text !== "string") return "";
+  const result = fastSanitizeText(text, {
+    standard: "HIPAA_SAFE_HARBOR",
+    ...options,
+  });
+  return result.sanitizedText;
+}
+

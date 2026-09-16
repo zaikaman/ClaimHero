@@ -377,6 +377,8 @@ export interface EmailMessage {
     contentType: string;
     size: number;
     url?: string | null;
+    ocrStatus?: "needs_client_ocr" | "extracted" | "not_required" | "failed" | string;
+    extractedText?: string;
   }>;
   agentMailMessageId?: string;
   detectedDetermination?: "OVERTURNED_APPROVED" | "PARTIAL_SETTLEMENT_OFFER" | "ADDITIONAL_RECORDS_REQUIRED" | "POLICY_CONFLICT_CITATION" | "DENIAL_UPHELD" | "ACKNOWLEDGMENT_ONLY" | "GENERAL_INQUIRY" | "DELIVERY_FAILURE" | string;

@@ -97,7 +97,8 @@ interface IngestionModalProps {
   onClose: () => void;
   onUploadFile: (
     file: File,
-    patientState?: string
+    patientState?: string,
+    onProgress?: (progressText: string) => void
   ) => Promise<DenialExtractionResult & { claimId: string }>;
   onParseText: (
     text: string,
@@ -453,15 +454,20 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       return;
     }
 
+    const isPdf = selectedFile.type.includes("pdf") || selectedFile.name.toLowerCase().endsWith(".pdf");
     beginProcessing(
       "extracting",
       isDetailed
-        ? "Step 1/2: Optical document analysis and clinical entity extraction..."
-        : "Step 1/2: Reading your denial letter..."
+        ? isPdf
+          ? "Step 1/2: In-browser PDF extraction (pdf.js) and Safe Harbor de-identification..."
+          : "Step 1/2: In-browser OCR (tesseract.js) and Safe Harbor de-identification..."
+        : "Step 1/2: Reading your denial letter locally in browser..."
     );
 
     try {
-      const result = await onUploadFile(selectedFile, patientState);
+      const result = await onUploadFile(selectedFile, patientState, (progressMsg) => {
+        setProcessingMessage(isDetailed ? `Step 1/2: ${progressMsg}` : progressMsg);
+      });
       prepareContextReview(result);
       endProcessing();
     } catch (err) {
