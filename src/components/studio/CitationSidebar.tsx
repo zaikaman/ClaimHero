@@ -135,7 +135,7 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
             </span>
           </div>
           <Badge variant="success" size="sm" className="font-mono text-[10px]">
-            Auto-Cited in Brief
+            {isDetailed ? "Auto-Cited in Brief" : "Added to your letter"}
           </Badge>
         </div>
         <p className="text-[11px] text-muted-foreground leading-relaxed">
@@ -195,23 +195,29 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
                         <Badge variant="success" className="text-[9px] font-mono px-1.5 py-0">
                           {similarity}% match
                         </Badge>
-                        {isHybrid ? (
+                        {isDetailed && isHybrid && (
                           <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
                             Hybrid RRF
                           </Badge>
-                        ) : isBm25 ? (
+                        )}
+                        {isDetailed && isBm25 && (
                           <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 border-blue-500/40 text-blue-600 dark:text-blue-400 bg-blue-500/10">
                             BM25
                           </Badge>
-                        ) : null}
+                        )}
+                        {!isDetailed && isHybrid && (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
+                            Best match
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap text-[10px] text-muted-foreground font-mono">
                         <span>{match.citation}</span>
-                        {match.rrfScore && match.rrfScore > 0 && (
+                        {isDetailed && match.rrfScore && match.rrfScore > 0 && (
                           <span>• RRF: {match.rrfScore.toFixed(4)}</span>
                         )}
-                        {match.vectorRank && <span>• V#{match.vectorRank}</span>}
-                        {match.textRank && <span>• T#{match.textRank}</span>}
+                        {isDetailed && match.vectorRank && <span>• V#{match.vectorRank}</span>}
+                        {isDetailed && match.textRank && <span>• T#{match.textRank}</span>}
                       </div>
                     </div>
                     <Button
@@ -259,11 +265,17 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
             </span>
           </div>
           <Badge variant="outline" className="text-[9px] font-mono capitalize">
-            {appealLevel === "level_2_grievance"
-              ? "Level 2 Grievance"
+            {isDetailed
+              ? appealLevel === "level_2_grievance"
+                ? "Level 2 Grievance"
+                : appealLevel === "level_3_external_state_review"
+                ? "Level 3 IRO & DOI"
+                : "Level 1 Administrative"
+              : appealLevel === "level_2_grievance"
+              ? "Second appeal"
               : appealLevel === "level_3_external_state_review"
-              ? "Level 3 IRO & DOI"
-              : "Level 1 Administrative"}
+              ? "Outside review"
+              : "First appeal"}
           </Badge>
         </div>
 
@@ -279,13 +291,17 @@ export const CitationSidebar: React.FC<CitationSidebarProps> = ({
                     <span className="font-mono text-xs font-semibold text-foreground">
                       {auth.title}
                     </span>
-                    <Badge variant="outline" className="text-[9px] font-mono px-1.5 py-0">
-                      Cited in {auth.sectionTarget}
-                    </Badge>
+                    {isDetailed && (
+                      <Badge variant="outline" className="text-[9px] font-mono px-1.5 py-0">
+                        Cited in {auth.sectionTarget}
+                      </Badge>
+                    )}
                   </div>
-                  <span className="text-[10px] text-muted-foreground block font-mono">
-                    {auth.category}
-                  </span>
+                  {isDetailed && (
+                    <span className="text-[10px] text-muted-foreground block font-mono">
+                      {auth.category}
+                    </span>
+                  )}
                 </div>
 
                 <Button

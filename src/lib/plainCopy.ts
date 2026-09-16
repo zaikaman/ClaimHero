@@ -18,6 +18,18 @@ export const PLAIN_NAV = {
   settingsSimple: "Settings",
 } as const;
 
+/**
+ * Canonical first-run labels for the three terms a new user must never meet
+ * as jargon. These are the words shown by default on the landing page and
+ * workspace; the expert wording (CPB / CARC / cited brief) returns with
+ * Expert Details turned on.
+ */
+export const PLAIN_FIRST_RUN = {
+  insurerRule: "Insurer's own rule",
+  whyDenied: "Why they said no",
+  yourLetter: "Your letter",
+} as const;
+
 export const PLAIN_FLOW_STEPS = {
   evidenceSimple: "1. Your proof",
   evidenceDetailed: "1. Evidence & CPB",
@@ -112,3 +124,72 @@ export const PLAIN_STATUS: Record<string, { simple: string; detailed: string }> 
 export function statusSimple(status: string): string {
   return PLAIN_STATUS[status]?.simple ?? status.replace(/_/g, " ");
 }
+
+const PLAIN_CPT_NAMES: Record<string, string> = {
+  "29881": "knee arthroscopy",
+  "27447": "knee replacement",
+  "63047": "lumbar spine surgery",
+  "73721": "knee MRI scan",
+  "99214": "doctor visit",
+};
+
+export function getPlainProcedureName(cptCodes?: string[], fallback = "treatment"): string {
+  if (cptCodes && cptCodes.length > 0) {
+    const first = cptCodes[0];
+    if (PLAIN_CPT_NAMES[first]) return PLAIN_CPT_NAMES[first];
+  }
+  return fallback;
+}
+
+const PLAIN_CARC_REASONS: Record<string, string> = {
+  "CO-50": "they say it was not medically necessary",
+  "CO-197": "they say prior approval was missing",
+  "CO-16": "they say required records were missing",
+  "CO-96": "they say it is not covered by the plan",
+  "CO-4": "the billing code had an issue",
+  "CO-18": "they say this was already billed",
+};
+
+export function getPlainDenialReason(carcCode?: string, fallback = ""): string {
+  if (carcCode && PLAIN_CARC_REASONS[carcCode]) {
+    return PLAIN_CARC_REASONS[carcCode];
+  }
+  return fallback;
+}
+
+export function formatWhatHappenedSentence(claim: {
+  patient?: { name?: string; insurancePayer?: string };
+  deniedAmount: number;
+  cptCodes?: string[];
+  denialReasonCode?: string;
+  denialReasonDescription?: string;
+  serviceDescription?: string;
+}): string {
+  const patientPrefix = claim.patient?.name ? `${claim.patient.name}'s` : "Your";
+  const procedure = getPlainProcedureName(claim.cptCodes, claim.serviceDescription || "treatment");
+  const payer = claim.patient?.insurancePayer || "the insurer";
+  const amountStr = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(claim.deniedAmount);
+
+  const plainReason = getPlainDenialReason(claim.denialReasonCode);
+  if (plainReason) {
+    return `${patientPrefix} ${procedure} was denied (${amountStr}) by ${payer} — ${plainReason}.`;
+  }
+  if (claim.denialReasonDescription) {
+    return `${patientPrefix} ${procedure} was denied (${amountStr}) by ${payer}: ${claim.denialReasonDescription}.`;
+  }
+  return `${patientPrefix} ${procedure} was denied (${amountStr}) by ${payer}.`;
+}
+
+export function formatDeadlineSentence(statutoryDeadline: number, daysRemaining: number): string {
+  const dateStr = new Date(statutoryDeadline).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `Appeal deadline: ${dateStr} (${daysRemaining} days left)`;
+}
+

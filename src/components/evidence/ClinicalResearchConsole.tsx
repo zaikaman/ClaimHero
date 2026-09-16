@@ -29,6 +29,7 @@ import { Alert, AlertDescription } from "../ui/alert";
 import { stripMarkdownFormatting } from "../../lib/utils";
 import { getPayerClinicalDirectoryUrl } from "../../lib/constants";
 import { useDetailMode } from "../../hooks/useDetailMode";
+import { PLAIN_FIRST_RUN, getPlainProcedureName } from "../../lib/plainCopy";
 
 interface ClinicalResearchConsoleProps {
   claim: Claim;
@@ -71,6 +72,14 @@ export interface ResearchChannelConfig {
   shortLabel: string;
   fullLabel: string;
   tagline: string;
+  /** Everyday label shown by default; expert shortLabel appears in Detailed mode. */
+  plainLabel: string;
+  /** Everyday sub-label shown by default; expert tagline appears in Detailed mode. */
+  plainTagline: string;
+  /** Everyday description shown by default; expert description appears in Detailed mode. */
+  plainDescription: string;
+  /** Everyday evidence value shown by default; expert clinicalImpact appears in Detailed mode. */
+  plainImpact: string;
   icon: React.ElementType;
   iconColor: string;
   badge?: string;
@@ -85,6 +94,12 @@ export const RESEARCH_MODES: ResearchChannelConfig[] = [
     shortLabel: "Multi-Source",
     fullLabel: "Full Multi-Source Sentinel Scan",
     tagline: "3-Channel Sweep",
+    plainLabel: "Everything at once",
+    plainTagline: "Three sources",
+    plainDescription:
+      "Checks three things at once: the insurer's own coverage rules, published medical studies about your treatment, and official FDA approvals.",
+    plainImpact:
+      "Shows where the insurer's reason for denying contradicts their own published rules.",
     icon: Lightning,
     iconColor: "text-cyan-400 bg-cyan-500/15 border-cyan-500/30",
     badge: "Recommended",
@@ -99,6 +114,12 @@ export const RESEARCH_MODES: ResearchChannelConfig[] = [
     shortLabel: "Insurer CPB",
     fullLabel: "Insurer Policy Bulletin (CPB)",
     tagline: "Payer Coverage Rules",
+    plainLabel: PLAIN_FIRST_RUN.insurerRule,
+    plainTagline: "Their coverage rules",
+    plainDescription:
+      "Reads the coverage rule the insurer publishes for your exact treatment, including the conditions they require you to meet.",
+    plainImpact:
+      "Shows when their denial contradicts their own published rule, or leans on a restriction they never published.",
     icon: BookOpen,
     iconColor: "text-blue-400 bg-blue-500/15 border-blue-500/30",
     description:
@@ -112,6 +133,12 @@ export const RESEARCH_MODES: ResearchChannelConfig[] = [
     shortLabel: "Directory Map",
     fullLabel: "Insurer Policy Directory Discovery",
     tagline: "Firecrawl /v1/map Sweep",
+    plainLabel: "Their policy library",
+    plainTagline: "Find all their rules",
+    plainDescription:
+      "Scans the insurer's policy website to find every rule they publish for this kind of care.",
+    plainImpact:
+      "Uncovers the related rules the insurer left out of the denial letter.",
     icon: Compass,
     iconColor: "text-violet-400 bg-violet-500/15 border-violet-500/30",
     description:
@@ -125,6 +152,12 @@ export const RESEARCH_MODES: ResearchChannelConfig[] = [
     shortLabel: "PubMed Trials",
     fullLabel: "PubMed & ClinicalTrials.gov",
     tagline: "Peer-Reviewed RCTs",
+    plainLabel: "Medical studies",
+    plainTagline: "Published research",
+    plainDescription:
+      "Looks for published studies and trials that support the treatment your doctor ordered.",
+    plainImpact:
+      "Answers a 'not medically necessary' denial with published medical evidence.",
     icon: Flask,
     iconColor: "text-emerald-400 bg-emerald-500/15 border-emerald-500/30",
     description:
@@ -138,6 +171,12 @@ export const RESEARCH_MODES: ResearchChannelConfig[] = [
     shortLabel: "FDA Labels",
     fullLabel: "FDA Package Inserts & Labels",
     tagline: "On-Label Indications",
+    plainLabel: "FDA approvals",
+    plainTagline: "Approved uses",
+    plainDescription:
+      "Pulls the official FDA information for the drug or device used in your treatment.",
+    plainImpact:
+      "Shows the treatment is officially approved for your diagnosis, not experimental.",
     icon: ShieldCheck,
     iconColor: "text-purple-400 bg-purple-500/15 border-purple-500/30",
     description:
@@ -151,6 +190,12 @@ export const RESEARCH_MODES: ResearchChannelConfig[] = [
     shortLabel: "Custom URL",
     fullLabel: "Live Web & Guideline URL Scanner",
     tagline: "External Guideline",
+    plainLabel: "Any web link",
+    plainTagline: "Your own guideline",
+    plainDescription:
+      "Reads any public guideline link you paste in and pulls out the rules that apply to your case.",
+    plainImpact:
+      "Lets you bring in a medical society guideline or state policy the insurer ignored.",
     icon: Globe,
     iconColor: "text-amber-400 bg-amber-500/15 border-amber-500/30",
     description:
@@ -234,17 +279,17 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
   }, [claim._id, claim.patient?.insurancePayer]);
 
   const stages = activeMode === "directory_discovery" ? [
-    { name: "Handshake", desc: "Firecrawl /v1/map gateway" },
-    { name: "Domain Map", desc: "Payer URL structure sweep" },
-    { name: "Filter Spec", desc: "Specialty bulletin match" },
-    { name: "Extract IDs", desc: "CPB bulletin identifiers" },
-    { name: "Ledger Save", desc: "Persisted to Convex DB" },
+    { name: "Handshake", desc: isDetailed ? "Firecrawl /v1/map gateway" : "Connecting to the policy site" },
+    { name: "Domain Map", desc: isDetailed ? "Payer URL structure sweep" : "Scanning their policy pages" },
+    { name: "Filter Spec", desc: isDetailed ? "Specialty bulletin match" : "Keeping this specialty" },
+    { name: "Extract IDs", desc: isDetailed ? "CPB bulletin identifiers" : "Rule page identifiers" },
+    { name: "Ledger Save", desc: isDetailed ? "Persisted to Convex DB" : "Saving to your case" },
   ] : [
-    { name: "Handshake", desc: "Firecrawl v2 gateway auth" },
-    { name: "Web Scrape", desc: "DOM to Markdown conversion" },
-    { name: "Clinical AI", desc: "GPT criteria & indications" },
-    { name: "Citations", desc: "ERISA & standard-of-care" },
-    { name: "Ledger Save", desc: "Structured index in Convex DB" },
+    { name: "Handshake", desc: isDetailed ? "Firecrawl v2 gateway auth" : "Opening the source" },
+    { name: "Web Scrape", desc: isDetailed ? "DOM to Markdown conversion" : "Reading the page text" },
+    { name: "Clinical AI", desc: isDetailed ? "GPT criteria & indications" : "Pulling out the rules" },
+    { name: "Citations", desc: isDetailed ? "ERISA & standard-of-care" : "Matching to your rights" },
+    { name: "Ledger Save", desc: isDetailed ? "Structured index in Convex DB" : "Saving to your case" },
   ];
 
   const addLog = (stage: string, message: string, type: "info" | "success" | "warning" | "error" = "info") => {
@@ -303,9 +348,21 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
       } else if (activeMode === "fda_labels") {
         addLog("Scrape", `Searching FDA Drugs@FDA & DailyMed for procedure package inserts...`, "info");
       } else if (activeMode === "payer_cpb") {
-        addLog("Scrape", `Crawling official CPB guidelines for payer: ${claim.patient?.insurancePayer}...`, "info");
+        addLog(
+          "Scrape",
+          isDetailed
+            ? `Crawling official CPB guidelines for payer: ${claim.patient?.insurancePayer}...`
+            : `Reading the coverage rules ${claim.patient?.insurancePayer || "the insurer"} publishes...`,
+          "info"
+        );
       } else {
-        addLog("Scrape", "Initiating parallel multi-source crawl (CPB + PubMed + FDA)...", "info");
+        addLog(
+          "Scrape",
+          isDetailed
+            ? "Initiating parallel multi-source crawl (CPB + PubMed + FDA)..."
+            : "Checking their rules, medical studies, and FDA approvals at once...",
+          "info"
+        );
       }
 
       // Stage 3 & 4: Clinical AI Extraction / Directory Processing
@@ -331,27 +388,63 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
         }
         addLog("Audit", `Discovered ${count} active policy bulletins for ${directorySpecialty} under ${directoryDomain}`, "success");
       } else if (activeMode === "multi_source") {
-        addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
+        addLog(
+          "Extraction",
+          isDetailed
+            ? "Running structured clinical reasoning extraction on document payload..."
+            : "Reading the source and pulling out the rules that apply...",
+          "info"
+        );
         result = (await onCrawlMultiSource(claim._id, customUrl || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
-        addLog("Audit", `Synthesized multi-source dossier: ${result?.cpbClauses || 0} CPB, ${result?.pubMedClauses || 0} PubMed, ${result?.fdaClauses || 0} FDA clauses`, "success");
+        addLog(
+          "Audit",
+          isDetailed
+            ? `Synthesized multi-source dossier: ${result?.cpbClauses || 0} CPB, ${result?.pubMedClauses || 0} PubMed, ${result?.fdaClauses || 0} FDA clauses`
+            : `Found ${result?.cpbClauses || 0} insurer rules, ${result?.pubMedClauses || 0} studies, and ${result?.fdaClauses || 0} FDA items`,
+          "success"
+        );
       } else if (activeMode === "payer_cpb") {
-        addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
+        addLog(
+          "Extraction",
+          isDetailed
+            ? "Running structured clinical reasoning extraction on document payload..."
+            : "Reading the source and pulling out the rules that apply...",
+          "info"
+        );
         result = (await onCrawlCPB(claim._id, customUrl || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} clinical policy clauses: "${result?.policyTitle || "Policy Bulletin"}"`, "success");
       } else if (activeMode === "pubmed_trials") {
-        addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
+        addLog(
+          "Extraction",
+          isDetailed
+            ? "Running structured clinical reasoning extraction on document payload..."
+            : "Reading the source and pulling out the rules that apply...",
+          "info"
+        );
         result = (await onCrawlPubMed(claim._id, customQuery || undefined, customUrl || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} trial clauses from study: "${result?.studyTitle || "PubMed Study"}" (${result?.identifier || "PMID"})`, "success");
       } else if (activeMode === "fda_labels") {
-        addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
+        addLog(
+          "Extraction",
+          isDetailed
+            ? "Running structured clinical reasoning extraction on document payload..."
+            : "Reading the source and pulling out the rules that apply...",
+          "info"
+        );
         result = (await onCrawlFDA(claim._id, customUrl || undefined, customQuery || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} FDA label clauses for: "${result?.productName || "Approved Medical Product"}" (${result?.applicationNumber || "NDA/PMA"})`, "success");
       } else if (activeMode === "custom_url") {
-        addLog("Extraction", "Running OpenAI gpt-5.4-nano clinical reasoning auditor on document payload...", "info");
+        addLog(
+          "Extraction",
+          isDetailed
+            ? "Running structured clinical reasoning extraction on document payload..."
+            : "Reading the source and pulling out the rules that apply...",
+          "info"
+        );
         result = (await onCrawlCustomUrl(claim._id, customUrl.trim(), customCategory, customQuery || undefined)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} structured criteria clauses: "${result?.documentTitle || "Custom Guideline"}"`, "success");
@@ -360,9 +453,21 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
       // Stage 5: Persistence
       setCurrentStageIndex(4);
       if (activeMode === "directory_discovery") {
-        addLog("Convex DB", `Persisted discovered bulletins to discoveredPolicies and clinicalEvidences.`, "success");
+        addLog(
+          "Save",
+          isDetailed
+            ? "Persisted discovered bulletins to discoveredPolicies and clinicalEvidences."
+            : "Saved the rules we found to your case.",
+          "success"
+        );
       } else {
-        addLog("Convex DB", "Persisted structured criteria clauses to clinicalEvidences ledger.", "success");
+        addLog(
+          "Save",
+          isDetailed
+            ? "Persisted structured criteria clauses to clinicalEvidences ledger."
+            : "Saved the rules we found to your case.",
+          "success"
+        );
       }
       await new Promise((r) => setTimeout(r, 300));
       setCurrentStageIndex(5);
@@ -406,7 +511,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
   const getSourceBadge = (type: EvidenceSourceType) => {
     switch (type) {
       case "payer_cpb":
-        return <Badge variant="default">Insurer CPB</Badge>;
+        return <Badge variant="default">{isDetailed ? "Insurer CPB" : "Insurer Rule"}</Badge>;
       case "pubmed_study":
         return <Badge variant="secondary" className="bg-cyan-500/10 text-cyan-400 border-cyan-500/30">PubMed Trial</Badge>;
       case "fda_package_insert":
@@ -435,7 +540,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                   {isDetailed ? "Multi-Source Clinical Research Hub" : "Evidence Research Hub"}
                 </h3>
                 <Badge variant="outline" className="font-mono text-[9px] h-4 px-1.5 text-primary border-primary/30 shrink-0">
-                  Live Telemetry
+                  {isDetailed ? "Live Telemetry" : "Live"}
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
@@ -456,7 +561,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                 className="h-7.5 text-xs px-2.5 gap-1.5 font-sans"
               >
                 <TrendUp className="size-3.5 text-primary" />
-                <span>Re-score Rubric</span>
+                <span>{isDetailed ? "Re-score Rubric" : "Check my proof again"}</span>
               </Button>
             )}
             {onNavigateToStudio && (
@@ -478,14 +583,14 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-foreground font-sans tracking-wide">
-                Clinical Research Channel
+                {isDetailed ? "Clinical Research Channel" : "Where to look for proof"}
               </span>
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted/60 border border-border/60 text-muted-foreground">
-                6 Ingestion Channels
+                {isDetailed ? "6 Ingestion Channels" : "6 sources"}
               </span>
             </div>
             <span className="text-[11px] font-mono text-muted-foreground hidden sm:inline">
-              Select active workstation
+              {isDetailed ? "Select active workstation" : "Pick one to start"}
             </span>
           </div>
 
@@ -550,7 +655,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                           isSelected ? "text-foreground font-bold" : "text-foreground/90"
                         }`}
                       >
-                        {mode.shortLabel}
+                        {isDetailed ? mode.shortLabel : mode.plainLabel}
                       </span>
                       {mode.badge && (
                         <span
@@ -561,7 +666,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                       )}
                     </div>
                     <span className="text-[10px] font-mono text-muted-foreground block truncate mt-0.5">
-                      {mode.tagline}
+                      {isDetailed ? mode.tagline : mode.plainTagline}
                     </span>
                   </div>
 
@@ -603,7 +708,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="text-sm font-semibold text-foreground font-sans">
-                          {currentModeConfig.fullLabel}
+                          {isDetailed ? currentModeConfig.fullLabel : currentModeConfig.plainLabel}
                         </h4>
                         {currentModeConfig.badge && (
                           <Badge variant="outline" className="font-mono text-[9px] h-4 px-1.5 text-primary border-primary/30">
@@ -612,7 +717,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                         )}
                       </div>
                       <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-                        {currentModeConfig.tagline}
+                        {isDetailed ? currentModeConfig.tagline : currentModeConfig.plainTagline}
                       </span>
                     </div>
                   </div>
@@ -620,7 +725,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
 
                 {/* Full Unclipped Description */}
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  {currentModeConfig.description}
+                  {isDetailed ? currentModeConfig.description : currentModeConfig.plainDescription}
                 </p>
 
                 {/* Clinical & Statutory Leverage Callout */}
@@ -631,7 +736,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                       {isDetailed ? "Clinical & Statutory Leverage:" : "Key Evidence Value:"}
                     </span>
                     <p className="text-[11px] text-foreground/85 leading-relaxed">
-                      {currentModeConfig.clinicalImpact}
+                      {isDetailed ? currentModeConfig.clinicalImpact : currentModeConfig.plainImpact}
                     </p>
                   </div>
                 </div>
@@ -643,10 +748,12 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-semibold text-muted-foreground uppercase font-mono tracking-wider">
-                        Active Ingestion Pipelines (3 Channels Concurrent):
+                        {isDetailed
+                          ? "Active Ingestion Pipelines (3 Channels Concurrent):"
+                          : "We check three things at once:"}
                       </span>
                       <Badge variant="outline" className="font-mono text-[10px] text-primary border-primary/30">
-                        Parallel Autonomous Sweep
+                        {isDetailed ? "Parallel Autonomous Sweep" : "One pass"}
                       </Badge>
                     </div>
 
@@ -663,7 +770,15 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                           </Badge>
                         </div>
                         <p className="text-[11px] text-muted-foreground leading-tight">
-                          Target: <strong className="text-foreground">{claim.patient?.insurancePayer || "Insurer"}</strong> clinical bulletin for CPT <strong className="font-mono text-foreground">{claim.cptCodes.join(", ")}</strong>.
+                          {isDetailed ? (
+                            <>
+                              Target: <strong className="text-foreground">{claim.patient?.insurancePayer || "Insurer"}</strong> clinical bulletin for CPT <strong className="font-mono text-foreground">{claim.cptCodes.join(", ")}</strong>.
+                            </>
+                          ) : (
+                            <>
+                              Their own published rules for your treatment, from <strong className="text-foreground">{claim.patient?.insurancePayer || "the insurer"}</strong>.
+                            </>
+                          )}
                         </p>
                       </div>
 
@@ -679,7 +794,13 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                           </Badge>
                         </div>
                         <p className="text-[11px] text-muted-foreground leading-tight">
-                          Target: Efficacy trials & meta-analyses for CPT <strong className="font-mono text-foreground">{claim.cptCodes.join(", ")}</strong>.
+                          {isDetailed ? (
+                            <>
+                              Target: Efficacy trials & meta-analyses for CPT <strong className="font-mono text-foreground">{claim.cptCodes.join(", ")}</strong>.
+                            </>
+                          ) : (
+                            "Published trials that support your treatment."
+                          )}
                         </p>
                       </div>
 
@@ -695,7 +816,13 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                           </Badge>
                         </div>
                         <p className="text-[11px] text-muted-foreground leading-tight">
-                          Target: Approved indications & device safety specs to refute CARC <strong className="font-mono text-foreground">{claim.denialReasonCode}</strong>.
+                          {isDetailed ? (
+                            <>
+                              Target: Approved indications & device safety specs to refute CARC <strong className="font-mono text-foreground">{claim.denialReasonCode}</strong>.
+                            </>
+                          ) : (
+                            "Official approvals that answer why they said no."
+                          )}
                         </p>
                       </div>
                     </div>
@@ -733,7 +860,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                           Payer Presets:
                         </span>
                         {[
-                          { label: "Aetna CPB", url: "https://www.aetna.com/cpb", spec: "Orthopedics", match: "aetna" },
+                          { label: isDetailed ? "Aetna CPB" : "Aetna rules", url: "https://www.aetna.com/cpb", spec: "Orthopedics", match: "aetna" },
                           { label: "Cigna Policies", url: "https://www.cigna.com/coveragePolicies", spec: "Orthopedics", match: "cigna" },
                           { label: "UHC Commercial", url: "https://www.uhcprovider.com/en/policies-protocols/commercial-policies.html", spec: "Orthopedics", match: "uhc" },
                           { label: "Anthem / BCBS", url: "https://www.anthem.com/provider/policies", spec: "Orthopedics", match: "anthem" },
@@ -859,7 +986,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                           className="h-8 text-xs font-sans"
                           disabled={isExecuting}
                         >
-                          <option value="payer_cpb">Insurer CPB</option>
+                          <option value="payer_cpb">{isDetailed ? "Insurer CPB" : "Insurer Rules"}</option>
                           <option value="pubmed_study">PubMed Study</option>
                           <option value="fda_package_insert">FDA Label</option>
                           <option value="nccn_guideline">NCCN Guideline</option>
@@ -937,7 +1064,13 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                       disabled={isExecuting}
                     />
                     <p className="text-[10.5px] text-muted-foreground leading-tight pt-0.5">
-                      Retrieves FDA DailyMed package inserts proving on-label clearance, dismantling CARC {claim.denialReasonCode || "CO-50"} experimental determinations.
+                      {isDetailed ? (
+                        <>
+                          Retrieves FDA DailyMed package inserts proving on-label clearance, dismantling CARC {claim.denialReasonCode || "CO-50"} experimental determinations.
+                        </>
+                      ) : (
+                        "Shows the drug or device is officially approved for your diagnosis, so it cannot be called experimental."
+                      )}
                     </p>
                   </div>
                 ) : (
@@ -965,7 +1098,12 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Sliders className="size-3.5 text-primary shrink-0" />
                   <span>
-                    Target: <strong className="font-mono text-foreground">#{claim.claimNumber}</strong> &bull; {claim.patient?.name} (CPT {claim.cptCodes.join(", ")})
+                    {isDetailed ? "Target: " : "Researching: "}
+                    <strong className="font-mono text-foreground">#{claim.claimNumber}</strong> &bull;{" "}
+                    {claim.patient?.name}
+                    {isDetailed
+                      ? ` (CPT ${claim.cptCodes.join(", ")})`
+                      : ` (${getPlainProcedureName(claim.cptCodes, "your treatment")})`}
                   </span>
                 </div>
 
@@ -1026,7 +1164,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                   <Article className="size-4 text-muted-foreground" />
                 )}
                 <span className="text-xs font-semibold text-foreground font-mono uppercase">
-                  Live Extraction Telemetry Stream
+                  {isDetailed ? "Live Extraction Telemetry Stream" : "Progress"}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -1158,7 +1296,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                     <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                       {item.bulletinNumber ? (
                         <Badge variant="outline" className="font-mono text-[10px] border-violet-500/40 text-violet-400 shrink-0">
-                          CPB {item.bulletinNumber}
+                          {isDetailed ? `CPB ${item.bulletinNumber}` : `Rule ${item.bulletinNumber}`}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="font-mono text-[10px] border-border text-muted-foreground shrink-0">

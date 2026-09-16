@@ -351,7 +351,7 @@ export default function App() {
                   onOpenIngestion={handleOpenIngestion}
                 />
               ) : selectedClaimId ? (
-                <ViewLoadingFallback message="Opening case dossier & clinical policy matrix..." />
+                <ViewLoadingFallback message="Opening your case and their published rules..." />
               ) : (
                 <CasePickerEmptyState
                   viewType="evidence"

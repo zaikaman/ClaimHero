@@ -50,6 +50,7 @@ import { Input } from "../ui/input";
 
 import { Id } from "../../../convex/_generated/dataModel";
 import { useDetailMode } from "../../hooks/useDetailMode";
+import { PLAIN_FIRST_RUN } from "../../lib/plainCopy";
 import { toast } from "sonner";
 
 type IngestionStage = "idle" | "extracting" | "preparing_questions" | "saving";
@@ -452,7 +453,12 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       return;
     }
 
-    beginProcessing("extracting", "Step 1/2: Optical document analysis and clinical entity extraction...");
+    beginProcessing(
+      "extracting",
+      isDetailed
+        ? "Step 1/2: Optical document analysis and clinical entity extraction..."
+        : "Step 1/2: Reading your denial letter..."
+    );
 
     try {
       const result = await onUploadFile(selectedFile, patientState);
@@ -469,7 +475,12 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   };
 
   const handleProcessPreset = async (preset: SampleCasePreset) => {
-    beginProcessing("extracting", "Step 1/2: Extracting CPT, CARC and ERISA statutory deadlines...");
+    beginProcessing(
+      "extracting",
+      isDetailed
+        ? "Step 1/2: Extracting CPT, CARC and ERISA statutory deadlines..."
+        : "Step 1/2: Reading the letter — treatment, why they said no, and your deadline..."
+    );
 
     try {
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
@@ -498,7 +509,12 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       return;
     }
 
-    beginProcessing("extracting", "Step 1/2: Parsing clinical records and denial rationale...");
+    beginProcessing(
+      "extracting",
+      isDetailed
+        ? "Step 1/2: Parsing clinical records and denial rationale..."
+        : "Step 1/2: Reading your denial letter..."
+    );
 
     try {
       const result = await onParseText(pastedText, patientState);
@@ -580,14 +596,22 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       setContextSubmitted(true);
       setExtractedResult((current) => current ? { ...current, pipelineResult: null } : current);
       endProcessing();
-      toast.info("Sentinel pipeline activated. Indexing policy guidelines and compiling appeal brief...");
+      toast.info(
+        isDetailed
+          ? "Sentinel pipeline activated. Indexing policy guidelines and compiling appeal brief..."
+          : "We've started your appeal. Checking their rules and writing your letter..."
+      );
       onSuccess(claimId, "evidence");
       onClose();
       void executePostExtractionPipeline(claimId, snapshot)
         .then((pipelineResult) => {
           if (pipelineResult && typeof pipelineResult === "object") {
             soundEffects.play("appeal_synthesis_complete");
-            toast.success("Case indexed and appeal brief compiled. Review it in the Studio.");
+            toast.success(
+              isDetailed
+                ? "Case indexed and appeal brief compiled. Review it in the Studio."
+                : "Your appeal letter is ready to review."
+            );
           }
         })
         .catch((pipelineErr) => {
@@ -613,7 +637,11 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     const claimId = extractedResult.claimId;
     // Manual-pipeline mode: enter the workspace instantly and run in background.
     setContextSubmitted(true);
-    toast.info("Autonomous Sentinel activated. Indexing policy guidelines and compiling appeal brief...");
+    toast.info(
+      isDetailed
+        ? "Autonomous Sentinel activated. Indexing policy guidelines and compiling appeal brief..."
+        : "We've started your appeal. Checking their rules and writing your letter..."
+    );
     onSuccess(claimId, "evidence");
     onClose();
     void executePostExtractionPipeline(claimId)
@@ -666,7 +694,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
         {/* State Jurisdiction & Mandatory Human Review Gate */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div className="flex items-center justify-between gap-2 bg-muted/40 border border-border p-2 rounded-lg text-xs">
-            <span className="text-muted-foreground font-medium truncate">Jurisdiction:</span>
+            <span className="text-muted-foreground font-medium truncate">
+              {isDetailed ? "Jurisdiction:" : "Your state:"}
+            </span>
             <Select
               value={patientState}
               onChange={(e) => setPatientState(e.target.value)}
@@ -1130,7 +1160,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   <p className="text-[11px] text-muted-foreground">
                     {activePreset
                       ? "Pre-filled treating physician clinical chart notes, therapy logs, and surgical necessity attestation."
-                      : "Optional clinical narrative, therapy logs, or physician statement. Incorporated directly into the synthesized appeal brief."}
+                      : "Optional clinical narrative, therapy logs, or physician statement. Added straight into your letter."}
                   </p>
                 </div>
                 <Badge variant={physicianNotes ? "secondary" : "outline"} className="text-[10px] font-mono shrink-0">
@@ -1228,7 +1258,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               />
               <span>
                 {activePreset
-                  ? "I confirm that the clinical entries and submitter details above reflect the verified case records and are ready for policy citation and appeal brief synthesis."
+                  ? isDetailed
+                    ? "I confirm that the clinical entries and submitter details above reflect the verified case records and are ready for policy citation and appeal brief synthesis."
+                    : "I confirm the entries above match the case records, so they can be cited in my appeal letter."
                   : "I confirm that the entries above reflect the available medical record. Blank sections mean the information is unrecorded; ClaimHero will not infer medical necessity."}
               </span>
             </label>
@@ -1266,8 +1298,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               </Button>
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              The evidence crawl, readiness audit, and brief synthesis run in the
-              background. In accordance with clinical safety protocols, a human must approve every clinical assertion, legal assertion, recipient, and outbound message before dispatch.
+              {isDetailed
+                ? "The evidence crawl, readiness audit, and brief synthesis run in the background. In accordance with clinical safety protocols, a human must approve every clinical assertion, legal assertion, recipient, and outbound message before dispatch."
+                : "We check their rules and write the letter in the background. Nothing is ever sent until you approve every statement and recipient."}
             </p>
           </Card>
         ) : (
@@ -1277,9 +1310,13 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <div className="flex items-center gap-2 font-semibold text-xs text-emerald-600 dark:text-emerald-400">
                 <CheckCircle className="size-4.5" />
                 <span className="text-sm font-semibold">
-                  {extractedResult.pipelineResult
-                    ? "Case Indexed & Appeal Pipeline Initialized"
-                    : "Case Indexed — Autonomous Pipeline Ready"}
+                  {isDetailed
+                    ? extractedResult.pipelineResult
+                      ? "Case Indexed & Appeal Pipeline Initialized"
+                      : "Case Indexed — Autonomous Pipeline Ready"
+                    : extractedResult.pipelineResult
+                      ? "Case added — appeal in progress"
+                      : "Case added — ready for your appeal"}
                 </span>
               </div>
               <Badge variant="outline" className="font-mono text-xs">
@@ -1303,15 +1340,19 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 </span>
               </div>
               <div>
-                <span className="text-[10px] text-muted-foreground block font-mono">Denial Code</span>
+                <span className="text-[10px] text-muted-foreground block font-mono">
+                  {isDetailed ? "Denial Code" : PLAIN_FIRST_RUN.whyDenied}
+                </span>
                 <span className="font-mono font-semibold text-destructive text-xs">
-                  {extractedResult.denialReasonCode || "CARC-50"}
+                  {extractedResult.denialReasonCode || (isDetailed ? "CARC-50" : "Not stated")}
                 </span>
               </div>
             </div>
 
             <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs text-muted-foreground">
-              <span className="text-foreground font-medium text-[11px] block font-mono">Denial Rationale:</span>
+              <span className="text-foreground font-medium text-[11px] block font-mono">
+                {isDetailed ? "Denial Rationale:" : "Their reason:"}
+              </span>
               <p className="mt-0.5 leading-relaxed">{extractedResult.denialReasonDescription}</p>
             </div>
 
@@ -1322,10 +1363,12 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   <div className="space-y-0.5">
                     <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                       <Lightning className="size-3.5 text-sky-400" />
-                      Sentinel Pipeline Ready
+                      {isDetailed ? "Sentinel Pipeline Ready" : "Ready to build your appeal"}
                     </span>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Case #{extractedResult.claimNumber} is indexed with confirmed clinical facts. Run the pipeline now to crawl insurer policy bulletins, evaluate Statutory Appeal Readiness, and synthesize the cited legal brief for your review and approval.
+                      {isDetailed
+                        ? `Case #${extractedResult.claimNumber} is indexed with confirmed clinical facts. Run the pipeline now to crawl insurer policy bulletins, evaluate Statutory Appeal Readiness, and synthesize the cited legal brief for your review and approval.`
+                        : `Case #${extractedResult.claimNumber} is saved with your confirmed details. Next we check the insurer's own rules, score your proof, and write the letter for you to review and approve.`}
                     </p>
                   </div>
                 </div>
@@ -1340,12 +1383,14 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     {isProcessing ? (
                       <>
                         <CircleNotch className="size-3 animate-spin" />
-                        <span>{processingMessage || "Executing pipeline..."}</span>
+                        <span>
+                          {processingMessage || (isDetailed ? "Executing pipeline..." : "Working on it...")}
+                        </span>
                       </>
                     ) : (
                       <>
                         <Lightning className="size-3.5" />
-                        <span>Run Sentinel Pipeline</span>
+                        <span>{isDetailed ? "Run Sentinel Pipeline" : "Build my appeal"}</span>
                       </>
                     )}
                   </Button>
@@ -1357,7 +1402,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     className="h-7 px-2.5 text-xs gap-1"
                   >
                     <ArrowLeft className="size-3" />
-                    <span>Edit Clinical Context</span>
+                    <span>{isDetailed ? "Edit Clinical Context" : "Edit my details"}</span>
                   </Button>
                   {errorMessage && (
                     <Button
@@ -1368,7 +1413,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                       className="h-7 px-2 text-xs text-destructive hover:text-destructive gap-1"
                     >
                       <ArrowCounterClockwise className="size-3" />
-                      <span>Retry Analysis</span>
+                      <span>{isDetailed ? "Retry Analysis" : "Try again"}</span>
                     </Button>
                   )}
                 </div>
@@ -1380,7 +1425,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
                   <Shield className="size-3.5 text-primary" />
-                  Core Appeal Pipeline:
+                  {isDetailed ? "Core Appeal Pipeline:" : "What happens next:"}
                 </span>
                 {typeof extractedResult.pipelineResult === "object" &&
                   extractedResult.pipelineResult !== null &&
@@ -1388,7 +1433,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   typeof (extractedResult.pipelineResult as { overturnProbabilityScore?: unknown }).overturnProbabilityScore === "number" && (
                     <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px]">
                       <TrendUp className="size-3 mr-1" />
-                      {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}/100 Readiness Score
+                      {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}/100 {isDetailed ? "Readiness Score" : "Case strength"}
                     </Badge>
                   )}
               </div>
@@ -1407,10 +1452,12 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                       </Badge>
                     </div>
                     <span className="text-xs font-semibold text-foreground block">
-                      Evidence & CPB Matrix
+                      {isDetailed ? "Evidence & CPB Matrix" : "Your proof"}
                     </span>
                     <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
-                      Clinical Policy Bulletins matched against denial reason codes.
+                      {isDetailed
+                        ? "Clinical Policy Bulletins matched against denial reason codes."
+                        : "Their own rules checked against why they said no."}
                     </span>
                   </div>
                   <Button
@@ -1419,7 +1466,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     onClick={() => handleDone("evidence")}
                     className="w-full text-[11px] h-6 justify-between text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 px-1.5 cursor-pointer"
                   >
-                    <span>View Evidence</span>
+                    <span>{isDetailed ? "View Evidence" : "See your proof"}</span>
                     <ArrowRight className="size-3" />
                   </Button>
                 </div>
@@ -1433,14 +1480,16 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                         Step 2
                       </span>
                       <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4 border-sky-500/40 text-sky-400">
-                        Legal Brief
+                        {isDetailed ? "Legal Brief" : PLAIN_FIRST_RUN.yourLetter}
                       </Badge>
                     </div>
                     <span className="text-xs font-semibold text-foreground block">
-                      Appeal Brief
+                      {isDetailed ? "Appeal Brief" : PLAIN_FIRST_RUN.yourLetter}
                     </span>
                     <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
-                      ERISA 29 CFR § 2560.503-1 cited appeal brief with CPB evidence.
+                      {isDetailed
+                        ? "ERISA 29 CFR § 2560.503-1 cited appeal brief with CPB evidence."
+                        : "A formal letter that answers their reason with your records and their own rules."}
                     </span>
                   </div>
                   <Button
@@ -1449,7 +1498,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     onClick={() => handleDone("studio")}
                     className="w-full text-[11px] h-6 justify-between text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 px-1.5 cursor-pointer"
                   >
-                    <span>Open Brief</span>
+                    <span>{isDetailed ? "Open Brief" : "Open your letter"}</span>
                     <ArrowRight className="size-3" />
                   </Button>
                 </div>
@@ -1467,10 +1516,12 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                       </Badge>
                     </div>
                     <span className="text-xs font-semibold text-foreground block">
-                      Payer Dispatch
+                      {isDetailed ? "Payer Dispatch" : "Send & track"}
                     </span>
                     <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">
-                      AgentMail review-gated delivery, tracking, and reply sentinel.
+                      {isDetailed
+                        ? "AgentMail review-gated delivery, tracking, and reply sentinel."
+                        : "You approve first. Their reply lands back here."}
                     </span>
                   </div>
                   <Button
@@ -1479,7 +1530,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     onClick={() => handleDone("communications")}
                     className="w-full text-[11px] h-6 justify-between text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 px-1.5 cursor-pointer"
                   >
-                    <span>Dispatch Gateway</span>
+                    <span>{isDetailed ? "Dispatch Gateway" : "Go to send"}</span>
                     <ArrowRight className="size-3" />
                   </Button>
                 </div>
@@ -1488,7 +1539,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
               {/* Companion Tools Strip */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-lg border border-border/60 bg-muted/10 text-xs">
                 <span className="text-[10px] font-mono uppercase text-muted-foreground font-semibold">
-                  Companion Tools Available:
+                  {isDetailed ? "Companion Tools Available:" : "Also available:"}
                 </span>
                 <div className="flex items-center gap-2">
                   <Button
@@ -1498,7 +1549,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     className="h-6 px-2 text-[11px] gap-1 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 cursor-pointer"
                   >
                     <PhoneCall className="size-3" />
-                    <span>Doctor P2P Copilot</span>
+                    <span>{isDetailed ? "Doctor P2P Copilot" : "Doctor call prep"}</span>
                   </Button>
                   <div className="h-3 w-px bg-border shrink-0" />
                   <Button
@@ -1508,7 +1559,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                     className="h-6 px-2 text-[11px] gap-1 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 cursor-pointer"
                   >
                     <Scales className="size-3" />
-                    <span>ERISA Audit</span>
+                    <span>{isDetailed ? "ERISA Audit" : "Cost & rights"}</span>
                   </Button>
                 </div>
               </div>
@@ -1521,7 +1572,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 onClick={() => setExtractedResult(null)}
                 className="text-xs w-full sm:w-auto"
               >
-                Ingest Another
+                {isDetailed ? "Ingest Another" : "Add another letter"}
               </Button>
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 <Button
@@ -1530,7 +1581,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   onClick={() => handleDone("radar")}
                   className="gap-1 text-xs"
                 >
-                  <span>Radar</span>
+                  <span>{isDetailed ? "Radar" : "My cases"}</span>
                 </Button>
                 <Button
                   size="sm"
@@ -1538,7 +1589,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   className="gap-1.5 text-xs bg-primary text-primary-foreground shadow-2xs font-semibold"
                 >
                   <FileMagnifyingGlass className="size-3.5" />
-                  <span>Enter Case Workspace &rarr;</span>
+                  <span>{isDetailed ? "Enter Case Workspace" : "See what to do next"} &rarr;</span>
                 </Button>
               </div>
             </div>

@@ -26,7 +26,7 @@ import { PolicyDriftSentinel } from "./PolicyDriftSentinel";
 import { formatCurrency, formatDate, stripMarkdownFormatting, cn } from "../../lib/utils";
 import { DENIAL_REASON_CODES } from "../../lib/constants";
 import { useDetailMode } from "../../hooks/useDetailMode";
-import { pillarPlainTitle } from "../../lib/plainCopy";
+import { pillarPlainTitle, PLAIN_FIRST_RUN } from "../../lib/plainCopy";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { PipelineActivityFeed } from "../common/PipelineActivityFeed";
 import { Card } from "../ui/card";
@@ -704,13 +704,17 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
 
                 <div>
                   <span className="text-[10px] text-muted-foreground font-mono block mb-1">
-                    {isDetailed ? "Denial Reason (CARC):" : "Why they said no:"}
+                    {isDetailed ? "Denial Reason (CARC):" : `${PLAIN_FIRST_RUN.whyDenied}:`}
                   </span>
                   <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs space-y-1.5">
                     <div className="flex items-center gap-1.5 font-mono font-bold text-destructive text-xs">
                       <Warning className="size-3.5 shrink-0" />
-                      <span>{claim.denialReasonCode}</span>
-                      {denialReason?.title && (
+                      <span>
+                        {isDetailed
+                          ? claim.denialReasonCode
+                          : denialReason?.title || "Their stated reason"}
+                      </span>
+                      {isDetailed && denialReason?.title && (
                         <span className="font-normal text-muted-foreground font-sans truncate">
                           — {denialReason.title}
                         </span>

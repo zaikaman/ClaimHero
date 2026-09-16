@@ -8,6 +8,7 @@ import {
 } from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import { SHORTCUTS_REGISTRY } from "../../lib/shortcuts";
+import { useDetailMode } from "../../hooks/useDetailMode";
 import { Keyboard } from "@phosphor-icons/react";
 
 interface ShortcutsHelpDialogProps {
@@ -19,6 +20,7 @@ export const ShortcutsHelpDialog: React.FC<ShortcutsHelpDialogProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { isDetailed } = useDetailMode();
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md p-0 overflow-hidden border-border/70 bg-card/95 backdrop-blur-xl shadow-2xl">
@@ -52,7 +54,7 @@ export const ShortcutsHelpDialog: React.FC<ShortcutsHelpDialogProps> = ({
                   <span>{shortcut.label}</span>
                   {shortcut.scope === "p2p" && (
                     <Badge variant="outline" className="text-[9px] px-1 py-0 border-purple-500/30 text-purple-400 font-mono">
-                      P2P Studio
+                      {isDetailed ? "P2P Studio" : "Doctor call prep"}
                     </Badge>
                   )}
                 </div>

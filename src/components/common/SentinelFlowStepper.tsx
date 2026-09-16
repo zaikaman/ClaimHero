@@ -8,6 +8,7 @@ import {
   Envelope,
   PaperPlaneTilt,
   ArrowLeft,
+  ArrowRight,
   TrendUp,
   Clock,
   Scales,
@@ -18,6 +19,8 @@ import { formatCurrency, cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { useDetailMode } from "../../hooks/useDetailMode";
+import { DetailModeToggle } from "./DetailModeToggle";
+import { formatWhatHappenedSentence, formatDeadlineSentence } from "../../lib/plainCopy";
 
 export type FlowView = "radar" | "evidence" | "studio" | "p2p" | "calculator" | "communications" | "audit";
 
@@ -131,6 +134,166 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     claim.status === "analyzing" ||
     claim.status === "precedent_matched" ||
     claim.status === "drafting";
+
+  if (!isDetailed) {
+    const whatHappened = formatWhatHappenedSentence(claim);
+    const deadline = formatDeadlineSentence(claim.statutoryDeadline, daysRemaining);
+
+    const isStep1 = currentView === "evidence";
+    const isStep2 = currentView === "studio";
+    const isStep3 = currentView === "communications";
+
+    let primaryButtonLabel = "Review & Approve";
+    let primaryButtonAction = () => onNavigateView("studio");
+
+    if (isWon) {
+      primaryButtonLabel = "View Outcome";
+      primaryButtonAction = () => onNavigateView("communications");
+    } else if (isDispatched) {
+      primaryButtonLabel = isStep3 ? "Track Sent Appeal" : "Track Appeal";
+      primaryButtonAction = () => onNavigateView("communications");
+    } else if (isStep1) {
+      primaryButtonLabel = "Review & Approve";
+      primaryButtonAction = () => onNavigateView("studio");
+    } else if (isStep2) {
+      primaryButtonLabel = "Continue to Send";
+      primaryButtonAction = () => onNavigateView("communications");
+    } else if (isStep3) {
+      primaryButtonLabel = "Review Letter";
+      primaryButtonAction = () => onNavigateView("studio");
+    }
+
+    return (
+      <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-3.5 sm:p-4 shadow-xs space-y-3">
+        {/* Top bar: All Cases back link + 3-Step Guided Navigation Strip */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2.5">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => onNavigateView("radar")}
+              className="gap-1 text-xs text-muted-foreground hover:text-foreground h-6 px-1.5 -ml-1 cursor-pointer"
+              title="Back to all cases"
+            >
+              <ArrowLeft className="size-3" />
+              <span>All Cases</span>
+            </Button>
+            {isWon ? (
+              <Badge variant="secondary" className="font-sans text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30">
+                Won • Full payment
+              </Badge>
+            ) : isDispatched ? (
+              <Badge variant="outline" className="font-sans text-[10px] text-sky-400 border-sky-500/30 bg-sky-500/10">
+                Sent to insurer
+              </Badge>
+            ) : null}
+          </div>
+
+          {/* 3-Step Guided Navigation Strip (Bidirectional traversal) */}
+          <nav aria-label="Appeal steps" className="flex items-center gap-1 overflow-x-auto">
+            {steps.map((s, idx) => {
+              const StepIcon = s.icon;
+              return (
+                <React.Fragment key={s.id}>
+                  {idx > 0 && <span className="text-muted-foreground/30 text-xs select-none">/</span>}
+                  <button
+                    type="button"
+                    onClick={() => onNavigateView(s.view)}
+                    aria-current={s.isActive ? "step" : undefined}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shrink-0",
+                      s.isActive
+                        ? "bg-primary text-primary-foreground font-semibold shadow-2xs"
+                        : s.isCompleted
+                        ? "bg-muted/40 text-foreground hover:bg-muted/70 font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                    )}
+                    title={`Go to ${s.title}`}
+                  >
+                    <StepIcon className={cn("size-3.5 shrink-0", s.isActive ? "text-primary-foreground" : "text-muted-foreground")} />
+                    <span>{s.title}</span>
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Main Header Content: 1 sentence + 1 date + Navigation buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1 min-w-0 flex-1">
+            {/* 1 Sentence: What happened */}
+            <p className="text-sm font-semibold text-foreground leading-snug">
+              {whatHappened}
+            </p>
+
+            {/* 1 Date: What to do by when */}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-0.5">
+              <Clock className={cn("size-3.5 shrink-0", isUrgent ? "text-destructive" : "text-primary")} />
+              <span className={cn("font-medium", isUrgent ? "text-destructive font-bold" : "text-foreground/80")}>
+                {deadline}
+              </span>
+            </div>
+          </div>
+
+          {/* Action Buttons: Back / Next Step + Details Toggle */}
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+            {/* Contextual Back button when beyond step 1 */}
+            {isStep2 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigateView("evidence")}
+                className="h-9 px-3 text-xs font-medium gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                title="Go back to Step 1: Your proof"
+              >
+                <ArrowLeft className="size-3.5" />
+                <span>Back to Proof</span>
+              </Button>
+            )}
+
+            {isStep3 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigateView("studio")}
+                className="h-9 px-3 text-xs font-medium gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                title="Go back to Step 2: Your letter"
+              >
+                <ArrowLeft className="size-3.5" />
+                <span>Back to Letter</span>
+              </Button>
+            )}
+
+            {(!isStep1 && !isStep2 && !isStep3) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigateView("studio")}
+                className="h-9 px-3 text-xs font-medium gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                title="Back to Appeal Letter"
+              >
+                <ArrowLeft className="size-3.5" />
+                <span>Back</span>
+              </Button>
+            )}
+
+            {/* Primary Action Button */}
+            <Button
+              size="sm"
+              onClick={primaryButtonAction}
+              className="h-9 px-4 text-xs font-semibold shadow-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+            >
+              <span>{primaryButtonLabel}</span>
+              {(isStep1 || isStep2) && <ArrowRight className="size-3.5" />}
+            </Button>
+
+            <DetailModeToggle compact className="inline-flex" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-border bg-card/70 backdrop-blur-sm p-3 shadow-xs space-y-2.5">

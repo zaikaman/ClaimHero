@@ -363,10 +363,10 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                       onNavigateView("p2p");
                     }}
                     className="h-8 rounded-md px-2 text-xs gap-1 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 shrink-0"
-                    title="Open Doctor P2P Tele-Script Companion Asset"
+                    title={isDetailed ? "Open Doctor P2P Tele-Script Companion Asset" : "Open doctor call prep"}
                   >
                     <PhoneCall className="size-3.5" />
-                    <span className="hidden md:inline">P2P Script</span>
+                    <span className="hidden md:inline">{isDetailed ? "P2P Script" : "Call prep"}</span>
                   </Button>
                   <Button
                     variant="ghost"

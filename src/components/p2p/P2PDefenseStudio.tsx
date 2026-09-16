@@ -261,10 +261,10 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
             size="xs"
             onClick={() => onNavigateView?.("studio")}
             className="gap-1.5 text-xs text-muted-foreground hover:text-foreground h-7 px-2.5 cursor-pointer"
-            title="Return to Appeal Brief Studio"
+            title={isDetailed ? "Return to Appeal Brief Studio" : "Back to your letter"}
           >
             <ArrowLeft className="size-3" />
-            <span>Appeal Brief</span>
+            <span>{isDetailed ? "Appeal Brief" : "Your letter"}</span>
           </Button>
 
           <div className="h-4 w-px bg-border shrink-0" />

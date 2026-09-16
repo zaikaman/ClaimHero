@@ -7,6 +7,7 @@ import {
   Eye,
   PencilSimpleLine,
   Printer,
+  ArrowLeft,
   ArrowRight,
   ArrowsClockwise,
   Scales,
@@ -49,6 +50,12 @@ interface AppealStudioProps {
   onRunAutonomousPipeline?: (claimId?: string) => Promise<unknown>;
   onOpenAuditDrawer?: () => void;
   onOpenIngestion?: (claim?: Claim) => void;
+}
+
+/** Everyday name for an appeal level, with a safe fallback for unmapped tiers. */
+function plainTierSentence(tier: string | undefined | null): string {
+  if (!tier) return "The next review level";
+  return PLAIN_TIERS[tier]?.simple ?? "The next review level";
 }
 
 const TIER_METADATA_CONFIG = {
@@ -275,7 +282,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       }
 
       markEditingBrief();
-      toast.success("Inserted cited argument into Appeal Brief");
+      toast.success(isDetailed ? "Inserted cited argument into Appeal Brief" : "Added to your letter");
     };
 
     window.addEventListener("claimhero:insert-brief-text", handleInsertText);
@@ -284,11 +291,19 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
   const handleRunSynthesis = async () => {
     if (readOnly) {
-      toast.error("Viewers have read-only access and cannot synthesize briefs");
+      toast.error(
+        isDetailed
+          ? "Viewers have read-only access and cannot synthesize briefs"
+          : "Viewers can read the letter but cannot change it"
+      );
       return;
     }
     setSynthesisError(null);
-    const toastId = toast.loading("Synthesizing legal appeal brief with clinical citations...");
+    const toastId = toast.loading(
+      isDetailed
+        ? "Synthesizing legal appeal brief with clinical citations..."
+        : "Writing your appeal letter..."
+    );
     try {
       await synthesizeAppeal(appealLevel, physicianNotes, {
         name: senderName,
@@ -296,7 +311,12 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         email: senderEmail,
         phone: senderPhone,
       });
-      toast.success("Appeal brief successfully compiled with statutory citations", { id: toastId });
+      toast.success(
+        isDetailed
+          ? "Appeal brief successfully compiled with statutory citations"
+          : "Your letter is ready to review",
+        { id: toastId }
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to synthesize appeal brief. Please try again.";
       setSynthesisError(msg);
@@ -311,11 +331,18 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     }
     if (!currentTierConfig.nextTier) return;
     setSynthesisError(null);
-    const toastId = toast.loading("Escalating statutory tier and re-synthesizing brief...");
+    const toastId = toast.loading(
+      isDetailed
+        ? "Escalating statutory tier and re-synthesizing brief..."
+        : "Moving to the next appeal level and rewriting your letter..."
+    );
     try {
       await escalateTier(currentTierConfig.nextTier, escalationReason);
       setShowEscalationModal(false);
-      toast.success("Statutory appeal tier successfully escalated", { id: toastId });
+      toast.success(
+        isDetailed ? "Statutory appeal tier successfully escalated" : "Moved to the next appeal level",
+        { id: toastId }
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to escalate tier";
       setSynthesisError(msg);
@@ -371,11 +398,14 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             <CircleNotch className="size-4 animate-spin text-primary shrink-0 mt-0.5" />
             <div className="space-y-1 min-w-0">
               <span className="text-xs font-semibold text-foreground block">
-                Appeal brief synthesizing in background
+                {isDetailed
+                  ? "Appeal brief synthesizing in background"
+                  : "Your letter is being written"}
               </span>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                The autonomous pipeline is crawling policy, scoring, and drafting. The brief
-                appears here automatically; review the Evidence Matrix meanwhile. No need to wait.
+                {isDetailed
+                  ? "The autonomous pipeline is crawling policy, scoring, and drafting. The brief appears here automatically; review the Evidence Matrix meanwhile. No need to wait."
+                  : "We are checking their rules, scoring your proof, and writing the letter. It appears here on its own — you can look at your proof while you wait."}
               </p>
             </div>
           </div>
@@ -705,6 +735,20 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   <Printer className="size-3.5" />
                   <span>{isDetailed ? "Preview Email" : "Preview"}</span>
                 </Button>
+
+                {/* Back to Evidence / Proof button */}
+                {onNavigateToEvidence && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onNavigateToEvidence}
+                    className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
+                    title={isDetailed ? "Back to Clinical Policy & Evidence Matrix" : "Back to your proof"}
+                  >
+                    <ArrowLeft className="size-3.5" />
+                    <span>{isDetailed ? "Back" : "Back to Proof"}</span>
+                  </Button>
+                )}
 
                 {/* Primary Blue CTA: Next step in the Sentinel pipeline */}
                 {onNavigateToDispatch ? (
@@ -1073,6 +1117,19 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {onNavigateToEvidence && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onNavigateToEvidence}
+              className="gap-1.5 text-xs h-8 cursor-pointer"
+              title={isDetailed ? "Back to Clinical Policy & Evidence Matrix" : "Back to your proof"}
+            >
+              <ArrowLeft className="size-3.5" />
+              <span>{isDetailed ? "Back to Evidence" : "Back to Proof"}</span>
+            </Button>
+          )}
+
           <Button
             variant="outline"
             size="sm"
@@ -1160,19 +1217,27 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             <div className="space-y-3 text-xs">
               <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-2">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-muted-foreground">Current Tier:</span>
+                  <span className="text-muted-foreground">
+                    {isDetailed ? "Current Tier:" : "Appeal level now:"}
+                  </span>
                   <Badge variant="outline" className="font-mono text-[10px]">
-                    {currentTierConfig.shortTitle}
+                    {isDetailed ? currentTierConfig.shortTitle : plainTierSentence(appealLevel)}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-semibold text-foreground">Escalating To:</span>
+                  <span className="font-semibold text-foreground">
+                    {isDetailed ? "Escalating To:" : "Asking next:"}
+                  </span>
                   <Badge className={`font-mono text-[10px] ${TIER_METADATA_CONFIG[currentTierConfig.nextTier].colorClass}`}>
-                    {TIER_METADATA_CONFIG[currentTierConfig.nextTier].title}
+                    {isDetailed
+                      ? TIER_METADATA_CONFIG[currentTierConfig.nextTier].title
+                      : plainTierSentence(currentTierConfig.nextTier)}
                   </Badge>
                 </div>
                 <div className="pt-2 border-t border-border/60 text-[11px] text-muted-foreground leading-relaxed">
-                  {TIER_METADATA_CONFIG[currentTierConfig.nextTier].description}
+                  {isDetailed
+                    ? TIER_METADATA_CONFIG[currentTierConfig.nextTier].description
+                    : `A different review team takes over: ${PLAIN_TIERS[currentTierConfig.nextTier]?.who ?? "the next reviewers"}.`}
                 </div>
               </div>
 
@@ -1209,12 +1274,12 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 {isEscalating ? (
                   <>
                     <CircleNotch className="size-3.5 animate-spin" />
-                    <span>Escalating & Synthesizing...</span>
+                    <span>{isDetailed ? "Escalating & Synthesizing..." : "Working on it..."}</span>
                   </>
                 ) : (
                   <>
                     <TrendUp className="size-3.5" />
-                    <span>Confirm Statutory Escalation</span>
+                    <span>{isDetailed ? "Confirm Statutory Escalation" : "Send to the next level"}</span>
                   </>
                 )}
               </Button>

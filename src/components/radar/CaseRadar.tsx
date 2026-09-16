@@ -42,6 +42,12 @@ import {
 } from "../../lib/exportUtils";
 import { CPT_CODES, DENIAL_REASON_CODES } from "../../lib/constants";
 import { useDetailMode } from "../../hooks/useDetailMode";
+import {
+  formatWhatHappenedSentence,
+  formatDeadlineSentence,
+  PLAIN_FIRST_RUN,
+} from "../../lib/plainCopy";
+import { DetailModeToggle } from "../common/DetailModeToggle";
 import { DeadlineCountdown } from "./DeadlineCountdown";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -118,6 +124,12 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   onToggleIncludeDemo,
 }) => {
   const { isDetailed } = useDetailMode();
+  const [radarTab, setRadarTab] = useState<"family" | "teams">(() => isDetailed ? "teams" : "family");
+
+  React.useEffect(() => {
+    setRadarTab(isDetailed ? "teams" : "family");
+  }, [isDetailed]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [payerFilter, setPayerFilter] = useState("all");
@@ -343,18 +355,167 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
 
   return (
     <div className="space-y-4 animate-fadeIn font-sans">
-      {/* 1. Top 4 Macro Financial & Risk Metrics */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1: Disputed Portfolio */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle>
-              <div className="flex size-7 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
-                <CurrencyDollar className="size-4" />
+      {/* Primary View Mode Switcher: My Cases (Everyday / Families) vs For Teams & Advocates */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/60">
+        <div className="flex items-center gap-1.5 p-1 rounded-lg bg-muted/40 border border-border/60 w-fit">
+          <button
+            onClick={() => setRadarTab("family")}
+            className={cn(
+              "px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer",
+              radarTab === "family"
+                ? "bg-card text-foreground font-semibold shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            My Cases
+          </button>
+          <button
+            onClick={() => setRadarTab("teams")}
+            className={cn(
+              "px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer",
+              radarTab === "teams"
+                ? "bg-card text-foreground font-semibold shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            For Teams & Advocates
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => onOpenIngestion()}
+            className="gap-1.5 text-xs h-8 shadow-xs cursor-pointer"
+          >
+            <PlusCircle className="size-3.5" weight="bold" />
+            <span>{isDetailed ? "Ingest Denial" : "Add denial letter"}</span>
+          </Button>
+          <DetailModeToggle compact className="inline-flex" />
+        </div>
+      </div>
+
+      {radarTab === "family" ? (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <h2 className="text-base sm:text-lg font-bold text-foreground tracking-tight">Your Cases</h2>
+            <p className="text-xs text-muted-foreground">
+              Bills the insurer refused to pay — what happened, your deadline, and your appeal letter.
+            </p>
+          </div>
+
+          {activeClaims.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border/80 bg-card/40 p-8 text-center space-y-3">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-muted border border-border/60 text-muted-foreground">
+                <FileText className="size-6" />
               </div>
-            </CardTitle>
-            <CardDescription className="text-xs">{isDetailed ? "Total Disputed Pipeline" : "Total you're challenging"}</CardDescription>
-          </CardHeader>
+              <div className="space-y-1 max-w-sm mx-auto">
+                <p className="text-sm font-semibold text-foreground">No medical bills added yet</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Upload a photo or PDF of your denial letter. ClaimHero explains what happened in plain English, checks the insurer rules, and prepares an appeal letter for you to review and approve.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => onOpenIngestion()}
+                className="gap-1.5 text-xs h-9 px-4 cursor-pointer"
+              >
+                <PlusCircle className="size-4" weight="bold" />
+                <span>Add denial letter</span>
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {activeClaims.map((c) => {
+                const whatHappened = formatWhatHappenedSentence(c);
+                const deadline = formatDeadlineSentence(c.statutoryDeadline, c.daysRemaining ?? 180);
+                const isWon = c.status === "won";
+                const isDispatched = c.status === "dispatched" || c.status === "under_review";
+                const isUrgent = (c.daysRemaining ?? 180) <= 14 && !isWon && !isDispatched;
+
+                return (
+                  <div
+                    key={c._id}
+                    onClick={() => {
+                      onSelectClaim(c._id);
+                      onNavigateView(isWon || isDispatched ? "communications" : "studio");
+                    }}
+                    className={cn(
+                      "group rounded-xl border bg-card/80 backdrop-blur-sm p-4 transition-all hover:bg-card hover:border-primary/40 cursor-pointer shadow-xs",
+                      selectedClaimId === c._id ? "border-primary/60 ring-1 ring-primary/20" : "border-border/70"
+                    )}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          {isWon ? (
+                            <Badge variant="secondary" className="font-sans text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30">
+                              Won • Full payment
+                            </Badge>
+                          ) : isDispatched ? (
+                            <Badge variant="outline" className="font-sans text-[10px] text-sky-400 border-sky-500/30 bg-sky-500/10">
+                              Sent to insurer
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="font-sans text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20">
+                              Ready to review
+                            </Badge>
+                          )}
+                          <span className="text-[11px] font-mono text-muted-foreground">
+                            Case #{c.claimNumber}
+                          </span>
+                        </div>
+
+                        {/* 1 Sentence: What happened */}
+                        <p className="text-sm font-semibold text-foreground leading-snug">
+                          {whatHappened}
+                        </p>
+
+                        {/* 1 Date: What to do by when */}
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Clock className={cn("size-3.5 shrink-0", isUrgent ? "text-destructive" : "text-primary")} />
+                          <span className={cn("font-medium", isUrgent ? "text-destructive font-bold" : "text-foreground/80")}>
+                            {deadline}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 1 Button: Review & Approve */}
+                      <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectClaim(c._id);
+                            onNavigateView(isWon || isDispatched ? "communications" : "studio");
+                          }}
+                          className="h-9 px-4 text-xs font-semibold shadow-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                        >
+                          <FileText className="size-4" />
+                          <span>{isWon ? "View Outcome" : isDispatched ? "Track Status" : "Review & Approve"}</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* 1. Top 4 Macro Financial & Risk Metrics */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Card 1: Disputed Portfolio */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle>
+                  <div className="flex size-7 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                    <CurrencyDollar className="size-4" />
+                  </div>
+                </CardTitle>
+                <CardDescription className="text-xs">{isDetailed ? "Total Disputed Pipeline" : "Total you're challenging"}</CardDescription>
+              </CardHeader>
           <CardContent className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
               <div className="font-medium text-2xl sm:text-3xl tabular-nums leading-none tracking-tight text-foreground font-mono">
@@ -684,7 +845,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 <TableHead>{isDetailed ? "Claim & Patient" : "Case"}</TableHead>
                 <TableHead>{isDetailed ? "Payer" : "Insurer"}</TableHead>
                 <TableHead>{isDetailed ? "CPT Code" : "Care received"}</TableHead>
-                <TableHead>{isDetailed ? "Denial Reason" : "Why they said no"}</TableHead>
+                <TableHead>{isDetailed ? "Denial Reason" : PLAIN_FIRST_RUN.whyDenied}</TableHead>
                 <TableHead>{isDetailed ? "Disputed" : "Bill amount"}</TableHead>
                 <TableHead>{isDetailed ? "Readiness" : "Strength"}</TableHead>
                 <TableHead>{isDetailed ? "Statutory Clock" : "Time left"}</TableHead>
@@ -1193,6 +1354,8 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
           </div>
         )}
       </Card>
+      </>
+      )}
 
       {/* Delete Case Confirmation Modal */}
       <DeleteCaseModal

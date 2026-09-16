@@ -219,10 +219,10 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             size="xs"
             onClick={() => onNavigateView?.("studio")}
             className="gap-1.5 text-xs text-muted-foreground hover:text-foreground h-7 px-2.5 cursor-pointer"
-            title="Return to Appeal Brief (Step 2)"
+            title={isDetailed ? "Return to Appeal Brief (Step 2)" : "Back to your letter"}
           >
             <ArrowLeft className="size-3" />
-            <span>Appeal Brief</span>
+            <span>{isDetailed ? "Appeal Brief" : "Your letter"}</span>
           </Button>
 
           <div className="h-4 w-px bg-border shrink-0" />

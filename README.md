@@ -118,11 +118,17 @@ Healthcare denial letters and appellate procedures are deliberately obscured by 
 
 ClaimHero resolves this dilemma with a built-in **Everyday Language vs. Expert Details** dual-mode architecture:
 
-- **Everyday Language (Default / Patient-Friendly)**:
+- **Everyday Language (Default / Patient-Friendly on First-Run)**:
+  - **Workspace Header (1 Sentence + 1 Date + 1 Button)**: Rather than overwhelming everyday users with team software, the Case Workspace header distills the case into 3 essential points:
+    1. **1 Sentence (What happened)**: Plain English summary (e.g., *"Sarah's knee arthroscopy was denied ($6,400) by Cigna — they say it was not medically necessary."*).
+    2. **1 Date (What to do by when)**: Clear statutory timeline (e.g., *"Appeal deadline: Jan 14, 2027 (120 days left)"*).
+    3. **1 Button ("Review & Approve")**: Direct action to inspect the prepared appeal letter and approve dispatch.
+  - **Case Radar with "My Cases" vs. "For Teams & Advocates" Tabs**: The complex team portfolio triage view (macro financial metrics, CPT/CARC code grids, and CSV/JSON audit exports) is moved behind a dedicated **"For Teams & Advocates"** tab. Everyday users see a calm, focused list of family bills under **"My Cases"** with instant 1-click review triggers.
   - Jargon-free labels across all 28 UI surfaces: CARC codes become plain-language denial causes (e.g., *"Coverage rules require trying other treatments first"*), statutory postures translate to clear action summaries, and navigation uses intuitive concepts (*"1. Your proof • 2. Your letter • 3. Send & track"*).
-  - Patients and caregivers understand their rights, deadlines, and appeal strategy instantly without requiring a medical billing certification.
+  - **First-Run Label Renames**: the professional vocabulary is preserved, but the words a first-time user actually meets are renamed. An insurer Clinical Policy Bulletin (CPB) reads as **"Insurer's own rule"**, a CARC denial code as **"Why they said no"**, and the cited appeal brief as **"Your letter"** (`PLAIN_FIRST_RUN` in `src/lib/plainCopy.ts`). The public landing hero, badges, CTAs, and navigation carry no CPB / CARC / RRF / P2P / IMR / dossier wording, and navigation reads *"My Cases • Why it was denied • Your letter • Insurer replies • Money recovered"*.
+  - **Retrieval Jargon Stays Expert**: hybrid precedent badges (Hybrid RRF Fusion, BM25 lexical hits, RRF scores, vector and BM25 ranks), the appeal-level escalation dialog, and the clinical research channel labels, descriptions, and evidence-value copy all fall back to everyday equivalents in Simple Mode, and the live research telemetry no longer prints internal model identifiers.
 - **Expert Details (On-Demand Clinical & Legal Precision)**:
-  - An instant toggle in the persistent header, sidebar, or case settings reveals the complete technical apparatus: full CPT/HCPCS procedure codes, ICD-10 diagnostic codes, CARC/RARC remark codes, ERISA 29 CFR § 2560.503-1 statutory disclosure citations, exact Clinical Policy Bulletin (CPB) clause numbers, and cryptographic SHA-256 Merkle block fingerprints.
+  - An instant toggle in the persistent header, sidebar, or case settings reveals the complete technical apparatus: full CPT/HCPCS procedure codes, ICD-10 diagnostic codes, CARC/RARC remark codes, ERISA §502(c) $110/day statutory liability exposure timers, ERISA 29 CFR § 2560.503-1 statutory disclosure citations, exact Clinical Policy Bulletin (CPB) clause numbers, and cryptographic SHA-256 Merkle block fingerprints.
   - Appeals teams, clinical staff, and attorneys retain the exact forensic citations needed for administrative law judges and external reviews.
 - **Global Zero-Friction Synchronization**:
   - Managed via `useDetailMode` and stored in `localStorage` with resilient in-memory fallback for sandboxed or private browsing environments.
@@ -289,12 +295,12 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **1001 automated tests** across 64 test suites (verified via `npm run test`):
+ClaimHero is backed by **1005 automated tests** across 64 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (1001 tests across 64 suites)
+npm run test            # Comprehensive Vitest test suite (1005 tests across 64 suites)
 npm run test:coverage   # Code coverage report (~81% lines)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate

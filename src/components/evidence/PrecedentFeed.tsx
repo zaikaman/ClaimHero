@@ -73,7 +73,9 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
         </div>
         <div className="flex items-center gap-1.5">
           <Badge variant="outline" className="font-mono text-[10px]">
-            CPT {primaryCpt} • {claim.denialReasonCode}
+            {isDetailed
+              ? `CPT ${primaryCpt} • ${claim.denialReasonCode}`
+              : "Matched to your case"}
           </Badge>
           <Button
             variant="ghost"
@@ -136,23 +138,33 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
                       <TrendUp className="size-3" />
                       <span>{similarity}% similarity</span>
                     </Badge>
-                    {isHybrid ? (
-                      <Badge variant="outline" className="font-mono text-[9px] border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
-                        Hybrid RRF Fusion
-                      </Badge>
-                    ) : isBm25Only ? (
-                      <Badge variant="outline" className="font-mono text-[9px] border-blue-500/40 text-blue-600 dark:text-blue-400 bg-blue-500/10">
-                        BM25 Lexical Hit
-                      </Badge>
+                    {isDetailed ? (
+                      <>
+                        {isHybrid ? (
+                          <Badge variant="outline" className="font-mono text-[9px] border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
+                            Hybrid RRF Fusion
+                          </Badge>
+                        ) : isBm25Only ? (
+                          <Badge variant="outline" className="font-mono text-[9px] border-blue-500/40 text-blue-600 dark:text-blue-400 bg-blue-500/10">
+                            BM25 Lexical Hit
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="font-mono text-[9px] border-purple-500/40 text-purple-600 dark:text-purple-400 bg-purple-500/10">
+                            Dense Vector Hit
+                          </Badge>
+                        )}
+                        {typeof item.rrfScore === "number" && item.rrfScore > 0 && (
+                          <span className="text-[10px] font-mono text-muted-foreground">
+                            RRF: {item.rrfScore.toFixed(4)}
+                          </span>
+                        )}
+                      </>
                     ) : (
-                      <Badge variant="outline" className="font-mono text-[9px] border-purple-500/40 text-purple-600 dark:text-purple-400 bg-purple-500/10">
-                        Dense Vector Hit
-                      </Badge>
-                    )}
-                    {typeof item.rrfScore === "number" && item.rrfScore > 0 && (
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        RRF: {item.rrfScore.toFixed(4)}
-                      </span>
+                      isHybrid && (
+                        <Badge variant="outline" className="text-[9px] border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
+                          Best match
+                        </Badge>
+                      )
                     )}
                     <Badge variant="outline" className="font-mono text-[10px]">
                       {sourceKindLabel(item.sourceKind)}
@@ -161,7 +173,7 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
                   <h4 className="text-xs font-semibold text-foreground mt-1">
                     {item.title}
                   </h4>
-                  {(item.vectorRank || item.textRank) && (
+                  {isDetailed && (item.vectorRank || item.textRank) && (
                     <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground mt-0.5">
                       {item.vectorRank && <span>Vector Rank #{item.vectorRank}</span>}
                       {item.vectorRank && item.textRank && <span>•</span>}

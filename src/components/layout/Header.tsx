@@ -79,37 +79,39 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Center/Right: Live metrics & actions */}
         <div className="flex items-center gap-2">
-          {/* Subtle Live Stats on Header */}
-          <div className="hidden xl:flex items-center gap-3 text-xs text-muted-foreground pr-2">
-            <div className="flex items-center gap-1.5">
-              <span>{isDetailed ? "Pipeline:" : "At stake:"}</span>
-              <strong className="text-foreground font-mono">{formatCurrency(totalDisputedAmount)}</strong>
+          {/* Subtle Live Stats on Header (Gated for Teams & Detailed Mode) */}
+          {isDetailed && (
+            <div className="hidden xl:flex items-center gap-3 text-xs text-muted-foreground pr-2">
+              <div className="flex items-center gap-1.5">
+                <span>Pipeline:</span>
+                <strong className="text-foreground font-mono">{formatCurrency(totalDisputedAmount)}</strong>
+              </div>
+              <Separator orientation="vertical" className="h-3" />
+              <div className="flex items-center gap-1.5">
+                <span>Recovered:</span>
+                <strong className="text-emerald-600 dark:text-emerald-400 font-mono">
+                  {formatCurrency(totalWonAmount)}
+                </strong>
+              </div>
+              {criticalDeadlinesCount > 0 && (
+                <>
+                  <Separator orientation="vertical" className="h-3" />
+                  <button
+                    onClick={() => {
+                      playSound("deadline_alert");
+                      onSelectView?.("radar");
+                    }}
+                    className="flex items-center gap-1.5 text-destructive font-semibold hover:opacity-80 transition-opacity cursor-pointer text-xs"
+                    title="Critical statutory deadline alarms (click to view and play alert tone)"
+                    aria-label={`${criticalDeadlinesCount} urgent alarms`}
+                  >
+                    <ShieldWarning className="size-3.5 animate-pulse" />
+                    <span>{criticalDeadlinesCount} Urgent Alarms</span>
+                  </button>
+                </>
+              )}
             </div>
-            <Separator orientation="vertical" className="h-3" />
-            <div className="flex items-center gap-1.5">
-              <span>{isDetailed ? "Recovered:" : "Saved:"}</span>
-              <strong className="text-emerald-600 dark:text-emerald-400 font-mono">
-                {formatCurrency(totalWonAmount)}
-              </strong>
-            </div>
-            {criticalDeadlinesCount > 0 && (
-              <>
-                <Separator orientation="vertical" className="h-3" />
-                <button
-                  onClick={() => {
-                    playSound("deadline_alert");
-                    onSelectView?.("radar");
-                  }}
-                  className="flex items-center gap-1.5 text-destructive font-semibold hover:opacity-80 transition-opacity cursor-pointer text-xs"
-                  title={isDetailed ? "Critical statutory deadline alarms (click to view and play alert tone)" : "Cases running out of time — click to view"}
-                  aria-label={`${criticalDeadlinesCount} ${isDetailed ? "urgent alarms" : "cases need attention"}`}
-                >
-                  <ShieldWarning className="size-3.5 animate-pulse" />
-                  <span>{criticalDeadlinesCount} {isDetailed ? "Urgent Alarms" : "Needs attention"}</span>
-                </button>
-              </>
-            )}
-          </div>
+          )}
 
           <div className="flex items-center gap-1">
             <DetailModeToggle compact className="inline-flex" />

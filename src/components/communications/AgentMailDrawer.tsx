@@ -25,6 +25,7 @@ import {
   X,
   PhoneCall,
   SealCheck,
+  ArrowLeft,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
@@ -533,6 +534,18 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
             {/* Companion Utility Tools - Single line group of rectangular buttons */}
             <div className="flex items-center gap-2 shrink-0">
+              {onNavigateView && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onNavigateView("studio")}
+                  className="h-8 rounded-md text-xs px-2.5 gap-1.5 shrink-0 cursor-pointer"
+                  title={isDetailed ? "Back to Collaborative Appeal Studio" : "Back to your letter"}
+                >
+                  <ArrowLeft className="size-3.5" />
+                  <span>{isDetailed ? "Back to Studio" : "Back to Letter"}</span>
+                </Button>
+              )}
               {payerContact.intakePortalUrl && (
                 <a
                   href={payerContact.intakePortalUrl}
@@ -568,7 +581,15 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 variant="outline"
                 onClick={() => setIsExportDrawerOpen(true)}
                 disabled={!effectiveAppeal}
-                title={effectiveAppeal ? "Open formal appeal dossier & print docket" : "Synthesize appeal brief in studio first"}
+                title={
+                  effectiveAppeal
+                    ? isDetailed
+                      ? "Open formal appeal dossier & print docket"
+                      : "Open and print your letter"
+                    : isDetailed
+                      ? "Synthesize appeal brief in studio first"
+                      : "Write your letter first"
+                }
                 className="h-8 rounded-md text-xs px-2.5 gap-1.5 shrink-0"
               >
                 <Printer className="size-3.5" />
@@ -1203,7 +1224,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <Envelope className="size-8 mx-auto text-muted-foreground/60" />
                 <div className="text-xs font-medium text-foreground">No transmissions yet</div>
                 <p className="text-[11px] max-w-sm mx-auto">
-                  Click &apos;Transmit Appeal Packet&apos; above to deliver the synthesized brief. You can also copy or print the dossier for your records.
+                  {isDetailed
+                    ? "Click 'Transmit Appeal Packet' above to deliver the synthesized brief. You can also copy or print the dossier for your records."
+                    : "Use the send button above to deliver your letter. You can also copy or print it for your records."}
                 </p>
               </div>
             ) : (

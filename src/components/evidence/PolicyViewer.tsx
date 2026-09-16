@@ -53,7 +53,7 @@ const SOURCE_TYPE_LABELS: Record<
 > = {
   payer_cpb: {
     label: "Insurer Policy Bulletin",
-    shortLabel: "Insurer CPB",
+    shortLabel: "Insurer Rules",
     badgeVariant: "default",
     icon: BookOpen,
   },

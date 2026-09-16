@@ -773,7 +773,9 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
                 No matching claims or actions found
               </div>
               <div className="text-[11px] text-muted-foreground max-w-sm mx-auto">
-                No results for &ldquo;{query}&rdquo;. Try searching by patient name, claim #, clinical term (e.g. &ldquo;subchondral&rdquo;, &ldquo;arthroplasty&rdquo;), CARC code (&ldquo;CO-50&rdquo;), or action keywords like &ldquo;radar&rdquo;, &ldquo;brief&rdquo;, &ldquo;p2p&rdquo;, &ldquo;ingest&rdquo;, or &ldquo;erisa&rdquo;.
+                {isDetailed
+                  ? `No results for "${query}". Try searching by patient name, claim #, clinical term (e.g. "subchondral", "arthroplasty"), CARC code ("CO-50"), or action keywords like "radar", "brief", "p2p", "ingest", or "erisa".`
+                  : `No results for "${query}". Try a patient name, an insurer, the treatment (e.g. "knee MRI"), or a next step like "my cases", "your letter", "send", or "doctor call".`}
               </div>
             </div>
           )}

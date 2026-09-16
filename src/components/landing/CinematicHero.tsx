@@ -30,7 +30,7 @@ interface CinematicHeroProps {
   hasCachedSession?: boolean;
 }
 
-interface ShowcaseSlide {
+export interface ShowcaseSlide {
   badge1: { icon: React.ElementType; label: string };
   badge2: { icon: React.ElementType; label: string };
   badge3: { icon: React.ElementType; label: string };
@@ -42,43 +42,58 @@ interface ShowcaseSlide {
   targetView: NavigationView;
 }
 
-const HERO_SLIDES: ShowcaseSlide[] = [
+export const HERO_SLIDES: ShowcaseSlide[] = [
   {
-    badge1: { icon: ShieldCheck, label: "ERISA § 502(c) Sentinel" },
-    badge2: { icon: Clock, label: "30-Day Alarms" },
-    badge3: { icon: CheckCircle, label: "Multi-Tier Appeal Engine" },
-    titleLine1: "Overturn Denials.",
-    titleLine2: "Defend Coverage.",
+    badge1: { icon: ShieldCheck, label: "You approve every send" },
+    badge2: { icon: Clock, label: "Never miss a deadline" },
+    badge3: { icon: CheckCircle, label: "3-step guided appeal" },
+    titleLine1: "Fight the denial.",
+    titleLine2: "Keep your coverage.",
     description:
-      "Evidence-grounded appeal preparation workspace cross-referencing Aetna, UHC, Cigna, and Anthem clinical bulletins with PubMed and FDA evidence to challenge wrongful medical claim denials.",
-    primaryCtaText: "Ingest Denial Notice",
-    secondaryCtaText: "Explore Evidence Matrix",
+      "Got a bill your insurer refused to pay? Add the denial letter, see in plain words why they said no, and send a letter that answers their own rules.",
+    primaryCtaText: "Add your denial letter",
+    secondaryCtaText: "See why it was denied",
     targetView: "radar",
   },
   {
-    badge1: { icon: Buildings, label: "Clinical Policy Engine" },
-    badge2: { icon: Star, label: "FDA & NCCN Guidelines" },
-    badge3: { icon: CheckCircle, label: "Citations Verified" },
-    titleLine1: "Bulletproof Citations.",
-    titleLine2: "Real-time Crawls.",
+    badge1: { icon: Buildings, label: "Insurer's own rules" },
+    badge2: { icon: Star, label: "Your medical records" },
+    badge3: { icon: CheckCircle, label: "Every point sourced" },
+    titleLine1: "Their rules.",
+    titleLine2: "Your records.",
     description:
-      "Deeply crawl medical policy bulletins in seconds. Synthesize peer-reviewed clinical evidence directly cited into legal appeal briefs.",
-    primaryCtaText: "Inspect Evidence Matrix",
-    secondaryCtaText: "Launch Appeal Studio",
+      "We read the insurer's published coverage rules and check them against your medical record, so every sentence in your letter points back to something you can show them.",
+    primaryCtaText: "See the proof",
+    secondaryCtaText: "Open your letter",
     targetView: "evidence",
   },
   {
-    badge1: { icon: Envelope, label: "Two-Way AgentMail Gateway" },
-    badge2: { icon: Clock, label: "Statutory SLA Clocks" },
-    badge3: { icon: CheckCircle, label: "Audit-Logged Dispatch" },
-    titleLine1: "Review-Gated Dispatch.",
-    titleLine2: "Rapid Settlement.",
+    badge1: { icon: Envelope, label: "Read insurer replies" },
+    badge2: { icon: Clock, label: "Nothing sends without you" },
+    badge3: { icon: CheckCircle, label: "Full case history" },
+    titleLine1: "Send it.",
+    titleLine2: "Track the reply.",
     description:
-      "Dedicated case inboxes route review-approved appeal briefs to grievance portals and record incoming payer determinations in real time.",
-    primaryCtaText: "Open Payer Inbox",
-    secondaryCtaText: "View Portfolio Analytics",
+      "Send your letter from a case inbox you control, then see the insurer's reply and your next step in one place. You approve before anything leaves.",
+    primaryCtaText: "Read insurer replies",
+    secondaryCtaText: "See money recovered",
     targetView: "communications",
   },
+];
+
+export type LandingNavLink = { label: string; view: NavigationView; delay: string };
+
+/**
+ * Landing navigation uses the same everyday words as the in-app sidebar.
+ * Expert surface names (Case Radar, Evidence Matrix, Appeal Studio) live
+ * inside the console behind Expert Details.
+ */
+export const LANDING_NAV_LINKS: LandingNavLink[] = [
+  { label: "My Cases", view: "radar", delay: "100ms" },
+  { label: "Why it was denied", view: "evidence", delay: "150ms" },
+  { label: "Your letter", view: "studio", delay: "200ms" },
+  { label: "Insurer replies", view: "communications", delay: "250ms" },
+  { label: "Money recovered", view: "analytics", delay: "300ms" },
 ];
 
 export const CinematicHero: React.FC<CinematicHeroProps> = ({
@@ -175,13 +190,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
     return () => mediaQuery.removeEventListener("change", listener);
   }, []);
 
-  const navLinks: { label: string; view: NavigationView; delay: string }[] = [
-    { label: "Case Radar", view: "radar", delay: "100ms" },
-    { label: "Evidence Matrix", view: "evidence", delay: "150ms" },
-    { label: "Appeal Studio", view: "studio", delay: "200ms" },
-    { label: "Payer Communications", view: "communications", delay: "250ms" },
-    { label: "Portfolio Analytics", view: "analytics", delay: "300ms" },
-  ];
+  const navLinks = LANDING_NAV_LINKS;
 
   const Badge1Icon = slide.badge1.icon;
   const Badge2Icon = slide.badge2.icon;

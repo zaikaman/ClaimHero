@@ -845,60 +845,62 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({
                       {log.details}
                     </p>
 
-                    {/* Cryptographic Hash Seal Footer */}
-                    <div className="pt-1.5 flex items-center justify-between gap-2 border-t border-border/40 text-[10px] font-mono text-muted-foreground">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <LinkSimple
-                          className={`size-3 shrink-0 ${
-                            isBrokenBlock
-                              ? verificationResult?.tamperDetected
-                                ? "text-rose-400"
-                                : "text-amber-400"
-                              : !log.hash
-                              ? "text-amber-400/80"
-                              : "text-cyan-400"
-                          }`}
-                        />
-                        <span
-                          className={`font-semibold shrink-0 ${
-                            isBrokenBlock
-                              ? verificationResult?.tamperDetected
-                                ? "text-rose-400"
-                                : "text-amber-400"
-                              : !log.hash
-                              ? "text-amber-400/90"
-                              : "text-cyan-400"
-                          }`}
-                        >
-                          Block #{blockNumber}
-                        </span>
-                        {log.hash ? (
-                          <span className="truncate text-foreground/80 font-mono">
-                            SHA: {truncateHash(log.hash, 4, 4)}
+                    {/* Cryptographic Hash Seal Footer (Gated for Expert/Drawer Mode) */}
+                    {(isDetailed || isDrawer) && (
+                      <div className="pt-1.5 flex items-center justify-between gap-2 border-t border-border/40 text-[10px] font-mono text-muted-foreground">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <LinkSimple
+                            className={`size-3 shrink-0 ${
+                              isBrokenBlock
+                                ? verificationResult?.tamperDetected
+                                  ? "text-rose-400"
+                                  : "text-amber-400"
+                                : !log.hash
+                                ? "text-amber-400/80"
+                                : "text-cyan-400"
+                            }`}
+                          />
+                          <span
+                            className={`font-semibold shrink-0 ${
+                              isBrokenBlock
+                                ? verificationResult?.tamperDetected
+                                  ? "text-rose-400"
+                                  : "text-amber-400"
+                                : !log.hash
+                                ? "text-amber-400/90"
+                                : "text-cyan-400"
+                            }`}
+                          >
+                            Block #{blockNumber}
                           </span>
-                        ) : (
-                          <span className="text-amber-400/80 italic font-mono text-[10px]">
-                            Unsealed Block
-                          </span>
+                          {log.hash ? (
+                            <span className="truncate text-foreground/80 font-mono">
+                              SHA: {truncateHash(log.hash, 4, 4)}
+                            </span>
+                          ) : (
+                            <span className="text-amber-400/80 italic font-mono text-[10px]">
+                              Unsealed Block
+                            </span>
+                          )}
+                        </div>
+
+                        {log.hash && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(log.hash!)}
+                            className="hover:text-cyan-300 transition-colors shrink-0 flex items-center gap-0.5 cursor-pointer"
+                            title={`Copy full hash: ${log.hash}`}
+                            aria-label="Copy block hash"
+                          >
+                            {copiedHash === log.hash ? (
+                              <Check className="size-2.5 text-emerald-400" />
+                            ) : (
+                              <Copy className="size-2.5" />
+                            )}
+                          </button>
                         )}
                       </div>
-
-                      {log.hash && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(log.hash!)}
-                          className="hover:text-cyan-300 transition-colors shrink-0 flex items-center gap-0.5 cursor-pointer"
-                          title={`Copy full hash: ${log.hash}`}
-                          aria-label="Copy block hash"
-                        >
-                          {copiedHash === log.hash ? (
-                            <Check className="size-2.5 text-emerald-400" />
-                          ) : (
-                            <Copy className="size-2.5" />
-                          )}
-                        </button>
-                      )}
-                    </div>
+                    )}
                   </Card>
                 </div>
               );
