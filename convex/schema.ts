@@ -477,7 +477,6 @@ export default defineSchema({
     title: v.string(),
     activeClaimId: v.optional(v.id("claims")),
     agentThreadId: v.optional(v.string()), // Convex AI Agent component thread ID for streaming
-    summary: v.optional(v.string()), // Compressed summary of older conversation turns
     messageCount: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -487,25 +486,18 @@ export default defineSchema({
     .index("by_agent_thread", ["agentThreadId"])
     .index("by_updated", ["updatedAt"]),
 
-  // Sentinel Chatbot Messages
-  chatbotMessages: defineTable({
-    sessionId: v.id("chatbotSessions"),
-    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system"), v.literal("tool")),
-    content: v.string(),
-    toolCalls: v.optional(
-      v.array(
-        v.object({
-          id: v.string(),
-          name: v.string(),
-          arguments: v.string(),
-          output: v.optional(v.string()),
-        })
-      )
-    ),
+  // Live drafting thread per claim and long-form surface. Keeping the mapping
+  // lets the Studio re-attach to an in-flight stream after a reload and lets a
+  // re-generate retire the previous thread instead of accumulating them.
+  draftThreads: defineTable({
+    userId: v.id("users"),
+    claimId: v.id("claims"),
+    kind: v.union(v.literal("appeal_brief"), v.literal("p2p_script")),
+    threadId: v.string(),
     createdAt: v.number(),
   })
-    .index("by_session", ["sessionId"])
-    .index("by_session_and_time", ["sessionId", "createdAt"]),
+    .index("by_claim_and_kind", ["claimId", "kind"])
+    .index("by_user", ["userId"]),
 
   // Global & Per-User Sentinel Operational Settings
   userSettings: defineTable({

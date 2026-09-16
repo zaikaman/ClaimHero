@@ -34,6 +34,7 @@ import { StudioPresenceBridge } from "./CollaboratorPresence";
 import { ShareCaseModal } from "./ShareCaseModal";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { PipelineActivityFeed } from "../common/PipelineActivityFeed";
+import { LiveDraftStream } from "../common/LiveDraftStream";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -153,6 +154,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     senderPhone,
     isSynthesizing,
     isEscalating,
+    draftStream,
     isSaving,
     saveStatus,
     synthesizeAppeal,
@@ -411,6 +413,37 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           </div>
         </Card>
       )}
+
+      {/* Live drafting preview: prose sections appear as the model writes */}
+      <LiveDraftStream
+        isActive={Boolean(isSynthesizing || isEscalating)}
+        isStreaming={Boolean(draftStream.isStreaming || isSynthesizing || isEscalating)}
+        streamedText={draftStream.streamedText}
+        fields={[
+          {
+            key: "executiveSummary",
+            label: isDetailed ? "Executive summary" : "Opening summary",
+          },
+          {
+            key: "medicalNecessityArguments",
+            label: isDetailed ? "Medical necessity rationale" : "Why it should be covered",
+          },
+        ]}
+        label={
+          isEscalating
+            ? isDetailed
+              ? "Escalating the appeal tier"
+              : "Escalating your letter"
+            : isDetailed
+              ? "Drafting the appeal brief"
+              : "Writing your letter"
+        }
+        waitingMessage={
+          isDetailed
+            ? "Streaming grounded prose from the indexed evidence and case record. The finished brief replaces this preview and is saved automatically."
+            : "Writing the opening and the coverage argument from your evidence. The finished letter replaces this preview on its own."
+        }
+      />
 
       {/* Live agent thought stream (self-hides for older runs) */}
       <PipelineActivityFeed claimId={claim._id} />

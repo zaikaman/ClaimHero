@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Claim, P2PScript } from "../types";
+import { useDraftStream } from "./useDraftStream";
 import { Id } from "../../convex/_generated/dataModel";
 
 export function useP2PDefense(claim?: Claim | null) {
@@ -22,6 +23,9 @@ export function useP2PDefense(claim?: Claim | null) {
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
   const [timerSeconds, setTimerSeconds] = useState<number>(0);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Live token stream for the drafting thread the synthesis action writes into
+  const draftStream = useDraftStream({ claimId, kind: "p2p_script" });
 
   const saveEditsMutation = useMutation(api.p2pScripts.saveScriptEdits);
   const generateAction = useAction(api.actions.p2pDefenseGenerator.generateP2PScript);
@@ -115,12 +119,16 @@ export function useP2PDefense(claim?: Claim | null) {
 
       setIsSynthesizing(true);
       try {
+        // Open the drafting thread first so deltas stream into a subscribed row
+        const draftThreadId = await draftStream.beginDraft();
+
         const result = await generateAction({
           claimId: claim._id as Id<"claims">,
           physicianName: options?.physicianName,
           physicianSpecialty: options?.physicianSpecialty,
           medicalDirectorRole: options?.medicalDirectorRole,
           customStrategyNotes: options?.customStrategyNotes,
+          draftThreadId,
         });
 
         if (result?.fullScriptMarkdown) {
@@ -132,7 +140,7 @@ export function useP2PDefense(claim?: Claim | null) {
         setIsSynthesizing(false);
       }
     },
-    [claim, generateAction]
+    [claim, generateAction, draftStream]
   );
 
   return {
@@ -144,6 +152,7 @@ export function useP2PDefense(claim?: Claim | null) {
     isSaving,
     saveStatus,
     generateScript,
+    draftStream,
     // Timer & Call Companion
     isTimerRunning,
     timerSeconds,

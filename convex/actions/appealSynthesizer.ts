@@ -2,7 +2,7 @@
 
 import { action, internalAction, ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { createStructuredCompletion } from "../lib/openai";
+import { streamStructuredDraft } from "../lib/agentDraft";
 import { internal } from "../_generated/api";
 import { precedentMatchValidator } from "../lib/precedentValidators";
 import {
@@ -753,6 +753,8 @@ export const generateAppealBriefArgs = {
   customInstructions: v.optional(v.string()),
   vectorPrecedents: v.optional(v.array(precedentMatchValidator)),
   pipelineRunId: v.optional(v.string()),
+  /** Agent thread created by the Studio so it can render live drafting deltas. */
+  draftThreadId: v.optional(v.string()),
 };
 
 /**
@@ -773,6 +775,7 @@ export async function performGenerateAppealBrief(
     customInstructions?: string;
     vectorPrecedents?: VectorPrecedentMatch[];
     pipelineRunId?: string;
+    draftThreadId?: string;
   },
   claim: Doc<"claims"> & { patient?: Doc<"patients"> },
   userId?: string
@@ -874,13 +877,19 @@ export async function performGenerateAppealBrief(
     const cptList = (claim.cptCodes || []).join(", ");
     const icdList = (claim.icd10Codes || []).join(", ");
 
-    // 3. Call the configured model with structured JSON schema. Some
-    // OpenAI-compatible providers acknowledge the schema request but still
-    // return prose/YAML, so the shared helper retries protocol failures. If
-    // all attempts fail, do not persist or display synthetic appeal content.
+    // 3. Draft through the agent component with structured JSON schema. Tokens
+    // are streamed into a Convex agent thread so the Studio renders the draft as
+    // it is written, and some OpenAI-compatible providers acknowledge the schema
+    // request but still return prose/YAML, so the shared helper retries protocol
+    // failures. If all attempts fail, do not persist or display synthetic
+    // appeal content.
     let rawResult: AppealBriefSynthesisResult;
     try {
-      rawResult = await createStructuredCompletion<AppealBriefSynthesisResult>({
+      rawResult = (await streamStructuredDraft<AppealBriefSynthesisResult>({
+        ctx,
+        userId,
+        threadId: args.draftThreadId,
+        threadTitle: `Appeal brief drafting - ${claim.claimNumber}`,
         systemPrompt: `You draft professional healthcare payer correspondence. Produce content that can be sent as the body of a normal appeal email, not a litigation memorandum and not legal advice.
 
 Evidence and safety rules:
@@ -892,7 +901,7 @@ Evidence and safety rules:
 6. Be concise and practical: a salutation, short paragraphs, a clinical rationale grounded in the record, a specific request, and a professional closing. The application supplies the email subject separately. Do not use all-caps filler, exhibit indexes, markdown tables, horizontal rules, threats, or ceremonial language.
 7. The application assembles the final email from your structured fields. Return an empty string for fullAppealMarkdown; do not write a second full document there.
 8. Strict English-Only Mandate: ClaimHero exclusively supports English and US healthcare jurisdictions (ERISA, ACA, CMS). Always write all structured fields, arguments, clinical rationale, and correspondence exclusively in English. Non-English text, multilingual translation, or foreign legal citations are strictly prohibited.`,
-      userPrompt: `Draft the content for a ${appealLevel.replace(/_/g, " ")} medical appeal email for:
+        userPrompt: `Draft the content for a ${appealLevel.replace(/_/g, " ")} medical appeal email for:
 
 Case Details:
 - Claim Number: ${claim.claimNumber}
@@ -922,11 +931,9 @@ ${sender?.name ? `Sender details for the closing (use only as provided):\n- Name
 ${sanitizedCustomInstructions ? `${sanitizedCustomInstructions}\n` : ""}
 
 Return a short, evidence-grounded email draft in the structured fields. If a clinical detail is not present, say that the current record does not provide it rather than filling the gap.`,
-      schemaName: "AppealBriefSynthesisResult",
-      schema: APPEAL_SYNTHESIS_SCHEMA,
-      temperature: 0.15,
-      structuredRetries: 2,
-    });
+        schemaName: "AppealBriefSynthesisResult",
+        schema: APPEAL_SYNTHESIS_SCHEMA,
+      })).result;
     } catch (error) {
       if (isStructuredSynthesisFailure(error)) {
         throw new Error(

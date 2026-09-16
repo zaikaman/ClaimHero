@@ -150,9 +150,21 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
     }
   }, [messages, isSending, isOpen]);
 
+  const dispatchPrompt = (text: string) => {
+    sendMessage(text).catch((err) => {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : isDetailed
+            ? "Sentinel Copilot could not answer. Please try again."
+            : "We could not get an answer. Please try again."
+      );
+    });
+  };
+
   const handleSend = () => {
     if (!input.trim() || isSending) return;
-    sendMessage(input);
+    dispatchPrompt(input);
     setInput("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -418,7 +430,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                     return (
                       <button
                         key={idx}
-                        onClick={() => sendMessage(item.prompt)}
+                        onClick={() => dispatchPrompt(item.prompt)}
                         className="w-full text-left p-2.5 rounded-lg border border-border/70 bg-card/60 hover:bg-card hover:border-primary/40 transition-all flex items-center justify-between gap-3 group cursor-pointer shadow-2xs"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">

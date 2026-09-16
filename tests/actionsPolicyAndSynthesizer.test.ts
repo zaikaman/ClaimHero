@@ -2,12 +2,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as actionPolicyCrawler from "../convex/actions/policyCrawler";
 import * as actionAppealSynthesizer from "../convex/actions/appealSynthesizer";
 import * as libOpenAI from "../convex/lib/openai";
+import { streamStructuredDraft } from "../convex/lib/agentDraft";
 import { rateLimiter } from "../convex/lib/rateLimiter";
 // @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 vi.mock("@convex-dev/auth/server", () => ({
   getAuthUserId: vi.fn(),
+}));
+
+// Long-form drafting now streams through the Convex agent component
+vi.mock("../convex/lib/agentDraft", () => ({
+  streamStructuredDraft: vi.fn(),
 }));
 
 describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
@@ -1042,12 +1048,16 @@ Welcome to the NASS guidelines directory. Below are the published clinical pract
         },
       ];
 
-      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
-        executiveSummary: "Formal Level 1 Internal Appeal for reimbursement of decompressive laminectomy.",
-        medicalNecessityArguments: "Documented 12 weeks of non-operative care and progressive neurological deficit satisfy all clinical policy indications.",
-        legalCitations: ["29 U.S.C. § 1133", "29 CFR § 2560.503-1"],
-        fullAppealMarkdown: "# Formal Level 1 Appeal Brief\n\nFull appeal content.",
-      } as any);
+      vi.mocked(streamStructuredDraft).mockResolvedValue({
+        result: {
+          executiveSummary: "Formal Level 1 Internal Appeal for reimbursement of decompressive laminectomy.",
+          medicalNecessityArguments: "Documented 12 weeks of non-operative care and progressive neurological deficit satisfy all clinical policy indications.",
+          legalCitations: ["29 U.S.C. § 1133", "29 CFR § 2560.503-1"],
+          fullAppealMarkdown: "# Formal Level 1 Appeal Brief\n\nFull appeal content.",
+        } as any,
+        threadId: "thread_appeal_1",
+        attempts: 1,
+      });
 
       let qCount = 0;
       const mockCtx: any = {
@@ -1065,6 +1075,14 @@ Welcome to the NASS guidelines directory. Below are the published clinical pract
       });
 
       expect(res.appealId).toBe("appeal_new_123");
+      // The generation must run through the agent component, not the raw SDK
+      expect(vi.mocked(streamStructuredDraft)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ctx: mockCtx,
+          userId: "user_123",
+          schemaName: "AppealBriefSynthesisResult",
+        })
+      );
       expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
         claimId: "c1",
         appealLevel: "level_1_internal",
@@ -1074,7 +1092,7 @@ Welcome to the NASS guidelines directory. Below are the published clinical pract
     it("generateAppealBrief: surfaces a retryable error without persisting when structured output is unusable", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
-      vi.spyOn(libOpenAI, "createStructuredCompletion").mockRejectedValue(
+      vi.mocked(streamStructuredDraft).mockRejectedValue(
         new Error("Failed to parse structured JSON response from model gpt-5.4-nano")
       );
 

@@ -124,10 +124,9 @@ flowchart TD
 9. **`p2pScripts` & `p2pCallSessions`**:
    * `claimId`, `version`, `openingStatutoryStatement`, `clinicalPolicyCitations`, `disqualificationCounters`, `badFaithDemands`, `closingDemand`.
    * `sessionStatus`, `transcripts`, `fastAnswers`, `checklistProgress`, `winScore`.
-   * Indexes: `by_claim`, `by_session`.
-10. **`chatbotSessions` & `chatbotMessages`**:
-    * `sessionId`, `userId`, `claimId`, `title`, `summary`, `status`.
-    * `role` (`user`, `assistant`, `system`), `content`, `toolCalls` (name, arguments, output).
+   * Indexes: `by_claim`, `by_session`.10. **`chatbotSessions`**:
+   * `userId`, `title`, `activeClaimId`, `agentThreadId`, `messageCount`, `status`.
+   * Conversation messages and token streams live in the `@convex-dev/agent` component, linked by `agentThreadId`.
     * Indexes: `by_user`, `by_claim`, `by_session`.
 
 ---
@@ -151,7 +150,7 @@ flowchart TD
 5. **Payer Communications Drawer (`AgentMailDrawer.tsx`)**: Verified gateway with recipient switching, verified payer routing, threaded two-way correspondence, and the 1-click Printable **ERISA Delivery Evidence Report** (`ServiceCertificateModal.tsx`, `convex/serviceCertificate.ts`) generating contemporaneous electronic service records under 28 U.S.C. § 1746 with live RFC 5322 Message-IDs, Amazon SES MTA receipts, live Node.js DNS MX server resolution, and SHA-256 storage fingerprints to defeat payer non-receipt procedural defaults.
 6. **Portfolio Analytics (`AnalyticsMetrics.tsx`)**: Practice-wide disputed vs. recovered amounts, insurer win rates, confidence distribution, and printable Executive Report statements.
 7. **HIPAA Privacy Redaction Engine (`PrivacyRedactionFilter.tsx`)**: Deterministic PII masking across Safe Harbor, Balanced Appellate, and Public Exhibit standards.
-8. **Sentinel AI Copilot Widget (`SentinelChatbot.tsx`, `⌘J`)**: Autonomous clinical & legal chatbot with 10 agentic OpenAI tool calling capabilities across Convex database records (`get_active_claim_details`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) and live Firecrawl web intelligence (`firecrawl_web_search`, `firecrawl_scrape_url`, `crawl_and_attach_evidence`), persistent `chatbotSessions`/`chatbotMessages` Convex tables, rolling context window summarization, and collapsible tool execution traces.
+8. **Sentinel AI Copilot Widget (`SentinelChatbot.tsx`, `⌘J`)**: Autonomous clinical & legal chatbot on the `@convex-dev/agent` component with 10 agentic tool calling capabilities across Convex database records (`get_active_claim_details`, `search_claims`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) and live Firecrawl web intelligence (`firecrawl_web_search`, `firecrawl_scrape_url`, `crawl_and_attach_evidence`), agent-owned durable message history and token streaming, and collapsible tool execution traces.
 9. **AWS Textract HIPAA Optical Intake Gate (`convex/lib/textract.ts`)**: BAA-covered document OCR for denial PDFs and EOB images extracting text, key-value relationships, and 2D line-item tables; patient identifiers are vaulted directly into the private database, and prompts are de-identified (`redactBeforeLLM`) before external model dispatch, eliminating binary image transmission and direct PHI egress.
 
 ---
@@ -224,7 +223,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/routerAndUrlSync.test.ts` (7 tests): Deep-link URL routing, view synchronization, and browser history handling.
 * `tests/statutoryEscalation.test.ts` (6 tests): 180-day internal appeal to Level 3 DOI escalation state machine.
 * `tests/p2pDefense.test.ts` (6 tests): Tele-script generation, statutory openings, and pocket cheat sheet formatting.
-* `tests/sentinelChatbot.test.ts` (6 tests): Agentic tool schemas, Firecrawl live search/scrape parameters, and prompt construction.
+* `tests/sentinelPrompt.test.ts` (3 tests), `tests/sentinelAgent.test.ts` (5 tests), `tests/agentDraftStreaming.test.ts` (6 tests), `tests/draftStreamsAuthz.test.ts` (6 tests): Copilot prompt construction, registered tool schemas, streamed structured drafting with semantic retries, and drafting-thread ownership enforcement.
 * `tests/pipelineActivity.test.ts` (5 tests): Real-time pipeline execution activity and milestone tracking.
 * `tests/commandPaletteSearch.test.ts` (5 tests): Convex BM25 full-text search index execution, debounced query triggers, and command palette result deduplication.
 * `tests/judgeUxAndHardening.test.ts` (5 tests): Hackathon judge preset validation and UX flow safeguards.

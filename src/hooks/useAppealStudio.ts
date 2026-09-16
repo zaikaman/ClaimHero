@@ -13,6 +13,7 @@ import {
   type TextDeltaOp,
 } from "../lib/yjsBrief";
 import { BriefSyncProvider, type BriefSyncStatus, type SyncPayload } from "../lib/yjsProvider";
+import { useDraftStream } from "./useDraftStream";
 import { Id } from "../../convex/_generated/dataModel";
 import { soundEffects } from "../lib/soundEffects";
 
@@ -56,6 +57,9 @@ export function useAppealStudio(
   const [senderCredentials, setSenderCredentials] = useState<string>(claim?.appealContext?.sender.credentials || "");
   const [senderEmail, setSenderEmail] = useState<string>(claim?.appealContext?.sender.email || "");
   const [senderPhone, setSenderPhone] = useState<string>(claim?.appealContext?.sender.phone || "");
+
+  // Live token stream for the drafting thread the synthesis action writes into
+  const draftStream = useDraftStream({ claimId, kind: "appeal_brief" });
 
   const saveDraftMutation = useMutation(api.appeals.saveDraft);
   const escalateTierMutation = useMutation(api.appeals.escalateTier);
@@ -592,6 +596,9 @@ export function useAppealStudio(
       const targetLevel = customLevel || appealLevel;
       setIsSynthesizing(true);
       try {
+        // Open the drafting thread first so deltas stream into a subscribed row
+        const draftThreadId = await draftStream.beginDraft();
+
         const result = await synthesizeAction({
           claimId: claim._id as Id<"claims">,
           appealLevel: targetLevel,
@@ -600,6 +607,7 @@ export function useAppealStudio(
           senderCredentials: customSender?.credentials || senderCredentials || undefined,
           senderEmail: customSender?.email || senderEmail || undefined,
           senderPhone: customSender?.phone || senderPhone || undefined,
+          draftThreadId,
         });
 
         if (result?.fullAppealMarkdown) {
@@ -622,7 +630,17 @@ export function useAppealStudio(
         setIsSynthesizing(false);
       }
     },
-    [claim, appealLevel, physicianNotes, senderName, senderCredentials, senderEmail, senderPhone, synthesizeAction]
+    [
+      claim,
+      appealLevel,
+      physicianNotes,
+      senderName,
+      senderCredentials,
+      senderEmail,
+      senderPhone,
+      synthesizeAction,
+      draftStream,
+    ]
   );
 
   // Escalate to next statutory tier and synthesize escalated legal brief
@@ -758,5 +776,6 @@ export function useAppealStudio(
     collabStatus,
     boundAppealId,
     registerEditor,
+    draftStream,
   };
 }

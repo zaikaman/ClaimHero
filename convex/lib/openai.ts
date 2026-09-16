@@ -38,6 +38,26 @@ export function getOpenAIClient(options: { timeout?: number; maxRetries?: number
 const DEFAULT_STRUCTURED_RETRIES = 2;
 const STRUCTURED_RETRY_DELAY_MS = 250;
 
+/**
+ * Corrective instruction appended to the prompt when a previous attempt
+ * violated the structured-output contract. Providers that acknowledge a JSON
+ * schema request but still return prose or YAML need this explicit restatement.
+ */
+export const STRUCTURED_RETRY_INSTRUCTION =
+  "\n\nThe previous response did not satisfy the structured-output contract. Return only one valid JSON object matching the supplied schema. Do not return YAML, `key: value` lines, Markdown, a subject line, a preamble, or a second document. Do not omit required fields.";
+
+/**
+ * Classify a structured-output failure that is safe to retry: either the
+ * response violated the JSON contract, or the transport itself failed.
+ */
+export function isStructuredOutputProtocolError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    /Failed to parse structured JSON response|response empty for schema/i.test(error.message) ||
+    /unreachable|connection|timeout|rate limit|429|500|502|503|504|econnreset|fetch failed/i.test(error.message)
+  );
+}
+
 function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -94,7 +114,12 @@ function hasRequiredStructuredFields(value: unknown, schema: Record<string, unkn
   );
 }
 
-function parseStructuredContent<T>(content: string, model: string, schemaName: string, schema: Record<string, unknown>): T {
+/**
+ * Extract the first JSON value that satisfies the schema's required fields from
+ * raw model text. Shared by the direct SDK path and the agent streaming path so
+ * both enforce identical structured-output semantics.
+ */
+export function parseStructuredOutput<T>(content: string, model: string, schemaName: string, schema: Record<string, unknown>): T {
   let trimmed = content.trim();
   if (trimmed.startsWith("```")) {
     trimmed = trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -122,15 +147,7 @@ function parseStructuredContent<T>(content: string, model: string, schemaName: s
   );
 }
 
-function isStructuredOutputProtocolError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  return (
-    /Failed to parse structured JSON response|response empty for schema/i.test(error.message) ||
-    /unreachable|connection|timeout|rate limit|429|500|502|503|504|econnreset|fetch failed/i.test(error.message)
-  );
-}
-
-function buildStructuredSystemPrompt(systemPrompt: string, schemaName: string, schema: Record<string, unknown>): string {
+export function buildStructuredOutputSystemPrompt(systemPrompt: string, schemaName: string, schema: Record<string, unknown>): string {
   if (systemPrompt.includes("JSON SCHEMA") && systemPrompt.includes(schemaName)) {
     return systemPrompt;
   }
@@ -157,7 +174,7 @@ async function createStructuredCompletionAttempt<T>(options: {
   fileInputs?: Array<{ fileData: string; filename: string }>;
   temperature?: number;
 }): Promise<T> {
-  const effectiveSystemPrompt = buildStructuredSystemPrompt(
+  const effectiveSystemPrompt = buildStructuredOutputSystemPrompt(
     options.systemPrompt,
     options.schemaName,
     options.schema
@@ -187,7 +204,7 @@ async function createStructuredCompletionAttempt<T>(options: {
     });
     const messageContent = response.output_text;
     if (!messageContent) throw new Error(`OpenAI response empty for schema ${options.schemaName}`);
-    return parseStructuredContent<T>(messageContent, options.model, options.schemaName, options.schema);
+    return parseStructuredOutput<T>(messageContent, options.model, options.schemaName, options.schema);
   }
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -227,7 +244,7 @@ async function createStructuredCompletionAttempt<T>(options: {
 
   const messageContent = response.choices[0]?.message?.content;
   if (!messageContent) throw new Error(`OpenAI response empty for schema ${options.schemaName}`);
-  return parseStructuredContent<T>(messageContent, options.model, options.schemaName, options.schema);
+  return parseStructuredOutput<T>(messageContent, options.model, options.schemaName, options.schema);
 }
 
 /**
@@ -264,9 +281,7 @@ export async function createStructuredCompletion<T>(options: {
   const attempts = retries + 1;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const retryInstruction = attempt === 0
-      ? ""
-      : "\n\nThe previous response did not satisfy the structured-output contract. Return only one valid JSON object matching the supplied schema. Do not return YAML, `key: value` lines, Markdown, a subject line, a preamble, or a second document. Do not omit required fields.";
+    const retryInstruction = attempt === 0 ? "" : STRUCTURED_RETRY_INSTRUCTION;
 
     try {
       return await createStructuredCompletionAttempt<T>({

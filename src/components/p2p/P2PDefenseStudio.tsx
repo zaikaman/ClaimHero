@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Claim } from "../../types";
+import { toast } from "sonner";
 import { useDetailMode } from "../../hooks/useDetailMode";
 import { useP2PDefense } from "../../hooks/useP2PDefense";
 import { NavigationView } from "../layout/Sidebar";
 import { Card } from "../ui/card";
 import { P2PLiveCopilot } from "./P2PLiveCopilot";
+import { LiveDraftStream } from "../common/LiveDraftStream";
 import {
   PhoneCall,
   Printer,
@@ -45,6 +47,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
     isSynthesizing,
     saveStatus,
     generateScript,
+    draftStream,
   } = useP2PDefense(claim);
 
   // 2-Mode architecture: 'playbook' (pre-call prep & print) vs 'copilot' (live call & AI simulation)
@@ -92,6 +95,26 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
   const payer = claim.patient?.insurancePayer || "Health Insurer";
   const cptList = (claim.cptCodes || []).join(", ");
   const icdList = (claim.icd10Codes || []).join(", ");
+
+  // Regenerate from the toolbar: surfaces failures instead of dropping them
+  const handleRegenerate = async () => {
+    try {
+      await generateScript({
+        physicianName: customPhysicianName || undefined,
+        physicianSpecialty: customPhysicianSpecialty || undefined,
+        medicalDirectorRole: customMedicalDirectorRole || undefined,
+        customStrategyNotes: customStrategyNotes || undefined,
+      });
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : isDetailed
+            ? "P2P defense tele-script generation failed. Please try again."
+            : "We could not write the call script. Please try again."
+      );
+    }
+  };
 
   const handlePrint = () => {
     if (!script) {
@@ -357,14 +380,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
           <Button
             variant="outline"
             size="xs"
-            onClick={() =>
-              generateScript({
-                physicianName: customPhysicianName || undefined,
-                physicianSpecialty: customPhysicianSpecialty || undefined,
-                medicalDirectorRole: customMedicalDirectorRole || undefined,
-                customStrategyNotes: customStrategyNotes || undefined,
-              })
-            }
+            onClick={() => void handleRegenerate()}
             disabled={isSynthesizing}
             className="h-7 rounded-md px-2.5 text-xs gap-1.5 border-border/70 text-foreground cursor-pointer"
             title={isDetailed ? "Regenerate defense script from clinical policy data" : "Rewrite the call script"}
@@ -379,8 +395,35 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
         </div>
       </div>
 
+      {/* Live drafting preview: verbal sections appear as the model writes */}
+      <LiveDraftStream
+        isActive={Boolean(isSynthesizing)}
+        isStreaming={Boolean(draftStream.isStreaming || isSynthesizing)}
+        streamedText={draftStream.streamedText}
+        fields={[
+          {
+            key: "openingStatutoryStatement",
+            label: isDetailed ? "Statutory opening" : "How to open the call",
+          },
+          {
+            key: "statutoryDemands",
+            label: isDetailed ? "Closing demand" : "How to close the call",
+          },
+        ]}
+        label={
+          isDetailed
+            ? "Drafting the P2P defense tele-script"
+            : "Writing your call script"
+        }
+        waitingMessage={
+          isDetailed
+            ? "Streaming grounded verbal counter-strikes from the indexed clinical policy citations. The finished playbook replaces this preview and is saved automatically."
+            : "Writing what to say, opening to close, from your policy evidence. The finished script replaces this preview on its own."
+        }
+      />
+
       {/* Loading Skeleton */}
-      {isSynthesizing && !script && (
+      {isSynthesizing && !script && !draftStream.hasStream && (
         <Card className="p-8 flex flex-col items-center justify-center space-y-3 bg-card/60 backdrop-blur-md border-border/80">
           <CircleNotch className="size-6 text-primary animate-spin" />
           <div className="text-xs font-mono text-muted-foreground">

@@ -1,11 +1,9 @@
-import { query, mutation, internalQuery, internalMutation, MutationCtx } from "./_generated/server";
-import { v, ConvexError } from "convex/values";
-import type { Id, Doc } from "./_generated/dataModel";
-import { rateLimiter } from "./lib/rateLimiter";
+import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
+import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import {
   getChatbotSessionIfAuthorized,
   requireAuthUser,
-  requireChatbotSessionOwner,
   requireClaimAccess,
   getAuthUserId,
 } from "./lib/auth";
@@ -101,172 +99,24 @@ export const getSessionInternal = internalQuery({
 });
 
 /**
- * List all messages in a session, verifying session ownership
+ * Detach a session from its agent thread after the thread's messages have been
+ * deleted. Called by the Sentinel agent action, which owns the conversation
+ * history through the `@convex-dev/agent` component.
  */
-export const listMessages = query({
+export const clearSessionThreadInternal = internalMutation({
   args: {
     sessionId: v.id("chatbotSessions"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const session = await getChatbotSessionIfAuthorized(ctx, args.sessionId);
-    if (!session) return [];
-
-    return await ctx.db
-      .query("chatbotMessages")
-      .withIndex("by_session_and_time", (q) => q.eq("sessionId", args.sessionId))
-      .order("asc")
-      .take(100);
-  },
-});
-
-/**
- * Internal query for chatbot actions to list messages
- */
-export const listMessagesInternal = internalQuery({
-  args: {
-    sessionId: v.id("chatbotSessions"),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("chatbotMessages")
-      .withIndex("by_session_and_time", (q) => q.eq("sessionId", args.sessionId))
-      .order("asc")
-      .take(100);
-  },
-});
-
-interface AddMessageArgs {
-  sessionId: Id<"chatbotSessions">;
-  role: "user" | "assistant" | "system" | "tool";
-  content: string;
-  toolCalls?: Array<{
-    id: string;
-    name: string;
-    arguments: string;
-    output?: string;
-  }>;
-}
-
-async function applyAddMessage(ctx: MutationCtx, args: AddMessageArgs) {
-  const session = await ctx.db.get(args.sessionId);
-  if (!session) throw new Error("Chatbot session not found");
-
-  const now = Date.now();
-  const messageId = await ctx.db.insert("chatbotMessages", {
-    sessionId: args.sessionId,
-    role: args.role,
-    content: args.content,
-    toolCalls: args.toolCalls,
-    createdAt: now,
-  });
-
-  // Auto update title if this is the first user message
-  let title = session.title;
-  if (session.messageCount === 0 && args.role === "user") {
-    title = args.content.slice(0, 45).trim();
-    if (args.content.length > 45) title += "...";
-  }
-
-  await ctx.db.patch(args.sessionId, {
-    title,
-    messageCount: (session.messageCount || 0) + 1,
-    updatedAt: now,
-  });
-
-  return messageId;
-}
-
-/**
- * Add a message to a session
- */
-export const addMessage = mutation({
-  args: {
-    sessionId: v.id("chatbotSessions"),
-    role: v.literal("user"),
-    content: v.string(),
-    toolCalls: v.optional(
-      v.array(
-        v.object({
-          id: v.string(),
-          name: v.string(),
-          arguments: v.string(),
-          output: v.optional(v.string()),
-        })
-      )
-    ),
-  },
-  handler: async (ctx, args) => {
-    const { userId } = await requireChatbotSessionOwner(ctx, args.sessionId);
-
-    // Enforce chatMessage rate limiting per user/session
-    try {
-      const limitStatus = await rateLimiter.limit(ctx, "chatMessage", {
-        key: userId || args.sessionId,
-      });
-      if (!limitStatus.ok) {
-        throw new ConvexError({
-          code: "RATE_LIMITED",
-          status: 429,
-          message: `Chat message rate limit exceeded. Please wait ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)}s before sending another message.`,
-        });
-      }
-    } catch (rateErr) {
-      if (rateErr instanceof ConvexError) throw rateErr;
-      if (process.env.NODE_ENV !== "test") {
-        console.warn("[RateLimiter] Unexpected error checking chatMessage rate limit:", rateErr);
-      }
-    }
-
-    return await applyAddMessage(ctx, args);
-  },
-});
-
-/**
- * Internal mutation for background actions to add messages
- */
-export const addMessageInternal = internalMutation({
-  args: {
-    sessionId: v.id("chatbotSessions"),
-    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system"), v.literal("tool")),
-    content: v.string(),
-    toolCalls: v.optional(
-      v.array(
-        v.object({
-          id: v.string(),
-          name: v.string(),
-          arguments: v.string(),
-          output: v.optional(v.string()),
-        })
-      )
-    ),
-  },
-  handler: async (ctx, args) => {
-    return await applyAddMessage(ctx, args);
-  },
-});
-
-/**
- * Clear all messages in a session
- */
-export const clearSession = mutation({
-  args: {
-    sessionId: v.id("chatbotSessions"),
-  },
-  handler: async (ctx, args) => {
-    await requireChatbotSessionOwner(ctx, args.sessionId);
-
-    const messages = await ctx.db
-      .query("chatbotMessages")
-      .withIndex("by_session_and_time", (q) => q.eq("sessionId", args.sessionId))
-      .take(200);
-
-    for (const msg of messages) {
-      await ctx.db.delete(msg._id);
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) throw new Error("Chatbot session not found");
+    if (session.userId !== args.userId) {
+      throw new Error("Forbidden: You do not have permission to reset this chat session");
     }
 
     await ctx.db.patch(args.sessionId, {
       messageCount: 0,
-      summary: undefined,
       agentThreadId: undefined,
       title: "Clinical & Appellate Inquiry",
       updatedAt: Date.now(),
@@ -290,63 +140,6 @@ export const incrementSessionMessageCount = internalMutation({
       messageCount: (session.messageCount || 0) + 1,
       updatedAt: Date.now(),
     });
-  },
-});
-
-/**
- * Update session summary
- */
-export const updateSessionSummary = internalMutation({
-  args: {
-    sessionId: v.id("chatbotSessions"),
-    summary: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.sessionId, {
-      summary: args.summary,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
-/**
- * Internal mutation to update session summary and trim older messages
- * to enforce bounded history and prevent unbounded table growth.
- */
-export const summarizeAndTrimSessionInternal = internalMutation({
-  args: {
-    sessionId: v.id("chatbotSessions"),
-    summary: v.string(),
-    keepRecentCount: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const keepCount = Math.max(4, args.keepRecentCount ?? 10);
-    const now = Date.now();
-
-    // Fetch all messages in the session ordered oldest first
-    const messages = await ctx.db
-      .query("chatbotMessages")
-      .withIndex("by_session_and_time", (q) => q.eq("sessionId", args.sessionId))
-      .order("asc")
-      .take(100);
-
-    // If more messages than the keep threshold, delete the older ones
-    if (messages.length > keepCount) {
-      const messagesToDelete = messages.slice(0, messages.length - keepCount);
-      for (const msg of messagesToDelete) {
-        await ctx.db.delete(msg._id);
-      }
-    }
-
-    const remainingCount = Math.min(messages.length, keepCount);
-
-    await ctx.db.patch(args.sessionId, {
-      summary: args.summary,
-      messageCount: remainingCount,
-      updatedAt: now,
-    });
-
-    return { trimmedCount: Math.max(0, messages.length - keepCount), remainingCount };
   },
 });
 

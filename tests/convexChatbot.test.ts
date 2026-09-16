@@ -101,136 +101,60 @@ describe("Convex Sentinel Chatbot Server Functions", () => {
     });
   });
 
-  describe("listMessages & listMessagesInternal", () => {
-    it("listMessages: returns empty array if unauthorized", async () => {
-      vi.mocked(getAuthUserId).mockResolvedValue(null);
-      const mockCtx: any = { db: { get: vi.fn().mockResolvedValue(null) } };
-      const res = await (chatbot.listMessages as any)._handler(mockCtx, { sessionId: "sess_1" });
-      expect(res).toEqual([]);
-    });
-
-    it("listMessages: returns messages when authorized", async () => {
-      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
-      const session = { _id: "sess_1", userId: "user_123" };
-      const msgs = [{ _id: "m1", content: "hello" }];
+  describe("clearSessionThreadInternal", () => {
+    it("resets session metadata for the owning user", async () => {
+      const session = { _id: "sess_1", userId: "user_123", messageCount: 4 };
       const mockCtx: any = {
         db: {
           get: vi.fn().mockResolvedValue(session),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              order: vi.fn().mockReturnValue({
-                take: vi.fn().mockResolvedValue(msgs),
-              }),
-            }),
-          }),
-        },
-      };
-      const res = await (chatbot.listMessages as any)._handler(mockCtx, { sessionId: "sess_1" });
-      expect(res).toEqual(msgs);
-    });
-
-    it("listMessagesInternal: returns messages directly", async () => {
-      const msgs = [{ _id: "m1", content: "hello" }];
-      const mockCtx: any = {
-        db: {
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              order: vi.fn().mockReturnValue({
-                take: vi.fn().mockResolvedValue(msgs),
-              }),
-            }),
-          }),
-        },
-      };
-      const res = await (chatbot.listMessagesInternal as any)._handler(mockCtx, { sessionId: "sess_1" });
-      expect(res).toEqual(msgs);
-    });
-  });
-
-  describe("addMessage, addMessageInternal, clearSession & updateSessionSummary", () => {
-    it("addMessage: throws if session not found, else inserts message and auto-titles on first user message", async () => {
-      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
-      const session = { _id: "sess_1", userId: "user_123", messageCount: 0, title: "Default Title" };
-      const mockCtx: any = {
-        db: {
-          get: vi.fn().mockResolvedValue(session),
-          insert: vi.fn().mockResolvedValue("msg_new_1"),
           patch: vi.fn().mockResolvedValue(undefined),
         },
       };
 
-      const res = await (chatbot.addMessage as any)._handler(mockCtx, {
+      const res = await (chatbot.clearSessionThreadInternal as any)._handler(mockCtx, {
         sessionId: "sess_1",
-        role: "user",
-        content: "Explain CPT 27447 total knee arthroplasty medical necessity criteria",
+        userId: "user_123",
       });
 
-      expect(res).toBe("msg_new_1");
-      expect(mockCtx.db.patch).toHaveBeenCalledWith("sess_1", expect.objectContaining({
-        title: expect.stringContaining("Explain CPT 27447"),
-        messageCount: 1,
-      }));
-    });
-
-    it("addMessageInternal: inserts message with tool calls", async () => {
-      const session = { _id: "sess_1", messageCount: 2, title: "Existing Title" };
-      const mockCtx: any = {
-        db: {
-          get: vi.fn().mockResolvedValue(session),
-          insert: vi.fn().mockResolvedValue("msg_tool_1"),
-          patch: vi.fn().mockResolvedValue(undefined),
-        },
-      };
-
-      const res = await (chatbot.addMessageInternal as any)._handler(mockCtx, {
-        sessionId: "sess_1",
-        role: "assistant",
-        content: "Let me check the clinical evidence.",
-        toolCalls: [{ id: "t1", name: "get_clinical_evidence", arguments: "{}" }],
-      });
-
-      expect(res).toBe("msg_tool_1");
-      expect(mockCtx.db.patch).toHaveBeenCalledWith("sess_1", expect.objectContaining({
-        title: "Existing Title",
-        messageCount: 3,
-      }));
-    });
-
-    it("clearSession: deletes all messages and resets session metadata", async () => {
-      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
-      const session = { _id: "sess_1", userId: "user_123" };
-      const msgs = [{ _id: "m1" }, { _id: "m2" }];
-      const mockCtx: any = {
-        db: {
-          get: vi.fn().mockResolvedValue(session),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              take: vi.fn().mockResolvedValue(msgs),
-            }),
-          }),
-          delete: vi.fn().mockResolvedValue(undefined),
-          patch: vi.fn().mockResolvedValue(undefined),
-        },
-      };
-
-      const res = await (chatbot.clearSession as any)._handler(mockCtx, { sessionId: "sess_1" });
       expect(res).toEqual({ success: true });
-      expect(mockCtx.db.delete).toHaveBeenCalledTimes(2);
-      expect(mockCtx.db.patch).toHaveBeenCalledWith("sess_1", expect.objectContaining({
-        messageCount: 0,
-        title: "Clinical & Appellate Inquiry",
-      }));
+      expect(mockCtx.db.patch).toHaveBeenCalledWith(
+        "sess_1",
+        expect.objectContaining({
+          messageCount: 0,
+          agentThreadId: undefined,
+          title: "Clinical & Appellate Inquiry",
+        })
+      );
     });
 
-    it("updateSessionSummary: patches summary string", async () => {
-      const mockCtx: any = { db: { patch: vi.fn().mockResolvedValue(undefined) } };
-      await (chatbot.updateSessionSummary as any)._handler(mockCtx, {
-        sessionId: "sess_1",
-        summary: "Discussed ERISA 503 deadline",
-      });
-      expect(mockCtx.db.patch).toHaveBeenCalledWith("sess_1", expect.objectContaining({
-        summary: "Discussed ERISA 503 deadline",
-      }));
+    it("rejects a caller that does not own the session", async () => {
+      const session = { _id: "sess_1", userId: "user_victim" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(session),
+          patch: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      await expect(
+        (chatbot.clearSessionThreadInternal as any)._handler(mockCtx, {
+          sessionId: "sess_1",
+          userId: "user_attacker",
+        })
+      ).rejects.toThrow(/Forbidden/);
+
+      expect(mockCtx.db.patch).not.toHaveBeenCalled();
+    });
+
+    it("fails loudly when the session no longer exists", async () => {
+      const mockCtx: any = { db: { get: vi.fn().mockResolvedValue(null) } };
+
+      await expect(
+        (chatbot.clearSessionThreadInternal as any)._handler(mockCtx, {
+          sessionId: "sess_gone",
+          userId: "user_123",
+        })
+      ).rejects.toThrow(/not found/i);
     });
   });
 

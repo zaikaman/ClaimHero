@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useMutation, useAction } from "convex/react";
 import { useUIMessages } from "@convex-dev/agent/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -55,9 +55,8 @@ export function useSentinelChat(options: UseSentinelChatOptions) {
 
   const getOrCreateSessionMutation = useMutation(api.chatbot.getOrCreateSession);
   const getOrCreateAgentThreadMutation = useMutation(api.sentinelAgentQueries.getOrCreateAgentThread);
-  const clearSessionMutation = useMutation(api.chatbot.clearSession);
+  const resetSentinelThreadAction = useAction(api.actions.sentinelAgent.resetSentinelThread);
   const streamSentinelMessageAction = useAction(api.actions.sentinelAgent.streamSentinelMessage);
-  const fallbackSendMessageAction = useAction(api.actions.sentinelChatbot.sendMessageWithTools);
 
   // Close chat drawer immediately if navigating back to landing or login view
   useEffect(() => {
@@ -114,12 +113,6 @@ export function useSentinelChat(options: UseSentinelChatOptions) {
     api.sentinelAgentQueries.listThreadMessages,
     threadId ? { threadId } : "skip",
     { initialNumItems: 50, stream: true }
-  );
-
-  // Fallback to legacy database messages if no agent thread messages exist yet
-  const messagesFromDb = useQuery(
-    api.chatbot.listMessages,
-    sessionId ? { sessionId } : "skip"
   );
 
   // Map Agent component UIMessages into ChatMessage structure
@@ -195,29 +188,23 @@ export function useSentinelChat(options: UseSentinelChatOptions) {
           }
         }
 
-        if (activeThreadId) {
-          await streamSentinelMessageAction({
-            threadId: activeThreadId,
-            prompt: trimmed,
-            sessionId,
-            activeClaimId: selectedClaim?._id as Id<"claims"> | undefined,
-            activeClaimNumber: selectedClaim?.claimNumber,
-            activePayer: selectedClaim?.patient?.insurancePayer,
-            currentView,
-          });
-        } else {
-          // Fallback if thread creation was unavailable
-          await fallbackSendMessageAction({
-            sessionId,
-            userMessage: trimmed,
-            activeClaimId: selectedClaim?._id as Id<"claims"> | undefined,
-            activeClaimNumber: selectedClaim?.claimNumber,
-            activePayer: selectedClaim?.patient?.insurancePayer,
-            currentView,
-          });
+        if (!activeThreadId) {
+          throw new Error("Sentinel Copilot thread could not be created");
         }
+
+        await streamSentinelMessageAction({
+          threadId: activeThreadId,
+          prompt: trimmed,
+          sessionId,
+          activeClaimId: selectedClaim?._id as Id<"claims"> | undefined,
+          activeClaimNumber: selectedClaim?.claimNumber,
+          activePayer: selectedClaim?.patient?.insurancePayer,
+          currentView,
+        });
       } catch (error) {
+        // Rethrown so the chat surface can tell the user why nothing appeared
         console.error("Failed to send message to Sentinel Copilot:", error);
+        throw error;
       } finally {
         setIsSending(false);
       }
@@ -229,7 +216,6 @@ export function useSentinelChat(options: UseSentinelChatOptions) {
       threadId,
       getOrCreateAgentThreadMutation,
       streamSentinelMessageAction,
-      fallbackSendMessageAction,
       selectedClaim,
       currentView,
     ]
@@ -238,19 +224,25 @@ export function useSentinelChat(options: UseSentinelChatOptions) {
   const clearHistory = useCallback(async () => {
     if (!sessionId) return;
     try {
-      await clearSessionMutation({ sessionId });
+      // The agent component owns the conversation, so resetting history means
+      // deleting the thread and binding the session to a fresh one.
+      await resetSentinelThreadAction({ sessionId });
       setThreadId(null);
+      const res = await getOrCreateAgentThreadMutation({ sessionId });
+      if (res?.threadId) {
+        setThreadId(res.threadId);
+      }
     } catch (err) {
       console.error("Failed to clear chat history:", err);
     }
-  }, [sessionId, clearSessionMutation]);
+  }, [sessionId, resetSentinelThreadAction, getOrCreateAgentThreadMutation]);
 
   return {
     isOpen,
     setIsOpen,
     isSending: isSending || isAgentStreaming,
     isStreaming: isAgentStreaming,
-    messages: (mappedAgentMessages || (messagesFromDb || [])) as ChatMessage[],
+    messages: (mappedAgentMessages || []) as ChatMessage[],
     sendMessage,
     clearHistory,
     selectedClaim,

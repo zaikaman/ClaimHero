@@ -1,14 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as actionP2PDefenseGenerator from "../convex/actions/p2pDefenseGenerator";
 import * as actionP2PLiveCopilot from "../convex/actions/p2pLiveCopilot";
-import * as actionSentinelChatbot from "../convex/actions/sentinelChatbot";
 import * as libOpenAI from "../convex/lib/openai";
+import { streamStructuredDraft } from "../convex/lib/agentDraft";
 import { rateLimiter } from "../convex/lib/rateLimiter";
 // @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 vi.mock("@convex-dev/auth/server", () => ({
   getAuthUserId: vi.fn(),
+}));
+
+// Long-form drafting now streams through the Convex agent component
+vi.mock("../convex/lib/agentDraft", () => ({
+  streamStructuredDraft: vi.fn(),
 }));
 
 describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot", () => {
@@ -64,7 +69,11 @@ describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot
         },
       };
 
-      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue(mockScriptOutput as any);
+      vi.mocked(streamStructuredDraft).mockResolvedValue({
+        result: mockScriptOutput as any,
+        threadId: "thread_p2p_1",
+        attempts: 1,
+      });
 
       const mockCtx: any = {
         runQuery: vi.fn().mockImplementation((fn, args) => {
@@ -79,6 +88,15 @@ describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot
       });
 
       expect(res.scriptId).toBe("script_new_1");
+      expect(res.generatedBy).toBe("openai");
+      // The generation must run through the agent component, not the raw SDK
+      expect(vi.mocked(streamStructuredDraft)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ctx: mockCtx,
+          userId: "user_123",
+          schemaName: "P2PDefenseSynthesisResult",
+        })
+      );
       expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
         claimId: "c1",
         physicianName: "Dr. Amanda Vance",
@@ -293,193 +311,4 @@ describe("Convex Actions: P2P Defense Generator, Live Copilot & Sentinel Chatbot
     });
   });
 
-  describe("convex/actions/sentinelChatbot", () => {
-    it("sendMessageWithTools: executes conversational workflow and responds with assistant message", async () => {
-      process.env.OPENAI_API_KEY = "sk-test-key-12345";
-      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
-      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
-
-      const mockSession = {
-        _id: "sess_1",
-        userId: "user_123",
-        activeClaimId: "c1",
-        messageCount: 1,
-        summary: "Previous inquiry about ERISA 503",
-      };
-
-      const mockMessages = [
-        {
-          role: "user",
-          content: "Hello",
-        },
-      ];
-
-      let qCount = 0;
-      const mockCtx: any = {
-        runQuery: vi.fn().mockImplementation(() => {
-          qCount++;
-          if (qCount === 1) return Promise.resolve(mockSession);
-          return Promise.resolve(mockMessages);
-        }),
-        runMutation: vi.fn().mockResolvedValue("msg_assistant_1"),
-      };
-
-      vi.spyOn(libOpenAI, "getOpenAIClient").mockReturnValue({
-        chat: {
-          completions: {
-            create: vi.fn().mockResolvedValue({
-              choices: [
-                {
-                  message: {
-                    role: "assistant",
-                    content: "Under ERISA § 503, the insurer must provide a full and fair review within 30 days.",
-                  },
-                },
-              ],
-            }),
-          },
-        },
-      } as any);
-
-      const res = await (actionSentinelChatbot.sendMessageWithTools as any)._handler(mockCtx, {
-        sessionId: "sess_1",
-        userMessage: "What is the statutory deadline for ERISA appeals?",
-      });
-
-      expect(res.reply).toContain("ERISA § 503");
-      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-        sessionId: "sess_1",
-        role: "assistant",
-      }));
-    });
-
-    it("sendMessageWithTools: rejects unauthorized caller attempting to access another user's chat session", async () => {
-      vi.mocked(getAuthUserId).mockResolvedValue("user_attacker_999" as any);
-
-      const mockSession = {
-        _id: "sess_victim",
-        userId: "user_victim_123",
-      };
-
-      const mockCtx: any = {
-        runQuery: vi.fn().mockResolvedValue(mockSession),
-      };
-
-      await expect(
-        (actionSentinelChatbot.sendMessageWithTools as any)._handler(mockCtx, {
-          sessionId: "sess_victim",
-          userMessage: "Exfiltrate victim claims",
-        })
-      ).rejects.toThrow(/Forbidden.*permission to access this chat session/i);
-    });
-
-    it("sendMessageWithTools: rejects unauthenticated caller attempting to send a message to a chat session", async () => {
-      vi.mocked(getAuthUserId).mockResolvedValue(null);
-
-      const mockSession = {
-        _id: "sess_victim",
-        userId: "user_victim_123",
-      };
-
-      const mockCtx: any = {
-        runQuery: vi.fn().mockResolvedValue(mockSession),
-      };
-
-      await expect(
-        (actionSentinelChatbot.sendMessageWithTools as any)._handler(mockCtx, {
-          sessionId: "sess_victim",
-          userMessage: "Exfiltrate victim claims",
-        })
-      ).rejects.toThrow(/Unauthorized.*Authentication required/i);
-    });
-
-    it("sendMessageWithTools: strips unowned activeClaimId and passes userId into tool calls", async () => {
-      process.env.OPENAI_API_KEY = "sk-test-key-12345";
-      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
-      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
-
-      const mockSession = {
-        _id: "sess_1",
-        userId: "user_123",
-        activeClaimId: undefined,
-        messageCount: 0,
-      };
-
-      let sessionQueryDone = false;
-      const mockCtx: any = {
-        runQuery: vi.fn().mockImplementation((fn, args) => {
-          if (args?.claimId === "claim_victim" && args?.userId === "user_123") {
-            return Promise.resolve(null);
-          }
-          if (args?.sessionId) {
-            if (!sessionQueryDone) {
-              sessionQueryDone = true;
-              return Promise.resolve(mockSession);
-            }
-            return Promise.resolve([]);
-          }
-          if (args?.searchTerm) {
-            return Promise.resolve([]);
-          }
-          return Promise.resolve([]);
-        }),
-        runMutation: vi.fn().mockResolvedValue("msg_assistant_1"),
-      };
-
-      // Mock OpenAI tool call
-      let toolExecutionOccurred = false;
-      vi.spyOn(libOpenAI, "getOpenAIClient").mockReturnValue({
-        chat: {
-          completions: {
-            create: vi.fn()
-              .mockResolvedValueOnce({
-                choices: [
-                  {
-                    message: {
-                      role: "assistant",
-                      content: null,
-                      tool_calls: [
-                        {
-                          id: "call_1",
-                          function: {
-                            name: "search_claims",
-                            arguments: JSON.stringify({ searchTerm: "urgent" }),
-                          },
-                        },
-                      ],
-                    },
-                  },
-                ],
-              })
-              .mockResolvedValueOnce({
-                choices: [
-                  {
-                    message: {
-                      role: "assistant",
-                      content: "Searched your claims only.",
-                    },
-                  },
-                ],
-              }),
-          },
-        },
-      } as any);
-
-      const res = await (actionSentinelChatbot.sendMessageWithTools as any)._handler(mockCtx, {
-        sessionId: "sess_1",
-        userMessage: "Find my urgent claims",
-        activeClaimId: "claim_victim", // Attempting to pass victim claim
-      });
-
-      expect(res.reply).toContain("Searched your claims only");
-      // Verify searchClaimsForChatbot was called with caller's userId
-      expect(mockCtx.runQuery).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          userId: "user_123",
-          searchTerm: "urgent",
-        })
-      );
-    });
-  });
 });

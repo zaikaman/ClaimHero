@@ -59,58 +59,17 @@ describe("Backend Architectural Optimizations D-1 through D-7", () => {
     });
   });
 
-  describe("D-4: Chatbot Session Summarization & Trimming", () => {
-    it("summarizeAndTrimSessionInternal trims older messages and updates session summary", async () => {
-      const mockSession = {
-        _id: "sess_1",
-        claimId: "claim_1",
-        messageCount: 20,
-        summary: undefined,
-      };
-
-      const messages = Array.from({ length: 15 }, (_, i) => ({
-        _id: `msg_${i + 1}`,
-        sessionId: "sess_1",
-        createdAt: 1000 + i * 10,
-      }));
-
-      const deletedIds: string[] = [];
-      const mockCtx: any = {
-        db: {
-          get: vi.fn().mockResolvedValue(mockSession),
-          query: vi.fn().mockReturnValue({
-            withIndex: vi.fn().mockReturnValue({
-              order: vi.fn().mockReturnValue({
-                take: vi.fn().mockResolvedValue(messages),
-                collect: vi.fn().mockResolvedValue(messages),
-              }),
-            }),
-          }),
-          delete: vi.fn().mockImplementation((id: string) => {
-            deletedIds.push(id);
-            return Promise.resolve();
-          }),
-          patch: vi.fn().mockResolvedValue(undefined),
-        },
-      };
-
-      const res = await (chatbotModule.summarizeAndTrimSessionInternal as any)._handler(mockCtx, {
-        sessionId: "sess_1",
-        summary: "Claimant is appealing denial of Knee MRI based on conservative therapy failure.",
-        keepRecentCount: 5,
-      });
-
-      expect(res.trimmedCount).toBe(10);
-      expect(res.remainingCount).toBe(5);
-      expect(deletedIds).toHaveLength(10);
-      expect(deletedIds[0]).toBe("msg_1");
-      expect(deletedIds[9]).toBe("msg_10");
-
-      expect(mockCtx.db.patch).toHaveBeenCalledWith("sess_1", {
-        summary: "Claimant is appealing denial of Knee MRI based on conservative therapy failure.",
-        messageCount: 5,
-        updatedAt: expect.any(Number),
-      });
+  describe("D-4: Agent-owned conversation history (no app-side message table)", () => {
+    it("exposes no legacy message or summary internals", () => {
+      // Conversation history is owned by the @convex-dev/agent component, so the
+      // app no longer maintains a parallel message store or rolling summary.
+      expect((chatbotModule as any).listMessages).toBeUndefined();
+      expect((chatbotModule as any).listMessagesInternal).toBeUndefined();
+      expect((chatbotModule as any).addMessage).toBeUndefined();
+      expect((chatbotModule as any).addMessageInternal).toBeUndefined();
+      expect((chatbotModule as any).updateSessionSummary).toBeUndefined();
+      expect((chatbotModule as any).summarizeAndTrimSessionInternal).toBeUndefined();
+      expect(typeof (chatbotModule as any).clearSessionThreadInternal).toBe("function");
     });
   });
 

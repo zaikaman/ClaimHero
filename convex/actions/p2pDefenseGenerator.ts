@@ -2,7 +2,7 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { createStructuredCompletion } from "../lib/openai";
+import { streamStructuredDraft } from "../lib/agentDraft";
 import { internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
@@ -324,6 +324,8 @@ export const generateP2PScript = action({
     physicianSpecialty: v.optional(v.string()),
     medicalDirectorRole: v.optional(v.string()),
     customStrategyNotes: v.optional(v.string()),
+    /** Agent thread created by the Studio so it can render live drafting deltas. */
+    draftThreadId: v.optional(v.string()),
   },
   handler: async (
     ctx,
@@ -382,7 +384,11 @@ export const generateP2PScript = action({
     let generatedBy: "openai" | "fallback" = "openai";
 
     try {
-      rawResult = await createStructuredCompletion<P2PDefenseSynthesisResult>({
+      rawResult = (await streamStructuredDraft<P2PDefenseSynthesisResult>({
+        ctx,
+        userId,
+        threadId: args.draftThreadId,
+        threadTitle: `P2P tele-script drafting - ${claim.claimNumber}`,
         systemPrompt: `You are an elite Physician Peer-to-Peer (P2P) Defense Strategist and Healthcare Utilization Review Legal Counsel.
 Your mission is to generate a high-impact, razor-sharp 3-Minute Verbal Rebuttal Script and Condensed Pocket Cheat Sheet for a treating physician who must defend a denied medical claim during a 5-minute phone conference with an insurer medical director.
 
@@ -419,8 +425,7 @@ ${args.customStrategyNotes ? `Custom Strategy Tactical Emphasis:\n${args.customS
 Return the structured P2P defense tele-script and condensed pocket cheat sheet.`,
         schemaName: "P2PDefenseSynthesisResult",
         schema: P2P_DEFENSE_SCHEMA,
-        temperature: 0.2,
-      });
+      })).result;
 
       // Assemble full markdown
       rawResult.fullScriptMarkdown = assembleFullP2PScriptMarkdown(

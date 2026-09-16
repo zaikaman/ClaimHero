@@ -3,9 +3,9 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { Agent, createTool, stepCountIs } from "@convex-dev/agent";
-import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
-import { getOpenAIConfig } from "../lib/openai";
+import { getAgentLanguageModel } from "../lib/agentModel";
+import { buildLeanSentinelPrompt } from "../lib/sentinelPrompt";
 import { redactBeforeLLM } from "../lib/redactionEngine";
 import { api, components, internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
@@ -13,19 +13,6 @@ import { rateLimiter } from "../lib/rateLimiter";
 import { getAuthUserId } from "../lib/auth";
 import { FirecrawlClient, type Format } from "@firecrawl/firecrawl-convex";
 import { isAccessDeniedDocument, sanitizePublicPolicyUrl } from "./policyCrawler";
-import { buildLeanSentinelPrompt } from "./sentinelChatbot";
-
-/**
- * Configure OpenAI client for the AI Agent
- */
-export function getAgentLanguageModel() {
-  const { apiKey, model, baseURL } = getOpenAIConfig();
-  const openai = createOpenAI({
-    apiKey,
-    baseURL: baseURL || undefined,
-  });
-  return openai(model);
-}
 
 // 1. Get Active Claim Details Tool
 export const getActiveClaimDetails = createTool({
@@ -372,13 +359,22 @@ export const crawlAndAttachEvidence = createTool({
   },
 });
 
+/**
+ * Every capability the copilot advertises in its system prompt. Registering the
+ * Firecrawl tools here (rather than in a second, hand-rolled tool dispatcher)
+ * keeps one tool implementation and one tool-selection surface.
+ */
 export const SENTINEL_AGENT_TOOLS = {
   get_active_claim_details: getActiveClaimDetails,
   search_claims: searchClaims,
   get_clinical_evidence: getClinicalEvidence,
   get_appeal_brief: getAppealBrief,
+  get_p2p_defense_script: getP2PDefenseScript,
   get_audit_trail: getAuditTrail,
   search_precedents: searchPrecedents,
+  firecrawl_web_search: firecrawlWebSearch,
+  firecrawl_scrape_url: firecrawlScrapeUrl,
+  crawl_and_attach_evidence: crawlAndAttachEvidence,
 };
 
 /**
@@ -407,7 +403,6 @@ export const streamSentinelMessage = action({
     activeClaimNumber: v.optional(v.string()),
     activePayer: v.optional(v.string()),
     currentView: v.optional(v.string()),
-    conversationSummary: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -428,7 +423,6 @@ export const streamSentinelMessage = action({
       activeClaimId: args.activeClaimId,
       activeClaimNumber: args.activeClaimNumber,
       activePayer: args.activePayer,
-      conversationSummary: args.conversationSummary,
     });
 
     const agent = createSentinelAgent();
@@ -460,6 +454,42 @@ export const streamSentinelMessage = action({
         console.warn("Failed to increment session message count:", err);
       }
     }
+
+    return { success: true };
+  },
+});
+
+/**
+ * Delete the session's agent thread so the next message starts a clean
+ * conversation. The agent component owns the message history, so clearing chat
+ * history means deleting the thread rather than rows in an app table.
+ */
+export const resetSentinelThread = action({
+  args: {
+    sessionId: v.id("chatbotSessions"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthorized: You must be logged in to reset the Sentinel Copilot conversation");
+    }
+
+    const session = await ctx.runQuery(internal.chatbot.getSessionInternal, {
+      sessionId: args.sessionId,
+    });
+
+    if (!session || session.userId !== userId) {
+      throw new Error("Forbidden: You do not have permission to reset this chat session");
+    }
+
+    if (session.agentThreadId) {
+      await createSentinelAgent().deleteThreadAsync(ctx, { threadId: session.agentThreadId });
+    }
+
+    await ctx.runMutation(internal.chatbot.clearSessionThreadInternal, {
+      sessionId: args.sessionId,
+      userId,
+    });
 
     return { success: true };
   },
