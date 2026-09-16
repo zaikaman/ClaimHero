@@ -41,7 +41,7 @@ The hackathon is anchored around an integrated stack designed for autonomous, fu
 
 4. **Agentic Coding & Intelligence (OpenAI / Codex / Agent Ecosystem):**
    - Participants build using AI coding agents (such as Codex, Antigravity IDE, Claude, or ChatGPT) augmented with Convex agent plugins.
-   - Integrates OpenAI models for reasoning, multimodal extraction, and structured synthesis.
+   - Integrates OpenAI models for reasoning, clinical entity normalization on de-identified text, and structured appeal synthesis.
 
 ---
 

@@ -12,10 +12,10 @@ Sync Impact Report:
   - Governance & Enforcement
 - Removed sections: None (template placeholders replaced)
 - Templates requiring updates:
-  - .specify/templates/plan-template.md: ✅ aligned
-  - .specify/templates/spec-template.md: ✅ aligned
-  - .specify/templates/tasks-template.md: ✅ aligned
-  - AGENTS.md: ✅ aligned
+  - .specify/templates/plan-template.md: aligned
+  - .specify/templates/spec-template.md: aligned
+  - .specify/templates/tasks-template.md: aligned
+  - AGENTS.md: aligned
 - Follow-up TODOs: None
 -->
 

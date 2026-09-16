@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockChatCreate = vi.fn();
 const mockEmbeddingsCreate = vi.fn();
-const mockResponsesCreate = vi.fn();
 
 vi.mock("openai", () => {
   return {
@@ -14,9 +13,6 @@ vi.mock("openai", () => {
       };
       embeddings = {
         create: mockEmbeddingsCreate,
-      };
-      responses = {
-        create: mockResponsesCreate,
       };
     },
   };
@@ -95,7 +91,6 @@ describe("convex/lib/openai Unit Tests", () => {
       userPrompt: "Analyze claim for CPT 27447",
       schemaName: "ClinicalAnalysisResult",
       schema: { type: "object" },
-      imageUrls: ["https://example.com/knee_xray.png"],
     });
 
     expect(result.clinicalAnalysis).toBe("Meets CPB criteria");
@@ -165,26 +160,6 @@ describe("convex/lib/openai Unit Tests", () => {
     ).rejects.toThrow(/missing one or more required schema fields/);
   });
 
-  it("creates structured completions with file inputs", async () => {
-    const mockOutput = {
-      parsedSummary: "Document parsed",
-    };
-
-    mockResponsesCreate.mockResolvedValueOnce({
-      output_text: JSON.stringify(mockOutput),
-    });
-
-    const result = await createStructuredCompletion<{ parsedSummary: string }>({
-      systemPrompt: "You are a document parser.",
-      userPrompt: "Parse the attached PDF",
-      schemaName: "ParsedSummary",
-      schema: { type: "object" },
-      fileInputs: [{ fileData: "base64data", filename: "denial.pdf" }],
-    });
-
-    expect(result.parsedSummary).toBe("Document parsed");
-    expect(mockResponsesCreate).toHaveBeenCalled();
-  });
 
   it("creates chat completions for open text or falls back to empty string", async () => {
     mockChatCreate.mockResolvedValueOnce({
@@ -327,36 +302,6 @@ describe("convex/lib/openai Unit Tests", () => {
     expect(mockChatCreate).toHaveBeenCalledTimes(6);
   });
 
-  it("throws error when file responses are empty or unparseable", async () => {
-    mockResponsesCreate.mockResolvedValue({
-      output_text: null,
-    });
-
-    await expect(
-      createStructuredCompletion({
-        systemPrompt: "test",
-        userPrompt: "test",
-        schemaName: "FileSchema",
-        schema: {},
-        fileInputs: [{ fileData: "base64", filename: "doc.pdf" }],
-      })
-    ).rejects.toThrow("OpenAI response empty for schema FileSchema");
-
-    mockResponsesCreate.mockResolvedValue({
-      output_text: "NOT_VALID_JSON",
-    });
-
-    await expect(
-      createStructuredCompletion({
-        systemPrompt: "test",
-        userPrompt: "test",
-        schemaName: "FileSchema",
-        schema: {},
-        fileInputs: [{ fileData: "base64", filename: "doc.pdf" }],
-      })
-    ).rejects.toThrow("Failed to parse structured JSON response");
-    expect(mockResponsesCreate).toHaveBeenCalledTimes(6);
-  });
 
   it("throws error when embedding response is invalid or empty", async () => {
     process.env.OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";

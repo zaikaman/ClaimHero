@@ -9,7 +9,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 5,
   },
-  // Optical vision denial extraction (burst: 10, rate: 10/min)
+  // Optical denial extraction (burst: 10, rate: 10/min)
   opticalParser: {
     kind: "token bucket",
     rate: 10,

@@ -7,7 +7,7 @@
 
 ## Summary
 
-Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel that levels the healthcare reimbursement playing field for patients and providers. The system ingests medical claim denial letters and Explanation of Benefits (EOB) documents via direct file upload (PDF/Image), pasted text, or dedicated claim email inboxes (AgentMail). It parses clinical codes and disputed amounts using OpenAI Vision and Structured JSON powered by `gpt-5.4-nano`, crawls insurer Clinical Policy Bulletins (CPBs) live using Firecrawl, cross-matches precedents and calculates win probability via clinical reasoning, and synthesizes legally airtight, ERISA-cited appeal briefs within an interactive, real-time collaborative Appeal Studio. All data, crons, and live subscriptions are managed reactively via Convex with zero mock or fake data.
+Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel that levels the healthcare reimbursement playing field for patients and providers. The system ingests medical claim denial letters and Explanation of Benefits (EOB) documents via direct file upload (PDF/Image), pasted text, or dedicated claim email inboxes (AgentMail). It parses documents via AWS Textract OCR under HIPAA BAA (fail-hard), sanitizes text via `redactBeforeLLM`, and parses clinical codes and disputed amounts using OpenAI Structured JSON powered by `gpt-5.4-nano` (zero raw PHI/images transmitted to OpenAI), crawls insurer Clinical Policy Bulletins (CPBs) live using Firecrawl, cross-matches precedents and calculates win probability via clinical reasoning, and synthesizes legally airtight, ERISA-cited appeal briefs within an interactive, real-time collaborative Appeal Studio. All data, crons, and live subscriptions are managed reactively via Convex with zero mock or fake data.
 
 ---
 
@@ -16,7 +16,7 @@ Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel 
 - **Language/Version**: TypeScript 5.x, Node.js 20+
 - **Primary Dependencies**: 
   - Backend: `convex` (Reactive DB, Actions, Crons, File Storage)
-  - Intelligence: `openai` (Structured JSON outputs, Vision parsing, `gpt-5.4-nano` reasoning engine)
+  - Intelligence: AWS Textract (HIPAA BAA OCR) + `openai` (Structured JSON outputs on de-identified text, `gpt-5.4-nano` reasoning engine)
   - External Data & Scraping: `@mendable/firecrawl-js` / Firecrawl REST API (Insurer CPB & clinical guidelines scraper)
   - Email Communications: AgentMail REST API (Autonomous dedicated claim inboxes and outbound transmission)
   - Frontend: `react`, `react-dom`, `vite`, `tailwindcss`, `lucide-react`, `clsx`, `tailwind-merge`, `@radix-ui/react-*`
@@ -27,7 +27,7 @@ Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel 
 - **Performance Goals**: Sub-50ms reactive UI state updates, Sub-200ms query reads, <1.2s First Contentful Paint.
 - **Constraints**: 
   - Zero mock or placeholder code in production pathways; all data derived from real user inputs and live API integrations.
-  - Strict HIPAA-conscious data handling and sanitization: mandatory server-side Safe Harbor de-identification (45 CFR § 164.514(b)(2)) across all textual prompt and reasoning streams (`systemPrompt`, `userPrompt`, vector embeddings, chatbot/agent turns); raw binary PDF/image uploads (`fileInputs`, `imageUrls` in `opticalParser.ts`) are a documented multimodal intake exception requiring an enterprise HIPAA BAA for live production documents or synthetic fixtures in demo environments.
+  - Strict HIPAA-conscious data handling and sanitization: mandatory server-side Safe Harbor de-identification (45 CFR § 164.514(b)(2)) across all textual prompt and reasoning streams (`systemPrompt`, `userPrompt`, vector embeddings, chatbot/agent turns); binary PDF/image denial uploads are processed exclusively via AWS Textract under HIPAA BAA (fail-hard, zero raw-PHI fallback), vaulting direct patient identifiers into the private database and sanitizing OCR text with `redactBeforeLLM` before dispatch to OpenAI, ensuring OpenAI never receives binary images or raw PHI.
   - Unified OpenAI client configured via 3 explicit environment variables (`OPENAI_API_KEY`, `OPENAI_MODEL=gpt-5.4-nano`, `OPENAI_BASE_URL`).
   - Resilient fallbacks for external crawling and email delivery.
 - **Scale/Scope**: 5 prioritized user journeys (Ingestion & Parsing, Evidence Crawling & Precedent Matching, Appeal Brief Synthesis in Studio, Statutory Deadline Countdown & Dispatch, Real-Time Case Analytics & Audit Timeline).
@@ -44,7 +44,7 @@ Build **ClaimHero**, an autonomous medical and health insurance appeal sentinel 
 | **II. Rigorous Testing Standards** | PASS | Multi-tier testing hierarchy defined in `data-model.md` and `contracts/`, including automated Vitest unit tests and `npm run verify` CI script. |
 | **III. UX Consistency & "Precision Medical Dark-Mode"** | PASS | Design tokens codified (`#0b0f17` canvas, `#00e5ff` cyan, `#10b981` emerald, `#f43f5e` crimson, `#f59e0b` amber) with zero-latency reactive Convex subscriptions (`useQuery`). |
 | **IV. High-Throughput & Low-Latency Performance** | PASS | Decoupled non-blocking asynchronous actions for Firecrawl and `gpt-5.4-nano`, sub-50ms reactive mutations, and optimized relational indexing. |
-| **V. Security, Data Privacy & HIPAA Guardrails** | PASS | Dual-tier privacy boundary: mandatory server-side Safe Harbor de-identification on all textual prompt streams (`systemPrompt`, `userPrompt`, embeddings, agent tools), documented multimodal intake exception (`fileInputs`, `imageUrls`) requiring enterprise HIPAA BAA for production OCR, file storage isolation, and immutable audit logging (`appealAuditLogs`). |
+| **V. Security, Data Privacy & HIPAA Guardrails** | PASS | Exclusive AWS Textract OCR under HIPAA BAA (fail-hard, zero raw-PHI fallback) with mandatory server-side Safe Harbor de-identification (`redactBeforeLLM`) across all textual prompt streams (`systemPrompt`, `userPrompt`, embeddings, agent tools), zero binary image egress to third-party LLMs, file storage isolation, and immutable audit logging (`appealAuditLogs`). |
 | **VI. Development Workflow & Governance** | PASS | Single-branch workflow on `main`, continuous build logging in `hackathon.md`, and English-language communication and technical assets. |
 
 ---
@@ -79,7 +79,7 @@ convex/
 ├── emails.ts                    # Queries & mutations for AgentMail inbox correspondence
 ├── auditLogs.ts                 # Queries & mutations for immutable case audit trail
 ├── actions/
-│   ├── opticalParser.ts         # OpenAI Vision & EOB metadata extraction action
+│   ├── opticalParser.ts         # AWS Textract OCR & de-identified EOB extraction action
 │   ├── policyCrawler.ts         # Firecrawl CPB / FDA / PubMed evidence ingestion action
 │   ├── precedentMatcher.ts      # Clinical reasoning and Overturn Probability scoring action
 │   ├── appealSynthesizer.ts     # OpenAI cited medical & ERISA appeal brief generator action

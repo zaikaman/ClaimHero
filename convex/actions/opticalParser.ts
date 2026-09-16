@@ -37,7 +37,7 @@ const DENIAL_EXTRACTION_SCHEMA = {
     isMedicalClaimDenial: {
       type: "boolean",
       description:
-        "Set to true ONLY IF this document or image is an actual English-language healthcare insurance claim denial letter, Explanation of Benefits (EOB), adverse benefit determination, medical necessity denial, or medical bill denial. Set to false if the document or image is NOT an English healthcare denial notice (e.g. photos of animals, pets, scenery, food, receipts, memes, general letters, non-medical invoices, non-English or foreign documents, or unrelated graphics).",
+        "Set to true ONLY IF this document text is an actual English-language healthcare insurance claim denial letter, Explanation of Benefits (EOB), adverse benefit determination, medical necessity denial, or medical bill denial. Set to false if the document text is NOT an English healthcare denial notice (e.g. general non-medical letters, receipts, foreign documents, or unrelated text).",
     },
     documentClassificationReason: {
       type: "string",
@@ -186,7 +186,8 @@ function detectFileFormat(
 }
 
 /**
- * Optical Extraction Action: Parse an uploaded denial letter or user-submitted text using gpt-5.4-nano
+ * Optical Extraction Action: Parse an uploaded denial letter (OCR'd exclusively via AWS Textract
+ * under HIPAA BAA) or user-submitted text, sanitized via redactBeforeLLM, using gpt-5.4-nano Structured Outputs.
  */
 export const parseDenialDocument = action({
   args: {
@@ -315,16 +316,17 @@ export const parseDenialDocument = action({
         throw new Error("No document content or file provided for optical extraction.");
       }
 
-      // Call OpenAI Structured Outputs with gpt-5.4-nano
+      // Call OpenAI Structured Outputs with gpt-5.4-nano on de-identified text
+      // (redactBeforeLLM gate is strictly enforced inside createStructuredCompletion)
       extraction = await createStructuredCompletion<DenialExtractionResult>({
         systemPrompt: `You are an expert Certified Professional Medical Coder (CPC) and ERISA Insurance Claims Auditor.
-Your job is to rigorously classify uploaded documents/images and extract structured medical claim denial data.
+Your job is to rigorously classify uploaded document text and extract structured medical claim denial data.
 
 CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
-1. First, determine whether the input document or image is an actual English-language healthcare insurance claim denial, Explanation of Benefits (EOB), adverse benefit determination, or medical necessity denial letter.
-2. If the document or image is NOT a valid English healthcare claim denial (for example: photographs of animals, pets, scenery, food, receipts, general letters, memes, non-medical invoices, non-English or foreign documents, or unreadable graphics):
+1. First, determine whether the input document text is an actual English-language healthcare insurance claim denial, Explanation of Benefits (EOB), adverse benefit determination, or medical necessity denial letter.
+2. If the document text is NOT a valid English healthcare claim denial (for example: receipts, general correspondence, non-medical invoices, non-English or foreign documents, or unreadable OCR output):
    - Set "isMedicalClaimDenial" to FALSE.
-   - Provide a clear, polite 1-sentence reason in "documentClassificationReason" (e.g. "The uploaded file is not an English-language healthcare insurance claim denial or EOB. ClaimHero exclusively supports English-language documents under US healthcare jurisdictions.").
+   - Provide a clear, polite 1-sentence reason in "documentClassificationReason" (e.g. "The uploaded document text is not an English-language healthcare insurance claim denial or EOB. ClaimHero exclusively supports English-language documents under US healthcare jurisdictions.").
    - Set all string fields to "", numbers to 0, and arrays to [].
 3. If the document IS a valid English medical claim denial:
    - Set "isMedicalClaimDenial" to TRUE.

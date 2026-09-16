@@ -170,8 +170,6 @@ async function createStructuredCompletionAttempt<T>(options: {
   systemPrompt: string;
   schemaName: string;
   schema: Record<string, unknown>;
-  imageUrls?: string[];
-  fileInputs?: Array<{ fileData: string; filename: string }>;
   temperature?: number;
 }): Promise<T> {
   const effectiveSystemPrompt = buildStructuredOutputSystemPrompt(
@@ -180,53 +178,10 @@ async function createStructuredCompletionAttempt<T>(options: {
     options.schema
   );
 
-  if (options.fileInputs && options.fileInputs.length > 0) {
-    const content = [
-      { type: "input_text" as const, text: options.userPrompt },
-      ...options.fileInputs.map((file) => ({
-        type: "input_file" as const,
-        file_data: file.fileData,
-        filename: file.filename,
-      })),
-    ];
-    const response = await options.client.responses.create({
-      model: options.model as OpenAI.Responses.ResponseCreateParams["model"],
-      instructions: effectiveSystemPrompt,
-      input: [{ role: "user", content }],
-      text: {
-        format: {
-          type: "json_schema",
-          name: options.schemaName,
-          strict: true,
-          schema: options.schema,
-        },
-      },
-    });
-    const messageContent = response.output_text;
-    if (!messageContent) throw new Error(`OpenAI response empty for schema ${options.schemaName}`);
-    return parseStructuredOutput<T>(messageContent, options.model, options.schemaName, options.schema);
-  }
-
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: effectiveSystemPrompt },
+    { role: "user", content: options.userPrompt },
   ];
-
-  if (options.imageUrls && options.imageUrls.length > 0) {
-    const contentParts: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
-      { type: "text", text: options.userPrompt },
-    ];
-
-    for (const url of options.imageUrls) {
-      contentParts.push({
-        type: "image_url",
-        image_url: { url, detail: "high" },
-      });
-    }
-
-    messages.push({ role: "user", content: contentParts });
-  } else {
-    messages.push({ role: "user", content: options.userPrompt });
-  }
 
   const response = await options.client.chat.completions.create({
     model: options.model,
@@ -254,20 +209,16 @@ async function createStructuredCompletionAttempt<T>(options: {
  * - All textual prompt streams (`systemPrompt`, `userPrompt`) pass through mandatory
  *   pre-submission de-identification (`redactBeforeLLM`) adhering to HIPAA Safe Harbor
  *   (45 CFR § 164.514(b)(2)) to prevent transmission of direct patient identifiers.
- * - Multimodal intake exception: Raw binary PDF/image attachments (`fileInputs`, `imageUrls`)
- *   submitted during initial optical extraction (`opticalParser.ts`) bypass pre-OCR text
- *   redaction because optical character recognition precedes entity discovery. In live
- *   production environments processing genuine patient documents, an executed HIPAA
- *   Business Associate Agreement (BAA) with OpenAI is required. Demonstration environments
- *   strictly operate on synthetic Safe Harbor test fixtures.
+ * - Zero Raw-PHI / Zero Binary Image Egress: Optical character recognition (OCR) on
+ *   binary PDFs and images is executed exclusively within the AWS HIPAA BAA boundary
+ *   via AWS Textract (`convex/lib/textract.ts`). OpenAI receives solely de-identified text;
+ *   raw binary files and images are never transmitted to external third-party LLMs.
  */
 export async function createStructuredCompletion<T>(options: {
   systemPrompt: string;
   userPrompt: string;
   schemaName: string;
   schema: Record<string, unknown>;
-  imageUrls?: string[];
-  fileInputs?: Array<{ fileData: string; filename: string }>;
   temperature?: number;
   /** Number of additional attempts for malformed or empty structured output. */
   structuredRetries?: number;
@@ -291,8 +242,6 @@ export async function createStructuredCompletion<T>(options: {
         systemPrompt: safeSystemPrompt,
         schemaName: options.schemaName,
         schema: options.schema,
-        imageUrls: options.imageUrls,
-        fileInputs: options.fileInputs,
         temperature: options.temperature,
       });
     } catch (error) {

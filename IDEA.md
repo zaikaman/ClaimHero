@@ -1,7 +1,7 @@
 # ClaimHero — Evidence-Grounded Appeal Preparation Workspace for Denial Teams
 
 > **Evidence-Grounded Appeal Preparation Workspace for Convex "All Gas" Hackathon**  
-> Built with **Convex** (Reactive Database, Native 1536-d Vector Search, Full-Text Search Indexes, Scheduled Crons, File Storage, Auth & Official Components), **Firecrawl** (Live Insurer Clinical Policy Bulletins, PubMed & FDA Indications Crawler), **AgentMail** (Dedicated Two-Way Inbound/Outbound Appellate Inboxes & Review-Gated Payer Gateways), and **OpenAI** (Vision Denial Extraction, 4-Pillar Evidence Coverage Scoring & Grounded Appeal Synthesis).
+> Built with **Convex** (Reactive Database, Native 1536-d Vector Search, Full-Text Search Indexes, Scheduled Crons, File Storage, Auth & Official Components), **Firecrawl** (Live Insurer Clinical Policy Bulletins, PubMed & FDA Indications Crawler), **AgentMail** (Dedicated Two-Way Inbound/Outbound Appellate Inboxes & Review-Gated Payer Gateways), and **OpenAI** (Structured Clinical Extraction on De-identified Text, 4-Pillar Evidence Coverage Scoring & Grounded Appeal Synthesis) with OCR exclusively handled by **AWS Textract** under HIPAA BAA (fail-hard, zero raw PHI/images to LLMs).
 
 ---
 
@@ -22,8 +22,8 @@ In the U.S. healthcare system, health insurers improperly deny approximately **1
 
 ```mermaid
 flowchart TD
-    subgraph Intake ["1. Ingestion & Communication (AgentMail + Vision)"]
-        A1["Ingestion Modal (Presets / PDF Upload / Paste Text)"] --> A2["Vision Optical Parser (CPT / ICD-10 / CARC / Amounts)"]
+    subgraph Intake ["1. Ingestion & Communication (AgentMail + AWS Textract OCR)"]
+        A1["Ingestion Modal (Presets / PDF Upload / Paste Text)"] --> A2["AWS Textract HIPAA OCR & Redacted Parameter Extraction"]
         A3["Outbound 2-Mode Dispatch (Typed-In Email / Official Payer)"]
         A4["Inbound Payer Determination / Addendum Webhook (/agentmail-webhook)"]
     end
@@ -44,7 +44,7 @@ flowchart TD
     end
 
     subgraph Intelligence ["4. Clinical & Legal Reasoning (OpenAI)"]
-        O1["Vision Extraction & Denial Parameter Normalization"]
+        O1["Redacted Denial Parameter Normalization (OpenAI)"]
         O2["4-Pillar Evidence Coverage & Precedent Match Scoring (0–100)"]
         O3["Grounded 3-Tier ERISA Appeal Synthesis with Clause Citations"]
         O4["P2P Tele-Script & Real-Time Live Call Copilot (Web Speech STT)"]
@@ -183,7 +183,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/evidenceDossierUx.test.ts` (24 tests): Clinical research console modes, multi-source 3-pipeline telemetry, exhibit grouping, 4-way arrow navigation, and clause inspector contracts.
 * `tests/convexChatbot.test.ts` (23 tests): Agentic tool definitions, chat sessions, rolling summarization, and token-bucket rate limits.
 * `tests/convexEmails.test.ts` (22 tests): Inbound/outbound email persistence, thread association, and security authorization.
-* `tests/openai.test.ts` (20 tests): Structured completions, Vision OCR extraction, 1536-d vector embeddings, and retry resilience.
+* `tests/openai.test.ts` (18 tests): Structured completions, de-identified prompt gating (`redactBeforeLLM`), 1536-d vector embeddings, and retry resilience.
 * `tests/yjsBrief.test.ts` (20 tests): Real-time CRDT document synchronization, snapshotting, and collaborative conflict resolution.
 * `tests/useEvidenceFailFast.test.ts` (19 tests): Reactive evidence hooks, timeout handling, and fail-fast UX fallbacks.
 * `tests/productionReadinessFixes.test.ts` (19 tests): Edge-case handling, error containment, and production hardening.
@@ -239,7 +239,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 | Judging Criterion | Alignment & Technical Depth |
 |---|---|
 | **Real-World Utility** | Directly tackles a $200B/year denial crisis. Produces production-ready, sendable artifacts (formal briefs, P2P call scripts, EHR clinical notes, and court dossiers) rather than generic chat summaries. |
-| **Full-Stack Integration Depth** | All 4 sponsor platforms are deeply integrated: **Convex** (reactive DB, 1536-d vector search, searchIndex, scheduled crons, components), **Firecrawl** (live CPB scraping, PubMed, FDA), **AgentMail** (inbound webhooks, outbound dispatch), and **OpenAI** (Vision extraction, 4-pillar scoring, grounded synthesis). |
+| **Full-Stack Integration Depth** | All 4 sponsor platforms are deeply integrated: **Convex** (reactive DB, 1536-d vector search, searchIndex, scheduled crons, components), **Firecrawl** (live CPB scraping, PubMed, FDA), **AgentMail** (inbound webhooks, outbound dispatch), and **OpenAI** (de-identified structured extraction, 4-pillar scoring, grounded synthesis) paired with **AWS Textract** for BAA optical OCR. |
 | **Technical Rigor & Polish** | 100% clean `npm run verify` gate, comprehensive Vitest automated test suite (detailed in `README.md`), strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
 | **Transparency & Build Process** | Comprehensive `hackathon.md` log with UTC timestamps, reconciled 7-character commit hashes, and detailed milestone notes. |
 

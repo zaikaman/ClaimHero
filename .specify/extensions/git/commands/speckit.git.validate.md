@@ -35,7 +35,7 @@ If on a feature branch (matches either pattern):
   - For sequential branches, look for `specs/<prefix>-*` where prefix matches the numeric portion
   - For timestamp branches, look for `specs/<prefix>-*` where prefix matches the `YYYYMMDD-HHMMSS` portion
 - If spec directory exists: `✓ Spec directory found: <path>`
-- If spec directory missing: `⚠ No spec directory found for prefix <prefix>`
+- If spec directory missing: `[Warning] No spec directory found for prefix <prefix>`
 
 If NOT on a feature branch:
 - Output: `✗ Not on a feature branch. Current branch: <branch-name>`

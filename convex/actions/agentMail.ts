@@ -451,7 +451,7 @@ async function handleInboundClaimReply(
 
           // Fail-hard HIPAA gate: PDF/image attachments are OCR'd only inside the
           // AWS HIPAA BAA via Textract. Raw binary is stored in Convex Storage for
-          // human review but NEVER forwarded to the LLM as fileInputs, since that
+          // human review but NEVER forwarded to the LLM as raw binary files/images, since that
           // would bypass redactBeforeLLM and egress raw PHI.
           const lowerMime = downloaded.contentType.toLowerCase();
           const lowerName = downloaded.filename.toLowerCase();

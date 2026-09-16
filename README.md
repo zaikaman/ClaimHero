@@ -209,10 +209,10 @@ AgentMail provides two-way programmatic email infrastructure for appellate dispa
 - **Verified Appellate Transmission Gateway**: Resolves the payer's verified intake destination and transmits directly via AgentMail with delivery confirmation, audit trail, and printable docket for your records (`src/components/communications/AgentMailDrawer.tsx`).
 - **Review-Gated Inbound Adjudication & Decision Classification**: Automatically parses inbound payer replies to classify outcomes into 4 structured statuses: full overturn/settlement, partial settlement offer, Request for Information (RFI / `ADDITIONAL_RECORDS_REQUIRED`), or denial upheld, reactively updating the claim lifecycle, recalculating financial impact, and staging drafts for human review.
 
-### 4. OpenAI — Multi-Modal Clinical Intake & Grounded Synthesis
+### 4. OpenAI & AWS Textract — BAA Optical Intake, Redacted Clinical Extraction & Grounded Synthesis
 OpenAI powers clinical reasoning while operating within strict anti-hallucination boundaries:
 - **Model Architecture & Strict Structured Contracts**: Every long-form generation runs through the `@convex-dev/agent` component (`convex/lib/agentDraft.ts`) on `gpt-5.4-nano`, enforcing the same JSON schema contract with up to two semantic retries carrying a corrective JSON instruction, so unsupported claims are rejected or marked for review with PHI-safe error masking. The provider is never called directly from a request path that could bypass these contracts.
-- **Vision OCR Denial Parser**: Extracts structured CPT/HCPCS, ICD-10, CARC/RARC codes, disputed amounts, and payer contact info from PDF and image denial documents exclusively through AWS Textract under the HIPAA BAA (`convex/actions/opticalParser.ts`, `convex/lib/textract.ts`). PDF/image intake without `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` fails hard with an actionable error; Textract failures never fall back to raw-PHI vision. Raw-text intake remains available without Textract.
+- **AWS Textract HIPAA OCR & Redacted Clinical Intake Gate**: Extracts structured CPT/HCPCS, ICD-10, CARC/RARC codes, disputed amounts, and payer contact info from PDF and image denial documents exclusively through AWS Textract under the HIPAA BAA (`convex/actions/opticalParser.ts`, `convex/lib/textract.ts`). OpenAI never sees raw PHI or binary images: all extracted text passes through the mandatory `redactBeforeLLM` gate before OpenAI extraction. PDF/image intake without `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` fails hard with an actionable error; Textract failures never fall back to raw-PHI model ingestion. Raw-text intake remains available without Textract.
 - **Grounded Legal Brief Synthesis & Anti-Hallucination Contracts**: Synthesizes formal ERISA legal memorandums using strictly human-confirmed clinical facts and stored policy clauses; fabricated policy text is prohibited by schema contracts (`convex/actions/appealSynthesizer.ts`). Statutory notices, policy citations, the payment request, and the final assembly stay deterministic, so the model can only contribute the two prose sections it is asked for.
 - **Tuned for US Healthcare Appeals**: Optimized for denial letters, Explanations of Benefits (EOB), and medical records under US healthcare frameworks (ERISA 29 U.S.C. § 1133, ACA 45 C.F.R. § 147.136, and CMS NCD/LCD guidelines) for precise statutory citation.
 - **P2P Defense Playbook & Live Copilot**: Generates structured 4-phase clinical defense playbooks (Statutory Opening, Policy Citations, Trap Counters, Written Determination Demand), 1-page clipboard pocket sheets, real-time voice speech-to-text with rapid counter-strikes, and an interactive AI reviewer simulation for practicing oral arguments before the call (`convex/actions/p2pLiveCopilot.ts`, `src/components/p2p/`).
@@ -226,7 +226,7 @@ OpenAI powers clinical reasoning while operating within strict anti-hallucinatio
 
 | Judge-visible result | Implementation | Source |
 | :--- | :--- | :--- |
-| **Real denial extraction** | Convex Storage + OpenAI structured vision extraction | [`convex/actions/opticalParser.ts`](./convex/actions/opticalParser.ts) |
+| **Real denial extraction** | Convex Storage + AWS Textract OCR (HIPAA BAA) + OpenAI redacted structured extraction | [`convex/actions/opticalParser.ts`](./convex/actions/opticalParser.ts) |
 | **Current payer policy** | Firecrawl crawl and evidence persistence | [`convex/actions/policyCrawler.ts`](./convex/actions/policyCrawler.ts), [`convex/clinicalEvidences.ts`](./convex/clinicalEvidences.ts) |
 | **Precedent-grounded Readiness** | Convex vector search + attached precedent evidence | [`convex/actions/precedentMatcher.ts`](./convex/actions/precedentMatcher.ts), [`convex/actions/precedentArchive.ts`](./convex/actions/precedentArchive.ts) |
 | **Cited appeal brief** | Agent-component streaming synthesis over stored evidence | [`convex/actions/appealSynthesizer.ts`](./convex/actions/appealSynthesizer.ts), [`convex/lib/agentDraft.ts`](./convex/lib/agentDraft.ts) |
@@ -296,18 +296,18 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **1005 automated tests** across 64 test suites (verified via `npm run test`):
+ClaimHero is backed by **1019 automated tests** across 67 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (1005 tests across 64 suites)
-npm run test:coverage   # Code coverage report (~81% lines)
+npm run test            # Comprehensive Vitest test suite (1019 tests across 67 suites)
+npm run test:coverage   # Code coverage report (~81.6% statement coverage)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate
 ```
 
-Test suites cover Everyday Language vs. Expert Details dictionaries, cross-component custom events, and sandboxed storage resilience (`tests/detailMode.test.ts`), AWS Textract HIPAA optical document parsing, fail-hard missing-credential and extraction-failure semantics with zero raw-PHI LLM egress, and inbound attachment quarantine (`tests/textract.test.ts`, `tests/formalPdfAttachments.test.ts`), the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Delivery Evidence Reports (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs and embeddings, Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
+Test suites cover Everyday Language vs. Expert Details dictionaries, cross-component custom events, and sandboxed storage resilience (`tests/detailMode.test.ts`), AWS Textract HIPAA optical document parsing, fail-hard missing-credential and extraction-failure semantics with zero raw-PHI LLM egress, and inbound attachment quarantine (`tests/textract.test.ts`, `tests/formalPdfAttachments.test.ts`), the master durable workflow pipeline, Convex authorization and ownership isolation, tamper-evident cryptographic Merkle audit chains (NIST SHA-256 rolling hash, ERISA 29 CFR § 2560.503-1 immutability, sub-10ms verification benchmark), Policy Drift Sentinel retroactive CPB alteration detection, ERISA Delivery Evidence Reports (live AgentMail message IDs, Amazon SES receipts, recipient MX resolution, NIST SHA-256 storage fingerprints, 180-day timeliness formulas), cryptographic SHA-256 fingerprinting, automated ERISA Bad-Faith Notice of Violation drafting, case collaboration invites with editor/viewer roles, Yjs CRDT transport (clocks, seeds, snapshots, purges) and cursor-merge primitives, OpenAI structured outputs on de-identified text (`redactBeforeLLM`), 1536-d embeddings, and semantic retries (`tests/openai.test.ts`), Firecrawl policy selection and `/v1/map` directory discovery, AgentMail component integration and webhook signatures, ERISA deadline calculations, appeal versioning, redaction, storage cleanup, prompt-injection defenses, P2P workflows, and demo data isolation.
 
 ---
 

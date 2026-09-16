@@ -375,7 +375,7 @@ describe("Visual Proof & Audit Archive: Full-Page Screenshots & Policy Exhibits"
         { type: "wait", milliseconds: 3500 },
         { type: "screenshot" },
       ]);
-    });
+    }, 15000);
 
     it("scrapeFirecrawlPolicySource: falls back gracefully if Carelon action scrape errors", async () => {
       const { FirecrawlClient } = await import("@firecrawl/firecrawl-convex");

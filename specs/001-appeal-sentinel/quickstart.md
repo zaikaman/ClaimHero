@@ -61,7 +61,7 @@ Open your browser at `http://localhost:5173`.
 
 ## 3. End-to-End Real Data Workflow
 
-1. **Ingest Denial Document**: Click **"+ Ingest Denial Document"** (use 1-Click Judge Sample Presets, upload real PDF/Image, or paste raw EOB text). `gpt-5.4-nano` extracts clinical codes into Convex DB.
+1. **Ingest Denial Document**: Click **"+ Ingest Denial Document"** (use 1-Click Judge Sample Presets, upload real PDF/Image, or paste raw EOB text). Files are OCR'd via AWS Textract under HIPAA BAA, de-identified via `redactBeforeLLM`, and `gpt-5.4-nano` Structured Outputs extract clinical codes into Convex DB with zero raw PHI/images sent to OpenAI.
 2. **Inspect Clinical Policy Evidence**: Switch to the **Evidence Matrix** tab, click **"Crawl Insurer CPB"** (Firecrawl) and **"Calculate Win Score"** to cross-examine insurer policies and compute the Overturn Probability Score.
 3. **Collaborative Appeal Studio**: Open the **Appeal Studio**, click **"Synthesize Brief"** to generate a comprehensive multi-page ERISA legal brief citing 29 CFR § 2560.503-1, insert physician notes, and preview the export dossier.
 4. **Review-Gated AgentMail Dispatch**: Switch to the **AgentMail Inbox** tab or click **"Proceed to Dispatch"**. Select either the **Official Payer Reviewer** gateway or enter a **Typed-In Email** for testing. The brief is sent from the shared sender inbox directly to the selected destination, and each claim keeps its own Convex correspondence thread. Configure one AgentMail `message.received` webhook on the shared sender inbox at the public `/agentmail-webhook` endpoint to receive external replies. The default `agentmail.to` addresses work without a custom domain.
