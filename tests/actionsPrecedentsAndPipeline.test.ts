@@ -283,9 +283,14 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
       });
 
       expect(res.overturnProbabilityScore).toBeGreaterThanOrEqual(5);
+      expect(res.appealReadinessScore).toBe(res.overturnProbabilityScore);
+      expect(res.evidenceCoverageScore).toBe(res.overturnProbabilityScore);
       expect(res.scoringBreakdown).toHaveLength(4);
       expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
         status: "precedent_matched",
+        overturnProbabilityScore: res.overturnProbabilityScore,
+        appealReadinessScore: res.appealReadinessScore,
+        evidenceCoverageScore: res.evidenceCoverageScore,
       }));
     });
 
@@ -421,8 +426,78 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
 
       expect(erisaCriterion?.score).toBe(12);
       expect(erisaCriterion?.status).toBe("moderate");
-      expect(precedentCriterion?.score).toBe(12);
-      expect(precedentCriterion?.status).toBe("moderate");
+      // Precedent score is weak (4/20) because no legal precedents were provided or matched
+      expect(precedentCriterion?.score).toBe(4);
+      expect(precedentCriterion?.status).toBe("weak");
+    });
+
+    it("calculateDeterministicRubric: prevents score inflation when claim has CPB + 3 clinical evidences but 0 precedents", () => {
+      const claim = {
+        cptCodes: ["63047"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+      };
+      const evidencesWithoutPrecedents = [
+        {
+          sourceType: "payer_cpb",
+          citationClause: "Section 3.A",
+          extractedEvidenceMarkdown: "Laminectomy indication satisfied",
+        },
+        {
+          sourceType: "pubmed_study",
+          citationClause: "Spine J. 2023",
+          extractedEvidenceMarkdown: "Decompression efficacy confirmed",
+        },
+        {
+          sourceType: "nccn_guideline",
+          citationClause: "Section B.1",
+          extractedEvidenceMarkdown: "Standard treatment guideline met",
+        },
+      ];
+
+      const result = actionPrecedentMatcher.calculateDeterministicRubric(claim, evidencesWithoutPrecedents, []);
+
+      // Without precedents, total score is capped in moderate band (76) instead of inflated to 96
+      expect(result.overturnProbabilityScore).toBe(76);
+      expect(result.appealReadinessScore).toBe(76);
+      expect(result.evidenceCoverageScore).toBe(76);
+      expect(result.riskLevel).toBe("moderate");
+
+      const precedentCriterion = result.scoringBreakdown.find((c) => c.category === "precedent_strength");
+      expect(precedentCriterion?.score).toBe(4);
+      expect(precedentCriterion?.status).toBe("weak");
+      expect(precedentCriterion?.rationale).toContain("No controlling appellate rulings");
+    });
+
+    it("calculateDeterministicRubric: detects adverse precedent parity and lowers score when matched precedent affirmed denial", () => {
+      const claim = {
+        cptCodes: ["63047"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+      };
+      const evidences = [
+        {
+          sourceType: "payer_cpb",
+          citationClause: "Section 3.A",
+          extractedEvidenceMarkdown: "Laminectomy indication satisfied",
+        },
+      ];
+      const adversePrecedents = [
+        {
+          citation: "Adverse Federal Ruling 2023",
+          title: "Laminectomy Denial Upheld",
+          outcome: "Affirmed. Denial upheld due to lack of conservative therapy documentation.",
+          sourceKind: "court_overturn",
+          combinedScore: 0.85,
+        },
+      ];
+
+      const result = actionPrecedentMatcher.calculateDeterministicRubric(claim, evidences, adversePrecedents);
+
+      const precedentCriterion = result.scoringBreakdown.find((c) => c.category === "precedent_strength");
+      expect(precedentCriterion?.score).toBe(6);
+      expect(precedentCriterion?.status).toBe("weak");
+      expect(precedentCriterion?.rationale).toContain("adverse parity detected");
     });
 
     it("calculateDeterministicRubric: awards high confidence when CPB and precedents are robustly indexed", () => {

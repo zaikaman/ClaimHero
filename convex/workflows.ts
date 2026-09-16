@@ -267,7 +267,11 @@ export async function executeDurableClaimPipeline(
 
       const scoreResult = await step.runAction(
         internal.actions.precedentMatcher.computeOverturnScoreInternal,
-        { claimId: args.claimId, pipelineRunId },
+        {
+          claimId: args.claimId,
+          pipelineRunId,
+          matchedPrecedents: vectorPrecedents,
+        },
         {
           retry: { maxAttempts: 2, initialBackoffMs: 1000, base: 2 },
           name: "computeOverturnScore",

@@ -59,6 +59,8 @@ export interface Claim {
   daysRemaining: number;
   /** Evidence Coverage & Precedent Match audit score (0-100) based on 4 statutory pillars */
   overturnProbabilityScore?: number;
+  appealReadinessScore?: number;
+  evidenceCoverageScore?: number;
   riskLevel?: RiskLevel;
   scoringBreakdown?: ScoringCriterion[];
   assignedAgentEmail: string;
@@ -445,6 +447,8 @@ export interface DenialExtractionResult {
 
 export interface OverturnScoringResult {
   overturnProbabilityScore: number;
+  appealReadinessScore?: number;
+  evidenceCoverageScore?: number;
   riskLevel: RiskLevel;
   scoringBreakdown?: ScoringCriterion[];
   keyPolicyContradictions: string[];

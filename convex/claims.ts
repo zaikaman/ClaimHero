@@ -1528,6 +1528,8 @@ interface StatusUpdateArgs {
   details?: string;
   actor?: string;
   overturnProbabilityScore?: number;
+  appealReadinessScore?: number;
+  evidenceCoverageScore?: number;
   riskLevel?: string;
   scoringBreakdown?: ScoringBreakdownItem[];
 }
@@ -1548,8 +1550,12 @@ async function applyStatusUpdate(ctx: MutationCtx, args: StatusUpdateArgs) {
     updatedAt: now,
   };
 
-  if (args.overturnProbabilityScore !== undefined) {
-    patchData.overturnProbabilityScore = args.overturnProbabilityScore;
+  const scoreToApply =
+    args.appealReadinessScore ?? args.evidenceCoverageScore ?? args.overturnProbabilityScore;
+  if (scoreToApply !== undefined) {
+    patchData.overturnProbabilityScore = scoreToApply;
+    patchData.appealReadinessScore = scoreToApply;
+    patchData.evidenceCoverageScore = scoreToApply;
   }
   if (args.riskLevel !== undefined) {
     patchData.riskLevel = args.riskLevel;
@@ -1589,6 +1595,8 @@ export const updateStatus = mutation({
     details: v.optional(v.string()),
     actor: v.optional(v.string()),
     overturnProbabilityScore: v.optional(v.number()),
+    appealReadinessScore: v.optional(v.number()),
+    evidenceCoverageScore: v.optional(v.number()),
     riskLevel: v.optional(v.string()),
     scoringBreakdown: v.optional(
       v.array(
@@ -1619,6 +1627,8 @@ export const updateStatusInternal = internalMutation({
     details: v.optional(v.string()),
     actor: v.optional(v.string()),
     overturnProbabilityScore: v.optional(v.number()),
+    appealReadinessScore: v.optional(v.number()),
+    evidenceCoverageScore: v.optional(v.number()),
     riskLevel: v.optional(v.string()),
     scoringBreakdown: v.optional(
       v.array(
@@ -2102,6 +2112,8 @@ export const getPortfolioStats = query({
         activeDisputedAmount: 0,
         overturnedWonAmount: 0,
         averageWinScore: 0,
+        averageReadinessScore: 0,
+        averageCoverageScore: 0,
         recoveryRatePercent: 0,
         criticalDeadlinesCount: 0,
         urgentDeadlinesCount: 0,
@@ -2344,6 +2356,8 @@ export const getPortfolioStats = query({
       activeDisputedAmount,
       overturnedWonAmount,
       averageWinScore,
+      averageReadinessScore: averageWinScore,
+      averageCoverageScore: averageWinScore,
       recoveryRatePercent,
       criticalDeadlinesCount: isCriticalDeadline ? criticalDeadlinesCount : criticalDeadlinesCountInScope,
       urgentDeadlinesCount,

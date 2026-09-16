@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-16T13:52:00Z
+- **Last updated:** 2026-09-16T18:10:00Z
 
 ## Log
 
@@ -1540,7 +1540,7 @@ Redesigned the Transmission History and addendum composer layout in `src/compone
 - Compliance & Transmission Footer: Integrated a persistent carrier relay status bar displaying live AgentMail connectivity, ERISA § 503 audit compliance, and instant shortcuts for Certificate of Electronic Service delivery evidence and dossier export.
 - Regression Verification: Verified 100% clean with typecheck, lint, 1,053 passing unit tests across 69 test suites, and production build.
 
-### 2026-09-16 - working tree
+### 2026-09-16 - 24b43e1
 Implemented in-browser optical intake and converted AWS Textract into an optional server-side enhancement (`src/lib/clientOcr.ts`, `src/lib/redactionEngine.ts`, `convex/actions/opticalParser.ts`, `convex/actions/agentMail.ts`, `convex/emails.ts`, `convex/schema.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/radar/IngestionModal.tsx`, `src/hooks/useClaims.ts`, `.env.example`, `README.md`, `tests/clientOcrAndOptionalTextract.test.ts`, `tests/textract.test.ts`, `tests/formalPdfAttachments.test.ts`):
 - In-Browser OCR & Digital PDF Extraction: Implemented `src/lib/clientOcr.ts` utilizing `pdfjs-dist` `getTextContent()` for digital PDFs (100% accuracy, zero OCR, zero keys, covering ~80% of denials) with fallback to offscreen canvas rendering and `tesseract.js` in-browser for scanned documents and images. PHI never leaves the user's device for optical processing.
 - Client-Side De-Identification & Convex Vaulting: Added client-side `redactBeforeLLM` in `src/lib/redactionEngine.ts` to de-identify text in-browser under HIPAA Safe Harbor before transmission, with server-side `redactBeforeLLM` in `convex/lib/openai.ts:228-229` as defense-in-depth. Authentic patient identifiers are extracted locally and securely vaulted directly in Convex DB. OpenAI receives zero binary images and zero direct PHI.
@@ -1548,6 +1548,18 @@ Implemented in-browser optical intake and converted AWS Textract into an optiona
 - AgentMail Inbound Attachments & Local Drawer Extraction: Updated `convex/actions/agentMail.ts` lines 455-464 to preserve inbound attachments in Convex Storage and flag `ocrStatus: "needs_client_ocr"` when Textract is unconfigured (instead of quarantine-only). Added `updateAttachmentClientOcr` mutation in `convex/emails.ts` and an "Extract locally" action in `AgentMailDrawer.tsx` allowing users to extract text in-browser with zero keys and zero PHI egress.
 - Config & Documentation: Updated `.env.example` and `README.md` to document Textract as an optional server-side enhancement, update test counts (1,061 tests across 70 suites) and test suite descriptions, and highlight in-browser optical intake.
 - Regression Verification: Added unit test suite `tests/clientOcrAndOptionalTextract.test.ts`, updated `tests/textract.test.ts` and `tests/formalPdfAttachments.test.ts`, and verified 100% clean across typecheck, lint, 1,061 passing tests across 70 test suites, and production build.
+
+### 2026-09-16 - working tree
+- Fixed broken external link for the "Your appeal rights (law)" / "ERISA 29 CFR § 2560.503-1" navigation item in `src/components/layout/Sidebar.tsx` to the authoritative Electronic Code of Federal Regulations (eCFR) legal codification.
+- Decoupled Precedent & Statutory Rubrics and Wired Vector Handoff (`convex/actions/precedentMatcher.ts`, `convex/workflows.ts`, `convex/schema.ts`, `convex/claims.ts`, `src/types/index.ts`, `src/components/radar/CaseRadar.tsx`, `tests/actionsPrecedentsAndPipeline.test.ts`):
+  - Fixed Production Wiring Gap: Passed retrieved `vectorPrecedents` from durable workflow Step 2 into `computeOverturnScoreInternal` (Step 3), and added backward-compatible precedent extraction from attached `clinicalEvidences` when actions are called directly.
+  - Decoupled Pillar 4 (Precedents): Completely eliminated false attribution where the presence of a CPB or 2 clinical documents awarded 16-19/20 points for precedent without legal matches. Pillar 4 now strictly checks precedent presence and multi-factor match quality (outcome favorability, vector/hybrid fusion similarity, CARC denial code overlap, and procedure code parity), setting a baseline of 4/20 ("weak") when 0 precedents are matched.
+  - Decoupled Pillar 3 (ERISA): Separated general clinical document count from statutory standing, checking for explicit statutory authority, ERISA disclosure citations, or preliminary procedural notices.
+  - Appeal Readiness Score & Honest Framing: Added `appealReadinessScore` and `evidenceCoverageScore` in database schema (`claims`), types, actions, and portfolio queries alongside `overturnProbabilityScore` for 100% backward compatibility. Replaced overclaiming copy ("High Win-Probability", "Likely to win") across Case Radar and Evidence Matrix with truthful "High Dossier Readiness" and "Ready for review".
+  - Updated Documentation & Public Artifacts: Refactored `README.md` to document the decoupled 4-pillar Statutory Appeal Readiness Rubric, pipeline vector handoff, multi-factor legal precedent matching (similarity thresholds, CARC/CPT code parity, and adverse precedent safeguards), Judge Evidence Matrix updates, and updated test suite metrics (1,063 automated tests across 70 test suites, ~82.7% statement coverage).
+  - Regression Coverage: Added unit tests asserting inflation prevention on zero precedents, adverse precedent penalty handling, and readiness score persistence (`tests/actionsPrecedentsAndPipeline.test.ts`). Verified 1,063/1,063 passing tests across 70 suites, 0 typecheck errors, 0 lint warnings, and clean production build.
+
+
 
 
 

@@ -531,7 +531,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
           </CardContent>
         </Card>
 
-        {/* Card 2: High Win-Probability */}
+        {/* Card 2: High Dossier Readiness & Coverage */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>
@@ -547,7 +547,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 {highRiskCount} {highRiskCount === 1 ? "Case" : "Cases"}
               </div>
               <Badge variant="outline" className="text-[10px] font-mono text-emerald-600 border-emerald-500/30">
-                {isDetailed ? "≥ 80 Readiness" : "Likely to win"}
+                {isDetailed ? "≥ 80 Readiness" : "Ready for review"}
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs">

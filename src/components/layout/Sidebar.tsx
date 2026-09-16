@@ -490,7 +490,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
-                window.open("https://www.dol.gov/agencies/ebsa/about-ebsa/our-activities/resource-center/fact-sheets/claims-procedure-rule", "_blank");
+                window.open("https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XXV/part-2560/section-2560.503-1", "_blank", "noopener,noreferrer");
               }}
               className="gap-2 cursor-pointer text-xs"
             >
