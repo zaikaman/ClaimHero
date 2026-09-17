@@ -2,6 +2,7 @@ import { Claim, Appeal, ClinicalEvidence, AppealLevel, FinancialLiabilityData, E
 import { getPayerAppellateContact } from "./constants";
 import { fastSanitizeText } from "./redactionEngine";
 import { formatCurrency } from "./utils";
+import { getStateRegulator } from "../../convex/lib/stateRegulators";
 
 export interface DossierExhibitItem {
   id: string;
@@ -200,16 +201,18 @@ export function buildDossierData(
   }
 
   const statutoryLevel: AppealLevel = appeal?.appealLevel || "level_1_internal";
+  // Federal ERISA engine: patient state names only the DOI reference, never deadlines.
+  const regulator = getStateRegulator(claim.patient?.state);
   const statutoryLevelLabels: Record<AppealLevel, string> = {
     level_1_internal: "Level 1 Internal Administrative Appeal",
     level_2_grievance: "Level 2 Formal Grievance & Same-Specialty Peer Review",
-    level_3_external_state_review: "Level 3 External IRO & State Insurance Commissioner Petition",
+    level_3_external_state_review: `Level 3 External IRO & ${regulator.doiShort} Petition`,
   };
 
   const defaultTargetAuthorities: Record<AppealLevel, string> = {
     level_1_internal: "Payer Medical Director Review",
     level_2_grievance: "Multi-Disciplinary Peer Review Panel & Grievance Committee",
-    level_3_external_state_review: "External Independent Review Organization (IRO) & State Insurance Commissioner",
+    level_3_external_state_review: `External Independent Review Organization (IRO) & ${regulator.doiName}`,
   };
 
   const targetAuthority = appeal?.targetAuthority || defaultTargetAuthorities[statutoryLevel];
@@ -422,7 +425,7 @@ export function generatePlainTextDossier(dossier: DossierData): string {
   out += `INSURED BENEFICIARY:${dossier.patientName}\n`;
   out += `MEMBER ID:          ${dossier.memberId}\n`;
   if (dossier.groupNumber) out += `GROUP NUMBER:       ${dossier.groupNumber}\n`;
-  out += `JURISDICTION STATE: ${dossier.state}\n`;
+  out += `PATIENT STATE (DOI REF.): ${dossier.state}\n`;
   out += `\n`;
   out += `TREATING PROVIDER:  ${dossier.providerName}\n`;
   out += `PHYSICIAN NPI:      ${dossier.physicianInfo.npiNumber}\n`;

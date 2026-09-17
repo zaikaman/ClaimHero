@@ -477,7 +477,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
                 <div className="space-y-1">
                   <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
                     <MapPin className="size-3.5" />
-                    <span>State / Jurisdiction</span>
+                    <span>Patient State (DOI Ref.)</span>
                   </label>
                   <Input
                     value={formState.advocateProfile.state}
@@ -485,7 +485,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
                     placeholder="e.g. CA"
                     maxLength={2}
                     className="text-xs bg-background/80 font-mono uppercase text-center"
+                    title="Federal ERISA engine only; used for DOI references in letters"
                   />
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Federal ERISA engine only; used for DOI references in letters.
+                  </p>
                 </div>
               </div>
             </div>

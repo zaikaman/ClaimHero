@@ -133,7 +133,7 @@ export const DossierCoverPage: React.FC<DossierCoverPageProps> = ({
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-slate-500">Jurisdiction / State:</span>
+              <span className="text-slate-500">Patient State (DOI Ref.):</span>
               <span className="font-medium text-slate-800">{dossier.state}</span>
             </div>
           </div>

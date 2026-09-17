@@ -7,6 +7,7 @@ import { createStructuredCompletion } from "../lib/openai";
 import type { Doc, Id } from "../_generated/dataModel";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { rateLimiter } from "../lib/rateLimiter";
+import { getStateRegulator } from "../lib/stateRegulators";
 
 export interface P2PLiveClaimContext {
   _id: Id<"claims">;
@@ -76,6 +77,7 @@ export const generateLiveFastAnswer = action({
     const cptList = (claim.cptCodes || []).join(", ") || "the procedure";
     const icdList = (claim.icd10Codes || []).join(", ") || "the diagnosis";
     const state = claim.patient?.state || "the State";
+    const regulator = getStateRegulator(claim.patient?.state);
 
     const evidenceList = (evidences || [])
       .map(
@@ -94,7 +96,7 @@ The medical director just made an objection, posed a trap question, or challenge
 Your mission: Deliver a sub-second, devastatingly precise, 1-2 sentence spoken rebuttal card that the physician can read ALOUD RIGHT NOW.
 
 Case Context:
-- Patient: ${claim.patient?.name || "Patient"} | Payer: ${payer} | State: ${state}
+- Patient: ${claim.patient?.name || "Patient"} | Payer: ${payer} | State: ${state} (${regulator.doiShort} ref only; federal ERISA engine)
 - Procedure: ${cptList} | Diagnosis: ${icdList}
 - Denial Reason: ${claim.denialReasonCode || "CO-50"}: ${claim.denialReasonDescription || "Medical Necessity"}
 - Clinical Findings: ${clinicalFacts?.examinationFindings || "Not documented on file (pending chart review)"}
@@ -177,7 +179,7 @@ Generate an instant, grounded Fast Answer response card.`;
         suggestedQuote: completion.suggestedQuote,
         chartProof: completion.chartProof,
         cpbCitation: completion.cpbCitation,
-        regulatoryLeverage: completion.regulatoryLeverage || `ERISA 29 CFR § 2560.503-1 & ${state} Utilization Review Standards`,
+        regulatoryLeverage: completion.regulatoryLeverage || `ERISA 29 CFR § 2560.503-1 (${regulator.doiShort} grievance reference only)`,
         confidenceScore: completion.confidenceScore || 95,
         timestamp: Date.now(),
         generatedBy: "openai" as const,
@@ -268,6 +270,7 @@ export const generateInteractiveReviewerPushback = action({
     const cptList = (claim.cptCodes || []).join(", ") || "the procedure";
     const icdList = (claim.icd10Codes || []).join(", ") || "the diagnosis";
     const state = claim.patient?.state || "the State";
+    const regulator = getStateRegulator(claim.patient?.state);
 
     const evidenceList = (evidences || [])
       .map(
@@ -326,7 +329,7 @@ CRITICAL GUIDELINES FOR REALISTIC P2P CALL SIMULATION:
 Case Details:
 - Patient: ${claim.patient?.name || "Patient"}
 - Payer: ${payer}
-- Jurisdiction: ${state}
+- Patient State (DOI ref only): ${state} (${regulator.doiShort}; federal ERISA engine)
 - Disputed CPT Codes: ${cptList}
 - Diagnosis Codes: ${icdList}
 - Denial Reason: ${claim.denialReasonCode || "CO-50"}: ${claim.denialReasonDescription || "Medical Necessity"}
@@ -515,7 +518,9 @@ function buildDeterministicFastAnswer(
   let trapQuestion = "Insurer challenged medical necessity or conservative therapy duration.";
   let suggestedQuote = `Under ${payer}'s published policy criteria (${cpbSection}), procedure ${cptList} is indicated based on documented clinical criteria and objective functional impairment.`;
   let chartProof = claim.appealContext?.clinicalFacts?.treatmentHistoryAndResponse || "[Simulation Only] Conservative therapy trial documentation pending chart verification.";
-  const regulatoryLeverage = `ERISA 29 CFR § 2560.503-1(h) & ${state} Insurance Utilization Review Regulations`;
+  // Federal ERISA engine: patient state names only the DOI grievance reference, never deadlines.
+  const regulator = getStateRegulator(state);
+  const regulatoryLeverage = `ERISA 29 CFR § 2560.503-1(h) (${regulator.doiShort} grievance reference only)`;
 
   if (lower.includes("conservative") || lower.includes("physical therapy") || lower.includes("pt") || lower.includes("weeks") || lower.includes("months")) {
     trapQuestion = "Did the patient complete sufficient conservative management before scheduling this procedure?";
@@ -535,7 +540,7 @@ function buildDeterministicFastAnswer(
     chartProof = "Category I CPT code supported by specialty clinical practice guidelines.";
   } else if (lower.includes("specialty") || lower.includes("license") || lower.includes("board")) {
     trapQuestion = "Medical director reviewer qualifications inquiry.";
-    suggestedQuote = `Under ${state} Utilization Review statutes, adverse determinations must be rendered by a physician in the same active clinical specialty as the treating provider.`;
+    suggestedQuote = `Under ERISA full and fair review standards and ${regulator.doiShort} grievance procedures, adverse determinations must be rendered by a physician in the same active clinical specialty as the treating provider.`;
     chartProof = `Treating specialist is board-certified for ${cptList}.`;
   }
 

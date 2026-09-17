@@ -296,7 +296,7 @@ EXTRACTION GUIDELINES:
    - Set isVerified: true if genuine, actionable contact details (portal, fax, email, or statutory mailing address) were found in the authoritative search results.`;
 
   const userPrompt = `Insurer Name: ${payer}
-Patient State / Jurisdiction: ${claim.patient?.state || "National"}
+Patient State (DOI reference): ${claim.patient?.state || "National"}
 
 ${detectedEmailsSection}
 

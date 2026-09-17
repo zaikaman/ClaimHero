@@ -13,6 +13,7 @@ import {
 } from "../lib/statutoryTierValidators";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
+import { getStateRegulator } from "../lib/stateRegulators";
 import { logPipelineActivity } from "../lib/pipelineActivity";
 import type { Id, Doc } from "../_generated/dataModel";
 
@@ -100,11 +101,15 @@ export const STATUTORY_RIGHTS_NOTICES: Record<string, string> = {
     "STATUTORY BAD-FAITH & ERISA SECTION 502(a)(1)(B) LITIGATION WARNING: Having exhausted available internal administrative appeals without a medically sound determination, notice is hereby given under ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)], 45 C.F.R. § 147.136, and state bad-faith insurance statutes. This matter is submitted for immediate binding external review and formal complaint to the State Insurance Commissioner. If benefits are not disbursed in full with applicable statutory prompt-pay interest, claimant reserves all civil enforcement remedies under ERISA Section 502(a)(1)(B), statutory bad-faith penalties, and attorney's fees under 29 U.S.C. § 1132(g)(1).",
 };
 
-export function getStatutoryRightsNotice(appealLevel?: string): string {
-  if (appealLevel && STATUTORY_RIGHTS_NOTICES[appealLevel]) {
-    return STATUTORY_RIGHTS_NOTICES[appealLevel];
+export function getStatutoryRightsNotice(appealLevel?: string, patientState?: string): string {
+  const base =
+    (appealLevel && STATUTORY_RIGHTS_NOTICES[appealLevel]) || STATUTORY_RIGHTS_NOTICES.level_1_internal;
+  if (appealLevel === "level_3_external_state_review") {
+    // Federal ERISA engine: patient state names only the DOI reference, never deadlines.
+    const regulator = getStateRegulator(patientState);
+    return base.replace(/State Insurance Commissioner/g, regulator.doiName);
   }
-  return STATUTORY_RIGHTS_NOTICES.level_1_internal;
+  return base;
 }
 
 const SAFE_STATUTORY_RIGHTS_NOTICE = STATUTORY_RIGHTS_NOTICES.level_1_internal;
@@ -598,6 +603,8 @@ export function assembleProfessionalAppealEmail(
     ? (claim.icd10Codes || []).filter(Boolean).join(", ")
     : "Not specified";
   const denialReason = formatDenialReason(claim.denialReasonCode, claim.denialReasonDescription);
+  // Federal ERISA engine: patient state names only the DOI / external-review reference, never deadlines.
+  const regulator = getStateRegulator(claim.patient?.state);
   const clinicalBasis = buildGroundedClinicalBasis(result.medicalNecessityArguments, claim, clinicalFacts);
   const supportingEvidences = evidences.filter(
     (e) =>
@@ -624,8 +631,8 @@ export function assembleProfessionalAppealEmail(
     salutation = `To the Multi-Disciplinary Peer Review Panel & Grievance Committee,`;
     openingParagraph = `I hereby submit this Level 2 Formal Grievance escalating the adverse benefit determination for ${claimRefLabel} (service date: ${serviceDateText}). The initial adverse determination cites ${primaryDenial}. We formally challenge the clinical and procedural adequacy of the prior review and demand multi-disciplinary peer review under ERISA Section 503.`;
   } else if (appealLevel === "level_3_external_state_review") {
-    title = `# Appeal of Adverse Benefit Determination — Level 3 External IRO & State Insurance Commissioner Petition`;
-    salutation = `To the Independent Review Organization (IRO), State Insurance Commissioner, and Plan Administrator,`;
+    title = `# Appeal of Adverse Benefit Determination — Level 3 External IRO & ${regulator.doiShort} Petition`;
+    salutation = `To the Independent Review Organization (IRO), ${regulator.doiName}, and Plan Administrator,`;
     openingParagraph = `I hereby submit this Level 3 Petition for External Independent Review and formal administrative complaint regarding ${claimRefLabel} (service date: ${serviceDateText}) regarding the adverse determination citing ${primaryDenial}. Having exhausted internal administrative reviews, this petition demands independent external overturn, regulatory scrutiny, and statutory bad-faith remedies under ERISA Section 502(a)(1)(B).`;
   }
 
@@ -708,8 +715,8 @@ export function assembleProfessionalAppealEmail(
     email += `3. ${buildPaymentRequest(claimNumber)}\n`;
     email += `4. Issue a formal written determination detailing specific clinical guidelines and criteria applied.\n\n`;
   } else if (appealLevel === "level_3_external_state_review") {
-    email += `1. Conduct expedited binding external independent review pursuant to ACA 45 C.F.R. § 147.136 and applicable state external review laws.\n`;
-    email += `2. State Insurance Commissioner review for unfair claims settlement practices and statutory bad-faith adjudication.\n`;
+    email += `1. Conduct expedited binding external independent review pursuant to ACA 45 C.F.R. § 147.136 (${regulator.externalReviewLabel}).\n`;
+    email += `2. ${regulator.doiName} review for unfair claims settlement practices and statutory bad-faith adjudication.\n`;
     email += `3. Immediate full disbursement of the denied amount of ${claim.deniedAmount ? formatMoney(claim.deniedAmount) : "the disputed charges"} plus statutory prompt-pay interest penalties.\n`;
     email += `4. Notice of civil enforcement rights under ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)] and mandatory fee-shifting under ERISA Section 502(g)(1).\n\n`;
   } else {
@@ -718,7 +725,7 @@ export function assembleProfessionalAppealEmail(
     email += `3. Confirm receipt of this appeal and identify the applicable decision timeframe and any further review or external-review instructions.\n\n`;
   }
 
-  const statutoryNotice = getStatutoryRightsNotice(appealLevel);
+  const statutoryNotice = getStatutoryRightsNotice(appealLevel, claim.patient?.state);
   email += `${statutoryNotice}\n\n`;
   email += `Thank you for your review. Please reference ${hasClaimNumber ? `Claim #${claimNumber}` : "the attached denial notice"} in any response or request for additional information.\n\n`;
   email += buildSignature(providerName, sender);

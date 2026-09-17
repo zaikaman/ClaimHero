@@ -153,7 +153,7 @@ describe('Multi-Tier Statutory Appeal Escalation Workflow', () => {
     });
   });
 
-  describe("Tier 3: External IRO & State Insurance Commissioner Petition", () => {
+  describe("Tier 3: External IRO & State DOI Petition", () => {
     it("assembles Level 3 external review petition citing ERISA § 502(a)(1)(B) and statutory bad-faith penalties", () => {
       const brief = assembleProfessionalAppealEmail(
         mockClaim,
@@ -165,7 +165,7 @@ describe('Multi-Tier Statutory Appeal Escalation Workflow', () => {
         mockSender
       );
 
-      expect(brief).toContain("# Appeal of Adverse Benefit Determination — Level 3 External IRO & State Insurance Commissioner Petition");
+      expect(brief).toContain("# Appeal of Adverse Benefit Determination — Level 3 External IRO & State DOI Petition");
       expect(brief).toContain("To the Independent Review Organization (IRO), State Insurance Commissioner, and Plan Administrator,");
       expect(brief).toContain("Level 3 Petition for External Independent Review");
 
@@ -179,6 +179,52 @@ describe('Multi-Tier Statutory Appeal Escalation Workflow', () => {
       expect(brief).toContain("Having exhausted available internal administrative appeals without a medically sound determination");
       expect(brief).toContain("formal complaint to the State Insurance Commissioner");
       expect(brief).toContain("reserves all civil enforcement remedies under ERISA Section 502(a)(1)(B)");
+    });
+  });
+
+  describe("Patient State Is DOI-Reference-Only (Federal ERISA Engine)", () => {
+    const californiaClaim = {
+      ...mockClaim,
+      patient: { ...mockClaim.patient, state: "California" },
+    };
+
+    it("names the state DOI in Level 3 title, salutation, review requests, and rights notice", () => {
+      const brief = assembleProfessionalAppealEmail(
+        californiaClaim,
+        "level_3_external_state_review",
+        mockSynthesisResult,
+        mockEvidences,
+        "Treating surgeon addendum: Unwarranted denial has delayed urgent spinal decompression.",
+        undefined,
+        mockSender
+      );
+
+      expect(brief).toContain("Level 3 External IRO & CA DMHC/CDI Petition");
+      expect(brief).toContain("California Department of Managed Health Care (DMHC) / Department of Insurance (CDI)");
+      expect(brief).toContain("DMHC Independent Medical Review");
+    });
+
+    it("resolves the state DOI in the Level 3 statutory rights notice without changing federal citations", () => {
+      const notice = getStatutoryRightsNotice("level_3_external_state_review", "Texas");
+      expect(notice).toContain("Texas Department of Insurance (TDI)");
+      expect(notice).toContain("ERISA Section 502(a)(1)(B)");
+      expect(notice).toContain("45 C.F.R. § 147.136");
+
+      const federalNotice = getStatutoryRightsNotice("level_3_external_state_review");
+      expect(federalNotice).toContain("State Insurance Commissioner");
+    });
+
+    it("does not leak state DOI references into Level 1 briefs", () => {
+      const brief = assembleProfessionalAppealEmail(
+        californiaClaim,
+        "level_1_internal",
+        mockSynthesisResult,
+        mockEvidences,
+        "Routine reconsideration request.",
+        undefined,
+        mockSender
+      );
+      expect(brief).not.toContain("DMHC");
     });
   });
 });

@@ -80,6 +80,7 @@ export const ClauseInspectorDrawer: React.FC<ClauseInspectorDrawerProps> = ({
   const [copiedClause, setCopiedClause] = useState<boolean>(false);
   const [copiedRule, setCopiedRule] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [internalZoom, setInternalZoom] = useState(false);
 
   const drawerRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -119,6 +120,12 @@ export const ClauseInspectorDrawer: React.FC<ClauseInspectorDrawerProps> = ({
     };
   }, [isOpen]);
 
+  // Reset internal zoom when switching clauses or reopening
+  const activeEvidenceId = evidence?._id;
+  useEffect(() => {
+    setInternalZoom(false);
+  }, [isOpen, activeEvidenceId]);
+
   const currentIndex = evidence
     ? allEvidences.findIndex((item) => item._id === evidence._id)
     : -1;
@@ -150,6 +157,16 @@ export const ClauseInspectorDrawer: React.FC<ClauseInspectorDrawerProps> = ({
 
       if (e.key === "Escape" && !e.defaultPrevented) {
         e.preventDefault();
+        // Close internal zoom first, drawer only when not zoomed
+        let closedZoom = false;
+        setInternalZoom((prev) => {
+          if (prev) {
+            closedZoom = true;
+            return false;
+          }
+          return prev;
+        });
+        if (closedZoom) return;
         onCloseRef.current();
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
@@ -220,20 +237,41 @@ export const ClauseInspectorDrawer: React.FC<ClauseInspectorDrawerProps> = ({
     }
   };
 
-  return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Evidence Inspector: ${evidence.title}`}
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex justify-end animate-fadeIn print:hidden"
-      onClick={onClose}
-    >
-      <div
-        ref={drawerRef}
-        tabIndex={-1}
-        className="w-full max-w-xl bg-background border-l border-border/80 h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 outline-none"
-        onClick={(e) => e.stopPropagation()}
-      >
+  const screenshotPayload = evidence.screenshotUrl
+    ? {
+        url: evidence.screenshotUrl,
+        title: evidence.title,
+        date: evidence.capturedAt
+          ? new Date(evidence.capturedAt).toLocaleDateString()
+          : undefined,
+      }
+    : null;
+
+  const handleZoomScreenshot = () => {
+    if (!screenshotPayload) return;
+    if (onInspectScreenshot) {
+      onInspectScreenshot(screenshotPayload);
+    } else {
+      setInternalZoom(true);
+    }
+  };
+
+  return (
+    <>
+      {createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Evidence Inspector: ${evidence.title}`}
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex justify-end animate-fadeIn print:hidden"
+          onClick={onClose}
+        >
+          <div
+            ref={drawerRef}
+            tabIndex={-1}
+            className="w-full max-w-xl bg-background border-l border-border/80 h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 outline-none"
+            onClick={(e) => e.stopPropagation()}
+          >
         {/* Inspector Header */}
         <div className="sticky top-0 z-10 shrink-0 border-b border-border/70 bg-card/95 backdrop-blur-md px-5 py-3.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -445,25 +483,15 @@ export const ClauseInspectorDrawer: React.FC<ClauseInspectorDrawerProps> = ({
                   <Camera className="size-4" />
                   <span>Visual Proof Archive</span>
                 </div>
-                {onInspectScreenshot && (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={() =>
-                      onInspectScreenshot({
-                        url: evidence.screenshotUrl!,
-                        title: evidence.title,
-                        date: evidence.capturedAt
-                          ? new Date(evidence.capturedAt).toLocaleDateString()
-                          : undefined,
-                      })
-                    }
-                    className="h-6 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 gap-1"
-                  >
-                    <Eye className="size-3.5" />
-                    <span>Expand</span>
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={handleZoomScreenshot}
+                  className="h-6 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 gap-1 cursor-pointer"
+                >
+                  <Eye className="size-3.5" />
+                  <span>Expand</span>
+                </Button>
               </div>
 
               <p className="text-[11px] text-muted-foreground leading-relaxed">
@@ -471,24 +499,25 @@ export const ClauseInspectorDrawer: React.FC<ClauseInspectorDrawerProps> = ({
               </p>
 
               <div
-                onClick={() =>
-                  onInspectScreenshot?.({
-                    url: evidence.screenshotUrl!,
-                    title: evidence.title,
-                    date: evidence.capturedAt
-                      ? new Date(evidence.capturedAt).toLocaleDateString()
-                      : undefined,
-                  })
-                }
-                className="relative rounded-lg border border-border bg-black/40 overflow-hidden cursor-pointer group max-h-56 flex items-start justify-center"
+                role="button"
+                tabIndex={0}
+                aria-label={`Zoom screenshot: ${evidence.title}`}
+                onClick={handleZoomScreenshot}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleZoomScreenshot();
+                  }
+                }}
+                className="relative rounded-lg border border-border bg-black/40 overflow-hidden cursor-pointer group max-h-56 flex items-start justify-center outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <img
                   src={evidence.screenshotUrl}
                   alt={`Screenshot: ${evidence.title}`}
-                  className="w-full object-cover object-top group-hover:scale-[1.01] transition-transform duration-200"
+                  className="w-full object-cover object-top group-hover:scale-[1.01] transition-transform duration-200 pointer-events-none"
                   loading="lazy"
                 />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 focus-within:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                   <span className="bg-background/95 text-foreground text-xs font-medium px-3 py-1.5 rounded-md shadow-md border border-border flex items-center gap-1.5">
                     <Eye className="size-3.5 text-primary" />
                     <span>Click to Zoom</span>
@@ -547,6 +576,49 @@ export const ClauseInspectorDrawer: React.FC<ClauseInspectorDrawerProps> = ({
         </div>
       </div>
     </div>,
-    document.body
+        document.body
+      )}
+      {internalZoom &&
+        screenshotPayload &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Visual proof: ${screenshotPayload.title}`}
+            className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+            onClick={() => setInternalZoom(false)}
+          >
+            <div
+              className="relative max-w-4xl w-full max-h-[85vh] flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border">
+                <p className="text-xs font-medium text-foreground truncate">
+                  {screenshotPayload.title}
+                  {screenshotPayload.date ? ` • Captured on ${screenshotPayload.date}` : ""}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => setInternalZoom(false)}
+                  className="size-7 rounded-md text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+                  title="Close zoom (Esc)"
+                  aria-label="Close zoom"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-auto bg-black/40 p-2 min-h-0">
+                <img
+                  src={screenshotPayload.url}
+                  alt={`Visual proof: ${screenshotPayload.title}`}
+                  className="w-full h-auto rounded object-contain"
+                />
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
   );
 };

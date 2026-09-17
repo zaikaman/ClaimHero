@@ -125,7 +125,7 @@ Represents the insured patient or policyholder.
 | `memberId` | `v.string()` | Yes | Insurance member identification number. |
 | `groupNumber` | `v.optional(v.string())` | No | Employer or plan group number. |
 | `insurancePayer` | `v.string()` | Yes | Insurance company name (e.g. "UnitedHealthcare", "Aetna", "Cigna", "BCBS", "Humana"). |
-| `state` | `v.string()` | Yes | State of jurisdiction (determines statutory DOI review windows). |
+| `state` | `v.string()` | Yes | Patient state, DOI-reference-only (names the state DOI / external-review body in letters; deadlines use the uniform federal 180-day clock). |
 | `createdAt` | `v.number()` | Yes | Unix timestamp in milliseconds. |
 
 **Indexes**:

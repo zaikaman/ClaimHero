@@ -697,23 +697,24 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           </div>
         </DialogHeader>
 
-        {/* State Jurisdiction & Mandatory Human Review Gate */}
+        {/* Patient State (DOI Reference) & Mandatory Human Review Gate */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div className="flex items-center justify-between gap-2 bg-muted/40 border border-border p-2 rounded-lg text-xs">
             <span className="text-muted-foreground font-medium truncate">
-              {isDetailed ? "Jurisdiction:" : "Your state:"}
+              {isDetailed ? "Patient state (DOI ref):" : "Your state:"}
             </span>
             <Select
               value={patientState}
               onChange={(e) => setPatientState(e.target.value)}
               className="h-7 text-xs font-sans border-border/80"
+              title="Federal 180-day clock applies in every state; state names only the DOI reference"
             >
-              <option value="California">California (ERISA 180d)</option>
-              <option value="New York">New York (DFS 180d)</option>
-              <option value="Texas">Texas (TDI 180d)</option>
-              <option value="Florida">Florida (FL DOI)</option>
-              <option value="Illinois">Illinois (IDFPR)</option>
-              <option value="Pennsylvania">Pennsylvania (PID)</option>
+              <option value="California">California — CA DOI ref</option>
+              <option value="New York">New York — NY DOI ref</option>
+              <option value="Texas">Texas — TX DOI ref</option>
+              <option value="Florida">Florida — FL DOI ref</option>
+              <option value="Illinois">Illinois — IL DOI ref</option>
+              <option value="Pennsylvania">Pennsylvania — PA DOI ref</option>
             </Select>
           </div>
 

@@ -55,6 +55,7 @@ import type * as lib_precedentValidators from "../lib/precedentValidators.js";
 import type * as lib_rateLimiter from "../lib/rateLimiter.js";
 import type * as lib_redactionEngine from "../lib/redactionEngine.js";
 import type * as lib_sentinelPrompt from "../lib/sentinelPrompt.js";
+import type * as lib_stateRegulators from "../lib/stateRegulators.js";
 import type * as lib_statutoryTierValidators from "../lib/statutoryTierValidators.js";
 import type * as lib_textract from "../lib/textract.js";
 import type * as model_auth from "../model/auth.js";
@@ -124,6 +125,7 @@ declare const fullApi: ApiFromModules<{
   "lib/rateLimiter": typeof lib_rateLimiter;
   "lib/redactionEngine": typeof lib_redactionEngine;
   "lib/sentinelPrompt": typeof lib_sentinelPrompt;
+  "lib/stateRegulators": typeof lib_stateRegulators;
   "lib/statutoryTierValidators": typeof lib_statutoryTierValidators;
   "lib/textract": typeof lib_textract;
   "model/auth": typeof model_auth;

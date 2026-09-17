@@ -6,6 +6,7 @@ import { streamStructuredDraft } from "../lib/agentDraft";
 import { internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
+import { getStateRegulator } from "../lib/stateRegulators";
 import type { Doc, Id } from "../_generated/dataModel";
 
 const P2P_DEFENSE_SCHEMA = {
@@ -217,9 +218,11 @@ function buildDeterministicFallback(
   const cptList = (claim.cptCodes || []).join(", ") || "the requested procedure";
   const icdList = (claim.icd10Codes || []).join(", ") || "the primary diagnosis";
   const denialReason = claim.denialReasonDescription || claim.denialReasonCode || "Medical Necessity";
-  const state = claim.patient?.state || "the State";
+  // Federal ERISA engine: patient state names only the DOI grievance reference, never deadlines.
+  const regulator = getStateRegulator(claim.patient?.state);
+  const stateLabel = regulator.code === "US" ? "applicable state" : regulator.stateName;
 
-  const opening = `"Hello Dr. [Reviewer Name]. I am ${physicianName}, ${physicianSpecialty || "the treating specialist"} for patient ${claim.patient?.name || "the insured"} (Member ID: ${claim.patient?.memberId || "on file"}). Before we begin this 5-minute peer-to-peer conference regarding Claim #${claim.claimNumber}, I am required for the medical record to ask: Are you currently licensed and actively practicing in ${physicianSpecialty || "this same surgical subspecialty"}? Please note that this call constitutes a formal clinical discussion under ERISA 29 CFR § 2560.503-1 and ${state} Utilization Review regulations, and I am documenting this discussion for our clinical file and any potential Department of Insurance grievance."`;
+  const opening = `"Hello Dr. [Reviewer Name]. I am ${physicianName}, ${physicianSpecialty || "the treating specialist"} for patient ${claim.patient?.name || "the insured"} (Member ID: ${claim.patient?.memberId || "on file"}). Before we begin this 5-minute peer-to-peer conference regarding Claim #${claim.claimNumber}, I am required for the medical record to ask: Are you currently licensed and actively practicing in ${physicianSpecialty || "this same surgical subspecialty"}? Please note that this call constitutes a formal clinical discussion under ERISA 29 CFR § 2560.503-1 and ${stateLabel} Utilization Review regulations, and I am documenting this discussion for our clinical file and any potential ${regulator.doiName} grievance."`;
 
   const citations: PolicyCitationScriptItem[] = [];
   if (evidences && evidences.length > 0) {
@@ -265,7 +268,7 @@ function buildDeterministicFallback(
     },
   ];
 
-  const demands = `"Dr. [Reviewer Name], if you intend to uphold this adverse determination against my clinical judgment as the treating specialist, I formally request your full name, state medical license number, and board specialty on the record. Furthermore, under ${state} insurance regulations and ERISA rules, I demand a detailed written denial letter within 24 hours specifying the exact clinical policy criteria you claim were not met, as we will immediately submit this case to the State Insurance Commissioner for independent external review and bad-faith scrutiny."`;
+  const demands = `"Dr. [Reviewer Name], if you intend to uphold this adverse determination against my clinical judgment as the treating specialist, I formally request your full name, state medical license number, and board specialty on the record. Furthermore, under ${stateLabel} insurance regulations and ERISA rules, I demand a detailed written denial letter within 24 hours specifying the exact clinical policy criteria you claim were not met, as we will immediately submit this case to the ${regulator.doiName} for independent external review and bad-faith scrutiny."`;
 
   const cheatSheet: CondensedCheatSheet = {
     rapidChecklist: [
@@ -288,7 +291,7 @@ function buildDeterministicFallback(
       `DO NOT agree that this procedure is "investigational" or "elective" when clinical indications are satisfied.`,
       `DO NOT allow a non-specialist reviewer to dismiss clinical findings without putting their license number on the record.`,
     ],
-    closingDemandStatement: `If upheld, provide your medical license number and written clinical denial criteria within 24 hours for State Insurance Commissioner and ERISA bad-faith review.`,
+    closingDemandStatement: `If upheld, provide your medical license number and written clinical denial criteria within 24 hours for ${regulator.doiName} and ERISA bad-faith review.`,
   };
 
   const fullMarkdown = assembleFullP2PScriptMarkdown(
@@ -368,6 +371,7 @@ export const generateP2PScript = action({
     const payer = claim.patient?.insurancePayer || "Health Insurer";
     const cptList = (claim.cptCodes || []).join(", ");
     const icdList = (claim.icd10Codes || []).join(", ");
+    const stateRegulator = getStateRegulator(claim.patient?.state);
 
     const evidenceContext =
       evidences.length > 0
@@ -393,7 +397,7 @@ export const generateP2PScript = action({
 Your mission is to generate a high-impact, razor-sharp 3-Minute Verbal Rebuttal Script and Condensed Pocket Cheat Sheet for a treating physician who must defend a denied medical claim during a 5-minute phone conference with an insurer medical director.
 
 Key Strategic Objectives:
-1. STATUTORY OPENING SALVO: Establish treating specialist authority, immediately challenge the medical director's board credentials in the same specialty pursuant to state utilization review laws (e.g. Texas Insurance Code § 4201.206, California, NY), and place them on notice of ERISA 29 CFR § 2560.503-1 / state insurance regulations.
+1. STATUTORY OPENING SALVO: Establish treating specialist authority, immediately challenge the medical director's board credentials in the same specialty pursuant to federal ERISA 29 CFR § 2560.503-1 full and fair review standards (same-specialty review), and place them on notice of ERISA requirements plus a grievance reference to the patient's state regulator where applicable.
 2. EXACT CPB CITATIONS: Cite specific Clinical Policy Bulletin (CPB) section numbers and criteria satisfaction clauses proving the patient meets published coverage requirements.
 3. DIRECT COUNTERS TO INSURER TRAPS: Supply devastating verbal counter-strikes to common insurer trap questions (e.g. conservative therapy duration, step therapy, non-surgical alternatives, imaging thresholds).
 4. FORMAL BAD-FAITH DEMAND: Deliver an uncompromising closing demand for the medical director's name and license number on the record, a written denial letter within 24 hours, and notice of intent to file a State Insurance Commissioner bad-faith complaint.
@@ -414,7 +418,7 @@ Case Details:
 - Diagnosis Codes (ICD-10): ${icdList}
 - Denial Reason Code: ${claim.denialReasonCode}
 - Denial Reason Description: ${claim.denialReasonDescription}
-- Patient State: ${claim.patient?.state || "US"}
+- Patient State: ${claim.patient?.state || "US"} (${stateRegulator.doiShort} reference only; federal ERISA engine, 180-day clock)
 
 Clinical Policies & Indexed Evidence:
 ${evidenceContext}

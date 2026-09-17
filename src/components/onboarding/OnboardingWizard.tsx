@@ -140,12 +140,12 @@ const ROLES = [
 ];
 
 const JURISDICTIONS = [
-  { code: "FL", label: "Florida (11th Circuit / AHCA Guidelines)", plainLabel: "Florida" },
-  { code: "CA", label: "California (9th Circuit / Knox-Keene Act & DMHC)", plainLabel: "California" },
-  { code: "TX", label: "Texas (5th Circuit / TDI Protections)", plainLabel: "Texas" },
-  { code: "NY", label: "New York (2nd Circuit / DFS Independent Dispute Resolution)", plainLabel: "New York" },
-  { code: "IL", label: "Illinois (7th Circuit / IDOI Mandates)", plainLabel: "Illinois" },
-  { code: "FED", label: "Federal ERISA Statutory Default (29 U.S.C. § 1133)", plainLabel: "Federal rules (job-based plans)" },
+  { code: "FL", label: "Florida — FL AHCA/OIR reference (federal ERISA engine)", plainLabel: "Florida" },
+  { code: "CA", label: "California — CA DMHC/CDI reference (federal ERISA engine)", plainLabel: "California" },
+  { code: "TX", label: "Texas — TX TDI reference (federal ERISA engine)", plainLabel: "Texas" },
+  { code: "NY", label: "New York — NY DFS reference (federal ERISA engine)", plainLabel: "New York" },
+  { code: "IL", label: "Illinois — IL IDOI reference (federal ERISA engine)", plainLabel: "Illinois" },
+  { code: "FED", label: "Federal default — no state DOI (ERISA engine)", plainLabel: "Federal rules (job-based plans)" },
 ];
 
 const TARGET_PAYERS = [
@@ -576,7 +576,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           <div className="grid grid-cols-3 gap-2">
             {[
               { num: 1, label: "Appellate Role" },
-              { num: 2, label: "Jurisdiction & Payers" },
+              { num: 2, label: "State Reference & Payers" },
               { num: 3, label: "First Sentinel Case" },
             ].map((s) => (
               <div key={s.num} className="space-y-1">
@@ -720,18 +720,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             </div>
           )}
 
-          {/* ================= STEP 2: Jurisdiction & Payers ================= */}
+          {/* ================= STEP 2: State Reference & Payers ================= */}
           {!extractedResult && step === 2 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="space-y-2">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">
-                    {isDetailed ? "Primary State Jurisdiction" : "Your State or Region"}
+                    {isDetailed ? "Patient State (DOI Reference Only)" : "Patient State or Region"}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {isDetailed
-                      ? "Governs statutory review timelines (ERISA 180-day clock vs. California DMHC/CDI standards)."
-                      : "Sets appeal deadlines and state consumer protection rules."}
+                      ? "Federal ERISA 180-day engine applies in every state. This state names only the DOI / external review reference in letters."
+                      : "Deadlines always use the federal 180-day clock. State is used only for agency references."}
                   </p>
                 </div>
 
