@@ -22,6 +22,17 @@ export interface AuthTokenStorage {
 const ACCESS_TOKEN_KEY = "__convexAuthJWT";
 const REFRESH_TOKEN_KEY = "__convexAuthRefreshToken";
 
+/**
+ * Query params the Convex Auth OAuth component appends to callback redirects
+ * back to the browser (see `@convex-dev/auth` `lib/oauthParams`).
+ * Deliberately `convexAuth`-prefixed so they never collide with app params.
+ */
+export const OAUTH_CODE_PARAM = "convexAuthCode";
+export const OAUTH_ERROR_PARAM = "convexAuthError";
+
+/** Set once in `src/main.tsx` before the auth provider strips callback params. */
+export const OAUTH_CALLBACK_BOOT_FLAG = "__CLAIMHERO_OAUTH_CALLBACK__";
+
 function readBrowserStorage(): AuthTokenStorage | null {
   if (typeof window === "undefined") return null;
   try {
@@ -82,6 +93,105 @@ export function hasCachedAuthToken(
     return false;
   }
   return false;
+}
+
+/**
+ * Synchronously report whether this browser holds a pending Convex Auth OAuth
+ * flow (the `state` saved before redirecting to Google). The key shape mirrors
+ * the provider storage in `@convex-dev/auth` (`__convexAuthProvider_oauth_flow`
+ * plus per-deployment suffix variants). True only while a flow is in flight;
+ * the client removes the entry the moment the callback code is redeemed.
+ */
+export function hasPendingOAuthFlow(
+  storage: AuthTokenStorage | null = readBrowserStorage(),
+): boolean {
+  if (!storage) return false;
+  try {
+    const total = storage.length;
+    if (typeof total !== "number" || total <= 0) return false;
+    for (let i = 0; i < total; i++) {
+      let flowKey: string | null = null;
+      try {
+        flowKey = storage.key(i);
+      } catch {
+        continue;
+      }
+      if (!flowKey || !flowKey.includes("__convexAuthProvider_")) continue;
+      if (!flowKey.toLowerCase().includes("flow")) continue;
+      let storedValue: string | null = null;
+      try {
+        storedValue = storage.getItem(flowKey);
+      } catch {
+        continue;
+      }
+      if (isNonEmpty(storedValue)) return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+/**
+ * Report whether the given URL carries a Convex Auth OAuth callback
+ * (`?convexAuthCode=` on success, `?convexAuthError=` on failure).
+ * Accepts a full href or a bare query string; safe on the server (false).
+ */
+export function isOAuthCallbackUrl(href?: string | null): boolean {
+  try {
+    const raw =
+      href ?? (typeof window !== "undefined" ? window.location.href : null);
+    if (!raw) return false;
+    const queryIndex = raw.indexOf("?");
+    if (queryIndex === -1) return false;
+    const hashIndex = raw.indexOf("#", queryIndex);
+    const query =
+      hashIndex === -1 ? raw.slice(queryIndex + 1) : raw.slice(queryIndex + 1, hashIndex);
+    if (!query) return false;
+    const params = new URLSearchParams(query);
+    return params.has(OAUTH_CODE_PARAM) || params.has(OAUTH_ERROR_PARAM);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Report whether this page load is returning from an OAuth redirect.
+ * `src/main.tsx` snapshots this before the auth provider strips the callback
+ * params from the URL; falls back to a live URL check for contexts where the
+ * snapshot has not run (tests, SSR-safe false).
+ */
+export function wasOAuthCallbackAtBoot(): boolean {
+  try {
+    if (typeof window !== "undefined") {
+      const flagged =
+        (window as unknown as Record<string, unknown>)[OAUTH_CALLBACK_BOOT_FLAG] ===
+        true;
+      if (flagged) return true;
+    }
+  } catch {
+    // Ignore and fall through to the live URL check.
+  }
+  return isOAuthCallbackUrl();
+}
+
+/**
+ * Decide whether the UI must show a "completing sign-in" state instead of the
+ * static login form: the session is still verifying AND this is either a
+ * returning session or an OAuth redirect completing its code exchange.
+ * Anonymous first visits stay on signed-out copy so landing LCP never waits.
+ */
+export function shouldShowCompletingSignIn(args: {
+  isAuthenticated: boolean;
+  isAuthLoading: boolean;
+  hasCachedSession: boolean;
+  isOAuthReturn?: boolean;
+  hasPendingFlow?: boolean;
+}): boolean {
+  if (args.isAuthenticated || !args.isAuthLoading) return false;
+  return Boolean(
+    args.hasCachedSession || args.isOAuthReturn || args.hasPendingFlow,
+  );
 }
 
 /**

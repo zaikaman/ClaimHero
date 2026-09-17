@@ -1,9 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useMutation } from "convex/react";
+import { useConvexAuth } from "@convex-dev/auth/react";
 import { useSignInWithPassword, useSignUpWithPassword } from "@convex-dev/auth/providers/password/react";
 import { useSignInWithGoogle, useOauth } from "@convex-dev/auth/providers/oauth/react";
 import { useAnonymousAuth } from "@convex-dev/auth/providers/anonymous/react";
 import { api } from "../../../convex/_generated/api";
+import {
+  hasPendingOAuthFlow,
+  wasOAuthCallbackAtBoot,
+} from "../../lib/authSession";
 import {
   Eye,
   EyeSlash,
@@ -31,6 +36,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const { signInGoogle } = useSignInWithGoogle(api.auth);
   const { signInAnonymous } = useAnonymousAuth(api.auth.signInAnonymous);
   const { flowError } = useOauth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
   const updateProfile = useMutation(api.users.updateProfile);
 
   const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
@@ -45,6 +51,37 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Snapshot once: true for the whole page load that returns from the Google
+  // redirect (the provider strips the callback params during init, so a live
+  // URL check would miss it after mount).
+  const [isOAuthReturn] = useState<boolean>(() => wasOAuthCallbackAtBoot());
+  // While the OAuth code exchange is in flight the provider reports loading
+  // with no session yet. Show an explicit completing state instead of a
+  // static form so the return trip never looks stuck on the login page.
+  const isCompletingOAuth =
+    !isAuthenticated &&
+    (isGoogleLoading ||
+      (isAuthLoading && (isOAuthReturn || hasPendingOAuthFlow())));
+  const showGoogleBusy = isGoogleLoading || isCompletingOAuth;
+
+  // Enter the workspace the exact tick the session becomes authenticated
+  // (covers the Google redirect return, which has no submit handler to call
+  // onSuccess). Runs alongside the App-level redirect guard; whichever fires
+  // first wins and the router dedupes identical targets.
+  const didAutoNavigateRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (!isAuthenticated || didAutoNavigateRef.current) return;
+    didAutoNavigateRef.current = true;
+    setIsGoogleLoading(false);
+    setIsAnonymousLoading(false);
+    setIsLoading(false);
+    if (onSuccess) {
+      onSuccess();
+    } else {
+      onNavigate("radar");
+    }
+  }, [isAuthenticated, onNavigate, onSuccess]);
 
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
@@ -136,6 +173,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   useEffect(() => {
     if (flowError) {
+      setIsGoogleLoading(false);
       if (flowError.code === "access_denied") {
         setError("Google sign-in was cancelled.");
       } else if (flowError.code === "expired") {
@@ -293,6 +331,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </div>
             )}
 
+            {/* Completing Google sign-in status (OAuth redirect return) */}
+            {isCompletingOAuth && !error && (
+              <div className="p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 text-xs sm:text-sm flex items-center gap-2.5">
+                <CircleNotch className="w-4 h-4 shrink-0 animate-spin text-zinc-600" />
+                <p>Completing Google sign-in, entering your workspace...</p>
+              </div>
+            )}
+
             {/* Form */}
             <form onSubmit={handlePasswordAuth} className="space-y-3.5 text-left">
               {/* Optional Name field in sign up mode */}
@@ -377,7 +423,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               {/* Primary Sign In Button */}
               <button
                 type="submit"
-                disabled={isLoading || isSigningIn || isSigningUp || isGoogleLoading}
+                disabled={isLoading || isSigningIn || isSigningUp || showGoogleBusy || isCompletingOAuth}
                 className="w-full h-10 sm:h-11 rounded-xl bg-black text-white font-medium text-sm hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-md mt-1.5"
               >
                 {isLoading || isSigningIn || isSigningUp ? (
@@ -401,10 +447,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <button
                 type="button"
                 onClick={handleGoogleAuth}
-                disabled={isLoading || isSigningIn || isSigningUp || isGoogleLoading || isAnonymousLoading}
+                disabled={isLoading || isSigningIn || isSigningUp || showGoogleBusy || isAnonymousLoading || isCompletingOAuth}
                 className="w-full h-10 sm:h-11 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-medium text-sm transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs"
               >
-                {isGoogleLoading ? (
+                {showGoogleBusy ? (
                   <CircleNotch className="w-4 h-4 animate-spin text-zinc-700" />
                 ) : (
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -426,14 +472,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     />
                   </svg>
                 )}
-                <span>Continue with Google</span>
+                <span>{isCompletingOAuth ? "Completing Google sign-in..." : "Continue with Google"}</span>
               </button>
 
               {/* Anonymous Instant Access Button */}
               <button
                 type="button"
                 onClick={handleAnonymousAuth}
-                disabled={isLoading || isSigningIn || isSigningUp || isGoogleLoading || isAnonymousLoading}
+                disabled={isLoading || isSigningIn || isSigningUp || showGoogleBusy || isAnonymousLoading || isCompletingOAuth}
                 className="w-full h-10 sm:h-11 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-medium text-sm transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs mt-2"
               >
                 {isAnonymousLoading ? (

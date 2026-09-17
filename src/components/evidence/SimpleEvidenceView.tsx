@@ -27,6 +27,22 @@ interface SimpleEvidenceViewProps {
   onNavigateToStudio: () => void;
   onRunCompleteAnalysis: () => Promise<void>;
   isAnalyzing?: boolean;
+  isPipelineRunning?: boolean;
+}
+
+/**
+ * Normalize a treating-provider display name without inventing titles.
+ * Provider names already ship with their title ("Dr. Sarah Chen, MD"), so
+ * blindly prefixing "Dr." renders "Dr. Dr. ...". Collapse repeated leading
+ * titles to one; never add a title to a bare facility or personal name and
+ * never fall back to an invented person.
+ */
+export function formatProviderDisplayName(raw?: string | null): string {
+  const name = (raw ?? "").trim().replace(/\s+/g, " ");
+  if (!name) return "";
+  const withoutTitles = name.replace(/^(dr\.?\s+)+/i, "").trim();
+  if (!withoutTitles) return name;
+  return /^dr\.?\s+/i.test(name) ? `Dr. ${withoutTitles}` : name;
 }
 
 export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
@@ -36,6 +52,7 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
   onNavigateToStudio,
   onRunCompleteAnalysis,
   isAnalyzing = false,
+  isPipelineRunning = false,
 }) => {
   const [showFullRubric, setShowFullRubric] = useState(false);
   const [inspectedEvidence, setInspectedEvidence] = useState<ClinicalEvidence | null>(null);
@@ -54,6 +71,14 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
       ? "text-amber-400 bg-amber-500/10 border-amber-500/30"
       : "text-rose-400 bg-rose-500/10 border-rose-500/30";
 
+  // Work is in flight (manual analysis or the background pipeline). Until a
+  // finding is backed by retrieved evidence or computed scoring, the view
+  // must show honest gathering/empty states — never fabricated specifics.
+  const isWorking = isAnalyzing || isPipelineRunning;
+  const providerDisplayName = formatProviderDisplayName(claim.providerName);
+  const hasScoreSignal = scoringResult !== null || breakdown.length > 0;
+  const showAnalyzingScore = isWorking && !hasScoreSignal;
+
   // Top 3 Curated Decisive Proof Points ("Smoking Guns")
   const smokingGuns = useMemo(() => {
     // 1. Insurer Rule finding
@@ -70,13 +95,16 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
         ? stripMarkdownFormatting(topContradiction)
         : cpbEvidence
         ? cpbEvidence.title
-        : "The insurer's clinical policy bulletin contains explicit coverage exceptions.",
+        : isWorking
+        ? "Checking the insurer's published rules for exceptions that apply to this denial."
+        : "No insurer policy exception verified yet. Run a check to review their published rules.",
       quote: cpbEvidence?.citationClause
         ? `Clause: ${cpbEvidence.citationClause}`
         : cpbEvidence?.extractedEvidenceMarkdown
         ? stripMarkdownFormatting(cpbEvidence.extractedEvidenceMarkdown).slice(0, 160) + "..."
-        : "Emergency and acute symptoms are exempted from standard prior authorization under published criteria.",
+        : "Policy findings will appear here once the insurer's published rules are checked.",
       evidenceItem: cpbEvidence || null,
+      verified: Boolean(topContradiction || cpbEvidence),
     };
 
     // 2. Doctor Documentation finding
@@ -91,11 +119,22 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
       badge: "Doctor Records",
       summary: docCrit?.rationale
         ? stripMarkdownFormatting(docCrit.rationale)
-        : `Dr. ${claim.providerName || "Chen"} documented clinical necessity and symptoms justifying the procedure.`,
+        : guidelineEvidence
+        ? guidelineEvidence.title
+        : providerDisplayName
+        ? isWorking
+          ? `Reviewing clinical documentation from ${providerDisplayName}...`
+          : `No documentation from ${providerDisplayName} verified yet. Run a check to review the clinical records.`
+        : isWorking
+        ? "Reviewing the clinical documentation..."
+        : "No doctor documentation verified yet. Run a check to review the clinical records.",
       quote: guidelineEvidence?.citationClause
         ? `Clinical Guideline: ${guidelineEvidence.citationClause}`
-        : "Medical records demonstrate acute progressive neurological impairment or clinical necessity.",
+        : guidelineEvidence?.extractedEvidenceMarkdown
+        ? stripMarkdownFormatting(guidelineEvidence.extractedEvidenceMarkdown).slice(0, 160) + "..."
+        : "Clinical findings will appear here once the records review completes.",
       evidenceItem: guidelineEvidence || null,
+      verified: Boolean(docCrit?.rationale || guidelineEvidence),
     };
 
     // 3. Federal Rights & Winning Precedent finding
@@ -111,17 +150,32 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
       badge: "Federal Rights",
       summary: erisaCrit?.rationale
         ? stripMarkdownFormatting(erisaCrit.rationale)
-        : "Under federal law (ERISA 29 CFR § 2560.503-1), the insurer is required to disclose all internal clinical criteria used.",
+        : legalEvidence
+        ? legalEvidence.title
+        : isWorking
+        ? "Checking your appeal rights and similar winning cases..."
+        : "No legal rights finding verified yet. Run a check to review appeal rights and similar wins.",
       quote: scoringResult?.winningPrecedentSummary
         ? stripMarkdownFormatting(scoringResult.winningPrecedentSummary)
         : precedentCrit?.rationale
         ? stripMarkdownFormatting(precedentCrit.rationale)
-        : "Appeals presenting documented clinical exceptions have an established track record of overturn.",
+        : legalEvidence?.extractedEvidenceMarkdown
+        ? stripMarkdownFormatting(legalEvidence.extractedEvidenceMarkdown).slice(0, 160) + "..."
+        : "Rights and precedent findings will appear here once the review completes.",
       evidenceItem: legalEvidence || null,
+      verified: Boolean(
+        erisaCrit?.rationale ||
+          scoringResult?.winningPrecedentSummary ||
+          precedentCrit?.rationale ||
+          legalEvidence
+      ),
     };
 
     return [ruleFinding, doctorFinding, rightsFinding];
-  }, [evidences, keyContradictions, breakdown, claim.providerName, scoringResult]);
+  }, [evidences, keyContradictions, breakdown, providerDisplayName, isWorking, scoringResult]);
+
+  const verifiedCount = smokingGuns.filter((g) => g.verified).length;
+  const hasVerifiedFindings = verifiedCount > 0;
 
   return (
     <div className="space-y-4 font-sans animate-fadeIn">
@@ -129,10 +183,16 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
       <Card className="p-5 border-border/80 bg-card/80 backdrop-blur-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start sm:items-center gap-4">
-            {/* Prominent Score Pill */}
+            {/* Prominent Score Pill (honest while scoring is still running) */}
             <div className="flex h-14 min-w-[5.5rem] shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 font-mono text-2xl font-bold tracking-tight text-emerald-400">
-              {activeScore}
-              <span className="text-xs font-normal text-emerald-400/70 ml-1">/100</span>
+              {showAnalyzingScore ? (
+                <CircleNotch className="size-6 animate-spin" aria-label="Scoring in progress" />
+              ) : (
+                <>
+                  {activeScore}
+                  <span className="text-xs font-normal text-emerald-400/70 ml-1">/100</span>
+                </>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -140,8 +200,8 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
                 <h2 className="text-base sm:text-lg font-semibold text-foreground">
                   Your case strength
                 </h2>
-                <Badge variant="outline" className={cn("text-xs font-medium border px-2 py-0.5", scoreBadgeColor)}>
-                  {scoreBadgeText}
+                <Badge variant="outline" className={cn("text-xs font-medium border px-2 py-0.5", showAnalyzingScore ? "text-muted-foreground bg-muted/40 border-border/70" : scoreBadgeColor)}>
+                  {showAnalyzingScore ? "Analyzing" : scoreBadgeText}
                 </Badge>
                 <Badge variant="secondary" className="font-mono text-[11px] text-muted-foreground">
                   {evidences.length} proof document{evidences.length === 1 ? "" : "s"} indexed
@@ -187,7 +247,11 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
             <p className="text-muted-foreground leading-relaxed">
               {keyContradictions.length > 0
                 ? stripMarkdownFormatting(keyContradictions[0])
-                : "The insurer denied coverage for missing pre-authorization, but their published clinical policies specify clear exceptions for acute care and clinical necessity."}
+                : isWorking
+                ? "Analysis in progress. Verified findings will appear here as the insurer's rules and your records are checked."
+                : hasVerifiedFindings
+                ? "Verified proof points are listed below. Only cited, verified findings go into your appeal letter."
+                : "No verified findings yet. Run a check to analyze this denial against the insurer's published rules and your records."}
             </p>
           </div>
         </div>
@@ -197,10 +261,22 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
-            3 Key Proof Points Found
+            {hasVerifiedFindings
+              ? `${verifiedCount} Key Proof Point${verifiedCount === 1 ? "" : "s"} Found`
+              : isWorking
+              ? "Gathering Key Proof Points"
+              : "No Proof Points Yet"}
           </span>
           <span className="text-[11px] text-muted-foreground">
-            Included in your appeal letter
+            {hasVerifiedFindings
+              ? verifiedCount === smokingGuns.length
+                ? "Included in your appeal letter"
+                : isWorking
+                ? "More still being verified..."
+                : "Run a check to verify the rest"
+              : isWorking
+              ? "Checking live..."
+              : "Run a check to verify findings"}
           </span>
         </div>
 
@@ -342,10 +418,18 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
       <Card className="p-4 border-primary/30 bg-primary/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="space-y-0.5">
           <span className="text-xs font-semibold text-foreground">
-            Ready to review your appeal letter?
+            {hasVerifiedFindings
+              ? "Ready to review your appeal letter?"
+              : isWorking
+              ? "Your appeal letter is being prepared..."
+              : "Run a check to build your appeal letter"}
           </span>
           <p className="text-[11px] text-muted-foreground">
-            We have integrated all these proof points directly into your cited brief.
+            {hasVerifiedFindings
+              ? "We have integrated all these proof points directly into your cited brief."
+              : isWorking
+              ? "Each proof point streams into your cited brief as it is verified."
+              : "Only verified, cited proof points go into your letter. Run a check to verify them first."}
           </p>
         </div>
 

@@ -104,7 +104,7 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
           </Button>
           <Button
             size="sm"
-            onClick={onOpenIngestion}
+            onClick={() => onOpenIngestion()}
             className="gap-1.5 text-xs shadow-xs"
           >
             <PlusCircle className="size-3.5" />
@@ -141,7 +141,7 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
                   : "Add a denial letter (photo, PDF, or text) to see why it can be challenged and get your letter."}
               </p>
             </div>
-            <Button onClick={onOpenIngestion} className="gap-2 text-xs shadow-xs">
+            <Button onClick={() => onOpenIngestion()} className="gap-2 text-xs shadow-xs">
               <PlusCircle className="size-3.5" />
               <span>{isDetailed ? "Ingest First Denial Notice" : "Add your first denial"}</span>
             </Button>

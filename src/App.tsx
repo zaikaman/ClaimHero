@@ -10,6 +10,11 @@ import { useEvidence } from "./hooks/useEvidence";
 import { useCommunications } from "./hooks/useCommunications";
 import { useRouterView } from "./hooks/useRouterView";
 import { useCurrentUser } from "./hooks/useCurrentUser";
+import {
+  hasPendingOAuthFlow,
+  shouldShowCompletingSignIn,
+  wasOAuthCallbackAtBoot,
+} from "./lib/authSession";
 import { BrandIcon, BrandWordmark } from "./components/common/BrandLogo";
 import { CircleNotch } from "@phosphor-icons/react";
 import { Toaster } from "sonner";
@@ -68,6 +73,16 @@ export default function App() {
   }, []);
 
   const { isAuthenticated, isAuthLoading, hasCachedSession, user } = useCurrentUser();
+  const [isOAuthReturnAtBoot] = useState<boolean>(() => wasOAuthCallbackAtBoot());
+  // True while the Google code exchange (or a returning session refresh) is
+  // still verifying: show a completing state instead of the static login form.
+  const isCompletingSignIn = shouldShowCompletingSignIn({
+    isAuthenticated,
+    isAuthLoading,
+    hasCachedSession,
+    isOAuthReturn: isOAuthReturnAtBoot,
+    hasPendingFlow: hasPendingOAuthFlow(),
+  });
   const isDashboardActive = isAuthenticated && currentView !== "landing" && currentView !== "login" && currentView !== "notFound";
 
   const {
@@ -165,8 +180,17 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const handleOpenIngestion = useCallback((claim?: Claim) => {
-    setIngestionClaim(claim || null);
+  const handleOpenIngestion = useCallback((claim?: Claim | unknown) => {
+    // Guard: header/empty-state buttons forward a MouseEvent via onClick={onOpenIngestion}.
+    // Only treat the argument as a claim when it carries a valid claim id.
+    const validClaim =
+      claim &&
+      typeof claim === "object" &&
+      "_id" in (claim as Record<string, unknown>) &&
+      typeof (claim as Claim)._id === "string"
+        ? (claim as Claim)
+        : null;
+    setIngestionClaim(validClaim);
     setIsIngestionOpen(true);
   }, []);
 
@@ -189,6 +213,14 @@ export default function App() {
       setCurrentView(nextView);
     }
   }, [currentView, isAuthenticated, pendingTargetView, setCurrentView]);
+
+  // Warm the workspace bundle while the sign-in completes so the console
+  // paints the moment the session flips to authenticated.
+  useEffect(() => {
+    if (currentView === "login" || isCompletingSignIn) {
+      void import("./components/radar/CaseRadar").catch(() => {});
+    }
+  }, [currentView, isCompletingSignIn]);
 
   // Open Sentinel Setup Guide (Onboarding) for new users on initial entry into console
   useEffect(() => {
@@ -219,6 +251,41 @@ export default function App() {
         </div>
         <Toaster position="bottom-right" richColors theme="dark" closeButton />
       </Suspense>
+    );
+  }
+
+  // Just authenticated while still on the login route: render the workspace
+  // entry state immediately instead of the login form. The redirect effect
+  // above settles the route to the console on this same tick.
+  if (currentView === "login" && isAuthenticated) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
+        <div className="flex flex-col items-center gap-4">
+          <BrandIcon size="xl" />
+          <div className="flex flex-col items-center gap-1.5">
+            <BrandWordmark size="md" />
+            <span className="text-xs font-mono text-muted-foreground">Entering your workspace...</span>
+          </div>
+          <CircleNotch className="size-4 animate-spin text-muted-foreground mt-1" />
+        </div>
+      </div>
+    );
+  }
+
+  // Google redirect return (or returning session) still verifying: show a
+  // completing state instead of the static login form.
+  if (isCompletingSignIn) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
+        <div className="flex flex-col items-center gap-4">
+          <BrandIcon size="xl" />
+          <div className="flex flex-col items-center gap-1.5">
+            <BrandWordmark size="md" />
+            <span className="text-xs font-mono text-muted-foreground">Completing Google sign-in...</span>
+          </div>
+          <CircleNotch className="size-4 animate-spin text-muted-foreground mt-1" />
+        </div>
+      </div>
     );
   }
 

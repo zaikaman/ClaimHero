@@ -15,6 +15,15 @@ export interface PipelineResult {
   riskLevel?: string;
   appealId?: string;
   precedentsUnavailable?: boolean;
+  cpbDegraded?: boolean;
+  status?: string;
+  evidenceIntegrity?: {
+    cpbStatus: "verified" | "fallback_statutory" | "missing";
+    precedentStatus: "matched" | "archive_unavailable" | "none_found";
+    scoreStatus: "certified" | "provisional_capped" | "withheld";
+    degradationWarnings: string[];
+    requiresEvidentiaryAcknowledgement: boolean;
+  };
   error?: string;
 }
 
@@ -103,6 +112,9 @@ export const runAutonomousPipeline = action({
           riskLevel: result.riskLevel,
           appealId: result.appealId,
           precedentsUnavailable: result.precedentsUnavailable,
+          cpbDegraded: result.cpbDegraded,
+          status: result.status,
+          evidenceIntegrity: result.evidenceIntegrity,
         };
       }
 

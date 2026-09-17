@@ -6,6 +6,33 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { api } from "../convex/_generated/api";
 import App from "./App";
 import "./index.css";
+import {
+  OAUTH_CALLBACK_BOOT_FLAG,
+  OAUTH_CODE_PARAM,
+  OAUTH_ERROR_PARAM,
+} from "./lib/authSession";
+
+/**
+ * Snapshot whether this page load is returning from an OAuth redirect BEFORE
+ * the auth provider strips the callback params from the URL during init.
+ * `wasOAuthCallbackAtBoot()` in `src/lib/authSession.ts` reads this flag so
+ * the login UI can show a "completing sign-in" state for the whole code
+ * exchange instead of a static form. Runs synchronously at module evaluation.
+ */
+function captureOAuthCallbackAtBoot(): void {
+  try {
+    if (typeof window === "undefined" || !window.location) return;
+    const params = new URLSearchParams(window.location.search || "");
+    if (params.has(OAUTH_CODE_PARAM) || params.has(OAUTH_ERROR_PARAM)) {
+      (window as unknown as Record<string, unknown>)[OAUTH_CALLBACK_BOOT_FLAG] =
+        true;
+    }
+  } catch {
+    // Never block app boot on a best-effort snapshot.
+  }
+}
+
+captureOAuthCallbackAtBoot();
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
 if (!convexUrl) {
@@ -101,15 +128,15 @@ function removeStaleTokenSet(accessTokenKey: string): void {
   }
 }
 
-async function purgeUnverifiableAuthTokens(convexUrl: string): Promise<void> {
+async function purgeUnverifiableAuthTokens(convexUrl: string): Promise<number> {
   try {
-    if (typeof window === "undefined" || !window.localStorage) return;
-    if (typeof fetch !== "function") return;
+    if (typeof window === "undefined" || !window.localStorage) return 0;
+    if (typeof fetch !== "function") return 0;
     const cached = findCachedAccessTokens();
-    if (cached.length === 0) return;
+    if (cached.length === 0) return 0;
     // The auth JWKS is served from the deployment's site URL, which follows
     // the Cloud URL with `.convex.cloud` swapped for `.convex.site`.
-    if (!convexUrl.includes(".convex.cloud")) return;
+    if (!convexUrl.includes(".convex.cloud")) return 0;
     const siteUrl = convexUrl.replace(".convex.cloud", ".convex.site");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
@@ -117,37 +144,53 @@ async function purgeUnverifiableAuthTokens(convexUrl: string): Promise<void> {
       const res = await fetch(`${siteUrl}/auth/.well-known/jwks.json`, {
         signal: controller.signal,
       });
-      if (!res.ok) return;
+      if (!res.ok) return 0;
       const jwks = (await res.json()) as { keys?: Array<{ kid?: unknown }> };
       const liveKids = new Set(
         (jwks.keys ?? [])
           .filter((k) => typeof k.kid === "string")
           .map((k) => k.kid as string),
       );
+      let removed = 0;
       for (const { key, kid } of cached) {
         if (!kid || !liveKids.has(kid)) {
           removeStaleTokenSet(key);
+          removed += 1;
         }
       }
+      return removed;
     } finally {
       clearTimeout(timeout);
     }
   } catch {
     // Never block app boot on a best-effort cleanup.
+    return 0;
   }
 }
 
 const convex = new ConvexReactClient(convexUrl);
 
-// Resolve stale-token cleanup before mounting so the auth provider never
-// adopts a token the server would reject. The app renders the moment the
-// check settles (fast when logged out or when the JWKS fetch is cached).
-purgeUnverifiableAuthTokens(convexUrl).finally(() => {
-  ReactDOM.createRoot(document.getElementById("root")!).render(
-    <React.StrictMode>
-      <ConvexAuthProvider client={convex} api={api.auth}>
-        <App />
-      </ConvexAuthProvider>
-    </React.StrictMode>,
-  );
+// Mount immediately so OAuth callback handling (`completeFlow`) and first
+// paint never wait on the best-effort JWKS cleanup. The purge runs in the
+// background; when it drops a proven-stale token set the provider may have
+// already adopted in memory, a single reload re-initializes the session
+// clean. Healthy sessions are untouched, so this reload only ever fires once
+// for users carrying a pre-rotation token (after which there is nothing left
+// to purge and no further reload).
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <ConvexAuthProvider client={convex} api={api.auth}>
+      <App />
+    </ConvexAuthProvider>
+  </React.StrictMode>,
+);
+
+void purgeUnverifiableAuthTokens(convexUrl).then((removed) => {
+  if (removed > 0 && typeof window !== "undefined") {
+    try {
+      window.location.reload();
+    } catch {
+      // Ignore reload errors in restricted contexts.
+    }
+  }
 });

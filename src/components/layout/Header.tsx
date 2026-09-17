@@ -118,7 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Quick Ingest Button */}
             <Button
               size="sm"
-              onClick={onOpenIngestion}
+              onClick={() => onOpenIngestion()}
               className="gap-1.5 text-xs h-8 shadow-xs"
             >
               <PlusCircle className="size-3.5" />

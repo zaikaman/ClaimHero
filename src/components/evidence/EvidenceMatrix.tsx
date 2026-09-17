@@ -269,6 +269,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           onNavigateToStudio={onNavigateToStudio}
           onRunCompleteAnalysis={handleRunCompleteAnalysis}
           isAnalyzing={isUnifiedAnalyzing || isScoring}
+          isPipelineRunning={isBackgroundPipelineRunning}
         />
       ) : (
         <>

@@ -448,6 +448,29 @@ export const durableClaimPipeline = workflow
       appealId: v.optional(v.string()),
       dispatched: v.optional(v.boolean()),
       precedentsUnavailable: v.optional(v.boolean()),
+      cpbDegraded: v.optional(v.boolean()),
+      status: v.optional(v.string()),
+      evidenceIntegrity: v.optional(
+        v.object({
+          cpbStatus: v.union(
+            v.literal("verified"),
+            v.literal("fallback_statutory"),
+            v.literal("missing")
+          ),
+          precedentStatus: v.union(
+            v.literal("matched"),
+            v.literal("archive_unavailable"),
+            v.literal("none_found")
+          ),
+          scoreStatus: v.union(
+            v.literal("certified"),
+            v.literal("provisional_capped"),
+            v.literal("withheld")
+          ),
+          degradationWarnings: v.array(v.string()),
+          requiresEvidentiaryAcknowledgement: v.boolean(),
+        })
+      ),
       error: v.optional(v.string()),
     }),
   })

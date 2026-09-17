@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it, expect } from "vitest";
 import { PolicyViewer, getExtractionEngineChip } from "../src/components/evidence/PolicyViewer";
 import { ClauseInspectorDrawer } from "../src/components/evidence/ClauseInspectorDrawer";
-import { SimpleEvidenceView } from "../src/components/evidence/SimpleEvidenceView";
+import { SimpleEvidenceView, formatProviderDisplayName } from "../src/components/evidence/SimpleEvidenceView";
 import {
   RESEARCH_MODES,
   PRESET_RESEARCH_URLS,
@@ -824,6 +824,81 @@ describe("Evidence Dossier UX & Quad-Solution Architecture", () => {
 
       expect(markup).toContain("Ready to review your appeal letter?");
       expect(markup).toContain("Continue to Your Letter");
+    });
+
+    describe("Honest Proof States (no fabricated findings)", () => {
+      const emptyClaim: Claim = {
+        ...mockClaim,
+        _id: "claim_empty_1",
+        claimNumber: "CLM-EMPTY-001",
+        providerName: "Dr. Dr. Emily Nakamura, M.D. (ClearVision Eye Center)",
+        status: "analyzing",
+        overturnProbabilityScore: 0,
+        scoringBreakdown: [],
+      };
+
+      const renderSimple = (
+        overrides: Partial<React.ComponentProps<typeof SimpleEvidenceView>> = {}
+      ) =>
+        renderToStaticMarkup(
+          React.createElement(SimpleEvidenceView, {
+            claim: emptyClaim,
+            evidences: [],
+            scoringResult: null,
+            onNavigateToStudio: () => {},
+            onRunCompleteAnalysis: async () => {},
+            ...overrides,
+          })
+        );
+
+      it("never duplicates the provider title", () => {
+        expect(
+          formatProviderDisplayName("Dr. Dr. Emily Nakamura, M.D. (ClearVision Eye Center)")
+        ).toBe("Dr. Emily Nakamura, M.D. (ClearVision Eye Center)");
+        expect(formatProviderDisplayName("Dr. Sarah Chen, MD")).toBe("Dr. Sarah Chen, MD");
+        expect(formatProviderDisplayName("General Hospital")).toBe("General Hospital");
+        expect(formatProviderDisplayName("")).toBe("");
+        expect(formatProviderDisplayName(null)).toBe("");
+      });
+
+      it("shows a gathering state with zero fabricated findings while the pipeline runs", () => {
+        const markup = renderSimple({ isPipelineRunning: true });
+
+        expect(markup).toContain("Gathering Key Proof Points");
+        expect(markup).toContain("Analyzing");
+        expect(markup).not.toContain("Dr. Dr.");
+        expect(markup).not.toContain("3 Key Proof Points Found");
+        expect(markup).not.toContain("Included in your appeal letter");
+        expect(markup).not.toContain("Emergency and acute symptoms");
+        expect(markup).not.toContain("track record of overturn");
+        expect(markup).not.toContain("missing pre-authorization");
+        expect(markup).not.toContain("required to disclose");
+      });
+
+      it("names the real provider exactly once while gathering", () => {
+        const markup = renderSimple({ isAnalyzing: true });
+
+        expect(markup).toContain("Dr. Emily Nakamura, M.D. (ClearVision Eye Center)");
+        expect(markup).not.toContain("Dr. Dr.");
+      });
+
+      it("shows an honest empty state when idle with no verified findings", () => {
+        const markup = renderSimple({});
+
+        expect(markup).toContain("No Proof Points Yet");
+        expect(markup).toContain("Run a check to verify findings");
+        expect(markup).not.toContain("Dr. Dr.");
+        expect(markup).not.toContain("Proof Points Found");
+        expect(markup).not.toContain("Included in your appeal letter");
+      });
+
+      it("counts only verified proof points in the header", () => {
+        const markup = renderSimple({ evidences: [mockEvidences[0]] });
+
+        expect(markup).toContain("1 Key Proof Point Found");
+        expect(markup).not.toContain("Proof Points Found");
+        expect(markup).toContain("Run a check to verify the rest");
+      });
     });
   });
 });

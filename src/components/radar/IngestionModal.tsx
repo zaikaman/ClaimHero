@@ -343,7 +343,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      if (initialClaim) {
+      if (initialClaim?._id) {
         const result: DenialExtractionResult & { claimId: string; pipelineResult?: unknown } = {
           claimId: initialClaim._id,
           claimNumber: initialClaim.claimNumber,
@@ -368,7 +368,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           initialClaim.origin === "demo-fixture"
             ? DEMO_CASE_FIXTURES.find((f) => {
                 const baseNum = f.content.match(/CLM-[A-Za-z0-9-]+/)?.[0];
-                if (baseNum && initialClaim.claimNumber.startsWith(baseNum.slice(0, 8))) return true;
+                if (baseNum && initialClaim.claimNumber?.startsWith(baseNum.slice(0, 8))) return true;
                 if (f.cpt && initialClaim.cptCodes?.includes(f.cpt)) return true;
                 return false;
               })
