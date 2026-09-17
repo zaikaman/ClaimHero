@@ -52,7 +52,7 @@ export default defineSchema({
     icd10Codes: v.array(v.string()),
     denialReasonCode: v.string(),
     denialReasonDescription: v.string(),
-    status: v.string(), // ingested, parsing, analyzing, precedent_matched, drafting, ready_for_review, dispatched, won, lost, escalated
+    status: v.string(), // ingested, parsing, analyzing, precedent_matched, drafting, review_provisional, ready_for_review, dispatched, won, lost, escalated
     statutoryDeadline: v.number(),
     daysRemaining: v.number(),
     overturnProbabilityScore: v.optional(v.number()),
@@ -168,6 +168,18 @@ export default defineSchema({
         severityTier: v.string(),
         statutoryDemandLanguage: v.string(),
         updatedAt: v.number(),
+      })
+    ),
+    evidenceIntegrity: v.optional(
+      v.object({
+        cpbStatus: v.union(v.literal("verified"), v.literal("fallback_statutory"), v.literal("missing")),
+        precedentStatus: v.union(v.literal("matched"), v.literal("archive_unavailable"), v.literal("none_found")),
+        scoreStatus: v.union(v.literal("certified"), v.literal("provisional_capped"), v.literal("withheld")),
+        degradationWarnings: v.array(v.string()),
+        requiresEvidentiaryAcknowledgement: v.boolean(),
+        acknowledgedAt: v.optional(v.number()),
+        acknowledgedBy: v.optional(v.string()),
+        acknowledgmentReason: v.optional(v.string()),
       })
     ),
     isDemo: v.optional(v.boolean()),

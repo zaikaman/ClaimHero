@@ -179,8 +179,11 @@ export type ClaimStatus =
   | "analyzing"
   | "precedent_matched"
   | "drafting"
+  | "review_provisional"
   | "ready_for_review"
   | "dispatched"
+  | "delivered"
+  | "under_review"
   | "won"
   | "lost"
   | "escalated";
@@ -224,6 +227,13 @@ export const CLAIM_STATUS_CONFIG: Record<
     border: "border-amber-500/40",
     glow: "shadow-amber-glow",
   },
+  review_provisional: {
+    label: "Provisional Review",
+    color: "text-amber-300",
+    bg: "bg-amber-950/40",
+    border: "border-amber-500/40",
+    glow: "shadow-amber-glow",
+  },
   ready_for_review: {
     label: "Ready for Review",
     color: "text-cyan-300",
@@ -236,6 +246,20 @@ export const CLAIM_STATUS_CONFIG: Record<
     color: "text-purple-400",
     bg: "bg-purple-950/40",
     border: "border-purple-500/40",
+    glow: "shadow-none",
+  },
+  delivered: {
+    label: "Delivered",
+    color: "text-teal-400",
+    bg: "bg-teal-950/40",
+    border: "border-teal-500/40",
+    glow: "shadow-teal-glow",
+  },
+  under_review: {
+    label: "Payer Under Review",
+    color: "text-indigo-400",
+    bg: "bg-indigo-950/40",
+    border: "border-indigo-500/40",
     glow: "shadow-none",
   },
   won: {

@@ -105,6 +105,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
 
   const hasDraftedBrief = Boolean(
     claim.latestAppeal ||
+    claim.status === "review_provisional" ||
     claim.status === "ready_for_review" ||
     claim.status === "dispatched" ||
     claim.status === "won" ||
@@ -420,6 +421,11 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                       Evidence Coverage
                     </Badge>
                   )}
+                  {(claim.evidenceIntegrity?.scoreStatus === "provisional_capped" || claim.status === "review_provisional") && (
+                    <Badge variant="outline" className="font-mono text-[10px] border-amber-500/40 text-amber-500 bg-amber-500/10">
+                      {isDetailed ? "Provisional (Capped)" : "Limited proof"}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {isDetailed
@@ -429,6 +435,14 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               </div>
             </div>
           </div>
+          {claim.evidenceIntegrity?.degradationWarnings && claim.evidenceIntegrity.degradationWarnings.length > 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-200/90 leading-relaxed">
+              <span className="font-semibold text-amber-300">
+                {isDetailed ? "Evidentiary Caveat:" : "Important note:"}
+              </span>{" "}
+              {claim.evidenceIntegrity.degradationWarnings.join(" ")}
+            </div>
+          )}
           <p className="text-[11px] text-muted-foreground/80 italic leading-relaxed">
             {isDetailed
               ? "Evidence Coverage Audit: Evaluates documentation completeness and ERISA 29 CFR § 2560.503-1 disclosure requirements against published clinical criteria. Does not constitute an actuarial legal prediction or guarantee of payer approval."

@@ -1052,7 +1052,13 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                                   : "text-amber-500"
                               }`}
                             >
-                              {claim.riskLevel === "high_confidence" ? "Ready" : "Gaps"}
+                              {claim.evidenceIntegrity?.scoreStatus === "provisional_capped"
+                                ? isDetailed
+                                  ? "Capped"
+                                  : "Limited"
+                                : claim.riskLevel === "high_confidence"
+                                ? "Ready"
+                                : "Gaps"}
                             </Badge>
                           </div>
                         ) : (

@@ -125,6 +125,8 @@ describe("Plain Language Copy Dictionaries (plainCopy.ts)", () => {
     expect(statusSimple("drafting")).toBe("Writing letter");
     expect(statusSimple("under_review")).toBe("Waiting for reply");
     expect(statusSimple("ready_for_review")).toBe("Ready to send");
+    expect(statusSimple("review_provisional")).toBe("Needs review (unverified proof)");
+    expect(statusSimple("delivered")).toBe("Delivered");
     expect(statusSimple("custom_unmapped_status")).toBe("custom unmapped status");
   });
 

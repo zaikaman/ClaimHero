@@ -58,6 +58,8 @@ export interface OverturnScoringResult {
   suggestedAppealLevel: "level_1_internal" | "level_2_grievance" | "level_3_external_state_review";
   llmAvailable?: boolean;
   generatedBy?: "openai" | "fallback";
+  scoreStatus?: "certified" | "provisional_capped" | "withheld";
+  degradationWarnings?: string[];
 }
 
 interface RawLLMAnalysisOutput {
@@ -86,6 +88,26 @@ export interface MatchedPrecedentInput {
   icd10Codes?: string[];
   winningArgument?: string;
   statutoryLanguage?: string;
+}
+
+/**
+ * Helper to identify baseline ERISA statutory procedural protocol evidence clauses.
+ * Distinguishes statutory disclosure rights from payer clinical policy bulletins (CPB),
+ * medical record documentation, or judicial appellate precedents.
+ */
+export function isStatutoryBaselineEvidence(e: {
+  sourceType?: string;
+  citationClause?: string;
+  title?: string;
+}): boolean {
+  const clause = (e.citationClause || "").toLowerCase();
+  const title = (e.title || "").toLowerCase();
+  return (
+    e.sourceType === "statutory_authority" ||
+    clause.includes("2560.503-1") ||
+    title.includes("erisa full & fair review") ||
+    title.includes("statutory protocol")
+  );
 }
 
 /**
@@ -120,11 +142,21 @@ export function calculateDeterministicRubric(
     title?: string;
     relevanceScore?: number;
   }>,
-  matchedPrecedents: MatchedPrecedentInput[] = []
+  matchedPrecedents: MatchedPrecedentInput[] = [],
+  options?: {
+    precedentsUnavailable?: boolean;
+    cpbDegraded?: boolean;
+  }
 ) {
   const evidencesCount = evidences.length;
+  const isPureStatutory = evidencesCount > 0 && evidences.every(isStatutoryBaselineEvidence);
+  const substantiveClinicalEvidences = evidences.filter((e) => !isStatutoryBaselineEvidence(e));
+  const substantiveCount = substantiveClinicalEvidences.length;
+
   const hasCpb = evidences.some((e) => e.sourceType === "payer_cpb");
-  const hasLegalPrecedent = evidences.some((e) => e.sourceType === "legal_precedent");
+  const hasLegalPrecedent = evidences.some(
+    (e) => e.sourceType === "legal_precedent" && !isStatutoryBaselineEvidence(e)
+  );
   const hasClinicalStudies = evidences.some((e) =>
     ["pubmed_study", "nccn_guideline", "fda_package_insert"].includes(e.sourceType)
   );
@@ -145,10 +177,10 @@ export function calculateDeterministicRubric(
       policyScore = 29;
       policyRationale = `Published clinical policy guidelines substantiate medical necessity for CPT ${claim.cptCodes[0] || "procedure"}.`;
     }
-  } else if (hasClinicalStudies || evidencesCount >= 2) {
+  } else if (hasClinicalStudies || substantiveCount >= 2) {
     policyScore = isClinicalDenial ? 24 : isAuthOrAdminDenial ? 22 : 20;
     policyRationale = `Clinical indications align with national standards; crawl insurer CPB to unlock full coverage criteria verification.`;
-  } else if (evidencesCount === 1) {
+  } else if (substantiveCount === 1) {
     policyScore = isClinicalDenial ? 18 : 16;
     policyRationale = `Preliminary clinical indication alignment identified; ingesting insurer CPB is recommended to verify procedural coverage criteria.`;
   }
@@ -156,10 +188,10 @@ export function calculateDeterministicRubric(
   // Pillar 2. Objective Clinical Documentation & Step-Therapy (Max: 25 points; rubric weight tested in tests/claimhero.test.ts:114)
   let clinicalScore = 5;
   let clinicalRationale = "No objective clinical documentation or diagnostic records attached to substantiate medical necessity.";
-  if (evidencesCount >= 3) {
+  if (substantiveCount >= 3) {
     clinicalScore = isClinicalDenial ? 24 : 22;
     clinicalRationale = `Documented step-therapy trial, diagnostic imaging, and treating physician clinical narrative substantiate medical necessity.`;
-  } else if (evidencesCount >= 1) {
+  } else if (substantiveCount >= 1) {
     clinicalScore = isClinicalDenial ? 22 : 20;
     clinicalRationale = `Treating provider records confirm clinical diagnosis and failed conservative management prior to procedure.`;
   }
@@ -180,10 +212,10 @@ export function calculateDeterministicRubric(
   if (hasLegalPrecedent || hasStatutoryAuthority) {
     erisaScore = 19;
     erisaRationale = `Adverse determination violates ERISA 29 CFR § 2560.503-1 disclosure mandates by failing to articulate specific internal clinical review criteria contradicted by documented record.`;
-  } else if (hasCpb || evidencesCount >= 2) {
+  } else if (hasCpb || substantiveCount >= 2) {
     erisaScore = 14;
     erisaRationale = `Preliminary statutory standing identified under ERISA 29 CFR § 2560.503-1; indexed clinical records establish basis for full and fair review disclosure demand.`;
-  } else if (evidencesCount === 1) {
+  } else if (substantiveCount === 1) {
     erisaScore = 12;
     erisaRationale = `Preliminary statutory grounds identified under ERISA 29 CFR § 2560.503-1; supplementary disclosure request recommended to substantiate complete denial rationale omissions.`;
   }
@@ -193,10 +225,16 @@ export function calculateDeterministicRubric(
   let precedentScore = 4;
   let precedentRationale = "No controlling appellate rulings or external review precedents indexed or matched to this denial reason.";
 
-  const hasMatchedPrecedents = Boolean(matchedPrecedents && matchedPrecedents.length > 0);
-  const legalEv = evidences.find((e) => e.sourceType === "legal_precedent");
+  if (options?.precedentsUnavailable) {
+    precedentScore = 4;
+    precedentRationale = "Precedent Vector Archive was unavailable during analysis; external judicial benchmark is unverified.";
+  } else {
+    const hasMatchedPrecedents = Boolean(matchedPrecedents && matchedPrecedents.length > 0);
+    const legalEv = evidences.find(
+      (e) => e.sourceType === "legal_precedent" && !isStatutoryBaselineEvidence(e)
+    );
 
-  if (hasMatchedPrecedents || legalEv) {
+    if (hasMatchedPrecedents || legalEv) {
     const isLegalEvFavorable = Boolean(
       legalEv &&
         ((legalEv.extractedEvidenceMarkdown &&
@@ -308,6 +346,7 @@ export function calculateDeterministicRubric(
       precedentRationale = `External review precedent (${legalCitation}) establishes favorable adjudication parity for ${claim.denialReasonCode || "denial"} (${matchType}).`;
     }
   }
+  }
 
   const scoringBreakdown: ScoringCriterionResult[] = [
     {
@@ -344,17 +383,45 @@ export function calculateDeterministicRubric(
     },
   ];
 
-  const overturnProbabilityScore = Math.min(
-    99,
-    Math.max(5, scoringBreakdown.reduce((sum, item) => sum + item.score, 0))
+  const isEvidentiallyDegraded = Boolean(
+    options?.cpbDegraded ||
+    options?.precedentsUnavailable ||
+    (!hasCpb && (isPureStatutory || evidencesCount === 0))
   );
 
+  const degradationWarnings: string[] = [];
+  if (options?.cpbDegraded || (!hasCpb && isPureStatutory)) {
+    degradationWarnings.push(
+      "Live insurer clinical policy bulletins (CPB) were inaccessible; dossier relies solely on statutory ERISA § 503 procedural disclosure demands."
+    );
+  } else if (!hasCpb && evidencesCount === 0) {
+    degradationWarnings.push(
+      "No insurer clinical policy bulletins (CPB) or clinical documentation items are currently attached to this case."
+    );
+  }
+  if (options?.precedentsUnavailable) {
+    degradationWarnings.push(
+      "Precedent vector retrieval was unavailable during evaluation; judicial overturn benchmark unverified."
+    );
+  }
+
+  const rawSum = scoringBreakdown.reduce((sum, item) => sum + item.score, 0);
+  const overturnProbabilityScore = isEvidentiallyDegraded
+    ? Math.min(40, Math.max(5, rawSum))
+    : Math.min(99, Math.max(5, rawSum));
+
+  const scoreStatus: "certified" | "provisional_capped" = isEvidentiallyDegraded
+    ? "provisional_capped"
+    : "certified";
+
   const riskLevel: "high_confidence" | "moderate" | "complex_litigation" =
-    overturnProbabilityScore >= 80
-      ? "high_confidence"
-      : overturnProbabilityScore >= 55
-        ? "moderate"
-        : "complex_litigation";
+    isEvidentiallyDegraded
+      ? "complex_litigation"
+      : overturnProbabilityScore >= 80
+        ? "high_confidence"
+        : overturnProbabilityScore >= 55
+          ? "moderate"
+          : "complex_litigation";
 
   return {
     overturnProbabilityScore,
@@ -362,6 +429,8 @@ export function calculateDeterministicRubric(
     evidenceCoverageScore: overturnProbabilityScore,
     riskLevel,
     scoringBreakdown,
+    scoreStatus,
+    degradationWarnings,
   };
 }
 
@@ -375,6 +444,8 @@ export async function performComputeOverturnScore(
     claimId: Id<"claims">;
     pipelineRunId?: string;
     matchedPrecedents?: MatchedPrecedentInput[];
+    precedentsUnavailable?: boolean;
+    cpbDegraded?: boolean;
   },
   claim: Doc<"claims"> & { patient?: Doc<"patients">; latestAppeal?: Doc<"appeals"> | null },
   userId?: string
@@ -408,10 +479,12 @@ export async function performComputeOverturnScore(
       claimId: args.claimId,
     })) || [];
 
-  // Resolve matched precedents from args or attached clinicalEvidences
+  // Resolve matched precedents from args or attached clinicalEvidences (excluding pure statutory baseline notices)
   let resolvedPrecedents: MatchedPrecedentInput[] = args.matchedPrecedents || [];
   if (resolvedPrecedents.length === 0) {
-    const legalEvidences = evidences.filter((e) => e.sourceType === "legal_precedent");
+    const legalEvidences = evidences.filter(
+      (e) => e.sourceType === "legal_precedent" && !isStatutoryBaselineEvidence(e)
+    );
     if (legalEvidences.length > 0) {
       resolvedPrecedents = legalEvidences.map((e) => {
         const md = e.extractedEvidenceMarkdown || "";
@@ -441,7 +514,15 @@ export async function performComputeOverturnScore(
   });
 
   // 3. Compute deterministic 4-pillar score
-  const deterministicCalculation = calculateDeterministicRubric(claim, evidences, resolvedPrecedents);
+  const deterministicCalculation = calculateDeterministicRubric(
+    claim,
+    evidences,
+    resolvedPrecedents,
+    {
+      precedentsUnavailable: args.precedentsUnavailable,
+      cpbDegraded: args.cpbDegraded,
+    }
+  );
 
   const evidencesSummary = evidences.length > 0
     ? evidences.map((e, i: number) => `[Evidence ${i + 1}] (${e.sourceType.toUpperCase()} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
@@ -522,13 +603,19 @@ ${evidencesSummary}`,
     suggestedAppealLevel: llmAnalysis.suggestedAppealLevel,
     llmAvailable,
     generatedBy,
+    scoreStatus: deterministicCalculation.scoreStatus,
+    degradationWarnings: deterministicCalculation.degradationWarnings,
   };
 
   // 5. Update claim in database with deterministic score, risk level, and criteria breakdown
   // Do not regress status if the claim has already drafted an appeal brief or reached dispatch/resolution
   const hasDraftedAppeal = Boolean(claim.latestAppeal);
+  const isEvidentiallyDegraded = deterministicCalculation.scoreStatus === "provisional_capped";
+  const targetReviewStatus = isEvidentiallyDegraded ? "review_provisional" : "ready_for_review";
+
   const preservesAdvancedStatus =
     hasDraftedAppeal ||
+    claim.status === "review_provisional" ||
     claim.status === "ready_for_review" ||
     claim.status === "dispatched" ||
     claim.status === "delivered" ||
@@ -544,8 +631,9 @@ ${evidencesSummary}`,
           claim.status === "parsing" ||
           claim.status === "analyzing" ||
           claim.status === "precedent_matched" ||
-          claim.status === "drafting")
-          ? "ready_for_review"
+          claim.status === "drafting" ||
+          (claim.status === "review_provisional" && !isEvidentiallyDegraded))
+          ? targetReviewStatus
           : claim.status)
       : "precedent_matched"
   ) as
@@ -554,6 +642,7 @@ ${evidencesSummary}`,
     | "analyzing"
     | "precedent_matched"
     | "drafting"
+    | "review_provisional"
     | "ready_for_review"
     | "dispatched"
     | "delivered"
@@ -561,6 +650,20 @@ ${evidencesSummary}`,
     | "won"
     | "lost"
     | "escalated";
+
+  const evidenceIntegrity = {
+    cpbStatus: (args.cpbDegraded || !evidences.some((e) => e.sourceType === "payer_cpb"))
+      ? ("fallback_statutory" as const)
+      : ("verified" as const),
+    precedentStatus: args.precedentsUnavailable
+      ? ("archive_unavailable" as const)
+      : resolvedPrecedents.length > 0
+        ? ("matched" as const)
+        : ("none_found" as const),
+    scoreStatus: deterministicCalculation.scoreStatus || ("certified" as const),
+    degradationWarnings: deterministicCalculation.degradationWarnings || [],
+    requiresEvidentiaryAcknowledgement: isEvidentiallyDegraded,
+  };
 
   await ctx.runMutation(internal.claims.updateStatusInternal, {
     claimId: args.claimId,
@@ -570,6 +673,7 @@ ${evidencesSummary}`,
     evidenceCoverageScore: finalResult.evidenceCoverageScore,
     riskLevel: finalResult.riskLevel,
     scoringBreakdown: finalResult.scoringBreakdown,
+    evidenceIntegrity,
     actor: "Precedent Matcher & Rubric Engine",
     details: `Evaluated 4-pillar Statutory Appeal Readiness: ${finalResult.appealReadinessScore}/100 (${finalResult.riskLevel.replace(/_/g, " ").toUpperCase()}). Found ${finalResult.keyPolicyContradictions.length} cited policy contradictions.`,
   });
@@ -622,6 +726,8 @@ export const computeOverturnScore = action({
     claimId: v.id("claims"),
     pipelineRunId: v.optional(v.string()),
     matchedPrecedents: v.optional(v.array(precedentInputValidator)),
+    precedentsUnavailable: v.optional(v.boolean()),
+    cpbDegraded: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<OverturnScoringResult> => {
     // 1. Authorize claim ownership
@@ -639,6 +745,8 @@ export const computeOverturnScoreInternal = internalAction({
     claimId: v.id("claims"),
     pipelineRunId: v.optional(v.string()),
     matchedPrecedents: v.optional(v.array(precedentInputValidator)),
+    precedentsUnavailable: v.optional(v.boolean()),
+    cpbDegraded: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<OverturnScoringResult> => {
     const claim = (await ctx.runQuery(internal.claims.getByIdInternal, {

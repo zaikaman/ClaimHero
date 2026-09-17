@@ -8,8 +8,10 @@ export type ClaimStatus =
   | "analyzing"
   | "precedent_matched"
   | "drafting"
+  | "review_provisional"
   | "ready_for_review"
   | "dispatched"
+  | "delivered"
   | "under_review"
   | "won"
   | "lost"
@@ -28,6 +30,17 @@ export type EvidenceSourceType =
   | "pubmed_study"
   | "nccn_guideline"
   | "legal_precedent";
+
+export interface EvidenceIntegrity {
+  cpbStatus: "verified" | "fallback_statutory" | "missing";
+  precedentStatus: "matched" | "archive_unavailable" | "none_found";
+  scoreStatus: "certified" | "provisional_capped" | "withheld";
+  degradationWarnings: string[];
+  requiresEvidentiaryAcknowledgement: boolean;
+  acknowledgedAt?: number;
+  acknowledgedBy?: string;
+  acknowledgmentReason?: string;
+}
 
 export interface Patient {
   _id: string;
@@ -87,6 +100,7 @@ export interface Claim {
   insurancePayer?: string;
   latestAppeal?: Appeal | null;
   evidenceCount?: number;
+  evidenceIntegrity?: EvidenceIntegrity;
   payerContact?: PayerContact;
   accessRole?: "owner" | "editor" | "viewer";
   isShared?: boolean;

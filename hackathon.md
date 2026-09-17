@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-17T03:16:00Z
+- **Last updated:** 2026-09-17T03:30:00Z
 
 ## Log
 
@@ -1570,5 +1570,13 @@ Refactored aggressive and unverified legal conclusions in Policy Drift Sentinel 
 - Synchronized `README.md` features, directory layout, and test suite metrics (1,067 automated tests across 70 test suites, ~82.7% statement coverage).
 - Added regression tests in `tests/detailMode.test.ts` asserting Simple Mode and Expert Details label transitions. Verified 100% clean with `npm run verify` across all 70 test suites (1,067 passing tests), strict typecheck (0 errors), lint (0 warnings), coverage, and production build.
 
-### 2026-09-17 - working tree
+### 2026-09-17 - c17e8f9
 Removed the redundant and out-of-context "Add to my letter" / "Insert into Brief" action button from assistant messages in Sentinel Chat (`src/components/chat/SentinelChatbot.tsx`). Cleaned up unused state and dispatch handlers while preserving quick copy functionality for chatbot responses. Verified with strict typecheck and linting.
+
+### 2026-09-17 - working tree
+Decoupled workflow execution from evidence integrity to prevent degraded failure paths from quietly advancing into completed output (`convex/schema.ts`, `convex/claims.ts`, `convex/actions/precedentMatcher.ts`, `convex/workflows.ts`, `src/types/index.ts`, `src/lib/constants.ts`, `src/lib/plainCopy.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `tests/evidentiaryDegradationGating.test.ts`, `README.md`):
+- Statutory Fallback Isolation: Isolated pure statutory fallback notices (`isStatutoryBaselineEvidence`, `29 CFR § 2560.503-1`) during scraper timeouts or WAF blocks, preventing boilerplate from inflating policy or clinical scoring pillars.
+- Score Withholding & Capping: Decoupled rubric scoring under degraded states (missing CPB or unavailable precedent index) to assign `provisional_capped` status, capping scores at 40 max, enforcing `complex_litigation` risk posture, and surfacing granular degradation warnings.
+- Durable Provisional Review Checkpoint: Updated `executeDurableClaimPipeline` to checkpoint claims with degraded evidence into `review_provisional` rather than advancing directly to `ready_for_review`.
+- Evidentiary Acknowledgment Gate: Implemented `acknowledgeEvidentiaryDegradation` mutation with audit logging, and enforced review gates in `approveAppeal` and `dispatchAppealPacket` requiring explicit advocate acknowledgment before enabling 1-click dispatch.
+- Verification & Regression: Added 12 automated tests in `tests/evidentiaryDegradationGating.test.ts` validating rubric capping, review gate refusal, acknowledgment promotion, zero evidence handling, and pipeline checkpointing. Verified all 71 test suites (1,079 tests) passing.

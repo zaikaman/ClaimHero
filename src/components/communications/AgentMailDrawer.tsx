@@ -362,6 +362,27 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     import.meta.env.VITE_AGENTMAIL_SENDER_EMAIL ||
     "";
 
+  const acknowledgeDegradation = useMutation(api.claims.acknowledgeEvidentiaryDegradation);
+  const [isAcknowledging, setIsAcknowledging] = useState(false);
+
+  const handleAcknowledgeDegradation = async () => {
+    if (!claim._id || isAcknowledging) return;
+    setIsAcknowledging(true);
+    try {
+      await acknowledgeDegradation({ claimId: claim._id as Id<"claims"> });
+      toast.success(
+        isDetailed
+          ? "Statutory procedural posture acknowledged. Claim marked ready for review."
+          : "Proof reviewed and confirmed. Your letter is ready to send."
+      );
+      soundEffects.play("tactile_click");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to acknowledge evidentiary gap.");
+    } finally {
+      setIsAcknowledging(false);
+    }
+  };
+
   const appealFromDb = useQuery(
     api.appeals.getLatestByClaim,
     claim?._id ? { claimId: claim._id as Id<"claims"> } : "skip"
@@ -411,6 +432,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
   const canDispatch =
     isReadyForReview &&
+    !claim.evidenceIntegrity?.requiresEvidentiaryAcknowledgement &&
     isSenderGatewayConfigured &&
     (!isPatientUnspecified || hasSender) &&
     (dispatchMode === "custom_email"
@@ -544,6 +566,59 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             <PhoneCall className="size-3.5" />
             <span>Prep Tele-Script</span>
           </Button>
+        </div>
+      )}
+
+      {/* Evidentiary Degradation & Provisional Review Gating Banner */}
+      {(claim.status === "review_provisional" || claim.evidenceIntegrity?.requiresEvidentiaryAcknowledgement) && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 space-y-3 shadow-2xs">
+          <div className="flex items-start gap-3">
+            <div className="size-8 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+              <WarningCircle className="size-4" />
+            </div>
+            <div className="space-y-1 min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                  {isDetailed ? "Evidentiary Integrity Alert: Provisional Review Gate" : "Review Required: Missing Policy Proof"}
+                </span>
+                <Badge variant="outline" className="text-[10px] font-mono border-amber-500/40 text-amber-300">
+                  {claim.evidenceIntegrity?.scoreStatus === "provisional_capped" ? "Score Capped" : "Provisional Draft"}
+                </Badge>
+              </div>
+              <p className="text-xs text-amber-200/90 leading-relaxed">
+                {claim.evidenceIntegrity?.degradationWarnings?.[0] ||
+                  (isDetailed
+                    ? "Live insurer clinical policy bulletins (CPB) or judicial precedents could not be verified. This appeal operates as an ERISA § 503 Statutory Procedural Disclosure Demand rather than a substantive clinical medical necessity rebuttal."
+                    : "The insurer's policy rules could not be verified online. This appeal relies on your legal right to request the documents they used to deny your claim.")}
+              </p>
+              <p className="text-[11px] text-amber-300/70">
+                {isDetailed
+                  ? `Readiness score is capped (${claim.overturnProbabilityScore ?? 0}/100) and 1-click dispatch is held in provisional review until you acknowledge this statutory posture.`
+                  : `Your score is capped (${claim.overturnProbabilityScore ?? 0}/100) and sending is paused until you review and confirm.`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center justify-end pt-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleAcknowledgeDegradation}
+              disabled={isAcknowledging}
+              className="text-xs border-amber-500/50 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 hover:text-amber-100 cursor-pointer gap-2"
+            >
+              {isAcknowledging ? (
+                <>
+                  <CircleNotch className="size-3.5 animate-spin" />
+                  <span>{isDetailed ? "Acknowledging..." : "Confirming..."}</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="size-3.5 text-amber-400" />
+                  <span>{isDetailed ? "Acknowledge Statutory Posture & Enable Dispatch" : "Confirm & Enable Sending"}</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -835,7 +910,11 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               disabled={isDispatching || !canDispatch || !effectiveAppeal}
               title={
                 !isReadyForReview
-                  ? `Dispatch disabled: Claim status is "${claim.status}". Mandatory human review requires claim status to be "ready_for_review".`
+                  ? claim.status === "review_provisional"
+                    ? isDetailed
+                      ? "Dispatch paused: Claim is held in provisional review due to unverified policy/precedents. Acknowledge statutory posture above to enable dispatch."
+                      : "Sending paused: Missing insurer proof. Review and confirm above to enable sending."
+                    : `Dispatch disabled: Claim status is "${claim.status}". Mandatory human review requires claim status to be "ready_for_review".`
                   : !isSenderGatewayConfigured
                   ? "Dispatch disabled: AgentMail sender address is not configured. Set VITE_AGENTMAIL_SENDER_EMAIL in environment."
                   : isPatientUnspecified && !hasSender

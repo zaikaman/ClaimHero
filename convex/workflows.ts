@@ -30,6 +30,15 @@ export interface DurablePipelineResult {
   appealId?: string;
   dispatched?: boolean;
   precedentsUnavailable?: boolean;
+  cpbDegraded?: boolean;
+  status?: string;
+  evidenceIntegrity?: {
+    cpbStatus: "verified" | "fallback_statutory" | "missing";
+    precedentStatus: "matched" | "archive_unavailable" | "none_found";
+    scoreStatus: "certified" | "provisional_capped" | "withheld";
+    degradationWarnings: string[];
+    requiresEvidentiaryAcknowledgement: boolean;
+  };
   error?: string;
 }
 
@@ -144,6 +153,7 @@ export async function executeDurableClaimPipeline(
       });
 
       let crawlResult: { policyTitle?: string; clausesExtracted?: number } | null = null;
+      let cpbDegraded = false;
       try {
         crawlResult = await step.runAction(
           internal.actions.policyCrawler.crawlInsurerPolicyInternal,
@@ -164,6 +174,7 @@ export async function executeDurableClaimPipeline(
           }
         );
       } catch (crawlErr) {
+        cpbDegraded = true;
         const crawlMessage = crawlErr instanceof Error ? crawlErr.message : String(crawlErr);
         await logWorkflowActivity(step, {
           claimId: args.claimId,
@@ -271,6 +282,8 @@ export async function executeDurableClaimPipeline(
           claimId: args.claimId,
           pipelineRunId,
           matchedPrecedents: vectorPrecedents,
+          precedentsUnavailable,
+          cpbDegraded,
         },
         {
           retry: { maxAttempts: 2, initialBackoffMs: 1000, base: 2 },
@@ -306,15 +319,45 @@ export async function executeDurableClaimPipeline(
         }
       );
 
-      // Step 5: Checkpoint final status to ready_for_review
+      // Step 5: Checkpoint final status & review gate (decoupled evidentiary gating)
+      const isEvidentiallyDegraded =
+        cpbDegraded ||
+        precedentsUnavailable ||
+        scoreResult?.scoreStatus === "provisional_capped";
+      const finalClaimStatus = isEvidentiallyDegraded ? "review_provisional" : "ready_for_review";
+
+      const evidenceIntegrity = {
+        cpbStatus: cpbDegraded ? ("fallback_statutory" as const) : ("verified" as const),
+        precedentStatus: precedentsUnavailable
+          ? ("archive_unavailable" as const)
+          : vectorPrecedents.length > 0
+            ? ("matched" as const)
+            : ("none_found" as const),
+        scoreStatus: isEvidentiallyDegraded ? ("provisional_capped" as const) : ("certified" as const),
+        degradationWarnings: [
+          ...(cpbDegraded ? ["Insurer clinical policy bulletins (CPB) inaccessible; statutory disclosure protocol applied."] : []),
+          ...(precedentsUnavailable ? ["Precedent Vector Archive unreachable; external judicial benchmark unverified."] : []),
+          ...(!cpbDegraded && !precedentsUnavailable && scoreResult?.scoreStatus === "provisional_capped"
+            ? ["Evidentiary dossier lacks substantive clinical documentation or verified CPB criteria."]
+            : []),
+        ],
+        requiresEvidentiaryAcknowledgement: isEvidentiallyDegraded,
+      };
+
+      // Step 6: Mandatory Human Review Gate
+      // Safer product rule: AI may prepare, classify, cite, and recommend.
+      // A human must approve every clinical assertion, legal assertion, recipient, and outbound message.
       await step.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
-        status: "ready_for_review",
+        status: finalClaimStatus,
         actor: "Durable Sentinel Workflow",
-        details: `Durable pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}/100 readiness score computed, and formal brief synthesized.`,
+        details: isEvidentiallyDegraded
+          ? `Durable pipeline completed with degraded evidence caveat: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}/100 provisional score computed. Held in review_provisional awaiting evidentiary acknowledgment before dispatch.`
+          : `Durable pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}/100 readiness score computed, and formal brief synthesized. Held in ready_for_review for mandatory human approval before dispatch.`,
         overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
         riskLevel: scoreResult?.riskLevel,
         scoringBreakdown: scoreResult?.scoringBreakdown,
+        evidenceIntegrity,
       });
 
       await logWorkflowActivity(step, {
@@ -322,17 +365,9 @@ export async function executeDurableClaimPipeline(
         runId: pipelineRunId,
         stage: "run",
         status: "completed",
-        message: `Review complete: ${scoreResult?.overturnProbabilityScore || 0}/100 readiness score with the appeal brief drafted and ready.`,
-      });
-
-      // Step 6: Mandatory Human Review Gate
-      // Safer product rule: AI may prepare, classify, cite, and recommend.
-      // A human must approve every clinical assertion, legal assertion, recipient, and outbound message.
-      await step.runMutation(internal.claims.updateStatusInternal, {
-        claimId: args.claimId,
-        status: "ready_for_review",
-        actor: "Durable Sentinel Workflow",
-        details: "Sentinel analysis complete: Policy citations and legal brief synthesized. Claim is held in ready_for_review for mandatory human approval before dispatch.",
+        message: isEvidentiallyDegraded
+          ? `Review complete with degraded evidence caveat: ${scoreResult?.overturnProbabilityScore || 0}/100 provisional score. Claim held in provisional review awaiting human review.`
+          : `Review complete: ${scoreResult?.overturnProbabilityScore || 0}/100 readiness score with the appeal brief drafted and ready.`,
       });
 
       const wasDispatched = false;
@@ -352,6 +387,9 @@ export async function executeDurableClaimPipeline(
         appealId: synthesisResult?.appealId,
         dispatched: wasDispatched,
         precedentsUnavailable,
+        cpbDegraded,
+        status: finalClaimStatus,
+        evidenceIntegrity,
       };
     } catch (stageErr) {
       await logWorkflowActivity(step, {

@@ -1498,6 +1498,7 @@ export const claimStatusValidator = v.union(
   v.literal("analyzing"),
   v.literal("precedent_matched"),
   v.literal("drafting"),
+  v.literal("review_provisional"),
   v.literal("ready_for_review"),
   v.literal("dispatched"),
   v.literal("delivered"),
@@ -1513,6 +1514,7 @@ export const ALLOWED_CLAIM_STATUSES = new Set([
   "analyzing",
   "precedent_matched",
   "drafting",
+  "review_provisional",
   "ready_for_review",
   "dispatched",
   "delivered",
@@ -1521,6 +1523,17 @@ export const ALLOWED_CLAIM_STATUSES = new Set([
   "lost",
   "escalated",
 ]);
+
+export const evidenceIntegrityValidator = v.object({
+  cpbStatus: v.union(v.literal("verified"), v.literal("fallback_statutory"), v.literal("missing")),
+  precedentStatus: v.union(v.literal("matched"), v.literal("archive_unavailable"), v.literal("none_found")),
+  scoreStatus: v.union(v.literal("certified"), v.literal("provisional_capped"), v.literal("withheld")),
+  degradationWarnings: v.array(v.string()),
+  requiresEvidentiaryAcknowledgement: v.boolean(),
+  acknowledgedAt: v.optional(v.number()),
+  acknowledgedBy: v.optional(v.string()),
+  acknowledgmentReason: v.optional(v.string()),
+});
 
 interface StatusUpdateArgs {
   claimId: Id<"claims">;
@@ -1532,6 +1545,16 @@ interface StatusUpdateArgs {
   evidenceCoverageScore?: number;
   riskLevel?: string;
   scoringBreakdown?: ScoringBreakdownItem[];
+  evidenceIntegrity?: {
+    cpbStatus: "verified" | "fallback_statutory" | "missing";
+    precedentStatus: "matched" | "archive_unavailable" | "none_found";
+    scoreStatus: "certified" | "provisional_capped" | "withheld";
+    degradationWarnings: string[];
+    requiresEvidentiaryAcknowledgement: boolean;
+    acknowledgedAt?: number;
+    acknowledgedBy?: string;
+    acknowledgmentReason?: string;
+  };
 }
 
 async function applyStatusUpdate(ctx: MutationCtx, args: StatusUpdateArgs) {
@@ -1562,6 +1585,9 @@ async function applyStatusUpdate(ctx: MutationCtx, args: StatusUpdateArgs) {
   }
   if (args.scoringBreakdown !== undefined) {
     patchData.scoringBreakdown = args.scoringBreakdown;
+  }
+  if (args.evidenceIntegrity !== undefined) {
+    patchData.evidenceIntegrity = args.evidenceIntegrity;
   }
 
   await ctx.db.patch(args.claimId, patchData);
@@ -1610,6 +1636,7 @@ export const updateStatus = mutation({
         })
       )
     ),
+    evidenceIntegrity: v.optional(evidenceIntegrityValidator),
   },
   handler: async (ctx, args) => {
     await requireClaimEditor(ctx, args.claimId);
@@ -1642,9 +1669,65 @@ export const updateStatusInternal = internalMutation({
         })
       )
     ),
+    evidenceIntegrity: v.optional(evidenceIntegrityValidator),
   },
   handler: async (ctx, args) => {
     return await applyStatusUpdate(ctx, args);
+  },
+});
+
+/**
+ * Acknowledge degraded evidence for a provisional claim, elevating it to ready_for_review
+ */
+export const acknowledgeEvidentiaryDegradation = mutation({
+  args: {
+    claimId: v.id("claims"),
+    acknowledgmentReason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { claim, userId } = await requireClaimEditor(ctx, args.claimId);
+    if (claim.status !== "review_provisional" && !claim.evidenceIntegrity?.requiresEvidentiaryAcknowledgement) {
+      throw new Error(
+        `Cannot acknowledge evidentiary degradation: claim status is "${claim.status}" and no evidentiary acknowledgment is pending.`
+      );
+    }
+    const user = await ctx.db.get(userId);
+    const actor = user?.name || user?.email || "Authorized Reviewer";
+    const now = Date.now();
+
+    const existingIntegrity = claim.evidenceIntegrity || {
+      cpbStatus: "missing" as const,
+      precedentStatus: "none_found" as const,
+      scoreStatus: "provisional_capped" as const,
+      degradationWarnings: ["Statutory baseline protocol applied without live insurer CPB criteria."],
+      requiresEvidentiaryAcknowledgement: true,
+    };
+
+    const updatedIntegrity = {
+      ...existingIntegrity,
+      requiresEvidentiaryAcknowledgement: false,
+      acknowledgedAt: now,
+      acknowledgedBy: actor,
+      acknowledgmentReason:
+        args.acknowledgmentReason ||
+        "Advocate verified evidentiary gaps and approved procedural disclosure posture.",
+    };
+
+    await ctx.db.patch(args.claimId, {
+      status: "ready_for_review",
+      evidenceIntegrity: updatedIntegrity,
+      updatedAt: now,
+    });
+
+    await appendAuditLog(ctx, {
+      claimId: args.claimId,
+      eventType: "evidentiary_degradation_acknowledged",
+      actor,
+      details: `Evidentiary degradation acknowledged by ${actor}: Claim elevated from review_provisional to ready_for_review for statutory procedural dispatch.`,
+      timestamp: now,
+    });
+
+    return { success: true, status: "ready_for_review" };
   },
 });
 
@@ -2123,6 +2206,7 @@ export const getPortfolioStats = query({
           analyzing: 0,
           precedent_matched: 0,
           drafting: 0,
+          review_provisional: 0,
           ready_for_review: 0,
           dispatched: 0,
           won: 0,
@@ -2209,6 +2293,7 @@ export const getPortfolioStats = query({
       analyzing: 0,
       precedent_matched: 0,
       drafting: 0,
+      review_provisional: 0,
       ready_for_review: 0,
       dispatched: 0,
       won: 0,

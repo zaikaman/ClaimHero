@@ -68,6 +68,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
     hasDraftedBrief ||
     Boolean(claim.latestAppeal) ||
     claim.status === "ready_for_review" ||
+    claim.status === "review_provisional" ||
     isDispatched;
   const { isDetailed } = useDetailMode();
   const hasAppealContext = Boolean(
