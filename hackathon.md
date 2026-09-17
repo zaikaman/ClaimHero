@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-17T14:51:00Z
+- **Last updated:** 2026-09-17T17:36:09Z
 
 ## Log
 
@@ -1617,8 +1617,15 @@ Removed risky healthcare overclaims across UI, backend actions, schemas, test su
 - Global Regulatory Disclaimer & Human-in-the-Loop Gates: Created and integrated `<GlobalDisclaimer>` (`src/components/common/GlobalDisclaimer.tsx`) across workspace layouts and dossier export binders, confirming ClaimHero is an administrative decision-support workspace rather than a source of legal or medical advice, and highlighting that all appeals require independent human review.
 - Verification & Clean Build: Verified all 74 test suites (1,118 passing tests) with 100% backend library line coverage, strict TypeScript compilation (0 errors), clean ESLint (0 warnings), and successful production build.
 
-### 2026-09-17 - working tree
+### 2026-09-17 - 083a531
 Hardened autonomous pipeline orchestration entry points against unauthenticated callers and cross-tenant IDOR triggers (`convex/actions/sentinelPipeline.ts`, `tests/authorization.test.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`, `tests/workflows.test.ts`):
 - Guarded `runAutonomousPipeline` and `startDurablePipelineAction` with `requireClaimOwnerAction(ctx, args.claimId)` before delegating to `startDurablePipelineInternal` or starting the durable workflow. Unauthenticated callers are rejected with `Unauthorized: Authentication required` and unauthorized tenants/viewers are rejected with `Forbidden: You do not have permission to access this claim`, protecting downstream Firecrawl and OpenAI compute spend.
 - Added comprehensive spend-guard and IDOR rejection tests in `tests/authorization.test.ts`, verified owner and configuration pass-through in `tests/actionsPrecedentsAndPipeline.test.ts`, and updated workflow integration mocks in `tests/workflows.test.ts`.
 - Verified all 74 test suites (1,122 tests passing), strict typecheck (0 errors), clean lint (0 warnings), and production build.
+
+### 2026-09-17 - working tree
+Streamlined `README.md` into a focused, submission-ready project brief emphasizing the core user journey (Proof -> Letter -> Send & Track), evidence coverage over outcome prediction, and everyday app accessibility:
+- Restructured documentation around the three core user workflows, highlighting how ClaimHero solves the real-world coordination problem of medical denials without legal jargon.
+- Emphasized Convex as the central reactive system of record (durable workflows, vector search, CRDT collaborative editing, scheduled statutory clocks, and authentication) and documented production integrations with Firecrawl, OpenAI, and AgentMail with mandatory human review gates.
+- Refreshed the judge evidence map connecting documented architectural claims directly to implementation files and components.
+
