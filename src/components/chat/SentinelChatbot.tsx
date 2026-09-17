@@ -18,7 +18,6 @@ import {
   FileMagnifyingGlass,
   Globe,
   Gear,
-  ArrowElbowDownRight,
 } from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -62,7 +61,6 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
   const { isDetailed } = useDetailMode();
   const [input, setInput] = useState<string>("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [insertedIndex, setInsertedIndex] = useState<number | null>(null);
   const [expandedTools, setExpandedTools] = useState<Record<number, boolean>>({});
 
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -182,20 +180,6 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
-  };
-
-  const handleInsertIntoBrief = (text: string, index: number) => {
-    if (currentView !== "studio") {
-      toast.info("Navigate to Appeal Studio to insert cited arguments into your brief");
-      return;
-    }
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("claimhero:insert-brief-text", { detail: { text } })
-      );
-    }
-    setInsertedIndex(index);
-    setTimeout(() => setInsertedIndex(null), 2000);
   };
 
   const toggleTools = (index: number) => {
@@ -548,30 +532,9 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                         <p className="whitespace-pre-wrap">{msg.content}</p>
                       )}
 
-                      {/* Action Bar for Assistant Messages (Copy & Insert into Brief) */}
+                      {/* Action Bar for Assistant Messages (Copy) */}
                       {isAssistant && msg.content && (
                         <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-border/40 justify-end">
-                          {/* Insert into Brief Button (available during appeal workflow) */}
-                          <button
-                            type="button"
-                            onClick={() => handleInsertIntoBrief(msg.content, index)}
-                            className="bg-muted/60 hover:bg-muted border border-border/70 rounded px-2 py-1 text-[10px] font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors cursor-pointer"
-                            title={isDetailed ? "Insert cited argument into active Appeal Brief" : "Add this to your letter"}
-                            aria-label={isDetailed ? "Insert cited argument into active Appeal Brief" : "Add this to your letter"}
-                          >
-                            {insertedIndex === index ? (
-                              <>
-                                <Check className="size-3 text-emerald-500" />
-                                <span className="text-emerald-500 font-semibold">{isDetailed ? "Inserted into Brief" : "Added to letter"}</span>
-                              </>
-                            ) : (
-                              <>
-                                <ArrowElbowDownRight className="size-3 text-primary" />
-                                <span>{isDetailed ? "Insert into Brief" : "Add to my letter"}</span>
-                              </>
-                            )}
-                          </button>
-
                           {/* Copy Text Button */}
                           <button
                             type="button"

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-17T02:45:00Z
+- **Last updated:** 2026-09-17T03:16:00Z
 
 ## Log
 
@@ -1559,7 +1559,7 @@ Implemented in-browser optical intake and converted AWS Textract into an optiona
   - Updated Documentation & Public Artifacts: Refactored `README.md` to document the decoupled 4-pillar Statutory Appeal Readiness Rubric, pipeline vector handoff, multi-factor legal precedent matching (similarity thresholds, CARC/CPT code parity, and adverse precedent safeguards), Judge Evidence Matrix updates, and updated test suite metrics (1,063 automated tests across 70 test suites, ~82.7% statement coverage).
   - Regression Coverage: Added unit tests asserting inflation prevention on zero precedents, adverse precedent penalty handling, and readiness score persistence (`tests/actionsPrecedentsAndPipeline.test.ts`). Verified 1,063/1,063 passing tests across 70 suites, 0 typecheck errors, 0 lint warnings, and clean production build.
 
-### 2026-09-17 - working tree
+### 2026-09-17 - 7a2ffd7
 Refactored aggressive and unverified legal conclusions in Policy Drift Sentinel into an objective, jurisdiction-aware Clinical Policy Discrepancy & Governing Criteria Notice (`convex/actions/policyDriftSentinel.ts`, `convex/lib/policyDriftNotice.ts`, `convex/policyDrift.ts`, `convex/schema.ts`, `src/types/index.ts`, `src/components/evidence/PolicyDriftSentinel.tsx`, `README.md`, `tests/policyDriftSentinel.test.ts`, `tests/detailMode.test.ts`):
 - Replaced inflammatory rhetoric ("FORMAL NOTICE OF STATUTORY ERISA VIOLATION", premature bad-faith tort assertions) with evidence-grounded discrepancy findings comparing Date-of-Service clinical criteria against live alterations.
 - Introduced multi-tier governing framework support (`erisa_self_funded`, `erisa_insured`, `medicare_advantage` under CMS 42 CFR § 422.101/CMS-4201-F, `medicaid_mco` under 42 CFR Part 438, `aca_individual`, and `general_administrative`) with automatic payer metadata inference.
@@ -1569,3 +1569,6 @@ Refactored aggressive and unverified legal conclusions in Policy Drift Sentinel 
 - Created isolate-safe `convex/lib/policyDriftNotice.ts` for cross-environment deterministic notice generation and updated audit logs.
 - Synchronized `README.md` features, directory layout, and test suite metrics (1,067 automated tests across 70 test suites, ~82.7% statement coverage).
 - Added regression tests in `tests/detailMode.test.ts` asserting Simple Mode and Expert Details label transitions. Verified 100% clean with `npm run verify` across all 70 test suites (1,067 passing tests), strict typecheck (0 errors), lint (0 warnings), coverage, and production build.
+
+### 2026-09-17 - working tree
+Removed the redundant and out-of-context "Add to my letter" / "Insert into Brief" action button from assistant messages in Sentinel Chat (`src/components/chat/SentinelChatbot.tsx`). Cleaned up unused state and dispatch handlers while preserving quick copy functionality for chatbot responses. Verified with strict typecheck and linting.
