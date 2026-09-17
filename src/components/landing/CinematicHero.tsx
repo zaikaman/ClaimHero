@@ -78,7 +78,7 @@ export const HERO_SLIDES: ShowcaseSlide[] = [
     description:
       "Send your letter from a case inbox you control, then see the insurer's reply and your next step in one place. You approve before anything leaves.",
     primaryCtaText: "Read insurer replies",
-    secondaryCtaText: "See money recovered",
+    secondaryCtaText: "Review financial resolution",
     targetView: "communications",
   },
 ];
@@ -95,7 +95,7 @@ export const LANDING_NAV_LINKS: LandingNavLink[] = [
   { label: "Why it was denied", view: "evidence", delay: "150ms" },
   { label: "Your letter", view: "studio", delay: "200ms" },
   { label: "Insurer replies", view: "communications", delay: "250ms" },
-  { label: "Money recovered", view: "analytics", delay: "300ms" },
+  { label: "Resolution progress", view: "analytics", delay: "300ms" },
 ];
 
 export const CinematicHero: React.FC<CinematicHeroProps> = ({

@@ -685,7 +685,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 {claim.status === "won" && (
                   <Badge variant="default" className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 text-[10px] font-semibold gap-1">
                     <Check className="size-3 text-emerald-500" />
-                    <span>{isDetailed ? "Overturned & Won" : "Won"}</span>
+                    <span>{isDetailed ? "Resolved in Full" : "Resolved"}</span>
                   </Badge>
                 )}
                 {saveStatus === "saving" && (

@@ -57,12 +57,18 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
   const [showFullRubric, setShowFullRubric] = useState(false);
   const [inspectedEvidence, setInspectedEvidence] = useState<ClinicalEvidence | null>(null);
 
-  const activeScore = scoringResult?.overturnProbabilityScore ?? claim.overturnProbabilityScore ?? 0;
+  const activeScore =
+    scoringResult?.appealReadinessScore ??
+    scoringResult?.overturnProbabilityScore ??
+    claim.appealReadinessScore ??
+    claim.evidenceCoverageScore ??
+    claim.overturnProbabilityScore ??
+    0;
   const breakdown: ScoringCriterion[] = scoringResult?.scoringBreakdown || claim.scoringBreakdown || [];
   const keyContradictions = scoringResult?.keyPolicyContradictions || [];
 
   const scoreBadgeText =
-    activeScore >= 80 ? "Strong case" : activeScore >= 55 ? "Missing some proof" : "Needs more proof";
+    activeScore >= 80 ? "Well documented" : activeScore >= 55 ? "Missing some proof" : "Needs more proof";
 
   const scoreBadgeColor =
     activeScore >= 80
@@ -242,7 +248,7 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
           <CheckCircle className="size-5 text-emerald-400 shrink-0 mt-0.5" weight="fill" />
           <div className="space-y-0.5 text-xs">
             <span className="font-semibold text-foreground">
-              What we found to overturn this denial:
+              Key evidence supporting this appeal:
             </span>
             <p className="text-muted-foreground leading-relaxed">
               {keyContradictions.length > 0

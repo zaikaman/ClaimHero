@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Autonomous Medical Appeal Sentinel
+# Specification Quality Checklist: Evidence-Grounded Appeal Preparation Sentinel
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning  
 **Created**: 2026-08-26  

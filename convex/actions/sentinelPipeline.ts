@@ -12,6 +12,8 @@ export interface PipelineResult {
   policyTitle?: string;
   clausesExtracted?: number;
   overturnProbabilityScore?: number;
+  appealReadinessScore?: number;
+  evidenceCoverageScore?: number;
   riskLevel?: string;
   appealId?: string;
   precedentsUnavailable?: boolean;
@@ -28,14 +30,14 @@ export interface PipelineResult {
 }
 
 /**
- * Autonomous Sentinel Master Pipeline Action:
- * Initiates the full end-to-end medical appeal pipeline using the durable
+ * Evidence Analysis & Appeal Preparation Pipeline Action:
+ * Initiates the full end-to-end medical appeal evidence analysis pipeline using the durable
  * Convex workflow engine (@convex-dev/workflow) as the single, unified execution path:
  * 1. Payer Intake Gateway Discovery & Resolution
  * 2. Insurer Clinical Policy Bulletin (CPB) Crawling & Evidence Extraction (Firecrawl)
  * 3. Precedent Vector Search & Statutory Appeal Readiness Scoring
- * 4. Cited ERISA 29 CFR § 2560.503-1 Legal Appeal Brief Synthesis
- * 5. Optional Auto-Pilot Transmission & Statutory Follow-Up Countdown (step.sleep)
+ * 4. Cited ERISA 29 CFR § 2560.503-1 Appeal Brief Synthesis (Human Review Required)
+ * 5. Review-Gated Staging: Held in ready_for_review for mandatory human approval before dispatch.
  */
 export const runAutonomousPipeline = action({
   args: {
@@ -108,7 +110,9 @@ export const runAutonomousPipeline = action({
           workflowId,
           policyTitle: result.policyTitle,
           clausesExtracted: result.clausesExtracted,
-          overturnProbabilityScore: result.overturnProbabilityScore,
+          overturnProbabilityScore: result.overturnProbabilityScore ?? result.appealReadinessScore,
+          appealReadinessScore: result.appealReadinessScore ?? result.overturnProbabilityScore,
+          evidenceCoverageScore: result.evidenceCoverageScore ?? result.overturnProbabilityScore,
           riskLevel: result.riskLevel,
           appealId: result.appealId,
           precedentsUnavailable: result.precedentsUnavailable,

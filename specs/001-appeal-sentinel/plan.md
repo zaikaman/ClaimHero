@@ -1,4 +1,4 @@
-# Implementation Plan: Autonomous Medical Appeal Sentinel
+# Implementation Plan: Evidence-Grounded Appeal Preparation Sentinel
 
 **Branch**: `main` | **Date**: 2026-08-26 | **Spec**: [specs/001-appeal-sentinel/spec.md](file:///d:/ClaimHero/specs/001-appeal-sentinel/spec.md)  
 **Input**: Feature specification from `/specs/001-appeal-sentinel/spec.md`
@@ -81,7 +81,7 @@ convex/
 ├── actions/
 │   ├── opticalParser.ts         # AWS Textract OCR & de-identified EOB extraction action
 │   ├── policyCrawler.ts         # Firecrawl CPB / FDA / PubMed evidence ingestion action
-│   ├── precedentMatcher.ts      # Clinical reasoning and Overturn Probability scoring action
+│   ├── precedentMatcher.ts      # Clinical reasoning and Appeal Readiness scoring action
 │   ├── appealSynthesizer.ts     # OpenAI cited medical & ERISA appeal brief generator action
 │   └── mailDispatcher.ts        # AgentMail outbound dossier transmission action
 ├── crons.ts                     # Scheduled statutory deadline alarms (ERISA / DOI countdowns)

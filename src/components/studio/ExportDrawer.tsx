@@ -323,7 +323,7 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
                       ? "bg-card text-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   )}
-                  title={isDetailed ? "Full multi-page legal exhibit binder with Cover Page, TOC, Statutory Summary, Exhibits A-C, and Attestation" : "Complete appeal packet with cover page, table of contents, evidence exhibits, and signature"}
+                  title={isDetailed ? "Full multi-page formal exhibit binder with Cover Page, TOC, Statutory Summary, Exhibits A-C, and Attestation" : "Complete appeal packet with cover page, table of contents, evidence exhibits, and signature"}
                 >
                   <FolderSimpleStar className="size-3.5" />
                   <span>{isDetailed ? "Exhibit Binder" : "Full Packet"}</span>

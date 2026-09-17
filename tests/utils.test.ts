@@ -108,7 +108,7 @@ describe("src/lib/utils Unit Tests", () => {
     expect(fallback.label).toBe("Evaluating...");
   });
 
-  it("getScoreColor categorizes win scores properly", () => {
+  it("getScoreColor categorizes appeal readiness scores properly", () => {
     const high = getScoreColor(92);
     expect(high.text).toBe("text-emerald-400");
 
@@ -157,7 +157,7 @@ describe("src/lib/constants Unit Tests", () => {
     expect(DENIAL_REASON_CODES["CO-50"].overturnCategory).toContain("Clinical Necessity");
     expect(CPT_CODES["27447"].name).toContain("Total Knee Arthroplasty");
     expect(STATUTORY_REGULATIONS.DEADLINE_DAYS_INTERNAL_APPEAL).toBe(180);
-    expect(CLAIM_STATUS_CONFIG.won.label).toBe("Overturned / Won");
+    expect(CLAIM_STATUS_CONFIG.won.label).toBe("Resolved / Approved");
     expect(SIMULATION_STAGES).toHaveLength(5);
     expect(SAMPLE_CASE_PRESETS).toHaveLength(3);
   });

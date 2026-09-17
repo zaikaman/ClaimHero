@@ -123,7 +123,7 @@ describe("Phase 4: Clinical Evidence & Precedent Structure Validation", () => {
     expect(RUBRIC_WEIGHTS.precedent_strength).toBe(20);
   });
 
-  it("computes deterministic win score from criteria sub-scores idempotently", () => {
+  it("computes deterministic appeal readiness score from criteria sub-scores idempotently", () => {
     const mockBreakdown = [
       { category: "policy_alignment", score: 33, maxScore: 35 },
       { category: "clinical_documentation", score: 23, maxScore: 25 },

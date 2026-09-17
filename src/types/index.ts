@@ -461,8 +461,10 @@ export interface DenialExtractionResult {
 
 export interface OverturnScoringResult {
   overturnProbabilityScore: number;
-  appealReadinessScore?: number;
-  evidenceCoverageScore?: number;
+  appealReadinessScore: number;
+  evidenceCoverageScore: number;
+  policyAlignmentScore?: number;
+  documentationCompletenessScore?: number;
   riskLevel: RiskLevel;
   scoringBreakdown?: ScoringCriterion[];
   keyPolicyContradictions: string[];
@@ -471,6 +473,8 @@ export interface OverturnScoringResult {
   llmAvailable?: boolean;
   generatedBy?: "openai" | "fallback";
 }
+
+export type AppealReadinessResult = OverturnScoringResult;
 
 export interface PolicyCitation {
   source: string;
@@ -507,6 +511,7 @@ export interface DashboardStats {
   activeDisputedAmount: number;
   overturnedWonAmount: number;
   averageWinScore: number;
+  averageReadinessScore?: number;
   criticalDeadlinesCount: number;
 }
 
@@ -735,6 +740,7 @@ export interface P2PCallSession {
   fastAnswers: LiveFastAnswer[];
   checklistProgress: LiveCallChecklistItem[];
   winScore: number;
+  readinessScore?: number;
   summaryNotes?: string;
   createdAt: number;
   updatedAt: number;

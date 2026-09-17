@@ -26,6 +26,8 @@ export interface DurablePipelineResult {
   policyTitle?: string;
   clausesExtracted?: number;
   overturnProbabilityScore?: number;
+  appealReadinessScore?: number;
+  evidenceCoverageScore?: number;
   riskLevel?: string;
   appealId?: string;
   dispatched?: boolean;
@@ -43,7 +45,7 @@ export interface DurablePipelineResult {
 }
 
 /**
- * Stage 1-5 Autonomous Medical Appeal Pipeline defined as a Durable Convex Workflow.
+ * Stage 1-5 Evidence-Grounded Appeal Preparation Pipeline defined as a Durable Convex Workflow.
  * Survives function timeouts, API rate limits, and network dropouts with automatic
  * exponential backoff retries, checkpointed state transitions, and durable execution.
  */
@@ -352,9 +354,11 @@ export async function executeDurableClaimPipeline(
         status: finalClaimStatus,
         actor: "Durable Sentinel Workflow",
         details: isEvidentiallyDegraded
-          ? `Durable pipeline completed with degraded evidence caveat: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}/100 provisional score computed. Held in review_provisional awaiting evidentiary acknowledgment before dispatch.`
-          : `Durable pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.overturnProbabilityScore || 0}/100 readiness score computed, and formal brief synthesized. Held in ready_for_review for mandatory human approval before dispatch.`,
+          ? `Durable pipeline completed with degraded evidence caveat: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore ?? 0}/100 provisional score computed. Held in review_provisional awaiting evidentiary acknowledgment before dispatch.`
+          : `Durable pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore ?? 0}/100 readiness score computed, and formal brief synthesized. Held in ready_for_review for mandatory human approval before dispatch.`,
         overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
+        appealReadinessScore: scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore,
+        evidenceCoverageScore: scoreResult?.evidenceCoverageScore ?? scoreResult?.overturnProbabilityScore,
         riskLevel: scoreResult?.riskLevel,
         scoringBreakdown: scoreResult?.scoringBreakdown,
         evidenceIntegrity,
@@ -366,8 +370,8 @@ export async function executeDurableClaimPipeline(
         stage: "run",
         status: "completed",
         message: isEvidentiallyDegraded
-          ? `Review complete with degraded evidence caveat: ${scoreResult?.overturnProbabilityScore || 0}/100 provisional score. Claim held in provisional review awaiting human review.`
-          : `Review complete: ${scoreResult?.overturnProbabilityScore || 0}/100 readiness score with the appeal brief drafted and ready.`,
+          ? `Review complete with degraded evidence caveat: ${scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore ?? 0}/100 provisional score. Claim held in provisional review awaiting human review.`
+          : `Review complete: ${scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore ?? 0}/100 readiness score with the appeal brief drafted and ready.`,
       });
 
       const wasDispatched = false;
@@ -383,6 +387,8 @@ export async function executeDurableClaimPipeline(
         policyTitle: crawlResult?.policyTitle,
         clausesExtracted: crawlResult?.clausesExtracted,
         overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
+        appealReadinessScore: scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore,
+        evidenceCoverageScore: scoreResult?.evidenceCoverageScore ?? scoreResult?.overturnProbabilityScore,
         riskLevel: scoreResult?.riskLevel,
         appealId: synthesisResult?.appealId,
         dispatched: wasDispatched,
@@ -405,7 +411,7 @@ export async function executeDurableClaimPipeline(
 }
 
 /**
- * Stage 1-5 Autonomous Medical Appeal Pipeline defined as a Durable Convex Workflow.
+ * Stage 1-5 Evidence-Grounded Appeal Preparation Pipeline defined as a Durable Convex Workflow.
  * Survives function timeouts, API rate limits, and network dropouts with automatic
  * exponential backoff retries, checkpointed state transitions, and durable execution.
  */

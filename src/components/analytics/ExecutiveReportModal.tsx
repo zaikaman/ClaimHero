@@ -27,6 +27,7 @@ interface PortfolioAnalyticsStats {
   overturnedWonAmount: number;
   recoveryRatePercent: number;
   averageWinScore: number;
+  averageReadinessScore?: number;
   criticalDeadlinesCount: number;
   urgentDeadlinesCount: number;
   payerBreakdown: PayerStatItem[];
@@ -58,26 +59,26 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
     lines.push(`Report Date: ${reportDate} | Statutory Standard: ERISA 29 CFR § 2560.503-1`);
     lines.push("================================================================================");
     lines.push("");
-    lines.push("1. EXECUTIVE FINANCIAL RECOVERY METRICS");
+    lines.push("1. EXECUTIVE FINANCIAL RESOLUTION METRICS");
     lines.push("--------------------------------------------------------------------------------");
     lines.push(`- Total Disputed Clinical Pipeline:  ${formatCurrency(stats.totalDisputedAmount)} (${stats.totalClaims} cases)`);
-    lines.push(`- Overturned / Won Benefit Yield:     ${formatCurrency(stats.overturnedWonAmount)} (${stats.recoveryRatePercent}% net recovery)`);
-    lines.push(`- Portfolio Average Statutory Appeal Readiness: ${stats.averageWinScore}/100`);
+    lines.push(`- Resolved in Full / Approved Yield:  ${formatCurrency(stats.overturnedWonAmount)} (${stats.recoveryRatePercent}% resolution rate)`);
+    lines.push(`- Portfolio Average Statutory Appeal Readiness: ${stats.averageReadinessScore ?? stats.averageWinScore}/100`);
     lines.push(`- Critical Statutory Alarms (<14d):   ${stats.criticalDeadlinesCount} active claims`);
     lines.push("");
-    lines.push("2. INSURER ACCOUNTABILITY & PERFORMANCE BREAKDOWN");
+    lines.push("2. INSURER ACCOUNTABILITY & RESOLUTION PERFORMANCE BREAKDOWN");
     lines.push("--------------------------------------------------------------------------------");
-    lines.push("Insurer / Payer               | Cases | Total Disputed | Recovered (Won) | Win % | Avg Readiness");
+    lines.push("Insurer / Payer               | Cases | Total Disputed | Resolved (Won) | Res % | Avg Readiness");
     lines.push("--------------------------------------------------------------------------------");
     stats.payerBreakdown.forEach((p) => {
-      const winRate = Math.round((p.wonCount / (p.totalClaims || 1)) * 100);
+      const resRate = Math.round((p.wonCount / (p.totalClaims || 1)) * 100);
       const payerName = p.payer.padEnd(29, " ").slice(0, 29);
       const count = String(p.totalClaims).padStart(5, " ");
       const disputed = formatCurrency(p.totalDisputed).padStart(14, " ");
       const won = formatCurrency(p.wonAmount).padStart(15, " ");
-      const winStr = `${winRate}%`.padStart(5, " ");
+      const resStr = `${resRate}%`.padStart(5, " ");
       const score = `${p.averageScore}/100`.padStart(9, " ");
-      lines.push(`${payerName} | ${count} | ${disputed} | ${won} | ${winStr} | ${score}`);
+      lines.push(`${payerName} | ${count} | ${disputed} | ${won} | ${resStr} | ${score}`);
     });
     lines.push("");
     lines.push("3. STATUTORY ERISA 180-DAY DEADLINE EXPOSURE (29 CFR § 2560.503-1)");
@@ -105,8 +106,8 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
       "Payer / Insurer",
       "Active Cases",
       "Total Disputed ($)",
-      "Overturned Won ($)",
-      "Win Rate (%)",
+      "Resolved Amount ($)",
+      "Resolution Rate (%)",
       "Average Statutory Appeal Readiness (0-100)",
     ];
 
@@ -246,7 +247,7 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                 </div>
 
                 <div className="p-3 rounded border border-emerald-300 bg-emerald-50">
-                  <div className="text-[10px] font-mono uppercase font-bold text-emerald-800">Overturned / Won Yield</div>
+                  <div className="text-[10px] font-mono uppercase font-bold text-emerald-800">Resolved / Approved Yield</div>
                   <div className="text-xl font-bold font-mono text-emerald-700 mt-1">
                     {formatCurrency(stats.overturnedWonAmount)}
                   </div>
@@ -254,9 +255,9 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                 </div>
 
                 <div className="p-3 rounded border border-slate-300 bg-slate-50">
-                  <div className="text-[10px] font-mono uppercase font-bold text-slate-500">Average Dossier Readiness</div>
+                  <div className="text-[10px] font-mono uppercase font-bold text-slate-500">Average Appeal Readiness</div>
                   <div className="text-xl font-bold font-mono text-blue-700 mt-1">
-                    {stats.averageWinScore}/100
+                    {stats.averageReadinessScore ?? stats.averageWinScore}/100
                   </div>
                   <div className="text-[10px] text-slate-500 mt-0.5">4-Pillar evidence rubric</div>
                 </div>
@@ -289,8 +290,8 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                       <th className="p-2.5 border-r border-slate-300 font-sans">Insurer / Payer</th>
                       <th className="p-2.5 border-r border-slate-300 text-center">Volume</th>
                       <th className="p-2.5 border-r border-slate-300 text-right">Total Disputed</th>
-                      <th className="p-2.5 border-r border-slate-300 text-right">Recovered (Won)</th>
-                      <th className="p-2.5 border-r border-slate-300 text-center">Win Rate</th>
+                      <th className="p-2.5 border-r border-slate-300 text-right">Resolved in Full</th>
+                      <th className="p-2.5 border-r border-slate-300 text-center">Resolution Rate</th>
                       <th className="p-2.5 text-center">Avg Readiness</th>
                     </tr>
                   </thead>

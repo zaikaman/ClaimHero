@@ -523,7 +523,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                             <span className="font-mono text-[10px] text-primary">Max 20 pts</span>
                           </div>
                           <p className="text-muted-foreground text-[10.5px]">
-                            {isDetailed ? "Historical overturn benchmarks from state insurance commissions and Independent Medical Reviews (IMR)." : "Other people who won with the same issue."}
+                            {isDetailed ? "Historical appeal precedents and criteria applications from state insurance commissions and Independent Medical Reviews (IMR)." : "Prior case precedents with the same issue."}
                           </p>
                         </div>
                       </div>

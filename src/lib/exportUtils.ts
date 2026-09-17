@@ -268,7 +268,9 @@ export function buildClaimCsvRow(claim: Claim, redactMode: boolean): string[] {
     serviceDate,
     deadlineStr,
     String(claim.daysRemaining ?? ""),
-    claim.overturnProbabilityScore != null ? String(claim.overturnProbabilityScore) : "N/A",
+    (claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore) != null
+      ? String(claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore)
+      : "N/A",
     claim.status || "",
     isClaimRedacted ? "YES (HIPAA Safe Harbor)" : "NO (Full Audit)",
   ];

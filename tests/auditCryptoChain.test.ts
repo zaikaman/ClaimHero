@@ -124,7 +124,7 @@ describe("Tamper-Evident Cryptographic Merkle/Audit Chain (ERISA 29 CFR § 2560.
       const events = [
         { type: "denial_ingested", details: "Ingested EOB for CPT 29881 ($6,400.00)", time: 1726140000000 },
         { type: "policy_crawled", details: "Crawled Cigna CPB 0512 criteria", time: 1726140060000 },
-        { type: "overturn_score_computed", details: "Computed Overturn Probability: 84%", time: 1726140120000 },
+        { type: "overturn_score_computed", details: "Computed Appeal Readiness: 84%", time: 1726140120000 },
         { type: "brief_synthesized", details: "Synthesized ERISA § 503 legal brief", time: 1726140180000 },
         { type: "appeal_dispatched", details: "Dispatched appellate dossier to payer gateway", time: 1726140240000 },
       ];

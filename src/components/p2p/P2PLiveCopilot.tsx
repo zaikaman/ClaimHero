@@ -183,7 +183,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   )}
                 >
                   {isOverturned
-                    ? (isDetailed ? "Overturned & Won" : "Won")
+                    ? (isDetailed ? "Criteria Satisfied & Approved" : "Criteria Accepted")
                     : isCallLive
                     ? callResolutionStage === "probing"
                       ? (isDetailed ? "Live: Probing Phase" : "Live: early questions")
@@ -629,7 +629,7 @@ export const P2PLiveCopilot: React.FC<P2PLiveCopilotProps> = ({ claim }) => {
                   <h3 className="text-sm font-bold text-foreground font-sans flex items-center gap-1.5">
                     <span>
                       {isOverturned
-                        ? (isDetailed ? "Denial Overturned &bull; Prior Authorization Granted" : "You won the call")
+                        ? (isDetailed ? "Denial Overturned &bull; Prior Authorization Granted" : "Criteria satisfied")
                         : authorizationNumber === "Simulation only — no authorization granted"
                         ? (isDetailed ? "Simulation Complete" : "Practice over")
                         : (isDetailed ? "Instant Verbal Counter-Strike" : "What to say now")}

@@ -1,6 +1,6 @@
 ---
 name: ClaimHero Design System
-description: Precision Medical Dark-Mode Design System for Autonomous Medical Appeal Sentinel
+description: Precision Medical Dark-Mode Design System for Evidence-Grounded Appeal Preparation Sentinel
 colors:
   primary: "#0ea5e9"
   primary-foreground: "#ffffff"
@@ -119,7 +119,7 @@ The palette is anchored by deep obsidian slates, punctuated by clinical cyan ill
 - **Precedent Indigo** (`#6366f1`): Secondary analytical accent. Used for Clinical Policy Bulletin (CPB) evidence highlights, precedent matching tags, and analytical trend lines.
 
 ### Semantic Status
-- **Victory Emerald** (`#10b981`): Success, claim overturned, payment won, high win-probability scores (>75%), and verified policy compliance.
+- **Victory Emerald** (`#10b981`): Success, claim resolved, payment approved, high appeal-readiness scores (>75%), and verified policy compliance.
 - **Denial Crimson** (`#f43f5e`): Payer denial codes, disputed amounts, expired deadlines, and severe ERISA non-compliance flags.
 - **Deadline Amber** (`#f59e0b`): Statutory appeal countdown warnings (<30 days remaining), pending review states, and required human sign-offs.
 
@@ -134,7 +134,7 @@ The palette is anchored by deep obsidian slates, punctuated by clinical cyan ill
 ### Named Rules
 **The Rarity Rule.** High-intensity neon accents (cyan, crimson, emerald, amber) are strictly rationed and must occupy ≤10% of any given view. Their rarity is what guarantees instant visual triage.
 
-**The Semantic Truth Rule.** Red is never used decoratively; it is strictly reserved for denials, errors, and critical countdown risks. Green is strictly reserved for positive claim outcomes, overturned precedents, and verified evidence.
+**The Semantic Truth Rule.** Red is never used decoratively; it is strictly reserved for denials, errors, and critical countdown risks. Green is strictly reserved for positive claim outcomes, resolved precedents, and verified evidence.
 
 ## Typography
 

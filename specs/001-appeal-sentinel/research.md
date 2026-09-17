@@ -1,4 +1,4 @@
-# Implementation Research: ClaimHero (Autonomous Medical Appeal Sentinel)
+# Implementation Research: ClaimHero (Evidence-Grounded Appeal Preparation Sentinel)
 
 **Feature**: `001-appeal-sentinel`  
 **Date**: 2026-08-26  
@@ -15,7 +15,7 @@
   - `OPENAI_BASE_URL`: Custom base endpoint (e.g. `https://api.openai.com/v1` or custom proxy).
 - **Rationale**: 
   - **Single-Model Simplicity & 100% Proxy Compatibility**: Eliminates the need for a secondary `text-embedding-3-small` model. Custom proxies or local endpoints (vLLM, Ollama, OpenRouter, LiteLLM) often only support `/v1/chat/completions` and fail on `/v1/embeddings`.
-  - **Clinical Reasoning Over Naive Vector Search**: `gpt-5.4-nano` directly performs semantic matching, medical necessity evaluation, CPT/ICD-10 code cross-referencing against insurer Clinical Policy Bulletins (CPBs), and calculates the Overturn Probability Score with clinical context rather than simple cosine word similarity.
+  - **Clinical Reasoning Over Naive Vector Search**: `gpt-5.4-nano` directly performs semantic matching, medical necessity evaluation, CPT/ICD-10 code cross-referencing against insurer Clinical Policy Bulletins (CPBs), and calculates the Appeal Readiness Score with clinical context rather than simple cosine word similarity.
   - **Structured Outputs**: OpenAI's JSON Schema enforcement (`response_format: { type: "json_schema", ... }`) guarantees 100% deterministic parsing of medical Explanation of Benefits (EOBs), code mappings, and multi-page appeal briefs.
 - **Alternatives Considered**:
   - *LangChain / LlamaIndex*: Rejected due to unnecessary abstraction overhead, heavy bundle size, and lower determinism compared to direct Convex actions calling OpenAI SDK.

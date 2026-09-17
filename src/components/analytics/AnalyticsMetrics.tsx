@@ -42,6 +42,7 @@ interface PortfolioStats {
   activeDisputedAmount: number;
   overturnedWonAmount: number;
   averageWinScore: number;
+  averageReadinessScore?: number;
   recoveryRatePercent: number;
   criticalDeadlinesCount: number;
   urgentDeadlinesCount: number;
@@ -70,8 +71,8 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
     return (
       <div className="p-12 text-center text-xs font-mono text-muted-foreground animate-pulse">
         {isDetailed
-          ? "Computing portfolio financial recovery metrics & win benchmarks..."
-          : "Loading financial recovery numbers & case benchmarks..."}
+          ? "Computing portfolio financial resolution metrics & appeal benchmarks..."
+          : "Loading financial resolution numbers & case benchmarks..."}
       </div>
     );
   }
@@ -88,7 +89,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-semibold text-foreground">
-                  {isDetailed ? "Portfolio Financial & Overturn Analytics" : "Financial & Recovery Overview"}
+                  {isDetailed ? "Portfolio Financial & Resolution Analytics" : "Financial & Resolution Overview"}
                 </h2>
                 <Badge variant="outline" className="font-mono text-[10px]">
                   Live Aggregation
@@ -96,8 +97,8 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
               </div>
               <p className="text-xs text-muted-foreground">
                 {isDetailed
-                  ? "Financial recovery tracking, insurer overturn benchmarks, and statutory dials"
-                  : "Track recovered money, win rates, and upcoming deadlines"}
+                  ? "Financial resolution tracking, documentation benchmarks, and deadline risk"
+                  : "Track resolved balances, resolution rates, and upcoming deadlines"}
               </p>
             </div>
           </div>
@@ -154,7 +155,9 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         {/* Recovered & Won Funds */}
         <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Recovered Funds</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider">
+              {isDetailed ? "Resolved Disputed Funds" : "Resolved Funds"}
+            </span>
             <CheckCircle className="size-4" />
           </div>
           <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
@@ -163,7 +166,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
           <div className="text-[11px] text-muted-foreground font-mono flex items-center justify-between">
             <span>{stats.claimsByStatus.won || 0} Settled Cases</span>
             <span className="font-semibold text-foreground">
-              {stats.recoveryRatePercent}% Overturn Rate
+              {stats.recoveryRatePercent}% Resolution Rate
             </span>
           </div>
         </Card>
@@ -172,12 +175,12 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
         <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between text-foreground">
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              {isDetailed ? "Avg Dossier Readiness" : "Avg Case Strength"}
+              {isDetailed ? "Avg Appeal Readiness" : "Avg Documentation Score"}
             </span>
             <TrendUp className="size-4 text-muted-foreground" />
           </div>
           <div className="text-2xl font-bold font-mono text-foreground">
-            {stats.averageWinScore}/100
+            {stats.averageReadinessScore ?? stats.averageWinScore}/100
           </div>
           <div className="text-[11px] text-muted-foreground font-mono">
             Across {stats.totalClaims} {isDetailed ? "cross-examined cases" : "cases"}
@@ -235,7 +238,7 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
                 <TableHead>Insurance Payer</TableHead>
                 <TableHead>Cases</TableHead>
                 <TableHead>Disputed</TableHead>
-                <TableHead>Won / Overturned</TableHead>
+                <TableHead>{isDetailed ? "Resolved in Full" : "Resolved"}</TableHead>
                 <TableHead className="text-right">
                   {isDetailed ? "Avg Readiness" : "Avg Strength"}
                 </TableHead>

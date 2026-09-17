@@ -129,7 +129,7 @@ interface PageStream {
 }
 
 /**
- * Compiles an official, multi-page, court-ready PDF appellate dossier in pure TypeScript.
+ * Compiles an official, multi-page, formal administrative appellate dossier in pure TypeScript.
  * Conforms to PDF 1.4 specification without external native or binary dependencies.
  */
 export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
@@ -634,7 +634,7 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
 /**
  * Ensures the formal appeal PDF dossier is compiled and stored in Convex File Storage.
  * If appeal.pdfExportStorageId exists and resolves in storage, reuses it; otherwise compiles
- * a court-ready PDF, stores it in Convex Storage, and patches the appeal record.
+ * a formal administrative PDF dossier, stores it in Convex Storage, and patches the appeal record.
  */
 export async function ensureAppealPdfStored(
   ctx: ActionCtx,
@@ -674,7 +674,7 @@ export async function ensureAppealPdfStored(
     throw new Error("Convex File Storage service is not available in ActionCtx");
   }
 
-  // 2. Dynamically compile formal court-ready PDF dossier
+  // 2. Dynamically compile formal administrative PDF dossier
   const rawPatientName = claim.patientName || "Insured Policyholder";
   const pdfBuffer = generateFormalAppealPdf({
     claimNumber: claim.claimNumber,

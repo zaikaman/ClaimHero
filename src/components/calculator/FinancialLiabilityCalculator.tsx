@@ -304,8 +304,8 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               </div>
               <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                 {isDetailed
-                  ? `Audit how much you will save when this denial is overturned, and track statutory ERISA penalties ($${dailyPenaltyRate.toFixed(0)}/day) against the insurer.`
-                  : `See what you'd save if you win — plus daily fees the insurer may owe ($${dailyPenaltyRate.toFixed(0)}/day).`}
+                  ? `Audit potential savings if the denial is resolved in full, and track statutory ERISA penalties ($${dailyPenaltyRate.toFixed(0)}/day) against the insurer.`
+                  : `See what you could save if resolved — plus daily fees the insurer may owe ($${dailyPenaltyRate.toFixed(0)}/day).`}
               </p>
             </div>
           </div>
@@ -387,26 +387,26 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
           <div className="p-3 rounded-lg bg-background/50 border border-border/40">
             <div className="text-[10px] uppercase font-mono text-rose-400/90 flex items-center gap-1">
               <Receipt className="size-3 text-rose-400" />
-              <span>{isDetailed ? "You Owe If Denied" : "You pay if you lose"}</span>
+              <span>{isDetailed ? "You Owe If Denied" : "You pay if denial stands"}</span>
             </div>
             <div className="text-base font-mono font-bold text-rose-400 mt-1">
               {formatCurrency(liabilityResult.totalPatientExposureDenied)}
             </div>
             <div className="text-[10px] text-muted-foreground truncate">
-              {isDetailed ? "Without overturning denial" : "If nothing changes"}
+              {isDetailed ? "Under unappealed denial" : "If nothing changes"}
             </div>
           </div>
 
           <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-500/30">
             <div className="text-[10px] uppercase font-mono text-emerald-400 flex items-center gap-1 font-semibold">
               <TrendUp className="size-3" />
-              <span>{isDetailed ? "You Save If Won" : "You save if you win"}</span>
+              <span>{isDetailed ? "Relief If Resolved" : "Potential savings"}</span>
             </div>
             <div className="text-base font-mono font-black text-emerald-400 mt-1">
               {formatCurrency(liabilityResult.netPatientSavings)}
             </div>
             <div className="text-[10px] text-emerald-400/80 truncate">
-              {isDetailed ? "Relief from overturned claim" : "Stays in your pocket"}
+              {isDetailed ? "Potential relief upon resolution" : "Stays in your pocket"}
             </div>
           </div>
 
@@ -538,7 +538,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-mono uppercase text-cyan-400 font-semibold tracking-wider">
-                    {isDetailed ? "If Appeal Overturned" : "If you win"}
+                    {isDetailed ? "If Appeal Resolved" : "If resolved"}
                   </span>
                   <Badge variant="outline" className="text-[10px] border-cyan-500/30 text-cyan-300 font-mono">
                     {isDetailed ? "Target Goal" : "Goal"}
@@ -583,7 +583,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
                 </div>
                 <p className="text-xs text-emerald-400/90 leading-relaxed font-medium">
                   {isDetailed
-                    ? "Actual money retained in your bank account when ClaimHero overturns this denial."
+                    ? "Estimated liability reduction if the denial is successfully resolved in full."
                     : "The money you don't have to pay if this appeal succeeds."}
                 </p>
               </div>
@@ -653,7 +653,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               <div className="flex items-center gap-2">
                 <Receipt className="size-4 text-primary" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground font-mono">
-                    {isDetailed ? "Itemized Cost Breakdown & Overturn Impact" : "What makes up your bill"}
+                    {isDetailed ? "Itemized Cost Breakdown & Resolution Impact" : "What makes up your bill"}
                 </h3>
               </div>
               <Badge variant="outline" className="text-[10px] font-mono">
@@ -667,7 +667,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="text-[11px] font-mono py-2">Item</TableHead>
                     <TableHead className="text-[11px] font-mono py-2 text-right">{isDetailed ? "If Denied" : "Now"}</TableHead>
-                    <TableHead className="text-[11px] font-mono py-2 text-right">{isDetailed ? "If Overturned" : "If you win"}</TableHead>
+                    <TableHead className="text-[11px] font-mono py-2 text-right">{isDetailed ? "If Resolved" : "If resolved"}</TableHead>
                     <TableHead className="text-[11px] font-mono py-2 text-right">{isDetailed ? "Difference" : "You save"}</TableHead>
                   </TableRow>
                 </TableHeader>

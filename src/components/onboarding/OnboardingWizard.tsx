@@ -773,8 +773,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {isDetailed
-                      ? "Pre-indexes insurer Clinical Policy Bulletins (CPBs) and overturn precedents."
-                      : "Helps quickly find insurer rules and similar past wins."}
+                      ? "Pre-indexes insurer Clinical Policy Bulletins (CPBs) and appeal precedents."
+                      : "Helps quickly find insurer rules and similar past appeals."}
                   </p>
                 </div>
 
@@ -1361,11 +1361,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   </span>
                   {typeof extractedResult.pipelineResult === "object" &&
                     extractedResult.pipelineResult !== null &&
-                    "overturnProbabilityScore" in extractedResult.pipelineResult &&
-                    typeof (extractedResult.pipelineResult as { overturnProbabilityScore?: unknown }).overturnProbabilityScore === "number" && (
+                    (("appealReadinessScore" in extractedResult.pipelineResult &&
+                      typeof (extractedResult.pipelineResult as { appealReadinessScore?: unknown }).appealReadinessScore === "number") ||
+                     ("overturnProbabilityScore" in extractedResult.pipelineResult &&
+                      typeof (extractedResult.pipelineResult as { overturnProbabilityScore?: unknown }).overturnProbabilityScore === "number")) && (
                       <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px]">
                         <TrendUp className="size-3 mr-1" />
-                        {(extractedResult.pipelineResult as { overturnProbabilityScore: number }).overturnProbabilityScore}/100 {isDetailed ? "Readiness Score" : "Case strength"}
+                        {Number((extractedResult.pipelineResult as { appealReadinessScore?: number; overturnProbabilityScore?: number }).appealReadinessScore ?? (extractedResult.pipelineResult as { appealReadinessScore?: number; overturnProbabilityScore?: number }).overturnProbabilityScore)}/100 {isDetailed ? "Readiness Score" : "Case strength"}
                       </Badge>
                     )}
                 </div>

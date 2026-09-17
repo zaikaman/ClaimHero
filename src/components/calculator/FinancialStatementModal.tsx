@@ -74,7 +74,7 @@ ${subHr}
 8. Out-of-Network Balance Billing:      ${formatCurrency(liabilityResult.balanceBillingExposure)} (${liabilityResult.data.noSurprisesActProtected ? "Protected by No Surprises Act 45 CFR § 149.410" : "Exposed"})
 --------------------------------------------------------------------------------
 TOTAL PATIENT RESPONSIBILITY (DENIED):     ${formatCurrency(liabilityResult.totalPatientExposureDenied)}
-TOTAL PATIENT RESPONSIBILITY (OVERTURNED): ${formatCurrency(liabilityResult.totalPatientLiabilityOverturned)}
+TOTAL PATIENT RESPONSIBILITY (IF RESOLVED): ${formatCurrency(liabilityResult.totalPatientLiabilityOverturned)}
 NET PATIENT RECOVERY SAVINGS:              ${formatCurrency(liabilityResult.netPatientSavings)}
 PAYER EXPECTED BENEFIT REIMBURSEMENT:      ${formatCurrency(liabilityResult.payerExpectedObligation)}
 
@@ -261,7 +261,7 @@ Authorized Representative / Claimant: ___________________________   Date: ${eris
                 <div className="text-[10px] text-slate-500">If Denial Upheld</div>
               </div>
               <div className="border-x border-slate-300">
-                <div className="text-[10px] uppercase text-emerald-800 font-bold">Net Overturn Savings</div>
+                <div className="text-[10px] uppercase text-emerald-800 font-bold">Net Resolution Savings</div>
                 <div className="text-base font-bold text-emerald-700 mt-0.5">
                   {formatCurrency(liabilityResult.netPatientSavings)}
                 </div>
@@ -291,7 +291,7 @@ Authorized Representative / Claimant: ___________________________   Date: ${eris
                   <tr className="bg-slate-100 text-slate-700 border-b border-slate-300 text-left">
                     <th className="p-2 border-r border-slate-300 font-semibold">Accounting Line Item</th>
                     <th className="p-2 border-r border-slate-300 text-right font-semibold">Denied State</th>
-                    <th className="p-2 border-r border-slate-300 text-right font-semibold">Overturned State</th>
+                    <th className="p-2 border-r border-slate-300 text-right font-semibold">Resolved State</th>
                     <th className="p-2 text-right font-semibold">Variance / Relief</th>
                   </tr>
                 </thead>

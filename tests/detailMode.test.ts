@@ -173,7 +173,7 @@ describe("First Screen Jargon Removal (landing page)", () => {
       "Why it was denied",
       "Your letter",
       "Insurer replies",
-      "Money recovered",
+      "Resolution progress",
     ]);
   });
 });

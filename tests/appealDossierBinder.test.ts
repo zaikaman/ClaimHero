@@ -8,7 +8,7 @@ import {
 } from "../src/lib/dossierBuilder";
 import { Claim, Appeal, ClinicalEvidence } from "../src/types";
 
-describe("Feature G: Court-Ready Appeal Dossier & Exhibit PDF Binder", () => {
+describe("Feature G: Formal Administrative Appeal Dossier & Exhibit PDF Binder", () => {
   const mockClaim: Claim = {
     _id: "claim-test-101",
     patientId: "patient-1",
@@ -138,7 +138,7 @@ describe("Feature G: Court-Ready Appeal Dossier & Exhibit PDF Binder", () => {
   });
 
   describe("Dossier Data Model Construction", () => {
-    it("constructs full court-ready dossier model with docket header and payer EDI details", () => {
+    it("constructs full administrative dossier model with docket header and payer EDI details", () => {
       const dossier = buildDossierData(mockClaim, mockAppeal, mockEvidences, false);
 
       expect(dossier.docketNumber).toBe("CLM-9823412");

@@ -61,9 +61,9 @@ Used by `actions/opticalParser.ts` to extract structured fields from raw OCR tex
 
 ---
 
-## 2. Overturn Probability & Risk Analysis Schema (`OverturnScoringResult`)
+## 2. Appeal Readiness & Evidence Analysis Schema (`AppealReadinessResult` / `OverturnScoringResult`)
 
-Used by `actions/precedentMatcher.ts` to compute the win score and identify policy contradictions.
+Used by `actions/precedentMatcher.ts` to compute the appeal readiness score and identify policy contradictions.
 
 ```json
 {

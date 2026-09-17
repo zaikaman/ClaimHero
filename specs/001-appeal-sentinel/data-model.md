@@ -1,4 +1,4 @@
-# Data Model: ClaimHero (Autonomous Medical Appeal Sentinel)
+# Data Model: ClaimHero (Evidence-Grounded Appeal Preparation Sentinel)
 
 **Feature**: `001-appeal-sentinel`  
 **Date**: 2026-08-26  
@@ -272,11 +272,11 @@ Tracks uploaded documents per authenticated user before case creation, preventin
 stateDiagram-v2
     [*] --> intake_received : Ingest Denial PDF / EOB
     intake_received --> analyzing_policy : Extract Metadata & Crawl CPBs
-    analyzing_policy --> evidence_assembled : Match Vector Precedents & Compute Win Score
+    analyzing_policy --> evidence_assembled : Match Vector Precedents & Audit Appeal Readiness
     evidence_assembled --> appeal_drafted : Synthesize Cited Appeal Brief
     appeal_drafted --> appeal_drafted : Collaborative Studio Edits
     appeal_drafted --> dispatched : Transmit Dossier via AgentMail
     dispatched --> under_review : Insurer Acknowledges Receipt
-    under_review --> overturned_won : Claim Overturned & Paid ($ Won)
+    under_review --> overturned_won : Claim Resolved & Approved ($ Approved)
     under_review --> escalated_external : Escalated to State DOI / External Review
 ```

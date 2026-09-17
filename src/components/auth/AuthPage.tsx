@@ -270,8 +270,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <h2 className="text-3xl sm:text-4xl lg:text-4xl xl:text-5xl font-serif font-normal tracking-tight text-white leading-[1.08]">
               Defend <br />
               Every Claim. <br />
-              Overturn <br />
-              Every Denial.
+              Ground <br />
+              Every Appeal.
             </h2>
 
             <p className="text-xs sm:text-sm text-gray-200/90 leading-relaxed font-light max-w-md">
@@ -319,7 +319,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <p className="text-xs sm:text-sm text-zinc-500 font-light max-w-xs mx-auto">
                 {flow === "signIn"
                   ? "Enter your email and password to access your account"
-                  : "Sign up to start defending clinical claims and overturning denials"}
+                  : "Sign up to start preparing evidence-grounded clinical appeals"}
               </p>
             </div>
 

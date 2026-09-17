@@ -272,7 +272,7 @@ ${demandsSection}
 Respectfully submitted,
 
 **Authorized Patient Representative & Appellate Sentinel**  
-*ClaimHero Autonomous Medical Appeal Sentinel — Cryptographically Audited Docket*
+*ClaimHero Evidence-Grounded Appeal Preparation Sentinel — Cryptographically Audited Docket*
 `;
 }
 

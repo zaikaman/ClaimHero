@@ -103,7 +103,7 @@ describe("Convex Physician P2P Defense Scripts & Live Copilot Sessions", () => {
       }));
     });
 
-    it("addFastAnswer & addFastAnswerInternal: prepends answer and boosts win score", async () => {
+    it("addFastAnswer & addFastAnswerInternal: prepends answer and boosts readiness score", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const mockClaim = { _id: "c1", userId: "user_123" };
       const session = { _id: "sess_1", claimId: "c1", fastAnswers: [], winScore: 50 };

@@ -1,4 +1,4 @@
-# Tasks: Autonomous Medical Appeal Sentinel
+# Tasks: Evidence-Grounded Appeal Preparation Sentinel
 
 **Input**: Design documents from `/specs/001-appeal-sentinel/`  
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`  
@@ -53,18 +53,18 @@
 
 ## Phase 4: User Story 2 - Clinical Policy Bulletin (CPB) Evidence Crawling & Precedent Matching (Priority: P2)
 
-**Goal**: Crawl insurer CPBs live via Firecrawl (with clinical guideline fallback) and use `gpt-5.4-nano` to cross-examine criteria and compute Overturn Probability Score.
+**Goal**: Crawl insurer CPBs live via Firecrawl (with clinical guideline fallback) and use `gpt-5.4-nano` to cross-examine criteria and compute Appeal Readiness Score.
 
-**Independent Test**: Trigger policy analysis on an ingested claim; verify that matching insurer policy clauses and clinical citations are displayed in a side-by-side policy matrix alongside an Overturn Probability Score.
+**Independent Test**: Trigger policy analysis on an ingested claim; verify that matching insurer policy clauses and clinical citations are displayed in a side-by-side policy matrix alongside an Appeal Readiness Score.
 
 - [X] T020 [P] [US2] Implement evidence persistence queries and mutations in `convex/clinicalEvidences.ts`
 - [X] T021 [US2] Implement Firecrawl scraper action with resilient clinical guideline fallback in `convex/actions/policyCrawler.ts`
-- [X] T022 [US2] Implement clinical precedent evaluation and Overturn Probability scoring action using `gpt-5.4-nano` in `convex/actions/precedentMatcher.ts`
+- [X] T022 [US2] Implement clinical precedent evaluation and Appeal Readiness scoring action using `gpt-5.4-nano` in `convex/actions/precedentMatcher.ts`
 - [X] T023 [P] [US2] Implement side-by-side Denial vs Insurer CPB inspector in `src/components/evidence/EvidenceMatrix.tsx`
 - [X] T024 [P] [US2] Implement CPB Clause & Medical Criteria Viewer with highlighted contradictions in `src/components/evidence/PolicyViewer.tsx`
-- [X] T025 [US2] Implement Precedent Feed displaying historical winning cases in `src/components/evidence/PrecedentFeed.tsx`
+- [X] T025 [US2] Implement Precedent Feed displaying historical resolved cases in `src/components/evidence/PrecedentFeed.tsx`
 
-**Checkpoint**: User Stories 1 and 2 functional — claims now have automated clinical policy evidence and win scoring.
+**Checkpoint**: User Stories 1 and 2 functional — claims now have automated clinical policy evidence and appeal readiness scoring.
 
 ---
 
@@ -103,14 +103,14 @@
 
 ---
 
-## Phase 7: User Story 5 - Real-time Case Analytics, Win Probability Dashboard & Audit Timeline (Priority: P5)
+## Phase 7: User Story 5 - Real-time Case Analytics, Appeal Readiness Dashboard & Audit Timeline (Priority: P5)
 
-**Goal**: Provide portfolio-wide financial recovery metrics, win likelihood distributions, statutory alarm aggregation, and immutable case audit tracking computed dynamically on Convex.
+**Goal**: Provide portfolio-wide financial recovery metrics, readiness score distributions, statutory alarm aggregation, and immutable case audit tracking computed dynamically on Convex.
 
-**Independent Test**: Ingest multiple claims and verify that the portfolio metrics, win score distribution, and audit trail update reactively with zero hardcoded numbers.
+**Independent Test**: Ingest multiple claims and verify that the portfolio metrics, readiness score distribution, and audit trail update reactively with zero hardcoded numbers.
 
 - [X] T039 [US5] Implement portfolio financial aggregation query and statutory deadline health metrics in `convex/claims.ts`
-- [X] T040 [US5] Implement portfolio analytics panel with win likelihood distribution in `src/components/analytics/AnalyticsMetrics.tsx`
+- [X] T040 [US5] Implement portfolio analytics panel with readiness score distribution in `src/components/analytics/AnalyticsMetrics.tsx`
 - [X] T041 [US5] Connect real-time analytics view into navigation sidebar and workspace in `src/App.tsx`
 
 **Checkpoint**: All 5 user stories complete — application provides end-to-end real data workflow from ingestion to dispatch and analytics.
@@ -153,7 +153,7 @@
 4. Validate User Story 1 independently with real file upload or text paste
 
 ### Incremental Feature Delivery
-1. Add User Story 2 &rarr; Live CPB policy crawler & Overturn Probability score calculation
+1. Add User Story 2 &rarr; Live CPB policy crawler & Appeal Readiness score calculation
 2. Add User Story 3 &rarr; Cited appeal brief synthesis & live collaborative studio
 3. Add User Story 4 &rarr; Statutory deadline alarm cron & AgentMail dispatch
 4. Add User Story 5 &rarr; Real-time portfolio analytics & audit timeline

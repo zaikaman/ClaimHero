@@ -318,7 +318,7 @@ export async function performDispatchAppealPacket(
       providerName: claim.providerName,
     });
 
-    // Automatically pull compiled PDF brief from Convex Storage (or compile court-ready PDF if not yet stored)
+    // Automatically pull compiled PDF brief from Convex Storage (or compile formal PDF dossier if not yet stored)
     let storedPdf: { storageId: Id<"_storage">; buffer: Buffer; filename: string } | null = null;
     let pdfMissing = false;
     try {

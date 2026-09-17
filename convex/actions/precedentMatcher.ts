@@ -49,8 +49,10 @@ export interface ScoringCriterionResult {
 
 export interface OverturnScoringResult {
   overturnProbabilityScore: number;
-  appealReadinessScore?: number;
-  evidenceCoverageScore?: number;
+  appealReadinessScore: number;
+  evidenceCoverageScore: number;
+  policyAlignmentScore?: number;
+  documentationCompletenessScore?: number;
   riskLevel: "high_confidence" | "moderate" | "complex_litigation";
   scoringBreakdown: ScoringCriterionResult[];
   keyPolicyContradictions: string[];
@@ -61,6 +63,8 @@ export interface OverturnScoringResult {
   scoreStatus?: "certified" | "provisional_capped" | "withheld";
   degradationWarnings?: string[];
 }
+
+export type AppealReadinessResult = OverturnScoringResult;
 
 interface RawLLMAnalysisOutput {
   keyPolicyContradictions: string[];
@@ -119,7 +123,7 @@ export function isStatutoryBaselineEvidence(e: {
  *   - Pillar 1: CPB & Indication Alignment (Max: 35 pts)
  *   - Pillar 2: Objective Clinical Documentation & Step-Therapy (Max: 25 pts)
  *   - Pillar 3: ERISA 29 CFR § 2560.503-1 Statutory Protections (Max: 20 pts)
- *   - Pillar 4: External Review Precedents & Overturn Benchmark (Max: 20 pts)
+ *   - Pillar 4: Precedent Alignment & Evidentiary Coverage (Max: 20 pts)
  *   - Total Score = min(99, max(5, round(∑ Pillar Scores)))
  * 
  * Evidence-Proportional Formula:
@@ -220,14 +224,14 @@ export function calculateDeterministicRubric(
     erisaRationale = `Preliminary statutory grounds identified under ERISA 29 CFR § 2560.503-1; supplementary disclosure request recommended to substantiate complete denial rationale omissions.`;
   }
 
-  // Pillar 4. External Review Precedents & Overturn Benchmark (Max: 20 points; rubric weight tested in tests/claimhero.test.ts:114)
+  // Pillar 4. External Review Precedents & Evidentiary Coverage (Max: 20 points; rubric weight tested in tests/claimhero.test.ts:114)
   // Strictly grounded in retrieved precedent vectors and verified judicial/appellate rulings
   let precedentScore = 4;
   let precedentRationale = "No controlling appellate rulings or external review precedents indexed or matched to this denial reason.";
 
   if (options?.precedentsUnavailable) {
     precedentScore = 4;
-    precedentRationale = "Precedent Vector Archive was unavailable during analysis; external judicial benchmark is unverified.";
+    precedentRationale = "Precedent Vector Archive was unavailable during analysis; external judicial documentation benchmark is unverified.";
   } else {
     const hasMatchedPrecedents = Boolean(matchedPrecedents && matchedPrecedents.length > 0);
     const legalEv = evidences.find(
@@ -343,7 +347,7 @@ export function calculateDeterministicRubric(
             ? `Exact ${claim.denialReasonCode} parity`
             : `${simPercent}% semantic alignment`;
 
-      precedentRationale = `External review precedent (${legalCitation}) establishes favorable adjudication parity for ${claim.denialReasonCode || "denial"} (${matchType}).`;
+      precedentRationale = `External review precedent (${legalCitation}) establishes favorable documentation parity for ${claim.denialReasonCode || "denial"} (${matchType}).`;
     }
   }
   }
@@ -375,7 +379,7 @@ export function calculateDeterministicRubric(
     },
     {
       category: "precedent_strength",
-      criterion: "External Review Precedents & Overturn Benchmark",
+      criterion: "Precedent & Evidentiary Coverage",
       score: precedentScore,
       maxScore: 20,
       status: precedentScore >= 16 ? "strong" : precedentScore >= 12 ? "moderate" : "weak",
@@ -401,7 +405,7 @@ export function calculateDeterministicRubric(
   }
   if (options?.precedentsUnavailable) {
     degradationWarnings.push(
-      "Precedent vector retrieval was unavailable during evaluation; judicial overturn benchmark unverified."
+      "Precedent vector retrieval was unavailable during evaluation; appellate documentation benchmark unverified."
     );
   }
 
@@ -427,6 +431,8 @@ export function calculateDeterministicRubric(
     overturnProbabilityScore,
     appealReadinessScore: overturnProbabilityScore,
     evidenceCoverageScore: overturnProbabilityScore,
+    policyAlignmentScore: policyScore,
+    documentationCompletenessScore: clinicalScore,
     riskLevel,
     scoringBreakdown,
     scoreStatus,
@@ -596,6 +602,8 @@ ${evidencesSummary}`,
     overturnProbabilityScore: deterministicCalculation.overturnProbabilityScore,
     appealReadinessScore: deterministicCalculation.appealReadinessScore,
     evidenceCoverageScore: deterministicCalculation.evidenceCoverageScore,
+    policyAlignmentScore: deterministicCalculation.policyAlignmentScore,
+    documentationCompletenessScore: deterministicCalculation.documentationCompletenessScore,
     riskLevel: deterministicCalculation.riskLevel,
     scoringBreakdown: finalBreakdown,
     keyPolicyContradictions: (llmAnalysis.keyPolicyContradictions || []).map((c) => c.replace(/\*\*/g, "")),
@@ -719,9 +727,9 @@ const precedentInputValidator = v.object({
 });
 
 /**
- * Precedent Matcher Action: Evaluate clinical evidence using deterministic 4-pillar rubric (User-facing)
+ * Appeal Readiness Matcher Action: Evaluate clinical evidence using deterministic 4-pillar rubric (User-facing)
  */
-export const computeOverturnScore = action({
+export const computeAppealReadinessScore = action({
   args: {
     claimId: v.id("claims"),
     pipelineRunId: v.optional(v.string()),
@@ -737,10 +745,15 @@ export const computeOverturnScore = action({
 });
 
 /**
- * Internal Precedent Matcher Action:
+ * Backward compatibility alias for computeAppealReadinessScore
+ */
+export const computeOverturnScore = computeAppealReadinessScore;
+
+/**
+ * Internal Appeal Readiness Matcher Action:
  * For durable workflows and scheduled background processing without active user token session.
  */
-export const computeOverturnScoreInternal = internalAction({
+export const computeAppealReadinessScoreInternal = internalAction({
   args: {
     claimId: v.id("claims"),
     pipelineRunId: v.optional(v.string()),
@@ -758,3 +771,8 @@ export const computeOverturnScoreInternal = internalAction({
     return await performComputeOverturnScore(ctx, args, claim, claim.userId);
   },
 });
+
+/**
+ * Backward compatibility alias for computeAppealReadinessScoreInternal
+ */
+export const computeOverturnScoreInternal = computeAppealReadinessScoreInternal;

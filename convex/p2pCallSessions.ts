@@ -176,7 +176,7 @@ async function applyAddFastAnswer(ctx: MutationCtx, args: AddFastAnswerArgs) {
 
   const fastAnswers = [args.fastAnswer, ...existingAnswers].slice(0, 30);
 
-  // Dynamic boost to win score when high confidence fast answer is available
+  // Dynamic boost to readiness/win score when high confidence fast answer is available
   const newWinScore = Math.min(100, Math.max(0, session.winScore + 5));
 
   await ctx.db.patch(args.sessionId, {

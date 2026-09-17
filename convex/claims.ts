@@ -2355,8 +2355,9 @@ export const getPortfolioStats = query({
         activeDisputedAmount += claim.deniedAmount;
       }
 
-      if (claim.overturnProbabilityScore !== undefined) {
-        totalScoreSum += claim.overturnProbabilityScore;
+      const scoreVal = claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore;
+      if (scoreVal !== undefined) {
+        totalScoreSum += scoreVal;
         scoredCount++;
       }
 
@@ -2389,8 +2390,8 @@ export const getPortfolioStats = query({
         pStat.wonCount++;
         pStat.wonAmount += claim.deniedAmount;
       }
-      if (claim.overturnProbabilityScore !== undefined) {
-        pStat.scoreSum += claim.overturnProbabilityScore;
+      if (scoreVal !== undefined) {
+        pStat.scoreSum += scoreVal;
         pStat.scoredCount++;
       }
     }

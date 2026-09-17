@@ -97,7 +97,7 @@ describe("Evidentiary Degradation & Provisional Review Gating", () => {
       const precedentCriterion = result.scoringBreakdown.find((c) => c.category === "precedent_strength");
       expect(precedentCriterion?.rationale).toContain("unavailable");
       expect(result.degradationWarnings).toContain(
-        "Precedent vector retrieval was unavailable during evaluation; judicial overturn benchmark unverified."
+        "Precedent vector retrieval was unavailable during evaluation; appellate documentation benchmark unverified."
       );
     });
 

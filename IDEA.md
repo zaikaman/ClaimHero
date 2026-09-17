@@ -30,7 +30,7 @@ flowchart TD
 
     subgraph Brain ["2. Reactive Nervous System (Convex)"]
         C1["Real-time Case Radar & Portfolio Aggregates (TableAggregate)"]
-        C2["Native Vector Search (1536-d by_embedding vs Overturned Precedents)"]
+        C2["Native Vector Search (1536-d by_embedding vs Resolved Precedents)"]
         C3["Native Full-Text Search Indexes (search_claims, search_evidence)"]
         C4["Statutory Deadline Sweeper (Daily Cron @ 00:00 UTC)"]
         C5["Rate Limiter Component (@convex-dev/rate-limiter)"]
@@ -68,7 +68,7 @@ flowchart TD
 ### Component Synergy Across the 4 Pillars
 * **Convex**:
   * **Reactive Subscriptions (`useQuery`)**: Live appeal case tracker, evidence matrix, countdown timers, and portfolio metrics updating in real time with zero polling.
-  * **Native Vector Search (`precedents.vectorIndex`)**: 1536-d cosine vector index (`by_embedding`) matching denied CPT/ICD/CARC codes against historical winning legal precedents, ranked by code overlap.
+  * **Native Vector Search (`precedents.vectorIndex`)**: 1536-d cosine vector index (`by_embedding`) matching denied CPT/ICD/CARC codes against historical resolved appeal precedents, ranked by code overlap.
   * **Native Full-Text Search (`searchIndex`)**: Server-side lexical search on `claims` (`search_claims`), `clinicalEvidences` (`search_evidence`), and `precedents` (`search_precedents`).
   * **Official Components**: `@convex-dev/rate-limiter` for token-bucket API protection, `@convex-dev/aggregate` TableAggregate for O(log N) portfolio statistics, `@convex-dev/auth` for Google OAuth and password authentication.
   * **Scheduled Crons & Actions**: Nightly statutory deadline sweepers recalculating remaining appeal days and emitting critical alerts.
@@ -100,7 +100,7 @@ flowchart TD
 2. **`claims`**:
    * `userId`, `patientId`, `claimNumber`, `serviceDate`, `providerName`, `deniedAmount`, `patientOwedAmount`.
    * `cptCodes`, `icd10Codes`, `denialReasonCode`, `denialReasonDescription`, `status`, `statutoryDeadline`, `daysRemaining`.
-   * `overturnProbabilityScore`, `riskLevel`, `scoringBreakdown`, `assignedAgentEmail`, `agentMailInboxId`, `agentMailInboxEmail`.
+   * `appealReadinessScore`, `evidenceCoverageScore`, `overturnProbabilityScore`, `riskLevel`, `scoringBreakdown`, `assignedAgentEmail`, `agentMailInboxId`, `agentMailInboxEmail`.
    * `denialLetterStorageId`, `appealContext` (sender, clinicalFacts, physicianNotes), `payerContact` (officialAppealsEmail, intakePortalUrl, appealsFax, statutoryPoBox, ediPayerId).
    * `redactionMetadata`, `financialLiability`, `erisaPenalties`.
    * Indexes: `by_user`, `by_user_status`, `by_patient`, `by_claim_number`, `by_status`, `by_deadline`, searchIndex `search_claims`.
@@ -123,7 +123,7 @@ flowchart TD
    * Indexes: `by_claim`, `by_event_type`.
 9. **`p2pScripts` & `p2pCallSessions`**:
    * `claimId`, `version`, `openingStatutoryStatement`, `clinicalPolicyCitations`, `disqualificationCounters`, `badFaithDemands`, `closingDemand`.
-   * `sessionStatus`, `transcripts`, `fastAnswers`, `checklistProgress`, `winScore`.
+   * `sessionStatus`, `transcripts`, `fastAnswers`, `checklistProgress`, `readinessScore` / `winScore`.
    * Indexes: `by_claim`, `by_session`.10. **`chatbotSessions`**:
    * `userId`, `title`, `activeClaimId`, `agentThreadId`, `messageCount`, `status`.
    * Conversation messages and token streams live in the `@convex-dev/agent` component, linked by `agentThreadId`.
@@ -144,13 +144,13 @@ flowchart TD
 4. **Defense Suite**:
    * **Legal Appeal Brief (`AppealStudio.tsx`)**: Split-pane markdown editor and preview, 3-tier escalation stepper, Section Outline Jump Bar, and 1-click ERISA § 502(c) penalty embedding.
    * **Doctor P2P Defense Studio (`P2PDefenseStudio.tsx`)**: 3-minute tele-script, bad-faith written denial demands, and Pocket Clinic Cheat Sheet with dedicated `@media print` styling.
-   * **P2P Live Call Copilot (`P2PLiveCopilot.tsx`)**: Web Speech STT real-time transcription, AI Medical Director 3-stage challenge loop, Fast Answer rebuttal cards, win-score HUD, and copyable EHR Encounter Summary addendums (Epic/Cerner).
+   * **P2P Live Call Copilot (`P2PLiveCopilot.tsx`)**: Web Speech STT real-time transcription, AI Medical Director 3-stage challenge loop, Fast Answer rebuttal cards, readiness HUD, and copyable EHR Encounter Summary addendums (Epic/Cerner).
    * **Financial Liability Calculator (`FinancialLiabilityCalculator.tsx`)**: OOP-max capping, No Surprises Act balance billing protection, $110/day ERISA failure-to-disclose penalty trajectory, and printable audit statements.
    * **Appeal Dossier Binder (`dossier/`)**: Complete 8-page packet (Cover, TOC, Statutory Summary, Exhibit Index, Exhibits A-C, Attestation) with US Letter / A4 print isolation.
 5. **Payer Communications Drawer (`AgentMailDrawer.tsx`)**: Verified gateway with recipient switching, verified payer routing, threaded two-way correspondence, and the 1-click Printable **ERISA Delivery Evidence Report** (`ServiceCertificateModal.tsx`, `convex/serviceCertificate.ts`) generating contemporaneous electronic service records under 28 U.S.C. § 1746 with live RFC 5322 Message-IDs, Amazon SES MTA receipts, live Node.js DNS MX server resolution, and SHA-256 storage fingerprints to defeat payer non-receipt procedural defaults.
-6. **Portfolio Analytics (`AnalyticsMetrics.tsx`)**: Practice-wide disputed vs. recovered amounts, insurer win rates, confidence distribution, and printable Executive Report statements.
+6. **Portfolio Analytics (`AnalyticsMetrics.tsx`)**: Practice-wide disputed vs. recovered amounts, insurer resolution rates, confidence distribution, and printable Executive Report statements.
 7. **HIPAA Privacy Redaction Engine (`PrivacyRedactionFilter.tsx`)**: Deterministic PII masking across Safe Harbor, Balanced Appellate, and Public Exhibit standards.
-8. **Sentinel AI Copilot Widget (`SentinelChatbot.tsx`, `⌘J`)**: Autonomous clinical & legal chatbot on the `@convex-dev/agent` component with 10 agentic tool calling capabilities across Convex database records (`get_active_claim_details`, `search_claims`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) and live Firecrawl web intelligence (`firecrawl_web_search`, `firecrawl_scrape_url`, `crawl_and_attach_evidence`), agent-owned durable message history and token streaming, and collapsible tool execution traces.
+8. **Sentinel AI Copilot Widget (`SentinelChatbot.tsx`, `⌘J`)**: Interactive clinical & procedural appeal copilot on the `@convex-dev/agent` component with 10 agentic tool calling capabilities across Convex database records (`get_active_claim_details`, `search_claims`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) and live Firecrawl web intelligence (`firecrawl_web_search`, `firecrawl_scrape_url`, `crawl_and_attach_evidence`), agent-owned durable message history and token streaming, and collapsible tool execution traces.
 9. **AWS Textract HIPAA Optical Intake Gate (`convex/lib/textract.ts`)**: BAA-covered document OCR for denial PDFs and EOB images extracting text, key-value relationships, and 2D line-item tables; patient identifiers are vaulted directly into the private database, and prompts are de-identified (`redactBeforeLLM`) before external model dispatch, eliminating binary image transmission and direct PHI egress.
 
 ---
@@ -200,7 +200,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/hybridSearchRRF.test.ts` (14 tests): Reciprocal Rank Fusion combining vector similarity and keyword search.
 * `tests/auditTrailDrawer.test.ts` (17 tests): Case Audit Drawer, Cryptographic Proof of Case Integrity HUD, 1-click Verify Hash Chain button, and block seals.
 * `tests/convexClaimsFull.test.ts` (14 tests): Comprehensive claim state machine transitions and cascading purge operations.
-* `tests/actionsPrecedentsAndPipeline.test.ts` (14 tests): Precedent archive search, vector matching, and autonomous pipeline orchestration.
+* `tests/actionsPrecedentsAndPipeline.test.ts` (14 tests): Precedent archive search, vector matching, and durable pipeline orchestration.
 * `tests/pendingUploads.test.ts` (13 tests): Secure file upload sessions and storage ownership verification.
 * `tests/radarExport.test.ts` (12 tests): HIPAA Safe Harbor export sanitization across 4 formats, entity masking, and technical audit exports.
 * `tests/clientStatsAndSearch.test.ts` (12 tests): In-memory client statistics aggregation and search filtering.
@@ -216,7 +216,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/actionsP2PAndChatbot.test.ts` (9 tests): Physician P2P script generation and chatbot retrieval actions.
 * `tests/ingestionAndDeletionPipeline.test.ts` (11 tests): Denial document ingestion and cascading resource deletion.
 * `tests/convexP2P.test.ts` (9 tests): P2P call session records and defense script persistence.
-* `tests/formalPdfAttachments.test.ts` (8 tests): Formal PDF legal memorandum assembly and court attachment generation.
+* `tests/formalPdfAttachments.test.ts` (8 tests): Formal PDF legal memorandum assembly and formal attachment generation.
 * `tests/firecrawlDirectoryMap.test.ts` (8 tests): Firecrawl `/v1/map` insurer CPB directory discovery, specialty code deduction, bulletin identifier extraction, SSRF URL filtering, and rate limiting.
 * `tests/collabSync.test.ts` (8 tests): Multi-user collaborative state synchronization and presence tracking.
 * `tests/soundEffects.test.ts` (7 tests): Procedural Web Audio API sound synthesis, 10 acoustic sentinel cues, and volume controls.
@@ -227,7 +227,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/pipelineActivity.test.ts` (5 tests): Real-time pipeline execution activity and milestone tracking.
 * `tests/commandPaletteSearch.test.ts` (5 tests): Convex BM25 full-text search index execution, debounced query triggers, and command palette result deduplication.
 * `tests/judgeUxAndHardening.test.ts` (5 tests): Hackathon judge preset validation and UX flow safeguards.
-* `tests/sentinelAgent.test.ts` (5 tests): Autonomous agent tool orchestration and multi-step reasoning.
+* `tests/sentinelAgent.test.ts` (5 tests): Agent tool orchestration and multi-step reasoning.
 * `tests/sentinelDrawerAndTrigger.test.ts` (5 tests): Slide-out Sentinel Copilot drawer, keyboard shortcuts, focus trapping, and brief insertion.
 * `tests/shortcutsRegistry.test.ts` (3 tests): Keyboard shortcut bindings and accessible navigation triggers.
 * `tests/liabilityDefaultsEmptyState.test.ts` (3 tests): Empty-state rendering and default liability values.
@@ -238,7 +238,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 
 | Judging Criterion | Alignment & Technical Depth |
 |---|---|
-| **Real-World Utility** | Directly tackles a $200B/year denial crisis. Produces production-ready, sendable artifacts (formal briefs, P2P call scripts, EHR clinical notes, and court dossiers) rather than generic chat summaries. |
+| **Real-World Utility** | Directly tackles a $200B/year denial crisis. Produces production-ready, sendable artifacts (formal briefs, P2P call scripts, EHR clinical notes, and appeal dossiers) rather than generic chat summaries. |
 | **Full-Stack Integration Depth** | All 4 sponsor platforms are deeply integrated: **Convex** (reactive DB, 1536-d vector search, searchIndex, scheduled crons, components), **Firecrawl** (live CPB scraping, PubMed, FDA), **AgentMail** (inbound webhooks, outbound dispatch), and **OpenAI** (de-identified structured extraction, 4-pillar scoring, grounded synthesis) paired with **AWS Textract** for BAA optical OCR. |
 | **Technical Rigor & Polish** | 100% clean `npm run verify` gate, comprehensive Vitest automated test suite (detailed in `README.md`), strict TypeScript, responsive dark-mode UI with glassmorphism, and isolated `@media print` stylesheets. |
 | **Transparency & Build Process** | Comprehensive `hackathon.md` log with UTC timestamps, reconciled 7-character commit hashes, and detailed milestone notes. |

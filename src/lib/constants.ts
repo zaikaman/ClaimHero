@@ -263,7 +263,7 @@ export const CLAIM_STATUS_CONFIG: Record<
     glow: "shadow-none",
   },
   won: {
-    label: "Overturned / Won",
+    label: "Resolved / Approved",
     color: "text-emerald-300",
     bg: "bg-emerald-900/60",
     border: "border-emerald-400",

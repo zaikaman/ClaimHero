@@ -174,7 +174,7 @@ describe("Visual Proof & Audit Archive: Full-Page Screenshots & Policy Exhibits"
     });
   });
 
-  describe("Court-Ready Dossier & Appeal Brief Integration", () => {
+  describe("Formal Appellate Dossier & Appeal Brief Integration", () => {
     const mockClaim: Claim = {
       _id: "claim-test-dossier",
       patientId: "pat-1",

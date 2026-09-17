@@ -1,9 +1,9 @@
-# Feature Specification: Autonomous Medical Appeal Sentinel
+# Feature Specification: Evidence-Grounded Appeal Preparation Sentinel
 
 **Feature Branch**: `main`  
 **Created**: 2026-08-26  
 **Status**: Ready for Implementation  
-**Input**: User description: "ClaimHero — Autonomous Medical & Health Insurance Appeal Sentinel (IDEA.md)"
+**Input**: User description: "ClaimHero — Evidence-Grounded Appeal Preparation Workspace for Denial Teams (IDEA.md)"
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -24,15 +24,15 @@ A patient, family member, or medical practice administrator receives an insuranc
 
 ### User Story 2 - Clinical Policy Bulletin Evidence Crawling & Precedent Matching (Priority: P2)
 
-The system automatically cross-references the extracted denial codes and payer identity against insurer-published Clinical Policy Bulletins (CPBs) crawled live via Firecrawl, FDA drug/device indications, PubMed peer-reviewed clinical guidelines, and historical overturned claim precedents. It flags specific clauses where the insurer's denial contradicts its own published medical necessity guidelines and calculates a clinically reasoned Overturn Probability Score (0–100%).
+The system automatically cross-references the extracted denial codes and payer identity against insurer-published Clinical Policy Bulletins (CPBs) crawled live via Firecrawl, FDA drug/device indications, PubMed peer-reviewed clinical guidelines, and historical resolved claim precedents. It flags specific clauses where the insurer's denial contradicts its own published medical necessity guidelines and calculates an evidence-grounded Appeal Readiness Score (0–100%).
 
-**Why this priority**: Medical necessity disputes require rigorous clinical citations and precedent evidence to compel insurers to reverse denials during formal review.
+**Why this priority**: Medical necessity disputes require rigorous clinical citations and precedent evidence to substantiate appeals during formal review.
 
-**Independent Test**: Trigger evidence analysis on an ingested claim with a "not medically necessary" denial code; verify that matching insurer policy clauses and clinical citations are retrieved and displayed in a side-by-side policy matrix alongside an overturn probability score.
+**Independent Test**: Trigger evidence analysis on an ingested claim with a "not medically necessary" denial code; verify that matching insurer policy clauses and clinical citations are retrieved and displayed in a side-by-side policy matrix alongside an appeal readiness score.
 
 **Acceptance Scenarios**:
 
-1. **Given** a claim denied by an insurer under code CO-50, **When** the evidence crawler executes, **Then** it crawls the insurer's policy criteria, matches the patient's conservative therapy history against qualifying criteria, and outputs an Overturn Probability Score.
+1. **Given** a claim denied by an insurer under code CO-50, **When** the evidence crawler executes, **Then** it crawls the insurer's policy criteria, matches the patient's conservative therapy history against qualifying criteria, and outputs an Appeal Readiness Score.
 2. **Given** a rare condition or off-label drug denial, **When** the evidence crawler runs, **Then** it indexes peer-reviewed clinical trial abstracts and FDA indications, linking relevant citation excerpts directly to the case dossier.
 
 ---
@@ -97,19 +97,19 @@ The system aggregates all active cases across the healthcare practice or individ
 - **FR-001**: System MUST support real document ingestion via direct file upload (PDF/image), pasted document text, and dedicated inbound claim email forwarding addresses.
 - **FR-002**: System MUST automatically extract and structure core denial metadata from real documents: claim ID, member ID, insurer name, denial reason codes (e.g., CO-50, CO-197), CPT/HCPCS procedure codes, ICD-10 diagnosis codes, denied dollar amount, and patient owed amount.
 - **FR-003**: System MUST crawl and index insurer Clinical Policy Bulletins (CPBs) using Firecrawl to retrieve explicit medical necessity criteria matching the claim's procedure and diagnosis codes.
-- **FR-004**: System MUST perform semantic precedent matching against historical overturned medical appeals and peer-reviewed clinical guidelines to locate winning arguments.
-- **FR-005**: System MUST calculate an Overturn Probability Score (0–100%) and assign a confidence rating (High Confidence, Moderate, Complex Dispute) based on clinical alignment and policy contradictions.
+- **FR-004**: System MUST perform semantic precedent matching against historical resolved medical appeals and peer-reviewed clinical guidelines to locate persuasive arguments.
+- **FR-005**: System MUST calculate an Appeal Readiness Score (0–100%) reflecting evidence coverage, policy alignment, and documentation completeness, assigning a confidence rating (High Readiness, Moderate, Complex Dispute) based on clinical alignment and procedural grounding.
 - **FR-006**: System MUST generate a legally formatted, multi-section appeal brief incorporating statutory rights references (ERISA 29 CFR § 2560.503-1, Affordable Care Act internal claims guidelines) and direct insurer CPB citations.
 - **FR-007**: System MUST provide an interactive Appeal Studio enabling real-time review, inline text editing, AI-assisted argumentation prompts, and document export.
 - **FR-008**: System MUST compute and display statutory appeal deadlines with countdown indicators and urgency-based visual alerts.
 - **FR-009**: System MUST support outbound transmission of finalized appeal dossiers with evidence attachments to payer appeals departments via AgentMail.
 - **FR-010**: System MUST maintain an immutable, chronological audit trail recording every state change, analysis result, document edit, and transmission event.
-- **FR-011**: System MUST calculate real-time aggregate financial metrics (Total Disputed Pipeline, Total Won, Critical Statutory Alarms) directly from the Convex reactive database.
+- **FR-011**: System MUST calculate real-time aggregate financial metrics (Total Disputed Pipeline, Total Resolved, Critical Statutory Alarms) directly from the Convex reactive database.
 
 ### Key Entities
 
 - **Patient**: Represents the insured individual (name, email, member ID, group number, insurance payer, state).
-- **Claim**: The primary appeal case (patient ID, claim number, service dates, provider name, denied amount, patient owed amount, CPT codes, ICD-10 codes, denial reason code, status, statutory deadline, overturn probability score, assigned dedicated email).
+- **Claim**: The primary appeal case (patient ID, claim number, service dates, provider name, denied amount, patient owed amount, CPT codes, ICD-10 codes, denial reason code, status, statutory deadline, appeal readiness score, assigned dedicated email).
 - **ClinicalEvidence**: Evidentiary citations linked to a claim (source type: CPB, FDA label, PubMed, NCCN guideline; title, source URL, citation clause, extracted text, relevance score).
 - **Appeal**: The synthesized appeal dossier (claim ID, version, appeal level, executive summary, medical necessity arguments, statutory citations, full appeal brief text, export file reference).
 - **EmailThread & EmailMessage**: Communication records for a claim (claim ID, agent inbox address, payer address, subject, direction, body content, attachments, timestamps).
@@ -121,7 +121,7 @@ The system aggregates all active cases across the healthcare practice or individ
 
 - **SC-001**: Ingestion and metadata extraction of real denial documents completes within 10 seconds of receipt with >95% accuracy on core fields.
 - **SC-002**: Generation of a fully cited, multi-page appeal brief completes within 25 seconds of claim analysis.
-- **SC-003**: Overturn probability score and clinical evidence citations maintain 100% traceability to verifiable insurer policy clauses or clinical literature.
+- **SC-003**: Appeal readiness score and clinical evidence citations maintain 100% traceability to verifiable insurer policy clauses or clinical literature.
 - **SC-004**: 100% of claims with established denial dates display active statutory deadline countdowns with zero deadline calculation errors.
 - **SC-005**: All user interactions, file uploads, and case status updates reflect across the interface in real time with sub-50ms reactive latency.
 

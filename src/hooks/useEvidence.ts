@@ -266,7 +266,7 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
   );
 
   // Trigger Statutory Appeal Readiness scoring
-  const computeOverturnScore = useCallback(
+  const computeAppealReadinessScore = useCallback(
     async (targetClaimId?: string): Promise<OverturnScoringResult> => {
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
       if (!activeClaimId) {
@@ -279,6 +279,8 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
     },
     [computeScoreAction, claim]
   );
+
+  const computeOverturnScore = computeAppealReadinessScore;
 
   // Run unified complete analysis (Crawl CPB + Compute Score in 1 step)
   const runCompleteAnalysis = useCallback(
@@ -405,6 +407,7 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
     discoverPolicyDirectory,
     deleteEvidence,
     insertSingleEvidence,
+    computeAppealReadinessScore,
     computeOverturnScore,
     runCompleteAnalysis,
     runFullPipeline,

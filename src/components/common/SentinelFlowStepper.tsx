@@ -62,6 +62,8 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
 
   const hasEvidence =
     evidencesCount > 0 ||
+    claim.appealReadinessScore !== undefined ||
+    claim.evidenceCoverageScore !== undefined ||
     claim.overturnProbabilityScore !== undefined ||
     (claim.evidenceCount !== undefined && claim.evidenceCount > 0);
   const hasBrief =

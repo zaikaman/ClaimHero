@@ -92,11 +92,13 @@ export function useClaims(options?: {
     const source = isFiltered ? (filteredPortfolioStats ?? rawPortfolioStats) : rawPortfolioStats;
 
     if (source) {
+      const avgScore = source.averageReadinessScore ?? source.averageWinScore;
       return {
         totalClaims: source.totalClaims,
         activeDisputedAmount: source.activeDisputedAmount,
         overturnedWonAmount: source.overturnedWonAmount,
-        averageWinScore: source.averageWinScore,
+        averageWinScore: avgScore,
+        averageReadinessScore: avgScore,
         criticalDeadlinesCount: source.criticalDeadlinesCount,
       };
     }
@@ -116,8 +118,9 @@ export function useClaims(options?: {
         activeDisputedAmount += c.deniedAmount;
       }
 
-      if (c.overturnProbabilityScore !== undefined) {
-        scoreSum += c.overturnProbabilityScore;
+      const scoreVal = c.appealReadinessScore ?? c.evidenceCoverageScore ?? c.overturnProbabilityScore;
+      if (scoreVal !== undefined) {
+        scoreSum += scoreVal;
         scoreCount++;
       }
 
@@ -126,11 +129,13 @@ export function useClaims(options?: {
       }
     }
 
+    const calculatedAvg = scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0;
     return {
       totalClaims,
       activeDisputedAmount,
       overturnedWonAmount,
-      averageWinScore: scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0,
+      averageWinScore: calculatedAvg,
+      averageReadinessScore: calculatedAvg,
       criticalDeadlinesCount,
     };
   }, [isFiltered, filteredPortfolioStats, rawPortfolioStats, rawClaims]);

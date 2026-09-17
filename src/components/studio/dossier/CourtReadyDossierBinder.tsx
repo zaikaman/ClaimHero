@@ -28,7 +28,15 @@ export const CourtReadyDossierBinder: React.FC<CourtReadyDossierBinderProps> = (
   };
 
   return (
-    <div className="court-ready-dossier-binder space-y-8 print:space-y-0 text-slate-900 bg-white font-sans">
+    <div className="formal-appeal-dossier-binder court-ready-dossier-binder space-y-8 print:space-y-0 text-slate-900 bg-white font-sans">
+      {!isPrintMode && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-50/80 p-3 text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <span>
+            <strong>Notice:</strong> Formatted for formal insurer appeals, IRO independent external reviews, and administrative records. Does not constitute legal representation or court pleadings.
+          </span>
+          <span className="font-semibold shrink-0 uppercase tracking-wider text-[10px] px-2 py-0.5 rounded bg-amber-200/80 text-amber-900 w-fit">Human Review Required</span>
+        </div>
+      )}
       {/* 1. Standardized Cover Page & Payer EDI Docket Header */}
       <section id="section-docket-cover">
         <DossierCoverPage dossier={dossier} isPrintMode={isPrintMode} />

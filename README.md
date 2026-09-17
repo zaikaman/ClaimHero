@@ -43,7 +43,7 @@ The audit evaluates four objective statutory pillars with strict evidentiary dec
 - **Precedent Match & Legal Parity** (Max: 20 points): Evaluates relevance, factual overlap, and appellate outcomes of retrieved state IMR and judicial external review precedents.
 
 To prevent artificial score inflation, Pillar 4 evaluates retrieved precedents across a multi-factor calibration matrix rather than raw evidence counts:
-- **Vector Pipeline Handoff**: Step 2's retrieved vector precedents (`vectorPrecedents`) are passed directly into the Step 3 scoring engine (`computeOverturnScoreInternal` -> `calculateDeterministicRubric`).
+- **Vector Pipeline Handoff**: Step 2's retrieved vector precedents (`vectorPrecedents`) are passed directly into the Step 3 scoring engine (`computeAppealReadinessScoreInternal` -> `calculateDeterministicRubric`).
 - **Decoupled Scoring Integrity**: Pillar 4 (Precedent Strength) and Pillar 3 (ERISA Standing) are decoupled from generic CPB presence and evidence counts (`hasCpb || evidencesCount >= 2`). In the absence of retrieved legal precedents, Pillar 4 remains at a baseline floor (4/20) rather than inflating to 19/20, capping claims without precedent support at moderate bands (~76/100) instead of reaching an artificial ~96/100.
 - **Multi-Factor Precedent Parity**: Precedent scores require favorable appellate outcomes (overturn/remand/settlement), high vector/hybrid cosine similarity (threshold ≥ 0.82), exact CARC denial code overlap (+4 pts), and CPT procedure code overlap (+3 pts).
 - **Adverse Parity Detection**: Automatically penalizes cases where external reviews upheld denials on comparable clinical facts (-6 pt penalty), surfacing cautionary parity warnings to the appellate team.
@@ -136,8 +136,8 @@ ClaimHero resolves this dilemma with a built-in **Everyday Language vs. Expert D
     2. **1 Date (What to do by when)**: Clear statutory timeline (e.g., *"Appeal deadline: Jan 14, 2027 (120 days left)"*).
     3. **Mode Toggle**: Instant switch between everyday language and specialist detail.
   - **Simple Evidence Workspace (`SimpleEvidenceView.tsx`)**: An evidence-grounded review view designed for clarity and fast comprehension:
-    1. **Hero Verdict Card**: Prominent case strength score (`90/100` • `Strong case`) with an instant plain-language explanation of why the denial can be overturned.
-    2. **3 Key Proof Points**: Curated proof cards highlighting the insurer's policy exception clause, treating physician clinical documentation, and federal ERISA rights or similar appeal win rates, with 1-click inspection.
+    1. **Hero Verdict Card**: Prominent readiness score (`90/100` • `Well documented`) with an instant plain-language explanation of key evidence supporting the appeal.
+    2. **3 Key Proof Points**: Curated proof cards highlighting the insurer's policy exception clause, treating physician clinical documentation, and federal ERISA rights or similar precedent resolutions, with 1-click inspection.
     3. **Progressive Disclosure**: Detailed 4-pillar scoring rubrics, full document lists, and forensic policy clauses remain accessible on demand.
     4. **Direct Workflow Action**: A single clear primary action guiding the user directly into appeal letter review.
   - **Simple Appeal Studio (`SimpleStudioView.tsx`)**: A document-first reading and editing experience designed for confident review:

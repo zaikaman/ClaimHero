@@ -33,6 +33,7 @@ const AuditTrailDrawer = lazy(() => import("./components/communications/AuditTra
 const AnalyticsMetrics = lazy(() => import("./components/analytics/AnalyticsMetrics").then((m) => ({ default: m.AnalyticsMetrics })));
 const SettingsPage = lazy(() => import("./components/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 import { PublicExperience } from "./components/landing/PublicExperience";
+import { GlobalDisclaimer } from "./components/common/GlobalDisclaimer";
 const OnboardingWizard = lazy(() => import("./components/onboarding/OnboardingWizard").then((m) => ({ default: m.OnboardingWizard })));
 const OnboardingChecklist = lazy(() => import("./components/onboarding/OnboardingChecklist").then((m) => ({ default: m.OnboardingChecklist })));
 const SentinelChatbot = lazy(() => import("./components/chat/SentinelChatbot").then((m) => ({ default: m.SentinelChatbot })));
@@ -337,7 +338,7 @@ export default function App() {
         onOpenSentinel={() => setIsSentinelOpen((prev) => !prev)}
         totalDisputedAmount={stats.activeDisputedAmount + stats.overturnedWonAmount}
         totalWonAmount={stats.overturnedWonAmount}
-        winRate={stats.averageWinScore}
+        winRate={stats.averageReadinessScore ?? stats.averageWinScore}
         criticalDeadlinesCount={stats.criticalDeadlinesCount}
       >
         {isLoading ? (
@@ -500,7 +501,7 @@ export default function App() {
                 />
               ))}
 
-            {/* 7. Portfolio Recovery & Overturn Analytics (Platform) */}
+            {/* 7. Portfolio Financial & Resolution Analytics (Platform) */}
             {currentView === "analytics" && (
               <AnalyticsMetrics
                 stats={portfolioStats}
@@ -521,7 +522,7 @@ export default function App() {
               />
             )}
 
-            {/* 9. Sentinel Operational & Advocate Settings */}
+            {/* 9. User & System Settings (Platform) */}
             {currentView === "settings" && (
               <SettingsPage
                 onNavigateToRadar={() => setCurrentView("radar")}
@@ -537,6 +538,8 @@ export default function App() {
             )}
           </Suspense>
         )}
+
+        <GlobalDisclaimer variant="footer" className="mt-8 mb-2" />
 
         {/* Real Ingestion Modal (File Upload + Text Paste + Presets + AgentMail) */}
         <Suspense fallback={null}>

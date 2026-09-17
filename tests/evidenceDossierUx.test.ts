@@ -783,9 +783,9 @@ describe("Evidence Dossier UX & Quad-Solution Architecture", () => {
       // Verify prominent score and plain-English verdict
       expect(markup).toContain("90");
       expect(markup).toContain("/100");
-      expect(markup).toContain("Strong case");
+      expect(markup).toContain("Well documented");
       expect(markup).toContain("Your case strength");
-      expect(markup).toContain("What we found to overturn this denial:");
+      expect(markup).toContain("Key evidence supporting this appeal:");
     });
 
     it("presents the 3 decisive smoking gun proof cards without technical toolbar clutter", () => {
