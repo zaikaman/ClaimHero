@@ -39,6 +39,7 @@ import { Button, buttonVariants } from "../ui/button";
 import { Input } from "../ui/input";
 import { ExportDrawer } from "../studio/ExportDrawer";
 import { ServiceCertificateModal } from "./ServiceCertificateModal";
+import { SimpleInboxView } from "./SimpleInboxView";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { soundEffects } from "../../lib/soundEffects";
 import { extractDocumentInBrowser } from "../../lib/clientOcr";
@@ -509,6 +510,77 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
       setIsDispatching(false);
     }
   };
+
+  if (!isDetailed) {
+    return (
+      <>
+        <SimpleInboxView
+          claim={claim}
+          messages={messages}
+          isLoading={isLoading}
+          payerName={payerName}
+          officialEmail={officialEmail}
+          customEmail={customEmail}
+          setCustomEmail={setCustomEmail}
+          dispatchMode={dispatchMode}
+          setDispatchMode={setDispatchMode}
+          effectiveRecipient={effectiveRecipient}
+          canDispatch={canDispatch}
+          isDispatching={isDispatching}
+          onRunDispatch={handleRunDispatch}
+          hasPriorTransmissions={hasPriorTransmissions}
+          isReadyForReview={isReadyForReview}
+          isPatientUnspecified={isPatientUnspecified}
+          hasSender={hasSender}
+          isSenderGatewayConfigured={isSenderGatewayConfigured}
+          isCustomEmailLoopback={isCustomEmailLoopback}
+          activeAutoDraft={activeAutoDraft}
+          isSynthesizing={isSynthesizing}
+          isSending={isSending}
+          onApproveAndSendDraft={handleApproveAndSendDraft}
+          onDismissDraft={handleDismissDraft}
+          replyText={replyText}
+          setReplyText={setReplyText}
+          onSendReply={handleSendReply}
+          onOpenExportDrawer={() => setIsExportDrawerOpen(true)}
+          onOpenCertificateModal={(msgId) => {
+            setCertificateMessageId(msgId);
+            setIsCertificateModalOpen(true);
+          }}
+          onNavigateView={onNavigateView}
+          onSyncInboxes={onSyncInboxes}
+          isSyncingInboxes={isSyncingInboxes}
+          onRunAutonomousPipeline={
+            onRunAutonomousPipeline ? () => onRunAutonomousPipeline(claim._id) : undefined
+          }
+          onOpenAuditDrawer={onOpenAuditDrawer}
+          onAcknowledgeDegradation={handleAcknowledgeDegradation}
+          isAcknowledging={isAcknowledging}
+          effectiveAppeal={effectiveAppeal}
+        />
+
+        {/* Formal Appeal Dossier Export & Print Modal */}
+        <ExportDrawer
+          isOpen={isExportDrawerOpen}
+          onClose={() => setIsExportDrawerOpen(false)}
+          claim={claim}
+          appeal={effectiveAppeal}
+          markdownContent={effectiveAppeal?.fullAppealMarkdown || ""}
+          onProceedToDispatch={() => {
+            setIsExportDrawerOpen(false);
+          }}
+        />
+
+        {/* Printable ERISA Certificate of Electronic Service Modal */}
+        <ServiceCertificateModal
+          isOpen={isCertificateModalOpen}
+          onClose={() => setIsCertificateModalOpen(false)}
+          claim={claim}
+          messageId={certificateMessageId}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="space-y-4 animate-fadeIn pb-12">

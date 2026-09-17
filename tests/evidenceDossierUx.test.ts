@@ -1,11 +1,14 @@
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it, expect } from "vitest";
 import { PolicyViewer, getExtractionEngineChip } from "../src/components/evidence/PolicyViewer";
 import { ClauseInspectorDrawer } from "../src/components/evidence/ClauseInspectorDrawer";
+import { SimpleEvidenceView } from "../src/components/evidence/SimpleEvidenceView";
 import {
   RESEARCH_MODES,
   PRESET_RESEARCH_URLS,
 } from "../src/components/evidence/ClinicalResearchConsole";
-import { ClinicalEvidence } from "../src/types";
+import { ClinicalEvidence, Claim } from "../src/types";
 
 const mockEvidences: ClinicalEvidence[] = [
   {
@@ -703,6 +706,124 @@ describe("Evidence Dossier UX & Quad-Solution Architecture", () => {
       const chip = getExtractionEngineChip(evidence);
       expect(chip).not.toBeNull();
       expect(chip?.label).toBe("Firecrawl");
+    });
+  });
+
+  describe("SimpleEvidenceView Cognitive Load Reduction Architecture", () => {
+    const mockClaim: Claim = {
+      _id: "claim_simple_1",
+      patientId: "patient_1",
+      patient: {
+        _id: "patient_1",
+        name: "Marcus Sterling",
+        email: "marcus@example.com",
+        memberId: "GEO-554210-99",
+        insurancePayer: "GeoBlue Worldwide Medical Insurance",
+        createdAt: Date.now(),
+      },
+      claimNumber: "CLM-6104-GEO-7356",
+      serviceDate: "2026-07-04",
+      providerName: "Dr. Sarah Chen, MD",
+      deniedAmount: 18200,
+      patientOwedAmount: 18200,
+      cptCodes: ["63047"],
+      icd10Codes: ["M51.16"],
+      denialReasonCode: "CO-197",
+      denialReasonDescription: "Precertification / prior authorization absent or lacking.",
+      status: "drafting",
+      statutoryDeadline: Date.now() + 180 * 24 * 3600 * 1000,
+      daysRemaining: 180,
+      overturnProbabilityScore: 90,
+      scoringBreakdown: [
+        {
+          category: "policy_alignment",
+          criterion: "Their own rules",
+          score: 31,
+          maxScore: 35,
+          rationale: "Emergency surgery exception under SURG.00011 waives prior auth requirement.",
+        },
+        {
+          category: "clinical_documentation",
+          criterion: "Your medical records",
+          score: 22,
+          maxScore: 25,
+          rationale: "Documented acute progressive neurological motor deficit (foot drop).",
+        },
+        {
+          category: "statutory_erisa",
+          criterion: "Your appeal rights",
+          score: 19,
+          maxScore: 20,
+          rationale: "ERISA 29 CFR § 2560.503-1 disclosure requirement violated.",
+        },
+        {
+          category: "precedent_strength",
+          criterion: "Similar cases that won",
+          score: 18,
+          maxScore: 20,
+          rationale: "87% overturn rate in similar emergency spinal decompressive procedures.",
+        },
+      ],
+      assignedAgentEmail: "appeals@claimhero.dev",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    it("renders the hero verdict card with clear score and plain language summary", () => {
+      const markup = renderToStaticMarkup(
+        React.createElement(SimpleEvidenceView, {
+          claim: mockClaim,
+          evidences: mockEvidences,
+          scoringResult: null,
+          onNavigateToStudio: () => {},
+          onRunCompleteAnalysis: async () => {},
+        })
+      );
+
+      // Verify prominent score and plain-English verdict
+      expect(markup).toContain("90");
+      expect(markup).toContain("/100");
+      expect(markup).toContain("Strong case");
+      expect(markup).toContain("Your case strength");
+      expect(markup).toContain("What we found to overturn this denial:");
+    });
+
+    it("presents the 3 decisive smoking gun proof cards without technical toolbar clutter", () => {
+      const markup = renderToStaticMarkup(
+        React.createElement(SimpleEvidenceView, {
+          claim: mockClaim,
+          evidences: mockEvidences,
+          scoringResult: null,
+          onNavigateToStudio: () => {},
+          onRunCompleteAnalysis: async () => {},
+        })
+      );
+
+      // Verify the 3 smoking gun cards
+      expect(markup).toContain("3 Key Proof Points Found");
+      expect(markup).toContain("Their Own Published Rules");
+      expect(markup).toContain("Your Medical Records");
+      expect(markup).toContain("Your Legal Rights &amp; Similar Wins");
+
+      // Verify lack of technical toolbar noise
+      expect(markup).not.toContain("Grouped Exhibits");
+      expect(markup).not.toContain("Detect Policy Drift");
+      expect(markup).not.toContain("Compact row view");
+    });
+
+    it("features a single canonical primary next-step action card", () => {
+      const markup = renderToStaticMarkup(
+        React.createElement(SimpleEvidenceView, {
+          claim: mockClaim,
+          evidences: mockEvidences,
+          scoringResult: null,
+          onNavigateToStudio: () => {},
+          onRunCompleteAnalysis: async () => {},
+        })
+      );
+
+      expect(markup).toContain("Ready to review your appeal letter?");
+      expect(markup).toContain("Continue to Your Letter");
     });
   });
 });

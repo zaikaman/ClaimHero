@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-17T03:30:00Z
+- **Last updated:** 2026-09-17T04:16:30Z
 
 ## Log
 
@@ -1573,10 +1573,22 @@ Refactored aggressive and unverified legal conclusions in Policy Drift Sentinel 
 ### 2026-09-17 - c17e8f9
 Removed the redundant and out-of-context "Add to my letter" / "Insert into Brief" action button from assistant messages in Sentinel Chat (`src/components/chat/SentinelChatbot.tsx`). Cleaned up unused state and dispatch handlers while preserving quick copy functionality for chatbot responses. Verified with strict typecheck and linting.
 
-### 2026-09-17 - working tree
+### 2026-09-17 - 6ed8cab
 Decoupled workflow execution from evidence integrity to prevent degraded failure paths from quietly advancing into completed output (`convex/schema.ts`, `convex/claims.ts`, `convex/actions/precedentMatcher.ts`, `convex/workflows.ts`, `src/types/index.ts`, `src/lib/constants.ts`, `src/lib/plainCopy.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `tests/evidentiaryDegradationGating.test.ts`, `README.md`):
 - Statutory Fallback Isolation: Isolated pure statutory fallback notices (`isStatutoryBaselineEvidence`, `29 CFR § 2560.503-1`) during scraper timeouts or WAF blocks, preventing boilerplate from inflating policy or clinical scoring pillars.
 - Score Withholding & Capping: Decoupled rubric scoring under degraded states (missing CPB or unavailable precedent index) to assign `provisional_capped` status, capping scores at 40 max, enforcing `complex_litigation` risk posture, and surfacing granular degradation warnings.
 - Durable Provisional Review Checkpoint: Updated `executeDurableClaimPipeline` to checkpoint claims with degraded evidence into `review_provisional` rather than advancing directly to `ready_for_review`.
 - Evidentiary Acknowledgment Gate: Implemented `acknowledgeEvidentiaryDegradation` mutation with audit logging, and enforced review gates in `approveAppeal` and `dispatchAppealPacket` requiring explicit advocate acknowledgment before enabling 1-click dispatch.
 - Verification & Regression: Added 12 automated tests in `tests/evidentiaryDegradationGating.test.ts` validating rubric capping, review gate refusal, acknowledgment promotion, zero evidence handling, and pipeline checkpointing. Verified all 71 test suites (1,079 tests) passing.
+
+### 2026-09-17 - working tree
+Streamlined Evidence, Appeal Studio, and Inbox workspaces, eliminating cognitive overload and duplicate controls across Simple and Expert modes (`src/components/evidence/SimpleEvidenceView.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/evidence/PolicyViewer.tsx`, `src/components/common/SentinelFlowStepper.tsx`, `src/components/studio/SimpleStudioView.tsx`, `src/components/studio/AppealStudio.tsx`, `src/components/communications/SimpleInboxView.tsx`, `src/components/communications/AgentMailDrawer.tsx`, `README.md`, `tests/evidenceDossierUx.test.ts`, `tests/appealStudioUx.test.ts`, `tests/simpleInboxUx.test.ts`, `tests/detailMode.test.ts`):
+- Created Dedicated Simple Evidence View (`SimpleEvidenceView.tsx`): Replaced dense technical CARC tables and multi-button toolbars with a high-confidence Hero Verdict card (`90/100 Strong case`), top 3 decisive smoking gun proof points (Insurer Policy Rules, Doctor Records, Federal Rights & Similar Wins) with 1-click clause inspection, collapsible scoring rubric and document list, and a single canonical forward action.
+- Eliminated Triple-CTA Collision on Evidence: Removed redundant "Review & Approve" button from the top stepper on Step 1 and "Review your letter" from the header card, consolidating primary forward navigation into the canonical bottom action bar.
+- Sleek Horizontal 4-Pillar Metric Strip: In Expert Mode, converted the bulky 4 vertical rubric cards into a compact 1-row 4-column diagnostic ribbon (Policy Alignment, Clinical Records, ERISA Statutory, Precedents) with progress meters and hover rationales, bringing the dual-pane evidence inspector into view without vertical scroll fatigue.
+- Decluttered PolicyViewer Toolbar: Removed redundant "Detect Policy Drift" button from the sub-toolbar (already accessible as a top-level tab in the workspace).
+- Created Dedicated Simple Appeal Studio View (`SimpleStudioView.tsx`): Built a document-first executive appeal letter surface using `AppealBriefRenderer`, eliminating raw Markdown symbols (`#`, `**`), technical jump anchors, and split code editor noise for everyday consumers. Added a smooth `Read` vs `Edit text` toggle, lightweight review tier status with subtle escalation triggers, and a curated 3-category proof breakdown card.
+- De-duplicated Studio Controls: Removed redundant "Back to Proof" and "Proceed to Dispatch" buttons from the inner document card header in `AppealStudio.tsx`, keeping the header focused strictly on document utilities (`Rewrite`, `Save/Print`, `Share`) while delegating workflow navigation to the stepper and persistent bottom bar.
+- Created Dedicated Simple Inbox View (`SimpleInboxView.tsx`): Replaced dense carrier gateway grids, fax lines, EDI Payer IDs, and raw RFC telemetry with a reassuring consumer message timeline. Built clear dispatch destination cards (Official Carrier Intake vs. Interactive Test Email), an explicit Human Review Gate assurance banner, a conversational message stream distinguishing patient transmissions from insurer replies with clinical explanations, and a smart rebuttal card for approving AI-prepared responses to insurer document requests.
+- Preserved Expert Forensic Inbound Gateway: In Expert Mode (`AgentMailDrawer.tsx`), retained the complete two-column apparatus with verified appeals fax lines, statutory P.O. Box addresses, EDI Payer IDs, delivery channel checks, and WebAssembly in-browser OCR triggers.
+- Regression Coverage & Verification: Added unit tests validating SimpleEvidenceView, SimpleStudioView, and SimpleInboxView rendering, dispatch flows, message streams, smart rebuttal approvals, and canonical actions (`tests/evidenceDossierUx.test.ts`, `tests/appealStudioUx.test.ts`, `tests/simpleInboxUx.test.ts`). Verified all 73 test suites (1,088 passing tests), strict typecheck (0 errors), lint (0 warnings), and production build.

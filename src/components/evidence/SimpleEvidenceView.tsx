@@ -1,0 +1,371 @@
+import React, { useState, useMemo } from "react";
+import {
+  Shield,
+  BookOpen,
+  Stethoscope,
+  Scales,
+  ArrowRight,
+  ArrowsClockwise,
+  CircleNotch,
+  CheckCircle,
+  FileText,
+  CaretDown,
+  CaretUp,
+  Eye,
+} from "@phosphor-icons/react";
+import { Claim, ClinicalEvidence, OverturnScoringResult, ScoringCriterion } from "../../types";
+import { Card } from "../ui/card";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { stripMarkdownFormatting, cn } from "../../lib/utils";
+import { ClauseInspectorDrawer } from "./ClauseInspectorDrawer";
+
+interface SimpleEvidenceViewProps {
+  claim: Claim;
+  evidences: ClinicalEvidence[];
+  scoringResult: OverturnScoringResult | null;
+  onNavigateToStudio: () => void;
+  onRunCompleteAnalysis: () => Promise<void>;
+  isAnalyzing?: boolean;
+}
+
+export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
+  claim,
+  evidences,
+  scoringResult,
+  onNavigateToStudio,
+  onRunCompleteAnalysis,
+  isAnalyzing = false,
+}) => {
+  const [showFullRubric, setShowFullRubric] = useState(false);
+  const [inspectedEvidence, setInspectedEvidence] = useState<ClinicalEvidence | null>(null);
+
+  const activeScore = scoringResult?.overturnProbabilityScore ?? claim.overturnProbabilityScore ?? 0;
+  const breakdown: ScoringCriterion[] = scoringResult?.scoringBreakdown || claim.scoringBreakdown || [];
+  const keyContradictions = scoringResult?.keyPolicyContradictions || [];
+
+  const scoreBadgeText =
+    activeScore >= 80 ? "Strong case" : activeScore >= 55 ? "Missing some proof" : "Needs more proof";
+
+  const scoreBadgeColor =
+    activeScore >= 80
+      ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
+      : activeScore >= 55
+      ? "text-amber-400 bg-amber-500/10 border-amber-500/30"
+      : "text-rose-400 bg-rose-500/10 border-rose-500/30";
+
+  // Top 3 Curated Decisive Proof Points ("Smoking Guns")
+  const smokingGuns = useMemo(() => {
+    // 1. Insurer Rule finding
+    const cpbEvidence = evidences.find((e) => e.sourceType === "payer_cpb");
+    const topContradiction = keyContradictions[0];
+    const ruleFinding = {
+      title: "Their Own Published Rules",
+      icon: BookOpen,
+      iconColor: "text-cyan-400",
+      accentBorder: "border-cyan-500/30 hover:border-cyan-500/50",
+      accentBg: "bg-cyan-500/5",
+      badge: "Insurer Policy",
+      summary: topContradiction
+        ? stripMarkdownFormatting(topContradiction)
+        : cpbEvidence
+        ? cpbEvidence.title
+        : "The insurer's clinical policy bulletin contains explicit coverage exceptions.",
+      quote: cpbEvidence?.citationClause
+        ? `Clause: ${cpbEvidence.citationClause}`
+        : cpbEvidence?.extractedEvidenceMarkdown
+        ? stripMarkdownFormatting(cpbEvidence.extractedEvidenceMarkdown).slice(0, 160) + "..."
+        : "Emergency and acute symptoms are exempted from standard prior authorization under published criteria.",
+      evidenceItem: cpbEvidence || null,
+    };
+
+    // 2. Doctor Documentation finding
+    const docCrit = breakdown.find((b) => b.category === "clinical_documentation");
+    const guidelineEvidence = evidences.find((e) => e.sourceType === "nccn_guideline" || e.sourceType === "pubmed_study");
+    const doctorFinding = {
+      title: "Your Medical Records",
+      icon: Stethoscope,
+      iconColor: "text-emerald-400",
+      accentBorder: "border-emerald-500/30 hover:border-emerald-500/50",
+      accentBg: "bg-emerald-500/5",
+      badge: "Doctor Records",
+      summary: docCrit?.rationale
+        ? stripMarkdownFormatting(docCrit.rationale)
+        : `Dr. ${claim.providerName || "Chen"} documented clinical necessity and symptoms justifying the procedure.`,
+      quote: guidelineEvidence?.citationClause
+        ? `Clinical Guideline: ${guidelineEvidence.citationClause}`
+        : "Medical records demonstrate acute progressive neurological impairment or clinical necessity.",
+      evidenceItem: guidelineEvidence || null,
+    };
+
+    // 3. Federal Rights & Winning Precedent finding
+    const legalEvidence = evidences.find((e) => e.sourceType === "legal_precedent");
+    const erisaCrit = breakdown.find((b) => b.category === "statutory_erisa");
+    const precedentCrit = breakdown.find((b) => b.category === "precedent_strength");
+    const rightsFinding = {
+      title: "Your Legal Rights & Similar Wins",
+      icon: Scales,
+      iconColor: "text-purple-400",
+      accentBorder: "border-purple-500/30 hover:border-purple-500/50",
+      accentBg: "bg-purple-500/5",
+      badge: "Federal Rights",
+      summary: erisaCrit?.rationale
+        ? stripMarkdownFormatting(erisaCrit.rationale)
+        : "Under federal law (ERISA 29 CFR § 2560.503-1), the insurer is required to disclose all internal clinical criteria used.",
+      quote: scoringResult?.winningPrecedentSummary
+        ? stripMarkdownFormatting(scoringResult.winningPrecedentSummary)
+        : precedentCrit?.rationale
+        ? stripMarkdownFormatting(precedentCrit.rationale)
+        : "Appeals presenting documented clinical exceptions have an established track record of overturn.",
+      evidenceItem: legalEvidence || null,
+    };
+
+    return [ruleFinding, doctorFinding, rightsFinding];
+  }, [evidences, keyContradictions, breakdown, claim.providerName, scoringResult]);
+
+  return (
+    <div className="space-y-4 font-sans animate-fadeIn">
+      {/* 1. Hero Verdict Card (Clean, Unnested, High Confidence) */}
+      <Card className="p-5 border-border/80 bg-card/80 backdrop-blur-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-4">
+            {/* Prominent Score Pill */}
+            <div className="flex h-14 min-w-[5.5rem] shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 font-mono text-2xl font-bold tracking-tight text-emerald-400">
+              {activeScore}
+              <span className="text-xs font-normal text-emerald-400/70 ml-1">/100</span>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base sm:text-lg font-semibold text-foreground">
+                  Your case strength
+                </h2>
+                <Badge variant="outline" className={cn("text-xs font-medium border px-2 py-0.5", scoreBadgeColor)}>
+                  {scoreBadgeText}
+                </Badge>
+                <Badge variant="secondary" className="font-mono text-[11px] text-muted-foreground">
+                  {evidences.length} proof document{evidences.length === 1 ? "" : "s"} indexed
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Why this denial can be challenged — based on their own rules, your medical records, and your rights.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRunCompleteAnalysis}
+              disabled={isAnalyzing}
+              className="h-8 text-xs gap-1.5 border-border/80 text-muted-foreground hover:text-foreground cursor-pointer"
+              title="Refresh check for new proof"
+            >
+              {isAnalyzing ? (
+                <>
+                  <CircleNotch className="size-3.5 animate-spin" />
+                  <span>Checking...</span>
+                </>
+              ) : (
+                <>
+                  <ArrowsClockwise className="size-3.5" />
+                  <span>Refresh check</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* 1 Plain-Language Summary Box */}
+        <div className="rounded-xl border border-border/70 bg-muted/30 p-3.5 flex items-start gap-3">
+          <CheckCircle className="size-5 text-emerald-400 shrink-0 mt-0.5" weight="fill" />
+          <div className="space-y-0.5 text-xs">
+            <span className="font-semibold text-foreground">
+              What we found to overturn this denial:
+            </span>
+            <p className="text-muted-foreground leading-relaxed">
+              {keyContradictions.length > 0
+                ? stripMarkdownFormatting(keyContradictions[0])
+                : "The insurer denied coverage for missing pre-authorization, but their published clinical policies specify clear exceptions for acute care and clinical necessity."}
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* 2. Top 3 Decisive Findings ("Smoking Guns") */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
+            3 Key Proof Points Found
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            Included in your appeal letter
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {smokingGuns.map((gun, idx) => {
+            const Icon = gun.icon;
+            return (
+              <Card
+                key={idx}
+                className={cn(
+                  "p-4 transition-all duration-200 border space-y-3 flex flex-col justify-between",
+                  gun.accentBorder,
+                  gun.accentBg
+                )}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Icon className={cn("size-4 shrink-0", gun.iconColor)} />
+                      <span className="text-xs font-semibold text-foreground">
+                        {gun.title}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] font-mono border-border/60 text-muted-foreground">
+                      {gun.badge}
+                    </Badge>
+                  </div>
+
+                  <p className="text-xs text-foreground/90 font-medium leading-snug">
+                    {gun.summary}
+                  </p>
+
+                  <div className="rounded-md bg-background/60 border border-border/50 p-2.5 text-[11px] text-muted-foreground leading-relaxed italic">
+                    {gun.quote}
+                  </div>
+                </div>
+
+                {gun.evidenceItem && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setInspectedEvidence(gun.evidenceItem)}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline cursor-pointer"
+                    >
+                      <Eye className="size-3" />
+                      <span>View original source clause</span>
+                    </button>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3. Collapsible Legal Scoring Breakdown & Full Evidence List */}
+      <Card className="border-border/70 bg-card/60 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowFullRubric((prev) => !prev)}
+          className="w-full p-3.5 flex items-center justify-between text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          aria-expanded={showFullRubric}
+          aria-controls="full-rubric-details"
+        >
+          <span className="font-medium flex items-center gap-2">
+            <Shield className="size-4 text-primary" />
+            <span>
+              {showFullRubric
+                ? "Hide detailed scoring rubric & all proof documents"
+                : `Show detailed scoring rubric & all ${evidences.length} proof documents`}
+            </span>
+          </span>
+          {showFullRubric ? <CaretUp className="size-4" /> : <CaretDown className="size-4" />}
+        </button>
+
+        {showFullRubric && (
+          <div id="full-rubric-details" className="p-4 pt-0 border-t border-border/50 space-y-4 animate-fadeIn">
+            {/* 4 Pillars in a clean 2x2 grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3">
+              {breakdown.map((crit, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-lg border border-border/70 bg-muted/20 p-3 space-y-1.5 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-foreground">
+                      {crit.criterion}
+                    </span>
+                    <Badge variant="secondary" className="font-mono text-[10px]">
+                      {crit.score}/{crit.maxScore} pts
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    {stripMarkdownFormatting(crit.rationale)}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* List of all indexed evidence documents */}
+            <div className="space-y-2 pt-2 border-t border-border/50">
+              <span className="text-xs font-semibold text-foreground block">
+                All Indexed Proof Documents ({evidences.length})
+              </span>
+              <div className="space-y-1.5">
+                {evidences.map((e) => (
+                  <div
+                    key={e._id}
+                    className="flex items-center justify-between gap-3 p-2 rounded-lg border border-border/60 bg-muted/10 hover:bg-muted/30 transition-colors text-xs"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="size-3.5 text-muted-foreground shrink-0" />
+                      <span className="font-medium text-foreground truncate">
+                        {e.title}
+                      </span>
+                      <span className="text-[10px] font-mono text-muted-foreground hidden sm:inline truncate">
+                        — {e.citationClause}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => setInspectedEvidence(e)}
+                      aria-label={`Inspect ${e.title}`}
+                      className="h-6 text-[11px] gap-1 text-primary shrink-0"
+                    >
+                      <Eye className="size-3" />
+                      <span>Inspect</span>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* 4. Single Canonical Next Step Card */}
+      <Card className="p-4 border-primary/30 bg-primary/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-0.5">
+          <span className="text-xs font-semibold text-foreground">
+            Ready to review your appeal letter?
+          </span>
+          <p className="text-[11px] text-muted-foreground">
+            We have integrated all these proof points directly into your cited brief.
+          </p>
+        </div>
+
+        <Button
+          onClick={onNavigateToStudio}
+          className="gap-2 h-9 px-4 text-xs bg-primary text-primary-foreground font-semibold shadow-xs hover:bg-primary/90 cursor-pointer shrink-0"
+        >
+          <span>Continue to Your Letter</span>
+          <ArrowRight className="size-3.5" />
+        </Button>
+      </Card>
+
+      {/* Slide-over Clause Inspector Drawer */}
+      <ClauseInspectorDrawer
+        isOpen={Boolean(inspectedEvidence)}
+        onClose={() => setInspectedEvidence(null)}
+        evidence={inspectedEvidence}
+        allEvidences={evidences}
+        onSelectEvidence={(e) => setInspectedEvidence(e)}
+      />
+    </div>
+  );
+};

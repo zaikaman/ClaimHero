@@ -146,22 +146,34 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
 
     let primaryButtonLabel = "Review & Approve";
     let primaryButtonAction = () => onNavigateView("studio");
+    let primaryButtonTarget: FlowView | null = "studio";
 
     if (isWon) {
       primaryButtonLabel = "View Outcome";
       primaryButtonAction = () => onNavigateView("communications");
+      primaryButtonTarget = "communications";
     } else if (isDispatched) {
       primaryButtonLabel = isStep3 ? "Track Sent Appeal" : "Track Appeal";
       primaryButtonAction = () => onNavigateView("communications");
+      primaryButtonTarget = "communications";
     } else if (isStep1) {
       primaryButtonLabel = "Review & Approve";
       primaryButtonAction = () => onNavigateView("studio");
+      primaryButtonTarget = "studio";
     } else if (isStep2) {
       primaryButtonLabel = "Continue to Send";
       primaryButtonAction = () => onNavigateView("communications");
+      primaryButtonTarget = "communications";
     } else if (isStep3) {
-      primaryButtonLabel = "Review Letter";
-      primaryButtonAction = () => onNavigateView("studio");
+      // No primary action on Step 3 pre-dispatch: the inbox card already owns
+      // the send CTA, so a "Review Letter" primary would duplicate the
+      // "Back to Letter" secondary (both navigate to studio).
+      primaryButtonTarget = null;
+    } else {
+      // Auxiliary views (p2p, calculator, audit) pre-dispatch already render a
+      // generic "Back" secondary to studio, so hide the primary to avoid the
+      // same studio duplication.
+      primaryButtonTarget = null;
     }
 
     return (
@@ -279,15 +291,18 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
               </Button>
             )}
 
-            {/* Primary Action Button */}
-            <Button
-              size="sm"
-              onClick={primaryButtonAction}
-              className="h-9 px-4 text-xs font-semibold shadow-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
-            >
-              <span>{primaryButtonLabel}</span>
-              {(isStep1 || isStep2) && <ArrowRight className="size-3.5" />}
-            </Button>
+            {/* Primary Action Button (Only when past Step 1 or on final action screens to avoid triple-button collision).
+                Hidden when it would duplicate the Back button or navigate to the current view. */}
+            {!isStep1 && primaryButtonTarget && primaryButtonTarget !== currentView && (
+              <Button
+                size="sm"
+                onClick={primaryButtonAction}
+                className="h-9 px-4 text-xs font-semibold shadow-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+              >
+                <span>{primaryButtonLabel}</span>
+                {isStep2 && <ArrowRight className="size-3.5" />}
+              </Button>
+            )}
 
             <DetailModeToggle compact className="inline-flex" />
           </div>

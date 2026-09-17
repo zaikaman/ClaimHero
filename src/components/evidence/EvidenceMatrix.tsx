@@ -10,7 +10,6 @@ import {
   Shield,
   ArrowRight,
   Stethoscope,
-  FileText,
   BookOpen,
   Medal,
   Scales,
@@ -23,7 +22,8 @@ import { PolicyViewer } from "./PolicyViewer";
 import { PrecedentFeed } from "./PrecedentFeed";
 import { ClinicalResearchConsole } from "./ClinicalResearchConsole";
 import { PolicyDriftSentinel } from "./PolicyDriftSentinel";
-import { formatCurrency, formatDate, stripMarkdownFormatting, cn } from "../../lib/utils";
+import { SimpleEvidenceView } from "./SimpleEvidenceView";
+import { formatCurrency, formatDate, stripMarkdownFormatting } from "../../lib/utils";
 import { DENIAL_REASON_CODES } from "../../lib/constants";
 import { useDetailMode } from "../../hooks/useDetailMode";
 import { pillarPlainTitle, PLAIN_FIRST_RUN } from "../../lib/plainCopy";
@@ -260,130 +260,102 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
         onOpenTimeline={() => onOpenAuditDrawer?.("pipeline")}
       />
 
-      {/* Header & Main Control Toolbar */}
-      <Card className="p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
-              <FileMagnifyingGlass className="size-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base font-semibold text-foreground font-sans">
-                  {isDetailed ? "Clinical Evidence Matrix & Policy Inspector" : "Your proof"}
-                </h2>
-                {isDetailed && (
-                  <Badge variant="outline" className="font-mono text-[10px]">
-                    Deterministic 4-Pillar Rubric
-                  </Badge>
-                )}
-                {hasAnalyzedEvidence && (
-                  <Badge variant="outline" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
-                    {isDetailed ? "Analysis Complete" : "Checked"}
-                  </Badge>
+      {/* Branch: Simple Mode vs Expert Mode */}
+      {!isDetailed ? (
+        <SimpleEvidenceView
+          claim={claim}
+          evidences={evidences}
+          scoringResult={scoringResult}
+          onNavigateToStudio={onNavigateToStudio}
+          onRunCompleteAnalysis={handleRunCompleteAnalysis}
+          isAnalyzing={isUnifiedAnalyzing || isScoring}
+        />
+      ) : (
+        <>
+          {/* Header & Main Control Toolbar (Expert Mode) */}
+          <Card className="p-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
+                  <FileMagnifyingGlass className="size-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base font-semibold text-foreground font-sans">
+                      Clinical Evidence Matrix & Policy Inspector
+                    </h2>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      Deterministic 4-Pillar Rubric
+                    </Badge>
+                    {hasAnalyzedEvidence && (
+                      <Badge variant="outline" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                        Analysis Complete
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Cross-referencing denial codes against official Clinical Policy Bulletins and legal precedents
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                {hasAnalyzedEvidence ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRunCompleteAnalysis}
+                    disabled={isUnifiedAnalyzing || isScoring || isBackgroundPipelineRunning}
+                    className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0"
+                    title={isBackgroundPipelineRunning ? "Pipeline already running in background" : "Re-crawl policy bulletin and recalculate 4-pillar score"}
+                  >
+                    {isUnifiedAnalyzing ? (
+                      <>
+                        <CircleNotch className="size-3.5 animate-spin" />
+                        <span>Re-analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowsClockwise className="size-3.5" />
+                        <span>Re-run Analysis</span>
+                      </>
+                    )}
+                  </Button>
+                ) : isBackgroundPipelineRunning ? (
+                  <Button
+                    size="sm"
+                    disabled
+                    variant="outline"
+                    className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 border-primary/40 bg-primary/10 text-primary cursor-not-allowed font-medium shadow-none"
+                    title="Autonomous pipeline is actively analyzing policies and synthesizing the appeal brief"
+                  >
+                    <CircleNotch className="size-3.5 animate-spin text-primary" />
+                    <span>Autonomous Pipeline Active</span>
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={handleRunCompleteAnalysis}
+                    disabled={isUnifiedAnalyzing || isScoring}
+                    className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
+                    title="Automatically index Clinical Policy Bulletin and audit Statutory Appeal Readiness"
+                  >
+                    {isUnifiedAnalyzing ? (
+                      <>
+                        <CircleNotch className="size-3.5 animate-spin" />
+                        <span>Analyzing Policy...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lightning className="size-3.5" weight="fill" />
+                        <span>1-Click Complete Analysis</span>
+                      </>
+                    )}
+                  </Button>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">
-                {isDetailed
-                  ? "Cross-referencing denial codes against official Clinical Policy Bulletins and legal precedents"
-                  : "Why this denial can be challenged — in plain language"}
-              </p>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap shrink-0">
-            {hasAnalyzedEvidence ? (
-              <>
-                {/* Re-run Policy Analysis Trigger (Secondary Outline) */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRunCompleteAnalysis}
-                  disabled={isUnifiedAnalyzing || isScoring || isBackgroundPipelineRunning}
-                  className="h-8 rounded-md text-xs px-3 gap-1.5 shrink-0"
-                  title={isBackgroundPipelineRunning ? (isDetailed ? "Pipeline already running in background" : "Already working in the background") : (isDetailed ? "Re-crawl policy bulletin and recalculate 4-pillar score" : "Check again for new proof")}
-                >
-                  {isUnifiedAnalyzing ? (
-                    <>
-                      <CircleNotch className="size-3.5 animate-spin" />
-                      <span>{isDetailed ? "Re-analyzing..." : "Checking..."}</span>
-                    </>
-                  ) : (
-                    <>
-                      <ArrowsClockwise className="size-3.5" />
-                      <span>{isDetailed ? "Re-run Analysis" : "Refresh check"}</span>
-                    </>
-                  )}
-                </Button>
-
-                {/* Primary CTA: Next step in the Sentinel pipeline */}
-                <Button
-                  size="sm"
-                  onClick={onNavigateToStudio}
-                  disabled={isBackgroundPipelineRunning && !hasDraftedBrief}
-                  className={cn(
-                    "h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 font-semibold shadow-xs transition-all",
-                    isBackgroundPipelineRunning && !hasDraftedBrief
-                      ? "border border-primary/30 bg-primary/10 text-primary cursor-not-allowed shadow-none"
-                      : "bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
-                  )}
-                  title={
-                    isBackgroundPipelineRunning && !hasDraftedBrief
-                      ? (isDetailed ? "Autonomous pipeline is actively synthesizing brief in background" : "Your letter is being written in the background")
-                      : (isDetailed ? "Proceed to Collaborative Appeal Studio to review or synthesize brief" : "Go to your letter")
-                  }
-                >
-                  {isBackgroundPipelineRunning && !hasDraftedBrief ? (
-                    <>
-                      <CircleNotch className="size-3.5 animate-spin text-primary" />
-                      <span>{isDetailed ? "Synthesizing Brief..." : "Writing letter..."}</span>
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="size-3.5" />
-                      <span>{hasDraftedBrief ? (isDetailed ? "Review Appeal Brief" : "Review your letter") : (isDetailed ? "Draft Appeal Brief" : "Write my letter")}</span>
-                      <ArrowRight className="size-3" />
-                    </>
-                  )}
-                </Button>
-              </>
-            ) : isBackgroundPipelineRunning ? (
-              /* Informative Active Pipeline Status Pill (Neutral, not an enticing blue button) */
-              <Button
-                size="sm"
-                disabled
-                variant="outline"
-                className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 border-primary/40 bg-primary/10 text-primary cursor-not-allowed font-medium shadow-none"
-                title={isDetailed ? "Autonomous pipeline is actively analyzing policies and synthesizing the appeal brief" : "Gathering proof and writing your letter in the background"}
-              >
-                <CircleNotch className="size-3.5 animate-spin text-primary" />
-                <span>{isDetailed ? "Autonomous Pipeline Active" : "Working on it..."}</span>
-              </Button>
-            ) : (
-              /* 1-Click Unified Analysis Trigger (Primary Initial CTA) */
-              <Button
-                size="sm"
-                onClick={handleRunCompleteAnalysis}
-                disabled={isUnifiedAnalyzing || isScoring}
-                className="h-8 rounded-md text-xs px-3.5 gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
-                title={isDetailed ? "Automatically index Clinical Policy Bulletin and audit Statutory Appeal Readiness" : "Check insurer rules, gather proof, and score your case"}
-              >
-                {isUnifiedAnalyzing ? (
-                  <>
-                    <CircleNotch className="size-3.5 animate-spin" />
-                    <span>{isDetailed ? "Analyzing Policy..." : "Checking..."}</span>
-                  </>
-                ) : (
-                  <>
-                    <Lightning className="size-3.5" weight="fill" />
-                    <span>{isDetailed ? "1-Click Complete Analysis" : "Check how strong my case is"}</span>
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
-      </Card>
+          </Card>
 
       {/* Error Alert */}
       {errorMessage && (
@@ -563,23 +535,24 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 </TooltipProvider>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
                 {breakdown.map((crit, idx) => {
                   const pct = Math.min(100, Math.round((crit.score / crit.maxScore) * 100));
                   return (
                     <div
                       key={idx}
-                      className="rounded-lg bg-card/90 border border-border/80 p-3 space-y-2 text-xs shadow-xs"
+                      className="rounded-lg bg-card/90 border border-border/80 p-2.5 space-y-1.5 text-xs shadow-xs hover:border-primary/40 transition-colors"
+                      title={stripMarkdownFormatting(crit.rationale)}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2 min-w-0">
+                      <div className="flex items-start justify-between gap-1.5">
+                        <div className="flex items-start gap-1.5 min-w-0">
                           {getCriteriaIcon(crit.category)}
-                          <div>
-                            <span className="font-semibold text-foreground block leading-tight">
+                          <div className="min-w-0">
+                            <span className="font-semibold text-foreground block leading-tight truncate">
                               {isDetailed ? crit.criterion : pillarPlainTitle(crit.category, crit.criterion)}
                             </span>
                             <span className="text-[10px] text-muted-foreground font-mono uppercase">
-                              {isDetailed ? `${crit.category.replace(/_/g, " ")} (Max ${crit.maxScore} pts)` : `Max ${crit.maxScore} pts`}
+                              Max {crit.maxScore} pts
                             </span>
                           </div>
                         </div>
@@ -587,7 +560,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                           variant="secondary"
                           className="font-mono font-bold shrink-0 text-[11px] bg-muted/60"
                         >
-                          {crit.score}/{crit.maxScore} pts
+                          {crit.score}/{crit.maxScore}
                         </Badge>
                       </div>
 
@@ -605,7 +578,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                         />
                       </div>
 
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      <p className="text-[10.5px] text-muted-foreground truncate leading-relaxed">
                         {stripMarkdownFormatting(crit.rationale)}
                       </p>
                     </div>
@@ -829,6 +802,8 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           </Tabs>
         </div>
       </div>
+        </>
+      )}
 
       {/* Sticky Bottom Next-Step Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md p-3 px-4 sm:px-8 flex items-center justify-between shadow-lg print:hidden">

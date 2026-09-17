@@ -30,6 +30,7 @@ import { usePrecedents } from "../../hooks/usePrecedents";
 import { CitationSidebar } from "./CitationSidebar";
 import { ExportDrawer } from "./ExportDrawer";
 import { AppealBriefRenderer } from "./AppealBriefRenderer";
+import { SimpleStudioView } from "./SimpleStudioView";
 import { StudioPresenceBridge } from "./CollaboratorPresence";
 import { ShareCaseModal } from "./ShareCaseModal";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
@@ -451,8 +452,33 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         onOpenTimeline={() => onOpenAuditDrawer?.("pipeline")}
       />
 
-      {/* Multi-Tier Statutory Escalation Stepper Bar */}
-      <Card className="p-2 sm:p-2.5 shrink-0 overflow-visible bg-card/90 border-border/80 shadow-xs">
+      {!isDetailed ? (
+        <SimpleStudioView
+          claim={claim}
+          evidences={evidences}
+          markdownContent={markdownContent}
+          setMarkdownContent={setMarkdownContent}
+          appealLevel={appealLevel}
+          hasSynthesizedBrief={hasSynthesizedBrief}
+          isSynthesizing={isSynthesizing}
+          isEscalating={isEscalating}
+          isSaving={isSaving}
+          saveStatus={saveStatus}
+          readOnly={readOnly}
+          isBackgroundPipelineRunning={isBackgroundPipelineRunning}
+          collaboratorsCount={collaborators.length}
+          onNavigateToDispatch={onNavigateToDispatch}
+          onRunSynthesis={handleRunSynthesis}
+          onOpenExport={() => setIsExportOpen(true)}
+          onOpenShare={() => setIsShareOpen(true)}
+          onOpenEscalate={() => setShowEscalationModal(true)}
+          registerEditor={registerEditor}
+          onMarkEditing={markEditingBrief}
+        />
+      ) : (
+        <>
+          {/* Multi-Tier Statutory Escalation Stepper Bar */}
+          <Card className="p-2 sm:p-2.5 shrink-0 overflow-visible bg-card/90 border-border/80 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
           {/* 3 Statutory Legal Tiers Segmented Controller */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 p-1 rounded-lg bg-muted/40 border border-border/60 flex-1">
@@ -771,43 +797,6 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   <Printer className="size-3.5" />
                   <span>{isDetailed ? "Preview Email" : "Preview"}</span>
                 </Button>
-
-                {/* Back to Evidence / Proof button */}
-                {onNavigateToEvidence && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onNavigateToEvidence}
-                    className="h-8 rounded-md px-3 text-xs gap-1.5 shrink-0"
-                    title={isDetailed ? "Back to Clinical Policy & Evidence Matrix" : "Back to your proof"}
-                  >
-                    <ArrowLeft className="size-3.5" />
-                    <span>{isDetailed ? "Back" : "Back to Proof"}</span>
-                  </Button>
-                )}
-
-                {/* Primary Blue CTA: Next step in the Sentinel pipeline */}
-                {onNavigateToDispatch ? (
-                  <Button
-                    size="sm"
-                    onClick={onNavigateToDispatch}
-                    className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
-                    title={isDetailed ? "Proceed to Payer Dispatch to review transmission and send appeal" : "Go to send your letter"}
-                  >
-                    <span>{isDetailed ? "Proceed to Dispatch" : "Next: Send it"}</span>
-                    <ArrowRight className="size-3.5" />
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => setIsExportOpen(true)}
-                    className="h-8 rounded-md px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground font-semibold shadow-xs"
-                    title={isDetailed ? "Preview printable appeal brief" : "See how your letter will look"}
-                  >
-                    <Printer className="size-3.5" />
-                    <span>{isDetailed ? "Preview Email" : "Preview"}</span>
-                  </Button>
-                )}
               </>
             ) : (
               <>
@@ -1138,6 +1127,8 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           </div>
         </Card>
       </div>
+        </>
+      )}
 
       {/* Sticky Bottom Next-Step Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md p-3 px-4 sm:px-8 flex items-center justify-between shadow-lg print:hidden">
@@ -1243,8 +1234,10 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowEscalationModal(false)}
-                className="text-muted-foreground hover:text-foreground"
+                aria-label="Close escalation dialog"
+                className="text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <X className="size-4" />
               </button>

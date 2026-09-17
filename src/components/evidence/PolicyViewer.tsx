@@ -88,7 +88,7 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
   isLoading,
   onDeleteEvidence,
   onOpenResearchConsole,
-  onOpenPolicyDrift,
+  onOpenPolicyDrift: _onOpenPolicyDrift,
 }) => {
   const { isDetailed } = useDetailMode();
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -454,18 +454,6 @@ export const PolicyViewer: React.FC<PolicyViewerProps> = ({
             </Button>
           )}
 
-          {onOpenPolicyDrift && (
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={onOpenPolicyDrift}
-              className="h-6 text-[11px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 border-cyan-500/30"
-              title="Detect retroactive policy changes via Policy Drift Sentinel"
-            >
-              <Scales className="size-3 text-cyan-400" />
-              <span>Detect Policy Drift</span>
-            </Button>
-          )}
         </div>
       </div>
 
