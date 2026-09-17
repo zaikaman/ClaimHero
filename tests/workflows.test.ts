@@ -430,13 +430,56 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
   });
 
   describe("sentinelPipeline integration with workflows", () => {
+    const mockClaim = {
+      _id: "c1",
+      userId: "user_123",
+      claimNumber: "CLM-DUR-1",
+      patient: { name: "Jane Doe", insurancePayer: "Aetna", state: "CA" },
+      cptCodes: ["27447"],
+      icd10Codes: ["M17.11"],
+      denialReasonCode: "CO-50",
+      denialReasonDescription: "Not medically necessary",
+    };
+
+    it("runAutonomousPipeline rejects unauthenticated callers and non-owners", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const unauthCtx: any = {
+        runQuery: vi.fn(),
+        runMutation: vi.fn(),
+      };
+      await expect(
+        (actionSentinelPipeline.runAutonomousPipeline as any)._handler(unauthCtx, {
+          claimId: "c1",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      vi.mocked(getAuthUserId).mockResolvedValue("user_attacker" as any);
+      const attackerCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "c1") return Promise.resolve(mockClaim);
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn(),
+      };
+      await expect(
+        (actionSentinelPipeline.runAutonomousPipeline as any)._handler(attackerCtx, {
+          claimId: "c1",
+        })
+      ).rejects.toThrow(/Forbidden/i);
+    });
+
     it("runAutonomousPipeline delegates to durable workflow as the sole execution path", async () => {
       const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "c1") return Promise.resolve(mockClaim);
+          return Promise.resolve(null);
+        }),
         runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_delegated_1" }),
       };
 
       const res = await (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
         claimId: "c1",
+        waitForCompletion: false,
       });
 
       expect(res.success).toBe(true);
@@ -449,12 +492,17 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
 
     it("runAutonomousPipeline delegates to durable workflow even if useDurableWorkflow flag is passed", async () => {
       const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "c1") return Promise.resolve(mockClaim);
+          return Promise.resolve(null);
+        }),
         runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_delegated_2" }),
       };
 
       const res = await (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
         claimId: "c1",
         useDurableWorkflow: true,
+        waitForCompletion: false,
       });
 
       expect(res.success).toBe(true);
@@ -467,6 +515,10 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
 
     it("startDurablePipelineAction triggers the durable workflow mutation", async () => {
       const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "c1") return Promise.resolve(mockClaim);
+          return Promise.resolve(null);
+        }),
         runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_from_action", claimId: "c1" }),
       };
 
@@ -484,15 +536,21 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
     it("runAutonomousPipeline awaits durable workflow completion when ctx.runQuery is present", async () => {
       const mockCtx: any = {
         runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_await_1", claimId: "c1" }),
-        runQuery: vi.fn().mockResolvedValue({
-          type: "completed",
-          result: {
-            policyTitle: "Aetna CPB 0244",
-            clausesExtracted: 5,
-            overturnProbabilityScore: 88,
-            riskLevel: "high_confidence",
-            appealId: "appeal_sync_1",
-          },
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "c1") return Promise.resolve(mockClaim);
+          if (args?.workflowId === "wf_await_1") {
+            return Promise.resolve({
+              type: "completed",
+              result: {
+                policyTitle: "Aetna CPB 0244",
+                clausesExtracted: 5,
+                overturnProbabilityScore: 88,
+                riskLevel: "high_confidence",
+                appealId: "appeal_sync_1",
+              },
+            });
+          }
+          return Promise.resolve(null);
         }),
       };
 
@@ -513,9 +571,15 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
     it("runAutonomousPipeline throws error when durable workflow fails", async () => {
       const mockCtx: any = {
         runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_failed_1", claimId: "c1" }),
-        runQuery: vi.fn().mockResolvedValue({
-          type: "failed",
-          error: "Firecrawl crawler service unavailable",
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "c1") return Promise.resolve(mockClaim);
+          if (args?.workflowId === "wf_failed_1") {
+            return Promise.resolve({
+              type: "failed",
+              error: "Firecrawl crawler service unavailable",
+            });
+          }
+          return Promise.resolve(null);
         }),
       };
 

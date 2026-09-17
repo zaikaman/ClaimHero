@@ -888,6 +888,37 @@ describe("Convex Authorization & Multi-Tenant Data Isolation Guard", () => {
       ).rejects.toThrow(/Forbidden/i);
     });
 
+    it("sentinelPipeline: rejects unauthenticated caller and non-owner on runAutonomousPipeline and startDurablePipelineAction", async () => {
+      const { runAutonomousPipeline, startDurablePipelineAction } = await import(
+        "../convex/actions/sentinelPipeline"
+      );
+
+      const unauthCtx = makeMockCtx(null);
+      await expect(
+        (runAutonomousPipeline as any)._handler(unauthCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Unauthorized/i);
+      await expect(
+        (startDurablePipelineAction as any)._handler(unauthCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      const attackerCtx = makeMockCtx("user_attacker_999");
+      await expect(
+        (runAutonomousPipeline as any)._handler(attackerCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Forbidden/i);
+      await expect(
+        (startDurablePipelineAction as any)._handler(attackerCtx, { claimId: "claim_victim_456" })
+      ).rejects.toThrow(/Forbidden/i);
+
+      const ownerCtx = makeMockCtx("user_victim_456");
+      ownerCtx.runMutation = vi.fn().mockResolvedValue({ workflowId: "wf_123", claimId: "claim_victim_456" });
+      const res = await (runAutonomousPipeline as any)._handler(ownerCtx, {
+        claimId: "claim_victim_456",
+        waitForCompletion: false,
+      });
+      expect(res.success).toBe(true);
+      expect(res.workflowId).toBe("wf_123");
+    });
+
     it("agentMail.syncInboxes: rejects unauthenticated caller", async () => {
       const { syncInboxes } = await import("../convex/actions/agentMail");
 

@@ -4,6 +4,7 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "../_generated/api";
 import { appealLevelValidator } from "../lib/statutoryTierValidators";
+import { requireClaimOwnerAction } from "../lib/auth";
 
 export interface PipelineResult {
   success: boolean;
@@ -69,6 +70,13 @@ export const runAutonomousPipeline = action({
     followUpCadenceDays: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<PipelineResult> => {
+    // Authorize before any expensive work: unauthenticated callers are rejected
+    // with Unauthorized, and callers without owner/editor access to this claim
+    // are rejected with Forbidden (IDOR guard). This protects the downstream
+    // Firecrawl/OpenAI spend triggered via startDurablePipelineInternal, which
+    // intentionally performs no auth of its own for background execution.
+    await requireClaimOwnerAction(ctx, args.claimId);
+
     // Durable @convex-dev/workflow is the single, unified execution architecture.
     const res = await ctx.runMutation(internal.workflows.startDurablePipelineInternal, {
       claimId: args.claimId,
@@ -169,6 +177,10 @@ export const startDurablePipelineAction = action({
     followUpCadenceDays: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<{ workflowId: string; claimId: string }> => {
+    // Fail fast on unauthenticated / unauthorized callers before delegating to
+    // the workflow mutation (defense in depth: the mutation re-validates via
+    // requireClaimEditor).
+    await requireClaimOwnerAction(ctx, args.claimId);
     return await ctx.runMutation(api.workflows.startDurablePipeline, args);
   },
 });

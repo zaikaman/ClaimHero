@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-17T13:12:45Z
+- **Last updated:** 2026-09-17T14:51:00Z
 
 ## Log
 
@@ -1609,10 +1609,16 @@ Streamlined Evidence, Appeal Studio, and Inbox workspaces, eliminating cognitive
 ### 2026-09-17 - 4bdfa85
 Locked the appeal engine to the federal ERISA baseline and demoted patient state to DOI-reference-only. Added a shared isolate-safe regulator map (`convex/lib/stateRegulators.ts`) resolving CA/TX/NY/FL/IL/PA to their DOI and external-review names with a generic State Insurance Commissioner fallback and a uniform 180-day clock. Onboarding, ingestion, settings, and dossier copy no longer claims state-specific deadlines; Level 3 briefs, P2P scripts, live copilot cards, and dossier headers now name the patient's actual DOI (e.g. CA DMHC/CDI) instead of the generic commissioner. Also fixed a copy-paste bug building the ICD list from CPT codes in the live P2P copilot (`convex/actions/p2pLiveCopilot.ts`). Verified all 74 test suites (1,118 passing tests), strict typecheck (0 errors), lint (0 warnings), and production build.
 
-### 2026-09-17 - working tree
+### 2026-09-17 - 61c786a
 Removed risky healthcare overclaims across UI, backend actions, schemas, test suites, and documentation, re-centering the product on evidence coverage, documentation completeness, policy alignment, deadline risk, appeal readiness, and mandatory human review (`convex/actions/precedentMatcher.ts`, `convex/claims.ts`, `convex/workflows.ts`, `convex/actions/sentinelPipeline.ts`, `convex/lib/sentinelPrompt.ts`, `convex/lib/pdfGenerator.ts`, `src/components/common/GlobalDisclaimer.tsx`, `src/components/auth/AuthPage.tsx`, `src/components/calculator/FinancialLiabilityCalculator.tsx`, `src/components/calculator/FinancialStatementModal.tsx`, `src/components/analytics/AnalyticsMetrics.tsx`, `src/components/analytics/ExecutiveReportModal.tsx`, `src/components/evidence/SimpleEvidenceView.tsx`, `src/components/studio/dossier/CourtReadyDossierBinder.tsx`, `README.md`, `DESIGN.md`, `IDEA.md`, `specs/001-appeal-sentinel/`):
 - Softened or Removed Risky Overclaims: Removed predictive promises including "Overturn probability", "Win score", "Court-ready", "Autonomous medical appeal", and "Legal appeal prediction" across user-facing copy, calculation labels, table headers, and system prompts. Replaced them with objective, calibrated metrics: "Appeal readiness", "Evidence coverage", "Documentation completeness", "Policy alignment", and "Resolved balances".
 - Canonical Appeal Readiness Actions & API Compatibility: Updated `precedentMatcher.ts` to export canonical actions `computeAppealReadinessScore` and `computeAppealReadinessScoreInternal`, returning structured `appealReadinessScore`, `evidenceCoverageScore`, `policyAlignmentScore`, and `documentationCompletenessScore` alongside backward-compatible aliases (`computeOverturnScore`, `computeOverturnScoreInternal`, `overturnProbabilityScore`).
 - Re-grounded Financial & Portfolio Analytics: Replaced "Win Rate" with "Resolution Rate", "Recovered Funds" with "Resolved Funds", and "Won / Overturned" with "Resolved in Full". Updated `getPortfolioStats` to prioritize `appealReadinessScore` and output `averageReadinessScore`.
 - Global Regulatory Disclaimer & Human-in-the-Loop Gates: Created and integrated `<GlobalDisclaimer>` (`src/components/common/GlobalDisclaimer.tsx`) across workspace layouts and dossier export binders, confirming ClaimHero is an administrative decision-support workspace rather than a source of legal or medical advice, and highlighting that all appeals require independent human review.
 - Verification & Clean Build: Verified all 74 test suites (1,118 passing tests) with 100% backend library line coverage, strict TypeScript compilation (0 errors), clean ESLint (0 warnings), and successful production build.
+
+### 2026-09-17 - working tree
+Hardened autonomous pipeline orchestration entry points against unauthenticated callers and cross-tenant IDOR triggers (`convex/actions/sentinelPipeline.ts`, `tests/authorization.test.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`, `tests/workflows.test.ts`):
+- Guarded `runAutonomousPipeline` and `startDurablePipelineAction` with `requireClaimOwnerAction(ctx, args.claimId)` before delegating to `startDurablePipelineInternal` or starting the durable workflow. Unauthenticated callers are rejected with `Unauthorized: Authentication required` and unauthorized tenants/viewers are rejected with `Forbidden: You do not have permission to access this claim`, protecting downstream Firecrawl and OpenAI compute spend.
+- Added comprehensive spend-guard and IDOR rejection tests in `tests/authorization.test.ts`, verified owner and configuration pass-through in `tests/actionsPrecedentsAndPipeline.test.ts`, and updated workflow integration mocks in `tests/workflows.test.ts`.
+- Verified all 74 test suites (1,122 tests passing), strict typecheck (0 errors), clean lint (0 warnings), and production build.

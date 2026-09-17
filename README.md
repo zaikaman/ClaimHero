@@ -1,37 +1,67 @@
 # ClaimHero
 
-## Evidence-Grounded Appeal Preparation Workspace for Denial Teams
+## Turn an insurance denial into a cited appeal before the deadline
 
-> **Your insurer denied a claim you paid for. ClaimHero finds the policy they're hiding behind, cites the clause, and drafts the appeal before the clock runs out — three steps, one human approval.**
+ClaimHero helps a patient advocate or denial coordinator turn an insurance
+denial into a source-grounded appeal.
+
+It reads the denial, finds the insurer's own policy, shows what evidence is
+missing, drafts a cited letter, and waits for a human to approve everything
+before sending.
 
 <p align="center">
-  <a href="https://kindhearted-elephant-992.convex.site"><strong>Open Live Application</strong></a>
+  <a href="https://kindhearted-elephant-992.convex.site"><strong>Open the live app</strong></a>
   &nbsp; · &nbsp;
-  <a href="https://www.youtube.com/watch?v=wLW_ZL093a8"><strong>Watch 3-Minute Demo Video</strong></a>
+  <a href="https://www.youtube.com/watch?v=wLW_ZL093a8"><strong>Watch the 3-minute demo</strong></a>
   &nbsp; · &nbsp;
-  <a href="./hackathon.md"><strong>Read Evidence-Based Build Log</strong></a>
+  <a href="./hackathon.md"><strong>Read the build log</strong></a>
 </p>
 
-Built for the **Convex All Gas Hackathon** (August 25 – September 22, 2026) using **Convex**, **Firecrawl**, **AgentMail**, and **OpenAI**.
+Built for the **Convex All Gas Hackathon** with **Convex**, **Firecrawl**,
+**OpenAI**, and **AgentMail**.
 
----
+## The product in three steps
 
-ClaimHero is an evidence-grounded appeal preparation workspace that starts with
-patients and families, then scales to teams. A denial is not just a letter to
-answer once; it creates a case that must be understood, researched, explained,
-reviewed, dispatched, and followed until the payer commits to an outcome.
+Simple Mode is the default experience. It uses everyday language while keeping
+specialist detail one toggle away.
 
-The Case Radar gives a team one live portfolio view of those cases. The Case
-Workspace gives each denial a repeatable, source-linked path from intake to
-appeal. This makes ClaimHero useful for the next denial that arrives, and the
-one after that, without requiring staff to rebuild the evidence trail from
-scratch.
+### 1. Your proof
 
-1. **Upload the denial.** Real PDF and image intake is supported. Synthetic demo fixtures are also available so a judge can test the complete workflow without uploading personal health information.
-2. **ClaimHero pulls the insurer's active policy bulletins via Firecrawl** and lifts the exact clause the denial turned on. Each extracted clause explicitly surfaces its extraction engine provenance (`Firecrawl • HH:mm` native structured extraction vs. `OpenAI • HH:mm` structured fallback) alongside visual proof screenshot exhibits.
-3. **You review a cited brief**, one click away from the clause it cites, then approve dispatch from an AgentMail inbox across **two dispatch paths**: transmit directly to the **official production payer reviewer email**, or dispatch to a **typed-in email** (such as your personal inbox) to inspect the packet in your mail client and test replying. Claims under the ERISA §502(c) clock show the exposure as they age; you never send without approving.
+Upload a denial letter, paste its text, or open a privacy-safe demo case.
+ClaimHero extracts the procedure, denial reason, amount at stake, and appeal
+deadline, then checks the insurer's current published rules.
 
-### Evidence Coverage & Precedent Match Score (Dossier Audit)
+### 2. Your letter
+
+Review what the denial says, what the insurer's own rule says, what supports the
+appeal, what evidence is missing, and where sources disagree. ClaimHero drafts
+an editable appeal from stored denial facts and inspectable citations.
+
+### 3. Send & track
+
+Choose the recipient, review the letter, and approve the transmission. AgentMail
+sends through the insurer's verified appeals route or a typed-in review address.
+Payer replies return to the same case, deadlines remain visible, and delivery
+evidence is recorded.
+
+**Nothing leaves the outbox without human approval.**
+
+## Try it in 60 seconds
+
+1. Open the [production deployment](https://kindhearted-elephant-992.convex.site).
+2. Choose **Explore as Anonymous Advocate**.
+3. Open the **Eleanor Vance** case.
+4. Follow **Your proof → Your letter → Send & track**.
+5. Review the appeal and inspect the approval-gated dispatch screen.
+
+The seeded cases are synthetic and visibly labelled. They are a privacy-safe
+evaluation shortcut, not a separate mock product: they exercise the same case,
+evidence, drafting, audit, deadline, and AgentMail surfaces used by real cases.
+
+You can also choose **Ingest Denial** to upload a PDF/image or paste denial
+text. Real cases and demo cases use the same pipeline.
+
+### Evidence completeness, not outcome prediction
 
 ClaimHero computes an explainable 0–100 **Evidence Coverage & Precedent Match Score** (`appealReadinessScore` / `evidenceCoverageScore`) to audit evidentiary completeness and statutory compliance before an appeal is submitted.
 
@@ -58,7 +88,7 @@ To prevent failure paths from quietly degrading into unearned "ready_for_review"
 
 > **Regulatory Compliance Disclaimer:** The Evidence Coverage & Precedent Match Score is an evidentiary completeness and procedural compliance audit evaluating documentation against published clinical guidelines and ERISA 29 CFR § 2560.503-1 standards. It functions as a pre-filing quality checklist and does not constitute an actuarial legal prediction or guarantee of payer approval.
 
-### How a Case Spends Its Life
+### Implementation path
 
 ```text
 denial letter
@@ -70,33 +100,6 @@ denial letter
   ->  human approval gate
   ->  packet sent via AgentMail; insurer reply routed back in
 ```
-
-### Real cases and demo cases use the same pipeline
-
-ClaimHero supports real denial PDFs, images, and denial text. The production path performs the same storage upload, structured extraction, policy research, precedent retrieval, scoring, drafting, collaboration, audit, and AgentMail operations used by the demo fixtures.
-
-Demo cases are only a privacy-safe shortcut for judges who do not want to upload a health record.
-
-### Try It in 60 Seconds
-
-To evaluate the complete end-to-end pipeline without uploading personal health records:
-
-1. Open the [Production Deployment](https://kindhearted-elephant-992.convex.site) and click **"Explore as Anonymous Advocate"** on `/login` (or sign in via Google) to enter instantly with zero credentials required.
-2. The workspace immediately opens pre-seeded with 3 live-pipeline-fidelity evaluation cases captured directly from authentic pipeline runs:
-   - **Eleanor Vance (Cigna Global — Knee Meniscectomy)**: $6,400 | CPT 29881 | CO-50 (Medical Necessity) — Status `ready_for_review` (96/100 score). Pre-populated with 10 clinical evidence items (Carelon joint surgery guidelines, ERISA 29 CFR § 2560.503-1 statutory requirements, winning hybrid vector precedents), full 4-page synthesized brief, and 4-phase P2P script. Left un-dispatched with zero emails so you can test the **Approve & Dispatch Appeal** flow yourself.
-   - **Marcus Sterling (GeoBlue Worldwide — Lumbar Decompression)**: $18,200 | CPT 63047 | CO-197 (Pre-Authorization) — Status `drafting` (94/100 score). Pre-populated with 6 clinical evidence items, emergency motor paralysis brief, and neurosurgical P2P defense script under Carelon SURG.00011.
-   - **Michael Patel (Aetna International — Diagnostic Knee MRI)**: $2,850 | CPT 73721 | CO-16 (Prior Records Required) — Status `won` (91/100 score). Demonstrates full financial resolution ($2,850 recovered, $0 member balance) and authentic multi-paragraph healthcare correspondence between appeals specialist Taylor Reed and Aetna International Medical Director Marcus Vance, MD, FAAOS overturning the adverse determination in full with EFT remittance advice.
-3. You can also click **Ingest Denial** (or press `Cmd+K` / `Ctrl+K`) to upload your own denial documents or select template presets.
-4. The application transitions directly into the **Case Workspace**, driving through the linear 3-step appellate spine:
-   - **Step 1: Evidence & CPB** — Review real insurer policy bulletins scraped via Firecrawl with extraction engine provenance badges (`Firecrawl • 12:04` native zero-hop extraction vs. `OpenAI • 12:04` fallback), visual proof screenshot exhibits, and the precedent-grounded 4-pillar Statutory Appeal Readiness Score, shown as a transparent 0–100 audit checklist.
-   - **Step 2: Appeal Brief** — Inspect the grounded legal brief strictly citing stored policy clauses; test real-time CRDT multi-user editing with live presence (`Share` button).
-   - **Step 3: Payer Dispatch** — Transmit the packet via AgentMail with one click. Select from two dispatch destinations:
-     - **Official Insurer Gateway (Production)**: Dispatches directly to the verified public grievance and appeals intake email of the payer.
-     - **Typed-In Email (Interactive Verification)**: Delivers the full cited brief and exhibits to a typed-in email address (such as your personal or reviewer inbox) so you can review the dossier and reply from your mail client to trigger the live inbound webhook.
-     For medical necessity denials (`CO-50`), review the contextual Physician Peer-to-Peer tele-script.
-5. Track the statutory stakes at all times: the case header monitors the active **ERISA §502(c) statutory liability exposure ($110/day)** alongside a dual-mode slide-out **Case Audit & Workflow Observability** drawer proving real-time pipeline execution milestones (step-by-step latency, run history, and milestone stages) and the cryptographic SHA-256 Merkle audit chain.
-
-*The demo cases are a privacy-preserving evaluation harness, not a substitute for the product workflow. They use the same intake, evidence, drafting, collaboration, deadline, audit, and dispatch path as a real case, are visibly marked as synthetic, are isolated from portfolio analytics, and can be purged at any time via the "Clear demo data" button.*
 
 ### Why this is an everyday app
 
@@ -135,17 +138,17 @@ ClaimHero resolves this dilemma with a built-in **Everyday Language vs. Expert D
     1. **1 Sentence (What happened)**: Plain-English summary (e.g., *"Sarah's knee arthroscopy was denied ($6,400) by Cigna — they say it was not medically necessary."*).
     2. **1 Date (What to do by when)**: Clear statutory timeline (e.g., *"Appeal deadline: Jan 14, 2027 (120 days left)"*).
     3. **Mode Toggle**: Instant switch between everyday language and specialist detail.
-  - **Simple Evidence Workspace (`SimpleEvidenceView.tsx`)**: An evidence-grounded review view designed for clarity and fast comprehension:
+  - **Simple Evidence Workspace (`EvidenceMatrix.tsx`)**: An evidence-grounded review view designed for clarity and fast comprehension:
     1. **Hero Verdict Card**: Prominent readiness score (`90/100` • `Well documented`) with an instant plain-language explanation of key evidence supporting the appeal.
     2. **3 Key Proof Points**: Curated proof cards highlighting the insurer's policy exception clause, treating physician clinical documentation, and federal ERISA rights or similar precedent resolutions, with 1-click inspection.
     3. **Progressive Disclosure**: Detailed 4-pillar scoring rubrics, full document lists, and forensic policy clauses remain accessible on demand.
     4. **Direct Workflow Action**: A single clear primary action guiding the user directly into appeal letter review.
-  - **Simple Appeal Studio (`SimpleStudioView.tsx`)**: A document-first reading and editing experience designed for confident review:
+  - **Simple Appeal Studio (`AppealStudio.tsx`)**: A document-first reading and editing experience designed for confident review:
     1. **Document-First Presentation**: Displays a beautifully formatted executive appeal letter (`AppealBriefRenderer`) ready for reading, without raw Markdown syntax (`#`, `**`) or visual clutter.
     2. **Seamless Read vs. Edit Modes**: Instant switch between reading the rendered brief and inline editing with real-time auto-saving.
     3. **Curated Proof Summary**: Surfaces the 3 core evidentiary pillars woven into the letter (insurer policy exceptions, clinical records, ERISA statutory rights) in a collapsible reference card.
     4. **Focused Document Controls**: Document-level actions (`Rewrite`, `Save/Print`, `Share`) remain cleanly separated in the document header, while workflow progression is anchored in the primary bottom action bar.
-  - **Simple Communication Workspace (`SimpleInboxView.tsx`)**: A conversational, reassuring dispatch and message experience:
+  - **Simple Communication Workspace (`AgentMailDrawer.tsx`)**: A conversational, reassuring dispatch and message experience:
     1. **Clear Dispatch Choice**: Direct selection between transmitting to the verified carrier intake address (official production path) or sending an interactive test copy to personal email to inspect the packet and test two-way replying.
     2. **Human Review Gate**: Transparent confirmation that nothing is ever transmitted without human authorization, with 1-click access to print or review the brief first.
     3. **Conversational Correspondence Timeline**: Clean message stream distinguishing patient submissions from insurer replies, featuring clear determination badges, clinical explanations, and attachment previews.
@@ -330,12 +333,12 @@ Copy variables from [`.env.example`](./.env.example). Store provider credentials
 
 ## Verification & Test Coverage
 
-ClaimHero is backed by **1,118 automated tests** across 74 test suites (verified via `npm run test`):
+ClaimHero is backed by **1,122 automated tests** across 74 test suites (verified via `npm run test`):
 
 ```bash
 npm run typecheck       # Strict TypeScript typechecking (0 errors)
 npm run lint            # ESLint static code analysis (0 warnings)
-npm run test            # Comprehensive Vitest test suite (1118 tests across 74 suites)
+npm run test            # Comprehensive Vitest test suite (1122 tests across 74 suites)
 npm run test:coverage   # Code coverage report (~82.9% statement coverage)
 npm run build           # Production bundle compilation
 npm run verify          # Full automated local verification gate

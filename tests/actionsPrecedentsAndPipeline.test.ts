@@ -574,13 +574,60 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
   });
 
   describe("convex/actions/sentinelPipeline", () => {
-    it("runAutonomousPipeline: dispatches to startDurablePipeline workflow as the sole execution path", async () => {
+    const mockClaim = {
+      _id: "c1",
+      userId: "user_123",
+      claimNumber: "CLM-100",
+      patient: { insurancePayer: "UnitedHealthcare", state: "CA" },
+      cptCodes: ["63047"],
+      icd10Codes: ["M51.16"],
+      denialReasonCode: "CO-50",
+    };
+
+    it("runAutonomousPipeline: rejects unauthenticated caller", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
       const mockCtx: any = {
+        runQuery: vi.fn(),
+        runMutation: vi.fn(),
+      };
+
+      await expect(
+        (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
+          claimId: "c1",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+    });
+
+    it("runAutonomousPipeline: rejects caller who is not the claim owner or editor", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("attacker_456" as any);
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "c1") return Promise.resolve(mockClaim);
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn(),
+      };
+
+      await expect(
+        (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
+          claimId: "c1",
+        })
+      ).rejects.toThrow(/Forbidden/i);
+    });
+
+    it("runAutonomousPipeline: dispatches to startDurablePipeline workflow as the sole execution path", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "c1") return Promise.resolve(mockClaim);
+          return Promise.resolve(null);
+        }),
         runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_sentinel_123", claimId: "c1" }),
       };
 
       const res = await (actionSentinelPipeline.runAutonomousPipeline as any)._handler(mockCtx, {
         claimId: "c1",
+        waitForCompletion: false,
       });
 
       expect(res.success).toBe(true);
@@ -593,7 +640,12 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
     });
 
     it("runAutonomousPipeline: passes through full configuration options to the durable workflow", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "c1") return Promise.resolve(mockClaim);
+          return Promise.resolve(null);
+        }),
         runMutation: vi.fn().mockResolvedValue({ workflowId: "wf_sentinel_456", claimId: "c1" }),
       };
 
@@ -621,6 +673,7 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
         clinicalFacts,
         autoDispatch: true,
         followUpCadenceDays: 14,
+        waitForCompletion: false,
       });
 
       expect(res.success).toBe(true);
