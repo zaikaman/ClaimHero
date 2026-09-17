@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-16T18:10:00Z
+- **Last updated:** 2026-09-17T02:45:00Z
 
 ## Log
 
@@ -1549,7 +1549,7 @@ Implemented in-browser optical intake and converted AWS Textract into an optiona
 - Config & Documentation: Updated `.env.example` and `README.md` to document Textract as an optional server-side enhancement, update test counts (1,061 tests across 70 suites) and test suite descriptions, and highlight in-browser optical intake.
 - Regression Verification: Added unit test suite `tests/clientOcrAndOptionalTextract.test.ts`, updated `tests/textract.test.ts` and `tests/formalPdfAttachments.test.ts`, and verified 100% clean across typecheck, lint, 1,061 passing tests across 70 test suites, and production build.
 
-### 2026-09-16 - working tree
+### 2026-09-16 - 4b20361
 - Fixed broken external link for the "Your appeal rights (law)" / "ERISA 29 CFR § 2560.503-1" navigation item in `src/components/layout/Sidebar.tsx` to the authoritative Electronic Code of Federal Regulations (eCFR) legal codification.
 - Decoupled Precedent & Statutory Rubrics and Wired Vector Handoff (`convex/actions/precedentMatcher.ts`, `convex/workflows.ts`, `convex/schema.ts`, `convex/claims.ts`, `src/types/index.ts`, `src/components/radar/CaseRadar.tsx`, `tests/actionsPrecedentsAndPipeline.test.ts`):
   - Fixed Production Wiring Gap: Passed retrieved `vectorPrecedents` from durable workflow Step 2 into `computeOverturnScoreInternal` (Step 3), and added backward-compatible precedent extraction from attached `clinicalEvidences` when actions are called directly.
@@ -1559,7 +1559,13 @@ Implemented in-browser optical intake and converted AWS Textract into an optiona
   - Updated Documentation & Public Artifacts: Refactored `README.md` to document the decoupled 4-pillar Statutory Appeal Readiness Rubric, pipeline vector handoff, multi-factor legal precedent matching (similarity thresholds, CARC/CPT code parity, and adverse precedent safeguards), Judge Evidence Matrix updates, and updated test suite metrics (1,063 automated tests across 70 test suites, ~82.7% statement coverage).
   - Regression Coverage: Added unit tests asserting inflation prevention on zero precedents, adverse precedent penalty handling, and readiness score persistence (`tests/actionsPrecedentsAndPipeline.test.ts`). Verified 1,063/1,063 passing tests across 70 suites, 0 typecheck errors, 0 lint warnings, and clean production build.
 
-
-
-
-
+### 2026-09-17 - working tree
+Refactored aggressive and unverified legal conclusions in Policy Drift Sentinel into an objective, jurisdiction-aware Clinical Policy Discrepancy & Governing Criteria Notice (`convex/actions/policyDriftSentinel.ts`, `convex/lib/policyDriftNotice.ts`, `convex/policyDrift.ts`, `convex/schema.ts`, `src/types/index.ts`, `src/components/evidence/PolicyDriftSentinel.tsx`, `README.md`, `tests/policyDriftSentinel.test.ts`, `tests/detailMode.test.ts`):
+- Replaced inflammatory rhetoric ("FORMAL NOTICE OF STATUTORY ERISA VIOLATION", premature bad-faith tort assertions) with evidence-grounded discrepancy findings comparing Date-of-Service clinical criteria against live alterations.
+- Introduced multi-tier governing framework support (`erisa_self_funded`, `erisa_insured`, `medicare_advantage` under CMS 42 CFR § 422.101/CMS-4201-F, `medicaid_mco` under 42 CFR Part 438, `aca_individual`, and `general_administrative`) with automatic payer metadata inference.
+- Re-anchored the 29 U.S.C. § 1132(c)(1) $110/day statutory penalty from an asserted fine to a formal 30-day administrative record demand clock under 29 U.S.C. § 1024(b)(4) and 29 CFR § 2560.503-1(h)(2)(iii).
+- Added interactive Framework and Appellate Posture selectors (`objective_inquiry`, `procedural_demand`, `statutory_escalation`) in the Policy Drift Sentinel modal, allowing advocates to dynamically adjust tone and citations prior to appending to the appeal brief.
+- Implemented complete Simple Mode (Everyday Language) parity across all Policy Drift Sentinel components and dialogs ("Policy Change Detector", "Check for Rule Changes", "Rule Changed After Your Denial Date", "View Rule Change Letter", "Rules on Denial Date", "Changes Found in Insurer Rules", "Harder for Your Claim", "Add to Appeal Letter"), keeping technical jargon strictly behind the Expert Details toggle.
+- Created isolate-safe `convex/lib/policyDriftNotice.ts` for cross-environment deterministic notice generation and updated audit logs.
+- Synchronized `README.md` features, directory layout, and test suite metrics (1,067 automated tests across 70 test suites, ~82.7% statement coverage).
+- Added regression tests in `tests/detailMode.test.ts` asserting Simple Mode and Expert Details label transitions. Verified 100% clean with `npm run verify` across all 70 test suites (1,067 passing tests), strict typecheck (0 errors), lint (0 warnings), coverage, and production build.

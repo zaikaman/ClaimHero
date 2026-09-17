@@ -111,6 +111,8 @@ export const saveDriftInternal = internalMutation({
     detectedChanges: v.array(detectedChangeValidator),
     erisaNoticeDraft: v.optional(v.string()),
     erisaNoticeGeneratedAt: v.optional(v.number()),
+    governingFramework: v.optional(v.string()),
+    noticePosture: v.optional(v.string()),
     status: driftStatusValidator,
     errorMessage: v.optional(v.string()),
   },
@@ -139,6 +141,8 @@ export const saveDriftInternal = internalMutation({
       detectedChanges: args.detectedChanges,
       erisaNoticeDraft: args.erisaNoticeDraft,
       erisaNoticeGeneratedAt: args.erisaNoticeGeneratedAt,
+      governingFramework: args.governingFramework,
+      noticePosture: args.noticePosture,
       status: args.status,
       errorMessage: args.errorMessage,
       createdAt: now,
@@ -147,7 +151,7 @@ export const saveDriftInternal = internalMutation({
 
     // Record immutable statutory audit log entry in the Merkle audit chain
     const auditDetails = args.isRetroactiveAlteration
-      ? `Retroactive policy alteration flagged for ${args.policyTitle}. ${args.detectedChanges.length} criteria changes detected since baseline snapshot (${args.baselineContentHash.slice(0, 8)} vs ${args.liveContentHash.slice(0, 8)}). ERISA Bad-Faith Notice of Violation drafted.`
+      ? `Retroactive policy criteria discrepancy flagged for ${args.policyTitle}. ${args.detectedChanges.length} criteria changes detected against Date-of-Service snapshot (${args.baselineContentHash.slice(0, 8)} vs ${args.liveContentHash.slice(0, 8)}). Clinical Policy Discrepancy & Governing Criteria Notice generated.`
       : args.hasDrift
       ? `Policy drift scan completed for ${args.policyTitle}. Minor non-retroactive criteria updates detected.`
       : `Policy drift scan verified for ${args.policyTitle}. Policy content matches baseline snapshot (0 drift detected).`;
@@ -218,14 +222,17 @@ export const appendErisaNoticeToAppeal = mutation({
       throw new Error("No active appeal brief found to append notice to");
     }
 
-    const noticeHeader = "### Exhibit: ERISA Bad-Faith Notice of Violation (Retroactive Policy Alteration)";
+    const modernHeader = "### Exhibit: Clinical Policy Discrepancy & Governing Criteria Notice";
+    const legacyHeader = "### Exhibit: ERISA Bad-Faith Notice of Violation (Retroactive Policy Alteration)";
+    const noticeHeader = modernHeader;
     const appendMarker = `\n\n---\n\n${noticeHeader}\n\n`;
     let updatedAppealMarkdown = appeal.fullAppealMarkdown;
 
-    if (updatedAppealMarkdown.includes(noticeHeader)) {
-      // Replace existing notice block cleanly if already appended previously
-      const delimiter = updatedAppealMarkdown.includes(appendMarker) ? appendMarker : noticeHeader;
-      const parts = updatedAppealMarkdown.split(delimiter);
+    if (updatedAppealMarkdown.includes(modernHeader)) {
+      const parts = updatedAppealMarkdown.split(updatedAppealMarkdown.includes(appendMarker) ? appendMarker : modernHeader);
+      updatedAppealMarkdown = `${parts[0].trimEnd()}${appendMarker}${drift.erisaNoticeDraft}`;
+    } else if (updatedAppealMarkdown.includes(legacyHeader)) {
+      const parts = updatedAppealMarkdown.split(legacyHeader);
       updatedAppealMarkdown = `${parts[0].trimEnd()}${appendMarker}${drift.erisaNoticeDraft}`;
     } else {
       updatedAppealMarkdown = `${updatedAppealMarkdown.trimEnd()}${appendMarker}${drift.erisaNoticeDraft}`;
@@ -241,7 +248,7 @@ export const appendErisaNoticeToAppeal = mutation({
       claimId: args.claimId,
       eventType: "appeal_edited",
       actor: "Policy Drift Sentinel",
-      details: `Appended ERISA Bad-Faith Notice of Violation to active appeal brief (Version ${appeal.version}).`,
+      details: `Appended Clinical Policy Discrepancy Notice to active appeal brief (Version ${appeal.version}).`,
       timestamp: now,
     });
 

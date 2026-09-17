@@ -5,6 +5,8 @@ import * as authLib from "../convex/lib/auth";
 import {
   computeContentSha256,
   generateErisaBadFaithNotice,
+  generatePolicyDiscrepancyNotice,
+  inferGoverningFramework,
   heuristicDriftComparison,
 } from "../convex/actions/policyDriftSentinel";
 // @ts-expect-error - getAuthUserId is provided via vitest mock
@@ -102,8 +104,8 @@ describe("Policy Drift Sentinel — Retroactive Policy Alteration Detector", () 
     });
   });
 
-  describe("ERISA Bad-Faith Notice of Violation Drafting", () => {
-    it("synthesizes formal statutory notice citing 29 CFR § 2560.503-1 and $110/day penalties", () => {
+  describe("Clinical Policy Discrepancy & Governing Notice Drafting", () => {
+    it("synthesizes formal statutory notice citing 29 CFR § 2560.503-1 and $110/day administrative record request window", () => {
       const notice = generateErisaBadFaithNotice({
         patientName: "Robert Vance",
         memberId: "VNC-78210",
@@ -130,7 +132,7 @@ describe("Policy Drift Sentinel — Retroactive Policy Alteration Detector", () 
         ],
       });
 
-      expect(notice).toContain("FORMAL NOTICE OF STATUTORY ERISA VIOLATION");
+      expect(notice).toContain("NOTICE OF CLINICAL POLICY DISCREPANCY & GOVERNING CRITERIA RECONSIDERATION DEMAND");
       expect(notice).toContain("29 CFR § 2560.503-1(h)(2)(iii)");
       expect(notice).toContain("29 U.S.C. § 1133");
       expect(notice).toContain("29 U.S.C. § 1104(a)(1)");
@@ -142,6 +144,50 @@ describe("Policy Drift Sentinel — Retroactive Policy Alteration Detector", () 
       expect(notice).toContain("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
       expect(notice).toContain("Added 6-Month Physical Therapy Requirement");
       expect(notice).toContain("U.S. Department of Labor Employee Benefits Security Administration (EBSA)");
+    });
+
+    it("synthesizes Medicare Advantage specific notice citing CMS 42 CFR § 422.101 and CMS-4201-F", () => {
+      const notice = generatePolicyDiscrepancyNotice({
+        patientName: "Dorothy Miller",
+        memberId: "MED-49102",
+        claimNumber: "CLM-MA-881",
+        payer: "UnitedHealthcare Medicare Advantage",
+        serviceDate: "2026-05-10",
+        denialReasonCode: "CO-50",
+        cptCodes: ["27447"],
+        policyTitle: "UHC Medicare Advantage Coverage Summary: Total Knee Arthroplasty",
+        policyUrl: "https://www.uhcprovider.com/policies/tka",
+        baselineCapturedAt: 1781500000000,
+        baselineHash: "hash123",
+        liveCapturedAt: 1789300000000,
+        liveHash: "hash456",
+        governingFramework: "medicare_advantage",
+        noticePosture: "objective_inquiry",
+        detectedChanges: [
+          {
+            category: "tightened_criteria",
+            title: "Added Functional Ambulatory Score Prerequisite",
+            liveText: "Must document ambulatory failure on 3 standardized scales",
+            impact: "Imposes hurdles more restrictive than traditional Medicare NCD/LCD standards.",
+            isAdverseToClaim: true,
+          },
+        ],
+      });
+
+      expect(notice).toContain("Medicare Advantage Part C Standards");
+      expect(notice).toContain("42 CFR § 422.101");
+      expect(notice).toContain("CMS-4201-F");
+      expect(notice).not.toContain("ERISA § 503");
+      expect(notice).toContain("ADMINISTRATIVE INQUIRY & RECONSIDERATION REQUEST");
+    });
+
+    it("correctly infers governing frameworks from payer metadata", () => {
+      expect(inferGoverningFramework("Humana Medicare Advantage Part C")).toBe("medicare_advantage");
+      expect(inferGoverningFramework("Wellcare Medicaid Community Plan")).toBe("medicaid_mco");
+      expect(inferGoverningFramework("Ambetter Health Marketplace Exchange")).toBe("aca_individual");
+      expect(inferGoverningFramework("Boeing Corporate Direct Self-Funded Plan (ASO)")).toBe("erisa_self_funded");
+      expect(inferGoverningFramework("Aetna Life Insurance Company")).toBe("erisa_insured");
+      expect(inferGoverningFramework("Regional Health Trust")).toBe("general_administrative");
     });
   });
 
@@ -414,10 +460,12 @@ describe("Policy Drift Sentinel — Retroactive Policy Alteration Detector", () 
       expect(res.isRetroactiveAlteration).toBe(true);
       expect(res.severity).toBe("critical_bad_faith");
       expect(res.erisaNoticeDraft).toBeDefined();
-      expect(res.erisaNoticeDraft).toContain("FORMAL NOTICE OF STATUTORY ERISA VIOLATION");
+      expect(res.erisaNoticeDraft).toContain("NOTICE OF CLINICAL POLICY DISCREPANCY & GOVERNING CRITERIA RECONSIDERATION DEMAND");
       expect(res.erisaNoticeDraft).toContain("Jane Miller");
       expect(res.erisaNoticeDraft).toContain("CH-200");
       expect(res.erisaNoticeDraft).toContain("29 CFR § 2560.503-1(h)(2)(iii)");
+      expect(res.governingFramework).toBe("erisa_insured");
+      expect(res.noticePosture).toBe("procedural_demand");
     });
 
     it("throws forbidden error if caller does not own the claim", async () => {

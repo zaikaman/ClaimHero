@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -18,6 +18,15 @@ import { DetailModeToggle } from "../src/components/common/DetailModeToggle";
 import { SentinelFlowStepper } from "../src/components/common/SentinelFlowStepper";
 import { HERO_SLIDES, LANDING_NAV_LINKS } from "../src/components/landing/CinematicHero";
 import { ClinicalResearchConsole } from "../src/components/evidence/ClinicalResearchConsole";
+import { PolicyDriftSentinel } from "../src/components/evidence/PolicyDriftSentinel";
+
+let mockDriftData: any = null;
+
+vi.mock("convex/react", () => ({
+  useQuery: vi.fn(() => mockDriftData),
+  useMutation: vi.fn(() => vi.fn()),
+  useAction: vi.fn(() => vi.fn()),
+}));
 
 /**
  * The exact terms an everyday user must never meet on the first screen:
@@ -439,4 +448,111 @@ describe("ExpertDetail & PlainLabel Components", () => {
     expect(markup).toContain("3. Send &amp; track");
   });
 });
+
+describe("PolicyDriftSentinel Everyday Language vs Expert Details", () => {
+  const testClaim: any = {
+    _id: "claim_drift_test",
+    claimNumber: "CLM-9912",
+    patientName: "Eleanor Vance",
+    insurancePayer: "Cigna",
+    serviceDate: "2026-08-10",
+    denialReasonCode: "CO-50",
+    cptCodes: ["29881"],
+  };
+
+  const sampleDrift: any = {
+    _id: "drift_mock_1",
+    claimId: "claim_drift_test",
+    policyTitle: "Cigna CPB 0736 Knee Arthroscopy",
+    policyUrl: "https://cigna.com/cpb/0736",
+    baselineCapturedAt: 1723248000000,
+    baselineContentHash: "a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0",
+    liveCapturedAt: 1723507200000,
+    liveContentHash: "f0e1d2c3b4a59876543210fedcba9876543210fedcba9876543210fedcba9876",
+    hasDrift: true,
+    isRetroactiveAlteration: true,
+    severity: "critical",
+    summary: "Mandatory conservative therapy requirement added post-denial.",
+    detectedChanges: [
+      {
+        category: "step_therapy",
+        title: "Mandatory 12-week conservative therapy hurdle",
+        baselineText: "Trial of conservative therapy recommended where clinically appropriate.",
+        liveText: "Must document 12 consecutive weeks of supervised physical therapy prior to surgery.",
+        isAdverseToClaim: true,
+        impact: "Imposes an unannounced post-hoc hurdle not in effect on Date of Service.",
+      },
+    ],
+    erisaNoticeDraft: "Formal criteria discrepancy notice text...",
+    governingFramework: "erisa_insured",
+    noticePosture: "procedural_demand",
+    createdAt: 1723507200000,
+  };
+
+  it("renders friendly everyday language in Simple Mode", () => {
+    mockLocalStorage.setItem("claimhero_detail_mode", "simple");
+    mockDriftData = sampleDrift;
+
+    const markup = renderToStaticMarkup(
+      React.createElement(PolicyDriftSentinel, {
+        claim: testClaim,
+        evidences: [],
+      })
+    );
+
+    // Simple mode header and status labels
+    expect(markup).toContain("Policy Change Detector");
+    expect(markup).toContain("Check for Rule Changes");
+    expect(markup).toContain("Rule Change Detector");
+    expect(markup).toContain("Rule Changed After Your Denial Date");
+    expect(markup).toContain("View Rule Change Letter");
+
+    // Baseline & Live card labels
+    expect(markup).toContain("Rules on Denial Date");
+    expect(markup).toContain("Today&#x27;s Live Insurer Rules");
+
+    // Detected changes labels
+    expect(markup).toContain("Changes Found in Insurer Rules (1)");
+    expect(markup).toContain("Harder for Your Claim");
+    expect(markup).toContain("Original rule when you were denied:");
+    expect(markup).toContain("New rule added later to insurer website:");
+    expect(markup).toContain("Why this matters:");
+
+    // Technical jargon not present in simple mode
+    expect(markup).not.toContain("Policy Drift Sentinel");
+    expect(markup).not.toContain("Retroactive Policy Alteration Flagged");
+    expect(markup).not.toContain("Inspect Policy Discrepancy Notice");
+  });
+
+  it("renders precise appellate and statutory terms in Expert Details Mode", () => {
+    mockLocalStorage.setItem("claimhero_detail_mode", "detailed");
+    mockDriftData = sampleDrift;
+
+    const markup = renderToStaticMarkup(
+      React.createElement(PolicyDriftSentinel, {
+        claim: testClaim,
+        evidences: [],
+      })
+    );
+
+    // Expert Details header and status labels
+    expect(markup).toContain("Policy Drift Sentinel");
+    expect(markup).toContain("Detect Policy Drift");
+    expect(markup).toContain("Retroactive Alteration Detector");
+    expect(markup).toContain("Retroactive Policy Alteration Flagged");
+    expect(markup).toContain("Inspect Policy Discrepancy Notice");
+
+    // Baseline & Live card labels
+    expect(markup).toContain("Baseline Snapshot (Denial Date)");
+    expect(markup).toContain("Current Live Policy (Firecrawl Crawled)");
+
+    // Detected changes labels
+    expect(markup).toContain("Retroactive Criteria Changes Identified (1)");
+    expect(markup).toContain("Adverse to Claim");
+    expect(markup).toContain("Baseline Rule (At Denial Date):");
+    expect(markup).toContain("Current Live Alteration (Inserted Post-Denial):");
+    expect(markup).toContain("Regulatory Impact:");
+  });
+});
+
 

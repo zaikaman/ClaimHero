@@ -57,7 +57,7 @@ export async function extractTextFromPdf(
     const page = await pdfDoc.getPage(pageNum);
     const textContent = await page.getTextContent();
     const pageStr = textContent.items
-      .map((item) => ("str" in item ? item.str : ""))
+      .map((item: Record<string, unknown>) => ("str" in item && typeof item.str === "string" ? item.str : ""))
       .join(" ");
     pageTexts.push(pageStr.trim());
   }
