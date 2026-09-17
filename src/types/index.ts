@@ -761,6 +761,8 @@ export interface PolicyDriftReport {
   detectedChanges: DetectedPolicyChangeItem[];
   erisaNoticeDraft?: string;
   erisaNoticeGeneratedAt?: number;
+  governingFramework?: string;
+  noticePosture?: string;
   status: "analyzing" | "completed" | "failed";
   errorMessage?: string;
   createdAt: number;

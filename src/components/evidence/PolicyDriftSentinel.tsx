@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Warning,
   CheckCircle,
@@ -28,6 +28,28 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { formatDateTime, formatDate, cn } from "../../lib/utils";
 import { toast } from "sonner";
 import { useDetailMode } from "../../hooks/useDetailMode";
+import {
+  type GoverningFramework,
+  type NoticePosture,
+  getFrameworkShortBadge,
+  generatePolicyDiscrepancyNotice,
+  inferGoverningFramework,
+} from "../../../convex/lib/policyDriftNotice";
+
+const FRAMEWORK_OPTIONS: { id: GoverningFramework; label: string; desc: string }[] = [
+  { id: "erisa_insured", label: "ERISA Insured", desc: "Commercial group plan subject to federal ERISA full & fair review and state insurance standards." },
+  { id: "erisa_self_funded", label: "ERISA Self-Funded", desc: "Self-funded employer plan governed strictly by federal ERISA fiduciary obligations." },
+  { id: "medicare_advantage", label: "Medicare Advantage", desc: "CMS Part C plan governed by 42 CFR § 422 and national coverage standards." },
+  { id: "medicaid_mco", label: "Medicaid MCO", desc: "State Medicaid managed care plan governed by 42 CFR Part 438 Subpart F." },
+  { id: "aca_individual", label: "ACA Individual", desc: "Marketplace individual plan governed by 45 CFR § 147.136 & state insurance law." },
+  { id: "general_administrative", label: "General Administrative", desc: "Universal claims procedure standards precluding retroactive criteria application." },
+];
+
+const POSTURE_OPTIONS: { id: NoticePosture; label: string; desc: string }[] = [
+  { id: "objective_inquiry", label: "Objective Inquiry", desc: "Reconsideration request and date-of-service criteria verification." },
+  { id: "procedural_demand", label: "Procedural Demand", desc: "Standard demand to strike post-service criteria and 30-day record request." },
+  { id: "statutory_escalation", label: "Statutory Escalation", desc: "Formal reservation of rights to petition CMS, DOL EBSA, or State DOI." },
+];
 
 interface PolicyDriftSentinelProps {
   claim: Claim;
@@ -48,6 +70,8 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const [copiedNotice, setCopiedNotice] = useState(false);
   const [isAppendingNotice, setIsAppendingNotice] = useState(false);
+  const [selectedFramework, setSelectedFramework] = useState<GoverningFramework>("erisa_insured");
+  const [selectedPosture, setSelectedPosture] = useState<NoticePosture>("procedural_demand");
 
   // Reactive queries and actions
   const latestDrift = useQuery(api.policyDrift.getLatestDrift, {
@@ -56,16 +80,55 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
 
   const detectDriftAction = useAction(api.actions.policyDriftSentinel.detectPolicyDriftAction);
   const appendNoticeMutation = useMutation(api.policyDrift.appendErisaNoticeToAppeal);
+  const updateNoticeMutation = useMutation(api.policyDrift.updateErisaNotice);
+
+  // Sync framework from latest drift or claim
+  useEffect(() => {
+    if (latestDrift?.governingFramework) {
+      setSelectedFramework(latestDrift.governingFramework as GoverningFramework);
+    } else if (claim.insurancePayer) {
+      setSelectedFramework(inferGoverningFramework(claim.insurancePayer));
+    }
+    if (latestDrift?.noticePosture) {
+      setSelectedPosture(latestDrift.noticePosture as NoticePosture);
+    }
+  }, [latestDrift?.governingFramework, latestDrift?.noticePosture, claim.insurancePayer]);
+
+  // Dynamically generated notice reflecting user-selected framework & posture
+  const activeNoticeText = useMemo(() => {
+    if (!latestDrift) return "";
+    if (latestDrift.detectedChanges && latestDrift.detectedChanges.length > 0) {
+      return generatePolicyDiscrepancyNotice({
+        patientName: claim.patientName || "Claimant",
+        memberId: claim.patientId ? "MEM-" + claim.patientId.slice(-6) : "REDACTED-MEM",
+        claimNumber: claim.claimNumber,
+        payer: claim.insurancePayer || "Health Insurer",
+        serviceDate: claim.serviceDate,
+        denialReasonCode: claim.denialReasonCode,
+        cptCodes: claim.cptCodes,
+        policyTitle: latestDrift.policyTitle,
+        policyUrl: latestDrift.policyUrl,
+        baselineCapturedAt: latestDrift.baselineCapturedAt,
+        baselineHash: latestDrift.baselineContentHash,
+        liveCapturedAt: latestDrift.liveCapturedAt,
+        liveHash: latestDrift.liveContentHash,
+        detectedChanges: latestDrift.detectedChanges,
+        governingFramework: selectedFramework,
+        noticePosture: selectedPosture,
+      });
+    }
+    return latestDrift.erisaNoticeDraft || "";
+  }, [latestDrift, selectedFramework, selectedPosture, claim]);
 
   // Timer ref to prevent race conditions and memory leaks on unmount
-  const timersRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const clearAllTimers = React.useCallback(() => {
+  const clearAllTimers = useCallback(() => {
     timersRef.current.forEach((t) => clearTimeout(t));
     timersRef.current = [];
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       clearAllTimers();
     };
@@ -90,7 +153,7 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
         setCopiedNotice(true);
         const timer = setTimeout(() => setCopiedNotice(false), 2000);
         timersRef.current.push(timer);
-        toast.success("ERISA Bad-Faith Notice of Violation copied to clipboard");
+        toast.success("Clinical Policy Discrepancy Notice copied to clipboard");
       }
     } catch {
       toast.error("Unable to copy to clipboard");
@@ -111,12 +174,14 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
         setTimeout(() => setScanStage("Computing Cryptographic Fingerprints & Hashes..."), 2400)
       );
       timersRef.current.push(
-        setTimeout(() => setScanStage("Analyzing Criteria Drift & ERISA Bad-Faith Alterations..."), 3600)
+        setTimeout(() => setScanStage("Analyzing Criteria Drift & Date-of-Service Discrepancies..."), 3600)
       );
 
       const result = await detectDriftAction({
         claimId: claim._id as Id<"claims">,
         policyUrl: activePolicyUrl,
+        governingFramework: selectedFramework,
+        noticePosture: selectedPosture,
       });
 
       if (result.isRetroactiveAlteration) {
@@ -140,11 +205,17 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
     if (!latestDrift?._id) return;
     setIsAppendingNotice(true);
     try {
+      if (activeNoticeText && activeNoticeText !== latestDrift.erisaNoticeDraft) {
+        await updateNoticeMutation({
+          driftId: latestDrift._id as Id<"policyDrifts">,
+          noticeText: activeNoticeText,
+        });
+      }
       await appendNoticeMutation({
         claimId: claim._id as Id<"claims">,
         driftId: latestDrift._id as Id<"policyDrifts">,
       });
-      toast.success("ERISA Bad-Faith Notice appended to active appeal brief!");
+      toast.success("Clinical Policy Discrepancy Notice appended to active appeal brief!");
       setIsNoticeModalOpen(false);
       if (onNavigateToStudio) {
         onNavigateToStudio();
@@ -281,10 +352,10 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={() => setIsNoticeModalOpen(true)}
-                  className="text-xs gap-1.5 border-rose-500/30 text-rose-300 hover:bg-rose-500/15"
+                  className="text-xs gap-1.5 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/15"
                 >
-                  <FileText className="size-3.5 text-rose-400" />
-                  <span>{isDetailed ? "Inspect ERISA Violation Notice" : "View Legal Notice"}</span>
+                  <FileText className="size-3.5 text-cyan-400" />
+                  <span>{isDetailed ? "Inspect Policy Discrepancy Notice" : "View Evidentiary Notice"}</span>
                 </Button>
               </div>
             )}
@@ -495,49 +566,109 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
         </Card>
       )}
 
-      {/* ERISA Bad-Faith Notice of Violation Modal / Drawer */}
+      {/* Clinical Policy Discrepancy & Governing Criteria Notice Modal */}
       {latestDrift?.erisaNoticeDraft && (
         <Dialog open={isNoticeModalOpen} onOpenChange={setIsNoticeModalOpen}>
-          <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col bg-card border-border shadow-2xl p-0 overflow-hidden">
+          <DialogContent className="max-w-3xl max-h-[88vh] flex flex-col bg-card border-border shadow-2xl p-0 overflow-hidden">
             <DialogHeader className="p-4 px-6 border-b border-border/80 bg-muted/20">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <Badge variant="destructive" className="text-[10px] font-mono uppercase">
-                      29 CFR § 2560.503-1 Violation
+                    <Badge variant={latestDrift.isRetroactiveAlteration ? "destructive" : "secondary"} className="text-[10px] font-mono uppercase">
+                      {latestDrift.isRetroactiveAlteration ? "Criteria Discrepancy" : "Evidentiary Audit"}
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border-cyan-500/30">
+                      {getFrameworkShortBadge(selectedFramework)}
                     </Badge>
                     <span className="text-[10px] text-muted-foreground font-mono">
-                      $110/Day Statutory Demand
+                      30-Day Production Demand
                     </span>
                   </div>
                   <DialogTitle className="text-sm font-semibold text-foreground">
-                    ERISA Bad-Faith Notice of Violation (Retroactive Policy Alteration)
+                    Clinical Policy Discrepancy & Governing Criteria Notice
                   </DialogTitle>
                 </div>
               </div>
               <DialogDescription className="text-xs text-muted-foreground">
-                Formal statutory notice citing ERISA § 503, demanding immediate withdrawal of retroactive criteria and adjudication under baseline policy terms.
+                Evidence-grounded demand requesting administrative record disclosure and re-adjudication under Date-of-Service clinical criteria.
               </DialogDescription>
             </DialogHeader>
+
+            {/* Interactive Posture & Governing Framework Toolbar */}
+            <div className="px-6 py-3 border-b border-border/80 bg-muted/10 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-[10.5px] font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
+                  Plan Framework:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {FRAMEWORK_OPTIONS.map((fw) => (
+                    <button
+                      key={fw.id}
+                      type="button"
+                      onClick={() => setSelectedFramework(fw.id)}
+                      className={cn(
+                        "text-[10.5px] px-2.5 py-1 rounded border transition-colors font-medium",
+                        selectedFramework === fw.id
+                          ? "bg-cyan-500/15 border-cyan-500/50 text-cyan-300 shadow-sm"
+                          : "border-border/60 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                      )}
+                      title={fw.desc}
+                    >
+                      {fw.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-border/40">
+                <span className="text-[10.5px] font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
+                  Appellate Posture:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {POSTURE_OPTIONS.map((pos) => (
+                    <button
+                      key={pos.id}
+                      type="button"
+                      onClick={() => setSelectedPosture(pos.id)}
+                      className={cn(
+                        "text-[10.5px] px-2.5 py-1 rounded border transition-colors font-medium",
+                        selectedPosture === pos.id
+                          ? "bg-primary/20 border-primary/50 text-primary-foreground shadow-sm"
+                          : "border-border/60 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                      )}
+                      title={pos.desc}
+                    >
+                      {pos.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
             {/* Scrollable Document Body */}
             <div className="flex-1 overflow-y-auto p-6 text-xs leading-relaxed text-foreground font-sans space-y-4 bg-background/50 select-text">
               <div className="rounded-lg border border-border/80 bg-card p-4 font-mono text-[11px] whitespace-pre-wrap leading-normal text-muted-foreground select-text">
-                {latestDrift.erisaNoticeDraft}
+                {activeNoticeText}
               </div>
             </div>
 
             {/* Footer Action Controls */}
             <div className="p-3 px-6 border-t border-border/80 bg-muted/20 flex items-center justify-between gap-3">
-              <span className="text-[11px] text-muted-foreground font-mono">
-                Statutory Authority: 29 U.S.C. § 1133 & 29 CFR § 2560.503-1(h)(2)(iii)
+              <span className="text-[10.5px] text-muted-foreground font-mono truncate max-w-sm">
+                {selectedFramework === "medicare_advantage"
+                  ? "Regulatory Authority: CMS 42 CFR § 422.101 & 422.566"
+                  : selectedFramework === "medicaid_mco"
+                  ? "Regulatory Authority: 42 CFR Part 438 Subpart F"
+                  : selectedFramework === "aca_individual"
+                  ? "Regulatory Authority: 45 CFR § 147.136 & State DOI"
+                  : "Statutory Authority: 29 U.S.C. § 1133, § 1132(c)(1) & 29 CFR § 2560.503-1"}
               </span>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => handleCopy(latestDrift.erisaNoticeDraft || "", "notice")}
+                  onClick={() => handleCopy(activeNoticeText || "", "notice")}
                   className="text-xs gap-1.5"
                 >
                   {copiedNotice ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}

@@ -688,6 +688,8 @@ export default defineSchema({
     ),
     erisaNoticeDraft: v.optional(v.string()),
     erisaNoticeGeneratedAt: v.optional(v.number()),
+    governingFramework: v.optional(v.string()),
+    noticePosture: v.optional(v.string()),
     status: v.union(
       v.literal("analyzing"),
       v.literal("completed"),
