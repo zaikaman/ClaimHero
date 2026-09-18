@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-18T17:44:00Z
+- **Last updated:** 2026-09-18T17:56:00Z
 
 ## Log
 
@@ -1734,13 +1734,21 @@ Resolved production readiness issues 25 through 33 across calculations, statutor
 - Responsive Viewports & Accessibility: Replaced rigid layout heights in `AuthPage.tsx` and `AppealStudio.tsx` with responsive viewports; enabled mobile print trigger; added WAI-ARIA dialog accessibility and Escape key handling to escalation modal; added arrow-key roving tabIndex navigation to `SimpleInboxView.tsx` radio options; upgraded sub-readable badge fonts to minimum text-[10px].
 - Regression & Verification: Synchronized test metrics in `README.md` (1,242 automated tests across 79 test suites). Verified all 79 test suites (1,242 passing tests), clean typecheck (`tsc --noEmit`), clean lint, and production Vite build (`npm run build`). Convex features: actions, durable workflows, internalAction, mutations, queries, vector search.
 
-### 2026-09-18 - working tree
+### 2026-09-18 - 680d39c
 Replaced mock setTimeout in AuthPage password reset dialog with production-grade transactional recovery powered by AgentMail (`convex/schema.ts`, `convex/lib/rateLimiter.ts`, `convex/lib/passwordResetEmail.ts`, `convex/passwordReset.ts`, `src/components/auth/AuthPage.tsx`, `tests/passwordReset.test.ts`, `tests/publicExperienceTransition.test.ts`):
 - Password Recovery Schema & Rate Limiting: Added `passwordResetTokens` table to `convex/schema.ts` with compound indexes (`by_token`, `by_email_and_code`, `by_email`, `by_userId`), storing one-time 6-digit verification codes and cryptographic tokens with single-use invalidation (`usedAt`) and 15-minute expirations. Configured token bucket rate limiters in `convex/lib/rateLimiter.ts` (`passwordResetRequest`: 3/15min, `passwordResetVerify`: 5/15min) to prevent brute-force attacks and email flooding.
 - Transactional & Appellate Light-Mode Email Redesign: Redesigned all transactional and appellate emails (password recovery OTPs in `convex/lib/passwordResetEmail.ts`, inbound payer determination alerts, and formal appeal letters/correspondence dossiers in `convex/lib/appealEmail.ts`) from dark mode to an executive clinical light-mode aesthetic tailored for Gmail, Apple Mail, and Outlook. Built responsive table structures with soft slate canvas (`#f8fafc`), pure white card containers (`#ffffff`), subtle hairline borders (`#e2e8f0`), authoritative navy typography (`#0f172a` / `#334155`), high-contrast monospace verification blocks, structured clinical summary tables, and statutory ERISA § 503 legal notices.
 - Atomic Password Mutation & Direct Link Recovery: Implemented `verifyCodeAndResetPassword` and `resetPasswordWithToken` mutations invoking `components.authPasswordProvider.public.setPassword` to update Argon2id password hashes directly through `@convex-dev/auth`, enforcing password complexity and marking tokens spent in a single transaction.
 - Multi-Step Modal & URL Param Detection: Upgraded `AuthPage.tsx` dialog to handle code request, 6-digit code verification, 60s resend cooldown timer, direct `?resetToken=...` query param recovery, accessible error/success alerts, and auto-return to sign-in.
 - Regression & Verification: Added `tests/passwordReset.test.ts` with 16 targeted unit tests covering email rendering, XSS sanitization, anti-enumeration protection, rate-limiting, expired/used token rejection, CRLF header injection defense, and password complexity error handling. Verified 80 test suites (1,258 passing tests), clean typecheck (`tsc --noEmit`), clean lint (`eslint src convex`), and production build (`npm run build`). Convex features: actions, internalAction, internalMutation, internalQuery, mutations, rateLimiter, schema, tables.
+
+### 2026-09-18 - working tree
+Resolved destination address discrepancy in communication inbox and message composer (`src/components/communications/SimpleInboxView.tsx`, `src/components/communications/AgentMailDrawer.tsx`, `src/hooks/useCommunications.ts`, `tests/simpleInboxUx.test.ts`):
+- Truthful Counterparty & Active Recipient Resolution: Resolved conversation recipient dynamically from `threads[0]?.payerEmail`, latest outbound message recipient (`msg.recipient`), and latest inbound message sender (`msg.sender`), preventing stale fallbacks to default production email (`officialEmail`) when an appeal was dispatched to a custom typed email address.
+- Delivered Status Banner & Quick Composer Synchronization: Updated `SimpleInboxView.tsx` and `AgentMailDrawer.tsx` to prompt follow-ups and display delivery confirmation using the actual dispatched recipient (`conversationRecipient`) across top status card ("Delivered to [recipient]"), quick composer placeholder ("Send a note or follow-up to [recipient]..."), and accessibility aria-labels. Preserved `effectiveRecipient` specifically for the re-dispatch configuration panel.
+- Prior Custom Recipient Memory: Added automatic pre-population of `customEmail` in `AgentMailDrawer.tsx` when re-dispatching if prior transmissions were sent to a custom recipient, eliminating redundant retyping.
+- Defensive Correspondence Action Dispatch: Hardened `sendMessage` in `src/hooks/useCommunications.ts` with layered fallback across thread payer email, latest outbound recipient, and latest inbound sender before falling back to payer registry email.
+- Regression Coverage: Added unit test in `tests/simpleInboxUx.test.ts` asserting that custom dispatched appeals truthfully prompt for and display the typed recipient instead of official production email. Verified 80 test suites (1,259 passing tests), clean typecheck, clean lint, and production build.
 
 
 

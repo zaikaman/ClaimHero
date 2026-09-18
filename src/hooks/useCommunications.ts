@@ -105,8 +105,13 @@ export function useCommunications(claim?: Claim | null, options?: UseCommunicati
     async (text: string) => {
       if (!claim?._id) return;
 
+      const lastOutbound = [...(threadDetails?.messages || [])].reverse().find((m) => m.direction === "outbound");
+      const lastInbound = [...(threadDetails?.messages || [])].reverse().find((m) => m.direction === "inbound");
+
       const recipient =
         threads?.[0]?.payerEmail ||
+        lastOutbound?.recipient ||
+        lastInbound?.sender ||
         claim.payerContact?.officialAppealsEmail;
 
       await sendOutboundAction({
@@ -120,7 +125,7 @@ export function useCommunications(claim?: Claim | null, options?: UseCommunicati
         approvalNotes: "Outbound correspondence authorized by advocate reviewer at transmission gate.",
       });
     },
-    [claim, threads, activeThreadId, sendOutboundAction]
+    [claim, threads, activeThreadId, threadDetails?.messages, sendOutboundAction]
   );
 
   // Dispatch full appeal packet

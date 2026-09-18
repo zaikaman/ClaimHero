@@ -160,6 +160,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     evaluatingMessageIdRef.current = null;
     seenMessageIdsRef.current = new Set(messages.map((m) => m._id));
     setIsRedispatchOpen(false);
+    setCustomEmail("");
   }, [claim._id]);
 
   // Real-time message arrival detector (audio chime, toast notification, and container-anchored smooth scroll)
@@ -400,9 +401,26 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
       ? customEmail.trim()
       : officialEmail;
 
+  const latestOutboundMessage = [...messages].reverse().find((m) => m.direction === "outbound");
+  const latestInboundMessage = [...messages].reverse().find((m) => m.direction === "inbound");
+
   const recipientEmail =
     threads[0]?.payerEmail ||
+    latestOutboundMessage?.recipient ||
+    latestInboundMessage?.sender ||
     effectiveRecipient;
+
+  // Pre-populate custom email if prior transmissions were sent to a custom address
+  useEffect(() => {
+    if (!customEmail) {
+      const priorRecipient =
+        (threads[0]?.payerEmail && threads[0].payerEmail !== officialEmail ? threads[0].payerEmail : "") ||
+        (latestOutboundMessage?.recipient && latestOutboundMessage.recipient !== officialEmail ? latestOutboundMessage.recipient : "");
+      if (priorRecipient) {
+        setCustomEmail(priorRecipient);
+      }
+    }
+  }, [claim._id, threads, messages, officialEmail, latestOutboundMessage?.recipient, customEmail]);
 
   const rawPatientName = claim.patient?.name || claim.patientName;
   const isPatientUnspecified =
@@ -533,6 +551,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
           dispatchMode={dispatchMode}
           setDispatchMode={setDispatchMode}
           effectiveRecipient={effectiveRecipient}
+          activeRecipient={recipientEmail}
+          threads={threads}
           canDispatch={canDispatch}
           isDispatching={isDispatching}
           onRunDispatch={handleRunDispatch}

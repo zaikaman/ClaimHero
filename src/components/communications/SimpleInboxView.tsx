@@ -19,7 +19,7 @@ import {
   CaretDown,
   CaretUp,
 } from "@phosphor-icons/react";
-import { Claim, EmailMessage, Appeal } from "../../types";
+import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, formatCurrency, cn } from "../../lib/utils";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
@@ -40,6 +40,8 @@ export interface SimpleInboxViewProps {
   dispatchMode: SimpleDispatchMode;
   setDispatchMode: (mode: SimpleDispatchMode) => void;
   effectiveRecipient?: string;
+  activeRecipient?: string;
+  threads?: EmailThread[];
   canDispatch: boolean;
   isDispatching: boolean;
   onRunDispatch: () => Promise<void>;
@@ -81,6 +83,8 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
   dispatchMode,
   setDispatchMode,
   effectiveRecipient,
+  activeRecipient,
+  threads,
   canDispatch,
   isDispatching,
   onRunDispatch,
@@ -126,6 +130,17 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
   }, [messages.length]);
 
   const isWon = claim.status === "won";
+
+  const latestOutbound = [...messages].reverse().find((m) => m.direction === "outbound");
+  const latestInbound = [...messages].reverse().find((m) => m.direction === "inbound");
+  const conversationRecipient =
+    activeRecipient ||
+    threads?.[0]?.payerEmail ||
+    latestOutbound?.recipient ||
+    latestInbound?.sender ||
+    effectiveRecipient ||
+    officialEmail ||
+    "";
 
   const toggleMessageExpand = (id: string) => {
     setExpandedMessageIds((prev) => {
@@ -540,7 +555,7 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {isWon
                     ? `Total recovered: ${formatCurrency(claim.deniedAmount || 0)} with $0 patient balance remaining.`
-                    : `Delivered to ${effectiveRecipient}. Most insurers reply within 30 to 60 days.`}
+                    : `Delivered to ${conversationRecipient || effectiveRecipient || payerName}. Most insurers reply within 30 to 60 days.`}
                 </p>
               </div>
             </div>
@@ -921,10 +936,10 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
           <form onSubmit={onSendReply} className="flex items-center gap-2">
             <Input
               type="text"
-              aria-label={`Send a note or follow-up to ${effectiveRecipient || payerName}`}
+              aria-label={`Send a note or follow-up to ${conversationRecipient || payerName}`}
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
-              placeholder={`Send a note or follow-up to ${effectiveRecipient || payerName}...`}
+              placeholder={`Send a note or follow-up to ${conversationRecipient || payerName}...`}
               className="flex-1 bg-background text-xs h-9"
               disabled={isSending}
             />

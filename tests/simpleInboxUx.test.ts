@@ -242,4 +242,69 @@ describe("SimpleInboxView UX & Communication Presentation", () => {
     expect(markup).toContain("Approve &amp; Send Response");
     expect(markup).toContain("Edit in Composer");
   });
+
+  it("prompts the user with the actual typed custom recipient instead of production address when appeal was dispatched to custom email", () => {
+    const customTypedEmail = "zaikaman123@gmail.com";
+    const officialPayerEmail = "appeals@uhc.com";
+
+    const customDispatchedMessages: EmailMessage[] = [
+      {
+        _id: "msg_custom_outbound_1",
+        threadId: "thread_custom_1",
+        claimId: "claim_test_inbox_1",
+        direction: "outbound",
+        sender: "claimhero-sender@agentmail.to",
+        recipient: customTypedEmail,
+        subject: "[ClaimHero #CLM-7429-UHC] Appeal request | Claim #CLM-7429-UHC | UnitedHealthcare Commercial",
+        bodyHtml: "<p>Formal appeal brief attached.</p>",
+        bodyText: "CLAIMHERO APPEALS DESK\nAppeal of Adverse Benefit Determination\nUnitedHealthcare Commercial - Claim #CLM-7429-UHC",
+        hasAttachments: true,
+        receivedAt: 1773310000000,
+      },
+    ];
+
+    const markup = renderToStaticMarkup(
+      React.createElement(SimpleInboxView, {
+        claim: { ...mockClaim, status: "dispatched" },
+        messages: customDispatchedMessages,
+        isLoading: false,
+        payerName: "UnitedHealthcare Commercial",
+        officialEmail: officialPayerEmail,
+        customEmail: "",
+        setCustomEmail: () => {},
+        dispatchMode: "official_payer", // default reset mode
+        setDispatchMode: () => {},
+        effectiveRecipient: officialPayerEmail, // previous bug would pass officialPayerEmail here
+        canDispatch: true,
+        isDispatching: false,
+        onRunDispatch: async () => {},
+        hasPriorTransmissions: true,
+        isReadyForReview: false,
+        isPatientUnspecified: false,
+        hasSender: true,
+        isSenderGatewayConfigured: true,
+        isCustomEmailLoopback: false,
+        activeAutoDraft: "",
+        isSynthesizing: false,
+        isSending: false,
+        onApproveAndSendDraft: async () => {},
+        onDismissDraft: async () => {},
+        replyText: "",
+        setReplyText: () => {},
+        onSendReply: () => {},
+        onOpenExportDrawer: () => {},
+        onOpenCertificateModal: () => {},
+        effectiveAppeal: null,
+      })
+    );
+
+    // Delivered banner must truthfully reflect the actual typed recipient we sent to
+    expect(markup).toContain(`Delivered to ${customTypedEmail}. Most insurers reply within 30 to 60 days.`);
+    expect(markup).not.toContain(`Delivered to ${officialPayerEmail}.`);
+
+    // Quick message composer placeholder and aria-label must prompt to send to the actual typed recipient
+    expect(markup).toContain(`placeholder="Send a note or follow-up to ${customTypedEmail}..."`);
+    expect(markup).toContain(`aria-label="Send a note or follow-up to ${customTypedEmail}"`);
+    expect(markup).not.toContain(`placeholder="Send a note or follow-up to ${officialPayerEmail}..."`);
+  });
 });
