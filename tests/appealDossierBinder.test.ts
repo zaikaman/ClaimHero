@@ -234,6 +234,23 @@ describe("Feature G: Formal Administrative Appeal Dossier & Exhibit PDF Binder",
       expect(dossier.memberId).toMatch(/\[REDACTED|\*\*/);
     });
 
+    it("generalizes service dates and scrubs physician contact identifiers in redacted exhibits", () => {
+      const dossier = buildDossierData(mockClaim, mockAppeal, mockEvidences, true);
+
+      expect(dossier.serviceDate).toBe("**/**/2024");
+      expect(dossier.exhibitA_Notice.serviceDate).toBe("**/**/2024");
+      expect(dossier.physicianInfo.phone).toBe("[REDACTED PHONE]");
+      expect(dossier.physicianInfo.email).toBe("[REDACTED EMAIL]");
+      expect(dossier.physicianInfo.npiNumber).toBe("[REDACTED NPI]");
+      // Attestation keeps a named declarant; contact identifiers do not ship.
+      expect(dossier.physicianInfo.name).toContain("Sarah Jenkins");
+
+      const operational = buildDossierData(mockClaim, mockAppeal, mockEvidences, false);
+      expect(operational.serviceDate).toContain("2024");
+      expect(operational.serviceDate).not.toContain("**");
+      expect(operational.physicianInfo.npiNumber).toBe("1982736450");
+    });
+
   });
 
   describe("Plain Text Dossier Serialization", () => {

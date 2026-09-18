@@ -222,10 +222,13 @@ export async function extractDocumentInBrowser(
   // Pre-redaction identifier capture for Convex DB vaulting
   const clientIdentifiers = extractClientVaultIdentifiers(extractedRawText);
 
-  // Client-Side De-Identification: redactBeforeLLM (HIPAA Safe Harbor)
+  // Client-Side De-Identification: HIPAA Safe Harbor with DOS masked, since
+  // the sanitized text may travel to untrusted model endpoints. Authentic DOS
+  // stays vaulted in `clientIdentifiers` / the Convex database for payer use.
   onProgress?.("Applying client-side HIPAA Safe Harbor de-identification...");
   const redactionOutput = fastSanitizeText(extractedRawText, {
     standard: "HIPAA_SAFE_HARBOR",
+    maskDateOfService: true,
   });
 
   return {

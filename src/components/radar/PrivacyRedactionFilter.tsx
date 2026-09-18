@@ -67,8 +67,13 @@ export const PrivacyRedactionFilter: React.FC<PrivacyRedactionFilterProps> = ({
 
   // Compute live redaction result
   const redactionResult = useMemo(() => {
-    return applyRedaction(originalText, detectedEntities, standard);
-  }, [originalText, detectedEntities, standard]);
+    return applyRedaction(originalText, detectedEntities, standard, {
+      standard,
+      customTerms,
+      patientName,
+      disabledEntityIds: Array.from(disabledEntityIds),
+    });
+  }, [originalText, detectedEntities, standard, customTerms, patientName, disabledEntityIds]);
 
   // Sync disabled entities if mode changes
   const handleStandardChange = (newStd: ComplianceStandard) => {
@@ -189,7 +194,7 @@ export const PrivacyRedactionFilter: React.FC<PrivacyRedactionFilterProps> = ({
           </span>
           <span className="text-[11px] text-muted-foreground font-mono">
             {standard === "HIPAA_SAFE_HARBOR" && "Standard Safe Harbor: Masks all 18 direct identifiers"}
-            {standard === "BALANCED_APPELLATE" && "Appellate Mode: Preserves claim routing while masking high-risk SSN & Suffix"}
+            {standard === "BALANCED_APPELLATE" && "Appellate Mode: Full Safe Harbor masking (historic partial preservation removed)"}
             {standard === "PUBLIC_EXHIBIT" && "Public Exhibit: Irreversible total de-identification for public precedents"}
             {standard === "CUSTOM" && "Custom Strategy: User-configured entity overrides"}
           </span>
@@ -224,7 +229,7 @@ export const PrivacyRedactionFilter: React.FC<PrivacyRedactionFilterProps> = ({
           >
             <span className="text-xs font-semibold">Appellate Payer</span>
             <span className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-              Masks Suffix & SSN-4
+              Full Safe Harbor Masks
             </span>
           </button>
 

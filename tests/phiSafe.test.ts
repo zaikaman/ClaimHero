@@ -26,7 +26,6 @@ vi.mock("openai", () => ({
 }));
 
 import {
-  createChatCompletion,
   createEmbedding,
   createStructuredCompletion,
 } from "../convex/lib/openai";
@@ -165,20 +164,24 @@ describe("openai boundary enforces the vault", () => {
     expect(sent).toContain("27447");
   });
 
-  it("blocks the request when vault sanitization cannot remove a value", async () => {
-    // Word-boundary vaulting intentionally skips identifiers fused into a
-    // longer token (X...Y). The fail-closed assertion uses substring matching
-    // and must still block egress before any network call.
+  it("redacts fused identifiers the vault misses and still fails closed on survivors", async () => {
+    // The hardened regex gate catches a member ID fused into a longer token
+    // (X...Y) that word-boundary vaulting intentionally skips.
+    const fused = deidentifyForLlm("Fused identifier XMBN9823412-01Y must not egress", {
+      memberId: "MBN9823412-01",
+    });
+    expect(fused).not.toContain("MBN9823412-01");
+
+    // A raw vault value that survives both layers still blocks egress before
+    // any network call: the fail-closed assertion uses substring matching.
     mockChatCreate.mockResolvedValueOnce({
       choices: [{ message: { content: "should never be reached" } }],
     });
-    await expect(
-      createChatCompletion({
-        systemPrompt: "hello",
-        userPrompt: "Fused identifier XMBN9823412-01Y must not egress",
-        phiValues: { memberId: "MBN9823412-01" },
+    expect(() =>
+      assertNoPhiLeak("Fused identifier XMBN9823412-01Y must not egress", {
+        memberId: "MBN9823412-01",
       })
-    ).rejects.toThrow(/PHI safety gate/);
+    ).toThrow(/PHI safety gate/);
     expect(mockChatCreate).not.toHaveBeenCalled();
   });
 

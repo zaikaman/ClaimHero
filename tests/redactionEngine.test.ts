@@ -8,7 +8,11 @@ import {
   maskDob,
   maskPatientName,
   maskMrn,
+  maskPhone,
+  maskEmail,
   maskAddress,
+  isPlausibleSsnDigits,
+  redactBeforeLLM,
 } from "../src/lib/redactionEngine";
 
 describe("HIPAA-Compliant Automated Redaction Engine", () => {
@@ -16,42 +20,57 @@ describe("HIPAA-Compliant Automated Redaction Engine", () => {
     it("masks SSN correctly across compliance standards", () => {
       const ssn = "123-45-6789";
       expect(maskSsn(ssn, "HIPAA_SAFE_HARBOR")).toBe("***-**-****");
-      expect(maskSsn(ssn, "BALANCED_APPELLATE")).toBe("***-**-6789");
+      // BALANCED no longer preserves the last-4: it is a HIPAA identifier and
+      // a quasi-identifier in combination with birth year / initials.
+      expect(maskSsn(ssn, "BALANCED_APPELLATE")).toBe("***-**-****");
       expect(maskSsn(ssn, "PUBLIC_EXHIBIT")).toBe("[REDACTED SSN]");
       expect(maskSsn("12345", "BALANCED_APPELLATE")).toBe("[REDACTED SSN]");
     });
 
     it("masks MRN and address across compliance standards", () => {
-      expect(maskMrn("MRN-984210", "BALANCED_APPELLATE")).toBe("MRN-***-210");
+      // BALANCED no longer preserves trailing MRN digits.
+      expect(maskMrn("MRN-984210", "BALANCED_APPELLATE")).toBe("[REDACTED MRN]");
       expect(maskMrn("123", "BALANCED_APPELLATE")).toBe("[REDACTED MRN]");
       expect(maskMrn("MRN-984210", "PUBLIC_EXHIBIT")).toBe("[REDACTED MRN]");
       expect(maskAddress("123 Main St", "HIPAA_SAFE_HARBOR")).toBe("[REDACTED ADDRESS]");
     });
 
+    it("masks contact identifiers fully in every standard", () => {
+      expect(maskPhone("(555) 019-2834", "BALANCED_APPELLATE")).toBe("[REDACTED PHONE]");
+      expect(maskPhone("(555) 019-2834", "HIPAA_SAFE_HARBOR")).toBe("[REDACTED PHONE]");
+      expect(maskEmail("jordan.taylor@example.com", "BALANCED_APPELLATE")).toBe("[REDACTED EMAIL]");
+      expect(maskEmail("jordan.taylor@example.com", "HIPAA_SAFE_HARBOR")).toBe("[REDACTED EMAIL]");
+    });
+
     it("masks Member ID suffixes correctly across compliance standards", () => {
       const memberWithSuffix = "MBN9823412-01";
-      expect(maskMemberId(memberWithSuffix, "BALANCED_APPELLATE")).toBe("MBN9823412-**");
+      // Every standard fully redacts beneficiary numbers: no root or suffix
+      // fragment is preserved in any mode.
+      expect(maskMemberId(memberWithSuffix, "BALANCED_APPELLATE")).toBe("[REDACTED MEMBER ID]");
       expect(maskMemberId(memberWithSuffix, "PUBLIC_EXHIBIT")).toBe("[REDACTED MEMBER ID]");
-      expect(maskMemberId(memberWithSuffix, "HIPAA_SAFE_HARBOR")).toBe("MBN***-**");
-      expect(maskMemberId(memberWithSuffix, "CUSTOM")).toBe("MBN9823412-**");
+      expect(maskMemberId(memberWithSuffix, "HIPAA_SAFE_HARBOR")).toBe("[REDACTED MEMBER ID]");
+      expect(maskMemberId(memberWithSuffix, "CUSTOM")).toBe("[REDACTED MEMBER ID]");
 
       // Member IDs without suffix
-      expect(maskMemberId("MBN9823412", "HIPAA_SAFE_HARBOR")).toBe("MBN***");
-      expect(maskMemberId("MBN9823412", "BALANCED_APPELLATE")).toBe("MBN9823***");
-      expect(maskMemberId("MBN", "BALANCED_APPELLATE")).toBe("[REDACTED ID]");
+      expect(maskMemberId("MBN9823412", "HIPAA_SAFE_HARBOR")).toBe("[REDACTED MEMBER ID]");
+      expect(maskMemberId("MBN9823412", "BALANCED_APPELLATE")).toBe("[REDACTED MEMBER ID]");
+      expect(maskMemberId("MBN", "BALANCED_APPELLATE")).toBe("[REDACTED MEMBER ID]");
     });
 
     it("masks Date of Birth correctly across compliance standards", () => {
       const dob = "05/14/1978";
+      // Safe Harbor permits the year; month/day are always removed.
       expect(maskDob(dob, "BALANCED_APPELLATE")).toBe("**/**/1978");
-      expect(maskDob(dob, "HIPAA_SAFE_HARBOR")).toBe("**/**/****");
+      expect(maskDob(dob, "HIPAA_SAFE_HARBOR")).toBe("**/**/1978");
+      expect(maskDob("May 14", "HIPAA_SAFE_HARBOR")).toBe("**/**/****");
       expect(maskDob(dob, "PUBLIC_EXHIBIT")).toBe("[REDACTED DOB]");
     });
 
     it("masks Patient Name correctly across compliance standards", () => {
       const name = "Jordan Lee Taylor";
-      expect(maskPatientName(name, "BALANCED_APPELLATE")).toBe("J. T.");
-      expect(maskPatientName("Cher", "BALANCED_APPELLATE")).toBe("C.");
+      // BALANCED no longer returns initials: they re-identify in combination.
+      expect(maskPatientName(name, "BALANCED_APPELLATE")).toBe("[PATIENT REDACTED]");
+      expect(maskPatientName("Cher", "BALANCED_APPELLATE")).toBe("[PATIENT REDACTED]");
       expect(maskPatientName(name, "PUBLIC_EXHIBIT")).toBe("[PATIENT NAME REDACTED]");
       expect(maskPatientName(name, "HIPAA_SAFE_HARBOR")).toBe("[PATIENT REDACTED]");
     });
@@ -82,9 +101,12 @@ describe("HIPAA-Compliant Automated Redaction Engine", () => {
       const entities = detectPiiEntities(sample);
 
       const dobEntities = entities.filter((e) => e.category === "dob");
-      expect(dobEntities.length).toBe(2);
+      // Safe Harbor redacts every calendar date, not just DOB-labeled ones:
+      // the admission date is caught by bare-date detection too.
+      expect(dobEntities.length).toBe(3);
       expect(dobEntities[0]?.originalText).toBe("05/14/1978");
-      expect(dobEntities[1]?.originalText).toContain("Oct 24, 1965");
+      expect(dobEntities.some((e) => e.originalText === "01/10/2026")).toBe(true);
+      expect(dobEntities.some((e) => e.originalText.includes("Oct 24, 1965"))).toBe(true);
     });
 
     it("detects Medical Record Numbers (MRN)", () => {
@@ -160,18 +182,27 @@ CPT: 27447 (Total Knee Arthroplasty) - Denied $24,500.00`;
       expect(result.stats.redactedCount).toBeGreaterThanOrEqual(6);
     });
 
-    it("executes Balanced Appellate Mode preserving last 4 SSN and Member root ID", () => {
+    it("executes Balanced Appellate Mode with full Safe Harbor masking", () => {
       const result = fastSanitizeText(complexDocument, {
         standard: "BALANCED_APPELLATE",
         patientName: "Eleanor Vance",
       });
 
-      expect(result.sanitizedText).toContain("***-**-6789");
-      expect(result.sanitizedText).toContain("MBN9823412-**");
-      expect(result.sanitizedText).toContain("MRN-***-210");
+      // No quasi-identifier preservation in any mode: no last-4, no birth
+      // year disclosure beyond the Safe Harbor year, no initials, no email
+      // prefix, no phone/MRN fragments.
+      expect(result.sanitizedText).toContain("***-**-****");
+      expect(result.sanitizedText).not.toContain("123-45-6789");
+      expect(result.sanitizedText).toContain("[REDACTED MEMBER ID]");
+      expect(result.sanitizedText).not.toContain("MBN9823412-01");
+      expect(result.sanitizedText).toContain("[REDACTED MRN]");
       expect(result.sanitizedText).toContain("**/**/1978");
-      expect(result.sanitizedText).toContain("E. V.");
+      expect(result.sanitizedText).toContain("[PATIENT REDACTED]");
+      expect(result.sanitizedText).not.toContain("Eleanor Vance");
+      expect(result.sanitizedText).not.toContain("E. V.");
       expect(result.sanitizedText).toContain("[REDACTED ADDRESS]");
+      expect(result.sanitizedText).toContain("[REDACTED EMAIL]");
+      expect(result.sanitizedText).toContain("[REDACTED PHONE]");
     });
 
     it("executes Public Legal Exhibit Mode with total anonymization tags", () => {
@@ -235,11 +266,14 @@ CPT: 27447 (Total Knee Arthroplasty) - Denied $24,500.00`;
       const claimText = "Claim #CLM-6104-GEO | Patient: Marcus Sterling | DOB: 11/22/1974 | Date of Service: 07/04/2026 | Procedure: 63047";
       const sanitized = fastSanitizeText(claimText);
 
-      // DOB must be redacted under HIPAA Safe Harbor
-      expect(sanitized.sanitizedText).toContain("**/**/****");
+      // DOB must be redacted under HIPAA Safe Harbor (year retained per Safe Harbor)
+      expect(sanitized.sanitizedText).toContain("**/**/1974");
+      expect(sanitized.sanitizedText).not.toContain("11/22/1974");
       // Date of Service must be PRESERVED so that claims and appeals have the authentic date
       expect(sanitized.sanitizedText).toContain("Date of Service: 07/04/2026");
-      expect(sanitized.sanitizedText).not.toContain("Date of Service: **/**/****");
+      expect(sanitized.sanitizedText).not.toContain("Date of Service: **/**/");
+      // Preservation is disclosed, so callers know the output is not de-identified
+      expect(sanitized.warnings.some((w) => /Date\(s\) of Service preserved/i.test(w))).toBe(true);
     });
 
     it("redacts both the phone and the address when a phone number precedes an address", () => {
@@ -294,6 +328,221 @@ CPT: 27447 (Total Knee Arthroplasty) - Denied $24,500.00`;
         standard: "PUBLIC_EXHIBIT",
       });
       expect(exhibitSanitized.sanitizedText).toBe("DOS: [REDACTED DOS] and Service Date: [REDACTED DOS]");
+    });
+  });
+
+  describe("Production Hardening: Bare Identifiers, Names & Safety Semantics", () => {
+    it("detects bare 9-digit SSNs without dashes or prefixes", () => {
+      expect(isPlausibleSsnDigits("123456789")).toBe(true);
+      expect(isPlausibleSsnDigits("000123456")).toBe(false);
+      expect(isPlausibleSsnDigits("666123456")).toBe(false);
+      expect(isPlausibleSsnDigits("900123456")).toBe(false);
+      expect(isPlausibleSsnDigits("123009999")).toBe(false);
+
+      const entities = detectPiiEntities("Secondary record notes SSN 987654321 on file.");
+      const ssn = entities.filter((e) => e.category === "ssn");
+      expect(ssn.length).toBeGreaterThanOrEqual(1);
+      expect(ssn.some((e) => e.originalText === "987654321")).toBe(true);
+
+      const sanitized = fastSanitizeText("Secondary record notes SSN 987654321 on file.");
+      expect(sanitized.sanitizedText).not.toContain("987654321");
+      expect(sanitized.sanitizedText).toContain("***-**-****");
+    });
+
+    it("does not mistake phone fragments or member IDs for bare SSNs", () => {
+      const phoneEntities = detectPiiEntities("Call (555) 019-2834 today.");
+      expect(phoneEntities.some((e) => e.category === "ssn")).toBe(false);
+      expect(phoneEntities.some((e) => e.category === "contact")).toBe(true);
+
+      const memberEntities = detectPiiEntities("Member ID: MBN9823412-01 confirmed.");
+      expect(memberEntities.some((e) => e.category === "member_id")).toBe(true);
+    });
+
+    it("redacts bare calendar dates even without a DOB label", () => {
+      const entities = detectPiiEntities("Chart notes birth 04/14/1968 and follow-up 2026-07-04.");
+      const dates = entities.filter((e) => e.category === "dob");
+      expect(dates.some((e) => e.originalText === "04/14/1968")).toBe(true);
+      expect(dates.some((e) => e.originalText === "2026-07-04")).toBe(true);
+
+      const sanitized = fastSanitizeText("Chart notes birth 04/14/1968.", {
+        patientName: "Test Patient",
+      });
+      expect(sanitized.sanitizedText).not.toContain("04/14/1968");
+      expect(sanitized.sanitizedText).toContain("**/**/1968");
+    });
+
+    it("detects standalone member IDs without a dependent suffix", () => {
+      const entities = detectPiiEntities("Verify coverage for MBN9823412 before submission.");
+      const member = entities.filter((e) => e.category === "member_id");
+      expect(member.length).toBeGreaterThanOrEqual(1);
+      expect(member[0]?.originalText).toBe("MBN9823412");
+
+      const sanitized = fastSanitizeText("Verify coverage for MBN9823412 before submission.");
+      expect(sanitized.sanitizedText).not.toContain("MBN9823412");
+      expect(sanitized.sanitizedText).toContain("[REDACTED MEMBER ID]");
+    });
+
+    it("detects group numbers via the Group label", () => {
+      const entities = detectPiiEntities("Group Number: GRP-99420-CUSTOM on file.");
+      expect(entities.some((e) => e.category === "member_id")).toBe(true);
+      const sanitized = fastSanitizeText("Group Number: GRP-99420-CUSTOM on file.");
+      expect(sanitized.sanitizedText).not.toContain("GRP-99420-CUSTOM");
+    });
+
+    it("catches surname-only mentions when patientName is supplied", () => {
+      const text = "Eleanor Vance was admitted. Vance tolerated the procedure well.";
+      const entities = detectPiiEntities(text, { patientName: "Eleanor Vance" });
+      const names = entities.filter((e) => e.category === "name");
+      expect(names.length).toBeGreaterThanOrEqual(2);
+
+      const sanitized = fastSanitizeText(text, { patientName: "Eleanor Vance" });
+      expect(sanitized.sanitizedText).not.toContain("Vance");
+      expect(sanitized.sanitizedText).not.toContain("Eleanor");
+    });
+
+    it("flags free-floating person names even without patientName context", () => {
+      const entities = detectPiiEntities("Clinical summary for Eleanor Vance indicates improvement.");
+      const names = entities.filter((e) => e.category === "name");
+      expect(names.some((e) => e.originalText === "Eleanor Vance")).toBe(true);
+
+      const result = fastSanitizeText("Clinical summary for Eleanor Vance indicates improvement.");
+      expect(result.sanitizedText).not.toContain("Eleanor Vance");
+      expect(result.warnings.some((w) => /Heuristic person-name/i.test(w))).toBe(true);
+    });
+
+    it("does not redact clinical procedure phrases as person names", () => {
+      const entities = detectPiiEntities(
+        "Patient presents with Kellgren-Lawrence Grade IV joint space narrowing. Total Knee Arthroplasty discussed."
+      );
+      const names = entities.filter((e) => e.category === "name");
+      expect(names.length).toBe(0);
+    });
+
+    it("never certifies preserved names or reviewer overrides as safe", () => {
+      const preserved = fastSanitizeText("Patient: Marcus Sterling | DOB: 11/22/1974", {
+        preservePatientName: true,
+      });
+      expect(preserved.isCertifiedSafe).toBe(false);
+      expect(preserved.warnings.some((w) => /intentionally preserved/i.test(w))).toBe(true);
+      expect(preserved.sanitizedText).toContain("Marcus Sterling");
+
+      const entities = detectPiiEntities("SSN: 123-45-6789", { standard: "HIPAA_SAFE_HARBOR" });
+      const disabled = entities.map((e) => e.id);
+      const overridden = applyRedaction(
+        "SSN: 123-45-6789",
+        detectPiiEntities("SSN: 123-45-6789", {
+          standard: "HIPAA_SAFE_HARBOR",
+          disabledEntityIds: disabled,
+        }),
+        "CUSTOM",
+        { standard: "CUSTOM", disabledEntityIds: disabled }
+      );
+      expect(overridden.isCertifiedSafe).toBe(false);
+      expect(overridden.sanitizedText).toContain("123-45-6789");
+    });
+
+    it("warns instead of certifying undetected text as safe", () => {
+      const clean = fastSanitizeText("No identifiers here, just a routine note.");
+      expect(clean.warnings.some((w) => /cannot guarantee absence of PHI/i.test(w))).toBe(true);
+    });
+
+    it("redactBeforeLLM forces HIPAA with DOS masking even when callers ask otherwise", () => {
+      const out = redactBeforeLLM("DOS: 07/04/2026 and DOB: 05/14/1978", {
+        standard: "BALANCED_APPELLATE",
+        maskDateOfService: false,
+      } as never);
+      expect(out).not.toContain("07/04/2026");
+      expect(out).not.toContain("05/14/1978");
+    });
+
+    it("keeps clinical codes and amounts intact while redacting bare identifiers", () => {
+      const out = fastSanitizeText("CPT: 27447 M17.11 denied $24,500.00 for MBN9823412 born 04/14/1968.");
+      expect(out.sanitizedText).toContain("27447");
+      expect(out.sanitizedText).toContain("M17.11");
+      expect(out.sanitizedText).not.toContain("MBN9823412");
+      expect(out.sanitizedText).not.toContain("04/14/1968");
+    });
+
+    it("redacts ZIP+4 and state-anchored ZIPs while keeping states and CPT codes", () => {
+      const zip4 = detectPiiEntities("Mail to Springfield, IL 62701-1234 today.");
+      expect(zip4.some((e) => e.category === "address" && e.originalText === "62701-1234")).toBe(true);
+
+      const out = fastSanitizeText("Mail records to Springfield, IL 62701 for CPT 27447.");
+      expect(out.sanitizedText).toContain("IL");
+      expect(out.sanitizedText).not.toContain("62701");
+      expect(out.sanitizedText).toContain("27447");
+
+      const poBox = fastSanitizeText("Send to P.O. Box 1000 for review.");
+      expect(poBox.sanitizedText).not.toContain("P.O. Box 1000");
+      expect(poBox.sanitizedText).toContain("[REDACTED ADDRESS]");
+    });
+
+    it("does not certify output with preserved DOS dates as safe", () => {
+      const preserved = fastSanitizeText("DOS: 07/04/2026 confirmed.");
+      expect(preserved.isCertifiedSafe).toBe(false);
+      expect(preserved.sanitizedText).toContain("07/04/2026");
+      expect(preserved.warnings.some((w) => /Date\(s\) of Service preserved/i.test(w))).toBe(true);
+
+      const masked = fastSanitizeText("DOS: 07/04/2026 confirmed.", { maskDateOfService: true });
+      expect(masked.isCertifiedSafe).toBe(true);
+      expect(masked.sanitizedText).not.toContain("07/04/2026");
+    });
+
+    it("redacts ISO datetimes including the time component", () => {
+      const out = fastSanitizeText("Recorded at 2026-07-04T10:30:00 in the chart.");
+      expect(out.sanitizedText).not.toContain("2026-07-04");
+      expect(out.sanitizedText).not.toContain("10:30:00");
+      expect(out.sanitizedText).toContain("**/**/2026");
+    });
+
+    it("detects hyphenated and lowercase standalone member IDs without touching CARC codes", () => {
+      for (const id of ["PEN-610492", "GRP-99214", "mbn9823412"]) {
+        const entities = detectPiiEntities(`Coverage under ${id} is active.`);
+        expect(entities.some((e) => e.category === "member_id")).toBe(true);
+        expect(fastSanitizeText(`Coverage under ${id} is active.`).sanitizedText).not.toContain(id);
+      }
+      const carc = fastSanitizeText("Denial CO-50 issued for CLM-6104.");
+      expect(carc.sanitizedText).toContain("CO-50");
+      expect(carc.sanitizedText).toContain("CLM-6104");
+    });
+
+    it("redacts ordinal dates with and without DOB labels", () => {
+      const prefixed = fastSanitizeText("DOB: Oct 24th, 1965 on file.", { patientName: "Test Patient" });
+      expect(prefixed.sanitizedText).not.toContain("Oct 24th, 1965");
+
+      const bare = fastSanitizeText("Born May 14th 1978 at home.", { patientName: "Test Patient" });
+      expect(bare.sanitizedText).not.toContain("May 14th 1978");
+      expect(bare.sanitizedText).toContain("**/**/1978");
+    });
+
+    it("catches apostrophized names and single surnames after labels", () => {
+      const apostrophe = fastSanitizeText("Sean O'Brien tolerated the procedure.", {
+        patientName: "Sean O'Brien",
+      });
+      expect(apostrophe.sanitizedText).not.toContain("O'Brien");
+
+      const lone = detectPiiEntities("Patient: Vance presented with pain.");
+      expect(lone.some((e) => e.category === "name" && e.originalText === "Vance")).toBe(true);
+    });
+
+    it("redacts unformatted phones and fax fragments without touching timestamps", () => {
+      const ten = fastSanitizeText("Call 5550192834 today.");
+      expect(ten.sanitizedText).not.toContain("5550192834");
+
+      const fax = fastSanitizeText("Fax 019-2834 for records.");
+      expect(fax.sanitizedText).not.toContain("019-2834");
+
+      const stamp = fastSanitizeText("Event 1789144706899 logged for CPT 27447.");
+      expect(stamp.sanitizedText).toContain("1789144706899");
+      expect(stamp.sanitizedText).toContain("27447");
+    });
+
+    it("redacts spaced 3-3-3 SSN-shaped runs only when issuance-plausible", () => {
+      const plausible = fastSanitizeText("Record shows 123 456 789 on the card.");
+      expect(plausible.sanitizedText).not.toContain("123 456 789");
+
+      const invalid = fastSanitizeText("Batch 000 123 456 counted.");
+      expect(invalid.sanitizedText).toContain("000 123 456");
     });
   });
 });

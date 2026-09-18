@@ -246,15 +246,20 @@ export function buildDossierData(
       ];
 
   const sender = claim.appealContext?.sender;
+  // Public exhibits must not carry treating-physician contact identifiers or
+  // exact service dates. Names, credentials, and facility stay (a physician
+  // attestation without a declarant is meaningless), but NPI/phone/email are
+  // direct identifiers and service dates generalize to year-only.
+  const serviceYearMatch = claim.serviceDate ? claim.serviceDate.match(/\b((?:19|20)\d{2})\b/) : null;
   const physicianInfo: DossierPhysicianInfo = {
     name: sender?.name || claim.providerName || "Treating Physician, MD",
     credentials: sender?.credentials || "MD, Board Certified Specialist",
-    npiNumber: sender?.npiNumber || ((claim as unknown as Record<string, unknown>).providerNpi as string) || "Not provided",
+    npiNumber: isRedacted ? "[REDACTED NPI]" : (sender?.npiNumber || ((claim as unknown as Record<string, unknown>).providerNpi as string) || "Not provided"),
     medicalLicenseState: claim.patient?.state || "US",
     specialty: "Orthopedic Surgery / Internal Medicine",
     facility: "Attending Medical Center & Surgical Group",
-    phone: sender?.phone || "Not provided",
-    email: sender?.email || claim.assignedAgentEmail || "appeals@claimhero.io",
+    phone: isRedacted ? "[REDACTED PHONE]" : (sender?.phone || "Not provided"),
+    email: isRedacted ? "[REDACTED EMAIL]" : (sender?.email || claim.assignedAgentEmail || "appeals@claimhero.io"),
     attestationDate: formatDossierDate(appeal?.updatedAt || Date.now()),
   };
 
@@ -369,7 +374,7 @@ export function buildDossierData(
     providerName: claim.providerName || "Treating Physician, MD",
     physicianInfo,
     
-    serviceDate: formatDossierDate(claim.serviceDate),
+      serviceDate: isRedacted && serviceYearMatch ? `**/**/${serviceYearMatch[1]}` : formatDossierDate(claim.serviceDate),
     billedAmount: claim.deniedAmount || 0,
     deniedAmount: claim.deniedAmount || 0,
     patientLiability: claim.patientOwedAmount || 0,
@@ -384,13 +389,15 @@ export function buildDossierData(
     medicalNecessityArguments,
     legalCitations,
     fullAppealMarkdown,
-    physicianNotes: claim.appealContext?.physicianNotes,
+    physicianNotes: isRedacted && claim.appealContext?.physicianNotes
+      ? fastSanitizeText(claim.appealContext.physicianNotes, { standard: "PUBLIC_EXHIBIT", patientName: rawPatientName }).sanitizedText
+      : claim.appealContext?.physicianNotes,
     
     exhibitA_Notice: {
       claimNumber: claim.claimNumber,
       denialReasonCode: claim.denialReasonCode || "CO-50",
       denialReasonDescription: claim.denialReasonDescription || "Adverse Benefit Determination",
-      serviceDate: formatDossierDate(claim.serviceDate),
+    serviceDate: isRedacted && serviceYearMatch ? `**/**/${serviceYearMatch[1]}` : formatDossierDate(claim.serviceDate),
       deniedAmount: claim.deniedAmount || 0,
       patientOwedAmount: claim.patientOwedAmount || 0,
       hasLetterAttachment: Boolean(claim.denialLetterStorageId),

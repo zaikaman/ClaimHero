@@ -128,14 +128,15 @@ describe("Judge UX & Pipeline Hardening", () => {
       },
     };
 
-    // Redaction gate simulation as used in CaseRadar.tsx
+    // Redaction gate simulation as used in CaseRadar.tsx (fully redacted: no
+    // initial or member prefix is preserved in Safe Harbor display).
     const isClaimRedacted = true;
     const name = isClaimRedacted
-      ? (rawClaim.patient?.name ? `[REDACTED - ${rawClaim.patient.name.charAt(0)}***]` : "[REDACTED]")
+      ? "[REDACTED]"
       : rawClaim.patient?.name || "";
 
     const memberId = isClaimRedacted
-      ? (rawClaim.patient?.memberId ? rawClaim.patient.memberId.replace(/^([A-Za-z0-9]{3}).*/, "$1*****") : "[REDACTED]")
+      ? (rawClaim.patient?.memberId ? "[REDACTED MEMBER ID]" : "[REDACTED]")
       : rawClaim.patient?.memberId || "";
 
     const maskCpt = isClaimRedacted && (
@@ -144,9 +145,9 @@ describe("Judge UX & Pipeline Hardening", () => {
     );
     const cptStr = maskCpt ? "[REDACTED-CPT]" : (rawClaim.cptCodes?.join("; ") || "");
 
-    expect(name).toBe("[REDACTED - J***]");
+    expect(name).toBe("[REDACTED]");
     expect(name).not.toContain("Jonathan");
-    expect(memberId).toBe("MBN*****");
+    expect(memberId).toBe("[REDACTED MEMBER ID]");
     expect(memberId).not.toContain("987654321");
     expect(cptStr).toBe("[REDACTED-CPT]");
   });

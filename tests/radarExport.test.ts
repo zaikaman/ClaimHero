@@ -71,9 +71,9 @@ describe("Case Radar Export Utilities & HIPAA Safe Harbor Masking", () => {
       const sanitized = sanitizeClaimForExport(mockClaim, true);
 
       // 1. Top-level and patient profile
-      expect(sanitized.patientName).toBe("[REDACTED - M***]");
-      expect(sanitized.patient?.name).toBe("[REDACTED - M***]");
-      expect(sanitized.patient?.memberId).toBe("PEN*****");
+      expect(sanitized.patientName).toBe("[REDACTED]");
+      expect(sanitized.patient?.name).toBe("[REDACTED]");
+      expect(sanitized.patient?.memberId).toBe("[REDACTED MEMBER ID]");
       expect(sanitized.patient?.memberId).not.toContain("610492");
       expect(sanitized.patient?.email).toBe("[REDACTED]");
 
@@ -115,7 +115,7 @@ describe("Case Radar Export Utilities & HIPAA Safe Harbor Masking", () => {
       const parsed = JSON.parse(jsonStr);
 
       expect(parsed).toHaveLength(1);
-      expect(parsed[0].patientName).toBe("[REDACTED - M***]");
+      expect(parsed[0].patientName).toBe("[REDACTED]");
       expect(jsonStr).not.toContain("Marcus Sterling");
       expect(jsonStr).not.toContain("11/22/1974");
       expect(jsonStr).not.toContain("alex.morgan@spineinstitute.org");
@@ -133,8 +133,8 @@ describe("Case Radar Export Utilities & HIPAA Safe Harbor Masking", () => {
       const row = buildClaimCsvRow(mockClaim, true);
       expect(row).toHaveLength(15);
       expect(row[0]).toBe("CLM-6104-GEO-9621");
-      expect(row[1]).toBe("[REDACTED - M***]");
-      expect(row[2]).toBe("PEN*****");
+      expect(row[1]).toBe("[REDACTED]");
+      expect(row[2]).toBe("[REDACTED MEMBER ID]");
       expect(row[9]).toBe("**/**/2026");
       expect(row[14]).toBe("YES (HIPAA Safe Harbor)");
 
@@ -167,8 +167,8 @@ describe("Case Radar Export Utilities & HIPAA Safe Harbor Masking", () => {
       };
 
       const row = buildClaimCsvRow(redactedClaim, false);
-      expect(row[1]).toBe("[REDACTED - M***]");
-      expect(row[2]).toBe("PEN*****");
+      expect(row[1]).toBe("[REDACTED]");
+      expect(row[2]).toBe("[REDACTED MEMBER ID]");
       expect(row[14]).toBe("YES (HIPAA Safe Harbor)");
     });
   });
@@ -198,7 +198,7 @@ describe("Case Radar Export Utilities & HIPAA Safe Harbor Masking", () => {
       };
 
       const result = sanitizeClaimForExport(redactedClaim, false);
-      expect(result.patientName).toBe("[REDACTED - M***]");
+      expect(result.patientName).toBe("[REDACTED]");
       expect(result.appealContext?.physicianNotes).not.toContain("Marcus Sterling");
     });
   });
@@ -288,7 +288,7 @@ describe("Case Radar Export Utilities & HIPAA Safe Harbor Masking", () => {
 
       const sanitized = sanitizeClaimForExport(selfAdvocateClaim, true);
       expect(sanitized.patient?.groupNumber).toBe("[REDACTED]");
-      expect(sanitized.appealContext?.sender.name).toBe("[REDACTED - M***]");
+      expect(sanitized.appealContext?.sender.name).toBe("[REDACTED]");
       expect(sanitized.appealContext?.sender.email).toBe("[REDACTED EMAIL]");
     });
 
@@ -302,6 +302,18 @@ describe("Case Radar Export Utilities & HIPAA Safe Harbor Masking", () => {
       const row = buildClaimCsvRow(corruptedClaim, true);
       expect(row[10]).toBe(""); // Deadline is safely empty string without throwing RangeError
       expect(row[12]).toBe("N/A"); // Null score formatted as N/A
+    });
+
+    it("generalizes the statutory deadline to year-only in redacted CSV rows", () => {
+      const row = buildClaimCsvRow(mockClaim, true);
+      const year = new Date(mockClaim.statutoryDeadline as number).getUTCFullYear();
+      expect(row[10]).toBe(`**/**/${year}`);
+      expect(row[10]).not.toContain("-");
+
+      const auditRow = buildClaimCsvRow(mockClaim, false);
+      expect(auditRow[10]).toBe(
+        new Date(mockClaim.statutoryDeadline as number).toISOString().split("T")[0]
+      );
     });
   });
 });

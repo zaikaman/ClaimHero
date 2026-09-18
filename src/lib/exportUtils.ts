@@ -34,8 +34,10 @@ export function sanitizeClaimForExport(
   }
 
   const rawPatientName = (claim.patient?.name || claim.patientName || "").trim();
-  const initial = rawPatientName ? rawPatientName.charAt(0).toUpperCase() : "";
-  const maskedPatientName = rawPatientName ? `[REDACTED - ${initial}***]` : "[REDACTED]";
+  // Fully redacted: even a first initial is a quasi-identifier in combination
+  // with year-only dates, payer, and procedure codes, so Safe Harbor exports
+  // carry no name fragment. Advocates distinguish cases by claim number.
+  const maskedPatientName = "[REDACTED]";
 
   // Extract individual name tokens (e.g. "Marcus", "Sterling") to ensure isolated mentions in notes are scrubbed
   const nameParts = rawPatientName
@@ -53,11 +55,10 @@ export function sanitizeClaimForExport(
     }).sanitizedText;
   };
 
-  // Mask patient member ID
+  // Mask patient member ID: beneficiary numbers are removed entirely per
+  // Safe Harbor (no root-prefix preservation).
   const rawMemberId = claim.patient?.memberId?.trim() || "";
-  const maskedMemberId = rawMemberId
-    ? (rawMemberId.length > 3 ? `${rawMemberId.slice(0, 3)}*****` : "[REDACTED]")
-    : "[REDACTED]";
+  const maskedMemberId = rawMemberId ? "[REDACTED MEMBER ID]" : "[REDACTED]";
 
   // Date of Service: HIPAA Safe Harbor allows only year for dates directly related to an individual
   const yearMatch = claim.serviceDate ? claim.serviceDate.match(/\b(19\d{2}|20\d{2})\b/) : null;
@@ -201,14 +202,11 @@ export function buildClaimCsvRow(claim: Claim, redactMode: boolean): string[] {
   const isClaimRedacted = redactMode || Boolean(claim.redactionMetadata?.isRedacted);
 
   const rawPatientName = (claim.patient?.name || claim.patientName || "").trim();
-  const initial = rawPatientName ? rawPatientName.charAt(0).toUpperCase() : "";
-  const name = isClaimRedacted
-    ? (rawPatientName ? `[REDACTED - ${initial}***]` : "[REDACTED]")
-    : rawPatientName;
+  const name = isClaimRedacted ? "[REDACTED]" : rawPatientName;
 
   const rawMemberId = claim.patient?.memberId?.trim() || "";
   const memberId = isClaimRedacted
-    ? (rawMemberId ? (rawMemberId.length > 3 ? `${rawMemberId.slice(0, 3)}*****` : "[REDACTED]") : "[REDACTED]")
+    ? (rawMemberId ? "[REDACTED MEMBER ID]" : "[REDACTED]")
     : rawMemberId;
 
   const maskCpt = isClaimRedacted && (
@@ -231,7 +229,11 @@ export function buildClaimCsvRow(claim: Claim, redactMode: boolean): string[] {
   let deadlineStr = "";
   if (claim.statutoryDeadline) {
     const d = new Date(claim.statutoryDeadline);
-    deadlineStr = !isNaN(d.getTime()) ? d.toISOString().split("T")[0] : "";
+    if (!isNaN(d.getTime())) {
+      // Exact deadlines are dates tied to the case: generalize to year-only
+      // in redacted exports like every other date.
+      deadlineStr = isClaimRedacted ? `**/**/${d.getUTCFullYear()}` : d.toISOString().split("T")[0];
+    }
   }
 
   const nameParts = rawPatientName
