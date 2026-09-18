@@ -2,6 +2,7 @@ import { query, internalQuery, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { requireClaimOwner } from "./lib/auth";
+import { resolveClaimMemberId, resolveClaimGroupNumber, resolveClaimPatientName, resolveClaimProviderName } from "./claims";
 
 export interface MxRecordInfo {
   exchange: string;
@@ -419,12 +420,12 @@ export async function buildCertificateData(
     certificateId,
     claimId: claim._id,
     claimNumber: claim.claimNumber,
-    patientName: patient?.name || claim.patientName || "Patient",
-    memberId: patient?.memberId || "Pending",
-    groupNumber: patient?.groupNumber,
+    patientName: resolveClaimPatientName(patient?.name || claim.patientName, claim.claimNumber, patient?.memberId),
+    memberId: resolveClaimMemberId(patient?.memberId) || "Pending",
+    groupNumber: resolveClaimGroupNumber(patient?.groupNumber) || undefined,
     payerName: claim.insurancePayer || patient?.insurancePayer || "Health Insurer",
     planAdministrator: claim.insurancePayer || "Designated Plan Administrator",
-    providerName: claim.providerName,
+    providerName: resolveClaimProviderName(claim.providerName) || "Treating Physician, MD",
     serviceDate: claim.serviceDate,
     deniedAmount: claim.deniedAmount,
     cptCodes: claim.cptCodes,

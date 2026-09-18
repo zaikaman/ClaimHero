@@ -3,6 +3,7 @@ import { Claim } from "../../types";
 import { toast } from "sonner";
 import { useDetailMode } from "../../hooks/useDetailMode";
 import { useP2PDefense } from "../../hooks/useP2PDefense";
+import { resolveProviderDisplayName, resolvePatientDisplayName, resolveMemberIdDisplay } from "../../lib/displaySafety";
 import { NavigationView } from "../layout/Sidebar";
 import { Card } from "../ui/card";
 import { P2PLiveCopilot } from "./P2PLiveCopilot";
@@ -58,7 +59,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
 
   // Customization Form state
   const [customPhysicianName, setCustomPhysicianName] = useState<string>(
-    claim.appealContext?.sender?.name || claim.providerName || ""
+    claim.appealContext?.sender?.name || resolveProviderDisplayName(claim.providerName)
   );
   const [customPhysicianSpecialty, setCustomPhysicianSpecialty] = useState<string>(
     claim.appealContext?.sender?.credentials || "Board-Certified Treating Specialist"
@@ -206,8 +207,8 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
           </div>
 
           <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;padding:8px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;font-size:10px;font-family:monospace;margin-bottom:12px;">
-            <div><span style="color:#64748b;">PATIENT:</span><br/><strong>${claim.patient?.name || "Patient"}</strong></div>
-            <div><span style="color:#64748b;">MEMBER ID:</span><br/><strong>${claim.patient?.memberId || "N/A"}</strong></div>
+            <div><span style="color:#64748b;">PATIENT:</span><br/><strong>${resolvePatientDisplayName(claim.patient?.name, "Patient")}</strong></div>
+            <div><span style="color:#64748b;">MEMBER ID:</span><br/><strong>${resolveMemberIdDisplay(claim.patient?.memberId)}</strong></div>
             <div><span style="color:#64748b;">CPT CODES:</span><br/><strong style="color:#0284c7;">${cptList}</strong></div>
             <div><span style="color:#64748b;">ICD-10 CODES:</span><br/><strong style="color:#0284c7;">${icdList}</strong></div>
           </div>
@@ -464,7 +465,7 @@ export const P2PDefenseStudio: React.FC<P2PDefenseStudioProps> = ({
                     Member ID
                   </span>
                   <span className="font-semibold text-foreground">
-                    {claim.patient?.memberId || "N/A"}
+                    {resolveMemberIdDisplay(claim.patient?.memberId)}
                   </span>
                 </div>
               </div>

@@ -3,6 +3,7 @@ import { Claim, FinancialLiabilityResult, ErisaPenaltyResult } from "../../types
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { formatCurrency } from "../../lib/utils";
+import { resolveProviderDisplayName, resolvePatientDisplayName, resolveMemberIdDisplay, resolveGroupNumberDisplay } from "../../lib/displaySafety";
 import { getSeverityTierMeta } from "../../lib/liabilityCalculator";
 import { resolvePayerEdiId, formatDossierDate } from "../../lib/dossierBuilder";
 import {
@@ -48,9 +49,9 @@ ${hr}
 
 I. ADMINISTRATIVE DOCKET & PARTIES
 ${subHr}
-INSURED BENEFICIARY: ${claim.patient?.name || "Insured Claimant"}
-MEMBER IDENTIFIER:   ${claim.patient?.memberId || "N/A"}
-GROUP NUMBER:        ${claim.patient?.groupNumber || "N/A"}
+INSURED BENEFICIARY: ${resolvePatientDisplayName(claim.patient?.name, "Insured Claimant")}
+MEMBER IDENTIFIER:   ${resolveMemberIdDisplay(claim.patient?.memberId)}
+GROUP NUMBER:        ${resolveGroupNumberDisplay(claim.patient?.groupNumber) || "N/A"}
 STATE JURISDICTION:  ${claim.patient?.state || "US"}
 
 PLAN ADMINISTRATOR:  ${claim.patient?.insurancePayer || "Health Insurer"}
@@ -58,7 +59,7 @@ PAYER EDI GATEWAY:   ${payerEdiId}
 APPEALS OFFICE:      ${claim.payerContact?.statutoryPoBox || "Grievance & Appeals Department"}
 APPEALS FAX:         ${claim.payerContact?.appealsFax || "N/A"}
 
-TREATING PROVIDER:   ${claim.providerName || "Treating Physician, MD"}
+TREATING PROVIDER:   ${resolveProviderDisplayName(claim.providerName) || "Treating Physician, MD"}
 PROCEDURE CODES:     CPT ${claim.cptCodes?.filter(Boolean).join(", ") || "N/A"} | ICD-10 ${claim.icd10Codes?.filter(Boolean).join(", ") || "N/A"}
 DENIAL REASON:       Code ${claim.denialReasonCode || "N/A"}: ${claim.denialReasonDescription || "Adverse Determination"}
 
@@ -238,9 +239,9 @@ Authorized Representative / Claimant: ___________________________   Date: ${eris
             <div className="grid grid-cols-2 gap-4 text-xs font-mono p-3.5 bg-slate-50 border border-slate-200 rounded">
               <div className="space-y-1">
                 <div className="text-[10px] uppercase font-bold text-slate-500">Insured Beneficiary</div>
-                <div className="font-bold text-slate-950 text-sm">{claim.patient?.name || "Insured Claimant"}</div>
-                <div className="text-slate-700">Member ID: {claim.patient?.memberId || "N/A"}</div>
-                <div className="text-slate-700">Group #: {claim.patient?.groupNumber || "N/A"} | State: {claim.patient?.state || "US"}</div>
+                <div className="font-bold text-slate-950 text-sm">{resolvePatientDisplayName(claim.patient?.name, "Insured Claimant")}</div>
+                <div className="text-slate-700">Member ID: {resolveMemberIdDisplay(claim.patient?.memberId)}</div>
+                <div className="text-slate-700">Group #: {resolveGroupNumberDisplay(claim.patient?.groupNumber) || "N/A"} | State: {claim.patient?.state || "US"}</div>
               </div>
 
               <div className="space-y-1">
@@ -380,7 +381,7 @@ Authorized Representative / Claimant: ___________________________   Date: ${eris
                 <div>
                   <div className="border-b border-slate-900 pb-1">
                     <span className="font-serif italic text-slate-800 text-sm">
-                      {claim.appealContext?.sender?.name || claim.providerName || "Authorized Clinical Advocate"}
+                      {claim.appealContext?.sender?.name || resolveProviderDisplayName(claim.providerName) || "Authorized Clinical Advocate"}
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-500 uppercase mt-1">Authorized Representative / Claimant Signature</div>

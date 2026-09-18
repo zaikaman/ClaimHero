@@ -583,7 +583,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   }
 
   return (
-    <div className="space-y-4 animate-fadeIn pb-12">
+    <div className="space-y-4 animate-fadeIn">
       {/* 3-Step Guided Sentinel Stepper */}
       <SentinelFlowStepper
         claim={claim}

@@ -27,6 +27,7 @@ import { formatCurrency, formatDate, stripMarkdownFormatting } from "../../lib/u
 import { DENIAL_REASON_CODES } from "../../lib/constants";
 import { useDetailMode } from "../../hooks/useDetailMode";
 import { pillarPlainTitle, PLAIN_FIRST_RUN } from "../../lib/plainCopy";
+import { resolveProviderDisplayName, resolvePatientDisplayName, resolveMemberIdDisplay } from "../../lib/displaySafety";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { PipelineActivityFeed } from "../common/PipelineActivityFeed";
 import { Card } from "../ui/card";
@@ -189,7 +190,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       : "Step 1/3: Initializing Autonomous Sentinel review";
 
   return (
-    <div className="space-y-4 animate-fadeIn pb-24">
+    <div className="flex flex-col gap-4 animate-fadeIn">
       {/* 4-Step Guided Sentinel Stepper */}
       <SentinelFlowStepper
         claim={claim}
@@ -646,12 +647,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 <div>
                   <span className="text-[10px] text-muted-foreground font-mono block">Patient</span>
                   <span className="font-semibold text-foreground">
-                    {claim.patient?.name || "Patient Record"}
+                    {resolvePatientDisplayName(claim.patient?.name, "Patient Record")}
                   </span>
                 </div>
                 <div>
                   <span className="text-[10px] text-muted-foreground font-mono block">Member ID</span>
-                  <span className="font-mono text-foreground">{claim.patient?.memberId || "N/A"}</span>
+                  <span className="font-mono text-foreground">{resolveMemberIdDisplay(claim.patient?.memberId)}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-muted-foreground font-mono block">{isDetailed ? "Insurance Payer" : "Insurer"}</span>
@@ -721,7 +722,13 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
               <div className="pt-1">
                 <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <Stethoscope className="size-3.5" />
-                  <span>{isDetailed ? `Treating Provider: ${claim.providerName}` : `Your doctor: ${claim.providerName}`}</span>
+                  {(() => {
+                    const provider = resolveProviderDisplayName(claim.providerName);
+                    if (!provider) {
+                      return <span>{isDetailed ? "Treating provider pending verification" : "Your doctor: pending verification"}</span>;
+                    }
+                    return <span>{isDetailed ? `Treating Provider: ${provider}` : `Your doctor: ${provider}`}</span>;
+                  })()}
                 </div>
               </div>
             </div>

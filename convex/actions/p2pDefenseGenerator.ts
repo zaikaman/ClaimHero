@@ -129,6 +129,24 @@ export interface P2PDefenseSynthesisResult {
   generatedBy?: "openai" | "fallback";
 }
 
+/**
+ * Trusted peer-facing output must never print LLM de-identification markers
+ * as patient identity. Central check shared by the script header, the verbal
+ * opening, and the condensed cheat sheet.
+ */
+function isMaskedScriptValue(raw?: string | null): boolean {
+  const value = (raw || "").trim();
+  return (
+    !value ||
+    value.includes("REDACTED") ||
+    value.includes("[PATIENT") ||
+    value.includes("[MEMBER") ||
+    value.includes("[CLAIM") ||
+    value.includes("[SERVICE") ||
+    value.includes("**")
+  );
+}
+
 interface P2PClaimContext {
   _id: Id<"claims">;
   claimNumber: string;
@@ -161,9 +179,16 @@ function assembleFullP2PScriptMarkdown(
   const payer = claim.patient?.insurancePayer || "Health Insurer";
   const cptList = (claim.cptCodes || []).join(", ");
   const icdList = (claim.icd10Codes || []).join(", ");
+  // Trusted peer-facing script: never print LLM-redaction markers as identity.
+  const scriptPatientName =
+    claim.patient?.name && !isMaskedScriptValue(claim.patient.name) ? claim.patient.name : "Patient";
+  const scriptMemberId =
+    claim.patient?.memberId && !isMaskedScriptValue(claim.patient.memberId)
+      ? claim.patient.memberId
+      : "N/A";
 
   let md = `# Peer-to-Peer (P2P) Defense Tele-Script\n\n`;
-  md += `**Case Reference:** Claim #${claim.claimNumber} | **Member:** ${claim.patient?.name || "Patient"} (ID: ${claim.patient?.memberId || "N/A"})\n`;
+  md += `**Case Reference:** Claim #${claim.claimNumber} | **Member:** ${scriptPatientName} (ID: ${scriptMemberId})\n`;
   md += `**Target Call Duration:** 3 Minutes | **Payer:** ${payer} (${medicalDirectorRole})\n`;
   md += `**Treating Physician:** ${physicianName}${physicianSpecialty ? ` (${physicianSpecialty})` : ""}\n`;
   md += `**Codes at Issue:** CPT ${cptList} | ICD-10 ${icdList} | **Denied Amount:** $${(claim.deniedAmount || 0).toLocaleString()}\n\n`;
@@ -222,8 +247,16 @@ function buildDeterministicFallback(
   // Federal ERISA engine: patient state names only the DOI grievance reference, never deadlines.
   const regulator = getStateRegulator(claim.patient?.state);
   const stateLabel = regulator.code === "US" ? "applicable state" : regulator.stateName;
+  const fallbackPatientName =
+    claim.patient?.name && !isMaskedScriptValue(claim.patient.name)
+      ? claim.patient.name
+      : "the insured";
+  const fallbackMemberId =
+    claim.patient?.memberId && !isMaskedScriptValue(claim.patient.memberId)
+      ? claim.patient.memberId
+      : "on file";
 
-  const opening = `"Hello Dr. [Reviewer Name]. I am ${physicianName}, ${physicianSpecialty || "the treating specialist"} for patient ${claim.patient?.name || "the insured"} (Member ID: ${claim.patient?.memberId || "on file"}). Before we begin this 5-minute peer-to-peer conference regarding Claim #${claim.claimNumber}, I am required for the medical record to ask: Are you currently licensed and actively practicing in ${physicianSpecialty || "this same surgical subspecialty"}? Please note that this call constitutes a formal clinical discussion under ERISA 29 CFR § 2560.503-1 and ${stateLabel} Utilization Review regulations, and I am documenting this discussion for our clinical file and any potential ${regulator.doiName} grievance."`;
+  const opening = `"Hello Dr. [Reviewer Name]. I am ${physicianName}, ${physicianSpecialty || "the treating specialist"} for patient ${fallbackPatientName} (Member ID: ${fallbackMemberId}). Before we begin this 5-minute peer-to-peer conference regarding Claim #${claim.claimNumber}, I am required for the medical record to ask: Are you currently licensed and actively practicing in ${physicianSpecialty || "this same surgical subspecialty"}? Please note that this call constitutes a formal clinical discussion under ERISA 29 CFR § 2560.503-1 and ${stateLabel} Utilization Review regulations, and I am documenting this discussion for our clinical file and any potential ${regulator.doiName} grievance."`;
 
   const citations: PolicyCitationScriptItem[] = [];
   if (evidences && evidences.length > 0) {
@@ -274,7 +307,7 @@ function buildDeterministicFallback(
   const cheatSheet: CondensedCheatSheet = {
     rapidChecklist: [
       `Confirm Reviewer Name, State License # & Clinical Specialty`,
-      `State Patient Name (${claim.patient?.name || "Patient"}), Member ID (${claim.patient?.memberId || "N/A"}), Claim #${claim.claimNumber}`,
+      `State Patient Name (${fallbackPatientName === "the insured" ? "Patient" : fallbackPatientName}), Member ID (${fallbackMemberId === "on file" ? "N/A" : fallbackMemberId}), Claim #${claim.claimNumber}`,
       `Identify exact CPT (${cptList}) & ICD-10 (${icdList}) codes`,
       `Cite ${payer} Policy Criteria section & failure of conservative modalities`,
       `Demand 24-hour written justification with reviewer credentials on record`,

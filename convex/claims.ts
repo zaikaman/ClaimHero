@@ -75,6 +75,69 @@ export function resolveClaimPatientName(
 }
 
 /**
+ * Shared redaction-placeholder check for claim identifiers. LLM de-identification
+ * markers (`[REDACTED ...]`, `[PATIENT...]`, `[MEMBER_ID]`, `[CLAIM_REF]`,
+ * `[SERVICE_DATE]`, `**` masks) must never persist as — or render as — real
+ * patient, member, group, claim, or service-date values in the trusted boundary
+ * (Convex DB reads, appeal letters, dossiers, certificates, UI).
+ */
+export function isMaskedIdentifierValue(raw: string | undefined | null): boolean {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) return true;
+  return (
+    trimmed.includes("REDACTED") ||
+    trimmed.includes("[PATIENT") ||
+    trimmed.includes("[MEMBER") ||
+    trimmed.includes("[CLAIM") ||
+    trimmed.includes("[SERVICE") ||
+    trimmed.includes("[DATE") ||
+    trimmed.includes("**") ||
+    trimmed === "Patient" ||
+    trimmed === "Patient Record" ||
+    trimmed === "[PATIENT]"
+  );
+}
+
+/**
+ * Resolve treating-provider display value, preventing LLM-redaction
+ * placeholder leakage into the trusted UI.
+ *
+ * The trusted UI (claims.list, getById, evidence views, appeal letters)
+ * must never render de-identification placeholders as physician identity.
+ * A masked extraction means the source was over-redacted upstream; callers
+ * fall back to honest empty/generic states ("Reviewing the clinical
+ * documentation...") instead of "Dr. [PATIENT REDACTED], MD".
+ */
+export function resolveClaimProviderName(rawName: string | undefined | null): string {
+  const trimmed = (rawName || "").trim().replace(/\s+/g, " ");
+  if (!trimmed || isMaskedIdentifierValue(trimmed)) return "";
+  return trimmed;
+}
+
+/**
+ * Resolve member ID, preventing placeholder leakage into appeal letters,
+ * dossiers, certificates, and UI. Masked or missing values collapse to ""
+ * so callers fall back to honest states ("PAYER PENDING", "N/A",
+ * "Not specified in denial notice") instead of "[REDACTED MEMBER ID]".
+ */
+export function resolveClaimMemberId(raw: string | undefined | null): string {
+  const trimmed = (raw || "").trim().replace(/\s+/g, " ");
+  if (!trimmed || isMaskedIdentifierValue(trimmed)) return "";
+  return trimmed;
+}
+
+/**
+ * Resolve group number. Same fail-honest contract as member IDs: masked or
+ * missing values collapse to "" so the letter omits the line instead of
+ * printing a redaction marker to the payer.
+ */
+export function resolveClaimGroupNumber(raw: string | undefined | null): string {
+  const trimmed = (raw || "").trim().replace(/\s+/g, " ");
+  if (!trimmed || isMaskedIdentifierValue(trimmed)) return "";
+  return trimmed;
+}
+
+/**
  * Detect whether claim parameters indicate an explicit synthetic evaluation demo fixture.
  * Gated strictly on the explicit origin: "demo-fixture" flag (or dataOrigin: "demo-fixture") only,
  * guaranteeing that genuine patients who share names ("Eleanor Vance", "Marcus Sterling", "Michael Patel")
@@ -357,6 +420,7 @@ export const list = query({
 
       const mappedPage = page.map((claim) => {
         const patientName = resolveClaimPatientName(claim.patientName, claim.claimNumber);
+        const providerName = resolveClaimProviderName(claim.providerName);
         const insurancePayer = claim.insurancePayer || "Health Insurer";
         const isDemo = Boolean(
           claim.isDemo ||
@@ -367,6 +431,7 @@ export const list = query({
         return {
           ...claim,
           patientName,
+          providerName,
           insurancePayer,
           isDemo,
           isSyntheticPII: isDemo || claim.isSyntheticPII,
@@ -517,6 +582,7 @@ export const list = query({
     // Map denormalized patient data into the expected Claim shape without N+1 joins
     return claims.map((claim) => {
       const patientName = resolveClaimPatientName(claim.patientName, claim.claimNumber);
+      const providerName = resolveClaimProviderName(claim.providerName);
       const insurancePayer = claim.insurancePayer || "Health Insurer";
       const isDemo = Boolean(
         claim.isDemo ||
@@ -529,6 +595,7 @@ export const list = query({
       return {
         ...claim,
         patientName,
+        providerName,
         insurancePayer,
         isDemo,
         isSyntheticPII: isDemo || claim.isSyntheticPII,
@@ -582,9 +649,14 @@ export const getById = query({
 
     const rawPatientName = patient?.name || claim.patientName;
     const resolvedName = resolveClaimPatientName(rawPatientName, claim.claimNumber, patient?.memberId);
+    // Legacy rows may carry LLM-redaction placeholders as member/group IDs;
+    // collapse them so letters, dossiers, and UI fall back honestly.
+    const resolvedMemberId = resolveClaimMemberId(patient?.memberId) || "PENDING";
+    const resolvedGroupNumber = resolveClaimGroupNumber(patient?.groupNumber) || undefined;
     const resolvedPatient = patient
-      ? { ...patient, name: resolvedName }
+      ? { ...patient, name: resolvedName, memberId: resolvedMemberId, groupNumber: resolvedGroupNumber }
       : undefined;
+    const resolvedProviderName = resolveClaimProviderName(claim.providerName);
 
     const isDemo = Boolean(
       claim.isDemo ||
@@ -610,6 +682,7 @@ export const getById = query({
       dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
       origin: isDemo && claim.origin !== "demo-fixture" ? "demo-fixture" : claim.origin,
       patientName: resolvedName,
+      providerName: resolvedProviderName,
       patient: resolvedPatient,
       evidenceCount,
       latestAppeal,
@@ -652,9 +725,14 @@ export const getByIdInternal = internalQuery({
 
     const rawPatientName = patient?.name || claim.patientName;
     const resolvedName = resolveClaimPatientName(rawPatientName, claim.claimNumber, patient?.memberId);
+    // Legacy rows may carry LLM-redaction placeholders as member/group IDs;
+    // collapse them so letters, dossiers, and UI fall back honestly.
+    const resolvedMemberId = resolveClaimMemberId(patient?.memberId) || "PENDING";
+    const resolvedGroupNumber = resolveClaimGroupNumber(patient?.groupNumber) || undefined;
     const resolvedPatient = patient
-      ? { ...patient, name: resolvedName }
+      ? { ...patient, name: resolvedName, memberId: resolvedMemberId, groupNumber: resolvedGroupNumber }
       : undefined;
+    const resolvedProviderName = resolveClaimProviderName(claim.providerName);
 
     const isDemo = Boolean(
       claim.isDemo ||
@@ -669,6 +747,7 @@ export const getByIdInternal = internalQuery({
       dataOrigin: isDemo && claim.dataOrigin !== "demo-fixture" ? "demo-fixture" : claim.dataOrigin,
       origin: isDemo && claim.origin !== "demo-fixture" ? "demo-fixture" : claim.origin,
       patientName: resolvedName,
+      providerName: resolvedProviderName,
       patient: resolvedPatient,
       evidenceCount,
       latestAppeal,
@@ -1139,13 +1218,22 @@ async function applyCreateWithPatient(
 
   await validateClaimFinancialsAndCodes(ctx, args, effectiveUserId);
 
+  // Trusted-boundary write guard: LLM de-identification markers must never
+  // persist as real identifiers. Masked values collapse to "" so member IDs
+  // fall back to "PENDING" and claim numbers regenerate below instead of
+  // storing (and later displaying) "[REDACTED MEMBER ID]".
+  const cleanMemberId = resolveClaimMemberId(args.memberId);
+  const cleanGroupNumber = resolveClaimGroupNumber(args.groupNumber) || undefined;
+  const cleanClaimNumberArg = isMaskedIdentifierValue(args.claimNumber) ? "" : args.claimNumber.trim();
+  const cleanServiceDate = isMaskedIdentifierValue(args.serviceDate) ? "" : args.serviceDate.trim();
+
   // Strictly scope patient matching to effectiveUserId to prevent cross-tenant patient hijack
-  const claimNumber = await generateUniqueClaimNumber(ctx, args.claimNumber);
+  const claimNumber = await generateUniqueClaimNumber(ctx, cleanClaimNumberArg);
 
   const resolvedPatientName = resolveClaimPatientName(
     args.patientName,
     claimNumber,
-    args.memberId
+    cleanMemberId
   );
 
   // Strictly scope patient matching to effectiveUserId to prevent cross-tenant patient hijack
@@ -1169,7 +1257,7 @@ async function applyCreateWithPatient(
     matchingPatient = userPatients.find(
       (p) =>
         p.name.toLowerCase() === resolvedPatientName.toLowerCase() &&
-        (!args.memberId || p.memberId === args.memberId)
+        (!cleanMemberId || p.memberId === cleanMemberId)
     );
   }
 
@@ -1181,8 +1269,8 @@ async function applyCreateWithPatient(
       userId: effectiveUserId,
       name: resolvedPatientName,
       email: cleanEmail || matchingPatient.email || "",
-      memberId: args.memberId || matchingPatient.memberId || "PENDING",
-      groupNumber: args.groupNumber || matchingPatient.groupNumber,
+      memberId: cleanMemberId || matchingPatient.memberId || "PENDING",
+      groupNumber: cleanGroupNumber || matchingPatient.groupNumber,
       insurancePayer: args.insurancePayer || matchingPatient.insurancePayer || "Molina Healthcare",
       state: args.state || matchingPatient.state || "FL",
     });
@@ -1191,8 +1279,8 @@ async function applyCreateWithPatient(
       userId: effectiveUserId,
       name: resolvedPatientName,
       email: cleanEmail,
-      memberId: args.memberId || "PENDING",
-      groupNumber: args.groupNumber,
+      memberId: cleanMemberId || "PENDING",
+      groupNumber: cleanGroupNumber,
       insurancePayer: args.insurancePayer || "Molina Healthcare",
       state: args.state || "FL",
       createdAt: now,
@@ -1214,8 +1302,8 @@ async function applyCreateWithPatient(
     patientName: resolvedPatientName,
     insurancePayer: args.insurancePayer || "Molina Healthcare",
     claimNumber,
-    serviceDate: args.serviceDate,
-    providerName: args.providerName,
+    serviceDate: cleanServiceDate,
+    providerName: resolveClaimProviderName(args.providerName),
     deniedAmount: args.deniedAmount,
     patientOwedAmount: args.patientOwedAmount !== undefined ? args.patientOwedAmount : args.deniedAmount,
     cptCodes: args.cptCodes,
@@ -1237,7 +1325,7 @@ async function applyCreateWithPatient(
       claimNumber,
       patientName: resolvedPatientName,
       insurancePayer: args.insurancePayer || "Molina Healthcare",
-      providerName: args.providerName,
+      providerName: resolveClaimProviderName(args.providerName),
       denialReasonCode: args.denialReasonCode,
       denialReasonDescription: args.denialReasonDescription,
       cptCodes: args.cptCodes,

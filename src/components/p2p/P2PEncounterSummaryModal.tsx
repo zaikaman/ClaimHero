@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "../ui/dialog";
 import { Button } from "../ui/button";
+import { resolveProviderDisplayName, resolvePatientDisplayName, resolveMemberIdDisplay } from "../../lib/displaySafety";
 import { Claim, CallTranscriptItem, LiveCallChecklistItem, P2PCallSession } from "../../types";
 import { formatCurrency } from "../../lib/utils";
 import { useDetailMode } from "../../hooks/useDetailMode";
@@ -65,7 +66,7 @@ export const P2PEncounterSummaryModal: React.FC<P2PEncounterSummaryModalProps> =
 
     return `================================================================================
 PHYSICIAN PEER-TO-PEER (P2P) CLINICAL ENCOUNTER ADDENDUM
-CLAIM REFERENCE: ${claim.claimNumber} | PATIENT: ${claim.patient?.name || "Patient Record"}
+CLAIM REFERENCE: ${claim.claimNumber} | PATIENT: ${resolvePatientDisplayName(claim.patient?.name, "Patient Record")}
 PAYER: ${claim.patient?.insurancePayer || "Insurer"} | SERVICE DATE: ${encounterDate}
 ================================================================================
 
@@ -73,7 +74,7 @@ PAYER: ${claim.patient?.insurancePayer || "Insurer"} | SERVICE DATE: ${encounter
 --------------------------------------------------------------------------------
 - Date of Discussion:    ${encounterDate}
 - Teleconference Length: ${formattedDuration}
-- Treating Clinician:    ${claim.providerName || "Treating Physician, MD"}
+- Treating Clinician:    ${resolveProviderDisplayName(claim.providerName) || "Treating Physician, MD"}
 - Disputed CPT / ICD-10: CPT ${claim.cptCodes?.join(", ")} | ICD-10 ${claim.icd10Codes?.join(", ")}
 - Adverse Determination: Code ${claim.denialReasonCode} - ${claim.denialReasonDescription}
 - Disputed Balance:      ${formatCurrency(claim.deniedAmount)}
@@ -94,7 +95,7 @@ ${session?.summaryNotes || "Treating physician presented peer-reviewed standard-
 Attending Physician Attestation:
 I hereby certify that the clinical facts documented above are true, accurate, and reflect the teleconference discussion held with the medical director.
 
-Signed: ${claim.providerName || "Treating Physician, MD"}
+Signed: ${resolveProviderDisplayName(claim.providerName) || "Treating Physician, MD"}
 Date:   ${encounterDate}
 ================================================================================`;
   };
@@ -225,9 +226,9 @@ Date:   ${encounterDate}
               <div>
                 <div className="text-[10px] font-mono uppercase font-bold text-slate-500">Patient</div>
                 <div className="text-xs font-bold text-slate-950 mt-0.5">
-                  {claim.patient?.name || "Patient Record"}
+                  {resolvePatientDisplayName(claim.patient?.name, "Patient Record")}
                 </div>
-                <div className="text-[10px] font-mono text-slate-600">{claim.patient?.memberId}</div>
+                <div className="text-[10px] font-mono text-slate-600">{resolveMemberIdDisplay(claim.patient?.memberId)}</div>
               </div>
 
               <div>
@@ -335,7 +336,7 @@ Date:   ${encounterDate}
                 The undersigned physician attests that the above teleconference clinical encounter accurately reflects the medical necessity defense presented to the payer's medical director. Pursuant to 29 CFR § 2560.503-1(h)(3)(iii), notice is hereby incorporated that denial upheld without clinical board certification will be appealed directly to the State Insurance Commissioner.
               </p>
               <div className="pt-3 flex items-center justify-between text-[11px] font-mono border-t border-slate-300">
-                <div>Attending: <span className="font-bold text-slate-950">{claim.providerName || "Treating Physician, MD"}</span></div>
+                <div>Attending: <span className="font-bold text-slate-950">{resolveProviderDisplayName(claim.providerName) || "Treating Physician, MD"}</span></div>
                 <div>Date Signed: <span className="font-bold text-slate-950">{encounterDate}</span></div>
               </div>
             </div>

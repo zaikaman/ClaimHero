@@ -542,7 +542,11 @@ export default function App() {
           </Suspense>
         )}
 
-        <GlobalDisclaimer variant="footer" className="mt-8 mb-2" />
+        <GlobalDisclaimer variant="footer" className="mt-3 mb-2" />
+        {/* Clearance for the fixed bottom next-step action bar on evidence/studio views */}
+        {(currentView === "evidence" || currentView === "studio") && (
+          <div className="h-16 shrink-0 print:hidden" aria-hidden="true" />
+        )}
 
         {/* Real Ingestion Modal (File Upload + Text Paste + Presets + AgentMail) */}
         <Suspense fallback={null}>

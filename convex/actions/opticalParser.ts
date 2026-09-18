@@ -392,6 +392,16 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         value.includes("[MEMBER_ID]") ||
         value.includes("[CLAIM_REF]") ||
         value.includes("[SERVICE_DATE]");
+      // Provider names are workforce operational data, not patient direct
+      // identifiers: the trusted UI must never render LLM-redaction
+      // placeholders ("Dr. [PATIENT REDACTED], MD") as the treating
+      // physician. A masked extraction means the source was over-redacted;
+      // fall back to the trusted Textract vault or honest empty.
+      const sanitizeProviderNameForStorage = (value?: string): string => {
+        const trimmed = (value || "").trim();
+        if (!trimmed || isMaskedIdentifier(trimmed)) return "";
+        return trimmed;
+      };
       const authenticPatientName = args.clientIdentifiers?.patientName || textractIdentifiers.patientName;
       if (authenticPatientName && isMaskedIdentifier(extraction.patientName)) {
         extraction.patientName = authenticPatientName;
@@ -407,8 +417,27 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
       if (textractIdentifiers.serviceDate && !extraction.serviceDate) {
         extraction.serviceDate = textractIdentifiers.serviceDate;
       }
-      if (textractIdentifiers.providerName && !extraction.providerName) {
+      if (
+        textractIdentifiers.providerName &&
+        (!extraction.providerName || isMaskedIdentifier(extraction.providerName))
+      ) {
         extraction.providerName = textractIdentifiers.providerName;
+      }
+      // Fail honest, never persist a redaction placeholder as the provider.
+      extraction.providerName = sanitizeProviderNameForStorage(extraction.providerName);
+      // Same fail-honest contract for routing identifiers: a masked extraction
+      // means the source was over-redacted. Collapse to "" so the database
+      // layer falls back to PENDING/regenerated values instead of persisting
+      // "[REDACTED MEMBER ID]" (which the appeal letter would print verbatim).
+      const sanitizeIdentifierForStorage = (value?: string): string => {
+        const trimmed = (value || "").trim();
+        if (!trimmed || isMaskedIdentifier(trimmed)) return "";
+        return trimmed;
+      };
+      extraction.memberId = sanitizeIdentifierForStorage(extraction.memberId);
+      extraction.claimNumber = sanitizeIdentifierForStorage(extraction.claimNumber);
+      if (isMaskedIdentifier(extraction.serviceDate)) {
+        extraction.serviceDate = "";
       }
       if (textractIdentifiers.deniedAmount !== undefined && (!extraction.deniedAmount || extraction.deniedAmount === 0)) {
         extraction.deniedAmount = textractIdentifiers.deniedAmount;

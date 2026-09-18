@@ -38,6 +38,7 @@ import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Id } from "../../../convex/_generated/dataModel";
 import { cn, formatCurrency } from "../../lib/utils";
+import { resolvePatientDisplayName } from "../../lib/displaySafety";
 import {
   fastSanitizeText,
   ComplianceStandard,
@@ -1323,7 +1324,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-muted/20 border border-border/70 rounded-lg p-3">
                 <div>
                   <span className="text-[10px] text-muted-foreground block font-mono">Patient</span>
-                  <span className="font-semibold text-foreground truncate block">{extractedResult.patientName}</span>
+                  <span className="font-semibold text-foreground truncate block">{resolvePatientDisplayName(extractedResult.patientName)}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-muted-foreground block font-mono">Payer</span>

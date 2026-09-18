@@ -25,6 +25,7 @@ import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Claim, ClinicalFacts, ClinicalIntakeQuestion, DenialExtractionResult } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
+import { resolvePatientDisplayName, resolveMemberIdDisplay } from "../../lib/displaySafety";
 import { DEMO_CASE_FIXTURES, DemoCaseFixture, SampleCasePreset } from "../../lib/constants";
 import {
   ComplianceStandard,
@@ -348,7 +349,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
           claimId: initialClaim._id,
           claimNumber: initialClaim.claimNumber,
           patientName: initialClaim.patientName || initialClaim.patient?.name || "Patient Record",
-          memberId: initialClaim.patient?.memberId || "PENDING",
+          memberId: resolveMemberIdDisplay(initialClaim.patient?.memberId, "PENDING"),
           insurancePayer: initialClaim.insurancePayer || initialClaim.patient?.insurancePayer || "Health Insurer",
           serviceDate: initialClaim.serviceDate || "",
           providerName: initialClaim.providerName || "",
@@ -1344,7 +1345,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-muted/20 border border-border/70 rounded-lg p-3">
               <div>
                 <span className="text-[10px] text-muted-foreground block font-mono">Patient</span>
-                <span className="font-semibold text-foreground truncate block">{extractedResult.patientName}</span>
+                <span className="font-semibold text-foreground truncate block">{resolvePatientDisplayName(extractedResult.patientName)}</span>
               </div>
               <div>
                 <span className="text-[10px] text-muted-foreground block font-mono">Payer</span>

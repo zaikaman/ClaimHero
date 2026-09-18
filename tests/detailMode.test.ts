@@ -376,8 +376,8 @@ describe("ExpertDetail & PlainLabel Components", () => {
     expect(markup).toContain("they say prior approval was missing");
     // 1 Date: What to do by when
     expect(markup).toContain("120 days left");
-    // On Step 1, stepper omits redundant top button so canonical action stays in proof workspace
-    expect(markup).not.toContain("Review &amp; Approve");
+    // On Step 1, forward navigation to Step 2 (Letter) stays in header like Steps 2/3
+    expect(markup).toContain("Review &amp; Approve");
     // Team software elements should NOT be visible in everyday mode
     expect(markup).not.toContain("$110/day ERISA exposure");
     // 3-step navigation strip

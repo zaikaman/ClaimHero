@@ -363,7 +363,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       claim.status === "parsing");
 
   return (
-    <div className="space-y-4 animate-fadeIn pb-24 flex flex-col">
+    <div className="space-y-4 animate-fadeIn flex flex-col">
       {/* 4-Step Guided Sentinel Stepper */}
       <SentinelFlowStepper
         claim={claim}

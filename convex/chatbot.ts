@@ -176,12 +176,27 @@ export const getClaimDataForChatbot = internalQuery({
 
     const patient = await ctx.db.get(claim.patientId);
 
+    // Never surface LLM de-identification markers as identity in chat: a
+    // masked member ID collapses to "" so the model says "on file" instead of
+    // quoting "[REDACTED MEMBER ID]" back to the user.
+    const rawMemberId = (patient?.memberId || "").trim();
+    const patientMemberId =
+      !rawMemberId ||
+      rawMemberId.includes("REDACTED") ||
+      rawMemberId.includes("[MEMBER") ||
+      rawMemberId.includes("[PATIENT") ||
+      rawMemberId.includes("[CLAIM") ||
+      rawMemberId.includes("[SERVICE") ||
+      rawMemberId.includes("**")
+        ? ""
+        : rawMemberId;
+
     return {
       claimId: claim._id,
       claimNumber: claim.claimNumber,
       patientName: patient?.name ?? "Unknown Patient",
       patientEmail: patient?.email ?? "",
-      patientMemberId: patient?.memberId ?? "",
+      patientMemberId,
       patientState: patient?.state ?? "",
       insurancePayer: patient?.insurancePayer ?? "",
       serviceDate: claim.serviceDate,

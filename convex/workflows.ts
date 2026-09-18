@@ -450,6 +450,8 @@ export const durableClaimPipeline = workflow
       policyTitle: v.optional(v.string()),
       clausesExtracted: v.optional(v.number()),
       overturnProbabilityScore: v.optional(v.number()),
+      appealReadinessScore: v.optional(v.number()),
+      evidenceCoverageScore: v.optional(v.number()),
       riskLevel: v.optional(v.string()),
       appealId: v.optional(v.string()),
       dispatched: v.optional(v.boolean()),

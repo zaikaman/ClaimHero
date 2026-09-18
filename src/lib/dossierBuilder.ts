@@ -188,9 +188,25 @@ export function buildDossierData(
   const rawMemberId = claim.patient?.memberId || "MBN-UNASSIGNED";
   const rawGroupNumber = claim.patient?.groupNumber;
 
-  let patientName = rawPatientName;
-  let memberId = rawMemberId;
-  let groupNumber = rawGroupNumber;
+  // Trusted-path guard: collapse LLM-redaction placeholders to the honest
+  // fallbacks below. (The redacted public-exhibit path re-masks afterwards.)
+  const hasMarker = (value?: string | null) => {
+    const v = (value || "").trim();
+    return (
+      !v ||
+      v.includes("REDACTED") ||
+      v.includes("[PATIENT") ||
+      v.includes("[MEMBER") ||
+      v.includes("[CLAIM") ||
+      v.includes("[SERVICE") ||
+      v.includes("[DATE") ||
+      v.includes("**")
+    );
+  };
+
+  let patientName = hasMarker(rawPatientName) ? "Claimant / Insured Patient" : rawPatientName;
+  let memberId = hasMarker(rawMemberId) ? "MBN-UNASSIGNED" : rawMemberId;
+  let groupNumber = hasMarker(rawGroupNumber) ? undefined : rawGroupNumber;
 
   if (isRedacted) {
     patientName = fastSanitizeText(rawPatientName, { standard: "PUBLIC_EXHIBIT", patientName: rawPatientName }).sanitizedText;
@@ -246,13 +262,30 @@ export function buildDossierData(
       ];
 
   const sender = claim.appealContext?.sender;
+  // Trusted UI: never surface LLM-redaction placeholders as physician
+  // identity. A masked providerName falls back to the honest generic.
+  const cleanProviderName = (() => {
+    const raw = (claim.providerName || "").trim();
+    if (
+      !raw ||
+      raw.includes("REDACTED") ||
+      raw.includes("[PATIENT") ||
+      raw.includes("[MEMBER") ||
+      raw.includes("[CLAIM") ||
+      raw.includes("[SERVICE") ||
+      raw.includes("**")
+    ) {
+      return "Treating Physician, MD";
+    }
+    return raw;
+  })();
   // Public exhibits must not carry treating-physician contact identifiers or
   // exact service dates. Names, credentials, and facility stay (a physician
   // attestation without a declarant is meaningless), but NPI/phone/email are
   // direct identifiers and service dates generalize to year-only.
   const serviceYearMatch = claim.serviceDate ? claim.serviceDate.match(/\b((?:19|20)\d{2})\b/) : null;
   const physicianInfo: DossierPhysicianInfo = {
-    name: sender?.name || claim.providerName || "Treating Physician, MD",
+    name: sender?.name || cleanProviderName,
     credentials: sender?.credentials || "MD, Board Certified Specialist",
     npiNumber: isRedacted ? "[REDACTED NPI]" : (sender?.npiNumber || ((claim as unknown as Record<string, unknown>).providerNpi as string) || "Not provided"),
     medicalLicenseState: claim.patient?.state || "US",
@@ -371,7 +404,7 @@ export function buildDossierData(
     groupNumber,
     state: claim.patient?.state || "US",
     
-    providerName: claim.providerName || "Treating Physician, MD",
+    providerName: cleanProviderName,
     physicianInfo,
     
       serviceDate: isRedacted && serviceYearMatch ? `**/**/${serviceYearMatch[1]}` : formatDossierDate(claim.serviceDate),

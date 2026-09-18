@@ -908,8 +908,19 @@ export function detectPiiEntities(
   // Documented tradeoff: may over-match facility or multi-word clinical terms
   // that are not in NON_NAME_WORDS; over-redaction is preferred to a name
   // leaking to an untrusted model. Supply patientName for precise matching.
+  //
+  // Provider guard (trusted-UI integrity): a candidate anchored by a clinical
+  // title ("Dr.", "Doctor", "Treating", "Attending", ...) or followed by a
+  // medical credential (", MD", "DO", "FAAOS", ...) is a treating provider,
+  // not a patient direct identifier. Masking it as [PATIENT REDACTED] destroys
+  // denial intake (the LLM copies the placeholder into providerName, which
+  // then leaks into the trusted UI as "Dr. [PATIENT REDACTED], MD").
+  // Workforce names stay for extraction; patient names are still caught by
+  // known-name + contextual-label detectors above.
   if (!options.preservePatientName) {
     const heuristicNameRegex = /\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,}){1,2})\b/g;
+    const providerTitleBefore = /\b(?:dr|doctor|physician|provider|treating|attending|surgeon|specialist|clinician|practitioner)\.?\s+$/i;
+    const credentialAfter = /^\s*,?\s*(?:M\s*\.?\s*D\s*\.?|D\s*\.?\s*O\s*\.?|FAAOS|FACS|Ph\s*\.?\s*D\s*\.?)\b/i;
     while ((match = heuristicNameRegex.exec(text)) !== null) {
       const rawName = match[1];
       const words = rawName.split(/\s+/);
@@ -920,6 +931,13 @@ export function detectPiiEntities(
       const fullText = match[0];
       const nameOffset = fullText.lastIndexOf(rawName);
       const startIdx = match.index + nameOffset;
+      const endIdx = startIdx + rawName.length;
+      // Treating-provider anchor: "Dr. Sarah Chen" / "Attending Sarah Chen".
+      const before = text.slice(Math.max(0, startIdx - 30), startIdx);
+      if (providerTitleBefore.test(before)) continue;
+      // Credential anchor: "Sarah Chen, MD" / "Sarah Chen M.D.".
+      const after = text.slice(endIdx, endIdx + 20);
+      if (credentialAfter.test(after)) continue;
       addEntity(
         "name",
         "Person Name Candidate",

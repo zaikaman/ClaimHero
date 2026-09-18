@@ -15,7 +15,7 @@ import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { getStateRegulator } from "../lib/stateRegulators";
 import { logPipelineActivity } from "../lib/pipelineActivity";
-import { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } from "../lib/phiSafe";
+import { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues, rehydrateForDisplay } from "../lib/phiSafe";
 import type { Id, Doc } from "../_generated/dataModel";
 
 const APPEAL_SYNTHESIS_SCHEMA = {
@@ -287,7 +287,18 @@ function buildSignature(providerName?: string, sender?: AppealSenderDetails): st
     .map((value) => value?.trim())
     .filter(Boolean) as string[];
 
-  const cleanProvider = providerName?.trim();
+  const rawProvider = (providerName || "").trim();
+  // Trusted correspondence must never carry LLM-redaction placeholders.
+  const cleanProvider =
+    !rawProvider ||
+    rawProvider.includes("REDACTED") ||
+    rawProvider.includes("[PATIENT") ||
+    rawProvider.includes("[MEMBER") ||
+    rawProvider.includes("[CLAIM") ||
+    rawProvider.includes("[SERVICE") ||
+    rawProvider.includes("**")
+      ? ""
+      : rawProvider;
 
   if (senderLines.length === 0) {
     return cleanProvider
@@ -596,7 +607,34 @@ export function assembleProfessionalAppealEmail(
   const claimNumber = hasClaimNumber ? rawClaimNumber : "";
   const claimRefDisplay = hasClaimNumber ? `#${claimNumber}` : "Not specified in denial notice";
   const claimRefLabel = hasClaimNumber ? `Claim #${claimNumber}` : "the referenced claim";
-  const memberId = claim.patient?.memberId?.trim() || "Not specified in denial notice";
+  // Trusted payer correspondence must carry authentic routing identifiers.
+  // A masked value means the upstream extraction was over-redacted; fall back
+  // honestly instead of printing "[REDACTED MEMBER ID]" in the letter.
+  const cleanMemberId = (claim.patient?.memberId || "").trim();
+  const memberId =
+    !cleanMemberId ||
+    cleanMemberId === "PENDING" ||
+    cleanMemberId === "MBN-UNASSIGNED" ||
+    cleanMemberId.includes("REDACTED") ||
+    cleanMemberId.includes("[MEMBER") ||
+    cleanMemberId.includes("[PATIENT") ||
+    cleanMemberId.includes("[CLAIM") ||
+    cleanMemberId.includes("[SERVICE") ||
+    cleanMemberId.includes("**")
+      ? "Not specified in denial notice"
+      : cleanMemberId;
+  const cleanGroupNumber = (claim.patient?.groupNumber || "").trim();
+  const groupNumber =
+    !cleanGroupNumber ||
+    cleanGroupNumber === "PENDING" ||
+    cleanGroupNumber.includes("REDACTED") ||
+    cleanGroupNumber.includes("[MEMBER") ||
+    cleanGroupNumber.includes("[PATIENT") ||
+    cleanGroupNumber.includes("[CLAIM") ||
+    cleanGroupNumber.includes("[SERVICE") ||
+    cleanGroupNumber.includes("**")
+      ? ""
+      : cleanGroupNumber;
   const cptCodes = (claim.cptCodes || []).filter(Boolean).length
     ? (claim.cptCodes || []).filter(Boolean).join(", ")
     : "Not specified";
@@ -620,7 +658,15 @@ export function assembleProfessionalAppealEmail(
     ? `${claim.denialReasonCode}${claim.denialReasonDescription ? ` — ${claim.denialReasonDescription.split(/[.;\n]/)[0].trim()}` : ""}`
     : denialReason;
 
-  const serviceDateText = claim.serviceDate ? formatServiceDate(claim.serviceDate) : "Not specified";
+  const rawServiceDate = (claim.serviceDate || "").trim();
+  const serviceDateText =
+    !rawServiceDate ||
+    rawServiceDate.includes("REDACTED") ||
+    rawServiceDate.includes("[SERVICE") ||
+    rawServiceDate.includes("[DATE") ||
+    rawServiceDate.includes("**")
+      ? "Not specified"
+      : formatServiceDate(rawServiceDate);
 
   // Tier-specific titles, addressees, and salutations
   let title = `# Appeal of Adverse Benefit Determination`;
@@ -642,7 +688,7 @@ export function assembleProfessionalAppealEmail(
   email += `**Claim details**\n`;
   email += `- Patient/member: ${patientName}\n`;
   email += `- Member ID: ${memberId}\n`;
-  if (claim.patient?.groupNumber) email += `- Group number: ${claim.patient.groupNumber}\n`;
+  if (groupNumber) email += `- Group number: ${groupNumber}\n`;
   email += `- Date of service: ${serviceDateText}\n`;
   email += `- Procedure code(s): ${cptCodes}\n`;
   email += `- Diagnosis code(s): ${icd10Codes}\n`;
@@ -989,17 +1035,32 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       formalDemandForPayment: buildPaymentRequest(claim.claimNumber),
       fullAppealMarkdown: "",
     };
+    // Trusted-boundary rehydration for stored structured fields: the model
+    // drafted against vault tokens, so restore authentic values before the
+    // studio renders them. (The assembled letter is rehydrated below.)
+    safeResult.executiveSummary = rehydrateForDisplay(safeResult.executiveSummary, phiValues);
+    safeResult.medicalNecessityArguments = rehydrateForDisplay(
+      safeResult.medicalNecessityArguments,
+      phiValues
+    );
 
     // 4. Assemble a sendable email from grounded case data and concise model sections.
-    const formattedMarkdown = assembleProfessionalMemorandum(
-      claim,
-      appealLevel,
-      safeResult,
-      evidences,
-      physicianNotes,
-      vectorPrecedents,
-      sender,
-      clinicalFacts
+    // TRUST-BOUNDARY REHYDRATION: the model drafted against vault tokens, so
+    // any token it echoed ([PATIENT], [MEMBER_ID], ...) is restored here from
+    // the trusted vault before the brief reaches the UI, dossier, PDF, or
+    // payer. Rehydrated text never flows back into an LLM input.
+    const formattedMarkdown = rehydrateForDisplay(
+      assembleProfessionalMemorandum(
+        claim,
+        appealLevel,
+        safeResult,
+        evidences,
+        physicianNotes,
+        vectorPrecedents,
+        sender,
+        clinicalFacts
+      ),
+      phiValues
     );
 
     const result: AppealBriefSynthesisResult = {

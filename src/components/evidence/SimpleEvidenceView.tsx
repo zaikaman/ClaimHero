@@ -19,6 +19,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { stripMarkdownFormatting, cn } from "../../lib/utils";
 import { ClauseInspectorDrawer } from "./ClauseInspectorDrawer";
+import { resolveProviderDisplayName } from "../../lib/displaySafety";
 
 interface SimpleEvidenceViewProps {
   claim: Claim;
@@ -32,18 +33,11 @@ interface SimpleEvidenceViewProps {
 
 /**
  * Normalize a treating-provider display name without inventing titles.
- * Provider names already ship with their title ("Dr. Sarah Chen, MD"), so
- * blindly prefixing "Dr." renders "Dr. Dr. ...". Collapse repeated leading
- * titles to one; never add a title to a bare facility or personal name and
- * never fall back to an invented person.
+ * Shared implementation lives in `src/lib/displaySafety.ts` so every trusted
+ * view collapses LLM-redaction placeholders identically; kept re-exported
+ * here for existing imports.
  */
-export function formatProviderDisplayName(raw?: string | null): string {
-  const name = (raw ?? "").trim().replace(/\s+/g, " ");
-  if (!name) return "";
-  const withoutTitles = name.replace(/^(dr\.?\s+)+/i, "").trim();
-  if (!withoutTitles) return name;
-  return /^dr\.?\s+/i.test(name) ? `Dr. ${withoutTitles}` : name;
-}
+export const formatProviderDisplayName = resolveProviderDisplayName;
 
 export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
   claim,
@@ -184,7 +178,7 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
   const hasVerifiedFindings = verifiedCount > 0;
 
   return (
-    <div className="space-y-4 font-sans animate-fadeIn">
+    <div className="flex flex-col gap-4 font-sans animate-fadeIn">
       {/* 1. Hero Verdict Card (Clean, Unnested, High Confidence) */}
       <Card className="p-5 border-border/80 bg-card/80 backdrop-blur-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -264,7 +258,7 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
       </Card>
 
       {/* 2. Top 3 Decisive Findings ("Smoking Guns") */}
-      <div className="space-y-2">
+      <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
             {hasVerifiedFindings
@@ -286,19 +280,19 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
           {smokingGuns.map((gun, idx) => {
             const Icon = gun.icon;
             return (
               <Card
                 key={idx}
                 className={cn(
-                  "p-4 transition-all duration-200 border space-y-3 flex flex-col justify-between",
+                  "p-4 transition-all duration-200 border gap-3 flex flex-col",
                   gun.accentBorder,
                   gun.accentBg
                 )}
               >
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Icon className={cn("size-4 shrink-0", gun.iconColor)} />
@@ -321,7 +315,7 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
                 </div>
 
                 {gun.evidenceItem && (
-                  <div className="pt-1">
+                  <div className="mt-auto pt-1">
                     <button
                       type="button"
                       onClick={() => setInspectedEvidence(gun.evidenceItem)}

@@ -17,6 +17,7 @@ import {
   TableCell,
 } from "../ui/table";
 import { formatCurrency, cn } from "../../lib/utils";
+import { resolvePatientDisplayName, resolveMemberIdDisplay } from "../../lib/displaySafety";
 import { useDetailMode } from "../../hooks/useDetailMode";
 import { getSeverityTierMeta, STATUTORY_DISCLOSURE_GRACE_DAYS } from "../../lib/liabilityCalculator";
 import {
@@ -158,7 +159,7 @@ export const FinancialLiabilityCalculator: React.FC<FinancialLiabilityCalculator
   const handleCopySummary = async () => {
     const summaryText = `# FINANCIAL RECOVERY & STATUTORY ERISA PENALTY AUDIT REPORT
 Claim Reference: ${claim.claimNumber}
-Patient: ${claim.patient?.name || "Insured Claimant"} (Member ID: ${claim.patient?.memberId || "N/A"})
+Patient: ${resolvePatientDisplayName(claim.patient?.name, "Insured Claimant")} (Member ID: ${resolveMemberIdDisplay(claim.patient?.memberId)})
 Insurer / Health Plan: ${claim.patient?.insurancePayer || "Health Plan"}
 Date of Service: ${claim.serviceDate}
 

@@ -230,10 +230,15 @@ export async function extractDocumentInBrowser(
   // Client-Side De-Identification: HIPAA Safe Harbor with DOS masked, since
   // the sanitized text may travel to untrusted model endpoints. Authentic DOS
   // stays vaulted in `clientIdentifiers` / the Convex database for payer use.
+  // The known patient name is supplied so redaction is precise: without it
+  // the free-floating heuristic would redact treating-provider names
+  // ("Dr. Sarah Chen, MD" -> "Dr. [PATIENT REDACTED], MD"), which the LLM
+  // then copies into providerName and the trusted UI renders verbatim.
   onProgress?.("Applying client-side HIPAA Safe Harbor de-identification...");
   const redactionOutput = fastSanitizeText(extractedRawText, {
     standard: "HIPAA_SAFE_HARBOR",
     maskDateOfService: true,
+    patientName: clientIdentifiers.patientName,
   });
 
   return {

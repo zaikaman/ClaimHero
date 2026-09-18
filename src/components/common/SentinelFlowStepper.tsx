@@ -293,16 +293,17 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
               </Button>
             )}
 
-            {/* Primary Action Button (Only when past Step 1 or on final action screens to avoid triple-button collision).
-                Hidden when it would duplicate the Back button or navigate to the current view. */}
-            {!isStep1 && primaryButtonTarget && primaryButtonTarget !== currentView && (
+            {/* Primary Action Button (forward navigation: Step 1 -> Letter, Step 2 -> Send/Track).
+                Hidden only when it would navigate to the current view. */}
+            {primaryButtonTarget && primaryButtonTarget !== currentView && (
               <Button
                 size="sm"
                 onClick={primaryButtonAction}
                 className="h-9 px-4 text-xs font-semibold shadow-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                title={isStep1 ? "Go to Step 2: Your letter" : isStep2 ? "Go to Step 3: Send & track" : primaryButtonLabel}
               >
                 <span>{primaryButtonLabel}</span>
-                {isStep2 && <ArrowRight className="size-3.5" />}
+                {(isStep1 || isStep2) && <ArrowRight className="size-3.5" />}
               </Button>
             )}
 
