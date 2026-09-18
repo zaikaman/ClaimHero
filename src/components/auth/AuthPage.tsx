@@ -282,8 +282,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </div>
 
         {/* ================= RIGHT COLUMN: Fully Opaque Solid White Form Card ================= */}
-        <div className="col-span-1 lg:col-span-6 bg-white text-zinc-900 rounded-[24px] sm:rounded-[32px] lg:rounded-r-[36px] lg:rounded-l-none p-4 sm:p-6 md:p-7 lg:p-6 xl:p-10 flex flex-col justify-between shadow-2xl lg:shadow-[-20px_0_40px_-10px_rgba(0,0,0,0.35)] h-full overflow-y-auto scrollbar-none relative z-10 border-l border-zinc-100 lg:border-l-zinc-200/80">
-          <div className="space-y-3 sm:space-y-4 lg:space-y-3 xl:space-y-4 max-w-sm lg:max-w-md mx-auto w-full my-auto">
+        <div className="col-span-1 lg:col-span-6 bg-white text-zinc-900 rounded-[24px] sm:rounded-[32px] lg:rounded-r-[36px] lg:rounded-l-none p-4 sm:p-5 lg:p-6 xl:p-8 flex flex-col justify-between shadow-2xl lg:shadow-[-20px_0_40px_-10px_rgba(0,0,0,0.35)] h-full overflow-y-auto scrollbar-none relative z-10 border-l border-zinc-100 lg:border-l-zinc-200/80">
+          <div className="space-y-2.5 sm:space-y-3 max-w-sm lg:max-w-md mx-auto w-full my-auto">
             
             {/* Mobile / Tablet Top Back Button */}
             <div className="flex lg:hidden items-center justify-between w-full mb-1 pb-1">
@@ -303,7 +303,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             {/* Top Brand Logo */}
             <div className="flex items-center justify-center">
               <BrandLogo
-                size="md"
+                size="sm"
                 theme="light"
                 glow={false}
                 interactive={true}
@@ -312,11 +312,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             </div>
 
             {/* Header Title & Subtitle */}
-            <div className="space-y-1.5 text-center pt-0.5">
-              <h1 className="text-2xl sm:text-3xl lg:text-3xl xl:text-4xl font-serif font-normal tracking-tight text-zinc-900 leading-tight">
+            <div className="space-y-1 text-center pt-0.5">
+              <h1 className="text-xl sm:text-2xl xl:text-3xl font-serif font-normal tracking-tight text-zinc-900 leading-tight">
                 {flow === "signIn" ? "Welcome Back" : "Create Account"}
               </h1>
-              <p className="text-xs sm:text-sm text-zinc-500 font-light max-w-xs mx-auto">
+              <p className="text-xs text-zinc-500 font-light max-w-sm mx-auto text-balance">
                 {flow === "signIn"
                   ? "Enter your email and password to access your account"
                   : "Sign up to start preparing evidence-grounded clinical appeals"}
@@ -340,11 +340,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             )}
 
             {/* Form */}
-            <form onSubmit={handlePasswordAuth} className="space-y-3.5 text-left">
+            <form onSubmit={handlePasswordAuth} className="space-y-3 text-left">
               {/* Optional Name field in sign up mode */}
               {flow === "signUp" && (
                 <div className="space-y-1">
-                  <label className="text-xs sm:text-sm font-medium text-zinc-700">Full Name</label>
+                  <label className="text-xs font-medium text-zinc-700">Full Name</label>
                   <input
                     type="text"
                     value={name}
@@ -357,7 +357,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
               {/* Email Field */}
               <div className="space-y-1">
-                <label className="text-xs sm:text-sm font-medium text-zinc-700">Email</label>
+                <label className="text-xs font-medium text-zinc-700">Email</label>
                 <input
                   type="email"
                   required
@@ -370,7 +370,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
               {/* Password Field */}
               <div className="space-y-1">
-                <label className="text-xs sm:text-sm font-medium text-zinc-700">Password</label>
+                <label className="text-xs font-medium text-zinc-700">Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -437,7 +437,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </button>
 
               {/* Or Divider */}
-              <div className="flex items-center my-2 xl:my-2.5">
+              <div className="flex items-center my-1">
                 <div className="flex-grow border-t border-zinc-200"></div>
                 <span className="px-3 text-[11px] font-mono uppercase tracking-wider text-zinc-400">or</span>
                 <div className="flex-grow border-t border-zinc-200"></div>
@@ -480,7 +480,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 type="button"
                 onClick={handleAnonymousAuth}
                 disabled={isLoading || isSigningIn || isSigningUp || showGoogleBusy || isAnonymousLoading || isCompletingOAuth}
-                className="w-full h-10 sm:h-11 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-medium text-sm transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs mt-2"
+                className="w-full h-10 sm:h-11 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-medium text-sm transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 {isAnonymousLoading ? (
                   <CircleNotch className="w-4 h-4 animate-spin text-zinc-700" />
@@ -498,7 +498,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </div>
 
           {/* Bottom Mode Switcher */}
-          <div className="pt-2 sm:pt-3 xl:pt-4 text-center text-xs sm:text-sm text-zinc-500">
+          <div className="pt-1 text-center text-xs sm:text-sm text-zinc-500">
             {flow === "signIn" ? (
               <p>
                 Don&apos;t have an account?{" "}

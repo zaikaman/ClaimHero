@@ -48,6 +48,7 @@ import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_erisaEvidence from "../lib/erisaEvidence.js";
 import type * as lib_openai from "../lib/openai.js";
 import type * as lib_pdfGenerator from "../lib/pdfGenerator.js";
+import type * as lib_phiSafe from "../lib/phiSafe.js";
 import type * as lib_pipelineActivity from "../lib/pipelineActivity.js";
 import type * as lib_policyDriftNotice from "../lib/policyDriftNotice.js";
 import type * as lib_precedentCorpus from "../lib/precedentCorpus.js";
@@ -118,6 +119,7 @@ declare const fullApi: ApiFromModules<{
   "lib/erisaEvidence": typeof lib_erisaEvidence;
   "lib/openai": typeof lib_openai;
   "lib/pdfGenerator": typeof lib_pdfGenerator;
+  "lib/phiSafe": typeof lib_phiSafe;
   "lib/pipelineActivity": typeof lib_pipelineActivity;
   "lib/policyDriftNotice": typeof lib_policyDriftNotice;
   "lib/precedentCorpus": typeof lib_precedentCorpus;

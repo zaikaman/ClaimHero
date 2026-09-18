@@ -244,11 +244,14 @@ export default function App() {
   if (currentView === "notFound" && !isAuthenticated) {
     return (
       <Suspense fallback={<div className="h-screen w-screen bg-black" />}>
-        <div className="h-screen w-screen bg-background flex items-center justify-center p-4">
-          <NotFoundWorkspace
-            onNavigateToRadar={() => setCurrentView("radar")}
-            onNavigateHome={() => setCurrentView("landing")}
-          />
+        <div className="h-screen w-screen bg-background flex flex-col">
+          <div className="flex flex-1 items-center justify-center p-4">
+            <NotFoundWorkspace
+              onNavigateToRadar={() => setCurrentView("radar")}
+              onNavigateHome={() => setCurrentView("landing")}
+            />
+          </div>
+          <GlobalDisclaimer variant="footer" />
         </div>
         <Toaster position="bottom-right" richColors theme="dark" closeButton />
       </Suspense>

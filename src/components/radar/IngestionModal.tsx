@@ -459,9 +459,9 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       "extracting",
       isDetailed
         ? isPdf
-          ? "Step 1/2: In-browser PDF extraction (pdf.js) and Safe Harbor de-identification..."
-          : "Step 1/2: In-browser OCR (tesseract.js) and Safe Harbor de-identification..."
-        : "Step 1/2: Reading your denial letter locally in browser..."
+          ? "Step 1/2: On-device PDF extraction (pdf.js) and Safe Harbor de-identification. Original retained in encrypted storage for audit; only redacted text reaches AI models..."
+          : "Step 1/2: On-device OCR (tesseract.js) and Safe Harbor de-identification. Original retained in encrypted storage for audit; only redacted text reaches AI models..."
+        : "Step 1/2: Reading your denial letter on-device, then saving the encrypted original for audit..."
     );
 
     try {
@@ -872,6 +872,16 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                   {selectedFile
                     ? `${(selectedFile.size / 1024).toFixed(1)} KB — Ready to upload`
                     : "Supports PDF, PNG, JPG, JPEG, and TXT denial notices"}
+                </p>
+              </div>
+
+              <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                <Lock className="size-3.5 shrink-0 mt-0.5 text-muted-foreground" />
+                <p>
+                  Text is extracted on-device and de-identified before analysis. The original
+                  file is stored encrypted for audit and attached to your appeal packet,
+                  deleted when you delete the case. AI models receive redacted text only,
+                  never the original file.
                 </p>
               </div>
 

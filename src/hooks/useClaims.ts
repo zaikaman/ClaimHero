@@ -226,7 +226,9 @@ export function useClaims(options?: {
     async (file: File, patientState?: string, onProgress?: (msg: string) => void) => {
       // 1. In-browser extraction & client-side PHI de-identification
       // Digital PDFs: pdf.js getTextContent() — zero OCR needed, 100% accuracy, zero keys.
-      // Scans/photos: tesseract.js in-browser. PHI never leaves user device for OCR.
+      // Scans/photos: tesseract.js recognition compute runs on-device. The original
+      // file is still uploaded to Convex Storage for audit below; only redacted
+      // text is sent to AI models.
       onProgress?.("Extracting document text locally in browser...");
       let clientResult: ClientExtractionResult | null = null;
       try {
@@ -239,7 +241,9 @@ export function useClaims(options?: {
       onProgress?.("Uploading document to secure storage...");
       const postUrl = await generateUploadUrlMutation();
 
-      // 3. Upload real binary to Convex Storage for human audit / download record
+      // 3. Upload original binary to Convex Storage for human audit / download
+      // record. Retained until the case is deleted; AI models receive only the
+      // redacted client text, never this binary.
       const response = await fetch(postUrl, {
         method: "POST",
         headers: { "Content-Type": file.type || "application/octet-stream" },

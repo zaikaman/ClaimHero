@@ -18,6 +18,7 @@ import {
 } from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
 import { BrandLogo } from "../common/BrandLogo";
+import { GlobalDisclaimer } from "../common/GlobalDisclaimer";
 import {
   hasCachedAuthToken,
   shouldDeferLandingAuthActions,
@@ -475,6 +476,14 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
                 <span>{slide.secondaryCtaText}</span>
                 <ArrowRight className="size-4" />
               </button>
+            </div>
+
+            {/* Administrative decision-support disclaimer (public surface) */}
+            <div
+              className="animate-blur-fade-up mt-6 max-w-2xl"
+              style={{ animationDelay: "750ms" }}
+            >
+              <GlobalDisclaimer variant="inline" className="text-white/55" />
             </div>
           </div>
 

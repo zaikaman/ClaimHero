@@ -112,7 +112,9 @@ export async function extractTextFromPdf(
 
 /**
  * Optical character recognition on images (PNG, JPEG, WebP) using tesseract.js in WebAssembly/Web Worker.
- * Raw image bytes and PHI never leave the browser.
+ * Recognition compute runs on-device in the browser. Callers that retain the
+ * source file (e.g. Convex Storage upload for audit) still transmit the
+ * original bytes server-side; only redacted text is ever sent to AI models.
  */
 export async function extractTextFromImage(
   imageSource: File | Blob | string,
@@ -181,7 +183,10 @@ export function extractClientVaultIdentifiers(rawText: string): {
  * 1. Extracts digital text (pdf.js) or runs local OCR (tesseract.js).
  * 2. Extracts client vault identifiers locally for Convex DB vaulting.
  * 3. Sanitizes text in-browser using redactBeforeLLM (HIPAA Safe Harbor).
- * 4. Returns de-identified text where PHI never leaves the browser.
+ * 4. Returns de-identified text so AI models receive no raw PHI. The original
+ *    file and vaulted identifiers are stored in Convex only when the caller
+ *    retains them for audit (e.g. uploadAndParseDocument); OCR compute itself
+ *    never sends bytes to a model endpoint.
  */
 export async function extractDocumentInBrowser(
   file: File | Blob,
