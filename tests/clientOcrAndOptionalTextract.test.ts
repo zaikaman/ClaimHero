@@ -105,6 +105,7 @@ describe("In-Browser Client OCR & De-Identification Architecture", () => {
         db: {
           get: vi.fn().mockImplementation(async (id: string) => {
             if (id === "msg_inbound_1") return mockMessage;
+            if (id === "claim_123") return { _id: "claim_123", userId: "user_owner" };
             return null;
           }),
           patch: vi.fn().mockResolvedValue(undefined),

@@ -809,6 +809,9 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
           if (id === "patient_1") {
             return { _id: "patient_1", userId: targetUserId, name: "[PATIENT NAME REDACTED]", memberId: "GEO-554210-99" };
           }
+          if (id === "claim_1") {
+            return { _id: "claim_1", userId: targetUserId, claimNumber: "CLM-6104-GEO-7830" };
+          }
           return null;
         }),
         patch: vi.fn().mockResolvedValue(true),
@@ -962,6 +965,9 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
         }),
         get: vi.fn().mockImplementation(async (id: string) => {
           if (id === "patient_1") return { _id: "patient_1", userId: targetUserId, name: "Marcus Sterling" };
+          if (id === "claim_more") {
+            return { _id: "claim_more", userId: targetUserId, claimNumber: "CLM-6104" };
+          }
           return null;
         }),
         patch: vi.fn().mockResolvedValue(true),

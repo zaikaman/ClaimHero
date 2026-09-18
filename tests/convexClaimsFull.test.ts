@@ -181,6 +181,7 @@ describe("Convex Claims CRUD, Financials & Analytics Engine", () => {
       const mockDb = createMockDb({
         get: vi.fn().mockImplementation((id) => {
           if (id === "user_123") return Promise.resolve({ _id: "user_123", email: "owner@test.com" });
+          if (id === "claim_1") return Promise.resolve({ _id: "claim_1", userId: "user_123" });
           return Promise.resolve(null);
         }),
         insert: vi.fn().mockImplementation((table) => {
@@ -328,6 +329,7 @@ describe("Convex Claims CRUD, Financials & Analytics Engine", () => {
         get: vi.fn().mockImplementation((id) => {
           if (id === "user_attacker") return Promise.resolve({ _id: "user_attacker", email: "attacker@test.com" });
           if (id === "user_victim") return Promise.resolve({ _id: "user_victim", email: "victim@test.com" });
+          if (id === "claim_spoof") return Promise.resolve({ _id: "claim_spoof", userId: "user_attacker" });
           return Promise.resolve(null);
         }),
         insert: vi.fn().mockImplementation((table) => {
