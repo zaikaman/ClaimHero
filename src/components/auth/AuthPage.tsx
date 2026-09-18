@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useAction } from "convex/react";
 import { useConvexAuth } from "@convex-dev/auth/react";
 import { useSignInWithPassword, useSignUpWithPassword } from "@convex-dev/auth/providers/password/react";
 import { useSignInWithGoogle, useOauth } from "@convex-dev/auth/providers/oauth/react";
@@ -18,7 +18,11 @@ import {
   Flask,
   CheckCircle,
   Key,
+  EnvelopeSimple,
+  ShieldCheck,
+  ArrowCounterClockwise,
 } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { NavigationView } from "../layout/Sidebar";
 import { BrandLogo } from "../common/BrandLogo";
 import {
@@ -60,9 +64,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const requestPasswordResetAction = useAction(api.passwordReset.requestPasswordReset);
+  const verifyCodeAndResetMutation = useMutation(api.passwordReset.verifyCodeAndResetPassword);
+  const resetPasswordWithTokenMutation = useMutation(api.passwordReset.resetPasswordWithToken);
+
   const [isResetDialogOpen, setIsResetDialogOpen] = useState<boolean>(false);
+  const [resetStep, setResetStep] = useState<"request" | "verify" | "token" | "success">("request");
   const [resetEmail, setResetEmail] = useState<string>("");
-  const [resetSent, setResetSent] = useState<boolean>(false);
+  const [resetCode, setResetCode] = useState<string>("");
+  const [resetNewPassword, setResetNewPassword] = useState<string>("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState<string>("");
+  const [resetToken, setResetToken] = useState<string>("");
+  const [showResetPassword, setShowResetPassword] = useState<boolean>(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState<number>(0);
   const [isSubmittingReset, setIsSubmittingReset] = useState<boolean>(false);
 
   // Snapshot once: true for the whole page load that returns from the Google
@@ -117,6 +132,168 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     mediaQuery.addEventListener("change", listener);
     return () => mediaQuery.removeEventListener("change", listener);
   }, [embedBackground]);
+
+  // Countdown timer for reset email resends
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  // Deep-link direct token detection (?resetToken=...)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get("resetToken");
+    if (tokenFromUrl && tokenFromUrl.trim()) {
+      setResetToken(tokenFromUrl.trim());
+      setResetStep("token");
+      setResetError(null);
+      setIsResetDialogOpen(true);
+    }
+  }, []);
+
+  const handleRequestReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = resetEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      setResetError("Please enter a valid email address.");
+      return;
+    }
+    setResetError(null);
+    setIsSubmittingReset(true);
+
+    try {
+      const res = await requestPasswordResetAction({ email: cleanEmail });
+      setIsSubmittingReset(false);
+      if (!res.success) {
+        setResetError(res.message || "Failed to dispatch recovery email. Please wait before trying again.");
+        return;
+      }
+      setResetStep("verify");
+      setResendCooldown(60);
+      toast.success("Verification code dispatched via ClaimHero Security.");
+    } catch (err: unknown) {
+      setIsSubmittingReset(false);
+      const msg = err instanceof Error ? err.message : "Failed to dispatch recovery email.";
+      setResetError(msg);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (resendCooldown > 0 || isSubmittingReset) return;
+    const cleanEmail = resetEmail.trim().toLowerCase();
+    if (!cleanEmail) return;
+    setResetError(null);
+    setIsSubmittingReset(true);
+
+    try {
+      const res = await requestPasswordResetAction({ email: cleanEmail });
+      setIsSubmittingReset(false);
+      if (!res.success) {
+        setResetError(res.message || "Failed to resend recovery email. Please wait before trying again.");
+        return;
+      }
+      setResendCooldown(60);
+      toast.success("A fresh verification code has been dispatched.");
+    } catch (err: unknown) {
+      setIsSubmittingReset(false);
+      const msg = err instanceof Error ? err.message : "Failed to resend recovery email.";
+      setResetError(msg);
+    }
+  };
+
+  const handleVerifyAndReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError(null);
+
+    const cleanCode = resetCode.trim().replace(/[^0-9]/g, "");
+    if (cleanCode.length !== 6) {
+      setResetError("Please enter the complete 6-digit verification code from your email.");
+      return;
+    }
+
+    if (resetNewPassword.length < 8) {
+      setResetError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    if (resetNewPassword !== resetConfirmPassword) {
+      setResetError("Passwords do not match. Please ensure both fields are identical.");
+      return;
+    }
+
+    setIsSubmittingReset(true);
+    try {
+      const res = await verifyCodeAndResetMutation({
+        email: resetEmail.trim().toLowerCase(),
+        code: cleanCode,
+        newPassword: resetNewPassword,
+      });
+      setIsSubmittingReset(false);
+
+      if (!res.success) {
+        setResetError(res.message || "Verification failed. Please check the code or try again.");
+        return;
+      }
+
+      setResetStep("success");
+      setEmail(resetEmail.trim().toLowerCase());
+      setPassword("");
+      toast.success("Password updated successfully! You can now sign in.");
+    } catch (err: unknown) {
+      setIsSubmittingReset(false);
+      const msg = err instanceof Error ? err.message : "Password reset failed.";
+      setResetError(msg);
+    }
+  };
+
+  const handleResetWithToken = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError(null);
+
+    if (resetNewPassword.length < 8) {
+      setResetError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    if (resetNewPassword !== resetConfirmPassword) {
+      setResetError("Passwords do not match. Please ensure both fields are identical.");
+      return;
+    }
+
+    setIsSubmittingReset(true);
+    try {
+      const res = await resetPasswordWithTokenMutation({
+        token: resetToken,
+        newPassword: resetNewPassword,
+      });
+      setIsSubmittingReset(false);
+
+      if (!res.success) {
+        setResetError(res.message || "Recovery link is invalid or expired.");
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("resetToken");
+        window.history.replaceState({}, "", url.pathname + (url.search || ""));
+      }
+
+      if (res.email) {
+        setEmail(res.email);
+      }
+      setResetStep("success");
+      toast.success("Password updated successfully! You can now sign in.");
+    } catch (err: unknown) {
+      setIsSubmittingReset(false);
+      const msg = err instanceof Error ? err.message : "Password reset failed.";
+      setResetError(msg);
+    }
+  };
 
   const handlePasswordAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -425,7 +602,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     type="button"
                     onClick={() => {
                       setResetEmail(email.trim());
-                      setResetSent(false);
+                      setResetCode("");
+                      setResetNewPassword("");
+                      setResetConfirmPassword("");
+                      setResetError(null);
+                      setResetStep("request");
                       setIsResetDialogOpen(true);
                     }}
                     className="text-zinc-600 hover:text-zinc-900 transition-colors cursor-pointer text-xs font-medium"
@@ -548,62 +729,65 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       </div>
 
       {/* Password Reset Modal */}
-      <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+      <Dialog open={isResetDialogOpen} onOpenChange={(open) => {
+        setIsResetDialogOpen(open);
+        if (!open) {
+          setResetError(null);
+          setResetCode("");
+          setResetNewPassword("");
+          setResetConfirmPassword("");
+        }
+      }}>
         <DialogContent className="sm:max-w-md p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xl">
           <DialogHeader className="space-y-1.5 pb-2">
             <div className="flex items-center gap-2.5">
               <div className="size-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center">
-                <Key className="size-4" />
+                {resetStep === "success" ? (
+                  <ShieldCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <Key className="size-4 text-zinc-700 dark:text-zinc-300" />
+                )}
               </div>
               <DialogTitle className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                Reset Account Password
+                {resetStep === "request" && "Reset Account Password"}
+                {resetStep === "verify" && "Enter Verification Code"}
+                {resetStep === "token" && "Create New Password"}
+                {resetStep === "success" && "Password Updated"}
               </DialogTitle>
             </div>
             <DialogDescription className="text-xs text-zinc-500 dark:text-zinc-400">
-              Enter your account email below. If an account is associated with this email address, password recovery instructions will be dispatched.
+              {resetStep === "request" &&
+                "Enter your account email. If registered, a 6-digit verification code will be dispatched via the claimhero-sender AgentMail gateway."}
+              {resetStep === "verify" &&
+                `We dispatched a 6-digit code to ${resetEmail}. Enter the code and your new password below.`}
+              {resetStep === "token" &&
+                "Enter and confirm your new account password to complete recovery."}
+              {resetStep === "success" &&
+                "Your account password has been successfully updated. You can now sign in."}
             </DialogDescription>
           </DialogHeader>
 
-          {resetSent ? (
-            <div className="space-y-4 py-2">
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 flex items-start gap-3 text-emerald-800 dark:text-emerald-300">
-                <CheckCircle className="size-5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
-                <div className="text-xs space-y-1">
-                  <p className="font-semibold">Recovery Instructions Dispatched</p>
-                  <p className="text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed">
-                    If an account exists for <span className="font-mono font-medium">{resetEmail}</span>, a secure password reset link has been dispatched to that inbox. Please check your spam or junk folder if it does not arrive within two minutes.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsResetDialogOpen(false)}
-                className="w-full h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black font-medium text-xs hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors cursor-pointer"
-              >
-                Return to Sign In
-              </button>
+          {/* Error Banner */}
+          {resetError && (
+            <div role="alert" aria-live="polite" className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 flex items-start gap-2.5 text-xs text-red-700 dark:text-red-400">
+              <WarningCircle className="size-4 shrink-0 mt-0.5" />
+              <div className="leading-relaxed font-medium">{resetError}</div>
             </div>
-          ) : (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!resetEmail.trim() || !resetEmail.includes("@")) return;
-                setIsSubmittingReset(true);
-                setTimeout(() => {
-                  setIsSubmittingReset(false);
-                  setResetSent(true);
-                }, 600);
-              }}
-              className="space-y-4 py-1"
-            >
+          )}
+
+          {/* STEP 1: Request Code */}
+          {resetStep === "request" && (
+            <form onSubmit={handleRequestReset} className="space-y-4 py-1">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                  Email Address
+                <label htmlFor="reset-email" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Account Email Address
                 </label>
                 <input
+                  id="reset-email"
                   type="email"
                   required
-                  placeholder="name@company.com"
+                  autoComplete="email"
+                  placeholder="advocate@hospital.org"
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
                   className="w-full h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
@@ -626,14 +810,249 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   {isSubmittingReset ? (
                     <>
                       <CircleNotch className="size-3.5 animate-spin" />
-                      <span>Sending...</span>
+                      <span>Dispatching Code...</span>
                     </>
                   ) : (
-                    <span>Send Reset Instructions</span>
+                    <span>Send Verification Code</span>
                   )}
                 </button>
               </div>
             </form>
+          )}
+
+          {/* STEP 2: Verify Code & Set New Password */}
+          {resetStep === "verify" && (
+            <form onSubmit={handleVerifyAndReset} className="space-y-3.5 py-1">
+              <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/60 p-3 text-xs space-y-1">
+                <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
+                  <span className="flex items-center gap-1.5">
+                    <EnvelopeSimple className="size-3.5" />
+                    <span>Sent to <strong className="text-zinc-900 dark:text-zinc-100 font-mono">{resetEmail}</strong></span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetStep("request");
+                      setResetError(null);
+                    }}
+                    className="text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 underline cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal">
+                  Dispatched via ClaimHero Security gateway (claimhero-sender). Check spam/junk if not visible in 2 minutes.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="reset-code" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  6-Digit Verification Code
+                </label>
+                <input
+                  id="reset-code"
+                  type="text"
+                  required
+                  maxLength={6}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  placeholder="123456"
+                  value={resetCode}
+                  onChange={(e) => setResetCode(e.target.value.replace(/[^0-9]/g, ""))}
+                  className="w-full h-11 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-base text-center font-mono font-bold tracking-[0.35em] text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="reset-new-password" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    New Password
+                  </label>
+                  <span className="text-[10px] text-zinc-500">Min. 8 characters</span>
+                </div>
+                <div className="relative">
+                  <input
+                    id="reset-new-password"
+                    type={showResetPassword ? "text" : "password"}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    placeholder="Enter new password"
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    className="w-full h-10 px-3 pr-9 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                  />
+                  <button
+                    type="button"
+                    aria-label={showResetPassword ? "Hide password" : "Show password"}
+                    title={showResetPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowResetPassword((prev) => !prev)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 cursor-pointer"
+                  >
+                    {showResetPassword ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="reset-confirm-password" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Confirm New Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="reset-confirm-password"
+                    type={showResetPassword ? "text" : "password"}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    placeholder="Re-enter new password"
+                    value={resetConfirmPassword}
+                    onChange={(e) => setResetConfirmPassword(e.target.value)}
+                    className="w-full h-10 px-3 pr-9 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  disabled={resendCooldown > 0 || isSubmittingReset}
+                  onClick={handleResendCode}
+                  className="text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <ArrowCounterClockwise className={`size-3.5 ${isSubmittingReset ? "animate-spin" : ""}`} />
+                  <span>{resendCooldown > 0 ? `Resend (${resendCooldown}s)` : "Resend Code"}</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsResetDialogOpen(false)}
+                    className="px-3 h-9 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReset || resetCode.trim().length !== 6 || resetNewPassword.length < 8}
+                    className="px-4 h-9 rounded-xl bg-black dark:bg-white text-white dark:text-black text-xs font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    {isSubmittingReset ? (
+                      <>
+                        <CircleNotch className="size-3.5 animate-spin" />
+                        <span>Updating...</span>
+                      </>
+                    ) : (
+                      <span>Update Password</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+
+          {/* STEP 3: Token Mode (via direct email link) */}
+          {resetStep === "token" && (
+            <form onSubmit={handleResetWithToken} className="space-y-3.5 py-1">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="token-new-password" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    New Password
+                  </label>
+                  <span className="text-[10px] text-zinc-500">Min. 8 characters</span>
+                </div>
+                <div className="relative">
+                  <input
+                    id="token-new-password"
+                    type={showResetPassword ? "text" : "password"}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    placeholder="Enter new password"
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    className="w-full h-10 px-3 pr-9 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                  />
+                  <button
+                    type="button"
+                    aria-label={showResetPassword ? "Hide password" : "Show password"}
+                    title={showResetPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowResetPassword((prev) => !prev)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 cursor-pointer"
+                  >
+                    {showResetPassword ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="token-confirm-password" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Confirm New Password
+                </label>
+                <input
+                  id="token-confirm-password"
+                  type={showResetPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  placeholder="Re-enter new password"
+                  value={resetConfirmPassword}
+                  onChange={(e) => setResetConfirmPassword(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsResetDialogOpen(false)}
+                  className="px-3.5 h-9 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReset || resetNewPassword.length < 8 || !resetNewPassword}
+                  className="px-4 h-9 rounded-xl bg-black dark:bg-white text-white dark:text-black text-xs font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSubmittingReset ? (
+                    <>
+                      <CircleNotch className="size-3.5 animate-spin" />
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <span>Set New Password</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* STEP 4: Success */}
+          {resetStep === "success" && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-start gap-3 text-emerald-800 dark:text-emerald-300">
+                <CheckCircle className="size-5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+                <div className="text-xs space-y-1">
+                  <p className="font-semibold text-sm">Password Updated Successfully</p>
+                  <p className="text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed">
+                    Your account password has been updated. You can now sign in using your new credentials.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResetDialogOpen(false);
+                  setFlow("signIn");
+                }}
+                className="w-full h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black font-medium text-xs hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors cursor-pointer"
+              >
+                Sign In Now
+              </button>
+            </div>
           )}
         </DialogContent>
       </Dialog>

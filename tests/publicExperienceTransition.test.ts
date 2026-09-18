@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 // Mock Convex and Auth hooks for component rendering tests
 vi.mock("convex/react", () => ({
   useMutation: () => vi.fn(),
+  useAction: () => vi.fn(),
   useQuery: () => null,
 }));
 

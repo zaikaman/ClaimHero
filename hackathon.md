@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-18T15:05:00Z
+- **Last updated:** 2026-09-18T17:44:00Z
 
 ## Log
 
@@ -1721,7 +1721,7 @@ Fixed workflow crawl failure masking, eliminated boilerplate ERISA filler, harde
 - Synthesizer Grounding Guard: Updated `convex/actions/appealSynthesizer.ts` prompt fallbacks to prohibit treating ERISA § 503 procedural disclosure rules as CPB clinical criteria.
 - Regression Coverage & Verification: Added comprehensive regression tests across `tests/workflows.test.ts`, `tests/policyDriftSentinel.test.ts`, and `tests/evidentiaryDegradationGating.test.ts`. Synchronized test metrics in `README.md` (1,240 automated tests across 79 test suites). Verified 79 test suites (1,240 passing tests), 0 type errors, 0 lint warnings, test coverage, and production build. Convex features: actions, durable workflows, internalAction, mutations, queries.
 
-### 2026-09-18 - working tree
+### 2026-09-18 - 001e8b7
 Resolved production readiness issues 25 through 33 across calculations, statutory synthesis, workflow state durability, error boundaries, UI contrast, HIPAA Safe Harbor privacy shields, and accessibility:
 - Financial Liability & Dossier Honesty: Fixed No Surprises Act protection inversion in `src/lib/liabilityCalculator.ts` to out-of-network balance billing; incorporated 2024 DOL inflation-adjusted penalty rate ($164/day per 29 C.F.R. § 2575.502c-1); added multi-state prompt-pay interest rates (TX 18%, FL 10%, CA 10%, NY 12%, IL 9%, PA 10%); replaced hardcoded attorney fees with dynamic Lodestar estimation; eliminated fabricated cost-sharing; added explicit statutory document demand placeholders without fake PMIDs or synthetic scores in `src/lib/dossierBuilder.ts` and dossier exhibit cards (`DossierExhibitB.tsx`, `DossierExhibitC.tsx`).
 - Similarity & Citation Grounding: Corrected cosine similarity math clamp in `convex/lib/embeddings.ts` and `convex/actions/appealSynthesizer.ts` to non-negative `[0, 1]`; normalized stored `relevanceScore` in `convex/precedents.ts` to 0-100; updated statutory citations to 29 C.F.R. § 2560.503-1(h)(3)(ii)-(iii) for mandatory same-specialty reviewer credentials; enforced ERISA § 514(a) preemption in Level 3 appeal briefs for self-funded plans, replacing preempted state tort claims with federal civil enforcement under ERISA § 502(a)(1)(B), § 502(c), and § 502(g)(1).
@@ -1733,6 +1733,14 @@ Resolved production readiness issues 25 through 33 across calculations, statutor
 - Print, Copy & Export Reliability: Created unified `copyToClipboard` utility with `document.execCommand` fallback (`src/lib/clipboard.ts`); fixed print iframe memory leaks in `ExportDrawer.tsx`; eliminated innerText scraping; added empty export toast guards in `CaseRadar.tsx`.
 - Responsive Viewports & Accessibility: Replaced rigid layout heights in `AuthPage.tsx` and `AppealStudio.tsx` with responsive viewports; enabled mobile print trigger; added WAI-ARIA dialog accessibility and Escape key handling to escalation modal; added arrow-key roving tabIndex navigation to `SimpleInboxView.tsx` radio options; upgraded sub-readable badge fonts to minimum text-[10px].
 - Regression & Verification: Synchronized test metrics in `README.md` (1,242 automated tests across 79 test suites). Verified all 79 test suites (1,242 passing tests), clean typecheck (`tsc --noEmit`), clean lint, and production Vite build (`npm run build`). Convex features: actions, durable workflows, internalAction, mutations, queries, vector search.
+
+### 2026-09-18 - working tree
+Replaced mock setTimeout in AuthPage password reset dialog with production-grade transactional recovery powered by AgentMail (`convex/schema.ts`, `convex/lib/rateLimiter.ts`, `convex/lib/passwordResetEmail.ts`, `convex/passwordReset.ts`, `src/components/auth/AuthPage.tsx`, `tests/passwordReset.test.ts`, `tests/publicExperienceTransition.test.ts`):
+- Password Recovery Schema & Rate Limiting: Added `passwordResetTokens` table to `convex/schema.ts` with compound indexes (`by_token`, `by_email_and_code`, `by_email`, `by_userId`), storing one-time 6-digit verification codes and cryptographic tokens with single-use invalidation (`usedAt`) and 15-minute expirations. Configured token bucket rate limiters in `convex/lib/rateLimiter.ts` (`passwordResetRequest`: 3/15min, `passwordResetVerify`: 5/15min) to prevent brute-force attacks and email flooding.
+- Transactional & Appellate Light-Mode Email Redesign: Redesigned all transactional and appellate emails (password recovery OTPs in `convex/lib/passwordResetEmail.ts`, inbound payer determination alerts, and formal appeal letters/correspondence dossiers in `convex/lib/appealEmail.ts`) from dark mode to an executive clinical light-mode aesthetic tailored for Gmail, Apple Mail, and Outlook. Built responsive table structures with soft slate canvas (`#f8fafc`), pure white card containers (`#ffffff`), subtle hairline borders (`#e2e8f0`), authoritative navy typography (`#0f172a` / `#334155`), high-contrast monospace verification blocks, structured clinical summary tables, and statutory ERISA § 503 legal notices.
+- Atomic Password Mutation & Direct Link Recovery: Implemented `verifyCodeAndResetPassword` and `resetPasswordWithToken` mutations invoking `components.authPasswordProvider.public.setPassword` to update Argon2id password hashes directly through `@convex-dev/auth`, enforcing password complexity and marking tokens spent in a single transaction.
+- Multi-Step Modal & URL Param Detection: Upgraded `AuthPage.tsx` dialog to handle code request, 6-digit code verification, 60s resend cooldown timer, direct `?resetToken=...` query param recovery, accessible error/success alerts, and auto-return to sign-in.
+- Regression & Verification: Added `tests/passwordReset.test.ts` with 16 targeted unit tests covering email rendering, XSS sanitization, anti-enumeration protection, rate-limiting, expired/used token rejection, CRLF header injection defense, and password complexity error handling. Verified 80 test suites (1,258 passing tests), clean typecheck (`tsc --noEmit`), clean lint (`eslint src convex`), and production build (`npm run build`). Convex features: actions, internalAction, internalMutation, internalQuery, mutations, rateLimiter, schema, tables.
 
 
 

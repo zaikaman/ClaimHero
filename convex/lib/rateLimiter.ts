@@ -121,5 +121,20 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: 15 * MINUTE,
     capacity: 1,
   },
+  // Password reset request rate limit (3 attempts per 15 minutes per email)
+  passwordResetRequest: {
+    kind: "token bucket",
+    rate: 3,
+    period: 15 * MINUTE,
+    capacity: 3,
+  },
+  // Password reset verification attempt rate limit (5 attempts per 15 minutes per email/token)
+  passwordResetVerify: {
+    kind: "token bucket",
+    rate: 5,
+    period: 15 * MINUTE,
+    capacity: 5,
+  },
 });
+
 

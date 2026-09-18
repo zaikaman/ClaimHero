@@ -716,6 +716,22 @@ export default defineSchema({
   })
     .index("by_claim", ["claimId"])
     .index("by_claim_and_created", ["claimId", "createdAt"]),
+
+  // Secure time-limited password reset tokens and verification codes
+  passwordResetTokens: defineTable({
+    userId: v.id("users"),
+    email: v.string(),
+    code: v.string(),
+    token: v.string(),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_email_and_code", ["email", "code"])
+    .index("by_email", ["email"])
+    .index("by_userId", ["userId"]),
 });
+
 
 

@@ -189,14 +189,14 @@ function isStructuralLine(line: string): boolean {
 function renderTable(lines: string[]): { html: string; text: string } {
   const header = splitTableRow(lines[0] || "");
   const rows = lines.slice(2).map(splitTableRow);
-  const htmlHeader = header.map((cell) => `<th style="padding:10px 12px; text-align:left; border-bottom:1px solid #dbe3ea; color:#526273; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;">${inlineHtml(cell)}</th>`).join("");
-  const htmlRows = rows.map((row) => `<tr>${header.map((_, index) => `<td style="padding:10px 12px; vertical-align:top; border-bottom:1px solid #edf1f4; color:#253342; font-size:13px; line-height:1.55;">${inlineHtml(row[index] || "")}</td>`).join("")}</tr>`).join("");
+  const htmlHeader = header.map((cell) => `<th style="padding:10px 14px; text-align:left; background-color:#f1f5f9; border-bottom:1px solid #e2e8f0; color:#475569; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;">${inlineHtml(cell)}</th>`).join("");
+  const htmlRows = rows.map((row) => `<tr>${header.map((_, index) => `<td style="padding:11px 14px; vertical-align:top; border-bottom:1px solid #f1f5f9; color:#1e293b; font-size:13px; line-height:1.55;">${inlineHtml(row[index] || "")}</td>`).join("")}</tr>`).join("");
   const text = rows
     .map((row) => header.map((label, index) => `${label}: ${row[index] || ""}`).join("\n"))
     .join("\n\n");
 
   return {
-    html: `<div style="overflow-x:auto; margin:20px 0;"><table role="presentation" style="width:100%; border-collapse:collapse; border:1px solid #dbe3ea;">${`<thead><tr>${htmlHeader}</tr></thead>`}<tbody>${htmlRows}</tbody></table></div>`,
+    html: `<div style="overflow-x:auto; margin:20px 0;"><table role="presentation" style="width:100%; border-collapse:collapse; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">${`<thead><tr>${htmlHeader}</tr></thead>`}<tbody>${htmlRows}</tbody></table></div>`,
     text,
   };
 }
@@ -235,10 +235,10 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
       const heading = inlineHtml(headingMatch[2]);
       const textHeading = inlineText(headingMatch[2]);
       const styles = level === 1
-        ? "margin:28px 0 12px; color:#12263a; font-size:22px; line-height:1.25; font-weight:700; page-break-after:avoid; break-after:avoid;"
+        ? "margin:28px 0 12px; color:#0f172a; font-size:22px; line-height:1.3; font-weight:700; letter-spacing:-0.02em; page-break-after:avoid; break-after:avoid;"
         : level === 2
-        ? "margin:26px 0 10px; padding-bottom:6px; border-bottom:1px solid #dbe3ea; color:#1f486d; font-size:16px; line-height:1.35; font-weight:700; page-break-after:avoid; break-after:avoid;"
-        : "margin:20px 0 8px; color:#365d7d; font-size:14px; line-height:1.4; font-weight:700; page-break-after:avoid; break-after:avoid;";
+        ? "margin:26px 0 10px; padding-bottom:6px; border-bottom:1px solid #e2e8f0; color:#0f172a; font-size:16px; line-height:1.35; font-weight:700; page-break-after:avoid; break-after:avoid;"
+        : "margin:20px 0 8px; color:#334155; font-size:14px; line-height:1.4; font-weight:700; page-break-after:avoid; break-after:avoid;";
       htmlBlocks.push(`<h${level} style="${styles}">${heading}</h${level}>`);
       textBlocks.push(textHeading);
       index += 1;
@@ -246,7 +246,7 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
     }
 
     if (isHorizontalRule(line)) {
-      htmlBlocks.push(`<hr style="margin:24px 0; border:0; border-top:1px solid #dbe3ea;" />`);
+      htmlBlocks.push(`<hr style="margin:24px 0; border:0; border-top:1px solid #e2e8f0;" />`);
       index += 1;
       continue;
     }
@@ -259,7 +259,7 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
       }
       const quoteText = quoteLines.map(inlineText).join("\n");
       const quoteHtml = quoteLines.map(inlineHtml).join("<br />");
-      htmlBlocks.push(`<blockquote style="margin:18px 0; padding:12px 16px; border-left:3px solid #2f7ca5; background:#f4f8fb; color:#334e68; font-size:13px; line-height:1.6; page-break-inside:avoid; break-inside:avoid;">${quoteHtml}</blockquote>`);
+      htmlBlocks.push(`<blockquote style="margin:18px 0; padding:12px 18px; border-left:3px solid #0284c7; background:#f8fafc; color:#1e293b; font-size:13px; line-height:1.6; border-radius:0 6px 6px 0; page-break-inside:avoid; break-inside:avoid;">${quoteHtml}</blockquote>`);
       textBlocks.push(`Quote: ${quoteText}`);
       continue;
     }
@@ -276,7 +276,7 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
       }
       const tag = ordered ? "ol" : "ul";
       const listStyle = ordered ? "list-style-type:decimal;" : "list-style-type:disc;";
-      htmlBlocks.push(`<${tag} style="margin:12px 0 18px; padding-left:24px; color:#253342; font-size:13px; line-height:1.6; ${listStyle}">${items.map((item) => `<li style="padding:2px 0;">${inlineHtml(item)}</li>`).join("")}</${tag}>`);
+      htmlBlocks.push(`<${tag} style="margin:12px 0 18px; padding-left:24px; color:#334155; font-size:13px; line-height:1.6; ${listStyle}">${items.map((item) => `<li style="padding:2px 0;">${inlineHtml(item)}</li>`).join("")}</${tag}>`);
       textBlocks.push(items.map((item, itemIndex) => `${ordered ? `${itemIndex + 1}.` : "-"} ${inlineText(item)}`).join("\n"));
       continue;
     }
@@ -290,7 +290,7 @@ function renderMarkdown(markdown: string): { html: string; text: string } {
     }
     const paragraphText = paragraphLines.map(inlineText).join("\n");
     const paragraphHtml = paragraphLines.map(inlineHtml).join("<br />");
-    htmlBlocks.push(`<p style="margin:0 0 14px; color:#253342; font-size:13px; line-height:1.7;">${paragraphHtml}</p>`);
+    htmlBlocks.push(`<p style="margin:0 0 14px; color:#334155; font-size:13px; line-height:1.7;">${paragraphHtml}</p>`);
     textBlocks.push(paragraphText);
   }
 
@@ -344,11 +344,11 @@ function buildHeader(context: AppealEmailContext, title: string): { html: string
   const claimSubtitle = hasClaimNumber ? `Claim #${displayValue(rawClaimNumber)}` : "Unspecified Claim Reference";
   const claimSubtitleText = hasClaimNumber ? `Claim #${inlineText(rawClaimNumber)}` : "Unspecified Claim Reference";
   const summaryRows = buildSummaryRows(context);
-  const htmlSummary = summaryRows.map(([label, value]) => `<tr><td style="padding:6px 12px 6px 0; color:#66788a; font-size:12px; white-space:nowrap;">${escapeHtml(label)}</td><td style="padding:6px 0; color:#253342; font-size:12px; font-weight:600;">${displayValue(value)}</td></tr>`).join("");
+  const htmlSummary = summaryRows.map(([label, value]) => `<tr><td style="padding:8px 14px; color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid #f1f5f9; width:35%;">${escapeHtml(label)}</td><td style="padding:8px 14px; color:#0f172a; font-size:12px; font-weight:600; border-bottom:1px solid #f1f5f9;">${displayValue(value)}</td></tr>`).join("");
   const textSummary = summaryRows.map(([label, value]) => `${label}: ${value}`).join("\n");
 
   return {
-    html: `<div style="padding-bottom:18px; border-bottom:2px solid #1f486d; margin-bottom:24px;"><div style="color:#2f7ca5; font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;">ClaimHero Appeals Desk</div><h1 style="margin:8px 0 6px; color:#12263a; font-family:Arial,Helvetica,sans-serif; font-size:24px; line-height:1.25; font-weight:700;">${escapeHtml(title)}</h1><div style="color:#526273; font-size:13px;">${payer} · ${claimSubtitle}</div></div><table role="presentation" style="width:100%; margin:0 0 26px; border-collapse:collapse;">${htmlSummary}</table>`,
+    html: `<div style="padding-bottom:18px; border-bottom:2px solid #0284c7; margin-bottom:24px;"><div style="color:#0284c7; font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;">ClaimHero Appeals Desk</div><h1 style="margin:8px 0 6px; color:#0f172a; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:22px; line-height:1.3; font-weight:700; letter-spacing:-0.02em;">${escapeHtml(title)}</h1><div style="color:#475569; font-size:13px; font-weight:500;">${payer} · ${claimSubtitle}</div></div><div style="margin:20px 0 28px; background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;"><table role="presentation" style="width:100%; border-collapse:collapse;">${htmlSummary}</table></div>`,
     text: `CLAIMHERO APPEALS DESK\n${title}\n${inlineText(context.payer)} · ${claimSubtitleText}\n\n${textSummary}`,
   };
 }
@@ -364,7 +364,37 @@ function buildEmailDocument(
   const safeFooter = escapeHtml(footer);
 
   return {
-    html: `<div style="max-width:720px; margin:0 auto; padding:32px 28px; background:#ffffff; color:#253342; font-family:Arial,Helvetica,sans-serif;">${header.html}<main>${content.html}</main><div style="margin-top:30px; padding-top:16px; border-top:1px solid #dbe3ea; color:#66788a; font-size:11px; line-height:1.6;">${safeFooter}</div></div>`,
+    html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;-webkit-font-smoothing:antialiased;">
+  <center style="width:100%;table-layout:fixed;background-color:#f8fafc;">
+    <table role="presentation" aria-hidden="true" width="100%" border="0" cellspacing="0" cellpadding="0" align="center" style="width:100% !important;max-width:100%;margin:0 auto;border-collapse:collapse;background-color:#f8fafc;">
+      <tr>
+        <td align="center" style="padding:36px 16px;text-align:center;background-color:#f8fafc;vertical-align:top;">
+          <div style="max-width:720px;margin:0 auto;text-align:left;">
+            <table role="presentation" aria-hidden="true" width="100%" border="0" cellspacing="0" cellpadding="0" align="center" style="width:100%;max-width:720px;margin:0 auto;border-collapse:collapse;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);text-align:left;">
+              <tr>
+                <td style="padding:40px 36px 36px 36px;text-align:left;">
+                  ${header.html}
+                  <main>${content.html}</main>
+                  <div style="margin-top:36px;padding-top:18px;border-top:1px solid #e2e8f0;color:#64748b;font-size:11px;line-height:1.6;text-align:left;">
+                    ${safeFooter}
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </center>
+</body>
+</html>`,
     text: `${header.text}\n\n${content.text}\n\n${footer}`.trim(),
   };
 }
@@ -444,7 +474,97 @@ export function formatPayerResponseAlertEmail(
 
   const text = `Hello,\n\nA new response has been received from ${safePayerText} regarding Claim #${safeClaimNumberText} (${safePatientText}).\n\nDetermination: ${safeHeadlineText}\nSummary: ${safeRationaleText}\n\nMandatory Human Review: ClaimHero AI has classified this response and prepared a cited rebuttal draft. In accordance with clinical safety protocols, a human must approve every clinical assertion, legal assertion, recipient, and outbound message before dispatch.\n\nPlease log in to ClaimHero to review and approve this communication.\n\nReview Claim Docket: ${normalizedSafeUrl}/app/inbox\n\nClaimHero Sentinel System`;
 
-  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:24px;background-color:#0b0f17;color:#f8fafc;border-radius:8px;border:1px solid #1e293b;"><div style="font-size:18px;font-weight:700;color:#00e5ff;margin-bottom:16px;">ClaimHero Sentinel Alert</div><p style="font-size:14px;line-height:1.6;color:#cbd5e1;">A new inbound response was received from <strong>${safePayerHtml}</strong> for <strong>Claim #${safeClaimNumberHtml}</strong>.</p><div style="background-color:#141c2c;border:1px solid #1e293b;padding:16px;border-radius:6px;margin:16px 0;"><div style="font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:4px;">Payer Determination</div><div style="font-size:15px;font-weight:600;color:#f8fafc;margin-bottom:8px;">${safeHeadlineHtml}</div><div style="font-size:13px;color:#94a3b8;line-height:1.5;">${safeRationaleHtml}</div></div><p style="font-size:13px;color:#94a3b8;line-height:1.6;"><strong style="color:#00e5ff;">Mandatory Human Review Gate:</strong> ClaimHero AI has prepared and cited a recommended rebuttal. In accordance with clinical safety protocols, a human must approve every clinical assertion, legal assertion, recipient, and outbound message before dispatch.</p><div style="margin-top:24px;"><a href="${escapeHtml(normalizedSafeUrl)}/app/inbox" style="display:inline-block;background-color:#0ea5e9;color:#ffffff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Review &amp; Approve in ClaimHero</a></div></div>`;
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClaimHero Alert: Payer Determination Received</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;-webkit-font-smoothing:antialiased;">
+  <center style="width:100%;table-layout:fixed;background-color:#f8fafc;">
+    <table role="presentation" aria-hidden="true" width="100%" border="0" cellspacing="0" cellpadding="0" align="center" style="width:100% !important;max-width:100%;margin:0 auto;border-collapse:collapse;background-color:#f8fafc;">
+      <tr>
+        <td align="center" style="padding:40px 16px;text-align:center;background-color:#f8fafc;vertical-align:top;">
+          <div style="max-width:600px;margin:0 auto;text-align:left;">
+            <table role="presentation" aria-hidden="true" width="100%" border="0" cellspacing="0" cellpadding="0" align="center" style="width:100%;max-width:600px;margin:0 auto;border-collapse:collapse;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);text-align:left;">
+              
+              <!-- Header Bar -->
+              <tr>
+                <td style="padding:24px 32px;border-bottom:1px solid #f1f5f9;background-color:#ffffff;text-align:left;">
+                  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                    <tr>
+                      <td align="left" style="vertical-align:middle;text-align:left;">
+                        <div style="font-size:19px;font-weight:700;letter-spacing:-0.02em;color:#0f172a;display:inline-block;">
+                          Claim<span style="color:#0284c7;">Hero</span>
+                        </div>
+                      </td>
+                      <td align="right" style="vertical-align:middle;text-align:right;">
+                        <span style="font-size:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;text-transform:uppercase;letter-spacing:0.08em;background-color:#eff6ff;color:#1d4ed8;padding:4px 10px;border-radius:9999px;border:1px solid #dbeafe;font-weight:700;">
+                          Sentinel Alert
+                        </span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Main Body -->
+              <tr>
+                <td style="padding:32px 32px 28px 32px;text-align:left;">
+                  <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:700;color:#0f172a;letter-spacing:-0.02em;line-height:1.3;text-align:left;">
+                    Inbound Determination Received
+                  </h1>
+                  <p style="margin:0 0 20px 0;font-size:14px;line-height:1.6;color:#475569;text-align:left;">
+                    A new inbound response was received from <strong style="color:#0f172a;">${safePayerHtml}</strong> for <strong style="color:#0f172a;">Claim #${safeClaimNumberHtml}</strong>.
+                  </p>
+
+                  <!-- Determination Card -->
+                  <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #0284c7;border-radius:8px;padding:18px 20px;margin:20px 0;">
+                    <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;font-weight:700;margin-bottom:6px;">
+                      Payer Determination
+                    </div>
+                    <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:8px;line-height:1.4;">
+                      ${safeHeadlineHtml}
+                    </div>
+                    <div style="font-size:13px;color:#334155;line-height:1.6;">
+                      ${safeRationaleHtml}
+                    </div>
+                  </div>
+
+                  <!-- Mandatory Review Gate -->
+                  <div style="background-color:#eff6ff;border:1px solid #bfdbfe;border-left:4px solid #2563eb;border-radius:8px;padding:14px 18px;margin:20px 0;">
+                    <p style="margin:0;font-size:12px;color:#1e3a8a;line-height:1.6;">
+                      <strong style="color:#1d4ed8;">Mandatory Human Review Gate:</strong> ClaimHero AI has prepared and cited a recommended rebuttal. In accordance with clinical safety protocols, a human must approve every clinical assertion, legal assertion, recipient, and outbound message before dispatch.
+                    </p>
+                  </div>
+
+                  <!-- CTA Button -->
+                  <div style="margin:28px 0 16px 0;">
+                    <a href="${escapeHtml(normalizedSafeUrl)}/app/inbox" style="display:inline-block;background-color:#0284c7;color:#ffffff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px;letter-spacing:0.01em;box-shadow:0 1px 3px 0 rgba(0,0,0,0.1),0 1px 2px 0 rgba(0,0,0,0.06);">
+                      Review &amp; Approve in ClaimHero
+                    </a>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="padding:20px 32px;background-color:#f8fafc;border-top:1px solid #f1f5f9;text-align:center;">
+                  <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.5;text-align:center;">
+                    ClaimHero AI Appeal Sentinel &bull; Precision Healthcare Denial Intelligence
+                  </p>
+                </td>
+              </tr>
+
+            </table>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </center>
+</body>
+</html>`;
 
   return {
     subject,
