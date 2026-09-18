@@ -1,6 +1,6 @@
 import { MutationCtx, internalMutation, internalQuery, mutation, query, QueryCtx } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
-import { v, ConvexError } from "convex/values";
+import { v, ConvexError, type Infer } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { claimsAggregate } from "./lib/aggregates";
@@ -9,6 +9,7 @@ import { normalizeCollaboratorEmail } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
 import { isInternalAgentMailAddress } from "./lib/agentMailWebhook";
 import { appendAuditLog } from "./auditLogs";
+import { resolveStatutoryDeadline, calculateDaysRemaining } from "./lib/dateUtils";
 
 /**
  * Fetch active collaboration grants for the caller, matched by userId or by
@@ -1056,6 +1057,7 @@ export const create = mutation({
     patientId: v.id("patients"),
     claimNumber: v.string(),
     serviceDate: v.string(),
+    denialDate: v.optional(v.string()),
     providerName: v.string(),
     deniedAmount: v.number(),
     patientOwedAmount: v.number(),
@@ -1074,8 +1076,12 @@ export const create = mutation({
     const userId = await requireAuthUser(ctx);
     await validateClaimFinancialsAndCodes(ctx, args, userId);
     const now = Date.now();
-    const deadlineDays = args.appealFilingDeadlineDays || 180;
-    const statutoryDeadline = now + deadlineDays * 86400000;
+    const deadlineResolution = resolveStatutoryDeadline({
+      denialDate: args.denialDate,
+      serviceDate: args.serviceDate,
+      appealFilingDeadlineDays: args.appealFilingDeadlineDays,
+      now,
+    });
 
     const patient = (await ctx.db.get(args.patientId)) as Doc<"patients"> | null;
     if (!patient || patient.userId !== userId) {
@@ -1097,6 +1103,7 @@ export const create = mutation({
       insurancePayer: patient?.insurancePayer || "Health Insurer",
       claimNumber,
       serviceDate: args.serviceDate,
+      denialDate: args.denialDate?.trim() || undefined,
       providerName: args.providerName,
       deniedAmount: args.deniedAmount,
       patientOwedAmount: args.patientOwedAmount,
@@ -1105,8 +1112,9 @@ export const create = mutation({
       denialReasonCode: args.denialReasonCode,
       denialReasonDescription: args.denialReasonDescription,
       status: "ingested",
-      statutoryDeadline,
-      daysRemaining: deadlineDays,
+      statutoryDeadline: deadlineResolution.statutoryDeadline,
+      daysRemaining: deadlineResolution.daysRemaining,
+      appealFilingDeadlineDays: deadlineResolution.effectiveDeadlineDays,
       assignedAgentEmail: "",
       agentMailProvisioningStatus: "pending",
       denialLetterStorageId: args.denialLetterStorageId,
@@ -1166,6 +1174,7 @@ interface CreateWithPatientArgs {
   insurancePayer: string;
   state?: string;
   serviceDate: string;
+  denialDate?: string;
   providerName: string;
   deniedAmount: number;
   patientOwedAmount?: number;
@@ -1226,6 +1235,7 @@ async function applyCreateWithPatient(
   const cleanGroupNumber = resolveClaimGroupNumber(args.groupNumber) || undefined;
   const cleanClaimNumberArg = isMaskedIdentifierValue(args.claimNumber) ? "" : args.claimNumber.trim();
   const cleanServiceDate = isMaskedIdentifierValue(args.serviceDate) ? "" : args.serviceDate.trim();
+  const cleanDenialDate = isMaskedIdentifierValue(args.denialDate) ? "" : args.denialDate?.trim() || "";
 
   // Strictly scope patient matching to effectiveUserId to prevent cross-tenant patient hijack
   const claimNumber = await generateUniqueClaimNumber(ctx, cleanClaimNumberArg);
@@ -1287,8 +1297,12 @@ async function applyCreateWithPatient(
     });
   }
 
-  const deadlineDays = args.appealFilingDeadlineDays || 180;
-  const statutoryDeadline = now + deadlineDays * 86400000;
+  const deadlineResolution = resolveStatutoryDeadline({
+    denialDate: cleanDenialDate || undefined,
+    serviceDate: cleanServiceDate || undefined,
+    appealFilingDeadlineDays: args.appealFilingDeadlineDays,
+    now,
+  });
 
   const isDemoFixture = args.origin === "demo-fixture" || args.dataOrigin === "demo-fixture";
   const isDemo = Boolean(args.isDemo ?? isDemoFixture);
@@ -1303,6 +1317,7 @@ async function applyCreateWithPatient(
     insurancePayer: args.insurancePayer || "Molina Healthcare",
     claimNumber,
     serviceDate: cleanServiceDate,
+    denialDate: cleanDenialDate || undefined,
     providerName: resolveClaimProviderName(args.providerName),
     deniedAmount: args.deniedAmount,
     patientOwedAmount: args.patientOwedAmount !== undefined ? args.patientOwedAmount : args.deniedAmount,
@@ -1311,8 +1326,9 @@ async function applyCreateWithPatient(
     denialReasonCode: args.denialReasonCode,
     denialReasonDescription: args.denialReasonDescription,
     status: "ingested",
-    statutoryDeadline,
-    daysRemaining: deadlineDays,
+    statutoryDeadline: deadlineResolution.statutoryDeadline,
+    daysRemaining: deadlineResolution.daysRemaining,
+    appealFilingDeadlineDays: deadlineResolution.effectiveDeadlineDays,
     assignedAgentEmail: "",
     agentMailProvisioningStatus: "pending",
     denialLetterStorageId: args.denialLetterStorageId,
@@ -1393,6 +1409,7 @@ export const createWithPatient = mutation({
     groupNumber: v.optional(v.string()),
     claimNumber: v.string(),
     serviceDate: v.string(),
+    denialDate: v.optional(v.string()),
     providerName: v.string(),
     deniedAmount: v.number(),
     patientOwedAmount: v.number(),
@@ -1439,6 +1456,7 @@ export const createWithPatientInternal = internalMutation({
     groupNumber: v.optional(v.string()),
     claimNumber: v.string(),
     serviceDate: v.string(),
+    denialDate: v.optional(v.string()),
     providerName: v.string(),
     deniedAmount: v.number(),
     patientOwedAmount: v.number(),
@@ -1603,6 +1621,8 @@ export const claimStatusValidator = v.union(
   v.literal("lost"),
   v.literal("escalated")
 );
+
+export type ClaimStatus = Infer<typeof claimStatusValidator>;
 
 export const ALLOWED_CLAIM_STATUSES = new Set([
   "ingested",
@@ -2153,10 +2173,7 @@ async function executeSweepDeadlinesBatch(
   for (const claim of pageResult.page) {
     if (claim.status === "won" || claim.status === "lost") continue;
 
-    const exactRemaining = Math.max(
-      0,
-      Math.ceil((claim.statutoryDeadline - now) / 86400000)
-    );
+    const exactRemaining = calculateDaysRemaining(claim.statutoryDeadline, now);
 
     if (exactRemaining !== claim.daysRemaining) {
       await ctx.db.patch(claim._id, {

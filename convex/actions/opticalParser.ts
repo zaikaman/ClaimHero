@@ -57,6 +57,11 @@ const DENIAL_EXTRACTION_SCHEMA = {
     },
     insurancePayer: { type: "string" },
     serviceDate: { type: "string" },
+    denialDate: {
+      type: "string",
+      description:
+        "Date of denial notice, adverse determination letter, or Explanation of Benefits (e.g. '2026-07-15' or '07/15/2026'). If not explicitly stated in document, return empty string. NEVER invent or fabricate dates.",
+    },
     providerName: { type: "string" },
     deniedAmount: { type: "number" },
     patientOwedAmount: { type: "number" },
@@ -70,7 +75,11 @@ const DENIAL_EXTRACTION_SCHEMA = {
     },
     denialReasonCode: { type: "string" },
     denialReasonDescription: { type: "string" },
-    appealFilingDeadlineDays: { type: "number" },
+    appealFilingDeadlineDays: {
+      type: "number",
+      description:
+        "Statutory or plan appeal filing deadline in days ONLY IF explicitly stated in the denial document text (e.g. 180, 60, 90). If NOT explicitly stated in the document, return 0. NEVER fabricate a deadline window.",
+    },
     payerAppealsEmail: { type: "string" },
     payerAppealsAddress: { type: "string" },
   },
@@ -82,6 +91,7 @@ const DENIAL_EXTRACTION_SCHEMA = {
     "memberId",
     "insurancePayer",
     "serviceDate",
+    "denialDate",
     "providerName",
     "deniedAmount",
     "patientOwedAmount",
@@ -104,6 +114,7 @@ export interface DenialExtractionResult {
   memberId: string;
   insurancePayer: string;
   serviceDate: string;
+  denialDate: string;
   providerName: string;
   deniedAmount: number;
   patientOwedAmount: number;
@@ -365,9 +376,9 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
     - Set "isMedicalClaimDenial" to TRUE.
     - Extract patient legal name, member ID, treating provider name, insurer payer name, all financial amounts, clinical CPT procedure codes, ICD-10 diagnosis codes, denial reason codes (e.g. CO-50, CO-197, CO-16), and statutory appeal filing deadlines.
     - Extract dollar amounts as pure numbers without currency symbols (e.g. 24500 instead of "$24,500.00"). If missing, return 0.
-    - If identifiers (patient name, member ID, provider, claim number, service date) are not explicitly mentioned, return "". NEVER invent or fabricate identifiers.
+    - If identifiers or dates (patient name, member ID, provider, claim number, service date, denial date) are not explicitly mentioned, return "". NEVER invent or fabricate identifiers or dates.
     - If CPT or ICD-10 codes are missing, return [].
-    - If statutory appeal deadline is not explicitly mentioned, default appealFilingDeadlineDays to 180.
+    - If statutory appeal deadline is explicitly stated in the document, extract the integer days (e.g. 180, 60, 90). If NOT explicitly stated in the document, return 0. NEVER fabricate or assume a 180-day or other statutory deadline.
 4. Strict English-Only Mandate: ClaimHero exclusively supports English-language documents and US healthcare jurisdictions (ERISA, ACA, CMS). All extracted textual metadata, denial reasons, descriptions, and classification reasons must be exclusively in English. Non-English and foreign insurance documents must be classified as non-claim documents.
 5. You must output all schema properties in the JSON response. If an attribute or identifier is not mentioned in the document, populate it with "" (empty string) for strings, 0 for numbers, and [] for arrays. Do not omit any properties.`,
         userPrompt: `Extract structured medical claim metadata from the following denial document:\n\n${documentContent}`,
@@ -496,6 +507,16 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         }
       }
 
+      let resolvedDenialDate = extraction.denialDate?.trim() || "";
+      if (resolvedDenialDate.includes("**") || !resolvedDenialDate) {
+        const denialDateMatch = documentContent.match(
+          /\b(?:Denial\s*Date|Notice\s*Date|Determination\s*Date|Date\s*of\s*Notice|Date\s*Processed|EOB\s*Date|Adverse\s*Determination\s*Date)[\s:]*([0-9]{1,2}[/.-][0-9]{1,2}[/.-][0-9]{2,4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+[0-9]{1,2},?\s+[0-9]{4})\b/i
+        );
+        if (denialDateMatch) {
+          resolvedDenialDate = denialDateMatch[1];
+        }
+      }
+
       // Save patient and claim into Convex database with denialLetterStorageId linked.
       // Identity is resolved server-side inside createWithPatientInternal from the
       // propagated auth session; no userId is passed so callers cannot spoof ownership.
@@ -507,6 +528,7 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         state: args.patientState || "California",
         claimNumber: extraction.claimNumber?.trim() || "",
         serviceDate: resolvedServiceDate,
+        denialDate: resolvedDenialDate || undefined,
         providerName: extraction.providerName?.trim() || "",
         deniedAmount: typeof extraction.deniedAmount === "number" ? extraction.deniedAmount : 0,
         patientOwedAmount: typeof extraction.patientOwedAmount === "number" ? extraction.patientOwedAmount : 0,
@@ -514,7 +536,10 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         icd10Codes: Array.isArray(extraction.icd10Codes) ? extraction.icd10Codes.filter(Boolean) : [],
         denialReasonCode: extraction.denialReasonCode?.trim() || "",
         denialReasonDescription: extraction.denialReasonDescription?.trim() || "",
-        appealFilingDeadlineDays: extraction.appealFilingDeadlineDays || 180,
+        appealFilingDeadlineDays:
+          typeof extraction.appealFilingDeadlineDays === "number" && extraction.appealFilingDeadlineDays > 0
+            ? extraction.appealFilingDeadlineDays
+            : undefined,
         denialLetterStorageId: args.storageId,
         origin,
         dataOrigin,

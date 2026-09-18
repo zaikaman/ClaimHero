@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-18T11:55:00Z
+- **Last updated:** 2026-09-18T12:15:02Z
 
 ## Log
 
@@ -1666,7 +1666,7 @@ Removed the patient-facing HIPAA Safe Harbor decision UI from both intake flows 
 Follow-up: fixed Simple Mode hiding the intake action — family cards in `src/components/radar/CaseRadar.tsx` always showed Review & Approve and routed to the studio, while the expert table showed Complete Form for claims missing intake context. Cards now mirror the expert priority (won/dispatched/ready-or-drafted first, then intake check via `hasCompletedIntakeContext`): incomplete-intake cases show an amber Add your details button plus Needs your details badge and open the ingestion form on both button and card click. Re-verified clean typecheck, clean lint, 76 suites (1,175 passing tests), and production build.
 Follow-up: fixed the demo seeder so exactly one case needed repair — Marcus Sterling was seeded with a complete brief, 6 evidences, and score 94 yet left at status `drafting`, which contradicts the pipeline's own rule that a drafted brief promotes a claim to `ready_for_review` (`convex/actions/precedentMatcher.ts`) and made the expert table offer Draft Brief for a finished brief. Claim 2 now seeds as `ready_for_review` (`convex/demoSeeder.ts`): 2 unsent cases with briefs and evidence (Eleanor, Marcus), 1 sent and approved (Michael). Extended `tests/anonymousAuthAndSeeder.test.ts` to assert 2x `ready_for_review`, zero `drafting`, and per-claim brief linkage with no approval on unsent cases. Re-verified clean typecheck, 76 suites (1,175 passing tests), and production build.
 
-### 2026-09-18 - working tree
+### 2026-09-18 - aacf01c
 Closed critical dispatch approval bypass across the secondary transmission path (`convex/actions/mailDispatcher.ts`, `src/hooks/useCommunications.ts`, `src/components/communications/AgentMailDrawer.tsx`, `src/components/communications/SimpleInboxView.tsx`, `README.md`):
 - `performSendOutboundMessage` (outbound correspondence / addendum path) now enforces the same mandatory safety gates as `performDispatchAppealPacket`: strictly rejects claims in `review_provisional` status, unacknowledged `provisional_capped` evidentiary degradation (`requiresEvidentiaryAcknowledgement` or unacknowledged score status), and unready intake/drafting states (`ingested`, `parsing`, `analyzing`, `precedent_matched`, `drafting`), eliminating fallback status coercion and forwarding `claim.userId` to enforce rate limits across all internal/external callers.
 - Enforced mandatory human review gate on outbound correspondence: requires explicit human approval (`humanApproved: true` or prior approval record on claim/appeal) and persists the approval audit trail, preventing unreviewed provisional dossiers from being exfiltrated via correspondence or addenda.
@@ -1674,5 +1674,12 @@ Closed critical dispatch approval bypass across the secondary transmission path 
 - Updated `AgentMailDrawer.tsx` and `SimpleInboxView.tsx` to detect provisional degradation, render a dedicated acknowledgment alert with inline elevation action, and disable rebuttal transmission, draft approval, and reply composer until degradation is acknowledged.
 - Added comprehensive regression tests in `tests/actionsAgentMailAndDispatcher.test.ts` (+10 tests) covering provisional degradation gating across both paths, drafting rejection, missing/undefined status rejection, rate limiter rejections, human approval gates, and PDF exhibit attachment. Verified 76 suites (1,185 passing tests), clean typecheck, and production build. Convex features: actions, internalAction, mutations.
 
-
-
+### 2026-09-18 - working tree
+Anchored statutory appeal deadlines strictly to denial dates rather than intake timestamps, stopped deadline window fabrication, eliminated overdue clamping, aligned client/server UTC parsing, and implemented reactive deadline alarm hook (`convex/schema.ts`, `convex/lib/dateUtils.ts`, `convex/claims.ts`, `convex/settings.ts`, `convex/actions/opticalParser.ts`, `convex/serviceCertificate.ts`, `src/lib/utils.ts`, `src/types/index.ts`, `src/components/radar/DeadlineCountdown.tsx`, `src/components/radar/CaseRadar.tsx`, `src/hooks/useDeadlineAlarm.ts`, `README.md`, `tests/statutoryDeadlinesAndAlarmHook.test.ts`):
+- Strict Denial Date Anchoring: Added `denialDate` and `appealFilingDeadlineDays` to `claims` schema. Created `resolveStatutoryDeadline` in `convex/lib/dateUtils.ts` anchoring statutory deadlines to `denialDate` with fallback to `serviceDate` and intake timestamp only if unrecorded, preventing older denials ingested today from receiving a false fresh 180-day clock.
+- Non-Fabrication of Federal Windows: Updated `convex/actions/opticalParser.ts` prompt and schema to extract explicit denial dates and deadline windows; returns 0 if unspecified, completely eliminating synthetic 180-day default clocks when the insurer notice specifies no timeline.
+- Honest Service Certification: In `convex/serviceCertificate.ts`, removed synthetic `createdAt - 14d` base date when service date was unverified. Now anchors to denial/service dates and sets `isTimelyFiled: false` with exact overdue day counts (`Emergency Submission: Transmitted X days past statutory deadline bar...`) rather than claiming timely filing for expired notices.
+- Overdue Day Tracking (No Zero Clamping): Removed `Math.max(0, ...)` clamping across `convex/claims.ts`, `convex/settings.ts`, `convex/serviceCertificate.ts`, `src/lib/utils.ts`, and UI countdowns; overdue claims now accurately compute negative `daysRemaining` for risk sorting and auditing.
+- UTC Date Normalization: Standardized `src/lib/utils.ts:formatDate` to parse and format dates with explicit UTC timezone parity (`{ timeZone: "UTC" }`), resolving off-by-one calendar discrepancies between browser local timezones and backend UTC appeal synthesizers.
+- Reactive `useDeadlineAlarm` Hook: Implemented promised `useDeadlineAlarm.ts` hook providing sub-second reactive countdowns, portfolio-wide urgency categorization (`overdue`, `emergency`, `critical`, `urgent`, `normal`), alarm triggers, and statutory countdown metrics.
+- Regression & Verification: Added comprehensive test suite `tests/statutoryDeadlinesAndAlarmHook.test.ts` (15 tests) and verified 1200 passing tests across 77 test suites, 0 lint warnings, 0 typecheck errors, and production build.

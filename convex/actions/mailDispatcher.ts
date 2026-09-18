@@ -19,7 +19,7 @@ import {
   formatCorrespondenceEmail,
 } from "../lib/appealEmail";
 import { rateLimiter } from "../lib/rateLimiter";
-import { resolveClaimPatientName } from "../claims";
+import { resolveClaimPatientName, type ClaimStatus } from "../claims";
 import { ensureAppealPdfStored } from "../lib/pdfGenerator";
 import type { ResolvedPayerContact } from "./payerContactResolver";
 
@@ -538,7 +538,7 @@ async function performSendOutboundMessage(
     );
   }
 
-  if (userId && typeof (ctx as any).runMutation === "function") {
+  if (userId && "runMutation" in ctx && typeof ctx.runMutation === "function") {
     // Enforce rate limiting per user
     const limitStatus = await rateLimiter.limit(ctx, "mailDispatcher", {
       key: userId || "global",
@@ -563,8 +563,9 @@ async function performSendOutboundMessage(
   }
 
   // Mandatory Gate 3: Explicit Human Approval Record Required
+  const claimRecord = claim as Record<string, unknown>;
   const hasExistingApproval = Boolean(
-    (claim as any).isHumanApproved || appeal?.isHumanApproved
+    claimRecord.isHumanApproved || appeal?.isHumanApproved
   );
   const hasExplicitApprovalArg = Boolean(args.humanApproved);
 
@@ -578,7 +579,7 @@ async function performSendOutboundMessage(
   const patientName = resolveClaimPatientName(rawPatientName, claim.claimNumber, claim.patient?.memberId);
 
   let effectiveApprover: string | undefined =
-    (claim as any).approvedBy ||
+    (claimRecord.approvedBy as string | undefined) ||
     appeal?.approvedBy ||
     args.approvedBy;
 
@@ -600,7 +601,7 @@ async function performSendOutboundMessage(
     } else {
       await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: claim._id,
-        status: claim.status as any,
+        status: claim.status as ClaimStatus,
         actor: effectiveApprover,
         details: args.approvalNotes || "Human review and authorization confirmed for outbound correspondence.",
       });

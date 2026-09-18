@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { getAuthUserId, requireAuthUser } from "./lib/auth";
 import { claimsAggregate } from "./lib/aggregates";
 import { rateLimiter } from "./lib/rateLimiter";
+import { calculateDaysRemaining } from "./lib/dateUtils";
 
 export const DEFAULT_ADVOCATE_PROFILE = {
   name: "Dr. Sarah Chen, MD, FACP",
@@ -154,8 +155,7 @@ export const triggerManualSweepAndSync = mutation({
     let updatedCount = 0;
 
     for (const claim of claims) {
-      const remainingMs = claim.statutoryDeadline - now;
-      const daysRemaining = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60 * 24)));
+      const daysRemaining = calculateDaysRemaining(claim.statutoryDeadline, now);
       if (claim.daysRemaining !== daysRemaining) {
         await ctx.db.patch(claim._id, {
           daysRemaining,

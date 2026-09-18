@@ -55,6 +55,8 @@ export default defineSchema({
     status: v.string(), // ingested, parsing, analyzing, precedent_matched, drafting, review_provisional, ready_for_review, dispatched, won, lost, escalated
     statutoryDeadline: v.number(),
     daysRemaining: v.number(),
+    denialDate: v.optional(v.string()),
+    appealFilingDeadlineDays: v.optional(v.number()),
     overturnProbabilityScore: v.optional(v.number()),
     appealReadinessScore: v.optional(v.number()),
     evidenceCoverageScore: v.optional(v.number()),

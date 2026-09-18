@@ -30,17 +30,34 @@ export function formatCurrency(
 }
 
 /**
- * Format timestamps into human-readable medical record dates with safe fallback
+ * Format timestamps into human-readable medical record dates with safe fallback.
+ * Uses UTC timezone matching convex/actions/appealSynthesizer.ts to prevent
+ * cross-timezone off-by-one date shifts (e.g. PST displaying the previous day).
  */
 export function formatDate(timestampOrDateString: number | string | undefined | null): string {
   if (timestampOrDateString === undefined || timestampOrDateString === null || timestampOrDateString === "") {
     return "N/A";
   }
 
-  const date =
-    typeof timestampOrDateString === "number"
-      ? new Date(timestampOrDateString)
-      : new Date(timestampOrDateString);
+  let date: Date;
+  if (typeof timestampOrDateString === "number") {
+    date = new Date(timestampOrDateString);
+  } else {
+    const trimmed = timestampOrDateString.trim();
+    const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+      const [, y, m, d] = isoMatch;
+      date = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+    } else {
+      const usMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (usMatch) {
+        const [, m, d, y] = usMatch;
+        date = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+      } else {
+        date = new Date(trimmed);
+      }
+    }
+  }
 
   if (isNaN(date.getTime())) {
     return typeof timestampOrDateString === "string" ? timestampOrDateString : "N/A";
@@ -50,6 +67,7 @@ export function formatDate(timestampOrDateString: number | string | undefined | 
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "UTC",
   }).format(date);
 }
 
@@ -77,20 +95,22 @@ export function formatDateTime(timestamp: number | string | undefined | null): s
 }
 
 /**
- * Format statutory deadline countdown
+ * Format statutory deadline countdown, preserving negative overdue state.
  */
 export function formatDeadlineRemaining(days: number): {
   text: string;
   badgeClass: string;
   isUrgent: boolean;
   isCritical: boolean;
+  isOverdue: boolean;
 } {
   if (days <= 0) {
     return {
       text: "Deadline Expired",
-      badgeClass: "bg-rose-950/80 text-rose-300 border-rose-600/60",
+      badgeClass: "bg-rose-950/80 text-rose-300 border-rose-600/60 shadow-crimson-glow font-bold",
       isUrgent: true,
       isCritical: true,
+      isOverdue: days < 0,
     };
   }
 
@@ -100,6 +120,7 @@ export function formatDeadlineRemaining(days: number): {
       badgeClass: "bg-rose-950/60 text-rose-400 border-rose-500/50 shadow-crimson-glow",
       isUrgent: true,
       isCritical: true,
+      isOverdue: false,
     };
   }
 
@@ -109,6 +130,7 @@ export function formatDeadlineRemaining(days: number): {
       badgeClass: "bg-amber-950/60 text-amber-400 border-amber-500/50",
       isUrgent: false,
       isCritical: false,
+      isOverdue: false,
     };
   }
 
@@ -117,6 +139,7 @@ export function formatDeadlineRemaining(days: number): {
     badgeClass: "bg-slate-800/60 text-slate-300 border-slate-700",
     isUrgent: false,
     isCritical: false,
+    isOverdue: false,
   };
 }
 

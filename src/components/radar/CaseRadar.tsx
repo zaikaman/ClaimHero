@@ -1099,6 +1099,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                         <DeadlineCountdown
                           daysRemaining={claim.daysRemaining}
                           statutoryDeadline={claim.statutoryDeadline}
+                          appealFilingDeadlineDays={claim.appealFilingDeadlineDays}
                           isWon={isWon}
                           size="sm"
                         />

@@ -124,8 +124,9 @@ ClaimHero is a reactive case system, not a prompt wrapped in a form:
 - **Appeal Studio** renders and edits the cited brief while saving versions.
 - **Communications** keeps AgentMail threads, payer replies, attachments, and
   human-approved follow-ups on the claim.
-- **Audit and deadline surfaces** record lifecycle events and keep statutory
-  clocks visible.
+- **Audit and deadline surfaces** record lifecycle events, anchor statutory filing
+  clocks strictly to adverse determination dates rather than intake timestamps,
+  and drive sub-second reactive countdown alarms without artificial zero-clamping.
 - **Simple Mode / Expert Details** lets a patient start in everyday language
   while an advocate can reveal CPT, CARC, ERISA, source, and audit details.
 
@@ -195,7 +196,7 @@ Key implementation: [`convex/actions/mailDispatcher.ts`](./convex/actions/mailDi
 | What to verify | Where to look |
 | --- | --- |
 | Authenticated case ownership and collaborator roles | [`convex/lib/auth.ts`](./convex/lib/auth.ts), [`convex/claimCollaborators.ts`](./convex/claimCollaborators.ts) |
-| Claim lifecycle, deadlines, and portfolio data | [`convex/claims.ts`](./convex/claims.ts), [`convex/crons.ts`](./convex/crons.ts) |
+| Claim lifecycle, deadlines, and portfolio data | [`convex/claims.ts`](./convex/claims.ts), [`convex/crons.ts`](./convex/crons.ts), [`convex/lib/dateUtils.ts`](./convex/lib/dateUtils.ts), [`src/hooks/useDeadlineAlarm.ts`](./src/hooks/useDeadlineAlarm.ts) |
 | Schema, indexes, and vector search | [`convex/schema.ts`](./convex/schema.ts), [`convex/precedents.ts`](./convex/precedents.ts) |
 | Durable pipeline and review checkpoints | [`convex/workflows.ts`](./convex/workflows.ts), [`convex/actions/sentinelPipeline.ts`](./convex/actions/sentinelPipeline.ts) |
 | Explainable readiness scoring | [`convex/actions/precedentMatcher.ts`](./convex/actions/precedentMatcher.ts) |
@@ -216,6 +217,8 @@ Key implementation: [`convex/actions/mailDispatcher.ts`](./convex/actions/mailDi
   outbound message is transmitted.
 - The score is an evidentiary completeness checklist, not medical advice, legal
   advice, a payment guarantee, or a calibrated approval probability.
+- Statutory filing clocks anchor strictly to adverse determination dates rather than
+  intake timestamps, never fabricate federal windows when unstated, and accurately preserve overdue days without artificial zero-clamping.
 
 ClaimHero is intended to help people prepare and coordinate an appeal. Users
 must verify clinical facts, policy sources, recipient destinations, and final
@@ -263,11 +266,11 @@ npm run build           # Production bundle
 npm run verify          # Full local verification gate
 ```
 
-The repository includes 1,185 automated tests across 76 suites, covering the
+The repository includes 1,200 automated tests across 77 suites, covering the
 Convex workflows, authorization boundaries, OCR/redaction, vault-tokenized
 PHI-safe LLM boundaries, Firecrawl and AgentMail integrations, precedent
-scoring, audit chains, deadline logic, collaboration, provisional
-evidence gating, and secondary dispatch review boundaries.
+scoring, audit chains, denial-anchored statutory deadlines, non-fabricated
+federal clocks, collaboration, provisional evidence gating, and secondary dispatch review boundaries.
 
 ## Project structure
 

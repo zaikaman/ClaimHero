@@ -67,6 +67,8 @@ export interface Claim {
   icd10Codes: string[];
   denialReasonCode: string;
   denialReasonDescription: string;
+  denialDate?: string;
+  appealFilingDeadlineDays?: number;
   status: ClaimStatus;
   statutoryDeadline: number;
   daysRemaining: number;

@@ -7,6 +7,7 @@ import { Progress } from "../ui/progress";
 interface DeadlineCountdownProps {
   daysRemaining: number;
   statutoryDeadline: number;
+  appealFilingDeadlineDays?: number;
   size?: "sm" | "md" | "lg";
   showDetails?: boolean;
   isWon?: boolean;
@@ -15,14 +16,24 @@ interface DeadlineCountdownProps {
 export const DeadlineCountdown: React.FC<DeadlineCountdownProps> = ({
   daysRemaining,
   statutoryDeadline,
+  appealFilingDeadlineDays,
   size = "md",
   showDetails = true,
   isWon = false,
 }) => {
-  const { text, isUrgent, isCritical } = formatDeadlineRemaining(daysRemaining);
+  const { text, isUrgent, isCritical, isOverdue } = formatDeadlineRemaining(daysRemaining);
+  const totalDays =
+    typeof appealFilingDeadlineDays === "number" && appealFilingDeadlineDays > 0
+      ? appealFilingDeadlineDays
+      : 180;
+  const isDueToday = daysRemaining === 0;
 
-  // Maximum standard ERISA window is 180 days
-  const progressPercent = isWon ? 100 : Math.min(100, Math.max(0, (daysRemaining / 180) * 100));
+  // Plan or regulatory statutory window calculation
+  const progressPercent = isWon
+    ? 100
+    : isOverdue
+    ? 0
+    : Math.min(100, Math.max(0, (daysRemaining / totalDays) * 100));
 
   if (size === "sm") {
     if (isWon) {
@@ -33,6 +44,30 @@ export const DeadlineCountdown: React.FC<DeadlineCountdownProps> = ({
         >
           <CheckCircle className="size-3 text-emerald-500" />
           <span>Case Resolved</span>
+        </Badge>
+      );
+    }
+
+    if (isOverdue) {
+      return (
+        <Badge
+          variant="destructive"
+          className="font-mono text-[10px] gap-1 px-2 py-0.5 border-rose-600/60 bg-rose-950/80 text-rose-300 shadow-crimson-glow font-bold"
+        >
+          <ShieldWarning className="size-3 animate-pulse text-rose-400" />
+          <span>{Math.abs(daysRemaining)}d overdue</span>
+        </Badge>
+      );
+    }
+
+    if (isDueToday) {
+      return (
+        <Badge
+          variant="destructive"
+          className="font-mono text-[10px] gap-1 px-2 py-0.5 border-rose-600/60 bg-rose-950/80 text-rose-300 shadow-crimson-glow animate-pulse font-bold"
+        >
+          <ShieldWarning className="size-3 text-rose-400" />
+          <span>Due today</span>
         </Badge>
       );
     }
@@ -150,8 +185,22 @@ export const DeadlineCountdown: React.FC<DeadlineCountdownProps> = ({
         </div>
 
         <div className="text-right font-mono">
-          <span className="text-base font-bold text-foreground">{daysRemaining}</span>
-          <span className="text-[10px] text-muted-foreground block">/ 180 Days</span>
+          {isOverdue ? (
+            <>
+              <span className="text-base font-bold text-destructive">-{Math.abs(daysRemaining)}d</span>
+              <span className="text-[10px] text-destructive/80 block uppercase font-semibold">Overdue ({totalDays}d Bar)</span>
+            </>
+          ) : isDueToday ? (
+            <>
+              <span className="text-base font-bold text-destructive">Due Today</span>
+              <span className="text-[10px] text-destructive/80 block uppercase font-semibold">{totalDays}d Bar</span>
+            </>
+          ) : (
+            <>
+              <span className="text-base font-bold text-foreground">{daysRemaining}</span>
+              <span className="text-[10px] text-muted-foreground block">/ {totalDays} Days</span>
+            </>
+          )}
         </div>
       </div>
 

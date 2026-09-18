@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { requireClaimOwner } from "./lib/auth";
 import { resolveClaimMemberId, resolveClaimGroupNumber, resolveClaimPatientName, resolveClaimProviderName } from "./claims";
+import { parseDateToUtcMidnight } from "./lib/dateUtils";
 
 export interface MxRecordInfo {
   exchange: string;
@@ -380,24 +381,33 @@ export async function buildCertificateData(
   }
 
   // Statutory Timing Calculations
-  const statutoryFilingWindowDays = 180;
-  const serviceDateTime = new Date(claim.serviceDate).getTime();
-  const baseDate = isNaN(serviceDateTime) ? claim.createdAt - 14 * 86400000 : serviceDateTime;
+  const statutoryFilingWindowDays = claim.appealFilingDeadlineDays || 180;
+  const denialTs = parseDateToUtcMidnight(claim.denialDate);
+  const serviceTs = parseDateToUtcMidnight(claim.serviceDate);
+  const anchorTs = denialTs ?? serviceTs;
+  const hasVerifiableAnchor = anchorTs !== null;
 
-  const daysElapsedSinceService = Math.max(
-    1,
-    Math.floor((dispatchedAt - baseDate) / (1000 * 60 * 60 * 24))
-  );
+  const daysElapsedSinceService = hasVerifiableAnchor
+    ? Math.max(0, Math.floor((dispatchedAt - anchorTs) / (1000 * 60 * 60 * 24)))
+    : 0;
 
-  const daysRemainingAtDispatch = Math.max(
-    0,
-    Math.ceil((claim.statutoryDeadline - dispatchedAt) / (1000 * 60 * 60 * 24))
-  );
+  const diffMs = claim.statutoryDeadline - dispatchedAt;
+  const daysRemainingAtDispatch = diffMs >= 0
+    ? Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+    : Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   const isTimelyFiled = dispatchedAt <= claim.statutoryDeadline;
-  const timelinessStatement = isTimelyFiled
-    ? `Timely Filed: Transmitted on Day ${daysElapsedSinceService} of the 180-Day Statutory Window (${daysRemainingAtDispatch} days remaining prior to statutory bar under 29 C.F.R. § 2560.503-1(h)).`
-    : `Emergency Submission: Transmitted at deadline boundary (${daysElapsedSinceService} days post-service).`;
+  let timelinessStatement: string;
+  if (!isTimelyFiled) {
+    const overdueDays = Math.abs(daysRemainingAtDispatch);
+    timelinessStatement = hasVerifiableAnchor
+      ? `Emergency Submission: Transmitted ${overdueDays} days past statutory deadline bar under 29 C.F.R. § 2560.503-1(h) (Day ${daysElapsedSinceService} post-notice).`
+      : `Emergency Submission: Transmitted ${overdueDays} days past statutory deadline bar under 29 C.F.R. § 2560.503-1(h).`;
+  } else if (hasVerifiableAnchor) {
+    timelinessStatement = `Timely Filed: Transmitted on Day ${daysElapsedSinceService} of the ${statutoryFilingWindowDays}-Day Statutory Window (${daysRemainingAtDispatch} days remaining prior to statutory bar under 29 C.F.R. § 2560.503-1(h)).`;
+  } else {
+    timelinessStatement = `Timely Filed: Transmitted ${daysRemainingAtDispatch} days prior to statutory bar under 29 C.F.R. § 2560.503-1(h) (Service/denial date unrecorded in source notice).`;
+  }
 
   // Unique Certificate ID & Verification Digest
   const certificateId = `COS-ERISA-${claim.claimNumber}-${dispatchedAt}`;
