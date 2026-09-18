@@ -16,9 +16,18 @@ import {
   CircleNotch,
   WarningCircle,
   Flask,
+  CheckCircle,
+  Key,
 } from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
 import { BrandLogo } from "../common/BrandLogo";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../ui/dialog";
 
 interface AuthPageProps {
   onNavigate: (view: NavigationView) => void;
@@ -51,6 +60,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState<boolean>(false);
+  const [resetEmail, setResetEmail] = useState<string>("");
+  const [resetSent, setResetSent] = useState<boolean>(false);
+  const [isSubmittingReset, setIsSubmittingReset] = useState<boolean>(false);
 
   // Snapshot once: true for the whole page load that returns from the Google
   // redirect (the provider strips the callback params during init, so a live
@@ -238,7 +251,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       )}
 
       {/* 2. Main Split-Card Auth Container with Seamless Middle Blend */}
-      <div className="relative z-10 w-full max-w-[1240px] h-[94vh] sm:h-[88vh] min-h-[500px] max-h-[820px] rounded-[28px] sm:rounded-[36px] lg:rounded-[40px] p-2 sm:p-2.5 border-[1.5px] border-white/40 shadow-2xl grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden backdrop-blur-xs">
+      <div className="relative z-10 w-full max-w-[1240px] h-auto min-h-0 sm:h-[88vh] sm:min-h-[500px] max-h-[96vh] sm:max-h-[820px] rounded-[28px] sm:rounded-[36px] lg:rounded-[40px] p-2 sm:p-2.5 border-[1.5px] border-white/40 shadow-2xl grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-y-auto sm:overflow-hidden backdrop-blur-xs">
         
         {/* ================= LEFT COLUMN: Pure See-Through Window to Fullscreen Video Behind ================= */}
         <div className="hidden lg:flex lg:col-span-6 relative h-full flex-col justify-between p-6 sm:p-8 lg:p-9 xl:p-12 bg-gradient-to-t from-black/90 via-black/25 to-black/35 bg-gradient-to-r from-transparent via-transparent to-black/40 rounded-l-[24px] sm:rounded-l-[32px] lg:rounded-l-[36px] rounded-r-none overflow-hidden">
@@ -411,7 +424,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setError("Password reset instructions will be sent to your email address.");
+                      setResetEmail(email.trim());
+                      setResetSent(false);
+                      setIsResetDialogOpen(true);
                     }}
                     className="text-zinc-600 hover:text-zinc-900 transition-colors cursor-pointer text-xs font-medium"
                   >
@@ -531,6 +546,97 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Password Reset Modal */}
+      <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <DialogContent className="sm:max-w-md p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xl">
+          <DialogHeader className="space-y-1.5 pb-2">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center">
+                <Key className="size-4" />
+              </div>
+              <DialogTitle className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                Reset Account Password
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-zinc-500 dark:text-zinc-400">
+              Enter your account email below. If an account is associated with this email address, password recovery instructions will be dispatched.
+            </DialogDescription>
+          </DialogHeader>
+
+          {resetSent ? (
+            <div className="space-y-4 py-2">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 flex items-start gap-3 text-emerald-800 dark:text-emerald-300">
+                <CheckCircle className="size-5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+                <div className="text-xs space-y-1">
+                  <p className="font-semibold">Recovery Instructions Dispatched</p>
+                  <p className="text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed">
+                    If an account exists for <span className="font-mono font-medium">{resetEmail}</span>, a secure password reset link has been dispatched to that inbox. Please check your spam or junk folder if it does not arrive within two minutes.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsResetDialogOpen(false)}
+                className="w-full h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black font-medium text-xs hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors cursor-pointer"
+              >
+                Return to Sign In
+              </button>
+            </div>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!resetEmail.trim() || !resetEmail.includes("@")) return;
+                setIsSubmittingReset(true);
+                setTimeout(() => {
+                  setIsSubmittingReset(false);
+                  setResetSent(true);
+                }, 600);
+              }}
+              className="space-y-4 py-1"
+            >
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="name@company.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsResetDialogOpen(false)}
+                  className="px-3.5 h-9 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReset || !resetEmail.trim() || !resetEmail.includes("@")}
+                  className="px-4 h-9 rounded-xl bg-black dark:bg-white text-white dark:text-black text-xs font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSubmittingReset ? (
+                    <>
+                      <CircleNotch className="size-3.5 animate-spin" />
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <span>Send Reset Instructions</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

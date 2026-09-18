@@ -97,9 +97,9 @@ export const STATUTORY_RIGHTS_NOTICES: Record<string, string> = {
   level_1_internal:
     "Please process this appeal under the plan's claims and appeals procedure and the instructions in the denial notice. If ERISA applies, please treat this as a request for full and fair review under 29 C.F.R. § 2560.503-1 and provide, upon request, the documents, records, plan provisions, clinical policies or criteria, and other information relevant to this claim. If external review is available, please include the applicable process and deadline in your determination.",
   level_2_grievance:
-    "FORMAL GRIEVANCE & ERISA § 503 PROCEDURAL NOTICE: This appeal is submitted under ERISA Section 503 (29 U.S.C. § 1133) and 29 C.F.R. § 2560.503-1(h)(3)(iii). We formally demand that this second-tier grievance be reviewed by an independent medical expert of the same specialty who was not involved in the initial adverse determination. Failure to afford a qualified same-specialty review or withholding clinical review guidelines constitutes a procedural violation and a reservation of rights regarding statutory bad-faith claims handling.",
+    "FORMAL GRIEVANCE & ERISA § 503 PROCEDURAL NOTICE: This appeal is submitted under ERISA Section 503 (29 U.S.C. § 1133) and 29 C.F.R. § 2560.503-1(h)(3)(ii)–(iii). We formally demand that this second-tier grievance be reviewed by an independent medical expert of the same specialty who was not involved in the initial adverse determination. Failure to afford a qualified same-specialty review or withholding clinical review guidelines constitutes a procedural violation and a reservation of rights regarding statutory claims handling.",
   level_3_external_state_review:
-    "STATUTORY BAD-FAITH & ERISA SECTION 502(a)(1)(B) LITIGATION WARNING: Having exhausted available internal administrative appeals without a medically sound determination, notice is hereby given under ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)], 45 C.F.R. § 147.136, and state bad-faith insurance statutes. This matter is submitted for immediate binding external review and formal complaint to the State Insurance Commissioner. If benefits are not disbursed in full with applicable statutory prompt-pay interest, claimant reserves all civil enforcement remedies under ERISA Section 502(a)(1)(B), statutory bad-faith penalties, and attorney's fees under 29 U.S.C. § 1132(g)(1).",
+    "STATUTORY REMEDIES & ERISA SECTION 502(a)(1)(B) ENFORCEMENT NOTICE: Having exhausted available internal administrative appeals without a medically sound determination, notice is hereby given under ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)], 45 C.F.R. § 147.136, and applicable state insurance standards. This matter is submitted for immediate binding external review and formal complaint to the State Insurance Commissioner. If benefits are not disbursed in full with applicable statutory prompt-pay interest, claimant reserves all civil enforcement remedies under ERISA Section 502(a)(1)(B), non-preempted state insurance remedies, and attorney's fees under 29 U.S.C. § 1132(g)(1).",
 };
 
 export function getStatutoryRightsNotice(appealLevel?: string, patientState?: string): string {
@@ -112,8 +112,6 @@ export function getStatutoryRightsNotice(appealLevel?: string, patientState?: st
   }
   return base;
 }
-
-const SAFE_STATUTORY_RIGHTS_NOTICE = STATUTORY_RIGHTS_NOTICES.level_1_internal;
 
 function cleanGeneratedSection(value?: string): string {
   if (!value) return "";
@@ -562,7 +560,7 @@ export function formatVectorPrecedentSection(vectorPrecedents?: VectorPrecedentM
   let section = `### Vector-Retrieved Controlling Authorities\n\n`;
   section += `Convex native vector search against the Precedent Vector Archive (indexed by ICD-10, CPT, and CARC) returned the following highest-scoring historical winning arguments. Proven statutory language is incorporated herein:\n\n`;
   vectorPrecedents.forEach((match, idx) => {
-    const similarity = Math.round(Math.max(0, Math.min(1, (match.vectorScore + 1) / 2)) * 1000) / 10;
+    const similarity = Math.round(Math.max(0, Math.min(1, match.vectorScore)) * 1000) / 10;
     section += `**${idx + 1}. ${match.title}** — \`${match.citation}\` (similarity ${similarity}%)\n\n`;
     section += `> ${match.statutoryLanguage}\n\n`;
     section += `${match.winningArgument}\n\n`;
@@ -680,7 +678,7 @@ export function assembleProfessionalAppealEmail(
   } else if (appealLevel === "level_3_external_state_review") {
     title = `# Appeal of Adverse Benefit Determination — Level 3 External IRO & ${regulator.doiShort} Petition`;
     salutation = `To the Independent Review Organization (IRO), ${regulator.doiName}, and Plan Administrator,`;
-    openingParagraph = `I hereby submit this Level 3 Petition for External Independent Review and formal administrative complaint regarding ${claimRefLabel} (service date: ${serviceDateText}) regarding the adverse determination citing ${primaryDenial}. Having exhausted internal administrative reviews, this petition demands independent external overturn, regulatory scrutiny, and statutory bad-faith remedies under ERISA Section 502(a)(1)(B).`;
+    openingParagraph = `I hereby submit this Level 3 Petition for External Independent Review and formal administrative complaint regarding ${claimRefLabel} (service date: ${serviceDateText}) regarding the adverse determination citing ${primaryDenial}. Having exhausted internal administrative reviews, this petition demands independent external overturn, regulatory review, and civil enforcement remedies under ERISA Section 502(a)(1)(B).`;
   }
 
   let email = `${title}\n\n`;
@@ -757,15 +755,15 @@ export function assembleProfessionalAppealEmail(
   email += `## Review requested\n\n`;
   email += `Please:\n\n`;
   if (appealLevel === "level_2_grievance") {
-    email += `1. Convene a Multi-Disciplinary Peer Review Panel and assign an independent, board-certified physician in the same medical specialty pursuant to 29 C.F.R. § 2560.503-1(h)(3)(iii).\n`;
+    email += `1. Convene a Multi-Disciplinary Peer Review Panel and assign an independent, board-certified physician in the same medical specialty pursuant to 29 C.F.R. § 2560.503-1(h)(3)(ii)–(iii).\n`;
     email += `2. Produce the name, specialty credentials, and clinical review notes of the initial adverse reviewer.\n`;
     email += `3. ${buildPaymentRequest(claimNumber)}\n`;
     email += `4. Issue a formal written determination detailing specific clinical guidelines and criteria applied.\n\n`;
   } else if (appealLevel === "level_3_external_state_review") {
     email += `1. Conduct expedited binding external independent review pursuant to ACA 45 C.F.R. § 147.136 (${regulator.externalReviewLabel}).\n`;
-    email += `2. ${regulator.doiName} review for unfair claims settlement practices and statutory bad-faith adjudication.\n`;
+    email += `2. ${regulator.doiName} regulatory review for unfair claims settlement practices and prompt-pay compliance.\n`;
     email += `3. Immediate full disbursement of the denied amount of ${claim.deniedAmount ? formatMoney(claim.deniedAmount) : "the disputed charges"} plus statutory prompt-pay interest penalties.\n`;
-    email += `4. Notice of civil enforcement rights under ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)] and mandatory fee-shifting under ERISA Section 502(g)(1).\n\n`;
+    email += `4. Notice of civil enforcement rights under ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)], non-preempted statutory remedies, and fee-shifting under ERISA Section 502(g)(1).\n\n`;
   } else {
     email += `1. ${buildPaymentRequest(claimNumber)}\n`;
     email += `2. If the denial is upheld, provide the specific clinical rationale, plan provision, criteria applied, and documents relied upon.\n`;
@@ -921,7 +919,7 @@ export async function performGenerateAppealBrief(
         ? vectorPrecedents
           .map((match, idx) => {
             const similarity =
-              Math.round(Math.max(0, Math.min(1, (match.vectorScore + 1) / 2)) * 1000) / 10;
+              Math.round(Math.max(0, Math.min(1, match.vectorScore)) * 1000) / 10;
             return `[Vector Precedent ${idx + 1}] ${match.title} (${match.citation}, similarity ${similarity}%):\nStatutory language: ${match.statutoryLanguage}\nWinning argument: ${match.winningArgument}`;
           })
           .join("\n\n")
@@ -1029,7 +1027,7 @@ Return a short, evidence-grounded email draft in the structured fields. If a cli
       ...rawResult,
       // These fields are deliberately deterministic so the model cannot turn
       // an uncertain jurisdiction or deadline into a legal conclusion.
-      statutoryRightsNotice: SAFE_STATUTORY_RIGHTS_NOTICE,
+      statutoryRightsNotice: getStatutoryRightsNotice(appealLevel, claim.patient?.state),
       medicalNecessityArguments: groundedMedicalNecessityArguments,
       policyCitations: groundedPolicyCitations,
       formalDemandForPayment: buildPaymentRequest(claim.claimNumber),

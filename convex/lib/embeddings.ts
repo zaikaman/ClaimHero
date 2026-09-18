@@ -391,7 +391,7 @@ export function formatPrecedentInsertion(match: {
   retrievalSource?: string;
   rrfScore?: number;
 }): string {
-  const similarity = Math.round(Math.max(0, Math.min(1, (match.vectorScore + 1) / 2)) * 1000) / 10;
+  const similarity = Math.round(Math.max(0, Math.min(1, match.vectorScore)) * 1000) / 10;
   const methodBadge = match.retrievalSource === "hybrid_fusion"
     ? " [Hybrid Vector+BM25 RRF]"
     : match.retrievalSource === "bm25_only"

@@ -6,6 +6,7 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { api } from "../convex/_generated/api";
 import App from "./App";
 import "./index.css";
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import {
   OAUTH_CALLBACK_BOOT_FLAG,
   OAUTH_CODE_PARAM,
@@ -34,22 +35,28 @@ function captureOAuthCallbackAtBoot(): void {
 
 captureOAuthCallbackAtBoot();
 
-const convexUrl = import.meta.env.VITE_CONVEX_URL;
-if (!convexUrl) {
-  throw new Error(
-    "Missing VITE_CONVEX_URL environment variable. Set VITE_CONVEX_URL in your .env.local file or deployment environment."
-  );
-}
-try {
-  const parsed = new URL(convexUrl);
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error(`unsupported protocol "${parsed.protocol}"`);
+const rawConvexUrl = import.meta.env.VITE_CONVEX_URL;
+let isConvexUrlValid = true;
+let envErrorMessage = "";
+
+if (!rawConvexUrl) {
+  isConvexUrlValid = false;
+  envErrorMessage =
+    "Missing VITE_CONVEX_URL environment variable. Set VITE_CONVEX_URL in your .env.local file or deployment environment.";
+} else {
+  try {
+    const parsed = new URL(rawConvexUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      isConvexUrlValid = false;
+      envErrorMessage = `Unsupported protocol "${parsed.protocol}" in VITE_CONVEX_URL. Must be http: or https:`;
+    }
+  } catch (err) {
+    isConvexUrlValid = false;
+    envErrorMessage = `VITE_CONVEX_URL environment variable is not a valid http(s) URL: "${rawConvexUrl}". Details: ${err instanceof Error ? err.message : String(err)}`;
   }
-} catch (err) {
-  throw new Error(
-    `VITE_CONVEX_URL environment variable is not a valid http(s) URL: "${convexUrl}". Details: ${err instanceof Error ? err.message : String(err)}`
-  );
 }
+
+const convexUrl = isConvexUrlValid ? rawConvexUrl : "";
 
 /**
  * Remove cached Convex Auth tokens that this deployment can no longer verify.
@@ -168,29 +175,69 @@ async function purgeUnverifiableAuthTokens(convexUrl: string): Promise<number> {
   }
 }
 
-const convex = new ConvexReactClient(convexUrl);
+const rootElement = document.getElementById("root");
 
-// Mount immediately so OAuth callback handling (`completeFlow`) and first
-// paint never wait on the best-effort JWKS cleanup. The purge runs in the
-// background; when it drops a proven-stale token set the provider may have
-// already adopted in memory, a single reload re-initializes the session
-// clean. Healthy sessions are untouched, so this reload only ever fires once
-// for users carrying a pre-rotation token (after which there is nothing left
-// to purge and no further reload).
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <ConvexAuthProvider client={convex} api={api.auth}>
-      <App />
-    </ConvexAuthProvider>
-  </React.StrictMode>,
-);
-
-void purgeUnverifiableAuthTokens(convexUrl).then((removed) => {
-  if (removed > 0 && typeof window !== "undefined") {
-    try {
-      window.location.reload();
-    } catch {
-      // Ignore reload errors in restricted contexts.
-    }
+if (!isConvexUrlValid || !convexUrl) {
+  if (rootElement) {
+    ReactDOM.createRoot(rootElement).render(
+      <React.StrictMode>
+        <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground px-4 text-center select-none font-sans">
+          <div className="max-w-md w-full p-8 rounded-2xl border border-destructive/40 bg-card/80 backdrop-blur-xl shadow-2xl flex flex-col items-center space-y-6">
+            <div className="size-16 rounded-2xl border border-destructive/40 bg-destructive/10 flex items-center justify-center text-destructive shadow-inner">
+              <svg className="size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <div className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono border border-destructive/30 text-destructive bg-destructive/5">
+                Environment Configuration Required
+              </div>
+              <h1 className="text-xl font-bold tracking-tight text-foreground">
+                Missing Convex Deployment URL
+              </h1>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {envErrorMessage}
+              </p>
+            </div>
+            <div className="w-full text-left p-3 rounded-lg bg-secondary/50 border border-border/40 font-mono text-xs text-muted-foreground space-y-1">
+              <div className="text-foreground font-semibold">Troubleshooting Steps:</div>
+              <div>1. Run <code className="text-primary font-bold">npx convex dev</code> to start and configure your dev deployment.</div>
+              <div>2. Verify <code className="text-primary">.env.local</code> contains <code className="text-primary">VITE_CONVEX_URL=https://...convex.cloud</code></div>
+            </div>
+          </div>
+        </div>
+      </React.StrictMode>
+    );
   }
-});
+} else {
+  const convex = new ConvexReactClient(convexUrl);
+
+  // Mount immediately so OAuth callback handling (`completeFlow`) and first
+  // paint never wait on the best-effort JWKS cleanup. The purge runs in the
+  // background; when it drops a proven-stale token set the provider may have
+  // already adopted in memory, a single reload re-initializes the session
+  // clean. Healthy sessions are untouched, so this reload only ever fires once
+  // for users carrying a pre-rotation token (after which there is nothing left
+  // to purge and no further reload).
+  if (rootElement) {
+    ReactDOM.createRoot(rootElement).render(
+      <React.StrictMode>
+        <ErrorBoundary>
+          <ConvexAuthProvider client={convex} api={api.auth}>
+            <App />
+          </ConvexAuthProvider>
+        </ErrorBoundary>
+      </React.StrictMode>
+    );
+  }
+
+  void purgeUnverifiableAuthTokens(convexUrl).then((removed) => {
+    if (removed > 0 && typeof window !== "undefined") {
+      try {
+        window.location.reload();
+      } catch {
+        // Ignore reload errors in restricted contexts.
+      }
+    }
+  });
+}

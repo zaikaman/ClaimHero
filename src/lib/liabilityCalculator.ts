@@ -18,8 +18,26 @@ import {
   StatutoryComplianceStatus,
 } from "../types";
 
-export const STATUTORY_DAILY_PENALTY_RATE = 110.0; // 29 U.S.C. § 1132(c)(1) & 29 C.F.R. § 2575.502c-1
+export const STATUTORY_DAILY_PENALTY_RATE = 110.0; // Statutory base rate under 29 U.S.C. § 1132(c)(1)
+export const DOL_INFLATION_ADJUSTED_DAILY_RATE = 164.0; // DOL annual inflation adjustment under 29 C.F.R. § 2575.502c-1 (2024+ rate)
 export const STATUTORY_DISCLOSURE_GRACE_DAYS = 30; // 30 calendar days from written request
+
+export const STATE_PROMPT_PAY_RATES: Record<string, { rate: number; citation: string }> = {
+  TX: { rate: 18, citation: "Tex. Ins. Code § 542.060 (18% per annum)" },
+  FL: { rate: 10, citation: "Fla. Stat. § 627.6131 (10% per annum)" },
+  CA: { rate: 10, citation: "Cal. Ins. Code § 10123.13 (10% per annum)" },
+  NY: { rate: 12, citation: "N.Y. Ins. Law § 3224-a (12% per annum)" },
+  IL: { rate: 9, citation: "215 ILCS 5/368a (9% per annum)" },
+  PA: { rate: 10, citation: "40 Pa. Stat. § 991.2166 (10% per annum)" },
+};
+
+export function getPromptPayRateForState(state?: string): { rate: number; citation: string } {
+  const normalized = state?.trim().toUpperCase();
+  if (normalized && STATE_PROMPT_PAY_RATES[normalized]) {
+    return STATE_PROMPT_PAY_RATES[normalized];
+  }
+  return { rate: 10, citation: "State Prompt-Pay Statute Baseline (10% per annum)" };
+}
 
 export const DEFAULT_REQUESTED_DOCUMENTS = [
   "Complete Administrative Claim File & Internal Adjudication Notes (29 CFR § 2560.503-1(h)(2)(iii))",
@@ -43,19 +61,27 @@ export function calculateFinancialLiability(
     Number(input.allowedAmount ?? (billedAmount > contractualDiscount ? billedAmount - contractualDiscount : billedAmount))
   );
 
-  const deductibleTotal = Math.max(0, Number(input.deductibleTotal ?? (billedAmount > 0 ? 1500 : 0)));
-  const deductibleMet = Math.max(0, Number(input.deductibleMet ?? (billedAmount > 0 ? 500 : 0)));
+  const isEstimatedPlaceholder = input.isEstimatedPlaceholder ?? (
+    input.deductibleTotal === undefined &&
+    input.coinsuranceRate === undefined &&
+    input.outOfPocketMax === undefined
+  );
+
+  const deductibleTotal = Math.max(0, Number(input.deductibleTotal ?? 0));
+  const deductibleMet = Math.max(0, Number(input.deductibleMet ?? 0));
   const remainingDeductible = Math.max(0, deductibleTotal - deductibleMet);
 
-  const coinsuranceRate = Math.min(100, Math.max(0, Number(input.coinsuranceRate ?? (billedAmount > 0 ? 20 : 0))));
-  const copayAmount = Math.max(0, Number(input.copayAmount ?? (billedAmount > 0 ? 50 : 0)));
+  const coinsuranceRate = Math.min(100, Math.max(0, Number(input.coinsuranceRate ?? 0)));
+  const copayAmount = Math.max(0, Number(input.copayAmount ?? 0));
 
-  const outOfPocketMax = Math.max(0, Number(input.outOfPocketMax ?? (billedAmount > 0 ? 6000 : 0)));
-  const outOfPocketSpent = Math.max(0, Number(input.outOfPocketSpent ?? (billedAmount > 0 ? 1800 : 0)));
+  const outOfPocketMax = Math.max(0, Number(input.outOfPocketMax ?? 0));
+  const outOfPocketSpent = Math.max(0, Number(input.outOfPocketSpent ?? 0));
   const remainingOopCapacity = Math.max(0, outOfPocketMax - outOfPocketSpent);
 
   const networkStatus = input.networkStatus ?? "in_network";
-  const noSurprisesActProtected = input.noSurprisesActProtected ?? (networkStatus === "in_network");
+  // The No Surprises Act (42 U.S.C. § 300gg-111 / 45 CFR § 149.410) protects patients against surprise
+  // balance billing for out-of-network emergency services and OON providers at in-network facilities.
+  const noSurprisesActProtected = input.noSurprisesActProtected ?? (networkStatus === "out_of_network");
 
   // Step 1: Deductible applied to this claim
   const deductibleApplied = Math.min(allowedAmount, remainingDeductible);
@@ -223,6 +249,7 @@ export function calculateFinancialLiability(
     totalPatientLiabilityOverturned,
     netPatientSavings,
     payerExpectedObligation,
+    isEstimatedPlaceholder,
     updatedAt: Date.now(),
   };
 
@@ -248,13 +275,14 @@ export function calculateFinancialLiability(
  * Calculates statutory ERISA § 502(c)(1) failure-to-disclose penalties ($110/day).
  */
 export function calculateErisaPenalties(
-  input: Partial<ErisaPenaltyData>,
+  input: Partial<ErisaPenaltyData> & { useDolInflation?: boolean },
   claimContext?: {
     deniedAmount?: number;
     patientName?: string;
     payerName?: string;
     claimNumber?: string;
     serviceDate?: string;
+    patientState?: string;
   }
 ): ErisaPenaltyResult {
   const calculationDateStr = input.calculationDate || formatDateISO(new Date());
@@ -269,7 +297,7 @@ export function calculateErisaPenalties(
   const deadlineDate = new Date(requestDate.getTime() + STATUTORY_DISCLOSURE_GRACE_DAYS * 24 * 60 * 60 * 1000);
   const disclosureDeadlineDateStr = formatDateISO(deadlineDate);
 
-  const dailyPenaltyRate = input.dailyPenaltyRate ?? STATUTORY_DAILY_PENALTY_RATE;
+  const dailyPenaltyRate = input.dailyPenaltyRate ?? (input.useDolInflation ? DOL_INFLATION_ADJUSTED_DAILY_RATE : STATUTORY_DAILY_PENALTY_RATE);
   const complianceStatus: StatutoryComplianceStatus = input.complianceStatus ?? "defaulted";
   const requestedDocuments = input.requestedDocuments && input.requestedDocuments.length > 0
     ? input.requestedDocuments
@@ -292,15 +320,22 @@ export function calculateErisaPenalties(
   const accruedPenaltyAmount = daysInDefault * dailyPenaltyRate;
 
   // Statutory Prompt-Pay / Prejudgment Interest (e.g. 18% p.a. under Texas Ins Code § 542.060 or Florida 10%)
-  const statutoryInterestRate = input.statutoryInterestRate ?? 18; // % per year
+  const statePromptPay = getPromptPayRateForState(claimContext?.patientState);
+  const statutoryInterestRate = input.statutoryInterestRate ?? statePromptPay.rate;
+  const statutoryInterestCitation = input.statutoryInterestCitation || statePromptPay.citation;
   const disputedAmount = claimContext?.deniedAmount ?? 0;
   const accruedInterestAmount = Math.round(
     (disputedAmount * (statutoryInterestRate / 100) * (daysElapsedSinceRequest / 365)) * 100
   ) / 100;
 
   // Estimated ERISA § 502(g)(1) Mandatory Attorney's Fees (Lodestar method)
-  // Baseline: 20-30 hours @ $450/hour
-  const estimatedAttorneysFees = input.estimatedAttorneysFees ?? (daysInDefault > 0 ? 11250 : 0);
+  // Baseline: 15-30 hours @ $450/hour based on default severity tier
+  const lodestarHours = daysInDefault > 60 ? 30 : daysInDefault > 30 ? 25 : daysInDefault > 0 ? 15 : 0;
+  const lodestarRate = 450;
+  const calculatedLodestarFees = lodestarHours * lodestarRate;
+  const estimatedAttorneysFees = input.estimatedAttorneysFees !== undefined
+    ? input.estimatedAttorneysFees
+    : (daysInDefault > 0 ? (calculatedLodestarFees || 11250) : 0);
 
   const totalStatutoryDamages = accruedPenaltyAmount + accruedInterestAmount + estimatedAttorneysFees;
   const totalPlanAdministratorExposure = disputedAmount + totalStatutoryDamages;
@@ -378,6 +413,7 @@ export function calculateErisaPenalties(
     daysInDefault,
     accruedPenaltyAmount,
     statutoryInterestRate,
+    statutoryInterestCitation,
     accruedInterestAmount,
     estimatedAttorneysFees,
     totalStatutoryDamages,
@@ -468,7 +504,8 @@ Demand is hereby made for immediate disclosure of all outstanding records within
  */
 export function getDefaultFinancialLiability(claim: Claim): FinancialLiabilityData {
   const billedAmount = claim.deniedAmount ?? 0;
-  const contractualDiscount = Math.round(billedAmount * 0.15); // ~15% discount
+  // If no contractual discount is documented in claim, provide standard commercial benchmark explicitly flagged as estimated
+  const contractualDiscount = Math.round(billedAmount * 0.15); // ~15% benchmark discount
   const allowedAmount = Math.max(0, billedAmount - contractualDiscount);
   const deductibleTotal = billedAmount > 0 ? 1500 : 0;
   const deductibleMet = billedAmount > 0 ? 500 : 0;
@@ -488,7 +525,8 @@ export function getDefaultFinancialLiability(claim: Claim): FinancialLiabilityDa
     outOfPocketMax,
     outOfPocketSpent,
     networkStatus: "in_network",
-    noSurprisesActProtected: true,
+    noSurprisesActProtected: false, // In-network claims are governed by contracted rates; NSA protects OON balance billing
+    isEstimatedPlaceholder: true,
   });
 
   return result.data;
@@ -497,17 +535,24 @@ export function getDefaultFinancialLiability(claim: Claim): FinancialLiabilityDa
 /**
  * Returns sensible default ERISA penalty data derived from an existing claim.
  */
-export function getDefaultErisaPenalties(claim: Claim): ErisaPenaltyData {
+export function getDefaultErisaPenalties(
+  claim: Claim,
+  options?: { useDolInflation?: boolean }
+): ErisaPenaltyData {
   const now = new Date();
   const requestDate = new Date(now.getTime() - 48 * 24 * 60 * 60 * 1000); // 48 days ago -> 18 days default
+  const patientState = claim.patient?.state;
+  const statePromptPay = getPromptPayRateForState(patientState);
+  const dailyPenaltyRate = options?.useDolInflation ? DOL_INFLATION_ADJUSTED_DAILY_RATE : 110.0;
 
   const result = calculateErisaPenalties(
     {
       documentRequestDate: formatDateISO(requestDate),
       calculationDate: formatDateISO(now),
       complianceStatus: "defaulted",
-      dailyPenaltyRate: 110.0,
-      statutoryInterestRate: 18,
+      dailyPenaltyRate,
+      statutoryInterestRate: statePromptPay.rate,
+      statutoryInterestCitation: statePromptPay.citation,
       requestedDocuments: DEFAULT_REQUESTED_DOCUMENTS,
     },
     {
@@ -516,6 +561,7 @@ export function getDefaultErisaPenalties(claim: Claim): ErisaPenaltyData {
       payerName: claim.patient?.insurancePayer || "Health Insurer",
       claimNumber: claim.claimNumber || "CLM-PENDING",
       serviceDate: claim.serviceDate,
+      patientState,
     }
   );
 

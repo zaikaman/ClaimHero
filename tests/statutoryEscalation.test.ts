@@ -68,9 +68,9 @@ describe('Multi-Tier Statutory Appeal Escalation Workflow', () => {
       expect(noticeLevel1).toContain('full and fair review');
 
       expect(noticeLevel2).toContain('ERISA Section 503');
-      expect(noticeLevel2).toContain('29 C.F.R. § 2560.503-1(h)(3)(iii)');
+      expect(noticeLevel2).toContain('29 C.F.R. § 2560.503-1(h)(3)(ii)–(iii)');
       expect(noticeLevel2).toContain('same specialty');
-      expect(noticeLevel2).toContain('bad-faith');
+      expect(noticeLevel2).toContain('statutory claims handling');
 
       expect(noticeLevel3).toContain('ERISA Section 502(a)(1)(B)');
       expect(noticeLevel3).toContain('45 C.F.R. § 147.136');
@@ -89,7 +89,7 @@ describe('Multi-Tier Statutory Appeal Escalation Workflow', () => {
       expect(metaL2.statutoryPosture).toBe('procedural_grievance_bad_faith');
       expect(metaL2.targetAuthority).toContain('Peer Review Panel');
       expect(metaL2.legalAggressiveness).toBe('elevated_grievance');
-      expect(metaL2.statutoryAuthorities).toContain('29 C.F.R. § 2560.503-1(h)(3)(iii) (Mandatory Same-Specialty Peer Review)');
+      expect(metaL2.statutoryAuthorities).toContain('29 C.F.R. § 2560.503-1(h)(3)(ii)–(iii) (Mandatory Same-Specialty Independent Consultation)');
 
       const metaL3 = getStatutoryTierMetadata('level_3_external_state_review');
       expect(metaL3.statutoryPosture).toBe('external_iro_erisa_502_petition');
@@ -145,11 +145,11 @@ describe('Multi-Tier Statutory Appeal Escalation Workflow', () => {
       expect(brief).toContain("ERISA Section 503");
 
       expect(brief).toContain("Convene a Multi-Disciplinary Peer Review Panel and assign an independent, board-certified physician in the same medical specialty");
-      expect(brief).toContain("29 C.F.R. § 2560.503-1(h)(3)(iii)");
+      expect(brief).toContain("29 C.F.R. § 2560.503-1(h)(3)(ii)–(iii)");
       expect(brief).toContain("Produce the name, specialty credentials, and clinical review notes of the initial adverse reviewer");
 
       expect(brief).toContain("FORMAL GRIEVANCE & ERISA § 503 PROCEDURAL NOTICE");
-      expect(brief).toContain("reservation of rights regarding statutory bad-faith claims handling");
+      expect(brief).toContain("reservation of rights regarding statutory claims handling");
     });
   });
 
@@ -170,12 +170,12 @@ describe('Multi-Tier Statutory Appeal Escalation Workflow', () => {
       expect(brief).toContain("Level 3 Petition for External Independent Review");
 
       expect(brief).toContain("Conduct expedited binding external independent review pursuant to ACA 45 C.F.R. § 147.136");
-      expect(brief).toContain("State Insurance Commissioner review for unfair claims settlement practices");
+      expect(brief).toContain("State Insurance Commissioner regulatory review for unfair claims settlement practices and prompt-pay compliance");
       expect(brief).toContain("disbursement of the denied amount of $48,500 plus statutory prompt-pay interest penalties");
       expect(brief).toContain("ERISA Section 502(a)(1)(B) [29 U.S.C. § 1132(a)(1)(B)]");
-      expect(brief).toContain("mandatory fee-shifting under ERISA Section 502(g)(1)");
+      expect(brief).toContain("fee-shifting under ERISA Section 502(g)(1)");
 
-      expect(brief).toContain("STATUTORY BAD-FAITH & ERISA SECTION 502(a)(1)(B) LITIGATION WARNING");
+      expect(brief).toContain("STATUTORY REMEDIES & ERISA SECTION 502(a)(1)(B) ENFORCEMENT NOTICE");
       expect(brief).toContain("Having exhausted available internal administrative appeals without a medically sound determination");
       expect(brief).toContain("formal complaint to the State Insurance Commissioner");
       expect(brief).toContain("reserves all civil enforcement remedies under ERISA Section 502(a)(1)(B)");

@@ -378,9 +378,26 @@ export async function executeDurableClaimPipeline(
       // Step 6: Mandatory Human Review Gate
       // Safer product rule: AI may prepare, classify, cite, and recommend.
       // A human must approve every clinical assertion, legal assertion, recipient, and outbound message.
+      const currentClaimForStatus = (await step.runQuery(internal.claims.getByIdInternal, {
+        claimId: args.claimId,
+      })) as Doc<"claims"> | null;
+
+      const ADVANCED_CLAIM_STATUSES = new Set([
+        "dispatched",
+        "delivered",
+        "won",
+        "lost",
+        "escalated",
+        "under_review",
+      ]);
+      const targetStatus =
+        currentClaimForStatus && ADVANCED_CLAIM_STATUSES.has(currentClaimForStatus.status)
+          ? currentClaimForStatus.status
+          : finalClaimStatus;
+
       await step.runMutation(internal.claims.updateStatusInternal, {
         claimId: args.claimId,
-        status: finalClaimStatus,
+        status: targetStatus as typeof finalClaimStatus,
         actor: "Durable Sentinel Workflow",
         details: isEvidentiallyDegraded
           ? `Durable pipeline completed with degraded evidence caveat: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore ?? 0}/100 provisional score computed. Held in review_provisional awaiting evidentiary acknowledgment before dispatch.`
@@ -535,12 +552,23 @@ export async function executeErisaStatutoryCountdown(
   const cadenceDays = Math.max(1, Math.min(args.cadenceDays, 90));
   const sleepDurationMs = cadenceDays * 24 * 60 * 60 * 1000;
 
-  await step.runMutation(internal.claims.updateStatusInternal, {
+  const initialClaim = (await step.runQuery(internal.claims.getByIdInternal, {
     claimId: args.claimId,
-    status: "dispatched",
-    actor: "ERISA Statutory Sentinel",
-    details: `Initialized ${cadenceDays}-day statutory follow-up cadence via durable workflow suspension.`,
-  });
+  })) as Doc<"claims"> | null;
+
+  if (initialClaim?.status === "dispatched") {
+    await step.runMutation(internal.claims.updateStatusInternal, {
+      claimId: args.claimId,
+      status: "dispatched",
+      actor: "ERISA Statutory Sentinel",
+      details: `Initialized ${cadenceDays}-day statutory follow-up cadence via durable workflow suspension.`,
+    });
+  } else {
+    await step.runMutation(internal.claims.updateClaimWorkflowStatusInternal, {
+      claimId: args.claimId,
+      workflowStatus: "inProgress",
+    });
+  }
 
   // Durable sleep without serverless resource consumption
   await step.sleep(sleepDurationMs, { name: "erisaCadenceCountdown" });
@@ -650,10 +678,21 @@ export async function performStartDurablePipeline(
     }
   );
 
+  const currentClaim = await ctx.db.get(args.claimId);
+  const ADVANCED_CLAIM_STATUSES = new Set([
+    "dispatched",
+    "delivered",
+    "won",
+    "lost",
+    "escalated",
+    "under_review",
+  ]);
+  const shouldResetStatus = !currentClaim || !ADVANCED_CLAIM_STATUSES.has(currentClaim.status);
+
   await ctx.db.patch(args.claimId, {
     workflowId,
     workflowStatus: "inProgress",
-    status: "analyzing",
+    ...(shouldResetStatus ? { status: "analyzing" } : {}),
     updatedAt: Date.now(),
   });
 

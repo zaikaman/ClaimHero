@@ -43,6 +43,7 @@ import { SimpleInboxView } from "./SimpleInboxView";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { soundEffects } from "../../lib/soundEffects";
 import { extractDocumentInBrowser } from "../../lib/clientOcr";
+import { copyToClipboard } from "../../lib/clipboard";
 import { toast } from "sonner";
 
 type DispatchMode = "custom_email" | "official_payer";
@@ -461,33 +462,33 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     (!hasPriorTransmissions || isRedispatchOpen)
   );
 
-  const handleCopyEmail = () => {
+  const handleCopyEmail = async () => {
     if (!assignedEmail) return;
-    navigator.clipboard.writeText(assignedEmail);
+    await copyToClipboard(assignedEmail);
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
   };
 
-  const handleCopyBrief = () => {
+  const handleCopyBrief = async () => {
     const briefText = effectiveAppeal?.fullAppealMarkdown;
     if (!briefText) return;
-    navigator.clipboard.writeText(briefText);
+    await copyToClipboard(briefText);
     setCopiedBrief(true);
     setTimeout(() => setCopiedBrief(false), 2000);
   };
 
-  const handleCopyFax = () => {
+  const handleCopyFax = async () => {
     const fax = payerContact.appealsFax;
     if (!fax) return;
-    navigator.clipboard.writeText(fax);
+    await copyToClipboard(fax);
     setCopiedFax(true);
     setTimeout(() => setCopiedFax(false), 2000);
   };
 
-  const handleCopyPoBox = () => {
+  const handleCopyPoBox = async () => {
     const pobox = payerContact.statutoryPoBox;
     if (!pobox) return;
-    navigator.clipboard.writeText(pobox);
+    await copyToClipboard(pobox);
     setCopiedPoBox(true);
     setTimeout(() => setCopiedPoBox(false), 2000);
   };
@@ -658,20 +659,20 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             </div>
             <div className="space-y-1 min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                <span className="text-xs font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider">
                   {isDetailed ? "Evidentiary Integrity Alert: Provisional Review Gate" : "Review Required: Missing Policy Proof"}
                 </span>
-                <Badge variant="outline" className="text-[10px] font-mono border-amber-500/40 text-amber-300">
+                <Badge variant="outline" className="text-[10px] font-mono border-amber-500/40 text-amber-800 dark:text-amber-300">
                   {claim.evidenceIntegrity?.scoreStatus === "provisional_capped" ? "Score Capped" : "Provisional Draft"}
                 </Badge>
               </div>
-              <p className="text-xs text-amber-200/90 leading-relaxed">
+              <p className="text-xs text-amber-950 dark:text-amber-200 leading-relaxed">
                 {claim.evidenceIntegrity?.degradationWarnings?.[0] ||
                   (isDetailed
                     ? "Live insurer clinical policy bulletins (CPB) or judicial precedents could not be verified. This appeal operates as an ERISA § 503 Statutory Procedural Disclosure Demand rather than a substantive clinical medical necessity rebuttal."
                     : "The insurer's policy rules could not be verified online. This appeal relies on your legal right to request the documents they used to deny your claim.")}
               </p>
-              <p className="text-[11px] text-amber-300/70">
+              <p className="text-[11px] text-amber-800/80 dark:text-amber-300/70">
                 {isDetailed
                   ? `Readiness score is capped (${claim.overturnProbabilityScore ?? 0}/100) and 1-click dispatch is held in provisional review until you acknowledge this statutory posture.`
                   : `Your score is capped (${claim.overturnProbabilityScore ?? 0}/100) and sending is paused until you review and confirm.`}
@@ -684,7 +685,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               variant="outline"
               onClick={handleAcknowledgeDegradation}
               disabled={isAcknowledging}
-              className="text-xs border-amber-500/50 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 hover:text-amber-100 cursor-pointer gap-2"
+              className="text-xs border-amber-500/50 bg-amber-500/20 text-amber-950 dark:text-amber-200 hover:bg-amber-500/30 hover:text-amber-950 dark:hover:text-amber-100 cursor-pointer gap-2"
             >
               {isAcknowledging ? (
                 <>
@@ -700,6 +701,53 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Persistent Active Transmission Status Bar when already sent */}
+      {hasPriorTransmissions && !isRedispatchOpen && (
+        <Card className="p-4 border-primary/30 bg-primary/5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
+                <PaperPlaneTilt className="size-4.5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {isDetailed ? "Active Appellate Transmission" : "Appeal Sent to Insurer"}
+                  </h3>
+                  <Badge variant="outline" className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                    {claim.status === "won" ? "Won / Overturned" : claim.status === "under_review" ? "Under Review" : "Dispatched"}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {isDetailed
+                    ? `Appeal transmitted. Dedicated inbox ${assignedEmail || "active"} is listening for payer responses and auto-drafting rebuttals.`
+                    : `Your appeal has been sent. We are watching for replies from ${payerName}.`}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsExportDrawerOpen(true)}
+                className="h-8 text-xs gap-1.5 cursor-pointer"
+              >
+                <FileText className="size-3.5" />
+                <span>{isDetailed ? "View Dossier" : "View Packet"}</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setIsRedispatchOpen(true)}
+                className="h-8 text-xs gap-1.5 cursor-pointer bg-primary text-primary-foreground font-semibold"
+              >
+                <PaperPlaneTilt className="size-3.5" />
+                <span>{isDetailed ? "Transmit Addendum / Re-dispatch" : "Send Again / Addendum"}</span>
+              </Button>
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* Prominent Multi-Channel Transmission Gateway Banner if not yet sent or explicitly opened */}
@@ -730,6 +778,17 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
             {/* Companion Utility Tools - Single line group of rectangular buttons */}
             <div className="flex items-center gap-2 shrink-0">
+              {isRedispatchOpen && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsRedispatchOpen(false)}
+                  className="h-8 rounded-md text-xs px-2.5 gap-1 shrink-0 cursor-pointer text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3.5" />
+                  <span>Collapse</span>
+                </Button>
+              )}
               {onNavigateView && (
                 <Button
                   size="sm"
@@ -1283,8 +1342,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                       <Button
                         variant="ghost"
                         size="icon-xs"
-                        onClick={() => {
-                          navigator.clipboard.writeText(officialEmail);
+                        onClick={async () => {
+                          await copyToClipboard(officialEmail);
                           setCopiedRecipientEmail(true);
                           setTimeout(() => setCopiedRecipientEmail(false), 2000);
                         }}

@@ -387,7 +387,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {isDetailed && (
                 <Badge
                   variant="outline"
-                  className="h-3.5 px-1 text-[8px] border-emerald-500/30 text-emerald-500 font-mono"
+                  className="h-4 px-1.5 text-[10px] border-emerald-500/30 text-emerald-500 font-mono"
                 >
                   29 CFR § 2560
                 </Badge>

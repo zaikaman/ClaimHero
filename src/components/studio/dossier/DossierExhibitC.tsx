@@ -65,11 +65,15 @@ export const DossierExhibitC: React.FC<DossierExhibitCProps> = ({
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
-                {item.relevanceScore && (
+                {item.isPlaceholder ? (
+                  <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800 font-bold">
+                    Clinical Addendum Index
+                  </span>
+                ) : item.relevanceScore ? (
                   <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-900 font-bold">
                     {item.relevanceScore}% Efficacy Score
                   </span>
-                )}
+                ) : null}
                 {item.sourceUrl && !isPrintMode && (
                   <a
                     href={item.sourceUrl}

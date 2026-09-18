@@ -353,6 +353,17 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!showEscalationModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowEscalationModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showEscalationModal]);
+
   const isBackgroundPipelineRunning =
     !hasSynthesizedBrief &&
     !markdownContent.trim() &&
@@ -894,8 +905,8 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
       {/* Main Studio Dual Pane Editor & Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        {/* Left 8 Cols: Markdown Editor & Live Preview (Fixed height matched with right panel) */}
-        <Card className="lg:col-span-8 h-[640px] xl:h-[700px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden min-w-0">
+        {/* Left 8 Cols: Markdown Editor & Live Preview (Responsive height on mobile, fixed on desktop) */}
+        <Card className="lg:col-span-8 min-h-[380px] h-[60vh] lg:h-[640px] xl:h-[700px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden min-w-0">
           {/* Sub-view Viewport Switcher */}
           <div className="h-10 shrink-0 flex items-center justify-between border-b border-border px-4 py-2 bg-muted/30">
             <div className="flex items-center gap-1.5">
@@ -1115,8 +1126,8 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
         </Card>
 
-        {/* Panel 3: Right 4 Cols Citation Sidebar (Fixed height matched with left card) */}
-        <Card className="lg:col-span-4 h-[640px] xl:h-[700px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden">
+        {/* Panel 3: Right 4 Cols Citation Sidebar (Responsive height matched with left card) */}
+        <Card className="lg:col-span-4 min-h-[380px] h-[60vh] lg:h-[640px] xl:h-[700px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden">
           <div className="h-full overflow-y-auto p-4">
             <CitationSidebar
               evidences={evidences}
@@ -1161,7 +1172,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             variant="outline"
             size="sm"
             onClick={() => setIsExportOpen(true)}
-            className="gap-1.5 text-xs h-8 hidden sm:inline-flex"
+            className="gap-1.5 text-xs h-8 inline-flex"
             title={isDetailed ? "Export printable PDF brief and statutory exhibits" : "Save or print your letter"}
           >
             <Printer className="size-3.5" />
@@ -1215,7 +1226,12 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
       {/* Statutory Escalation Confirmation Modal */}
       {showEscalationModal && currentTierConfig.nextTier && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fadeIn">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="statutory-escalation-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fadeIn"
+        >
           <Card className="w-full max-w-lg p-5 space-y-4 shadow-xl border-border bg-card">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2.5">
@@ -1223,7 +1239,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                   <ShieldWarning className="size-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">
+                  <h3 id="statutory-escalation-title" className="text-sm font-semibold text-foreground">
                     {isDetailed ? "Escalate Statutory Appeal Tier" : "Take it to the next level?"}
                   </h3>
                   <p className="text-xs text-muted-foreground">

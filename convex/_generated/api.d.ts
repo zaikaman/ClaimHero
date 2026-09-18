@@ -44,6 +44,7 @@ import type * as lib_agentModel from "../lib/agentModel.js";
 import type * as lib_aggregates from "../lib/aggregates.js";
 import type * as lib_appealEmail from "../lib/appealEmail.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_dateUtils from "../lib/dateUtils.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_erisaEvidence from "../lib/erisaEvidence.js";
 import type * as lib_openai from "../lib/openai.js";
@@ -115,6 +116,7 @@ declare const fullApi: ApiFromModules<{
   "lib/aggregates": typeof lib_aggregates;
   "lib/appealEmail": typeof lib_appealEmail;
   "lib/auth": typeof lib_auth;
+  "lib/dateUtils": typeof lib_dateUtils;
   "lib/embeddings": typeof lib_embeddings;
   "lib/erisaEvidence": typeof lib_erisaEvidence;
   "lib/openai": typeof lib_openai;

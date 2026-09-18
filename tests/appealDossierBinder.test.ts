@@ -290,12 +290,14 @@ describe("Feature G: Formal Administrative Appeal Dossier & Exhibit PDF Binder",
       const dossier = buildDossierData(minimalClaim, null, [], false);
       expect(dossier.docketNumber).toBe("CLM-998877");
       expect(dossier.exhibitB_PolicyBulletins).toHaveLength(1);
-      expect(dossier.exhibitB_PolicyBulletins[0].id).toBe("cpb-default-1");
+      expect(dossier.exhibitB_PolicyBulletins[0].id).toBe("cpb-statutory-demand-1");
+      expect(dossier.exhibitB_PolicyBulletins[0].isPlaceholder).toBe(true);
       expect(dossier.exhibitC_MedicalLiterature).toHaveLength(1);
-      expect(dossier.exhibitC_MedicalLiterature[0].id).toBe("lit-default-1");
+      expect(dossier.exhibitC_MedicalLiterature[0].id).toBe("lit-record-index-1");
+      expect(dossier.exhibitC_MedicalLiterature[0].isPlaceholder).toBe(true);
 
       const plainText = generatePlainTextDossier(dossier);
-      expect(plainText).toContain("Molina Healthcare Clinical Policy Bulletin: Medical Necessity Criteria for CPT 27447");
+      expect(plainText).toContain("Formal Demand for Molina Healthcare Clinical Policy Bulletin");
     });
 
     it("handles level 1 internal, level 2 grievance, and level 3 external review statutory postures", () => {

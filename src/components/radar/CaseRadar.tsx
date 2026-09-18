@@ -29,12 +29,15 @@ import {
   Flask,
   ShieldCheck,
   ClipboardText,
+  Eye,
+  EyeSlash,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import { Claim } from "../../types";
 import { formatCurrency, matchesClaimSearch } from "../../lib/utils";
+import { maskPatientName } from "../../lib/redactionEngine";
 import {
   exportClaimsToCsv,
   exportClaimsToJson,
@@ -86,6 +89,8 @@ interface CaseRadarProps {
   onRunAutonomousPipeline?: (claimId: string) => Promise<unknown>;
   includeDemo?: boolean;
   onToggleIncludeDemo?: () => void;
+  initialPayerFilter?: string;
+  onClearPayerFilter?: () => void;
 }
 
 const hasCompletedIntakeContext = (claim: Claim): boolean => Boolean(
@@ -122,17 +127,22 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   onRunAutonomousPipeline,
   includeDemo = true,
   onToggleIncludeDemo,
+  initialPayerFilter,
+  onClearPayerFilter,
 }) => {
   const { isDetailed } = useDetailMode();
   const [radarTab, setRadarTab] = useState<"family" | "teams">(() => isDetailed ? "teams" : "family");
 
-  React.useEffect(() => {
-    setRadarTab(isDetailed ? "teams" : "family");
-  }, [isDetailed]);
-
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [payerFilter, setPayerFilter] = useState("all");
+  const [payerFilter, setPayerFilter] = useState(() => initialPayerFilter || "all");
+  const [isPiiMasked, setIsPiiMasked] = useState(true);
+
+  React.useEffect(() => {
+    if (initialPayerFilter) {
+      setPayerFilter(initialPayerFilter);
+    }
+  }, [initialPayerFilter]);
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
   const [runningPipelineClaimId, setRunningPipelineClaimId] = useState<string | null>(null);
   const [isClearingDemo, setIsClearingDemo] = useState(false);
@@ -316,6 +326,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     setStatusFilter("all");
     setPayerFilter("all");
     setSearchQuery("");
+    onClearPayerFilter?.();
   };
 
   const statusTabs = [
@@ -338,6 +349,10 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   ];
 
   const handleExportCsv = (redactMode: boolean) => {
+    if (filtered.length === 0) {
+      toast.warning("No cases match the active filters to export.");
+      return;
+    }
     const csvContent = exportClaimsToCsv(filtered, redactMode);
     const prefix = redactMode ? "claimhero-cases-redacted" : "claimhero-cases-audit";
     const filename = `${prefix}-${new Date().toISOString().split("T")[0]}.csv`;
@@ -346,6 +361,10 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   };
 
   const handleExportJson = (redactMode: boolean) => {
+    if (filtered.length === 0) {
+      toast.warning("No cases match the active filters to export.");
+      return;
+    }
     const jsonContent = exportClaimsToJson(filtered, redactMode);
     const prefix = redactMode ? "claimhero-cases-redacted" : "claimhero-cases-audit";
     const filename = `${prefix}-${new Date().toISOString().split("T")[0]}.json`;
@@ -474,6 +493,14 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                           <span className="text-[11px] font-mono text-muted-foreground">
                             Case #{c.claimNumber}
                           </span>
+                          {(c.isDemo ||
+                            c.dataOrigin === "demo-fixture" ||
+                            c.origin === "demo-fixture" ||
+                            c.isSyntheticPII) && (
+                            <Badge variant="outline" className="font-mono text-[10px] text-muted-foreground border-border/80">
+                              Synthetic Demo
+                            </Badge>
+                          )}
                         </div>
 
                         {/* 1 Sentence: What happened */}
@@ -548,7 +575,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 {formatCurrency(totalDisputed)}
               </div>
               <Badge variant="outline" className="text-[11px] font-mono">
-                {claims.length} {claims.length === 1 ? "Case" : "Cases"}
+                {filtered.length} {filtered.length === 1 ? "Case" : "Cases"}
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs">
@@ -602,7 +629,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs">
-              {isDetailed ? `Across ${claims.length} cross-examined CPBs` : "Won back from insurers"}
+              {isDetailed ? `Across ${filtered.length} cross-examined CPBs` : "Won back from insurers"}
             </p>
           </CardContent>
         </Card>
@@ -843,6 +870,24 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 <span>{includeDemo ? "Demo cases included" : "Include demo cases"}</span>
               </button>
 
+              {/* PII Privacy Shield Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsPiiMasked((prev) => !prev)}
+                aria-pressed={isPiiMasked}
+                aria-label="Toggle patient PII masking in table display"
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer",
+                  isPiiMasked
+                    ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-700 dark:text-cyan-300 font-semibold"
+                    : "bg-muted/30 hover:bg-muted/60 text-muted-foreground border-border/70"
+                )}
+                title="Toggle patient PII masking for advocate privacy"
+              >
+                {isPiiMasked ? <EyeSlash className="size-3.5 text-cyan-600 dark:text-cyan-400" /> : <Eye className="size-3.5" />}
+                <span>{isPiiMasked ? "PII Masked" : "Reveal PII"}</span>
+              </button>
+
               {/* Reset Filters CTA if active */}
               {hasActiveFilters && (
                 <Button
@@ -940,13 +985,18 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                           </Avatar>
                           <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="font-semibold text-foreground text-xs truncate max-w-[110px]" title={claim.patient?.name}>
-                                {claim.patient?.name || "Patient Record"}
+                              <span
+                                className="font-semibold text-foreground text-xs truncate max-w-[110px]"
+                                title={isPiiMasked ? undefined : (claim.patient?.name || undefined)}
+                              >
+                                {claim.patient?.name
+                                  ? (isPiiMasked ? maskPatientName(claim.patient.name, "HIPAA_SAFE_HARBOR") : claim.patient.name)
+                                  : "Patient Record"}
                               </span>
                               {isWon && (
                                 <Badge
                                   variant="default"
-                                  className="bg-emerald-500/20 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 text-[9px] px-1 py-0 font-bold shrink-0 leading-none h-4"
+                                  className="bg-emerald-500/20 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 text-[10px] px-1 py-0 font-bold shrink-0 leading-none h-4"
                                 >
                                   WON
                                 </Badge>
@@ -958,13 +1008,14 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                               </span>
                               {(claim.isDemo ||
                                 claim.dataOrigin === "demo-fixture" ||
-                                claim.origin === "demo-fixture") && (
-                                <Badge variant="secondary" className="font-mono text-[8px] px-1 py-0 text-amber-500 bg-amber-500/10 border-amber-500/20">
+                                claim.origin === "demo-fixture" ||
+                                claim.isSyntheticPII) && (
+                                <Badge variant="secondary" className="font-mono text-[10px] px-1 py-0 text-amber-500 bg-amber-500/10 border-amber-500/20">
                                   Synthetic Demo
                                 </Badge>
                               )}
                               {claim.isShared && (
-                                <Badge variant="outline" className="font-mono text-[8px] px-1 py-0 text-violet-300 bg-violet-500/10 border-violet-500/30">
+                                <Badge variant="outline" className="font-mono text-[10px] px-1 py-0 text-violet-300 bg-violet-500/10 border-violet-500/30">
                                   Shared{claim.accessRole && claim.accessRole !== "owner" ? ` • ${claim.accessRole}` : ""}
                                 </Badge>
                               )}

@@ -261,7 +261,7 @@ export const attachMatchesToClaim = internalMutation({
         `Outcome: ${match.outcome}`,
         `Retrieval: ${sourceBadge.trim()} | Vector similarity: ${match.vectorScore.toFixed(4)} | Combined score: ${match.combinedScore.toFixed(4)}${rrfInfo}`,
       ].join("\n");
-      const relevanceScore = Math.max(0, Math.min(1, (match.combinedScore + 1) / 2));
+      const relevanceScore = Math.round(Math.max(0, Math.min(1, match.combinedScore)) * 100);
       const prior = existingByTitle.get(match.title);
 
       if (prior) {

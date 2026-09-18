@@ -410,8 +410,8 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
             </div>
           </div>
           {claim.evidenceIntegrity?.degradationWarnings && claim.evidenceIntegrity.degradationWarnings.length > 0 && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-200/90 leading-relaxed">
-              <span className="font-semibold text-amber-300">
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-950 dark:text-amber-200 leading-relaxed">
+              <span className="font-semibold text-amber-900 dark:text-amber-300">
                 {isDetailed ? "Evidentiary Caveat:" : "Important note:"}
               </span>{" "}
               {claim.evidenceIntegrity.degradationWarnings.join(" ")}

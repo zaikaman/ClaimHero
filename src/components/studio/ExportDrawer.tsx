@@ -36,6 +36,7 @@ import { fastSanitizeText } from "../../lib/redactionEngine";
 import { cn } from "../../lib/utils";
 import { soundEffects } from "../../lib/soundEffects";
 import { useDetailMode } from "../../hooks/useDetailMode";
+import { copyToClipboard } from "../../lib/clipboard";
 
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -109,12 +110,11 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
     if (viewMode === "binder") {
       return generatePlainTextDossier(dossierData);
     }
-    const printableText = document.querySelector<HTMLElement>(".printable-dossier")?.innerText.trim();
-    return printableText || processedContent;
+    return processedContent;
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(getExportText());
+  const handleCopy = async () => {
+    await copyToClipboard(getExportText());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -188,24 +188,27 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
       return;
     }
 
-    // Use hidden iframe to avoid popup blocker issues
-    let iframe = document.getElementById("claimhero-dossier-print-frame") as HTMLIFrameElement | null;
-    if (!iframe) {
-      iframe = document.createElement("iframe");
-      iframe.id = "claimhero-dossier-print-frame";
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "0";
-      iframe.style.opacity = "0";
-      iframe.style.pointerEvents = "none";
-      document.body.appendChild(iframe);
+    // Remove any existing print frame to prevent leaks
+    const existingFrame = document.getElementById("claimhero-dossier-print-frame");
+    if (existingFrame) {
+      existingFrame.remove();
     }
+
+    const iframe = document.createElement("iframe");
+    iframe.id = "claimhero-dossier-print-frame";
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0";
+    iframe.style.pointerEvents = "none";
+    document.body.appendChild(iframe);
 
     const doc = iframe.contentWindow?.document;
     if (!doc) {
+      iframe.remove();
       window.print();
       return;
     }
@@ -256,15 +259,25 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
       </html>`);
     doc.close();
 
-    iframe.contentWindow?.focus();
+    if (iframe.contentWindow) {
+      iframe.contentWindow.onafterprint = () => {
+        iframe.remove();
+      };
+    }
+
     window.setTimeout(() => {
-      iframe?.contentWindow?.print();
-    }, 250);
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch {
+        window.print();
+      }
+    }, 300);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-5xl lg:max-w-6xl h-[92vh] flex flex-col p-6 gap-4 print:h-auto print:max-w-none print:p-0 print:border-none print:shadow-none print:bg-white print:static print:inset-auto print:translate-x-0 print:translate-y-0">
+      <DialogContent className="sm:max-w-5xl lg:max-w-6xl h-[92vh] flex flex-col p-3 sm:p-6 gap-3 sm:gap-4 print:h-auto print:max-w-none print:p-0 print:border-none print:shadow-none print:bg-white print:static print:inset-auto print:translate-x-0 print:translate-y-0">
         <DialogHeader className="border-b border-border pb-3 shrink-0 print:hidden no-print space-y-3">
           {/* Top Row: Title, Badges, and Docket Reference */}
           <div className="flex items-start justify-between gap-4">
@@ -440,13 +453,18 @@ export const ExportDrawer: React.FC<ExportDrawerProps> = ({
               >
                 <PaperPlaneTilt className="size-3.5" />
                 <span>Proceed to Dispatch</span>
+                {needsClinicalDocumentation && (
+                  <span className="sm:hidden text-[10px] px-1 py-0 rounded bg-amber-500/20 text-amber-900 dark:text-amber-200">
+                    Needs records
+                  </span>
+                )}
               </Button>
             </div>
           </div>
 
           {isPublicExhibitRedacted && (
-            <div className="flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-300">
-              <Lock className="size-3.5 shrink-0 text-cyan-400" />
+            <div className="flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-900 dark:text-cyan-200">
+              <Lock className="size-3.5 shrink-0 text-cyan-700 dark:text-cyan-400" />
               <span>Public Legal Exhibit De-identification Active: Direct identifiers, member numbers, and patient names are masked under HIPAA Safe Harbor (45 CFR § 164.514).</span>
             </div>
           )}

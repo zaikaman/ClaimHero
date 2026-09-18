@@ -4,6 +4,7 @@ import { NavigationView } from "./components/layout/Sidebar";
 import { CommandDialog } from "./components/common/CommandDialog";
 import { CasePickerEmptyState } from "./components/common/CasePickerEmptyState";
 import { NotFoundWorkspace } from "./components/common/NotFoundWorkspace";
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { ShortcutsHelpDialog } from "./components/common/ShortcutsHelpDialog";
 import { useClaims } from "./hooks/useClaims";
 import { useEvidence } from "./hooks/useEvidence";
@@ -61,6 +62,7 @@ export default function App() {
   const [auditDrawerTab, setAuditDrawerTab] = useState<"audit" | "pipeline">("audit");
   const [isSentinelOpen, setIsSentinelOpen] = useState<boolean>(false);
   const [pendingTargetView, setPendingTargetView] = useState<NavigationView | null>(null);
+  const [radarPayerFilter, setRadarPayerFilter] = useState<string | undefined>(undefined);
 
   const handleOpenAuditDrawer = useCallback((tab: "audit" | "pipeline" = "audit") => {
     setAuditDrawerTab(tab);
@@ -347,6 +349,7 @@ export default function App() {
         {isLoading ? (
           <ViewLoadingFallback message="Connecting to Sentinel Engine..." />
         ) : (
+          <ErrorBoundary onReset={() => setCurrentView("radar")}>
           <Suspense fallback={<ViewLoadingFallback message="Loading Sentinel Workspace..." />}>
             {/* 1. Case Ingestion Radar View (Platform) */}
             {currentView === "radar" && (
@@ -367,6 +370,8 @@ export default function App() {
                   onRunAutonomousPipeline={runFullPipeline}
                   includeDemo={includeDemo}
                   onToggleIncludeDemo={() => setIncludeDemo((prev) => !prev)}
+                  initialPayerFilter={radarPayerFilter}
+                  onClearPayerFilter={() => setRadarPayerFilter(undefined)}
                 />
               </div>
             )}
@@ -393,8 +398,20 @@ export default function App() {
                   onOpenAuditDrawer={handleOpenAuditDrawer}
                   onOpenIngestion={handleOpenIngestion}
                 />
-              ) : selectedClaimId ? (
+              ) : selectedClaimId && isLoadingSelectedClaim ? (
                 <ViewLoadingFallback message="Opening your case and their published rules..." />
+              ) : selectedClaimId ? (
+                <NotFoundWorkspace
+                  pathname={`/claim/${selectedClaimId}/evidence`}
+                  onNavigateToRadar={() => {
+                    setSelectedClaimId("");
+                    setCurrentView("radar");
+                  }}
+                  onNavigateHome={() => {
+                    setSelectedClaimId("");
+                    setCurrentView("radar");
+                  }}
+                />
               ) : (
                 <CasePickerEmptyState
                   viewType="evidence"
@@ -445,8 +462,20 @@ export default function App() {
                   claim={selectedClaim}
                   onNavigateView={setCurrentView}
                 />
-              ) : selectedClaimId ? (
+              ) : selectedClaimId && isLoadingSelectedClaim ? (
                 <ViewLoadingFallback message="Preparing Physician Peer-to-Peer tele-script..." />
+              ) : selectedClaimId ? (
+                <NotFoundWorkspace
+                  pathname={`/claim/${selectedClaimId}/p2p`}
+                  onNavigateToRadar={() => {
+                    setSelectedClaimId("");
+                    setCurrentView("radar");
+                  }}
+                  onNavigateHome={() => {
+                    setSelectedClaimId("");
+                    setCurrentView("radar");
+                  }}
+                />
               ) : (
                 <CasePickerEmptyState
                   viewType="studio"
@@ -464,8 +493,20 @@ export default function App() {
                   claim={selectedClaim}
                   onNavigateView={setCurrentView}
                 />
-              ) : selectedClaimId ? (
+              ) : selectedClaimId && isLoadingSelectedClaim ? (
                 <ViewLoadingFallback message="Calculating financial ERISA statutory damages..." />
+              ) : selectedClaimId ? (
+                <NotFoundWorkspace
+                  pathname={`/claim/${selectedClaimId}/calculator`}
+                  onNavigateToRadar={() => {
+                    setSelectedClaimId("");
+                    setCurrentView("radar");
+                  }}
+                  onNavigateHome={() => {
+                    setSelectedClaimId("");
+                    setCurrentView("radar");
+                  }}
+                />
               ) : (
                 <CasePickerEmptyState
                   viewType="studio"
@@ -492,8 +533,20 @@ export default function App() {
                   isSyncingInboxes={isSyncingInboxes}
                   onOpenAuditDrawer={handleOpenAuditDrawer}
                 />
-              ) : selectedClaimId ? (
+              ) : selectedClaimId && isLoadingSelectedClaim ? (
                 <ViewLoadingFallback message="Connecting to secure AgentMail payer inbox..." />
+              ) : selectedClaimId ? (
+                <NotFoundWorkspace
+                  pathname={`/claim/${selectedClaimId}/communications`}
+                  onNavigateToRadar={() => {
+                    setSelectedClaimId("");
+                    setCurrentView("radar");
+                  }}
+                  onNavigateHome={() => {
+                    setSelectedClaimId("");
+                    setCurrentView("radar");
+                  }}
+                />
               ) : (
                 <CasePickerEmptyState
                   viewType="communications"
@@ -509,7 +562,8 @@ export default function App() {
               <AnalyticsMetrics
                 stats={portfolioStats}
                 isLoading={isLoadingPortfolioStats}
-                onSelectPayerFilter={() => {
+                onSelectPayerFilter={(payer) => {
+                  setRadarPayerFilter(payer);
                   setCurrentView("radar");
                 }}
                 onNavigateToRadar={() => setCurrentView("radar")}
@@ -540,6 +594,7 @@ export default function App() {
               />
             )}
           </Suspense>
+          </ErrorBoundary>
         )}
 
         <GlobalDisclaimer variant="footer" className="mt-3 mb-2" />

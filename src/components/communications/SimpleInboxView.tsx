@@ -203,18 +203,18 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
             </div>
             <div className="space-y-1 min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                <span className="text-xs font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider">
                   Review Required Before Sending
                 </span>
-                <Badge variant="outline" className="text-[10px] font-mono border-amber-500/40 text-amber-300">
+                <Badge variant="outline" className="text-[10px] font-mono border-amber-500/40 text-amber-800 dark:text-amber-300">
                   Provisional Draft
                 </Badge>
               </div>
-              <p className="text-xs text-amber-200/90 leading-relaxed">
+              <p className="text-xs text-amber-950 dark:text-amber-200 leading-relaxed">
                 {claim.evidenceIntegrity?.degradationWarnings?.[0] ||
                   "The insurer's policy rules could not be verified online. This appeal relies on your legal right to request the documents they used to deny your claim."}
               </p>
-              <p className="text-[11px] text-amber-300/70">
+              <p className="text-[11px] text-amber-800/80 dark:text-amber-300/70">
                 Sending is paused until you confirm this approach.
               </p>
             </div>
@@ -225,7 +225,7 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
               variant="outline"
               onClick={onAcknowledgeDegradation}
               disabled={isAcknowledging}
-              className="text-xs border-amber-500/50 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 hover:text-amber-100 cursor-pointer gap-2"
+              className="text-xs border-amber-500/50 bg-amber-500/20 text-amber-950 dark:text-amber-200 hover:bg-amber-500/30 hover:text-amber-950 dark:hover:text-amber-100 cursor-pointer gap-2"
             >
               {isAcknowledging ? (
                 <>
@@ -319,13 +319,16 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
               {/* Option 1: Official Insurer Reviewer */}
               <div
                 role="radio"
-                tabIndex={0}
+                tabIndex={dispatchMode === "official_payer" ? 0 : -1}
                 aria-checked={dispatchMode === "official_payer"}
                 onClick={() => setDispatchMode("official_payer")}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     setDispatchMode("official_payer");
+                  } else if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+                    e.preventDefault();
+                    setDispatchMode("custom_email");
                   }
                 }}
                 className={cn(
@@ -341,7 +344,7 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
                       <Buildings className={cn("size-4", dispatchMode === "official_payer" ? "text-primary" : "text-muted-foreground")} />
                       <span className="text-xs font-semibold text-foreground">Official Carrier Intake</span>
                     </div>
-                    <Badge variant="outline" className="text-[9px] font-mono text-emerald-400 border-emerald-500/30">
+                    <Badge variant="outline" className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
                       Recommended
                     </Badge>
                   </div>
@@ -357,13 +360,16 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
               {/* Option 2: Test to Personal Email */}
               <div
                 role="radio"
-                tabIndex={0}
+                tabIndex={dispatchMode === "custom_email" ? 0 : -1}
                 aria-checked={dispatchMode === "custom_email"}
                 onClick={() => setDispatchMode("custom_email")}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     setDispatchMode("custom_email");
+                  } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+                    e.preventDefault();
+                    setDispatchMode("official_payer");
                   }
                 }}
                 className={cn(
@@ -379,7 +385,7 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
                       <Envelope className={cn("size-4", dispatchMode === "custom_email" ? "text-primary" : "text-muted-foreground")} />
                       <span className="text-xs font-semibold text-foreground">Send Test to My Email</span>
                     </div>
-                    <Badge variant="outline" className="text-[9px] font-mono text-cyan-400 border-cyan-500/30">
+                    <Badge variant="outline" className="text-[10px] font-mono text-cyan-700 dark:text-cyan-400 border-cyan-500/30">
                       Interactive Test
                     </Badge>
                   </div>

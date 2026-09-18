@@ -17,6 +17,7 @@ export interface DossierExhibitItem {
   screenshotStorageId?: string;
   screenshotUrl?: string;
   capturedAt?: number;
+  isPlaceholder?: boolean;
 }
 
 export interface DossierPhysicianInfo {
@@ -161,7 +162,7 @@ export function extractCriteriaViolations(extractedEvidence: string, claimDenial
     violations.push("Clinical record meets all explicit indications set forth in the payer's published Clinical Policy Bulletin.");
   }
   if (/peer-to-peer|same specialty|board certified/i.test(text)) {
-    violations.push("Initial adverse review performed by non-same-specialty adjudicator in violation of 29 CFR § 2560.503-1(h)(3)(iii).");
+    violations.push("Initial adverse review performed by non-same-specialty adjudicator in violation of 29 CFR § 2560.503-1(h)(3)(ii)–(iii).");
   }
   if (claimDenialReason && /not medically necessary|co-50/i.test(claimDenialReason)) {
     violations.push("Generic denial code issued without patient-specific clinical justification or specific criterion citation.");
@@ -338,33 +339,33 @@ export function buildDossierData(
     }
   });
 
-  // Ensure Exhibit B has at least the default CPB item if no live evidence is loaded
+  // Ensure Exhibit B has statutory disclosure demand placeholder if no live policy bulletin is loaded
   if (exhibitB_PolicyBulletins.length === 0) {
     exhibitB_PolicyBulletins.push({
-      id: "cpb-default-1",
+      id: "cpb-statutory-demand-1",
       exhibitLetter: "B",
-      title: `${payer} Clinical Policy Bulletin: Medical Necessity Criteria for CPT ${claim.cptCodes?.[0] || "27447"}`,
-      sourceType: "payer_cpb",
-      citationClause: "CPB § IV.A - Indications & Conservative Therapy Precedents",
-      content: `The plan covers the requested service when clinical examination documents functional impairment, radiographic evidence of pathology, and failure of responsive conservative therapy. The treating physician clinical record satisfies all requisite threshold conditions.`,
+      title: `Formal Demand for ${payer} Clinical Policy Bulletin & Relied-Upon Coverage Criteria`,
+      sourceType: "statutory_demand",
+      citationClause: "29 C.F.R. § 2560.503-1(h)(2)(iii) Mandatory Disclosure Demand",
+      content: `Notice: The plan administrator and health insurer have not disclosed the specific clinical policy bulletin or medical necessity guidelines relied upon in issuing this adverse benefit determination. Pursuant to ERISA 29 C.F.R. § 2560.503-1(h)(2)(iii), claimant formally demands immediate production of all internal rules, guidelines, protocols, or criteria utilized in adjudicating this claim.`,
       highlightedViolations: [
-        "Payer denial letter failed to specify which clinical criteria item was purportedly unfulfilled.",
-        "Documented 6-month conservative regimen was summarily disregarded without substantive medical justification.",
+        "Plan administrator failed to produce or cite the specific clinical coverage criteria relied upon in adverse determination.",
+        "Procedural disclosure violation under ERISA full and fair review statutory requirements.",
       ],
-      relevanceScore: 98,
+      isPlaceholder: true,
     });
   }
 
-  // Ensure Exhibit C has at least the default peer-reviewed study item if no live literature is loaded
+  // Ensure Exhibit C has clinical record notice if no external published literature is indexed
   if (exhibitC_MedicalLiterature.length === 0) {
     exhibitC_MedicalLiterature.push({
-      id: "lit-default-1",
+      id: "lit-record-index-1",
       exhibitLetter: "C",
-      title: `PubMed Clinical Efficacy Evaluation: Functional Outcomes & Necessity Standards for ICD-10 ${claim.icd10Codes?.[0] || "M17.11"}`,
-      sourceType: "pubmed_study",
-      citationClause: "PMID: 34198210 • Journal of Clinical Medicine",
-      content: `Peer-reviewed multi-center trials confirm statistically significant functional recovery and disease resolution following prompt procedural intervention in patients exhibiting diagnostic imaging criteria corresponding to the claimant's documented clinical presentation.`,
-      relevanceScore: 94,
+      title: "Index of Submitted Medical Records & Attending Physician Clinical Addendum",
+      sourceType: "clinical_record_index",
+      citationClause: "Treating Physician Clinical Record & Patient Medical History",
+      content: "Treating clinician clinical notes, operative records, diagnostic imaging reports, and conservative therapy history have been incorporated into Exhibit A and submitted directly in support of medical necessity reconsideration.",
+      isPlaceholder: true,
     });
   }
 

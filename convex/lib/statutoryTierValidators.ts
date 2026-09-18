@@ -148,7 +148,7 @@ export function getStatutoryTierMetadata(appealLevel: string): StatutoryTierMeta
         legalAggressiveness: "elevated_grievance",
         statutoryAuthorities: [
           "ERISA Section 503 (29 U.S.C. § 1133)",
-          "29 C.F.R. § 2560.503-1(h)(3)(iii) (Mandatory Same-Specialty Peer Review)",
+          "29 C.F.R. § 2560.503-1(h)(3)(ii)–(iii) (Mandatory Same-Specialty Independent Consultation)",
           "Department of Labor Claims Procedure Regulations",
         ],
       };

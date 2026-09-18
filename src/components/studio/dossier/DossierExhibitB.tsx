@@ -139,11 +139,15 @@ export const DossierExhibitB: React.FC<DossierExhibitBProps> = ({
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
-                {item.relevanceScore && (
+                {item.isPlaceholder ? (
+                  <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-900 font-bold">
+                    Statutory Demand Placeholder
+                  </span>
+                ) : item.relevanceScore ? (
                   <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold">
                     {item.relevanceScore}% Policy Match
                   </span>
-                )}
+                ) : null}
                 {item.sourceUrl && !isPrintMode && (
                   <a
                     href={item.sourceUrl}

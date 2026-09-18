@@ -20,6 +20,8 @@ export interface PipelineResult {
   precedentsUnavailable?: boolean;
   cpbDegraded?: boolean;
   status?: string;
+  timedOutWaiting?: boolean;
+  message?: string;
   evidenceIntegrity?: {
     cpbStatus: "verified" | "fallback_statutory" | "missing";
     precedentStatus: "matched" | "archive_unavailable" | "none_found";
@@ -142,7 +144,14 @@ export const runAutonomousPipeline = action({
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
-    throw new Error("Durable workflow pipeline execution timed out after 5 minutes");
+    return {
+      success: true,
+      timedOutWaiting: true,
+      claimId: args.claimId,
+      workflowId,
+      message:
+        "Pipeline execution is continuing in the background. Your case radar and workspace will update dynamically upon completion.",
+    };
   },
 });
 

@@ -129,6 +129,7 @@ export interface FinancialLiabilityData {
   totalPatientLiabilityOverturned: number;
   netPatientSavings: number;
   payerExpectedObligation: number;
+  isEstimatedPlaceholder?: boolean;
   updatedAt: number;
 }
 
@@ -182,6 +183,7 @@ export interface ErisaPenaltyData {
   daysInDefault: number;
   accruedPenaltyAmount: number;
   statutoryInterestRate: number; // e.g. 18 for 18%
+  statutoryInterestCitation?: string;
   accruedInterestAmount: number;
   estimatedAttorneysFees: number;
   totalStatutoryDamages: number;

@@ -690,5 +690,60 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
         workflowStatus: "inProgress",
       }));
     });
+
+    it("performStartDurablePipeline preserves advanced terminal status on retry instead of resetting to analyzing", async () => {
+      const mockDb: any = {
+        get: vi.fn().mockResolvedValue({
+          _id: "c_won",
+          userId: "user_owner",
+          claimNumber: "CLM-WON",
+          status: "won",
+        }),
+        patch: vi.fn().mockResolvedValue(undefined),
+        insert: vi.fn().mockResolvedValue("log_won"),
+      };
+      const mockCtx: any = {
+        db: mockDb,
+      };
+
+      vi.spyOn(workflows.workflow, "start").mockResolvedValue("wf_retry" as any);
+      vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+
+      await (workflows.startDurablePipelineInternal as any)._handler(mockCtx, {
+        claimId: "c_won",
+      });
+
+      const patchCall = mockDb.patch.mock.calls[0];
+      expect(patchCall[0]).toBe("c_won");
+      expect(patchCall[1].status).toBeUndefined();
+      expect(patchCall[1].workflowStatus).toBe("inProgress");
+    });
+
+    it("executeErisaStatutoryCountdown does not overwrite status with dispatched when claim is not yet dispatched", async () => {
+      const mockClaim = {
+        _id: "c_draft",
+        status: "ready_for_review",
+        daysRemaining: 14,
+      };
+
+      const mockStep: any = {
+        runQuery: vi.fn().mockResolvedValue(mockClaim),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+        sleep: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const handler = workflows.executeErisaStatutoryCountdown;
+      const result = await handler(mockStep, {
+        claimId: "c_draft" as any,
+        cadenceDays: 7,
+      });
+
+      expect(result.claimId).toBe("c_draft");
+      expect(result.statutoryEscalated).toBe(false);
+      // Verify updateStatusInternal with dispatched was NOT called
+      const mutationCalls = mockStep.runMutation.mock.calls;
+      const dispatchedCall = mutationCalls.find((call: any[]) => call[1]?.status === "dispatched");
+      expect(dispatchedCall).toBeUndefined();
+    });
   });
 });
