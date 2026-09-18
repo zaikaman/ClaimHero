@@ -158,14 +158,85 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
           if (opts?.name === "crawlInsurerPolicy") {
             throw new Error("Firecrawl rate limit 429: Too Many Requests");
           }
+          return Promise.resolve([]);
+        }),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+        sleep: vi.fn(),
+      };
+
+      const handler = workflows.executeDurableClaimPipeline;
+      await expect(handler(mockStep, { claimId: "c1" as any })).rejects.toThrow(
+        /Clinical policy retrieval failed.*429/
+      );
+
+      // Verify boilerplate fallback evidence was NOT inserted
+      expect(mockStep.runMutation).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          claimId: "c1",
+          evidences: expect.any(Array),
+        })
+      );
+
+      // Verify workflow status was updated to failed
+      expect(mockStep.runMutation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          claimId: "c1",
+          workflowStatus: "failed",
+        })
+      );
+    });
+
+    it("retains verified clinical evidence and marks cpbDegraded when live crawl fails on existing evidence", async () => {
+      const mockClaim = {
+        _id: "c1",
+        userId: "user_123",
+        claimNumber: "CLM-RETAIN-1",
+        patient: { name: "John Doe", insurancePayer: "Aetna", state: "CA" },
+        cptCodes: ["29881"],
+        icd10Codes: ["M17.11"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Medical necessity criteria not met",
+        appealContext: {
+          sender: {
+            name: "Dr. Sarah Chen, MD",
+            email: "schen@clinic.org",
+          },
+        },
+      };
+
+      let queryCallCount = 0;
+      const mockStep: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          queryCallCount++;
+          if (queryCallCount === 1) {
+            return Promise.resolve(mockClaim);
+          }
+          return Promise.resolve([
+            {
+              _id: "ev1",
+              claimId: "c1",
+              sourceType: "payer_cpb",
+              title: "Aetna CPB 0736 Knee Arthroscopy",
+              citationClause: "Section 1.A",
+              extractedEvidenceMarkdown: "Documented meniscus tear with failure of conservative therapy.",
+            },
+          ]);
+        }),
+        runAction: vi.fn().mockImplementation((fn, args, opts) => {
+          if (opts?.name === "crawlInsurerPolicy") {
+            throw new Error("Firecrawl timeout: 504 Gateway Timeout");
+          }
           if (opts?.name === "computeOverturnScore") {
             return Promise.resolve({
-              overturnProbabilityScore: 75,
+              overturnProbabilityScore: 60,
+              scoreStatus: "provisional_capped",
               riskLevel: "moderate",
             });
           }
           if (opts?.name === "generateAppealBrief") {
-            return Promise.resolve({ appealId: "appeal_fallback_1" });
+            return Promise.resolve({ appealId: "appeal_retained_1" });
           }
           return Promise.resolve([]);
         }),
@@ -177,12 +248,13 @@ describe("Convex Workflows: Durable Claim Orchestration (@convex-dev/workflow)",
       const result = await handler(mockStep, { claimId: "c1" as any });
 
       expect(result.success).toBe(true);
-      expect(result.clausesExtracted).toBeGreaterThanOrEqual(1);
-      // Verify statutory fallback evidence insertion was called
-      expect(mockStep.runMutation).toHaveBeenCalledWith(
+      expect(result.cpbDegraded).toBe(true);
+      expect(result.clausesExtracted).toBe(1);
+      expect(result.policyTitle).toBe("Aetna CPB 0736 Knee Arthroscopy");
+      // Verify NO boilerplate fallback evidence was inserted into the database
+      expect(mockStep.runMutation).not.toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          claimId: "c1",
           evidences: expect.any(Array),
         })
       );

@@ -10,6 +10,7 @@ import { scrapeFirecrawlPolicySource } from "./policyCrawler";
 import { createStructuredCompletion } from "../lib/openai";
 import { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } from "../lib/phiSafe";
 import { getPayerClinicalDirectoryUrl } from "../../src/lib/constants";
+import { parseDateToUtcMidnight } from "../lib/dateUtils";
 
 export const POLICY_DRIFT_ANALYSIS_SCHEMA = {
   type: "object",
@@ -101,6 +102,32 @@ export {
   generateErisaBadFaithNotice,
 };
 
+// Legitimate clinical step-therapy prerequisites: must require trial/failure of conservative therapy or specific duration
+const STEP_THERAPY_PATTERNS = [
+  /\bstep[\s-]therapy\b/i,
+  /\bconservative\s+(?:therapy|treatment|management|care)\b/i,
+  /\b(?:trial\s+of|trial\s+period\s+of)\s+(?:\w+\s+){0,4}(?:\d+\s+)?(?:weeks?|months?|conservative|physical\s+therapy|pt|nsaids?|medications?)\b/i,
+  /\b(?:fail(?:ed|ure)?|unresponsive\s+to|refractory\s+to)\s+(?:\w+\s+){0,4}(?:conservative|therapy|treatment|care|physical\s+therapy|pt|nsaids?|corticosteroids?|medications?|first[\s-]line)\b/i,
+  /\b(?:must\s+(?:have\s+)?tried\s+and\s+failed|failure\s+to\s+respond\s+to|prior\s+trial\s+and\s+failure\s+of)\b/i,
+  /\b(?:mandatory\s+trial|step\s+protocol|prerequisite\s+(?:therapy|treatment|care))\b/i,
+];
+
+// Clinical exclusions: experimental/investigational exclusions or non-coverage for target indications
+const EXCLUSION_PATTERNS = [
+  /\b(?:investigational|experimental|unproven)\b/i,
+  /\b(?:considered\s+(?:experimental|investigational|unproven|not\s+medically\s+necessary))\b/i,
+  /\b(?:not\s+covered|clinical\s+exclusion|non[\s-]covered\s+(?:procedure|indication|service))\b/i,
+  /\bcontraindicated\s+for\b/i,
+];
+
+// Clinical criteria tightening: quantitative thresholds or qualifying criteria
+const THRESHOLD_PATTERNS = [
+  /\b(?:minimum\s+threshold|qualifying\s+score|severity\s+score)\s*(?:of|>=|>|minimum)?\s*\d+/i,
+  /\b(?:angle|mm|cm|degrees?|fev1|ejection\s+fraction|gfr|bmi)\s*(?:of|>=|<=|>|<)?\s*\d+/i,
+  /\b(?:clinical\s+criteria|diagnostic\s+criteria|qualifying\s+criteria)\s+must\s+demonstrate\b/i,
+  /\bmust\s+meet\s+all\s+of\s+the\s+following\s+criteria\b/i,
+];
+
 /**
  * Fallback heuristic comparison when OpenAI is unavailable or rate limited.
  * Deterministically detects added lines, step therapy mentions, and exclusions.
@@ -121,15 +148,11 @@ export function heuristicDriftComparison(
   const newLines = liveLines.filter((line) => !baselineLines.has(line.toLowerCase()));
   const detectedChanges: DetectedPolicyChange[] = [];
 
-  const stepTherapyKeywords = ["step therapy", "conservative therapy", "fail", "trial of", "months", "weeks", "nsaid", "physical therapy"];
-  const exclusionKeywords = ["investigational", "experimental", "not covered", "exclusion", "contraindicated", "unproven"];
-  const thresholdKeywords = ["criteria", "score", "threshold", "minimum", "angle", "mm", "severity"];
-
   for (const line of newLines) {
     const lower = line.toLowerCase();
     const matchesCpt = cptCodes.length === 0 || cptCodes.some((code) => lower.includes(code.toLowerCase()));
 
-    if (stepTherapyKeywords.some((kw) => lower.includes(kw))) {
+    if (STEP_THERAPY_PATTERNS.some((pattern) => pattern.test(line))) {
       detectedChanges.push({
         category: "added_step_therapy",
         title: "Added Step-Therapy or Conservative Treatment Prerequisite",
@@ -137,7 +160,7 @@ export function heuristicDriftComparison(
         impact: "Requires proof of failure of conservative therapies not mandated in original policy snapshot.",
         isAdverseToClaim: true,
       });
-    } else if (exclusionKeywords.some((kw) => lower.includes(kw))) {
+    } else if (EXCLUSION_PATTERNS.some((pattern) => pattern.test(line))) {
       detectedChanges.push({
         category: "added_exclusion",
         title: "Added Experimental or Investigational Exclusion",
@@ -145,7 +168,7 @@ export function heuristicDriftComparison(
         impact: "Expands non-coverage exclusions to restrict reimbursement for previously covered indications.",
         isAdverseToClaim: true,
       });
-    } else if (matchesCpt && thresholdKeywords.some((kw) => lower.includes(kw))) {
+    } else if (matchesCpt && THRESHOLD_PATTERNS.some((pattern) => pattern.test(line))) {
       detectedChanges.push({
         category: "tightened_criteria",
         title: "Tightened Clinical Threshold Criteria",
@@ -158,12 +181,26 @@ export function heuristicDriftComparison(
     if (detectedChanges.length >= 6) break;
   }
 
-  const hasAdverseChanges = detectedChanges.some((c) => c.isAdverseToClaim);
+  const adverseChanges = detectedChanges.filter((c) => c.isAdverseToClaim);
+  const hasStepTherapyOrExclusion = adverseChanges.some(
+    (c) => c.category === "added_step_therapy" || c.category === "added_exclusion"
+  );
+
+  let severity: "none" | "minor" | "moderate" | "critical_bad_faith" = "none";
+  if (hasStepTherapyOrExclusion || adverseChanges.length >= 3) {
+    severity = "critical_bad_faith";
+  } else if (adverseChanges.length > 0) {
+    severity = "moderate";
+  } else if (detectedChanges.length > 0) {
+    severity = "minor";
+  }
+
+  const hasAdverseChanges = adverseChanges.length > 0;
 
   return {
     hasDrift: detectedChanges.length > 0,
     isRetroactiveAlteration: hasAdverseChanges,
-    severity: hasAdverseChanges ? "critical_bad_faith" : detectedChanges.length > 0 ? "minor" : "none",
+    severity,
     summary: hasAdverseChanges
       ? `Detected ${detectedChanges.length} retroactive alterations adding harsher criteria and step-therapy exclusions to the clinical policy bulletin.`
       : detectedChanges.length > 0
@@ -282,27 +319,32 @@ export const detectPolicyDriftAction = action({
         }
       } catch (crawlErr) {
         const crawlErrMsg = crawlErr instanceof Error ? crawlErr.message : String(crawlErr);
-        console.warn(`Live policy crawl failed for drift detection (${crawlErrMsg}); evaluating against existing evidence.`);
-        if (resolvedBaselineMarkdown) {
-          liveMarkdown = resolvedBaselineMarkdown;
-        } else {
-          throw new Error(`Could not crawl live policy for drift detection: ${crawlErrMsg}`);
-        }
+        console.warn(`Live policy crawl failed for drift detection (${crawlErrMsg}).`);
+        throw new Error(
+          `Live policy crawl failed for drift detection: ${crawlErrMsg}. Cannot perform drift comparison without live policy content.`
+        );
       }
     }
+
+    // Resolve denial letter date: use claim.denialDate (the actual date on the denial letter/EOB).
+    // If not available, fall back to serviceDate or ingestion date.
+    const resolvedDenialDate =
+      claim.denialDate?.trim() ||
+      claim.serviceDate?.trim() ||
+      new Date(claim.createdAt).toISOString().split("T")[0];
+
+    const denialTs = parseDateToUtcMidnight(claim.denialDate);
+    const serviceTs = parseDateToUtcMidnight(claim.serviceDate);
+    const fallbackBaselineCapturedAt = denialTs ?? serviceTs ?? claim.createdAt;
 
     // If baseline was missing, use the scraped markdown as the initial baseline
     if (!resolvedBaselineMarkdown) {
       resolvedBaselineMarkdown = liveMarkdown || "Clinical Policy Bulletin - Standard of Care";
-      resolvedBaselineCapturedAt = claim.createdAt;
-    }
-
-    if (!liveMarkdown) {
-      liveMarkdown = resolvedBaselineMarkdown;
+      resolvedBaselineCapturedAt = fallbackBaselineCapturedAt;
     }
 
     if (!resolvedBaselineCapturedAt) {
-      resolvedBaselineCapturedAt = claim.createdAt;
+      resolvedBaselineCapturedAt = fallbackBaselineCapturedAt;
     }
 
     // 5. Cryptographic hash comparison
@@ -419,7 +461,7 @@ Perform structured policy drift comparison according to the schema.`;
       isRetroactiveAlteration: analysis.isRetroactiveAlteration,
       severity: analysis.severity,
       summary: analysis.summary,
-      denialDate: new Date(claim.createdAt).toISOString().split("T")[0],
+      denialDate: resolvedDenialDate,
       serviceDate: claim.serviceDate,
       detectedChanges: analysis.detectedChanges,
       erisaNoticeDraft,

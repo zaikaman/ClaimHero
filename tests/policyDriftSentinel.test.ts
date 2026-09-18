@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as policyDrift from "../convex/policyDrift";
 import * as policyDriftSentinel from "../convex/actions/policyDriftSentinel";
+import * as policyCrawler from "../convex/actions/policyCrawler";
 import * as authLib from "../convex/lib/auth";
 import {
   computeContentSha256,
@@ -101,6 +102,25 @@ describe("Policy Drift Sentinel — Retroactive Policy Alteration Detector", () 
       expect(result.isRetroactiveAlteration).toBe(true);
       expect(result.severity).toBe("critical_bad_faith");
       expect(result.detectedChanges.some((c) => c.category === "added_exclusion")).toBe(true);
+    });
+
+    it("does not falsely flag innocent lines with fail/months/weeks/nsaid as critical bad faith", () => {
+      const baseline = `# Aetna CPB 0736: Knee Arthroscopy
+- Indicated for acute meniscus tear.`;
+
+      // New lines mentioning "failure", "weeks", "months", "nsaid" in benign contexts
+      const liveAltered = `# Aetna CPB 0736: Knee Arthroscopy
+- Indicated for acute meniscus tear.
+- Note: Patients with congestive heart failure should be closely monitored.
+- Policy published 6 months ago and updated within the last 2 weeks.
+- Patients with documented NSAID allergy should discuss alternatives with their physician.`;
+
+      const result = heuristicDriftComparison(baseline, liveAltered, ["29881"]);
+
+      expect(result.hasDrift).toBe(false);
+      expect(result.isRetroactiveAlteration).toBe(false);
+      expect(result.severity).toBe("none");
+      expect(result.detectedChanges).toHaveLength(0);
     });
   });
 
@@ -483,6 +503,106 @@ describe("Policy Drift Sentinel — Retroactive Policy Alteration Detector", () 
           claimId: "claim_1",
         })
       ).rejects.toThrow("Forbidden");
+    });
+
+    it("uses letter denialDate rather than createdAt when persisting drift record", async () => {
+      const mockClaim = {
+        _id: "claim_1",
+        userId: "user_owner",
+        claimNumber: "CH-300",
+        serviceDate: "2026-01-10",
+        denialDate: "2026-02-15", // Explicit letter date
+        cptCodes: ["29881"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not Medically Necessary",
+        insurancePayer: "Aetna",
+        createdAt: 1780000000000, // Ingestion date in May 2026
+      };
+
+      vi.spyOn(authLib, "requireClaimOwnerAction").mockResolvedValue({
+        claim: mockClaim as any,
+        userId: "user_owner" as any,
+        accessRole: "owner",
+      });
+
+      let savedDriftArgs: any = null;
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.urlHash) {
+            return {
+              _id: "snapshot_1",
+              markdown: "Policy baseline",
+              capturedAt: 1771113600000,
+              title: "Aetna CPB 0736",
+            };
+          }
+          return null;
+        }),
+        runMutation: vi.fn().mockImplementation((fn, args) => {
+          savedDriftArgs = args;
+          return Promise.resolve("drift_123");
+        }),
+      };
+
+      await (policyDriftSentinel.detectPolicyDriftAction as any)._handler(mockCtx, {
+        claimId: "claim_1",
+        policyUrl: "https://www.aetna.com/cpb/0736.html",
+        liveMarkdownOverride: "Policy baseline",
+      });
+
+      expect(savedDriftArgs).toBeDefined();
+      expect(savedDriftArgs.denialDate).toBe("2026-02-15");
+      expect(savedDriftArgs.denialDate).not.toBe(new Date(mockClaim.createdAt).toISOString().split("T")[0]);
+    });
+
+    it("throws an error on live crawl failure rather than masking outage as zero alterations", async () => {
+      const mockClaim = {
+        _id: "claim_1",
+        userId: "user_owner",
+        claimNumber: "CH-400",
+        serviceDate: "2026-01-10",
+        denialDate: "2026-02-15",
+        cptCodes: ["29881"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not Medically Necessary",
+        insurancePayer: "Aetna",
+        createdAt: 1780000000000,
+      };
+
+      vi.spyOn(authLib, "requireClaimOwnerAction").mockResolvedValue({
+        claim: mockClaim as any,
+        userId: "user_owner" as any,
+        accessRole: "owner",
+      });
+
+      vi.spyOn(policyCrawler, "scrapeFirecrawlPolicySource").mockRejectedValue(
+        new Error("Firecrawl connection timeout 504")
+      );
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.urlHash) {
+            return {
+              _id: "snapshot_1",
+              markdown: "Policy baseline",
+              capturedAt: 1771113600000,
+              title: "Aetna CPB 0736",
+            };
+          }
+          return null;
+        }),
+        runMutation: vi.fn(),
+      };
+
+      await expect(
+        (policyDriftSentinel.detectPolicyDriftAction as any)._handler(mockCtx, {
+          claimId: "claim_1",
+          policyUrl: "https://www.aetna.com/cpb/0736.html",
+        })
+      ).rejects.toThrow(/Live policy crawl failed for drift detection.*504/);
+
+      // Verify no drift was saved asserting 0 alterations
+      expect(mockCtx.runMutation).not.toHaveBeenCalled();
     });
   });
 });

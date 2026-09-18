@@ -358,10 +358,23 @@ describe("Evidentiary Degradation & Provisional Review Gating", () => {
       };
 
       const runMutationCalls: any[] = [];
+      let queryCallCount = 0;
       const step: any = {
-        runQuery: vi.fn().mockImplementation((_, args) => {
-          if (args.claimId) return Promise.resolve(mockClaim);
-          return Promise.resolve([]);
+        runQuery: vi.fn().mockImplementation(() => {
+          queryCallCount++;
+          if (queryCallCount === 1) {
+            return Promise.resolve(mockClaim);
+          }
+          return Promise.resolve([
+            {
+              _id: "ev_existing_1",
+              claimId: "claim_pipe_1",
+              sourceType: "payer_cpb",
+              title: "Anthem CPB 29881 Prior Snapshot",
+              citationClause: "Section 2.A",
+              extractedEvidenceMarkdown: "Documented knee joint line tenderness and failure of conservative management.",
+            },
+          ]);
         }),
         runMutation: vi.fn().mockImplementation((_, args) => {
           runMutationCalls.push(args);

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-18T13:37:13Z
+- **Last updated:** 2026-09-18T14:05:00Z
 
 ## Log
 
@@ -1704,12 +1704,21 @@ Follow-up: Enforced evidentiary and statutory grounding in `convex/actions/prece
 - Auto-Reply Draft Hardening: Rewrote `generateAutoReplyDraft` system/user prompts to prohibit asserting that the record 'conclusively demonstrates medical necessity' and remove unverified conservative therapy/imaging demands; filters blocked (403/captcha) and anatomically mismatched evidence; and implements post-generation clinical safety gating with `buildNeutralClinicalBasis` when clinical intake facts are absent.
 - Regression & Verification: Added comprehensive test suite `tests/groundedMatcherAndSafeAutoReply.test.ts` (6 tests). Verified 79 test suites (1,227 passing tests), clean typecheck, clean lint, coverage, and production build. Convex features: actions, internalAction, mutations.
 
-### 2026-09-18 - working tree
+### 2026-09-18 - fafd1ce
 Fixed payer reply keyword misclassification, unlatched post-resolution reopenings, and eliminated unflagged synthetic 40% settlement offers in AgentMail inbound processing (`README.md`, `convex/lib/adversaryNegotiation.ts`, `convex/actions/agentMail.ts`, `convex/schema.ts`, `convex/emails.ts`, `src/types/index.ts`, `src/components/communications/AgentMailDrawer.tsx`, `tests/adversarialAdjudicator.test.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`, `tests/convexEmails.test.ts`):
 - Determination Keyword Classification: Replaced naive substring matching with contextual helpers (`isApprovalDeterminationText`, `isDenialUpheldText`, `detectSettlementOffer`). Blocked non-determination false positives on phrases like "approved provider list", "charge reversed", "payment was not issued", and "denied amount: $X" in EOBs, while guarding against member appeal upheld being classified as a denial.
 - Settlement Offer Extraction: Upgraded countermove detection to parse explicit dollar-only offers ("offer $3,500 to settle") and arbitrary percentage proposals, preventing premature fallback to general inquiry.
 - Unspecified Offer Provenance Flagging: Added `settlementProvenance` schema attribute (`"payer_stated" | "estimated_benchmark" | "unspecified"`). Prohibited LLM synthesis and fast heuristic updates from fabricating 40% figures when the payer omitted financial terms; labeled 40% fallback estimates transparently in the UI as statutory benchmark estimates rather than payer-stated concessions.
 - State Machine Integrity & Won Claim Reopening: Removed destructive downgrade of `escalated` and `under_review` claims to `dispatched` upon LLM analysis fallback; allowed `PENDING_LLM` in allowable determination sets so initial inbound message inserts succeed during async evaluation. Unlatched `isOverturned` so post-resolution adverse actions on previously won claims trigger reopened status (`REOPENED: ...`), draft rebuttals, stage pending auto-replies, and log audit entries.
 - Regression Coverage & Verification: Added comprehensive regression tests covering all six edge cases in `tests/actionsAgentMailAndDispatcher.test.ts`, `tests/convexEmails.test.ts`, and `tests/adversarialAdjudicator.test.ts`. Verified 79 test suites (1,236 passing tests), clean typecheck, clean lint, and production build. Convex features: actions, internalAction, mutations, queries, schema.
+
+### 2026-09-18 - working tree
+Fixed workflow crawl failure masking, eliminated boilerplate ERISA filler, hardened policy drift heuristics, and resolved denial dates from adverse determination letters (`README.md`, `convex/workflows.ts`, `convex/actions/policyDriftSentinel.ts`, `convex/actions/appealSynthesizer.ts`, `tests/workflows.test.ts`, `tests/policyDriftSentinel.test.ts`, `tests/evidentiaryDegradationGating.test.ts`):
+- Crawl Failure & Filler Removal: In `convex/workflows.ts`, removed fallback insertion of `ERISA_STATUTORY_EVIDENCE` into `clinicalEvidences` on crawler throw and eliminated faked clause counts (`Math.max(count, 1)`). When live policy crawling throws and no prior clinical evidence exists, the workflow now records activity as an error, marks `workflowStatus: "failed"`, and aborts cleanly rather than synthesizing an ungrounded brief citing disclosure rules as CPB criteria. When prior verified clinical evidence exists, it retains real evidence counts under `cpbDegraded: true`.
+- Precision Policy Drift Heuristics: In `convex/actions/policyDriftSentinel.ts`, replaced naive substring triggers (`fail`, `months`, `weeks`, `nsaid`) with targeted clinical regex patterns for step therapy, conservative management failure, and experimental exclusions; calibrated severity across `critical_bad_faith`, `moderate`, `minor`, and `none` to eliminate false positives on benign phrases like "heart failure", "evaluated within 2 weeks", or "NSAID allergy".
+- Outage Masking Prevention: In `detectPolicyDriftAction`, prohibited falling back to comparing baseline markdown to itself upon live crawler exceptions, raising a crawl error instead of reporting zero alterations and masking outages as clean.
+- Denial Letter Date Resolution: Anchored `denialDate` and baseline timestamps to the actual adverse determination letter date (`claim.denialDate`) rather than `claim.createdAt`.
+- Synthesizer Grounding Guard: Updated `convex/actions/appealSynthesizer.ts` prompt fallbacks to prohibit treating ERISA § 503 procedural disclosure rules as CPB clinical criteria.
+- Regression Coverage & Verification: Added comprehensive regression tests across `tests/workflows.test.ts`, `tests/policyDriftSentinel.test.ts`, and `tests/evidentiaryDegradationGating.test.ts`. Synchronized test metrics in `README.md` (1,240 automated tests across 79 test suites). Verified 79 test suites (1,240 passing tests), 0 type errors, 0 lint warnings, test coverage, and production build. Convex features: actions, durable workflows, internalAction, mutations, queries.
 
 

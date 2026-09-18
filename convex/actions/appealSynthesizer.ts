@@ -885,7 +885,7 @@ export async function performGenerateAppealBrief(
       };
     const evidenceText = externalEvidences.length > 0
       ? externalEvidences.map((e, idx: number) => `[Source ${idx + 1}] (${e.sourceType.toUpperCase()} - ${e.title} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
-      : "Standard national clinical practice guideline and ERISA disclosure rules apply.";
+      : "No verified clinical policy bulletin or guideline criteria were retrieved for this claim. Strictly do NOT cite disclosure rules or 29 CFR § 2560.503-1 as insurer clinical policy criteria or medical necessity standards. State clearly that the insurer's clinical criteria have not been provided or established.";
 
     let vectorPrecedents: VectorPrecedentMatch[] = args.vectorPrecedents || [];
     let precedentsUnavailable = false;
@@ -925,7 +925,7 @@ export async function performGenerateAppealBrief(
             return `[Vector Precedent ${idx + 1}] ${match.title} (${match.citation}, similarity ${similarity}%):\nStatutory language: ${match.statutoryLanguage}\nWinning argument: ${match.winningArgument}`;
           })
           .join("\n\n")
-        : "No vector-archive matches were available; rely on ERISA 29 CFR § 2560.503-1 and published CPB criteria.";
+        : "No vector-archive matches were available.";
 
     const payer = claim.patient?.insurancePayer || "Health Insurer";
     const cptList = (claim.cptCodes || []).join(", ");

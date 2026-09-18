@@ -5,7 +5,6 @@ import { v } from "convex/values";
 import type { Id, Doc } from "./_generated/dataModel";
 import { requireClaimEditor, getAuthUserId } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
-import { ERISA_STATUTORY_EVIDENCE } from "./lib/erisaEvidence";
 import { appealLevelValidator, type StatutoryAppealLevel } from "./lib/statutoryTierValidators";
 import { appendAuditLog } from "./auditLogs";
 
@@ -176,46 +175,76 @@ export async function executeDurableClaimPipeline(
           }
         );
       } catch (crawlErr) {
-        cpbDegraded = true;
         const crawlMessage = crawlErr instanceof Error ? crawlErr.message : String(crawlErr);
+
+        const existingEvidences = (await step.runQuery(
+          internal.clinicalEvidences.listByClaimInternal,
+          { claimId: args.claimId }
+        )) as Array<Doc<"clinicalEvidences">>;
+
+        const substantiveEvidences = Array.isArray(existingEvidences)
+          ? existingEvidences.filter(
+              (e) =>
+                e.sourceType !== "legal_precedent" &&
+                Boolean(e.extractedEvidenceMarkdown?.trim())
+            )
+          : [];
+
+        if (substantiveEvidences.length === 0) {
+          await logWorkflowActivity(step, {
+            claimId: args.claimId,
+            runId: pipelineRunId,
+            stage: "crawl",
+            status: "error",
+            message: `Clinical policy crawl failed: ${crawlMessage}. Pipeline halted because verified clinical evidence is required to synthesize an appeal.`,
+          });
+
+          await step.runMutation(internal.claims.updateStatusInternal, {
+            claimId: args.claimId,
+            status: "analyzing",
+            actor: "Durable Sentinel Workflow",
+            details: `Clinical policy retrieval failed: ${crawlMessage}. No clinical evidence available for appeal synthesis.`,
+          });
+
+          await step.runMutation(internal.claims.updateClaimWorkflowStatusInternal, {
+            claimId: args.claimId,
+            workflowStatus: "failed",
+          });
+
+          await step.runMutation(internal.auditLogs.logEventInternal, {
+            claimId: args.claimId,
+            eventType: "workflow_crawl_failed",
+            actor: "Durable Sentinel Workflow",
+            details: `Firecrawl policy crawl failed: ${crawlMessage}. Pipeline aborted to prevent synthetic or ungrounded appeal brief generation.`,
+          });
+
+          throw new Error(
+            `Clinical policy retrieval failed: ${crawlMessage}. A valid policy source or Firecrawl connection is required to extract clinical criteria.`
+          );
+        }
+
+        // Retain verified clinical evidence previously retrieved for this claim
+        cpbDegraded = true;
         await logWorkflowActivity(step, {
           claimId: args.claimId,
           runId: pipelineRunId,
           stage: "crawl",
           status: "completed",
-          message:
-            "The live policy search hit a snag, so I'm proceeding with statutory references instead of stalling.",
+          message: `Live policy search was unreachable (${crawlMessage}); proceeding with ${substantiveEvidences.length} previously verified clinical evidence clauses.`,
         });
-
-        const existingEvidences = (await step.runQuery(
-          internal.clinicalEvidences.listByClaimInternal,
-          { claimId: args.claimId }
-        )) as Array<{ _id: Id<"clinicalEvidences"> }>;
-
-        if (!existingEvidences || existingEvidences.length === 0) {
-          try {
-            await step.runMutation(internal.clinicalEvidences.insertBatchInternal, {
-              claimId: args.claimId,
-              evidences: [{ ...ERISA_STATUTORY_EVIDENCE }],
-            });
-          } catch (insertErr) {
-            console.warn("Durable workflow fallback evidence insertion note:", insertErr);
-          }
-        }
 
         await step.runMutation(internal.claims.updateStatusInternal, {
           claimId: args.claimId,
           status: "analyzing",
           actor: "Durable Sentinel Workflow",
-          details: `Policy crawl fallback applied: ${crawlMessage}. Proceeding with statutory evidence.`,
+          details: `Policy crawl fallback applied: ${crawlMessage}. Retained ${substantiveEvidences.length} verified clinical evidence clauses under provisional review.`,
         });
 
-        const count = Array.isArray(existingEvidences) ? existingEvidences.length : 0;
         crawlResult = {
-          policyTitle: count > 0
-            ? "Retained existing clinical evidence (live crawler fallback applied)"
-            : "No publicly accessible policy source (ERISA statutory protocol applied)",
-          clausesExtracted: Math.max(count, 1),
+          policyTitle:
+            substantiveEvidences[0]?.title ||
+            "Retained existing clinical evidence (live crawler fallback applied)",
+          clausesExtracted: substantiveEvidences.length,
         };
       }
 
