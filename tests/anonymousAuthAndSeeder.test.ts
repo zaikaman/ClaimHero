@@ -100,11 +100,11 @@ describe("Anonymous Auth Provider & 3 Pre-Seeded Demo Cases", () => {
       expect(claim.appealContext?.physicianNotes).toBeDefined();
     }
 
-    // Verify statuses
+    // Verify statuses: 2 unsent cases with briefs ready for review, 1 won
     const statuses = insertedRecords.claims.map((c) => c.status);
-    expect(statuses).toContain("ready_for_review");
-    expect(statuses).toContain("drafting");
+    expect(statuses.filter((s) => s === "ready_for_review").length).toBe(2);
     expect(statuses).toContain("won");
+    expect(statuses).not.toContain("drafting");
 
     // Verify clinical evidences were created with genuine policy citations
     expect(insertedRecords.clinicalEvidences.length).toBeGreaterThanOrEqual(20);
@@ -131,6 +131,15 @@ describe("Anonymous Auth Provider & 3 Pre-Seeded Demo Cases", () => {
     expect(wonClaim).toBeDefined();
     const wonAppeal = insertedRecords.appeals.find((a) => a.claimId === wonClaim._id);
     expect(wonAppeal?.isHumanApproved).toBe(true);
+
+    // Verify each unsent ready_for_review claim has a brief but no approval (not sent)
+    const readyClaims = insertedRecords.claims.filter((c) => c.status === "ready_for_review");
+    expect(readyClaims.length).toBe(2);
+    for (const readyClaim of readyClaims) {
+      const brief = insertedRecords.appeals.find((a) => a.claimId === readyClaim._id);
+      expect(brief?.fullAppealMarkdown.length).toBeGreaterThan(1000);
+      expect(brief?.isHumanApproved).not.toBe(true);
+    }
 
     // Verify P2P scripts with 4 phases and cheat sheets
     expect(insertedRecords.p2pScripts.length).toBe(3);

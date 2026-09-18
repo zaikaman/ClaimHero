@@ -432,13 +432,19 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                 const isWon = c.status === "won";
                 const isDispatched = c.status === "dispatched" || c.status === "under_review";
                 const isUrgent = (c.daysRemaining ?? 180) <= 14 && !isWon && !isDispatched;
+                const isReady = c.status === "ready_for_review" || Boolean(c.latestAppeal);
+                const needsIntake = !isWon && !isDispatched && !isReady && !hasCompletedIntakeContext(c);
 
                 return (
                   <div
                     key={c._id}
                     onClick={() => {
                       onSelectClaim(c._id);
-                      onNavigateView(isWon || isDispatched ? "communications" : "studio");
+                      if (needsIntake) {
+                        onOpenIngestion(c);
+                      } else {
+                        onNavigateView(isWon || isDispatched ? "communications" : "studio");
+                      }
                     }}
                     className={cn(
                       "group rounded-xl border bg-card/80 backdrop-blur-sm p-4 transition-all hover:bg-card hover:border-primary/40 cursor-pointer shadow-xs",
@@ -455,6 +461,10 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                           ) : isDispatched ? (
                             <Badge variant="outline" className="font-sans text-[10px] text-sky-400 border-sky-500/30 bg-sky-500/10">
                               Sent to insurer
+                            </Badge>
+                          ) : needsIntake ? (
+                            <Badge variant="outline" className="font-sans text-[10px] text-amber-500 border-amber-500/40 bg-amber-500/10">
+                              Needs your details
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="font-sans text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20">
@@ -480,20 +490,36 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                         </div>
                       </div>
 
-                      {/* 1 Button: Review & Approve */}
+                      {/* 1 Button: contextual primary action (mirrors expert table) */}
                       <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectClaim(c._id);
-                            onNavigateView(isWon || isDispatched ? "communications" : "studio");
-                          }}
-                          className="h-9 px-4 text-xs font-semibold shadow-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
-                        >
-                          <FileText className="size-4" />
-                          <span>{isWon ? "View Outcome" : isDispatched ? "Track Status" : "Review & Approve"}</span>
-                        </Button>
+                        {needsIntake ? (
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectClaim(c._id);
+                              onOpenIngestion(c);
+                            }}
+                            title="Add your contact details to continue"
+                            className="h-9 px-4 text-xs font-semibold shadow-2xs gap-1.5 bg-amber-600 hover:bg-amber-500 text-white border border-amber-500/30 cursor-pointer"
+                          >
+                            <ClipboardText className="size-4" weight="bold" />
+                            <span>Add your details</span>
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectClaim(c._id);
+                              onNavigateView(isWon || isDispatched ? "communications" : "studio");
+                            }}
+                            className="h-9 px-4 text-xs font-semibold shadow-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                          >
+                            <FileText className="size-4" />
+                            <span>{isWon ? "View Outcome" : isDispatched ? "Track Status" : "Review & Approve"}</span>
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

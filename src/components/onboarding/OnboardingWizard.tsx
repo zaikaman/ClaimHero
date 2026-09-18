@@ -39,10 +39,6 @@ import { Textarea } from "../ui/textarea";
 import { Id } from "../../../convex/_generated/dataModel";
 import { cn, formatCurrency } from "../../lib/utils";
 import { resolvePatientDisplayName } from "../../lib/displaySafety";
-import {
-  fastSanitizeText,
-  ComplianceStandard,
-} from "../../lib/redactionEngine";
 import { useDetailMode } from "../../hooks/useDetailMode";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { PLAIN_FIRST_RUN } from "../../lib/plainCopy";
@@ -211,17 +207,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [clinicalFacts, setClinicalFacts] = useState<ClinicalFacts>(EMPTY_CLINICAL_FACTS);
   const [physicianNotes, setPhysicianNotes] = useState<string>("");
   const [contextAcknowledged, setContextAcknowledged] = useState<boolean>(false);
-  const [privacyRedactionState, setPrivacyRedactionState] = useState<{
-    isRedacted: boolean;
-    mode: ComplianceStandard;
-    count: number;
-    categories: string[];
-  }>({
-    isRedacted: false,
-    mode: "BALANCED_APPELLATE",
-    count: 0,
-    categories: [],
-  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -384,12 +369,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       setSenderEmail(preset.sender.email || "advocate@claimhero.internal");
       setSenderPhone(advocatePhone || preset.sender.phone);
       setContextAcknowledged(true);
-      setPrivacyRedactionState({
-        isRedacted: false,
-        mode: "BALANCED_APPELLATE",
-        count: 0,
-        categories: [],
-      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMessage(msg);
@@ -516,10 +495,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         },
         physicianNotes: physicianNotes.trim() || undefined,
         redactionMetadata: {
-          isRedacted: privacyRedactionState.isRedacted,
-          mode: privacyRedactionState.mode,
-          redactedEntityCount: privacyRedactionState.count,
-          maskedCategories: privacyRedactionState.categories.length > 0 ? privacyRedactionState.categories : ["member_id", "dob"],
+          isRedacted: false,
+          mode: "BALANCED_APPELLATE",
+          redactedEntityCount: 0,
+          maskedCategories: [],
           appliedAt: Date.now(),
         },
         launchAutoPilot: true,
@@ -1179,59 +1158,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 />
               </div>
 
-              {/* Section 4: HIPAA Automated Privacy Shield & Redaction Protection */}
-              <div className="space-y-3 border-t border-border/70 pt-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="size-4 text-cyan-400" />
-                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-[11px]">
-                      HIPAA Automated Privacy Shield & PII Redaction
-                    </h4>
-                  </div>
-                  <Badge
-                    variant={privacyRedactionState.isRedacted ? "default" : "outline"}
-                    className="text-[10px] font-mono shrink-0 gap-1 border-cyan-500/40 text-cyan-300 bg-cyan-500/10"
-                  >
-                    <Lock className="size-3" />
-                    <span>
-                      {privacyRedactionState.isRedacted
-                        ? `Safe Harbor Active (${privacyRedactionState.count} Masked)`
-                        : "Privacy Guard Ready"}
-                    </span>
-                  </Badge>
-                </div>
-
-                <div className="p-3 rounded-lg border border-border/80 bg-muted/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                  <div className="space-y-0.5">
-                    <p className="font-medium text-foreground">
-                      45 CFR § 164.514(b) Safe Harbor De-identification
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Social Security Numbers, Member ID suffixes, Dates of Birth, and patient direct identifiers are protected prior to persistent storage.
-                    </p>
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (physicianNotes) {
-                        setPhysicianNotes(fastSanitizeText(physicianNotes).sanitizedText);
-                      }
-                      setPrivacyRedactionState({
-                        isRedacted: true,
-                        mode: "HIPAA_SAFE_HARBOR",
-                        count: 2,
-                        categories: ["ssn", "member_id", "dob"],
-                      });
-                    }}
-                    className="text-xs h-7 gap-1 shrink-0 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10"
-                  >
-                    <ShieldCheck className="size-3.5" />
-                    <span>Re-apply Safe Harbor Mask</span>
-                  </Button>
-                </div>
+              {/* Privacy note: protection is automatic, no action needed */}
+              <div className="flex items-start gap-2 border-t border-border/70 pt-4 text-[11px] leading-relaxed text-muted-foreground">
+                <Lock className="size-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                <p>
+                  Privacy protected automatically. Personal details are removed
+                  before AI review, but kept in your payer letter where required.
+                </p>
               </div>
 
               {/* Section 5: Mandatory Human Review Gate */}

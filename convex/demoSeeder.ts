@@ -223,7 +223,7 @@ Attending Orthopedic Surgeon: Dr. Robert Langston, MD, FAAOS (Metropolitan Surgi
   });
   await ctx.db.patch(claim1Id, { searchContent: claim1Search });
 
-  // --- CLAIM 2: Marcus Sterling (Lumbar Spine Decompression) - Status: drafting ---
+  // --- CLAIM 2: Marcus Sterling (Lumbar Spine Decompression) - Status: ready_for_review ---
   const claim2Number = `CLM-6104-GEO-${Math.floor(1000 + Math.random() * 9000)}`;
   const claim2CreatedAt = now - 7 * DAY_MS;
   const claim2Id = await ctx.db.insert("claims", {
@@ -240,7 +240,7 @@ Attending Orthopedic Surgeon: Dr. Robert Langston, MD, FAAOS (Metropolitan Surgi
     icd10Codes: ["M51.26"],
     denialReasonCode: "CO-197",
     denialReasonDescription: "Precertification / prior authorization / notification absent or lacking under Carelon Spine Surgery Guidelines.",
-    status: "drafting",
+    status: "ready_for_review",
     statutoryDeadline: now + 173 * DAY_MS,
     daysRemaining: 173,
     overturnProbabilityScore: 94,
