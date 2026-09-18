@@ -179,6 +179,10 @@ describe("Convex Claims CRUD, Financials & Analytics Engine", () => {
     it("creates patient and claim, updates aggregate, and logs audit", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const mockDb = createMockDb({
+        get: vi.fn().mockImplementation((id) => {
+          if (id === "user_123") return Promise.resolve({ _id: "user_123", email: "owner@test.com" });
+          return Promise.resolve(null);
+        }),
         insert: vi.fn().mockImplementation((table) => {
           if (table === "patients") return Promise.resolve("pat_1");
           if (table === "claims") return Promise.resolve("claim_1");
@@ -211,6 +215,194 @@ describe("Convex Claims CRUD, Financials & Analytics Engine", () => {
       expect(claimId).toBe("claim_1");
       expect(mockDb.insert).toHaveBeenCalledWith("patients", expect.objectContaining({ name: "Jane Doe" }));
       expect(mockDb.insert).toHaveBeenCalledWith("claims", expect.objectContaining({ claimNumber: "CLM-001" }));
+    });
+
+    it("createWithPatient: fails closed for unauthenticated callers without minting a shared sentinel user", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const mockDb = createMockDb();
+      const mockCtx: any = {
+        db: mockDb,
+        scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) },
+      };
+
+      await expect(
+        (claims.createWithPatient as any)._handler(mockCtx, {
+          patientName: "Jane Doe",
+          patientEmail: "jane@test.com",
+          memberId: "MEM-1",
+          insurancePayer: "UHC",
+          state: "CA",
+          claimNumber: "CLM-ORPHAN-1",
+          serviceDate: "2026-01-01",
+          providerName: "Dr. Smith",
+          deniedAmount: 1000,
+          patientOwedAmount: 1000,
+          cptCodes: ["27447"],
+          icd10Codes: ["M17.11"],
+          denialReasonCode: "CO-50",
+          denialReasonDescription: "Not medically necessary",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      expect(mockDb.insert).not.toHaveBeenCalledWith("claims", expect.anything());
+      expect(mockDb.insert).not.toHaveBeenCalledWith("patients", expect.anything());
+      expect(mockDb.insert).not.toHaveBeenCalledWith(
+        "users",
+        expect.objectContaining({ email: "sentinel@claimhero.internal" })
+      );
+    });
+
+    it("createWithPatient: rejects minting PHI for deleted or unknown users", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_ghost" as any);
+      const mockDb = createMockDb({
+        get: vi.fn().mockResolvedValue(null),
+      });
+      const mockCtx: any = {
+        db: mockDb,
+        scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) },
+      };
+
+      await expect(
+        (claims.createWithPatient as any)._handler(mockCtx, {
+          patientName: "Jane Doe",
+          patientEmail: "jane@test.com",
+          memberId: "MEM-1",
+          insurancePayer: "UHC",
+          state: "CA",
+          claimNumber: "CLM-GHOST-1",
+          serviceDate: "2026-01-01",
+          providerName: "Dr. Smith",
+          deniedAmount: 1000,
+          patientOwedAmount: 1000,
+          cptCodes: ["27447"],
+          icd10Codes: ["M17.11"],
+          denialReasonCode: "CO-50",
+          denialReasonDescription: "Not medically necessary",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      expect(mockDb.insert).not.toHaveBeenCalledWith("claims", expect.anything());
+    });
+
+    it("createWithPatient: rejects caller identity mismatch instead of attributing to another user", async () => {
+      vi.mocked(getAuthUserId)
+        .mockResolvedValueOnce("user_attacker" as any)
+        .mockResolvedValue("user_victim" as any);
+      const mockDb = createMockDb({
+        get: vi.fn().mockImplementation((id) => {
+          if (id === "user_attacker") return Promise.resolve({ _id: "user_attacker", email: "attacker@test.com" });
+          if (id === "user_victim") return Promise.resolve({ _id: "user_victim", email: "victim@test.com" });
+          return Promise.resolve(null);
+        }),
+      });
+      const mockCtx: any = {
+        db: mockDb,
+        scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) },
+      };
+
+      await expect(
+        (claims.createWithPatient as any)._handler(mockCtx, {
+          patientName: "Victim Patient",
+          patientEmail: "victim@test.com",
+          memberId: "MEM-VIC",
+          insurancePayer: "UHC",
+          state: "CA",
+          claimNumber: "CLM-SPOOF-1",
+          serviceDate: "2026-01-01",
+          providerName: "Dr. Smith",
+          deniedAmount: 1000,
+          patientOwedAmount: 1000,
+          cptCodes: ["27447"],
+          icd10Codes: ["M17.11"],
+          denialReasonCode: "CO-50",
+          denialReasonDescription: "Not medically necessary",
+        })
+      ).rejects.toThrow(/identity mismatch/i);
+
+      expect(mockDb.insert).not.toHaveBeenCalledWith("claims", expect.anything());
+    });
+
+    it("createWithPatientInternal: derives ownership from the auth session even when a spoofed userId is present", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_attacker" as any);
+      const mockDb = createMockDb({
+        get: vi.fn().mockImplementation((id) => {
+          if (id === "user_attacker") return Promise.resolve({ _id: "user_attacker", email: "attacker@test.com" });
+          if (id === "user_victim") return Promise.resolve({ _id: "user_victim", email: "victim@test.com" });
+          return Promise.resolve(null);
+        }),
+        insert: vi.fn().mockImplementation((table) => {
+          if (table === "patients") return Promise.resolve("pat_spoof");
+          if (table === "claims") return Promise.resolve("claim_spoof");
+          return Promise.resolve("log_1");
+        }),
+      });
+      const mockCtx: any = {
+        db: mockDb,
+        scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) },
+      };
+
+      const claimId = await (claims.createWithPatientInternal as any)._handler(mockCtx, {
+        patientName: "Victim Patient",
+        patientEmail: "victim@test.com",
+        memberId: "MEM-VIC",
+        insurancePayer: "UHC",
+        state: "CA",
+        claimNumber: "CLM-SPOOF-2",
+        serviceDate: "2026-01-01",
+        providerName: "Dr. Smith",
+        deniedAmount: 1000,
+        patientOwedAmount: 1000,
+        cptCodes: ["27447"],
+        icd10Codes: ["M17.11"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+        userId: "user_victim",
+      });
+
+      expect(claimId).toBe("claim_spoof");
+      expect(mockDb.insert).toHaveBeenCalledWith(
+        "claims",
+        expect.objectContaining({ userId: "user_attacker" })
+      );
+      expect(mockDb.insert).toHaveBeenCalledWith(
+        "patients",
+        expect.objectContaining({ userId: "user_attacker" })
+      );
+    });
+
+    it("createWithPatientInternal: fails closed for unauthenticated callers without creating a sentinel user", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const mockDb = createMockDb();
+      const mockCtx: any = {
+        db: mockDb,
+        scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) },
+      };
+
+      await expect(
+        (claims.createWithPatientInternal as any)._handler(mockCtx, {
+          patientName: "Jane Doe",
+          patientEmail: "jane@test.com",
+          memberId: "MEM-1",
+          insurancePayer: "UHC",
+          state: "CA",
+          claimNumber: "CLM-ORPHAN-2",
+          serviceDate: "2026-01-01",
+          providerName: "Dr. Smith",
+          deniedAmount: 1000,
+          patientOwedAmount: 1000,
+          cptCodes: ["27447"],
+          icd10Codes: ["M17.11"],
+          denialReasonCode: "CO-50",
+          denialReasonDescription: "Not medically necessary",
+        })
+      ).rejects.toThrow(/Unauthorized/i);
+
+      expect(mockDb.insert).not.toHaveBeenCalledWith("claims", expect.anything());
+      expect(mockDb.insert).not.toHaveBeenCalledWith("patients", expect.anything());
+      expect(mockDb.insert).not.toHaveBeenCalledWith(
+        "users",
+        expect.objectContaining({ email: "sentinel@claimhero.internal" })
+      );
     });
   });
 

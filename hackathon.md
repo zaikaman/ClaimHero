@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-18T01:20:58Z
+- **Last updated:** 2026-09-18T01:32:52Z
 
 ## Log
 
@@ -1635,6 +1635,10 @@ Repositioned optical intake as local-first with optional Textract enhancement an
 - Rewrote `BRIEF.md` to track official Convex All Gas wording verified 2026-09-18 (six participation steps, prize pool, qualification criteria), removing prior invented claims about a mock-data ban and a standalone `hackathon.md` submission requirement.
 - Expanded `.env.example` with required Convex backend vars (`SITE_URL`, `AUTH_PRIVATE_KEY`/`AUTH_JWKS`, Google OAuth) and runtime fail-closed notes for OpenAI, Firecrawl, and AgentMail sender inbox. Convex features: docs only, no new runtime features.
 
-### 2026-09-18 - working tree
+### 2026-09-18 - 19877a7
 Closed anonymous enumeration of the won-claim precedent archive in `searchTextPrecedents` (`convex/precedents.ts`): the query now returns an empty set for unauthenticated callers, requires a 3-500 character query, clamps results to 20 rows, and projects an allow-listed shape behind an explicit returns validator so `sourceClaimId`, `corpusKey`, raw embeddings, and outcome amounts can never leak. Added regression coverage in `tests/convexPrecedents.test.ts`. Verified 74 suites (1,123 passing tests), clean typecheck, and production build. Convex features: queries, full-text search, auth (`convex/lib/auth.ts`).
+
+### 2026-09-18 - working tree
+Closed cross-tenant PHI attribution in claim intake (`convex/claims.ts`, `convex/actions/opticalParser.ts`): `createWithPatientInternal` no longer accepts a caller-supplied `userId` and derives ownership server-side from the propagated auth session, failing closed when unauthenticated. `applyCreateWithPatient` rejects caller/auth identity mismatches, refuses to mint claims for unknown users, and no longer falls back to the shared `sentinel@claimhero.internal` account; pending-upload consumption now re-verifies storage ownership at claim creation. Added regression coverage in `tests/convexClaimsFull.test.ts` and updated authenticated-user mocks in `tests/demoIsolationAndHonestPipelines.test.ts`. Verified 74 suites (1,128 passing tests), clean typecheck, clean lint, and production build. Convex features: mutations, internalMutation, auth (`convex/lib/auth.ts`).
+Follow-up: deleted dead `claimLegacyCasesInternal` mass-reassignment helper (`convex/claims.ts`) — zero callers, and one future wiring would have been a mass tenant hijack. Re-verified 74 suites (1,128 passing tests), clean typecheck and lint.
 

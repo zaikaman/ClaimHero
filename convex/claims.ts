@@ -1115,26 +1115,27 @@ async function applyCreateWithPatient(
   explicitUserId?: Id<"users">
 ): Promise<Id<"claims">> {
   const authUserId = await getAuthUserId(ctx);
-  let userId: Id<"users"> | undefined = explicitUserId || authUserId || undefined;
+  // Confused-deputy guard: a caller-supplied identity must never disagree with
+  // the authenticated session. Any mismatch is a cross-tenant mint attempt.
+  // Compared without requiring authUserId so an unauthenticated caller passing
+  // an explicit identity also fails closed instead of minting without a session.
+  if (explicitUserId && explicitUserId !== authUserId) {
+    throw new Error("Forbidden: caller identity mismatch for claim creation");
+  }
+  const effectiveUserId: Id<"users"> | undefined = explicitUserId ?? authUserId ?? undefined;
   const now = Date.now();
 
-  if (!userId) {
-    const defaultUser = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", "sentinel@claimhero.internal"))
-      .first();
-    if (defaultUser) {
-      userId = defaultUser._id;
-    } else {
-      userId = await ctx.db.insert("users", {
-        name: "ClaimHero Sentinel System",
-        email: "sentinel@claimhero.internal",
-        createdAt: now,
-      });
-    }
+  // Fail closed: PHI claims are never attributed to a shared sentinel account.
+  // Unauthenticated intake is rejected instead of pooled cross-tenant.
+  if (!effectiveUserId) {
+    throw new Error("Unauthorized: Authentication required");
   }
 
-  const effectiveUserId: Id<"users"> = userId;
+  // Refuse to mint PHI for deleted or unknown users instead of orphaning records.
+  const owner = await ctx.db.get(effectiveUserId);
+  if (!owner) {
+    throw new Error("Unauthorized: Authentication required");
+  }
 
   await validateClaimFinancialsAndCodes(ctx, args, effectiveUserId);
 
@@ -1252,6 +1253,9 @@ async function applyCreateWithPatient(
       .withIndex("by_storageId", (q) => q.eq("storageId", args.denialLetterStorageId!))
       .first();
     if (pending) {
+      if (pending.userId !== effectiveUserId) {
+        throw new Error("Forbidden: This storage file belongs to another user");
+      }
       await ctx.db.patch(pending._id, {
         status: "consumed",
         claimId,
@@ -1269,7 +1273,7 @@ async function applyCreateWithPatient(
   // Log audit event (omitting direct patient name to prevent storing unredacted PHI in case audit trail)
   await appendAuditLog(ctx, {
     claimId,
-    userId,
+    userId: effectiveUserId,
     eventType: "denial_ingested",
     actor: "Optical OCR Parser",
     details: `Extracted denial document for claim #${args.claimNumber} (${args.insurancePayer})`,
@@ -1331,7 +1335,11 @@ export const createWithPatient = mutation({
 });
 
 /**
- * Internal mutation for background actions (such as opticalParser) to create a claim
+ * Internal mutation for background actions (such as opticalParser) to create a claim.
+ * Identity is derived server-side from the propagated auth session (ctx.runMutation
+ * from the authenticated action). No caller-supplied userId is accepted, so a
+ * compromised internal caller cannot mint PHI claims as an arbitrary victim.
+ * Unauthenticated invocations (e.g. via scheduler without auth) fail closed.
  */
 export const createWithPatientInternal = internalMutation({
   args: {
@@ -1352,7 +1360,6 @@ export const createWithPatientInternal = internalMutation({
     denialReasonDescription: v.string(),
     appealFilingDeadlineDays: v.optional(v.number()),
     denialLetterStorageId: v.optional(v.id("_storage")),
-    userId: v.optional(v.id("users")),
     isDemo: v.optional(v.boolean()),
     dataOrigin: v.optional(v.string()),
     origin: v.optional(v.string()),
@@ -1368,7 +1375,8 @@ export const createWithPatientInternal = internalMutation({
     ),
   },
   handler: async (ctx, args) => {
-    return await applyCreateWithPatient(ctx, args, args.userId);
+    const userId = await requireAuthUser(ctx);
+    return await applyCreateWithPatient(ctx, args, userId);
   },
 });
 
@@ -2455,30 +2463,6 @@ export const getPortfolioStats = query({
       portfolioTotalClaims,
       portfolioTotalDisputedAmount,
     };
-  },
-});
-
-/**
- * Assign all unassigned legacy claims created prior to auth to the specified user (internal only)
- */
-export const claimLegacyCasesInternal = internalMutation({
-  args: {
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    const allClaims = await ctx.db.query("claims").take(200);
-    const unassigned = allClaims.filter((c) => !c.userId);
-
-    for (const c of unassigned) {
-      await ctx.db.patch(c._id, { userId: args.userId });
-      try {
-        await claimsAggregate.replace(ctx, c, { ...c, userId: args.userId });
-      } catch {
-        // Aggregate tree may not be mounted in mock test environments
-      }
-    }
-
-    return unassigned.length;
   },
 });
 

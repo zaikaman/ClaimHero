@@ -439,9 +439,10 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         }
       }
 
-      // Save patient and claim into Convex database with denialLetterStorageId linked
+      // Save patient and claim into Convex database with denialLetterStorageId linked.
+      // Identity is resolved server-side inside createWithPatientInternal from the
+      // propagated auth session; no userId is passed so callers cannot spoof ownership.
       claimId = await ctx.runMutation(internal.claims.createWithPatientInternal, {
-        userId,
         patientName: extraction.patientName?.trim() || "",
         patientEmail: args.patientEmail?.trim() || "",
         memberId: extraction.memberId?.trim() || "",

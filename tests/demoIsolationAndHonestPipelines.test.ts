@@ -473,6 +473,7 @@ describe("Demo Isolation, Provenance Attribution & Honest Evaluation Pipeline", 
           }),
           get: vi.fn().mockImplementation((id: string) => {
             if (id === "claim_new_123") return Promise.resolve(insertedClaim);
+            if (id === "user_123") return Promise.resolve({ _id: "user_123", email: "owner@test.com" });
             return Promise.resolve(null);
           }),
         },
@@ -533,6 +534,7 @@ describe("Demo Isolation, Provenance Attribution & Honest Evaluation Pipeline", 
           }),
           get: vi.fn().mockImplementation((id: string) => {
             if (id === "claim_demo_456") return Promise.resolve(insertedClaim);
+            if (id === "user_123") return Promise.resolve({ _id: "user_123", email: "owner@test.com" });
             return Promise.resolve(null);
           }),
         },
