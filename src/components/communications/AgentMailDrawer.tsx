@@ -1591,7 +1591,11 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                     {/* Partial Settlement Offer */}
                     {!isOutbound && isPartialOffer && typeof msg.settlementAmount === "number" && (
                       <div className="p-2 rounded bg-amber-500/10 border border-amber-500/30 text-[11px] font-mono text-amber-700 dark:text-amber-300">
-                        Settlement offered: ${msg.settlementAmount.toLocaleString()} — counter-rebuttal drafted demanding full payment or cure path.
+                        {msg.settlementProvenance === "estimated_benchmark"
+                          ? `Settlement offer received (unspecified amount — estimated 40% benchmark: $${msg.settlementAmount.toLocaleString()}) — counter-rebuttal drafted demanding full payment or cure path.`
+                          : msg.settlementProvenance === "unspecified" || msg.settlementAmount <= 0
+                          ? "Settlement offer received (unspecified amount) — counter-rebuttal drafted demanding full payment or cure path."
+                          : `Settlement offered by payer: $${msg.settlementAmount.toLocaleString()} — counter-rebuttal drafted demanding full payment or cure path.`}
                       </div>
                     )}
 

@@ -403,6 +403,7 @@ export interface EmailMessage {
   clinicalRationale?: string;
   missingRecordsRequested?: string[];
   settlementAmount?: number;
+  settlementProvenance?: "payer_stated" | "estimated_benchmark" | "unspecified" | string;
   autoReplyDraft?: string;
   autoReplyStatus?: "pending" | "dispatched" | "dismissed" | "generating" | "skipped" | "disabled" | "failed" | string;
   receivedAt: number;

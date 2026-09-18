@@ -304,10 +304,11 @@ export default defineSchema({
     ),
     agentMailMessageId: v.optional(v.string()),
     outboundId: v.optional(v.string()),
-    detectedDetermination: v.optional(v.string()), // OVERTURNED_APPROVED, PARTIAL_SETTLEMENT_OFFER, ADDITIONAL_RECORDS_REQUIRED, POLICY_CONFLICT_CITATION, DENIAL_UPHELD, ACKNOWLEDGMENT_ONLY, GENERAL_INQUIRY, DELIVERY_FAILURE
+    detectedDetermination: v.optional(v.string()), // OVERTURNED_APPROVED, PARTIAL_SETTLEMENT_OFFER, ADDITIONAL_RECORDS_REQUIRED, POLICY_CONFLICT_CITATION, DENIAL_UPHELD, ACKNOWLEDGMENT_ONLY, GENERAL_INQUIRY, DELIVERY_FAILURE, PENDING_LLM
     clinicalRationale: v.optional(v.string()),
     missingRecordsRequested: v.optional(v.array(v.string())),
     settlementAmount: v.optional(v.number()),
+    settlementProvenance: v.optional(v.string()), // payer_stated, estimated_benchmark, unspecified
     autoReplyDraft: v.optional(v.string()),
     autoReplyStatus: v.optional(v.string()), // pending, dispatched, dismissed, generating, skipped, disabled, failed
     receivedAt: v.number(),

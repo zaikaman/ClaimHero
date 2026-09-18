@@ -93,6 +93,61 @@ describe("Insurer Defense Adversary negotiation engine", () => {
     );
   });
 
+  it("avoids false positive approval and denial classifications on routine phrases", () => {
+    // False-positive approvals
+    expect(
+      detectAdversaryCountermove("Please choose a participating in-network physician from our approved provider list.")
+    ).toBe("GENERAL_INQUIRY");
+    expect(
+      detectAdversaryCountermove("Services must be rendered at an approved facility.")
+    ).toBe("GENERAL_INQUIRY");
+    expect(
+      detectAdversaryCountermove("The requested service was not approved prior to treatment.")
+    ).toBe("GENERAL_INQUIRY");
+    expect(
+      detectAdversaryCountermove("Notice: Previous billing charge reversed per adjustment.")
+    ).toBe("GENERAL_INQUIRY");
+    expect(
+      detectAdversaryCountermove("Payment reversed due to duplicate submission.")
+    ).toBe("GENERAL_INQUIRY");
+
+    // Negated payment phrases must not trigger approval
+    expect(
+      detectAdversaryCountermove("Claim review complete. No payment issued.")
+    ).toBe("GENERAL_INQUIRY");
+    expect(
+      detectAdversaryCountermove("Notice: Payment was not issued for service code 99213.")
+    ).toBe("GENERAL_INQUIRY");
+
+    // False-positive denials on EOB tables and descriptive charge phrases
+    expect(
+      detectAdversaryCountermove("EOB Summary: Total Billed $2,500.00, Allowed $0.00, Denied Amount: $2,500.00.")
+    ).toBe("GENERAL_INQUIRY");
+    expect(
+      detectAdversaryCountermove("Regarding the denied charges for service date 01/15/2026.")
+    ).toBe("GENERAL_INQUIRY");
+
+    // Member appeal upheld must not be classified as denial upheld
+    expect(
+      detectAdversaryCountermove("The external arbiter ruled that the member's appeal is upheld.")
+    ).not.toBe("DENIAL_UPHELD");
+  });
+
+  it("detects dollar-only and custom percentage partial settlement offers", () => {
+    expect(
+      detectAdversaryCountermove("The payer is willing to offer $3,500 to settle this dispute.")
+    ).toBe("PARTIAL_SETTLEMENT_OFFER");
+    expect(
+      detectAdversaryCountermove("We propose to settle the claim for $1,250.")
+    ).toBe("PARTIAL_SETTLEMENT_OFFER");
+    expect(
+      detectAdversaryCountermove("Insurer counter-offer of $4,500 in full resolution.")
+    ).toBe("PARTIAL_SETTLEMENT_OFFER");
+    expect(
+      detectAdversaryCountermove("We can agree to a 50% settlement of the disputed balance.")
+    ).toBe("PARTIAL_SETTLEMENT_OFFER");
+  });
+
   it("maps countermoves to claim statuses that keep negotiation alive", () => {
     expect(getCountermoveClaimStatus("OVERTURNED_APPROVED")).toBe("won");
     expect(getCountermoveClaimStatus("PARTIAL_SETTLEMENT_OFFER")).toBe("under_review");

@@ -92,6 +92,184 @@ export function pickAdversaryCountermove(ctx: AdversaryClaimContext): AdversaryC
 }
 
 /**
+ * Context-aware check for affirmative determination reversal or approval.
+ * Avoids false-positives on "approved provider list", "approved facility",
+ * "not approved", "charge reversed", "payment reversed", etc.
+ */
+export function isApprovalDeterminationText(text: string): boolean {
+  const lower = (text || "").toLowerCase();
+  if (!lower.trim()) return false;
+
+  // Explicit positive phrases indicating determination overturn or approval
+  const positivePatterns = [
+    /\b(?:appeal|claim|authorization|coverage|reimbursement|service)\s+(?:has\s+been\s+|is\s+|was\s+)?approved\b/,
+    /\bapproved\s+(?:for\s+payment|for\s+reimbursement|upon\s+appeal|upon\s+review|in\s+full)\b/,
+    /\bapproved\s+the\s+appeal\b/,
+    /\b(?:adverse\s+determination|denial|decision|prior\s+determination)\s+(?:has\s+been\s+|is\s+|was\s+)?reversed\b/,
+    /\breversed\s+(?:the\s+denial|the\s+decision|the\s+adverse\s+determination)\b/,
+    /\b(?:overturned\s+upon\s+appeal|overturned\s+in\s+full|denial\s+overturned|determination\s+overturned|appeal\s+overturned)\b/,
+    /\boverturned\s+and\s+approved\b/,
+    /\b(?:authorized\s+in\s+full|coverage\s+authorized\s+in\s+full|authorized\s+coverage\s+in\s+full)\b/,
+    /\b(?:payment\s+issued\s+in\s+full|payment\s+issued\s+for\s+full|reimbursement\s+issued\s+in\s+full)\b/,
+  ];
+
+  if (positivePatterns.some((rx) => rx.test(lower))) {
+    if (/\b(?:not|cannot\s+be|never|unable\s+to\s+be)\s+approved\b/.test(lower)) {
+      return false;
+    }
+    return true;
+  }
+
+  // Check standalone "overturned" if not negated
+  if (/\boverturned\b/.test(lower) && !/\b(?:not|never)\s+overturned\b/.test(lower)) {
+    return true;
+  }
+
+  if (lower.includes("authorized in full")) return true;
+  const isNegatedPayment =
+    /\b(?:no|not|never|neither|without|zero)\s+payment\s+issued\b/.test(lower) ||
+    /\bpayment\s+(?:was\s+|is\s+|has\s+been\s+)?not\s+issued\b/.test(lower) ||
+    /\bpayment\s+(?:reversed|retracted|cancelled)\b/.test(lower);
+  if (/\bpayment\s+issued\b/.test(lower) && !isNegatedPayment) {
+    return true;
+  }
+  if (/\breimbursed\s+in\s+full\b/.test(lower)) return true;
+
+  if (/\bapproved\b/.test(lower)) {
+    const isFalseApproved =
+      /\bapproved\s+(?:provider|physician|doctor|facility|hospital|vendor|network|drug|medication|list|panel)\b/.test(lower) ||
+      /\b(?:pre-?approved|prior-?approved)\b/.test(lower) ||
+      /\b(?:not|cannot\s+be|never|unable\s+to\s+be)\s+approved\b/.test(lower);
+    if (!isFalseApproved && /\b(?:is|was|has\s+been)\s+approved\b/.test(lower)) {
+      return true;
+    }
+  }
+
+  if (/\breversed\b/.test(lower)) {
+    const isFalseReversed =
+      /\b(?:charge|charges|payment|payments|credit|fee|offset)\s+reversed\b/.test(lower) ||
+      /\breversed\s+(?:charge|charges|payment|payments|credit|fee|offset|prior\s+payment)\b/.test(lower);
+    if (!isFalseReversed && /\b(?:decision|denial|determination|adverse\s+action)\s+(?:is|was|has\s+been)?\s*reversed\b/.test(lower)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export interface DetectedSettlementOffer {
+  matches: boolean;
+  offeredAmount?: number;
+  isExplicitDollar: boolean;
+}
+
+/**
+ * Detect both phrasal and explicit dollar / percentage settlement offers.
+ * Captures "offer $X to settle", "settle for $X", "counter-offer of $X", etc.
+ */
+export function detectSettlementOffer(text: string): DetectedSettlementOffer {
+  const lower = (text || "").toLowerCase();
+  if (!lower.trim()) return { matches: false, isExplicitDollar: false };
+
+  // 1. Check for explicit dollar-bearing settlement offers
+  const dollarPatterns = [
+    /(?:offer(?:ing|ed|s)?|settl(?:e|ing|ed|ement)?|propos(?:e|ing|ed|al)?|counter-?offer)\s+(?:of\s+|for\s+|to\s+pay\s+)?\$\s*([\d,]+(?:\.\d{2})?)/i,
+    /\$\s*([\d,]+(?:\.\d{2})?)\s+(?:partial\s+)?(?:settlement|compromise|settlement\s+offer)/i,
+    /(?:settle|resolve)\s+(?:the|this)?\s*(?:claim|dispute|matter|appeal)\s+for\s+\$\s*([\d,]+(?:\.\d{2})?)/i,
+    /(?:willing|agree|propose)\s+(?:to\s+)?settle\s+(?:for|at)\s+\$\s*([\d,]+(?:\.\d{2})?)/i,
+  ];
+
+  for (const rx of dollarPatterns) {
+    const match = text.match(rx);
+    if (match && match[1]) {
+      const parsed = parseFloat(match[1].replace(/,/g, ""));
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return { matches: true, offeredAmount: parsed, isExplicitDollar: true };
+      }
+    }
+  }
+
+  // 2. Check for percentage settlement offers
+  if (/\b\d{1,2}%\s*(?:settlement|offer|compromise|reimbursement|payment)\b/i.test(lower)) {
+    return { matches: true, isExplicitDollar: false };
+  }
+  if (/\b(?:settle|offer|compromise)\b.*?\b\d{1,2}%\b/i.test(lower)) {
+    return { matches: true, isExplicitDollar: false };
+  }
+
+  // 3. Phrasal settlement offers without explicit amount
+  const phrasalMatch =
+    lower.includes("partial settlement") ||
+    lower.includes("settlement offer") ||
+    lower.includes("offer to settle") ||
+    lower.includes("partial payment") ||
+    lower.includes("partial reimbursement") ||
+    lower.includes("compromise offer") ||
+    lower.includes("offer to compromise") ||
+    (lower.includes("partial") && lower.includes("offer")) ||
+    (lower.includes("partial") && lower.includes("settl"));
+
+  if (phrasalMatch) {
+    return { matches: true, isExplicitDollar: false };
+  }
+
+  return { matches: false, isExplicitDollar: false };
+}
+
+/**
+ * Context-aware check for affirmative denial upheld determination.
+ * Prevents false-fires on EOB tables like "denied amount: $1,200".
+ */
+export function isDenialUpheldText(text: string): boolean {
+  const lower = (text || "").toLowerCase();
+  if (!lower.trim()) return false;
+
+  const positivePatterns = [
+    /\bdenial\s+(?:is\s+|was\s+|has\s+been\s+)?(?:upheld|maintained|affirmed|confirmed)\b/,
+    /\b(?:adverse|initial|original)?\s*determination\s+(?:is\s+|was\s+|has\s+been\s+)?(?:upheld|affirmed|maintained)\b/,
+    /\bupheld\s+(?:the\s+)?(?:denial|determination|adverse\s+decision)\b/,
+    /\b(?:appeal|claim|coverage|authorization)\s+(?:is\s+|was\s+|has\s+been\s+)?denied\b/,
+    /\bmaintain(?:s|ed|ing)?\s+(?:the\s+)?(?:denial|adverse\s+determination)\b/,
+    /\bremain(?:s)?\s+denied\b/,
+    /\badverse\s+determination\s+affirmed\b/,
+    /\bnot\s+paying\b/,
+    /\bain't\s+paying\b/,
+    /\brefuse\s+(?:payment|to\s+pay|to\s+reimburse)\b/,
+  ];
+
+  if (positivePatterns.some((rx) => rx.test(lower))) {
+    return true;
+  }
+
+  if (
+    lower.includes("upheld") &&
+    !lower.includes("not upheld") &&
+    !/\b(?:appeal|member|patient)\s+(?:is\s+|was\s+|has\s+been\s+)?upheld\b/.test(lower)
+  ) {
+    return true;
+  }
+  if (lower.includes("denial maintained")) {
+    return true;
+  }
+
+  // If "denied" appears alone, ensure it's an affirmative adjudication and NOT a descriptive field
+  if (/\bdenied\b/.test(lower)) {
+    const isDescriptiveReferenceOnly =
+      /\bdenied\s+(?:amount|charge|charges|service|services|sum|balance|date|code|cpt|line|item)\b/.test(lower) ||
+      /\b(?:previously|originally|prior)\s+denied\b/.test(lower);
+    const hasAffirmativeDenial =
+      /\b(?:claim|appeal|service|request)\s+(?:is|was|has\s+been|remains)\s+denied\b/.test(lower) ||
+      /\bdenied\s+upon\s+(?:review|appeal)\b/.test(lower);
+
+    if (hasAffirmativeDenial && !isDescriptiveReferenceOnly) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Fast heuristic classifier for inbound payer text. Ordering matters:
  * approval first, then partial-settlement, then RFI, then policy conflict,
  * then uphold. Returns GENERAL_INQUIRY when nothing matches.
@@ -102,24 +280,10 @@ export function detectAdversaryCountermove(
   const lower = (text || "").toLowerCase();
   if (!lower.trim()) return "GENERAL_INQUIRY";
 
-  const isApproval =
-    lower.includes("overturned") ||
-    lower.includes("approved") ||
-    lower.includes("payment issued") ||
-    lower.includes("reimbursed") ||
-    lower.includes("reversed") ||
-    lower.includes("authorized in full");
-  if (isApproval) return "OVERTURNED_APPROVED";
+  if (isApprovalDeterminationText(text)) return "OVERTURNED_APPROVED";
 
-  const isPartial =
-    lower.includes("partial settlement") ||
-    lower.includes("settlement offer") ||
-    lower.includes("offer to settle") ||
-    lower.includes("partial payment") ||
-    lower.includes("partial reimbursement") ||
-    (lower.includes("40%") && (lower.includes("offer") || lower.includes("settl"))) ||
-    (lower.includes("partial") && lower.includes("offer"));
-  if (isPartial) return "PARTIAL_SETTLEMENT_OFFER";
+  const settlementOffer = detectSettlementOffer(text);
+  if (settlementOffer.matches) return "PARTIAL_SETTLEMENT_OFFER";
 
   const isRecords =
     lower.includes("additional records") ||
@@ -143,15 +307,7 @@ export function detectAdversaryCountermove(
     lower.includes("exclusion");
   if (isPolicyConflict) return "POLICY_CONFLICT_CITATION";
 
-  const isDenial =
-    lower.includes("upheld") ||
-    lower.includes("denial maintained") ||
-    lower.includes("adverse determination affirmed") ||
-    lower.includes("not paying") ||
-    lower.includes("ain't paying") ||
-    lower.includes("refuse") ||
-    lower.includes("denied");
-  if (isDenial) return "DENIAL_UPHELD";
+  if (isDenialUpheldText(text)) return "DENIAL_UPHELD";
 
   return "GENERAL_INQUIRY";
 }

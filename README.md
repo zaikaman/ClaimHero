@@ -267,11 +267,11 @@ npm run build           # Production bundle
 npm run verify          # Full local verification gate
 ```
 
-The repository includes 1,227 automated tests across 79 suites, covering the
+The repository includes 1,236 automated tests across 79 suites, covering the
 Convex workflows, authorization boundaries, OCR/redaction, vault-tokenized
 PHI-safe LLM boundaries, Firecrawl and AgentMail integrations, precedent
 scoring, honest degradation floor gating (preventing unearned statutory baseline score inflation and hardcoded code match forcing), evidentiary and statutory matcher grounding, safe auto-reply addendum generation gating (prohibiting ungrounded clinical necessity assertions and phantom diagnostics), canonical appeal readiness vs un-capped evidence coverage, audit chains, denial-anchored statutory deadlines, dual-clock statutory timing (ERISA 180-day internal appeals, ACA 45 CFR § 147.136 4-month external reviews, and state 30-day expedited clocks across CA/TX/NY),
-collaboration, provisional evidence gating, and secondary dispatch review boundaries.
+collaboration, provisional evidence gating, secondary dispatch review boundaries, payer reply keyword classification and settlement provenance tracking, and post-resolution adverse action reopening.
 
 ## Project structure
 

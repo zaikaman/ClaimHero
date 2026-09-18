@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-18T13:12:00Z
+- **Last updated:** 2026-09-18T13:37:13Z
 
 ## Log
 
@@ -1692,7 +1692,7 @@ Harmonized statutory appeal and external review deadlines across docs and code (
 - Doc-vs-Code Harmonization: Updated `PRODUCT.md`, `stateRegulators.ts`, `OnboardingWizard.tsx`, `DossierStatutorySummary.tsx`, and `constants.ts` to eliminate doc-vs-code contradictions and align with US healthcare regulations.
 - Regression & Verification: Added comprehensive test suite `tests/statutoryDeadlinesExternalReview.test.ts` (14 tests) and updated `tests/stateRegulators.test.ts` and `tests/statutoryEscalation.test.ts`. Verified 78 test suites (1,218 passing tests), 0 type errors, 0 lint warnings, and production build.
 
-### 2026-09-18 - working tree
+### 2026-09-18 - 74297c1
 Refactored statutory scoring engine and evidentiary degradation gating to eliminate win-probability aliasing, auto-inserted statutory gifts, and hardcoded code match forcing (`README.md`, `convex/actions/precedentMatcher.ts`, `tests/evidentiaryDegradationGating.test.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`):
 - Canonical Appeal Readiness vs Evidence Coverage: Disentangled `evidenceCoverageScore` from the capped appeal readiness sum; `appealReadinessScore` canonically evaluates 0-100 dossier readiness (held at max 40 when evidentially degraded), while `evidenceCoverageScore` honestly reports true documentary completeness across the 4 statutory pillars without synthetic clamping. Retained `overturnProbabilityScore` as backward-compatible alias for existing database schemas and legacy API consumers.
 - Eliminated Statutory Baseline Score Inflation: Fixed Pillar 3 ERISA scoring so auto-inserted fallback boilerplate notices (`isStatutoryBaselineEvidence`, `ERISA_STATUTORY_EVIDENCE`) receive baseline floor (4/weak) rather than gifting 19/20 points, ensuring degraded dossiers with zero substantive evidence hit the honest floor (score 21), not the provisional cap (40).
@@ -1703,5 +1703,13 @@ Follow-up: Enforced evidentiary and statutory grounding in `convex/actions/prece
 - Precedent Matcher Grounding: `keyPolicyContradictions` now strictly checks against verified, non-blocked, site-matched substantive clinical policy evidence and evaluates to empty (`[]`) when CPB is degraded, pure statutory, or absent, discarding unsupported clinical assertions (`UNSUPPORTED_CLINICAL_CONCLUSION`); `winningPrecedentSummary` reports unverified archive status when unavailable or when no precedents match rather than passing hallucinated court cases; and `suggestedAppealLevel` enforces mandatory internal review (`level_1_internal`) on initial claims, blocking premature external review recommendations without administrative exhaustion.
 - Auto-Reply Draft Hardening: Rewrote `generateAutoReplyDraft` system/user prompts to prohibit asserting that the record 'conclusively demonstrates medical necessity' and remove unverified conservative therapy/imaging demands; filters blocked (403/captcha) and anatomically mismatched evidence; and implements post-generation clinical safety gating with `buildNeutralClinicalBasis` when clinical intake facts are absent.
 - Regression & Verification: Added comprehensive test suite `tests/groundedMatcherAndSafeAutoReply.test.ts` (6 tests). Verified 79 test suites (1,227 passing tests), clean typecheck, clean lint, coverage, and production build. Convex features: actions, internalAction, mutations.
+
+### 2026-09-18 - working tree
+Fixed payer reply keyword misclassification, unlatched post-resolution reopenings, and eliminated unflagged synthetic 40% settlement offers in AgentMail inbound processing (`README.md`, `convex/lib/adversaryNegotiation.ts`, `convex/actions/agentMail.ts`, `convex/schema.ts`, `convex/emails.ts`, `src/types/index.ts`, `src/components/communications/AgentMailDrawer.tsx`, `tests/adversarialAdjudicator.test.ts`, `tests/actionsAgentMailAndDispatcher.test.ts`, `tests/convexEmails.test.ts`):
+- Determination Keyword Classification: Replaced naive substring matching with contextual helpers (`isApprovalDeterminationText`, `isDenialUpheldText`, `detectSettlementOffer`). Blocked non-determination false positives on phrases like "approved provider list", "charge reversed", "payment was not issued", and "denied amount: $X" in EOBs, while guarding against member appeal upheld being classified as a denial.
+- Settlement Offer Extraction: Upgraded countermove detection to parse explicit dollar-only offers ("offer $3,500 to settle") and arbitrary percentage proposals, preventing premature fallback to general inquiry.
+- Unspecified Offer Provenance Flagging: Added `settlementProvenance` schema attribute (`"payer_stated" | "estimated_benchmark" | "unspecified"`). Prohibited LLM synthesis and fast heuristic updates from fabricating 40% figures when the payer omitted financial terms; labeled 40% fallback estimates transparently in the UI as statutory benchmark estimates rather than payer-stated concessions.
+- State Machine Integrity & Won Claim Reopening: Removed destructive downgrade of `escalated` and `under_review` claims to `dispatched` upon LLM analysis fallback; allowed `PENDING_LLM` in allowable determination sets so initial inbound message inserts succeed during async evaluation. Unlatched `isOverturned` so post-resolution adverse actions on previously won claims trigger reopened status (`REOPENED: ...`), draft rebuttals, stage pending auto-replies, and log audit entries.
+- Regression Coverage & Verification: Added comprehensive regression tests covering all six edge cases in `tests/actionsAgentMailAndDispatcher.test.ts`, `tests/convexEmails.test.ts`, and `tests/adversarialAdjudicator.test.ts`. Verified 79 test suites (1,236 passing tests), clean typecheck, clean lint, and production build. Convex features: actions, internalAction, mutations, queries, schema.
 
 

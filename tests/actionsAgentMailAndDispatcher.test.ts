@@ -1,5 +1,6 @@
 /// <reference path="./auth-mock.d.ts" />
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { internal } from "../convex/_generated/api";
 import * as actionAgentMail from "../convex/actions/agentMail";
 import * as actionMailDispatcher from "../convex/actions/mailDispatcher";
 import * as libAgentMail from "../convex/lib/agentMail";
@@ -21,6 +22,7 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
     process.env = { ...originalEnv };
     vi.clearAllMocks();
     vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+    vi.spyOn(libOpenAI, "createStructuredCompletion").mockRejectedValue(new Error("LLM Rate Limit"));
   });
 
   describe("convex/actions/agentMail", () => {
@@ -222,6 +224,323 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       const mutationCalls = mockCtx.runMutation.mock.calls;
       const wonCalls = mutationCalls.filter((call: any[]) => call[1]?.status === "won");
       expect(wonCalls).toHaveLength(0);
+    });
+
+    it("processInboundClaimReply: routine phrases 'approved provider list' and 'charge reversed' do NOT set PENDING_LLM or transition claim to under_review", async () => {
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_reply_provider_list",
+        inbox_id: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        to: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 In-Network Guidelines",
+        text: "Please select an in-network provider from our approved provider list. Also note previous charge reversed per adjustment.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_reply_prov",
+        messageId: "msg_reply_provider_list",
+        inboxId: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 In-Network Guidelines",
+        text: "Please select an in-network provider from our approved provider list. Also note previous charge reversed per adjustment.",
+        attachments: [],
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "claim_prov", claimNumber: "CLM-100", status: "dispatched" }),
+        runMutation: vi.fn().mockResolvedValue("id_prov"),
+        runAction: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_reply_prov",
+        messageId: "msg_reply_provider_list",
+        inboxId: "inbox_case_1",
+      });
+
+      console.log("MUTATION CALL ARGS:", mockCtx.runMutation.mock.calls.map((c: any[]) => c[1]));
+      const allArgs = mockCtx.runMutation.mock.calls.map((c: any[]) => c[1]).filter(Boolean);
+      expect(allArgs.some((arg: any) => arg.detectedDetermination === "GENERAL_INQUIRY")).toBe(true);
+      expect(allArgs.some((arg: any) => arg.status === "under_review")).toBe(false);
+    });
+
+    it("processInboundClaimReply: EOB containing 'denied amount' does NOT set DENIAL_UPHELD or transition claim to escalated", async () => {
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_reply_eob",
+        inbox_id: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        to: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Explanation of Benefits",
+        text: "EOB Summary: Billed $5,000.00, Allowed $0.00, Denied Amount: $5,000.00.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_reply_eob",
+        messageId: "msg_reply_eob",
+        inboxId: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Explanation of Benefits",
+        text: "EOB Summary: Billed $5,000.00, Allowed $0.00, Denied Amount: $5,000.00.",
+        attachments: [],
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "claim_eob", claimNumber: "CLM-100", status: "dispatched" }),
+        runMutation: vi.fn().mockResolvedValue("id_eob"),
+        runAction: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_reply_eob",
+        messageId: "msg_reply_eob",
+        inboxId: "inbox_case_1",
+      });
+
+      // Initial fast insertion should be GENERAL_INQUIRY, NOT DENIAL_UPHELD
+      const allArgs = mockCtx.runMutation.mock.calls.map((c: any[]) => c[1]).filter(Boolean);
+      expect(allArgs.some((arg: any) => arg.detectedDetermination === "GENERAL_INQUIRY")).toBe(true);
+
+      // Claim status should NOT transition to escalated
+      expect(allArgs.some((arg: any) => arg.status === "escalated")).toBe(false);
+    });
+
+    it("processInboundClaimReply: extracts dollar-only settlement offers and assigns settlementProvenance 'payer_stated'", async () => {
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_reply_dollar_offer",
+        inbox_id: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        to: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Settlement",
+        text: "The health plan is willing to offer $3,500 to settle this claim dispute.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_reply_dollar",
+        messageId: "msg_reply_dollar_offer",
+        inboxId: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Settlement",
+        text: "The health plan is willing to offer $3,500 to settle this claim dispute.",
+        attachments: [],
+      });
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        determination: "PARTIAL_SETTLEMENT_OFFER",
+        clinicalRationale: "Payer offered $3,500 compromise.",
+        missingRecordsRequested: [],
+        authorizedSettlementAmount: 3500,
+        settlementProvenance: "payer_stated",
+        reviewerName: "Aetna Reviewer",
+        shouldAutoReply: true,
+        suggestedAutoReplyAddendum: "We decline the $3,500 settlement.",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "claim_dollar", claimNumber: "CLM-100", deniedAmount: 8000, status: "dispatched" }),
+        runMutation: vi.fn().mockResolvedValue("id_dollar"),
+        runAction: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_reply_dollar",
+        messageId: "msg_reply_dollar_offer",
+        inboxId: "inbox_case_1",
+      });
+
+      const allArgs = mockCtx.runMutation.mock.calls.map((c: any[]) => c[1]).filter(Boolean);
+      const analysisArg = allArgs.find((a: any) => a.messageId === "id_dollar" && a.detectedDetermination === "PARTIAL_SETTLEMENT_OFFER");
+      expect(analysisArg).toEqual(expect.objectContaining({
+        detectedDetermination: "PARTIAL_SETTLEMENT_OFFER",
+        settlementAmount: 3500,
+        settlementProvenance: "payer_stated",
+      }));
+
+      // Check claim status details explicitly mention offered by payer
+      const underReviewArgs = allArgs.filter((a: any) => a.status === "under_review");
+      const finalUnderReview = underReviewArgs[underReviewArgs.length - 1];
+      expect(finalUnderReview.details).toContain("$3,500 offered by payer");
+    });
+
+    it("processInboundClaimReply: unspecified partial offer assigns settlementProvenance 'estimated_benchmark' and does not claim payer offered amount", async () => {
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_reply_unspec_offer",
+        inbox_id: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        to: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Settlement Consideration",
+        text: "We are open to a partial settlement of this appeal. Please contact our resolution unit.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_reply_unspec",
+        messageId: "msg_reply_unspec_offer",
+        inboxId: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Settlement Consideration",
+        text: "We are open to a partial settlement of this appeal. Please contact our resolution unit.",
+        attachments: [],
+      });
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        determination: "PARTIAL_SETTLEMENT_OFFER",
+        clinicalRationale: "Payer opened settlement negotiation without stating a number.",
+        missingRecordsRequested: [],
+        authorizedSettlementAmount: 0,
+        settlementProvenance: "unspecified",
+        reviewerName: "Aetna Reviewer",
+        shouldAutoReply: true,
+        suggestedAutoReplyAddendum: "We decline an unspecified settlement.",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "claim_unspec", claimNumber: "CLM-100", deniedAmount: 10000, status: "dispatched" }),
+        runMutation: vi.fn().mockResolvedValue("id_unspec"),
+        runAction: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_reply_unspec",
+        messageId: "msg_reply_unspec_offer",
+        inboxId: "inbox_case_1",
+      });
+
+      const allArgs = mockCtx.runMutation.mock.calls.map((c: any[]) => c[1]).filter(Boolean);
+      const analysisArg = allArgs.find((a: any) => a.messageId === "id_unspec" && a.detectedDetermination === "PARTIAL_SETTLEMENT_OFFER");
+      expect(analysisArg).toEqual(expect.objectContaining({
+        detectedDetermination: "PARTIAL_SETTLEMENT_OFFER",
+        settlementProvenance: "estimated_benchmark",
+      }));
+
+      // Check claim status details clearly flags benchmark baseline and does NOT state "Partial settlement of $X offered"
+      const underReviewArgsUnspec = allArgs.filter((a: any) => a.status === "under_review");
+      const finalUnderReviewUnspec = underReviewArgsUnspec[underReviewArgsUnspec.length - 1];
+      expect(finalUnderReviewUnspec.details).toContain("unspecified amount (industry benchmark baseline: ~$4,000)");
+      expect(finalUnderReviewUnspec.details).not.toContain("Partial settlement of $4,000 offered on");
+    });
+
+    it("processInboundClaimReply: LLM failure or general inquiry does NOT reset escalated or under_review claims to dispatched", async () => {
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_reply_inquiry",
+        inbox_id: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        to: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 General Update",
+        text: "We acknowledge receipt of your documentation.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_reply_inq",
+        messageId: "msg_reply_inquiry",
+        inboxId: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 General Update",
+        text: "We acknowledge receipt of your documentation.",
+        attachments: [],
+      });
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockRejectedValue(new Error("LLM timeout"));
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "claim_esc", claimNumber: "CLM-100", status: "escalated" }),
+        runMutation: vi.fn().mockResolvedValue("id_esc"),
+        runAction: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_reply_inq",
+        messageId: "msg_reply_inquiry",
+        inboxId: "inbox_case_1",
+      });
+
+      // Claim status must NOT be reset to 'dispatched'
+      const allArgs = mockCtx.runMutation.mock.calls.map((c: any[]) => c[1]).filter(Boolean);
+      expect(allArgs.some((arg: any) => arg.status === "dispatched")).toBe(false);
+    });
+
+    it("processInboundClaimReply: adverse determination on won claim unlatches isOverturned, stages autoReply draft, and logs appeal_review_requested", async () => {
+      vi.spyOn(libAgentMail, "getAgentMailMessage").mockResolvedValue({
+        message_id: "msg_reply_reopen",
+        inbox_id: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        to: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Post-Payment Audit Determination",
+        text: "Upon post-payment audit review, we are upholding the initial denial and requesting recoupment.",
+        attachments: [],
+      } as any);
+
+      vi.spyOn(libAgentMailWebhook, "normalizeAgentMailWebhook").mockReturnValue({
+        eventType: "message.received",
+        eventId: "evt_reply_reopen",
+        messageId: "msg_reply_reopen",
+        inboxId: "inbox_case_1",
+        from: "payer@aetna.com",
+        recipients: ["appeal-100@claimhero.com"],
+        subject: "RE: Claim CLM-100 Post-Payment Audit Determination",
+        text: "Upon post-payment audit review, we are upholding the initial denial and requesting recoupment.",
+        attachments: [],
+      });
+
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        determination: "DENIAL_UPHELD",
+        clinicalRationale: "Post-payment audit upheld denial.",
+        missingRecordsRequested: [],
+        authorizedSettlementAmount: 0,
+        reviewerName: "Aetna Audit Director",
+        shouldAutoReply: true,
+        suggestedAutoReplyAddendum: "We dispute the recoupment demand under ERISA statutory protections.",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue({ _id: "claim_won_reopened", claimNumber: "CLM-100", status: "won", deniedAmount: 5000 }),
+        runMutation: vi.fn().mockResolvedValue("id_reopen"),
+        runAction: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await (actionAgentMail.processInboundClaimReply as any)._handler(mockCtx, {
+        eventId: "evt_reply_reopen",
+        messageId: "msg_reply_reopen",
+        inboxId: "inbox_case_1",
+      });
+
+      const allArgs = mockCtx.runMutation.mock.calls.map((c: any[]) => c[1]).filter(Boolean);
+
+      // Rebuttal draft must NOT be suppressed; autoReplyStatus must be 'pending'
+      const analysisArg = allArgs.find((a: any) => a.messageId === "id_reopen" && a.detectedDetermination === "DENIAL_UPHELD");
+      expect(analysisArg).toEqual(expect.objectContaining({
+        detectedDetermination: "DENIAL_UPHELD",
+        autoReplyStatus: "pending",
+      }));
+      expect(analysisArg.autoReplyDraft).toBeTruthy();
+
+      // Claim status must transition from won to escalated with REOPENED prefix
+      const escalatedArg = allArgs.find((a: any) => a.status === "escalated");
+      expect(escalatedArg).toBeDefined();
+      expect(escalatedArg.details).toContain("REOPENED:");
+
+      // Audit review event must be triggered
+      const auditArg = allArgs.find((a: any) => a.eventType === "appeal_review_requested");
+      expect(auditArg).toBeDefined();
     });
 
     it("processInboundClaimReply: routes correctly via threadId match when claimNumber is missing from subject", async () => {

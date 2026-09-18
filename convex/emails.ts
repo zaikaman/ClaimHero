@@ -198,6 +198,7 @@ export const ALLOWED_DETERMINATIONS = new Set([
   "ACKNOWLEDGMENT_ONLY",
   "GENERAL_INQUIRY",
   "DELIVERY_FAILURE",
+  "PENDING_LLM",
 ]);
 
 export const ALLOWED_AUTOREPLY_STATUSES = new Set([
@@ -232,6 +233,7 @@ interface InsertMessageArgs {
   clinicalRationale?: string;
   missingRecordsRequested?: string[];
   settlementAmount?: number;
+  settlementProvenance?: string;
   autoReplyDraft?: string;
   autoReplyStatus?: string;
 }
@@ -298,6 +300,7 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
     clinicalRationale: args.clinicalRationale,
     missingRecordsRequested: args.missingRecordsRequested,
     settlementAmount: args.settlementAmount,
+    settlementProvenance: args.settlementProvenance,
     autoReplyDraft: args.autoReplyDraft,
     autoReplyStatus: args.autoReplyStatus,
     receivedAt: now,
@@ -392,6 +395,7 @@ export const insertMessage = mutation({
     clinicalRationale: v.optional(v.string()),
     missingRecordsRequested: v.optional(v.array(v.string())),
     settlementAmount: v.optional(v.number()),
+    settlementProvenance: v.optional(v.string()),
     autoReplyDraft: v.optional(v.string()),
     autoReplyStatus: v.optional(v.string()),
   },
@@ -431,6 +435,7 @@ export const insertMessageInternal = internalMutation({
     clinicalRationale: v.optional(v.string()),
     missingRecordsRequested: v.optional(v.array(v.string())),
     settlementAmount: v.optional(v.number()),
+    settlementProvenance: v.optional(v.string()),
     autoReplyDraft: v.optional(v.string()),
     autoReplyStatus: v.optional(v.string()),
   },
@@ -450,6 +455,7 @@ export const updateMessageAnalysisInternal = internalMutation({
     clinicalRationale: v.optional(v.string()),
     missingRecordsRequested: v.optional(v.array(v.string())),
     settlementAmount: v.optional(v.number()),
+    settlementProvenance: v.optional(v.string()),
     autoReplyDraft: v.optional(v.string()),
     autoReplyStatus: v.optional(v.string()),
     attachments: v.optional(

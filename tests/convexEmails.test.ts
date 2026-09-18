@@ -337,6 +337,40 @@ describe("Convex Emails & Communications API", () => {
       ).rejects.toThrow('Invalid detectedDetermination: "SOME_UNRECOGNIZED_STATUS"');
     });
 
+    it("accepts PENDING_LLM determination during atomic inbound message insertion", async () => {
+      const mockCtx: any = {
+        db: {
+          insert: vi.fn().mockImplementation(() => Promise.resolve("msg_inbound_pending")),
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              first: vi.fn().mockResolvedValue(null),
+            }),
+          }),
+        },
+      };
+
+      const res = await (emails.insertInboundMessageInternal as any)._handler(mockCtx, {
+        threadId: "t1",
+        claimId: "c1",
+        sender: "payer@aetna.com",
+        recipient: "agent@claimhero.com",
+        subject: "Preliminary Determination",
+        bodyHtml: "<p>Review complete</p>",
+        bodyText: "Review complete",
+        hasAttachments: false,
+        agentMailMessageId: "msg_pending_123",
+        detectedDetermination: "PENDING_LLM",
+        clinicalRationale: "Awaiting LLM adjudication",
+        autoReplyStatus: "generating",
+      });
+
+      expect(res.isNew).toBe(true);
+      expect(mockCtx.db.insert).toHaveBeenCalledWith("emailMessages", expect.objectContaining({
+        detectedDetermination: "PENDING_LLM",
+        autoReplyStatus: "generating",
+      }));
+    });
+
     it("accepts lifecycle autoReplyStatus values including generating, skipped, disabled, failed", async () => {
       const mockCtx: any = {
         db: {

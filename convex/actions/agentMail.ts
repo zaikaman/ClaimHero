@@ -13,6 +13,11 @@ import {
 } from "../lib/agentMail";
 import { extractEmailAddress, isInternalAgentMailAddress, normalizeAgentMailWebhook } from "../lib/agentMailWebhook";
 import { formatPayerResponseAlertEmail, escapeHtml } from "../lib/appealEmail";
+import {
+  detectSettlementOffer,
+  isApprovalDeterminationText,
+  isDenialUpheldText,
+} from "../lib/adversaryNegotiation";
 import { requireAuthUser } from "../lib/auth";
 import { rateLimiter } from "../lib/rateLimiter";
 import { isTextractConfigured, extractDocumentWithTextract } from "../lib/textract";
@@ -94,6 +99,10 @@ const INBOUND_ANALYSIS_SCHEMA = {
       items: { type: "string" },
     },
     authorizedSettlementAmount: { type: "number" },
+    settlementProvenance: {
+      type: "string",
+      enum: ["payer_stated", "estimated_benchmark", "unspecified"],
+    },
     citedPolicyClause: { type: "string" },
     settlementOfferPct: { type: "number" },
     reviewerName: { type: "string" },
@@ -124,6 +133,7 @@ interface InboundAnalysisResult {
   clinicalRationale: string;
   missingRecordsRequested: string[];
   authorizedSettlementAmount: number;
+  settlementProvenance?: "payer_stated" | "estimated_benchmark" | "unspecified";
   citedPolicyClause?: string;
   settlementOfferPct?: number;
   reviewerName: string;
@@ -360,22 +370,13 @@ async function handleInboundClaimReply(
     // Fast heuristic classification for instantaneous sub-second UI rendering.
     // Ordering: approval, then partial settlement, then RFI, then policy
     // conflict, then uphold — mirrors detectAdversaryCountermove().
-    const lowerText = (normalized.text || normalized.html || subject || "").toLowerCase();
-    const isApprovalFallback =
-      lowerText.includes("overturned") ||
-      lowerText.includes("approved") ||
-      lowerText.includes("payment issued") ||
-      lowerText.includes("reimbursed") ||
-      lowerText.includes("reversed") ||
-      lowerText.includes("authorized in full");
-    const isPartialFallback =
-      lowerText.includes("partial settlement") ||
-      lowerText.includes("settlement offer") ||
-      lowerText.includes("offer to settle") ||
-      lowerText.includes("partial payment") ||
-      lowerText.includes("partial reimbursement") ||
-      (lowerText.includes("40%") && (lowerText.includes("offer") || lowerText.includes("settl"))) ||
-      (lowerText.includes("partial") && lowerText.includes("offer"));
+    const candidateText = normalized.text || normalized.html || subject || "";
+    const lowerText = candidateText.toLowerCase();
+
+    const isApprovalFallback = isApprovalDeterminationText(candidateText);
+    const detectedOffer = detectSettlementOffer(candidateText);
+    const isPartialFallback = detectedOffer.matches;
+
     const isRecordsFallback =
       lowerText.includes("additional records") ||
       lowerText.includes("documentation required") ||
@@ -383,22 +384,18 @@ async function handleInboundClaimReply(
       lowerText.includes("clinical records") ||
       lowerText.includes("need records") ||
       lowerText.includes("operative notes") ||
-      lowerText.includes("request for information");
+      lowerText.includes("request for information") ||
+      lowerText.includes("rfi");
     const isPolicyFallback =
       lowerText.includes("clinical policy bulletin") ||
       lowerText.includes("cpb") ||
       lowerText.includes("medical policy") ||
       lowerText.includes("coverage criteria") ||
       lowerText.includes("policy clause") ||
-      lowerText.includes("conflicting");
-    const isDenialFallback =
-      lowerText.includes("upheld") ||
-      lowerText.includes("denial maintained") ||
-      lowerText.includes("adverse determination affirmed") ||
-      lowerText.includes("not paying") ||
-      lowerText.includes("ain't paying") ||
-      lowerText.includes("refuse") ||
-      lowerText.includes("denied");
+      lowerText.includes("conflicting") ||
+      lowerText.includes("not medically necessary per") ||
+      lowerText.includes("exclusion");
+    const isDenialFallback = isDenialUpheldText(candidateText);
 
     const fallbackDetermination = isApprovalFallback
       ? "PENDING_LLM"
@@ -558,7 +555,9 @@ async function handleInboundClaimReply(
           actor: `${payer} Review Board`,
           details:
             fallbackDetermination === "PARTIAL_SETTLEMENT_OFFER"
-              ? "Partial settlement offered by payer. File held in active negotiation."
+              ? (detectedOffer.isExplicitDollar && detectedOffer.offeredAmount
+                  ? `Partial settlement of $${detectedOffer.offeredAmount.toLocaleString()} offered by payer. File held in active negotiation.`
+                  : "Partial settlement offered by payer. File held in active negotiation.")
               : "Additional clinical records requested by reviewer.",
         });
       } else if (
@@ -601,14 +600,14 @@ Clinical Context:
 Evaluate the inbound correspondence text AND any attached documents (Explanation of Benefits, formal adverse determination notices, or settlement agreements) rigorously:
  1. Classify the determination:
     - "OVERTURNED_APPROVED": The payer explicitly agrees to reverse the adverse determination, authorize coverage, overturn the denial, or release settlement funds.
-    - "PARTIAL_SETTLEMENT_OFFER": The payer offers a compromise below the full disputed amount (e.g., a 40% partial settlement) while reserving the balance. Extract the offered dollar amount and percentage.
+    - "PARTIAL_SETTLEMENT_OFFER": The payer offers a compromise below the full disputed amount while reserving the balance. Extract the offered dollar amount and percentage.
     - "ADDITIONAL_RECORDS_REQUIRED": The payer issues a formal Request for Information demanding operative notes, dated imaging, conservative therapy records, or prior authorization proof before completing review.
     - "POLICY_CONFLICT_CITATION": The payer cites a specific conflicting Clinical Policy Bulletin (CPB) clause or medical-policy exclusion as the basis for denial. Quote the clause in citedPolicyClause.
     - "DENIAL_UPHELD": The payer explicitly affirms/maintains their adverse determination or advises of external review rights.
     - "ACKNOWLEDGMENT_ONLY": A routine automated or administrative receipt acknowledging file intake without substantive clinical determination.
     - "GENERAL_INQUIRY": General administrative question or status check.
  2. Extract specific missing clinical documentation or evidence demanded.
- 3. If overturned, partially settled, or settled, extract the authorized settlement dollar amount (default to denied amount $${matchingClaim.deniedAmount} if full approval; default to 40% of denied amount — $${Math.round(matchingClaim.deniedAmount * 0.4)} — if a partial offer omits the figure).
+ 3. If overturned, extract authorized recovery (default to full denied amount $${matchingClaim.deniedAmount}). If partially settled or compromise offered, extract the EXACT dollar figure or percentage explicitly stated by the payer. If the payer extended a partial offer but did NOT specify an amount or percentage, set authorizedSettlementAmount to 0 and settlementProvenance to "unspecified". NEVER fabricate or invent a dollar amount that the payer did not state.
  4. If an attached Explanation of Benefits or settlement agreement is present, incorporate its formal claim decisions into your evaluation.
  5. For ANY determination other than OVERTURNED_APPROVED (especially PARTIAL_SETTLEMENT_OFFER, POLICY_CONFLICT_CITATION, DENIAL_UPHELD, ADDITIONAL_RECORDS_REQUIRED, or GENERAL_INQUIRY), synthesize a professional, procedurally grounded clinical counter-rebuttal tailored to the countermove: decline discounted settlements and demand full payment with cure path for partial offers; distinguish the cited CPB clause on the facts for policy citations; formally demand Independent Review Organization (IRO) external review citing statutory ERISA 29 C.F.R. § 2560.503-1 rights if the denial is upheld; supply or commit the requested records for RFIs. All drafted rebuttals require human review prior to transmission.
  6. CRITICAL RULE: If determination is "OVERTURNED_APPROVED" (claim won/approved), set shouldAutoReply to false and set suggestedAutoReplyAddendum to empty string "". For ALL other determinations, set shouldAutoReply to true and provide a non-empty suggestedAutoReplyAddendum.`,
@@ -626,7 +625,14 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
     const determination =
       analysis?.determination ||
       (fallbackDetermination === "PENDING_LLM" ? "GENERAL_INQUIRY" : fallbackDetermination);
-    const isOverturned = determination === "OVERTURNED_APPROVED" || matchingClaim.status === "won";
+    const isOverturned = determination === "OVERTURNED_APPROVED";
+    const isReopeningWonClaim = matchingClaim.status === "won" && !isOverturned;
+    const isActionableAdverseMove =
+      determination === "PARTIAL_SETTLEMENT_OFFER" ||
+      determination === "ADDITIONAL_RECORDS_REQUIRED" ||
+      determination === "POLICY_CONFLICT_CITATION" ||
+      determination === "DENIAL_UPHELD";
+
     const citedClause = analysis?.citedPolicyClause?.trim() || undefined;
     const clinicalRationale =
       analysis?.clinicalRationale ||
@@ -643,16 +649,39 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
         : "Inbound correspondence received and recorded.");
     const missingRecords = analysis?.missingRecordsRequested || [];
     const partialDefault = Math.round((matchingClaim.deniedAmount || 0) * 0.4);
-    const settlementAmount =
-      analysis?.authorizedSettlementAmount ||
-      (determination === "OVERTURNED_APPROVED"
-        ? matchingClaim.deniedAmount
-        : determination === "PARTIAL_SETTLEMENT_OFFER"
-        ? partialDefault
-        : undefined);
+
+    let settlementAmount: number | undefined;
+    let settlementProvenance: "payer_stated" | "estimated_benchmark" | "unspecified" | undefined;
+
+    if (isOverturned) {
+      settlementAmount =
+        analysis?.authorizedSettlementAmount && analysis.authorizedSettlementAmount > 0
+          ? analysis.authorizedSettlementAmount
+          : matchingClaim.deniedAmount;
+      settlementProvenance = "payer_stated";
+    } else if (determination === "PARTIAL_SETTLEMENT_OFFER") {
+      const explicitDollar =
+        detectedOffer.offeredAmount ||
+        (analysis?.authorizedSettlementAmount && analysis.authorizedSettlementAmount > 0
+          ? analysis.authorizedSettlementAmount
+          : undefined);
+
+      if (explicitDollar && explicitDollar > 0) {
+        settlementAmount = explicitDollar;
+        settlementProvenance = "payer_stated";
+      } else if (analysis?.settlementOfferPct && analysis.settlementOfferPct > 0) {
+        settlementAmount = Math.round((matchingClaim.deniedAmount || 0) * (analysis.settlementOfferPct / 100));
+        settlementProvenance = "payer_stated";
+      } else {
+        settlementAmount = partialDefault;
+        settlementProvenance = "estimated_benchmark";
+      }
+    }
+
     const { buildCounterRebuttalFallback } = await import("../lib/adversaryNegotiation");
-    let suggestedAutoReply = isOverturned ? "" : (analysis?.suggestedAutoReplyAddendum || "");
-    if (!isOverturned && !suggestedAutoReply.trim()) {
+    const shouldDraftRebuttal = !isOverturned && (isActionableAdverseMove || determination === "GENERAL_INQUIRY");
+    let suggestedAutoReply = shouldDraftRebuttal ? (analysis?.suggestedAutoReplyAddendum || "") : "";
+    if (shouldDraftRebuttal && !suggestedAutoReply.trim()) {
       suggestedAutoReply = buildCounterRebuttalFallback({
         claimNumber: matchingClaim.claimNumber,
         determination,
@@ -669,6 +698,7 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
       clinicalRationale: citedClause ? `${clinicalRationale} Cited clause: ${citedClause}` : clinicalRationale,
       missingRecordsRequested: missingRecords.length > 0 ? missingRecords : undefined,
       settlementAmount,
+      settlementProvenance,
       autoReplyDraft: isOverturned ? undefined : (suggestedAutoReply || undefined),
       autoReplyStatus: isOverturned ? undefined : (suggestedAutoReply ? "pending" : undefined),
       attachments: storedAttachments.length > 0 ? storedAttachments : undefined,
@@ -718,34 +748,54 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
       determination === "ADDITIONAL_RECORDS_REQUIRED" ||
       determination === "PARTIAL_SETTLEMENT_OFFER"
     ) {
+      const reopenPrefix = isReopeningWonClaim ? "REOPENED: Post-resolution countermove received from payer. " : "";
+      const partialDetails =
+        settlementProvenance === "payer_stated"
+          ? `NEGOTIATION: Partial settlement of $${(settlementAmount || 0).toLocaleString()} offered by payer on $${(matchingClaim.deniedAmount || 0).toLocaleString()} disputed. Counter-rebuttal drafted demanding full payment or cure path.`
+          : `NEGOTIATION: Partial settlement offer extended with unspecified amount (industry benchmark baseline: ~$${partialDefault.toLocaleString()}) on $${(matchingClaim.deniedAmount || 0).toLocaleString()} disputed. Counter-rebuttal drafted demanding full payment or cure path.`;
+
       await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: matchingClaim._id,
         status: "under_review",
         actor: `${payer} Review Board`,
         details:
           determination === "PARTIAL_SETTLEMENT_OFFER"
-            ? `NEGOTIATION: Partial settlement of $${(settlementAmount || partialDefault || 0).toLocaleString()} offered on $${(matchingClaim.deniedAmount || 0).toLocaleString()} disputed. Counter-rebuttal drafted demanding full payment or cure path.`
-            : `Additional clinical records requested: ${missingRecords.join(", ") || "Supporting documentation needed"}.`,
+            ? `${reopenPrefix}${partialDetails}`
+            : `${reopenPrefix}Additional clinical records requested: ${missingRecords.join(", ") || "Supporting documentation needed"}.`,
       });
     } else if (
       determination === "DENIAL_UPHELD" ||
       determination === "POLICY_CONFLICT_CITATION"
     ) {
+      const reopenPrefix = isReopeningWonClaim ? "REOPENED: Post-resolution adverse action received from payer. " : "";
       await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: matchingClaim._id,
         status: "escalated",
         actor: `${payer} Appeals Department`,
         details:
           determination === "POLICY_CONFLICT_CITATION"
-            ? `POLICY CHALLENGE: Conflicting CPB language cited${citedClause ? `: ${citedClause.slice(0, 220)}` : ""}. Distinguishing counter-rebuttal drafted for IRO path.`
-            : `Level 1 determination upheld by payer. File prepared for Level 2 External Review / IRO escalation.`,
+            ? `${reopenPrefix}POLICY CHALLENGE: Conflicting CPB language cited${citedClause ? `: ${citedClause.slice(0, 220)}` : ""}. Distinguishing counter-rebuttal drafted for IRO path.`
+            : `${reopenPrefix}Level 1 determination upheld by payer. File prepared for Level 2 External Review / IRO escalation.`,
       });
-    } else if (matchingClaim.status !== "won") {
+    } else if (
+      matchingClaim.status !== "won" &&
+      matchingClaim.status !== "escalated" &&
+      matchingClaim.status !== "under_review" &&
+      matchingClaim.status !== "lost"
+    ) {
       await ctx.runMutation(internal.claims.updateStatusInternal, {
         claimId: matchingClaim._id,
         status: "dispatched",
         actor: "AgentMail Webhook",
         details: `Inbound correspondence received regarding claim #${matchingClaim.claimNumber}.`,
+      });
+    } else if (fallbackDetermination === "PENDING_LLM" && matchingClaim.status === "under_review") {
+      // Retain under_review if approval candidate was not confirmed by LLM, requiring manual review
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
+        claimId: matchingClaim._id,
+        status: "under_review",
+        actor: "AgentMail Webhook",
+        details: `Inbound correspondence held for manual review: LLM adjudication unconfirmed for claim #${matchingClaim.claimNumber}.`,
       });
     }
 
@@ -758,7 +808,9 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
         ...(matchingClaim.userId ? { userId: matchingClaim.userId } : {}),
         eventType: "appeal_review_requested",
         actor: "Sentinel AI Preparer",
-        details: `Clinical rebuttal addendum prepared and cited for Claim #${matchingClaim.claimNumber}. Awaiting mandatory human review and sign-off before dispatch.`,
+        details: isReopeningWonClaim
+          ? `Adversary reopened won file via post-resolution countermove (${determination}). Auto-pilot rebuttal staged for human advocate sign-off.`
+          : `Clinical rebuttal addendum prepared and cited for Claim #${matchingClaim.claimNumber}. Awaiting mandatory human review and sign-off before dispatch.`,
       });
     }
 
