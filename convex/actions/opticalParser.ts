@@ -186,8 +186,10 @@ function detectFileFormat(
 }
 
 /**
- * Optical Extraction Action: Parse an uploaded denial letter (OCR'd exclusively via AWS Textract
- * under HIPAA BAA) or user-submitted text, sanitized via redactBeforeLLM, using gpt-5.4-nano Structured Outputs.
+ * Optical Extraction Action: Parse an uploaded denial letter (in-browser client
+ * OCR via pdf.js/tesseract with zero PHI egress, plus optional AWS Textract
+ * server-side table enhancement when credentials are configured) or
+ * user-submitted text, sanitized via redactBeforeLLM, using gpt-5.4-nano Structured Outputs.
  */
 export const parseDenialDocument = action({
   args: {

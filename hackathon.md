@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-17T17:36:09Z
+- **Last updated:** 2026-09-18T01:12:30Z
 
 ## Log
 
@@ -1623,9 +1623,15 @@ Hardened autonomous pipeline orchestration entry points against unauthenticated 
 - Added comprehensive spend-guard and IDOR rejection tests in `tests/authorization.test.ts`, verified owner and configuration pass-through in `tests/actionsPrecedentsAndPipeline.test.ts`, and updated workflow integration mocks in `tests/workflows.test.ts`.
 - Verified all 74 test suites (1,122 tests passing), strict typecheck (0 errors), clean lint (0 warnings), and production build.
 
-### 2026-09-17 - working tree
+### 2026-09-17 - 7aae508
 Streamlined `README.md` into a focused, submission-ready project brief emphasizing the core user journey (Proof -> Letter -> Send & Track), evidence coverage over outcome prediction, and everyday app accessibility:
 - Restructured documentation around the three core user workflows, highlighting how ClaimHero solves the real-world coordination problem of medical denials without legal jargon.
 - Emphasized Convex as the central reactive system of record (durable workflows, vector search, CRDT collaborative editing, scheduled statutory clocks, and authentication) and documented production integrations with Firecrawl, OpenAI, and AgentMail with mandatory human review gates.
 - Refreshed the judge evidence map connecting documented architectural claims directly to implementation files and components.
+
+### 2026-09-18 - working tree
+Repositioned optical intake as local-first with optional Textract enhancement and corrected the hackathon brief against official sources (`convex/actions/opticalParser.ts`, `convex/lib/openai.ts`, `convex/lib/redactionEngine.ts`, `convex/lib/textract.ts`, `.env.example`, `BRIEF.md`, `IDEA.md`, `PRODUCT.md`, `docs/THREAT_MODEL.md`, `specs/001-appeal-sentinel/`):
+- Binary PDF/image extraction is now documented as in-browser pdf.js/tesseract with zero keys and zero PHI egress; AWS Textract is an optional server-side table/key-value enhancement under HIPAA BAA, failing hard only when binary storage arrives with neither credentials nor client-extracted text, and raw bytes are never sent to OpenAI.
+- Rewrote `BRIEF.md` to track official Convex All Gas wording verified 2026-09-18 (six participation steps, prize pool, qualification criteria), removing prior invented claims about a mock-data ban and a standalone `hackathon.md` submission requirement.
+- Expanded `.env.example` with required Convex backend vars (`SITE_URL`, `AUTH_PRIVATE_KEY`/`AUTH_JWKS`, Google OAuth) and runtime fail-closed notes for OpenAI, Firecrawl, and AgentMail sender inbox. Convex features: docs only, no new runtime features.
 

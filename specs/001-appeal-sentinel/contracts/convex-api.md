@@ -97,7 +97,7 @@ Saves edits and updates to an appeal brief draft with version increment.
 ## 4. Asynchronous Actions (`convex/actions/`)
 
 ### `actions.opticalParser.parseDenialDocument`
-Performs OCR on uploaded denial PDF/images via AWS Textract under HIPAA BAA (fail-hard, zero raw-PHI fallback), sanitizes text via `redactBeforeLLM`, and calls OpenAI Structured JSON (`gpt-5.4-nano`) on de-identified text to persist the patient and claim to Convex DB. Zero binary images or raw PHI are sent to OpenAI.
+Performs OCR on uploaded denial PDF/images via in-browser local extraction (pdf.js/tesseract, zero keys) with optional AWS Textract table enhancement under HIPAA BAA when configured (fail-hard only when binary storage arrives with neither credentials nor client-extracted text, zero raw-PHI vision fallback), sanitizes text via `redactBeforeLLM`, and calls OpenAI Structured JSON (`gpt-5.4-nano`) on de-identified text to persist the patient and claim to Convex DB. Zero binary images or raw PHI are sent to OpenAI.
 - **Arguments**:
   - `storageId`: `v.optional(v.id("_storage"))`
   - `rawDocumentText`: `v.optional(v.string())`

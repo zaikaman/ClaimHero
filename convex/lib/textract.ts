@@ -1,16 +1,20 @@
 /**
  * AWS Textract Integration & Document Parsing Engine
  *
- * Implements private, BAA-covered optical document extraction for Explanation of
- * Benefits (EOB), medical bills, and denial notices.
+ * Optional server-side enhancement for high-accuracy table and key-value
+ * extraction from Explanation of Benefits (EOB), medical bills, and denial
+ * notices. Primary optical intake runs locally in the browser
+ * (`src/lib/clientOcr.ts`: pdf.js `getTextContent` for digital PDFs,
+ * tesseract.js for scans) with zero keys and zero PHI egress.
  *
  * HIPAA Safe Harbor / BAA Compliance:
- * Documents are analyzed exclusively within the AWS HIPAA BAA boundary.
- * Extracted text is de-identified via redactBeforeLLM prior to external model
- * dispatch, and direct patient identifiers are preserved securely in Convex database.
- * Callers must fail hard when credentials are absent: binary PDF/image intake has
- * no direct-vision fallback, since forwarding raw PHI bytes to a third-party LLM
- * would bypass de-identification.
+ * When configured, documents sent to Textract are analyzed within the AWS
+ * HIPAA BAA boundary. Extracted text is de-identified via redactBeforeLLM
+ * prior to external model dispatch, and direct patient identifiers are
+ * preserved securely in Convex database. Callers fail hard only when binary
+ * PDF/image intake arrives with neither Textract credentials nor
+ * client-extracted text; there is no direct-vision fallback, since forwarding
+ * raw PHI bytes to a third-party LLM would bypass de-identification.
  */
 
 import {

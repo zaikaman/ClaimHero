@@ -36,7 +36,7 @@
 
 ## Phase 3: User Story 1 - Denial Document Ingestion & Optical Extraction (Priority: P1) - MVP
 
-**Goal**: Ingest real denial letters/EOBs via direct upload, text paste, or email, perform OCR via AWS Textract under HIPAA BAA (fail-hard), sanitize text via `redactBeforeLLM`, extract structured metadata using `gpt-5.4-nano` Structured Outputs (zero raw PHI/images to OpenAI), and create reactive claim cases.
+**Goal**: Ingest real denial letters/EOBs via direct upload, text paste, or email, extract text locally in the browser (pdf.js/tesseract, zero keys) with optional AWS Textract table enhancement under HIPAA BAA when configured, sanitize text via `redactBeforeLLM`, extract structured metadata using `gpt-5.4-nano` Structured Outputs (zero raw PHI/images to OpenAI), and create reactive claim cases.
 
 **Independent Test**: Upload a real denial letter PDF or paste raw text and verify that a new claim is created in the dashboard with extracted CPT codes, denial reason codes, denied amounts, and patient liability.
 

@@ -1,7 +1,7 @@
 # ClaimHero — Evidence-Grounded Appeal Preparation Workspace for Denial Teams
 
 > **Evidence-Grounded Appeal Preparation Workspace for Convex "All Gas" Hackathon**  
-> Built with **Convex** (Reactive Database, Native 1536-d Vector Search, Full-Text Search Indexes, Scheduled Crons, File Storage, Auth & Official Components), **Firecrawl** (Live Insurer Clinical Policy Bulletins, PubMed & FDA Indications Crawler), **AgentMail** (Dedicated Two-Way Inbound/Outbound Appellate Inboxes & Review-Gated Payer Gateways), and **OpenAI** (Structured Clinical Extraction on De-identified Text, 4-Pillar Evidence Coverage Scoring & Grounded Appeal Synthesis) with OCR exclusively handled by **AWS Textract** under HIPAA BAA (fail-hard, zero raw PHI/images to LLMs).
+> Built with **Convex** (Reactive Database, Native 1536-d Vector Search, Full-Text Search Indexes, Scheduled Crons, File Storage, Auth & Official Components), **Firecrawl** (Live Insurer Clinical Policy Bulletins, PubMed & FDA Indications Crawler), **AgentMail** (Dedicated Two-Way Inbound/Outbound Appellate Inboxes & Review-Gated Payer Gateways), and **OpenAI** (Structured Clinical Extraction on De-identified Text, 4-Pillar Evidence Coverage Scoring & Grounded Appeal Synthesis) with local in-browser OCR (pdf.js/tesseract, zero keys) plus optional **AWS Textract** table enhancement under HIPAA BAA (zero raw PHI/images to LLMs).
 
 ---
 
@@ -22,8 +22,8 @@ In the U.S. healthcare system, health insurers improperly deny approximately **1
 
 ```mermaid
 flowchart TD
-    subgraph Intake ["1. Ingestion & Communication (AgentMail + AWS Textract OCR)"]
-        A1["Ingestion Modal (Presets / PDF Upload / Paste Text)"] --> A2["AWS Textract HIPAA OCR & Redacted Parameter Extraction"]
+    subgraph Intake ["1. Ingestion & Communication (AgentMail + Local OCR / Optional Textract)"]
+        A1["Ingestion Modal (Presets / PDF Upload / Paste Text)"] --> A2["Local Browser OCR + Optional Textract Tables & Redacted Parameter Extraction"]
         A3["Outbound 2-Mode Dispatch (Typed-In Email / Official Payer)"]
         A4["Inbound Payer Determination / Addendum Webhook (/agentmail-webhook)"]
     end
@@ -151,7 +151,7 @@ flowchart TD
 6. **Portfolio Analytics (`AnalyticsMetrics.tsx`)**: Practice-wide disputed vs. recovered amounts, insurer resolution rates, confidence distribution, and printable Executive Report statements.
 7. **HIPAA Privacy Redaction Engine (`PrivacyRedactionFilter.tsx`)**: Deterministic PII masking across Safe Harbor, Balanced Appellate, and Public Exhibit standards.
 8. **Sentinel AI Copilot Widget (`SentinelChatbot.tsx`, `⌘J`)**: Interactive clinical & procedural appeal copilot on the `@convex-dev/agent` component with 10 agentic tool calling capabilities across Convex database records (`get_active_claim_details`, `search_claims`, `get_clinical_evidence`, `get_appeal_brief`, `get_p2p_defense_script`, `get_audit_trail`, `search_precedents`) and live Firecrawl web intelligence (`firecrawl_web_search`, `firecrawl_scrape_url`, `crawl_and_attach_evidence`), agent-owned durable message history and token streaming, and collapsible tool execution traces.
-9. **AWS Textract HIPAA Optical Intake Gate (`convex/lib/textract.ts`)**: BAA-covered document OCR for denial PDFs and EOB images extracting text, key-value relationships, and 2D line-item tables; patient identifiers are vaulted directly into the private database, and prompts are de-identified (`redactBeforeLLM`) before external model dispatch, eliminating binary image transmission and direct PHI egress.
+9. **Local OCR plus Optional Textract Enhancement (`src/lib/clientOcr.ts`, `convex/lib/textract.ts`)**: In-browser document extraction for denial PDFs and EOB images (pdf.js text layer, tesseract.js for scans; zero keys, zero PHI egress), with BAA-covered AWS Textract as an optional server-side enhancement extracting text, key-value relationships, and 2D line-item tables when configured; patient identifiers are vaulted directly into the private database, and prompts are de-identified (`redactBeforeLLM`) before external model dispatch, eliminating binary image transmission and direct PHI egress.
 
 ---
 

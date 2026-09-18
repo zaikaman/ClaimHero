@@ -614,12 +614,15 @@ export function fastSanitizeText(
  * across all textual prompt payloads (`systemPrompt`, `userPrompt`, embedding inputs,
  * and chatbot dialog turns) before dispatching to third-party LLM APIs (OpenAI).
  *
- * AWS Textract HIPAA BAA Optical Gate & Zero-PHI LLM Bridge:
- * All binary PDF and image uploads are parsed exclusively within the AWS HIPAA
- * Business Associate Agreement (BAA) boundary via AWS Textract (`convex/lib/textract.ts`).
- * Direct patient identifiers (`patientName`, `memberId`, `claimNumber`) are vaulted
- * into the private Convex database, and extracted text is de-identified via `redactBeforeLLM`
- * before external model dispatch. OpenAI receives solely sanitized text and zero binary images.
+ * Local OCR plus Optional Textract Enhancement & Zero-PHI LLM Bridge:
+ * Binary PDF and image uploads are extracted locally in the browser
+ * (`src/lib/clientOcr.ts`: pdf.js/tesseract, zero keys, zero PHI egress), with
+ * AWS Textract (`convex/lib/textract.ts`) as an optional server-side enhancement
+ * under the AWS HIPAA Business Associate Agreement (BAA) boundary when
+ * credentials are configured. Direct patient identifiers (`patientName`,
+ * `memberId`, `claimNumber`) are vaulted into the private Convex database, and
+ * extracted text is de-identified via `redactBeforeLLM` before external model
+ * dispatch. OpenAI receives solely sanitized text and zero binary images.
  */
 export function redactBeforeLLM(text: string, options?: RedactionEngineOptions): string {
   if (!text || typeof text !== "string") return "";

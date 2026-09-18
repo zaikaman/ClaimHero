@@ -210,9 +210,12 @@ async function createStructuredCompletionAttempt<T>(options: {
  *   pre-submission de-identification (`redactBeforeLLM`) adhering to HIPAA Safe Harbor
  *   (45 CFR § 164.514(b)(2)) to prevent transmission of direct patient identifiers.
  * - Zero Raw-PHI / Zero Binary Image Egress: Optical character recognition (OCR) on
- *   binary PDFs and images is executed exclusively within the AWS HIPAA BAA boundary
- *   via AWS Textract (`convex/lib/textract.ts`). OpenAI receives solely de-identified text;
- *   raw binary files and images are never transmitted to external third-party LLMs.
+ *   binary PDFs and images runs locally in the browser (`src/lib/clientOcr.ts`:
+ *   pdf.js text layer plus tesseract.js, zero keys, zero PHI egress), with AWS
+ *   Textract (`convex/lib/textract.ts`) as an optional server-side enhancement
+ *   under the AWS HIPAA BAA when credentials are configured. OpenAI receives
+ *   solely de-identified text; raw binary files and images are never transmitted
+ *   to external third-party LLMs.
  */
 export async function createStructuredCompletion<T>(options: {
   systemPrompt: string;
