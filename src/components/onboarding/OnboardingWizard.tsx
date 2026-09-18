@@ -706,12 +706,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <div className="space-y-2">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">
-                    {isDetailed ? "Patient State (DOI Reference Only)" : "Patient State or Region"}
+                    {isDetailed ? "Patient State & Regulatory Jurisdiction" : "Patient State or Region"}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {isDetailed
-                      ? "Federal ERISA 180-day engine applies in every state. This state names only the DOI / external review reference in letters."
-                      : "Deadlines always use the federal 180-day clock. State is used only for agency references."}
+                      ? "Governs State Department of Insurance (DOI) oversight and external review statutory timelines alongside the federal ERISA baseline."
+                      : "Sets your state Department of Insurance and statutory external review rules alongside federal ERISA protections."}
                   </p>
                 </div>
 

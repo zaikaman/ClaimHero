@@ -96,7 +96,7 @@ export const DossierStatutorySummary: React.FC<DossierStatutorySummaryProps> = (
             <tr>
               <td className="p-2.5 font-medium text-slate-900">Binding External Review</td>
               <td className="p-2.5 font-mono text-slate-700">45 CFR § 147.136</td>
-              <td className="p-2.5 text-slate-700">State DOI / Independent Review Organization jurisdiction</td>
+              <td className="p-2.5 text-slate-700">State DOI / Independent Review Organization jurisdiction (4-month ACA / 30-day state clock)</td>
             </tr>
             <tr>
               <td className="p-2.5 font-medium text-slate-900">Prompt-Pay & Bad-Faith Interest</td>

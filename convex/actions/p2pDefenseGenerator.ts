@@ -461,7 +461,7 @@ Case Details (identifiers are vault tokens):
 - Diagnosis Codes (ICD-10): ${icdList}
 - Denial Reason Code: ${claim.denialReasonCode}
 - Denial Reason Description: ${claim.denialReasonDescription}
-- Patient State: ${claim.patient?.state || "US"} (${stateRegulator.doiShort} reference only; federal ERISA engine, 180-day clock)
+- Patient State: ${claim.patient?.state || "US"} (${stateRegulator.doiShort}; ERISA 180-day internal appeal & statutory external review)
 
 Clinical Policies & Indexed Evidence:
 ${evidenceContext}

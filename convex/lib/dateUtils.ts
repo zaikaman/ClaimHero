@@ -8,8 +8,16 @@
  * - All date strings are parsed and evaluated at UTC midnight to prevent cross-timezone off-by-one shifts.
  */
 
+import {
+  getStateRegulator,
+  ACA_EXTERNAL_REVIEW_WINDOW_DAYS as ACA_WINDOW,
+  STATE_EXTERNAL_REVIEW_30_DAY_WINDOW,
+} from "./stateRegulators";
+
 export const ONE_DAY_MS = 86_400_000;
 export const DEFAULT_STATUTORY_APPEAL_WINDOW_DAYS = 180;
+export const ACA_EXTERNAL_REVIEW_WINDOW_DAYS = ACA_WINDOW; // 120 days (4 months under 45 CFR § 147.136)
+export const STATE_EXTERNAL_REVIEW_WINDOW_DAYS = STATE_EXTERNAL_REVIEW_30_DAY_WINDOW; // 30 days (state expedited review)
 
 /**
  * Parses any date string representation (ISO, US, or standard English) into
@@ -95,6 +103,13 @@ export function calculateDaysRemaining(statutoryDeadline: number, now: number = 
   return Math.floor(diffMs / ONE_DAY_MS);
 }
 
+export type StatutoryClockType =
+  | "erisa_internal_180"
+  | "aca_external_120"
+  | "state_external_30"
+  | "state_external_specific"
+  | "custom";
+
 export interface StatutoryDeadlineResolution {
   statutoryDeadline: number;
   daysRemaining: number;
@@ -102,26 +117,59 @@ export interface StatutoryDeadlineResolution {
   anchorDate: string;
   anchorType: "denial" | "service" | "ingestion";
   effectiveDeadlineDays: number;
+  clockType?: StatutoryClockType;
+  regulatoryCitation?: string;
 }
 
 /**
  * Resolves the statutory deadline and days remaining for a claim.
- * Follows federal ERISA priority:
+ * Follows statutory priority:
  * 1. Denial Date (date of adverse benefit determination)
  * 2. Service Date (fallback if denial date not explicitly documented)
  * 3. Ingestion Time (fallback only when neither date exists)
+ *
+ * Automatically resolves the statutory clock:
+ * - When appealLevel is "level_3_external_state_review", computes external review clock:
+ *   - Expedited: 30 days (state expedited external review clock)
+ *   - Standard CA: 180 days (6 months per Cal. Health & Safety Code § 1374.30(j))
+ *   - Standard TX / NY / Federal: 120 days (4 months per ACA 45 CFR § 147.136 & state statutes)
+ * - Otherwise defaults to 180 days under ERISA 29 CFR § 2560.503-1(h)(2)(i).
  */
 export function resolveStatutoryDeadline(options: {
   denialDate?: string;
   serviceDate?: string;
   appealFilingDeadlineDays?: number;
+  appealLevel?: string;
+  state?: string;
+  isExpedited?: boolean;
   now?: number;
 }): StatutoryDeadlineResolution {
   const now = options.now ?? Date.now();
-  const effectiveDeadlineDays =
-    options.appealFilingDeadlineDays && options.appealFilingDeadlineDays > 0
-      ? options.appealFilingDeadlineDays
-      : DEFAULT_STATUTORY_APPEAL_WINDOW_DAYS;
+
+  let effectiveDeadlineDays: number;
+  let clockType: StatutoryClockType;
+  let regulatoryCitation: string;
+
+  if (options.appealFilingDeadlineDays && options.appealFilingDeadlineDays > 0) {
+    effectiveDeadlineDays = options.appealFilingDeadlineDays;
+    clockType = "custom";
+    regulatoryCitation = `Explicit plan deadline (${effectiveDeadlineDays} days)`;
+  } else if (options.appealLevel === "level_3_external_state_review") {
+    const regulator = getStateRegulator(options.state);
+    if (options.isExpedited) {
+      effectiveDeadlineDays = regulator.stateExternalReviewDays; // 30 days
+      clockType = "state_external_30";
+      regulatoryCitation = `${regulator.doiShort} Expedited External Review (30-day statutory clock)`;
+    } else {
+      effectiveDeadlineDays = regulator.standardExternalReviewDays; // 180d for CA, 120d for others
+      clockType = regulator.code === "CA" ? "state_external_specific" : "aca_external_120";
+      regulatoryCitation = regulator.externalReviewCitation;
+    }
+  } else {
+    effectiveDeadlineDays = DEFAULT_STATUTORY_APPEAL_WINDOW_DAYS;
+    clockType = "erisa_internal_180";
+    regulatoryCitation = "ERISA 29 C.F.R. § 2560.503-1(h)(2)(i) (180-day internal appeal clock)";
+  }
 
   const denialTs = parseDateToUtcMidnight(options.denialDate);
   const serviceTs = parseDateToUtcMidnight(options.serviceDate);
@@ -154,5 +202,24 @@ export function resolveStatutoryDeadline(options: {
     anchorDate,
     anchorType,
     effectiveDeadlineDays,
+    clockType,
+    regulatoryCitation,
   };
 }
+
+/**
+ * Explicit helper to compute external review statutory deadline and remaining days.
+ */
+export function resolveExternalReviewDeadline(options: {
+  denialDate?: string;
+  serviceDate?: string;
+  state?: string;
+  isExpedited?: boolean;
+  now?: number;
+}): StatutoryDeadlineResolution {
+  return resolveStatutoryDeadline({
+    ...options,
+    appealLevel: "level_3_external_state_review",
+  });
+}
+

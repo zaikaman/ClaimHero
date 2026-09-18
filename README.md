@@ -126,6 +126,7 @@ ClaimHero is a reactive case system, not a prompt wrapped in a form:
   human-approved follow-ups on the claim.
 - **Audit and deadline surfaces** record lifecycle events, anchor statutory filing
   clocks strictly to adverse determination dates rather than intake timestamps,
+  enforce dual-clock statutory timing (ERISA 180-day internal appeal, ACA 45 CFR § 147.136 4-month external review, and state 30-day expedited clocks across CA/TX/NY),
   and drive sub-second reactive countdown alarms without artificial zero-clamping.
 - **Simple Mode / Expert Details** lets a patient start in everyday language
   while an advocate can reveal CPT, CARC, ERISA, source, and audit details.
@@ -266,11 +267,11 @@ npm run build           # Production bundle
 npm run verify          # Full local verification gate
 ```
 
-The repository includes 1,200 automated tests across 77 suites, covering the
+The repository includes 1,218 automated tests across 78 suites, covering the
 Convex workflows, authorization boundaries, OCR/redaction, vault-tokenized
 PHI-safe LLM boundaries, Firecrawl and AgentMail integrations, precedent
-scoring, audit chains, denial-anchored statutory deadlines, non-fabricated
-federal clocks, collaboration, provisional evidence gating, and secondary dispatch review boundaries.
+scoring, audit chains, denial-anchored statutory deadlines, dual-clock statutory timing (ERISA 180-day internal appeals, ACA 45 CFR § 147.136 4-month external reviews, and state 30-day expedited clocks across CA/TX/NY),
+collaboration, provisional evidence gating, and secondary dispatch review boundaries.
 
 ## Project structure
 

@@ -27,7 +27,7 @@ Unlike generic AI document tools or manual template appeals, ClaimHero connects:
 ## Operating Context
 
 - Web-first responsive application deployed on Convex static hosting.
-- High-stress, adversarial environment where patients and coordinators fight strict statutory timelines (ERISA 180-day federal window, state 30-day external review clocks).
+- High-stress, adversarial environment where patients and coordinators fight strict statutory timelines (ERISA 180-day federal internal window, ACA 45 CFR § 147.136 4-month / 120-day external review, and state 30-day external review clocks across CA, TX, NY, and all jurisdictions).
 - Workflows involve ingesting multi-page EOB denial letters, reviewing side-by-side clinical evidence matrices, editing appeal briefs in a collaborative live studio, and tracking real-time status updates via dedicated claim inboxes.
 
 ## Capabilities and Constraints

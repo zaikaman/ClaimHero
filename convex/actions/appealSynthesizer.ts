@@ -106,7 +106,7 @@ export function getStatutoryRightsNotice(appealLevel?: string, patientState?: st
   const base =
     (appealLevel && STATUTORY_RIGHTS_NOTICES[appealLevel]) || STATUTORY_RIGHTS_NOTICES.level_1_internal;
   if (appealLevel === "level_3_external_state_review") {
-    // Federal ERISA engine: patient state names only the DOI reference, never deadlines.
+    // Level 3 external review: resolve the designated state DOI and external review authority.
     const regulator = getStateRegulator(patientState);
     return base.replace(/State Insurance Commissioner/g, regulator.doiName);
   }

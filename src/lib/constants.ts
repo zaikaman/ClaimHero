@@ -162,14 +162,16 @@ export const CPT_CODES: Record<string, { code: string; name: string; category: s
   },
 };
 
-// ERISA & Statutory Regulations
+// ERISA, ACA & Statutory Regulations
 export const STATUTORY_REGULATIONS = {
   ERISA_CITATION: "29 CFR § 2560.503-1",
   ERISA_TITLE: "Employee Retirement Income Security Act Claims Procedure Rule",
   DEADLINE_DAYS_INTERNAL_APPEAL: 180, // 180 days from receipt of initial denial
   PAYER_RESPONSE_STANDARD_DAYS: 30, // 30 days for pre-service / post-service claims
   PAYER_RESPONSE_URGENT_HOURS: 72, // 72 hours for urgent care
-  EXTERNAL_REVIEW_DAYS: 120, // 4 months for state/federal external review
+  EXTERNAL_REVIEW_DAYS: 120, // 4 months for federal/state external review (ACA 45 CFR § 147.136)
+  ACA_EXTERNAL_REVIEW_DAYS: 120, // 4 months for federal ACA external review
+  STATE_EXTERNAL_REVIEW_EXPEDITED_DAYS: 30, // 30-day state expedited external review clock
 };
 
 // Claim Processing Statuses

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-18T12:15:02Z
+- **Last updated:** 2026-09-18T12:33:00Z
 
 ## Log
 
@@ -1674,7 +1674,7 @@ Closed critical dispatch approval bypass across the secondary transmission path 
 - Updated `AgentMailDrawer.tsx` and `SimpleInboxView.tsx` to detect provisional degradation, render a dedicated acknowledgment alert with inline elevation action, and disable rebuttal transmission, draft approval, and reply composer until degradation is acknowledged.
 - Added comprehensive regression tests in `tests/actionsAgentMailAndDispatcher.test.ts` (+10 tests) covering provisional degradation gating across both paths, drafting rejection, missing/undefined status rejection, rate limiter rejections, human approval gates, and PDF exhibit attachment. Verified 76 suites (1,185 passing tests), clean typecheck, and production build. Convex features: actions, internalAction, mutations.
 
-### 2026-09-18 - working tree
+### 2026-09-18 - 521bd9e
 Anchored statutory appeal deadlines strictly to denial dates rather than intake timestamps, stopped deadline window fabrication, eliminated overdue clamping, aligned client/server UTC parsing, and implemented reactive deadline alarm hook (`convex/schema.ts`, `convex/lib/dateUtils.ts`, `convex/claims.ts`, `convex/settings.ts`, `convex/actions/opticalParser.ts`, `convex/serviceCertificate.ts`, `src/lib/utils.ts`, `src/types/index.ts`, `src/components/radar/DeadlineCountdown.tsx`, `src/components/radar/CaseRadar.tsx`, `src/hooks/useDeadlineAlarm.ts`, `README.md`, `tests/statutoryDeadlinesAndAlarmHook.test.ts`):
 - Strict Denial Date Anchoring: Added `denialDate` and `appealFilingDeadlineDays` to `claims` schema. Created `resolveStatutoryDeadline` in `convex/lib/dateUtils.ts` anchoring statutory deadlines to `denialDate` with fallback to `serviceDate` and intake timestamp only if unrecorded, preventing older denials ingested today from receiving a false fresh 180-day clock.
 - Non-Fabrication of Federal Windows: Updated `convex/actions/opticalParser.ts` prompt and schema to extract explicit denial dates and deadline windows; returns 0 if unspecified, completely eliminating synthetic 180-day default clocks when the insurer notice specifies no timeline.
@@ -1683,3 +1683,12 @@ Anchored statutory appeal deadlines strictly to denial dates rather than intake 
 - UTC Date Normalization: Standardized `src/lib/utils.ts:formatDate` to parse and format dates with explicit UTC timezone parity (`{ timeZone: "UTC" }`), resolving off-by-one calendar discrepancies between browser local timezones and backend UTC appeal synthesizers.
 - Reactive `useDeadlineAlarm` Hook: Implemented promised `useDeadlineAlarm.ts` hook providing sub-second reactive countdowns, portfolio-wide urgency categorization (`overdue`, `emergency`, `critical`, `urgent`, `normal`), alarm triggers, and statutory countdown metrics.
 - Regression & Verification: Added comprehensive test suite `tests/statutoryDeadlinesAndAlarmHook.test.ts` (15 tests) and verified 1200 passing tests across 77 test suites, 0 lint warnings, 0 typecheck errors, and production build.
+
+### 2026-09-18 - working tree
+Harmonized statutory appeal and external review deadlines across docs and code (`README.md`, `PRODUCT.md`, `convex/lib/stateRegulators.ts`, `convex/lib/dateUtils.ts`, `convex/actions/appealSynthesizer.ts`, `convex/actions/p2pDefenseGenerator.ts`, `src/lib/constants.ts`, `src/components/studio/dossier/DossierStatutorySummary.tsx`, `src/components/onboarding/OnboardingWizard.tsx`, `tests/stateRegulators.test.ts`, `tests/statutoryDeadlinesExternalReview.test.ts`, `tests/statutoryEscalation.test.ts`):
+- Multi-Clock Statutory Architecture: Replaced uniform 180-day limitation with full dual-clock architecture separating ERISA 29 CFR § 2560.503-1 180-day internal appeals from ACA 45 CFR § 147.136 4-month (~120-day) external reviews and state 30-day expedited/prompt external review clocks.
+- State-Specific External Review Timelines: Mapped precise statutory external review timelines for California (DMHC/CDI 6-month / 180-day IMR per Cal. Health & Safety Code § 1374.30(j)), Texas (TDI 4-month / 120-day IRO per Tex. Ins. Code § 4201.359 / 28 TAC § 12.502), New York (DFS 4-month / 120-day external appeal per N.Y. Ins. Law § 4914(b)(1)), Florida, Illinois, Pennsylvania, and federal default, with 30-day expedited external review clocks.
+- Intelligent Deadline Resolution: Upgraded `resolveStatutoryDeadline` and created `resolveExternalReviewDeadline` in `convex/lib/dateUtils.ts` to compute statutory clocks and citations based on dispute level, patient state, and urgency posture.
+- Doc-vs-Code Harmonization: Updated `PRODUCT.md`, `stateRegulators.ts`, `OnboardingWizard.tsx`, `DossierStatutorySummary.tsx`, and `constants.ts` to eliminate doc-vs-code contradictions and align with US healthcare regulations.
+- Regression & Verification: Added comprehensive test suite `tests/statutoryDeadlinesExternalReview.test.ts` (14 tests) and updated `tests/stateRegulators.test.ts` and `tests/statutoryEscalation.test.ts`. Verified 78 test suites (1,218 passing tests), 0 type errors, 0 lint warnings, and production build.
+

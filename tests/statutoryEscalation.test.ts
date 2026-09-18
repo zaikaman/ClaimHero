@@ -182,7 +182,7 @@ describe('Multi-Tier Statutory Appeal Escalation Workflow', () => {
     });
   });
 
-  describe("Patient State Is DOI-Reference-Only (Federal ERISA Engine)", () => {
+  describe("Patient State DOI Reference & External Review Jurisdiction", () => {
     const californiaClaim = {
       ...mockClaim,
       patient: { ...mockClaim.patient, state: "California" },
