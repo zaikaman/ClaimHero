@@ -15,6 +15,7 @@ import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { getStateRegulator } from "../lib/stateRegulators";
 import { logPipelineActivity } from "../lib/pipelineActivity";
+import { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } from "../lib/phiSafe";
 import type { Id, Doc } from "../_generated/dataModel";
 
 const APPEAL_SYNTHESIS_SCHEMA = {
@@ -884,6 +885,25 @@ export async function performGenerateAppealBrief(
     const cptList = (claim.cptCodes || []).join(", ");
     const icdList = (claim.icd10Codes || []).join(", ");
 
+    // PHI-safe LLM boundary: known direct identifiers are vault-tokenized in
+    // the prompt and re-applied deterministically during local email assembly.
+    // The model drafts against tokens only; raw PII never egresses.
+    const phiValues = collectPhiValues({
+      patient: claim.patient
+        ? {
+            name: claim.patient.name,
+            memberId: claim.patient.memberId,
+            groupNumber: (claim.patient as { groupNumber?: string }).groupNumber,
+            email: (claim.patient as { email?: string }).email,
+          }
+        : null,
+      claimNumber: claim.claimNumber,
+      serviceDate: claim.serviceDate,
+      senderEmail: sender?.email,
+      senderPhone: sender?.phone,
+      appealContext: { sender },
+    });
+
     // 3. Draft through the agent component with structured JSON schema. Tokens
     // are streamed into a Convex agent thread so the Studio renders the draft as
     // it is written, and some OpenAI-compatible providers acknowledge the schema
@@ -897,7 +917,10 @@ export async function performGenerateAppealBrief(
         userId,
         threadId: args.draftThreadId,
         threadTitle: `Appeal brief drafting - ${claim.claimNumber}`,
+        phiValues,
         systemPrompt: `You draft professional healthcare payer correspondence. Produce content that can be sent as the body of a normal appeal email, not a litigation memorandum and not legal advice.
+
+${PHI_TOKEN_INSTRUCTION}
 
 Evidence and safety rules:
 1. Use only facts explicitly present in the case details, indexed evidence, and treating-provider notes. Never invent symptoms, severity grades, measurements, treatment dates, medication names or doses, outcome scores, functional limitations, clearance, authorization, representation authority, plan type, jurisdiction, deadlines, or eligibility.
@@ -910,14 +933,14 @@ Evidence and safety rules:
 8. Strict English-Only Mandate: ClaimHero exclusively supports English and US healthcare jurisdictions (ERISA, ACA, CMS). Always write all structured fields, arguments, clinical rationale, and correspondence exclusively in English. Non-English text, multilingual translation, or foreign legal citations are strictly prohibited.`,
         userPrompt: `Draft the content for a ${appealLevel.replace(/_/g, " ")} medical appeal email for:
 
-Case Details:
-- Claim Number: ${claim.claimNumber}
-- Patient Name: ${claim.patient?.name}
-- Member ID: ${claim.patient?.memberId}
-- Group Number: ${claim.patient?.groupNumber || "Not provided"}
+Case Details (identifiers are vault tokens; draft with the tokens, never invent real values):
+- Claim Number: ${PHI_TOKENS.claimNumber}
+- Patient Name: ${PHI_TOKENS.patientName}
+- Member ID: ${PHI_TOKENS.memberId}
+- Group Number: ${claim.patient && (claim.patient as { groupNumber?: string }).groupNumber ? PHI_TOKENS.groupNumber : "Not provided"}
 - Insurance Payer: ${payer} (Grievances & Appeals Department)
 - Treating Physician: ${claim.providerName}
-- Date of Service: ${claim.serviceDate}
+- Date of Service: ${PHI_TOKENS.serviceDate}
 - Disputed Claim Amount: $${(claim.deniedAmount || 0).toLocaleString()}
 - Patient Financial Liability: $${(claim.patientOwedAmount || 0).toLocaleString()}
 - Procedure Codes (CPT): ${cptList}
@@ -934,7 +957,7 @@ ${precedentText}
 
 ${physicianNotes ? `Treating Physician Clinical Notes / Addendum:\n${physicianNotes}\n` : ""}
 ${clinicalFacts ? `Human-confirmed clinical intake facts. Quote or accurately summarize only these entries; do not infer additional facts:\n${JSON.stringify(clinicalFacts)}\n` : "No patient-specific clinical intake facts were provided. State that the clinical record is incomplete.\n"}
-${sender?.name ? `Sender details for the closing (use only as provided):\n- Name: ${sender.name}\n- Credentials or role: ${sender.credentials || "Not provided"}\n- Email: ${sender.email || "Not provided"}\n- Phone: ${sender.phone || "Not provided"}\n` : ""}
+${sender?.name ? `Sender details for the closing (use only as provided):\n- Name: ${sender.name}\n- Credentials or role: ${sender.credentials || "Not provided"}\n- Email: ${sender.email ? PHI_TOKENS.senderEmail : "Not provided"}\n- Phone: ${sender.phone ? PHI_TOKENS.senderPhone : "Not provided"}\n` : ""}
 ${sanitizedCustomInstructions ? `${sanitizedCustomInstructions}\n` : ""}
 
 Return a short, evidence-grounded email draft in the structured fields. If a clinical detail is not present, say that the current record does not provide it rather than filling the gap.`,

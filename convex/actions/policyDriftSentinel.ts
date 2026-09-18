@@ -8,6 +8,7 @@ import { internal } from "../_generated/api";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { scrapeFirecrawlPolicySource } from "./policyCrawler";
 import { createStructuredCompletion } from "../lib/openai";
+import { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } from "../lib/phiSafe";
 import { getPayerClinicalDirectoryUrl } from "../../src/lib/constants";
 
 export const POLICY_DRIFT_ANALYSIS_SCHEMA = {
@@ -321,7 +322,18 @@ export const detectPolicyDriftAction = action({
         detectedChanges: [],
       };
     } else {
-      // Content has changed - perform semantic clinical drift analysis
+      // Content has changed - perform semantic clinical drift analysis.
+      // PHI-safe: drift comparison needs only the service YEAR for vintage
+      // ranking plus clinical codes; the full date of service stays vaulted.
+      const driftServiceYear = claim.serviceDate
+        ? (claim.serviceDate.match(/\b(19\d{2}|20\d{2})\b/)?.[1] || "[SERVICE_YEAR]")
+        : "[SERVICE_YEAR]";
+      const driftPhi = collectPhiValues({
+        patient: (claim as { patient?: { name?: string; memberId?: string } }).patient,
+        patientName: claim.patientName,
+        claimNumber: claim.claimNumber,
+        serviceDate: claim.serviceDate,
+      });
       try {
         const systemPrompt = `You are a Senior Healthcare Appellate Regulatory Specialist and Clinical Policy Auditor.
 Compare the Baseline Clinical Policy Bulletin (active when the claim was denied) against the Current Live Policy Bulletin (crawled today).
@@ -331,12 +343,15 @@ Determine if the insurer made retroactive changes that adversely affect the pati
 3. Tightening diagnostic score requirements or clinical documentation standards.
 4. Removing alternative qualification pathways.
 
+${PHI_TOKEN_INSTRUCTION}
+
 If harsher criteria were added, flag isRetroactiveAlteration: true and severity: "critical_bad_faith".`;
 
-        const userPrompt = `Patient Denial Context:
+        const userPrompt = `Patient Denial Context (identifiers are vault tokens):
 - Payer: ${claim.insurancePayer || "Health Insurer"}
-- Service Date: ${claim.serviceDate}
-- Denial Date: ${new Date(claim.createdAt).toISOString().split("T")[0]}
+- Service Year (vintage reference only): ${driftServiceYear}
+- Service Date: ${PHI_TOKENS.serviceDate}
+- Claim Reference: ${PHI_TOKENS.claimNumber}
 - Disputed CPT Codes: ${claim.cptCodes.join(", ")}
 - Denial Reason: ${claim.denialReasonCode} (${claim.denialReasonDescription})
 
@@ -353,6 +368,7 @@ Perform structured policy drift comparison according to the schema.`;
           schemaName: "PolicyDriftAnalysis",
           systemPrompt,
           userPrompt,
+          phiValues: driftPhi,
         });
       } catch (err) {
         console.warn("OpenAI drift comparison failed or unavailable, engaging deterministic fallback:", err);

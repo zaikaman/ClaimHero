@@ -6,6 +6,7 @@ import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { createChatCompletion } from "../lib/openai";
+import { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } from "../lib/phiSafe";
 import {
   formatMessageIdHeader,
   getSharedAgentMailboxes,
@@ -736,10 +737,16 @@ export const generateAutoReplyDraft = action({
     });
 
     const payer = claim.insurancePayer || "Health Insurer";
-    const patientName = claim.patientName || "Patient";
+    const addendumPhi = collectPhiValues({
+      patientName: claim.patientName,
+      claimNumber: claim.claimNumber,
+    });
 
     const systemPrompt = `You are a Board-Certified Physician Appeal Specialist & ERISA Appellate Counsel for ClaimHero.
-You are drafting an immediate Clinical Rebuttal Addendum in response to an insurance payer's (${payer}) request for additional documentation or clarifying review for Claim #${claim.claimNumber} (Patient: ${patientName}).
+You are drafting an immediate Clinical Rebuttal Addendum in response to an insurance payer's (${payer}) request for additional documentation or clarifying review for Claim #${PHI_TOKENS.claimNumber} (Patient: ${PHI_TOKENS.patientName}).
+
+${PHI_TOKEN_INSTRUCTION}
+
 Prior Appeal Summary: ${appeal?.executiveSummary || "Initial Level 1 ERISA Appeal Brief on file."}
 Clinical Context:
 - CPT Codes: [${(claim.cptCodes || []).join(", ")}]
@@ -764,6 +771,7 @@ Guidelines:
       systemPrompt,
       userPrompt,
       temperature: 0.2,
+      phiValues: addendumPhi,
     });
 
     const trimmedDraft = draft.trim();

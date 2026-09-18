@@ -488,7 +488,13 @@ export function detectPiiEntities(
   }
 
   // 8. Physical Street Addresses
-  const addressRegex = /\b\d{1,5}\s+[A-Z0-9\s.,]{3,35}\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Way|Court|Ct|Suite|Ste|Apt|Terrace|Ter|Parkway|Pkwy|Circle|Cir|Place|Pl)\b/gi;
+  // The house-number anchor carries a negative lookbehind so it can never start
+  // inside a phone fragment ("(555) 019-2834"), hyphenated run ("123-45-6789",
+  // "MBN9823412-01"), country code ("+1"), or decimal measure ("12.5 mg"): the
+  // digit-inclusive middle would otherwise span forward across words to a street
+  // suffix, producing a false match that overlaps a real entity, gets suppressed
+  // by collision avoidance, and silently swallows the true address that follows.
+  const addressRegex = /(?<![\d()\-+.])\b\d{1,5}\s+[A-Z0-9\s.,]{3,35}\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Way|Court|Ct|Suite|Ste|Apt|Terrace|Ter|Parkway|Pkwy|Circle|Cir|Place|Pl)\b/gi;
   while ((match = addressRegex.exec(text)) !== null) {
     const rawAddr = match[0];
     addEntity(

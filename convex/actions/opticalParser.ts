@@ -336,25 +336,38 @@ export const parseDenialDocument = action({
         throw new Error("No document content or file provided for optical extraction.");
       }
 
-      // Call OpenAI Structured Outputs with gpt-5.4-nano on de-identified text
-      // (redactBeforeLLM gate is strictly enforced inside createStructuredCompletion)
+      // Call OpenAI Structured Outputs with gpt-5.4-nano on de-identified text.
+      // The centralized PHI-safe boundary vault-tokenizes the client/Textract
+      // vault (authoritative identifiers) before the regex gate and fails
+      // closed on leak. The model therefore sees tokens where the vault
+      // applies and redacted placeholders elsewhere.
+      const { collectPhiValues: collectIntakePhi } = await import("../lib/phiSafe");
+      const intakePhi = collectIntakePhi({
+        patientName: args.clientIdentifiers?.patientName || textractIdentifiers.patientName,
+        memberId: args.clientIdentifiers?.memberId || textractIdentifiers.memberId,
+        claimNumber: args.clientIdentifiers?.claimNumber || textractIdentifiers.claimNumber,
+        serviceDate: textractIdentifiers.serviceDate,
+      });
       extraction = await createStructuredCompletion<DenialExtractionResult>({
+        phiValues: intakePhi,
         systemPrompt: `You are an expert Certified Professional Medical Coder (CPC) and ERISA Insurance Claims Auditor.
 Your job is to rigorously classify uploaded document text and extract structured medical claim denial data.
+
+Direct identifiers in the source are vault-tokenized (for example [PATIENT], [MEMBER_ID], [CLAIM_REF], [SERVICE_DATE]). When a token appears where an identifier belongs, return the token verbatim in that field; the application restores the authentic value from its trusted vault. Never invent a real name, ID, or date to replace a token.
 
 CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
 1. First, determine whether the input document text is an actual English-language healthcare insurance claim denial, Explanation of Benefits (EOB), adverse benefit determination, or medical necessity denial letter.
 2. If the document text is NOT a valid English healthcare claim denial (for example: receipts, general correspondence, non-medical invoices, non-English or foreign documents, or unreadable OCR output):
-   - Set "isMedicalClaimDenial" to FALSE.
-   - Provide a clear, polite 1-sentence reason in "documentClassificationReason" (e.g. "The uploaded document text is not an English-language healthcare insurance claim denial or EOB. ClaimHero exclusively supports English-language documents under US healthcare jurisdictions.").
-   - Set all string fields to "", numbers to 0, and arrays to [].
+    - Set "isMedicalClaimDenial" to FALSE.
+    - Provide a clear, polite 1-sentence reason in "documentClassificationReason" (e.g. "The uploaded document text is not an English-language healthcare insurance claim denial or EOB. ClaimHero exclusively supports English-language documents under US healthcare jurisdictions.").
+    - Set all string fields to "", numbers to 0, and arrays to [].
 3. If the document IS a valid English medical claim denial:
-   - Set "isMedicalClaimDenial" to TRUE.
-   - Extract patient legal name, member ID, treating provider name, insurer payer name, all financial amounts, clinical CPT procedure codes, ICD-10 diagnosis codes, denial reason codes (e.g. CO-50, CO-197, CO-16), and statutory appeal filing deadlines.
-   - Extract dollar amounts as pure numbers without currency symbols (e.g. 24500 instead of "$24,500.00"). If missing, return 0.
-   - If identifiers (patient name, member ID, provider, claim number, service date) are not explicitly mentioned, return "". NEVER invent or fabricate identifiers.
-   - If CPT or ICD-10 codes are missing, return [].
-   - If statutory appeal deadline is not explicitly mentioned, default appealFilingDeadlineDays to 180.
+    - Set "isMedicalClaimDenial" to TRUE.
+    - Extract patient legal name, member ID, treating provider name, insurer payer name, all financial amounts, clinical CPT procedure codes, ICD-10 diagnosis codes, denial reason codes (e.g. CO-50, CO-197, CO-16), and statutory appeal filing deadlines.
+    - Extract dollar amounts as pure numbers without currency symbols (e.g. 24500 instead of "$24,500.00"). If missing, return 0.
+    - If identifiers (patient name, member ID, provider, claim number, service date) are not explicitly mentioned, return "". NEVER invent or fabricate identifiers.
+    - If CPT or ICD-10 codes are missing, return [].
+    - If statutory appeal deadline is not explicitly mentioned, default appealFilingDeadlineDays to 180.
 4. Strict English-Only Mandate: ClaimHero exclusively supports English-language documents and US healthcare jurisdictions (ERISA, ACA, CMS). All extracted textual metadata, denial reasons, descriptions, and classification reasons must be exclusively in English. Non-English and foreign insurance documents must be classified as non-claim documents.
 5. You must output all schema properties in the JSON response. If an attribute or identifier is not mentioned in the document, populate it with "" (empty string) for strings, 0 for numbers, and [] for arrays. Do not omit any properties.`,
         userPrompt: `Extract structured medical claim metadata from the following denial document:\n\n${documentContent}`,
@@ -363,17 +376,32 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         temperature: 0.1,
       });
 
-      // Re-hydrate authentic patient identifiers extracted under BAA (Textract) or client vault
+      // TRUST-BOUNDARY REHYDRATION (Convex DB write only, never an LLM input):
+      // The model operated on de-identified text, so identifier fields may hold
+      // vault tokens or redaction placeholders. Authentic values are restored
+      // here from the trusted vault only — the in-browser client identifiers
+      // (zero PHI egress) or AWS Textract under the HIPAA BAA — before the
+      // claim is persisted. Rehydrated values must never be fed back into a
+      // subsequent LLM prompt without passing through the PHI-safe boundary
+      // again (all downstream actions supply phiValues for exactly this).
+      const isMaskedIdentifier = (value?: string) =>
+        !value ||
+        value.includes("REDACTED") ||
+        value.includes("*") ||
+        value.includes("[PATIENT]") ||
+        value.includes("[MEMBER_ID]") ||
+        value.includes("[CLAIM_REF]") ||
+        value.includes("[SERVICE_DATE]");
       const authenticPatientName = args.clientIdentifiers?.patientName || textractIdentifiers.patientName;
-      if (authenticPatientName && (!extraction.patientName || extraction.patientName.includes("REDACTED") || extraction.patientName.includes("*"))) {
+      if (authenticPatientName && isMaskedIdentifier(extraction.patientName)) {
         extraction.patientName = authenticPatientName;
       }
       const authenticMemberId = args.clientIdentifiers?.memberId || textractIdentifiers.memberId;
-      if (authenticMemberId && (!extraction.memberId || extraction.memberId.includes("REDACTED") || extraction.memberId.includes("*"))) {
+      if (authenticMemberId && isMaskedIdentifier(extraction.memberId)) {
         extraction.memberId = authenticMemberId;
       }
       const authenticClaimNumber = args.clientIdentifiers?.claimNumber || textractIdentifiers.claimNumber;
-      if (authenticClaimNumber && (!extraction.claimNumber || extraction.claimNumber.includes("REDACTED") || extraction.claimNumber.includes("*"))) {
+      if (authenticClaimNumber && isMaskedIdentifier(extraction.claimNumber)) {
         extraction.claimNumber = authenticClaimNumber;
       }
       if (textractIdentifiers.serviceDate && !extraction.serviceDate) {

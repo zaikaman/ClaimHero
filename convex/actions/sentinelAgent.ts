@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getAgentLanguageModel } from "../lib/agentModel";
 import { buildLeanSentinelPrompt } from "../lib/sentinelPrompt";
 import { redactBeforeLLM } from "../lib/redactionEngine";
+import { collectPhiValues, sanitizeToolOutputForLlm } from "../lib/phiSafe";
 import { api, components, internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import { rateLimiter } from "../lib/rateLimiter";
@@ -15,6 +16,8 @@ import { FirecrawlClient, type Format } from "@firecrawl/firecrawl-convex";
 import { isAccessDeniedDocument, sanitizePublicPolicyUrl } from "./policyCrawler";
 
 // 1. Get Active Claim Details Tool
+// Vault-aware: identifiers from the fetched record seed the deterministic
+// vault so full names and member IDs are tokenized, not regex-guessed.
 export const getActiveClaimDetails = createTool({
   description:
     "Retrieve comprehensive medical and clinical facts, denial reason codes (CARC), CPT/ICD-10 codes, financial liability, and ERISA § 502(c) statutory penalty calculations for a specific claim.",
@@ -36,7 +39,14 @@ export const getActiveClaimDetails = createTool({
       return `Claim not found or access denied for query ${input.claimId || input.claimNumber}.`;
     }
 
-    return redactBeforeLLM(JSON.stringify(data, null, 2));
+    const phi = collectPhiValues({
+      patientName: (data as { patientName?: string }).patientName,
+      patientMemberId: (data as { patientMemberId?: string }).patientMemberId,
+      claimNumber: (data as { claimNumber?: string }).claimNumber,
+      serviceDate: (data as { serviceDate?: string }).serviceDate,
+      patientEmail: (data as { patientEmail?: string }).patientEmail,
+    });
+    return sanitizeToolOutputForLlm(data, phi);
   },
 });
 
@@ -60,11 +70,16 @@ export const searchClaims = createTool({
       userId,
     });
 
+    // Portfolio listings aggregate multiple patients: no single vault covers
+    // every row, so the regex gate still strips labeled IDs, contacts, and
+    // addresses as defense-in-depth without a per-row vault.
     return redactBeforeLLM(JSON.stringify(data, null, 2));
   },
 });
 
 // 3. Get Clinical Evidence Tool
+// Tool outputs are LLM inputs: every payload is de-identified through the
+// centralized PHI-safe boundary before it reaches the agent model.
 export const getClinicalEvidence = createTool({
   description:
     "Retrieve crawled insurer Clinical Policy Bulletins (CPBs), PubMed clinical studies, FDA package inserts, and exact criteria citation clauses for a claim.",
@@ -80,7 +95,7 @@ export const getClinicalEvidence = createTool({
       userId,
     });
 
-    return JSON.stringify(data, null, 2);
+    return sanitizeToolOutputForLlm(data);
   },
 });
 
@@ -100,7 +115,7 @@ export const getAppealBrief = createTool({
       userId,
     });
 
-    return JSON.stringify(data, null, 2);
+    return sanitizeToolOutputForLlm(data);
   },
 });
 
@@ -120,7 +135,7 @@ export const getP2PDefenseScript = createTool({
       userId,
     });
 
-    return JSON.stringify(data, null, 2);
+    return sanitizeToolOutputForLlm(data);
   },
 });
 
@@ -140,7 +155,7 @@ export const getAuditTrail = createTool({
       userId,
     });
 
-    return JSON.stringify(data, null, 2);
+    return sanitizeToolOutputForLlm(data);
   },
 });
 
@@ -164,7 +179,9 @@ export const searchPrecedents = createTool({
       limit: 3,
     });
 
-    return JSON.stringify(searchRes, null, 2);
+    // Precedent corpus is public statutory/clinical material, but the boundary
+    // still applies so a compromised query cannot echo PII back into context.
+    return sanitizeToolOutputForLlm(searchRes);
   },
 });
 

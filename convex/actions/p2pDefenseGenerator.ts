@@ -7,6 +7,7 @@ import { internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { getStateRegulator } from "../lib/stateRegulators";
+import { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } from "../lib/phiSafe";
 import type { Doc, Id } from "../_generated/dataModel";
 
 const P2P_DEFENSE_SCHEMA = {
@@ -387,14 +388,23 @@ export const generateP2PScript = action({
     let rawResult: P2PDefenseSynthesisResult;
     let generatedBy: "openai" | "fallback" = "openai";
 
+    const p2pPhi = collectPhiValues({
+      patient: claim.patient
+        ? { name: claim.patient.name, memberId: claim.patient.memberId }
+        : null,
+      claimNumber: claim.claimNumber,
+    });
     try {
       rawResult = (await streamStructuredDraft<P2PDefenseSynthesisResult>({
         ctx,
         userId,
         threadId: args.draftThreadId,
         threadTitle: `P2P tele-script drafting - ${claim.claimNumber}`,
+        phiValues: p2pPhi,
         systemPrompt: `You are an elite Physician Peer-to-Peer (P2P) Defense Strategist and Healthcare Utilization Review Legal Counsel.
 Your mission is to generate a high-impact, razor-sharp 3-Minute Verbal Rebuttal Script and Condensed Pocket Cheat Sheet for a treating physician who must defend a denied medical claim during a 5-minute phone conference with an insurer medical director.
+
+${PHI_TOKEN_INSTRUCTION}
 
 Key Strategic Objectives:
 1. STATUTORY OPENING SALVO: Establish treating specialist authority, immediately challenge the medical director's board credentials in the same specialty pursuant to federal ERISA 29 CFR § 2560.503-1 full and fair review standards (same-specialty review), and place them on notice of ERISA requirements plus a grievance reference to the patient's state regulator where applicable.
@@ -407,10 +417,10 @@ Key Strategic Objectives:
 Do NOT use emojis anywhere in the output. Keep verbal language natural, confident, assertive, and clinical.`,
         userPrompt: `Generate a 3-Minute Physician P2P Defense Tele-Script for the following case:
 
-Case Details:
-- Claim Number: ${claim.claimNumber}
-- Patient Name: ${claim.patient?.name || "Patient"}
-- Member ID: ${claim.patient?.memberId || "N/A"}
+Case Details (identifiers are vault tokens):
+- Claim Number: ${PHI_TOKENS.claimNumber}
+- Patient Name: ${PHI_TOKENS.patientName}
+- Member ID: ${PHI_TOKENS.memberId}
 - Insurance Payer: ${payer} (${medicalDirectorRole})
 - Treating Physician: ${physicianName} (${physicianSpecialty})
 - Disputed Claim Amount: $${(claim.deniedAmount || 0).toLocaleString()}

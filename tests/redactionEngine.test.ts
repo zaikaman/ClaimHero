@@ -242,6 +242,43 @@ CPT: 27447 (Total Knee Arthroplasty) - Denied $24,500.00`;
       expect(sanitized.sanitizedText).not.toContain("Date of Service: **/**/****");
     });
 
+    it("redacts both the phone and the address when a phone number precedes an address", () => {
+      // Regression: the address anchor used to start inside the phone fragment
+      // ("2834 or 1234 Medical Center Blvd Suite"), overlap with the phone
+      // entity, get suppressed, and silently swallow the true address.
+      const text = "Contact patient at (555) 019-2834 or 1234 Medical Center Blvd Suite 500.";
+      const entities = detectPiiEntities(text);
+      expect(entities.some((e) => e.category === "contact")).toBe(true);
+      const addresses = entities.filter((e) => e.category === "address");
+      expect(addresses.length).toBe(1);
+      expect(addresses[0]?.originalText).toBe("1234 Medical Center Blvd Suite");
+
+      const sanitized = fastSanitizeText(text).sanitizedText;
+      expect(sanitized).toContain("[REDACTED PHONE]");
+      expect(sanitized).toContain("[REDACTED ADDRESS]");
+      expect(sanitized).not.toContain("1234 Medical Center Blvd Suite");
+    });
+
+    it("still finds addresses adjacent to SSN, member-ID, and decimal-measure runs", () => {
+      const ssnText = "SSN: 123-45-6789, 742 Evergreen Blvd, Springfield";
+      const ssnEntities = detectPiiEntities(ssnText);
+      expect(ssnEntities.some((e) => e.category === "ssn")).toBe(true);
+      expect(ssnEntities.some((e) => e.category === "address")).toBe(true);
+
+      const memberText = "Member ID: MBN9823412-01, 742 Evergreen Blvd, Springfield";
+      const memberEntities = detectPiiEntities(memberText, { patientName: "Test Patient" });
+      expect(memberEntities.some((e) => e.category === "member_id")).toBe(true);
+      expect(memberEntities.some((e) => e.category === "address")).toBe(true);
+
+      // A decimal clinical measure must not become a house number that spans
+      // forward into a later address ("5 mg daily, 123 Main St" is not an address).
+      const decimalText = "Takes 12.5 mg daily. Lives at 123 Main St, Springfield.";
+      const decimalEntities = detectPiiEntities(decimalText);
+      const decimalAddresses = decimalEntities.filter((e) => e.category === "address");
+      expect(decimalAddresses.length).toBe(1);
+      expect(decimalAddresses[0]?.originalText).toBe("123 Main St");
+    });
+
     it("masks Date of Service (DOS) only when explicitly configured or in PUBLIC_EXHIBIT mode", () => {
       const claimText = "DOS: 07/04/2026 and Service Date: 06/12/2026";
 

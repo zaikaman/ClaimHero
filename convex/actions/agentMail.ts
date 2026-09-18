@@ -574,13 +574,24 @@ async function handleInboundClaimReply(
       }
     }
 
-    // Perform deep structured LLM evaluation to refine rationale, extract settlement numbers & draft rebuttal
+    // Perform deep structured LLM evaluation to refine rationale, extract settlement numbers & draft rebuttal.
+    // PHI-safe: inbound payer text may quote patient identifiers, so the case
+    // reference is vault-tokenized and the boundary redacts + asserts.
     let analysis: InboundAnalysisResult | null = null;
     try {
       const { createStructuredCompletion } = await import("../lib/openai");
+      const { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } = await import("../lib/phiSafe");
+      const inboundPhi = collectPhiValues({
+        patientName: matchingClaim.patientName,
+        claimNumber: matchingClaim.claimNumber,
+      });
       analysis = await createStructuredCompletion<InboundAnalysisResult>({
+        phiValues: inboundPhi,
         systemPrompt: `You are a Senior Appellate Adjudication & Clinical Records Analyst for ClaimHero.
-You are analyzing an inbound communication letter received from an insurance payer or adjudicator (${payer}) regarding Claim #${matchingClaim.claimNumber} (Patient: ${matchingClaim.patientName || "Patient"}).
+You are analyzing an inbound communication letter received from an insurance payer or adjudicator (${payer}) regarding Claim #${PHI_TOKENS.claimNumber} (Patient: ${PHI_TOKENS.patientName}).
+
+${PHI_TOKEN_INSTRUCTION}
+
 Clinical Context:
 - CPT Codes: [${(matchingClaim.cptCodes || []).join(", ")}]
 - ICD-10 Diagnosis: [${(matchingClaim.icd10Codes || []).join(", ")}]

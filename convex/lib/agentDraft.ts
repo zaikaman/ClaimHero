@@ -9,7 +9,7 @@ import {
   isStructuredOutputProtocolError,
   parseStructuredOutput,
 } from "./openai";
-import { redactBeforeLLM } from "./redactionEngine";
+import { deidentifyPromptPair, type PhiValues } from "./phiSafe";
 
 /**
  * Hard ceiling on semantic retries for long-form structured drafting. Mirrors
@@ -36,6 +36,11 @@ export interface StreamedStructuredDraftOptions {
   userPrompt: string;
   schemaName: string;
   schema: Record<string, unknown>;
+  /**
+   * Known direct identifiers for the centralized PHI-safe boundary. The helper
+   * vault-tokenizes these before the regex gate and fails closed on leak.
+   */
+  phiValues?: PhiValues;
 }
 
 export interface StreamedStructuredDraft<T> {
@@ -64,12 +69,17 @@ export async function streamStructuredDraft<T>(
   options: StreamedStructuredDraftOptions
 ): Promise<StreamedStructuredDraft<T>> {
   const { model } = getOpenAIConfig();
+  const { systemPrompt: safeSystem, userPrompt: safeUser } = deidentifyPromptPair(
+    options.systemPrompt,
+    options.userPrompt,
+    options.phiValues
+  );
   const instructions = buildStructuredOutputSystemPrompt(
-    redactBeforeLLM(options.systemPrompt),
+    safeSystem,
     options.schemaName,
     options.schema
   );
-  const basePrompt = redactBeforeLLM(options.userPrompt);
+  const basePrompt = safeUser;
 
   const agent = new Agent(components.agent, {
     name: options.schemaName,

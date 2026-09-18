@@ -8,6 +8,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { rateLimiter } from "../lib/rateLimiter";
 import { getStateRegulator } from "../lib/stateRegulators";
+import { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } from "../lib/phiSafe";
 
 export interface P2PLiveClaimContext {
   _id: Id<"claims">;
@@ -88,15 +89,23 @@ export const generateLiveFastAnswer = action({
 
     const clinicalFacts = claim.appealContext?.clinicalFacts;
     const physicianNotes = claim.appealContext?.physicianNotes || "";
+    const livePhi = collectPhiValues({
+      patient: claim.patient
+        ? { name: claim.patient.name, memberId: claim.patient.memberId }
+        : null,
+      claimNumber: claim.claimNumber,
+    });
 
     const systemPrompt = `You are ClaimHero's Real-Time P2P Defense Copilot for Medical Peer-to-Peer Calls.
 A treating physician is currently on a live 5-minute phone conference with an insurer medical director regarding a denied insurance claim.
 The medical director just made an objection, posed a trap question, or challenged medical necessity.
 
+${PHI_TOKEN_INSTRUCTION}
+
 Your mission: Deliver a sub-second, devastatingly precise, 1-2 sentence spoken rebuttal card that the physician can read ALOUD RIGHT NOW.
 
-Case Context:
-- Patient: ${claim.patient?.name || "Patient"} | Payer: ${payer} | State: ${state} (${regulator.doiShort} ref only; federal ERISA engine)
+Case Context (identifiers are vault tokens):
+- Patient: ${PHI_TOKENS.patientName} | Payer: ${payer} | State: ${state} (${regulator.doiShort} ref only; federal ERISA engine)
 - Procedure: ${cptList} | Diagnosis: ${icdList}
 - Denial Reason: ${claim.denialReasonCode || "CO-50"}: ${claim.denialReasonDescription || "Medical Necessity"}
 - Clinical Findings: ${clinicalFacts?.examinationFindings || "Not documented on file (pending chart review)"}
@@ -171,6 +180,7 @@ Generate an instant, grounded Fast Answer response card.`;
         schemaName: "LiveFastAnswerResult",
         schema: fastAnswerSchema,
         temperature: 0.2,
+        phiValues: livePhi,
       });
 
       result = {
@@ -290,8 +300,16 @@ export const generateInteractiveReviewerPushback = action({
       .map((h) => `${h.speaker === "physician" ? "Treating Physician" : "Medical Director"}: "${h.text}"`)
       .join("\n");
 
+    const reviewerPhi = collectPhiValues({
+      patient: claim.patient
+        ? { name: claim.patient.name, memberId: claim.patient.memberId }
+        : null,
+      claimNumber: claim.claimNumber,
+    });
     const systemPrompt = `You are the Insurer Medical Director reviewing denied insurance claims for ${payer}.
-You are on a live, rapid 3-to-5 minute peer-to-peer (P2P) tele-conference with the treating physician for Claim #${claim.claimNumber} (${cptList}).
+You are on a live, rapid 3-to-5 minute peer-to-peer (P2P) tele-conference with the treating physician for Claim #${PHI_TOKENS.claimNumber} (${cptList}).
+
+${PHI_TOKEN_INSTRUCTION}
 Current Physician Speech Turn: #${physicianTurnCount}.
 
 CRITICAL GUIDELINES FOR REALISTIC P2P CALL SIMULATION:
@@ -326,8 +344,8 @@ CRITICAL GUIDELINES FOR REALISTIC P2P CALL SIMULATION:
 4. STRICT ENGLISH-ONLY MANDATE:
    - Always converse, push back, simulate dialogue, and output exclusively in English. Non-English speech is strictly prohibited.
 
-Case Details:
-- Patient: ${claim.patient?.name || "Patient"}
+Case Details (identifiers are vault tokens):
+- Patient: ${PHI_TOKENS.patientName}
 - Payer: ${payer}
 - Patient State (DOI ref only): ${state} (${regulator.doiShort}; federal ERISA engine)
 - Disputed CPT Codes: ${cptList}
@@ -356,6 +374,7 @@ Evaluate the clinical merits. Formulate your spoken response as the Medical Dire
       result = await createStructuredCompletion<InteractiveReviewerPushbackResult>({
         systemPrompt,
         userPrompt,
+        phiValues: reviewerPhi,
         schemaName: "InteractiveReviewerPushbackResult",
         schema: {
           type: "object",

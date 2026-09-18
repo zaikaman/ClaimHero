@@ -5,6 +5,7 @@ import crypto from "crypto";
 import type { Id, Doc } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
+import { PHI_TOKENS, collectPhiValues } from "../lib/phiSafe";
 import { ERISA_STATUTORY_EVIDENCE } from "../lib/erisaEvidence";
 import { api, components, internal } from "../_generated/api";
 import { rateLimiter } from "../lib/rateLimiter";
@@ -2275,10 +2276,15 @@ async function evaluatePolicySourceRelevance(
     .join(", ");
 
   const windowedMarkdown = extractRelevantDocumentWindow(policySource.markdown, cptCodes, 12000);
+  // PHI-safe: vintage ranking needs only the service year; the full DOS is
+  // vaulted and never sent. No patient identifiers are used in this prompt.
+  const serviceYear = (serviceDate.match(/\b(19\d{2}|20\d{2})\b/)?.[1] || targetYear) as string;
+  const relevancePhi = collectPhiValues({ serviceDate: serviceDate || undefined });
 
   let llmResult: PolicyRelevanceResponse;
   try {
     llmResult = await createStructuredCompletion<PolicyRelevanceResponse>({
+      phiValues: relevancePhi,
       systemPrompt: `You are an expert clinical document auditor for health insurance claim appeals.
 Evaluate whether the supplied document is an authoritative, clinically relevant coverage policy, medical necessity guideline, or specialty society standard that directly applies to this claim.
 
@@ -2287,10 +2293,10 @@ Evaluation Directives:
 2. Clinical Specificity: The document must establish substantive medical necessity criteria, diagnostic standards, conservative therapy rules, or coverage indications for the procedure and anatomical site involved in the claim (e.g. Spine Surgery / Decompression for CPT 63047, Joint Surgery / Knee Arthroscopy & Meniscectomy for CPT 29881, Total Knee Arthroplasty for CPT 27447, Knee MRI for CPT 73721). Note: Carelon Musculoskeletal Guidelines cover Knee Arthroscopy and Meniscectomy under their official guideline titled "Joint Surgery". Reject documents that address only perioperative adjuncts (e.g. antithrombotic prophylaxis, anesthesia, billing/coding) without establishing the primary procedure's medical necessity criteria.
 3. Content Type: Reject commercial billing coding blogs, consumer marketing materials, device-manufacturer reimbursement guides, provider enrollment forms, directory/landing index pages without substantive criteria, and private password-protected viewers.
 4. Guideline Recency & Best-Available Vintage:
-   - Prefer the ACTIVE, CURRENTLY EFFECTIVE guideline in effect on the claim's Date of Service (${serviceDate || targetYear}, Year ${targetYear}). Rank active/updated-year editions first.
-   - Do NOT reject a national specialty society guideline (NASS, AAOS, ACR, NCCN) solely because its publication year predates ${targetYear} when it remains the latest publicly accessible edition containing applicable medical necessity criteria for the claimed procedure. Return relevant=true with rationale noting vintage (for example: "NASS lumbar stenosis guideline - latest published edition, clinically applicable to 2026 DOS").
-   - Do NOT reject an archived Carelon/EviCore/CMS edition solely because its effective window ended before the Date of Service when it is otherwise clinically specific to the claimed procedure and no active edition was retrievable in this result set. Return relevant=true with rationale noting best-available vintage (for example: "Archived Carelon edition - best publicly accessible vintage; active edition not retrievable, cite with vintage disclosure"). Only return relevant=false for vintage when the document is about the wrong anatomy/procedure, lacks substantive criteria, or an active edition of the same guideline family is already available.
-   - Reject directory search-result pages, help/landing pages, and ongoing-research protocols without results (e.g. "project is ongoing and does not have results") because they contain no citable criteria, regardless of vintage.
+    - Prefer the ACTIVE, CURRENTLY EFFECTIVE guideline in effect for service year ${serviceYear}. Rank active/updated-year editions first.
+    - Do NOT reject a national specialty society guideline (NASS, AAOS, ACR, NCCN) solely because its publication year predates ${targetYear} when it remains the latest publicly accessible edition containing applicable medical necessity criteria for the claimed procedure. Return relevant=true with rationale noting vintage (for example: "NASS lumbar stenosis guideline - latest published edition, clinically applicable to ${serviceYear} DOS").
+    - Do NOT reject an archived Carelon/EviCore/CMS edition solely because its effective window ended before the Date of Service when it is otherwise clinically specific to the claimed procedure and no active edition was retrievable in this result set. Return relevant=true with rationale noting best-available vintage (for example: "Archived Carelon edition - best publicly accessible vintage; active edition not retrievable, cite with vintage disclosure"). Only return relevant=false for vintage when the document is about the wrong anatomy/procedure, lacks substantive criteria, or an active edition of the same guideline family is already available.
+    - Reject directory search-result pages, help/landing pages, and ongoing-research protocols without results (e.g. "project is ongoing and does not have results") because they contain no citable criteria, regardless of vintage.
 5. Administrative & Prior-Authorization Denials (e.g. CO-197, CO-16, Precertification Absent): When a claim is denied for lack of prior authorization or precertification, the universal legal and clinical appeal mechanism under ERISA and health plan rules is demonstrating emergency medical necessity, acute progressive deficit, or clinical indication for retroactive authorization. You MUST NEVER reject an authoritative clinical guideline, coverage policy, or peer-reviewed study simply because the denial code was administrative or 'lack of prior authorization'. Clinical criteria and surgical indications ARE the exact substantive evidence required to overturn prior-authorization denials.
 6. Peer-Reviewed Clinical Evidence & PubMed: Peer-reviewed clinical studies, systematic reviews, and meta-analyses indexed on PubMed/NCBI establish clinical efficacy, standard-of-care, and medical necessity indications under ERISA full-and-fair review regulations. You MUST accept a PubMed study or systematic review if it evaluates the surgical indications, clinical outcomes, or medical necessity for the procedure and diagnosis in the claim. Do not reject PubMed documents merely because they are formatted as journal articles or abstracts rather than an insurer CPB bulletin. Reject only protocols/project summaries that explicitly state they have no results or findings yet.
 
@@ -2302,7 +2308,8 @@ Procedure code(s): ${cptDescriptions}
 Diagnosis code(s): ${icd10Codes.join(", ") || "Not provided"}
 Denial reason code: ${denialReasonCode || "Not provided"}
 Denial description: ${denialReasonDescription || "Not provided"}
-Date of Service: ${serviceDate || targetYear} (Target Active Year: ${targetYear})
+Service Year (vintage reference only): ${serviceYear} (Target Active Year: ${targetYear})
+Service Date: ${serviceDate ? PHI_TOKENS.serviceDate : serviceYear}
 Source URL: ${policySource.sourceUrl}
 
 Document excerpt (title may be first line):
@@ -2601,7 +2608,10 @@ async function generatePolicySearchQueries(
     : "Medical Procedure";
   const primaryCpt = cptCodes[0] || "";
 
+  const searchPhi = collectPhiValues({ serviceDate: serviceDate || undefined });
+  const searchYear = (serviceDate.match(/\b(19\d{2}|20\d{2})\b/)?.[1] || targetYear) as string;
   const result = await createStructuredCompletion<PolicySearchIntentResponse>({
+    phiValues: searchPhi,
     systemPrompt: `You are an expert Clinical Policy Retrieval Strategist for health insurance appeals.
 Generate 3 distinct, high-precision web search queries to locate official, currently active clinical coverage policies, medical necessity guidelines, or national specialty society standards for this claim.
 
@@ -2642,7 +2652,8 @@ Payer: ${searchPayer} (Original: ${payer})
 Procedure: ${cptDescriptions || "Medical Procedure"}
 Diagnosis: ${icd10Codes.join(", ") || "Clinical Diagnosis"}
 Denial: ${denialReasonCode} - ${denialReasonDescription || "Medical necessity"}
-Date of Service: ${serviceDate || targetYear} (Target Active Year: ${targetYear})`,
+Service Year (vintage reference only): ${searchYear} (Target Active Year: ${targetYear})
+Service Date: ${serviceDate ? PHI_TOKENS.serviceDate : searchYear}`,
     schemaName: "PolicySearchIntentResponse",
     schema: POLICY_SEARCH_INTENT_SCHEMA,
     temperature: 0.1,

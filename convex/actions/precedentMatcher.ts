@@ -7,6 +7,7 @@ import { internal } from "../_generated/api";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { logPipelineActivity } from "../lib/pipelineActivity";
 import { rateLimiter } from "../lib/rateLimiter";
+import { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } from "../lib/phiSafe";
 import type { Id, Doc } from "../_generated/dataModel";
 
 const OVERTURN_ANALYSIS_SCHEMA = {
@@ -534,14 +535,25 @@ export async function performComputeOverturnScore(
     ? evidences.map((e, i: number) => `[Evidence ${i + 1}] (${e.sourceType.toUpperCase()} - ${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
     : "Standard national clinical practice guideline applied.";
 
-  // 4. Call OpenAI for deep qualitative legal/clinical contradictions
+  // 4. Call OpenAI for deep qualitative legal/clinical contradictions.
+  // PHI-safe: the model scores de-identified clinical/policy signals only.
+  const precedentPhi = collectPhiValues({
+    patient: claim.patient
+      ? { name: claim.patient.name, memberId: claim.patient.memberId }
+      : null,
+    claimNumber: claim.claimNumber,
+    serviceDate: claim.serviceDate,
+  });
   let llmAnalysis: RawLLMAnalysisOutput;
   let generatedBy: "openai" | "fallback" = "openai";
   let llmAvailable = true;
   try {
     llmAnalysis = await createStructuredCompletion<RawLLMAnalysisOutput>({
+      phiValues: precedentPhi,
       systemPrompt: `You are a Senior Medical Director, ERISA Claim Adjudication Expert, and Clinical Appeals Evaluator.
 Your task is to identify specific, cited policy contradictions and formulate a winning legal precedent summary for an insurance denial appeal.
+
+${PHI_TOKEN_INSTRUCTION}
 
 Requirements:
 - Identify 2 to 4 concrete, cited contradictions showing why the adverse determination under ${claim.denialReasonCode} is arbitrary and capricious under the insurer's CPB and ERISA 29 CFR § 2560.503-1.
@@ -550,12 +562,12 @@ Requirements:
 - Write everything in clean plain text. Strictly do NOT use markdown bold asterisks (such as **bold**) or formatting tokens in any contradiction strings, summaries, or rationales.`,
       userPrompt: `Analyze the following insurance denial case:
 
-Claim Details:
-- Claim Number: ${claim.claimNumber}
-- Patient: ${claim.patient?.name || "Patient"} (Member ID: ${claim.patient?.memberId || "N/A"})
+Claim Details (identifiers are vault tokens):
+- Claim Number: ${PHI_TOKENS.claimNumber}
+- Patient: ${PHI_TOKENS.patientName} (Member ID: ${PHI_TOKENS.memberId})
 - Insurance Payer: ${claim.patient?.insurancePayer || "Health Insurer"}
 - Provider: ${claim.providerName}
-- Date of Service: ${claim.serviceDate}
+- Date of Service: ${PHI_TOKENS.serviceDate}
 - CPT Codes: ${claim.cptCodes.join(", ")}
 - ICD-10 Codes: ${claim.icd10Codes.join(", ")}
 - Denied Amount: $${claim.deniedAmount.toLocaleString()}

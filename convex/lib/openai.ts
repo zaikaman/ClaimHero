@@ -3,7 +3,7 @@ import {
   EMBEDDING_DIMENSIONS,
   fitDimensions,
 } from "./embeddings";
-import { redactBeforeLLM } from "./redactionEngine";
+import { deidentifyForLlm, deidentifyPromptPair, type PhiValues } from "./phiSafe";
 
 /**
  * Singleton OpenAI Client Instance
@@ -206,9 +206,11 @@ async function createStructuredCompletionAttempt<T>(options: {
  * Execute a structured output completion with JSON schema validation.
  *
  * Privacy & HIPAA De-identification Architecture:
- * - All textual prompt streams (`systemPrompt`, `userPrompt`) pass through mandatory
- *   pre-submission de-identification (`redactBeforeLLM`) adhering to HIPAA Safe Harbor
- *   (45 CFR § 164.514(b)(2)) to prevent transmission of direct patient identifiers.
+ * - All textual prompt streams (`systemPrompt`, `userPrompt`) pass through the
+ *   centralized PHI-safe boundary (`convex/lib/phiSafe.ts`): deterministic
+ *   vault tokenization of known identifiers from `phiValues` first, regex
+ *   `redactBeforeLLM` second for unknown PII in free text, fail-closed leak
+ *   assertion last. Adheres to HIPAA Safe Harbor (45 CFR § 164.514(b)(2)).
  * - Zero Raw-PHI / Zero Binary Image Egress: Optical character recognition (OCR) on
  *   binary PDFs and images runs locally in the browser (`src/lib/clientOcr.ts`:
  *   pdf.js text layer plus tesseract.js, zero keys, zero PHI egress), with AWS
@@ -225,11 +227,17 @@ export async function createStructuredCompletion<T>(options: {
   temperature?: number;
   /** Number of additional attempts for malformed or empty structured output. */
   structuredRetries?: number;
+  /**
+   * Known direct identifiers for deterministic vault tokenization before the
+   * regex gate. Callers holding claim records must supply this; the boundary
+   * fails closed if a raw vault value survives sanitization.
+   */
+  phiValues?: PhiValues;
 }): Promise<T> {
   const { model } = getOpenAIConfig();
   const client = getOpenAIClient({ timeout: 60_000, maxRetries: 3 });
-  const safeUserPrompt = redactBeforeLLM(options.userPrompt);
-  const safeSystemPrompt = redactBeforeLLM(options.systemPrompt);
+  const { systemPrompt: safeSystemPrompt, userPrompt: safeUserPrompt } =
+    deidentifyPromptPair(options.systemPrompt, options.userPrompt, options.phiValues);
 
   const retries = Math.max(0, Math.min(options.structuredRetries ?? DEFAULT_STRUCTURED_RETRIES, 4));
   const attempts = retries + 1;
@@ -263,18 +271,19 @@ export async function createStructuredCompletion<T>(options: {
 /**
  * Standard text completion for open-ended clinical brief drafting.
  *
- * Enforces mandatory server-side de-identification on both systemPrompt
- * and userPrompt before transmitting payloads to external LLM APIs.
+ * Enforces the centralized PHI-safe boundary on both systemPrompt and
+ * userPrompt before transmitting payloads to external LLM APIs.
  */
 export async function createChatCompletion(options: {
   systemPrompt: string;
   userPrompt: string;
   temperature?: number;
+  phiValues?: PhiValues;
 }): Promise<string> {
   const { model } = getOpenAIConfig();
   const client = getOpenAIClient({ timeout: 60_000, maxRetries: 3 });
-  const safeUserPrompt = redactBeforeLLM(options.userPrompt);
-  const safeSystemPrompt = redactBeforeLLM(options.systemPrompt);
+  const { systemPrompt: safeSystemPrompt, userPrompt: safeUserPrompt } =
+    deidentifyPromptPair(options.systemPrompt, options.userPrompt, options.phiValues);
 
   const response = await client.chat.completions.create({
     model,
@@ -293,14 +302,15 @@ export async function createChatCompletion(options: {
  * Requires OPENAI_EMBEDDING_MODEL environment variable to be explicitly configured.
  * Fails hard without fallback if unset or if the API call fails.
  *
- * Mandatory de-identification (`redactBeforeLLM`) is enforced on the input text
- * before transmitting to external embedding endpoints.
+ * The centralized PHI-safe boundary is enforced on the input text before
+ * transmitting to external embedding endpoints.
  */
 export async function createEmbedding(
   text: string,
-  _extraWeightedTokens: string[] = []
+  _extraWeightedTokens: string[] = [],
+  phiValues?: PhiValues
 ): Promise<number[]> {
-  const safeText = redactBeforeLLM(text);
+  const safeText = deidentifyForLlm(text, phiValues);
   const input = safeText.slice(0, 8000);
   const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL?.trim();
 
