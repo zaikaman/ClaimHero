@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-18T01:12:30Z
+- **Last updated:** 2026-09-18T01:20:58Z
 
 ## Log
 
@@ -1629,9 +1629,12 @@ Streamlined `README.md` into a focused, submission-ready project brief emphasizi
 - Emphasized Convex as the central reactive system of record (durable workflows, vector search, CRDT collaborative editing, scheduled statutory clocks, and authentication) and documented production integrations with Firecrawl, OpenAI, and AgentMail with mandatory human review gates.
 - Refreshed the judge evidence map connecting documented architectural claims directly to implementation files and components.
 
-### 2026-09-18 - working tree
+### 2026-09-18 - b3aa66e
 Repositioned optical intake as local-first with optional Textract enhancement and corrected the hackathon brief against official sources (`convex/actions/opticalParser.ts`, `convex/lib/openai.ts`, `convex/lib/redactionEngine.ts`, `convex/lib/textract.ts`, `.env.example`, `BRIEF.md`, `IDEA.md`, `PRODUCT.md`, `docs/THREAT_MODEL.md`, `specs/001-appeal-sentinel/`):
 - Binary PDF/image extraction is now documented as in-browser pdf.js/tesseract with zero keys and zero PHI egress; AWS Textract is an optional server-side table/key-value enhancement under HIPAA BAA, failing hard only when binary storage arrives with neither credentials nor client-extracted text, and raw bytes are never sent to OpenAI.
 - Rewrote `BRIEF.md` to track official Convex All Gas wording verified 2026-09-18 (six participation steps, prize pool, qualification criteria), removing prior invented claims about a mock-data ban and a standalone `hackathon.md` submission requirement.
 - Expanded `.env.example` with required Convex backend vars (`SITE_URL`, `AUTH_PRIVATE_KEY`/`AUTH_JWKS`, Google OAuth) and runtime fail-closed notes for OpenAI, Firecrawl, and AgentMail sender inbox. Convex features: docs only, no new runtime features.
+
+### 2026-09-18 - working tree
+Closed anonymous enumeration of the won-claim precedent archive in `searchTextPrecedents` (`convex/precedents.ts`): the query now returns an empty set for unauthenticated callers, requires a 3-500 character query, clamps results to 20 rows, and projects an allow-listed shape behind an explicit returns validator so `sourceClaimId`, `corpusKey`, raw embeddings, and outcome amounts can never leak. Added regression coverage in `tests/convexPrecedents.test.ts`. Verified 74 suites (1,123 passing tests), clean typecheck, and production build. Convex features: queries, full-text search, auth (`convex/lib/auth.ts`).
 

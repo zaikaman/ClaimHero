@@ -279,6 +279,7 @@ describe("Convex Precedents & Controlling Authorities Engine", () => {
     });
 
     it("searchTextPrecedents: returns empty on empty query, else search index results", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const mockCtx: any = { db: {} };
       expect(await (precedents.searchTextPrecedents as any)._handler(mockCtx, { query: "" })).toEqual([]);
 
@@ -310,6 +311,75 @@ describe("Convex Precedents & Controlling Authorities Engine", () => {
 
       expect(res).toHaveLength(1);
       expect(res[0].primaryCpt).toBe("63047");
+    });
+
+    it("searchTextPrecedents: blocks anonymous enumeration and short queries, never leaks claim linkage", async () => {
+      // Anonymous callers get an empty set without touching the search index.
+      vi.mocked(getAuthUserId).mockResolvedValue(null);
+      const mockCtxAnon: any = {
+        db: {
+          query: vi.fn(),
+        },
+      };
+      expect(
+        await (precedents.searchTextPrecedents as any)._handler(mockCtxAnon, { query: "laminectomy" })
+      ).toEqual([]);
+      expect(mockCtxAnon.db.query).not.toHaveBeenCalled();
+
+      // Authenticated callers with sub-threshold queries are rejected before any index read.
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockCtxShort: any = {
+        db: {
+          query: vi.fn(),
+        },
+      };
+      expect(await (precedents.searchTextPrecedents as any)._handler(mockCtxShort, { query: "a" })).toEqual([]);
+      expect(await (precedents.searchTextPrecedents as any)._handler(mockCtxShort, { query: "  " })).toEqual([]);
+      expect(mockCtxShort.db.query).not.toHaveBeenCalled();
+
+      // Authenticated results use an allow-list projection: no sourceClaimId,
+      // corpusKey, embedding, or outcome (recovered amounts) may leak.
+      const sensitiveRow = {
+        _id: "p1",
+        sourceKind: "winning_brief",
+        title: "Brief 1",
+        citation: "ClaimHero overturned appeal CLM-123",
+        primaryCpt: "63047",
+        carcCode: "CO-50",
+        winningArgument: "Arg",
+        statutoryLanguage: "Stat",
+        sourceUrl: "url",
+        sourceClaimId: "claim_123",
+        corpusKey: "won-claim-claim_123",
+        embedding: [0.1, 0.2],
+        outcome: "Overturned. Recovered $12,000.",
+      };
+      const takeSpy = vi.fn().mockResolvedValue([sensitiveRow]);
+      const mockCtxSearch: any = {
+        db: {
+          query: vi.fn().mockReturnValue({
+            withSearchIndex: vi.fn().mockImplementation((_name, fn) => {
+              const qObj: any = {};
+              qObj.search = vi.fn().mockReturnValue(qObj);
+              qObj.eq = vi.fn().mockReturnValue(qObj);
+              fn(qObj);
+              return { take: takeSpy };
+            }),
+          }),
+        },
+      };
+      const res = await (precedents.searchTextPrecedents as any)._handler(mockCtxSearch, {
+        query: "laminectomy",
+        limit: 100,
+      });
+      expect(res).toHaveLength(1);
+      expect(res[0]).not.toHaveProperty("sourceClaimId");
+      expect(res[0]).not.toHaveProperty("corpusKey");
+      expect(res[0]).not.toHaveProperty("embedding");
+      expect(res[0]).not.toHaveProperty("outcome");
+      expect(res[0].embedding_redacted).toBe(true);
+      // Enumeration cap is clamped to 20 even when the client asks for more.
+      expect(takeSpy).toHaveBeenCalledWith(20);
     });
 
     it("searchLexicalPrecedentsInternal: returns empty on empty query, else stripped precedent results", async () => {

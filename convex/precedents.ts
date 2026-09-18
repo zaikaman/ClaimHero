@@ -2,7 +2,7 @@ import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { precedentMatchValidator } from "./lib/precedentValidators";
-import { getClaimIfAuthorized } from "./lib/auth";
+import { getAuthUserId, getClaimIfAuthorized } from "./lib/auth";
 import { fitDimensions, EMBEDDING_DIMENSIONS } from "./lib/embeddings";
 import { appendAuditLog } from "./auditLogs";
 
@@ -388,8 +388,35 @@ export const searchLexicalPrecedentsInternal = internalQuery({
 });
 
 /**
- * Full-text search across precedent winning arguments and statutory citations using Convex searchIndex
+ * Authenticated full-text search across the shared precedent archive.
+ *
+ * Security model: the archive mixes public statutory authorities with
+ * de-identified won-claim briefs (indexed via `indexWonAppeal` with a
+ * `won-claim-{claimId}` corpus key and a `sourceClaimId` link). Anonymous
+ * callers must not be able to enumerate that archive, and tenant-internal
+ * identifiers (`sourceClaimId`, `corpusKey`, raw `embedding` vectors) must
+ * never leave the server. The explicit allow-list projection below is the
+ * enforcement point — do not spread full rows or add claim-linking fields.
+ *
+ * Authenticated denial-team members share the de-identified corpus, matching
+ * the `hybridSearchPrecedents` action contract (which requires
+ * `requireAuthUser` + per-user rate limiting). Query-level enumeration is
+ * throttled via a minimum query length and a tight result cap; heavy/bulk
+ * consumers should use the rate-limited action instead.
  */
+const searchTextPrecedentResultValidator = v.object({
+  _id: v.id("precedents"),
+  sourceKind: sourceKindValidator,
+  title: v.string(),
+  citation: v.string(),
+  primaryCpt: v.string(),
+  carcCode: v.string(),
+  winningArgument: v.string(),
+  statutoryLanguage: v.string(),
+  sourceUrl: v.optional(v.string()),
+  embedding_redacted: v.boolean(),
+});
+
 export const searchTextPrecedents = query({
   args: {
     query: v.string(),
@@ -397,15 +424,27 @@ export const searchTextPrecedents = query({
     primaryCpt: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
+  returns: v.array(searchTextPrecedentResultValidator),
   handler: async (ctx, args) => {
-    if (!args.query.trim()) {
+    // Anonymous callers get an empty set (same convention as claims.search
+    // and clinicalEvidences.searchEvidence) so the archive cannot be
+    // scraped without an authenticated session.
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return [];
+    }
+
+    const trimmed = args.query.trim();
+    // Minimum length blocks single-character/wildcard enumeration of the
+    // won-claim archive; maximum length bounds search-index work.
+    if (trimmed.length < 3 || trimmed.length > 500) {
       return [];
     }
 
     const results = await ctx.db
       .query("precedents")
       .withSearchIndex("search_precedents", (q) => {
-        let builder = q.search("winningArgument", args.query);
+        let builder = q.search("winningArgument", trimmed);
         if (args.sourceKind) {
           builder = builder.eq("sourceKind", args.sourceKind);
         }
@@ -414,8 +453,10 @@ export const searchTextPrecedents = query({
         }
         return builder;
       })
-      .take(Math.max(1, Math.min(args.limit ?? 10, 100)));
+      .take(Math.max(1, Math.min(args.limit ?? 10, 20)));
 
+    // Allow-list projection only. Never return sourceClaimId, corpusKey,
+    // embedding, outcome (recovered amounts), or jurisdiction-level PII.
     return results.map((row) => ({
       _id: row._id,
       sourceKind: row.sourceKind,
@@ -426,7 +467,7 @@ export const searchTextPrecedents = query({
       winningArgument: row.winningArgument,
       statutoryLanguage: row.statutoryLanguage,
       sourceUrl: row.sourceUrl,
-      embedding_redacted: true,
+      embedding_redacted: true as const,
     }));
   },
 });
