@@ -53,8 +53,8 @@ describe("Evidentiary Degradation & Provisional Review Gating", () => {
       expect(clinicalCriterion?.rationale).toContain("No objective clinical documentation");
 
       const erisaCriterion = result.scoringBreakdown.find((c) => c.category === "statutory_erisa");
-      expect(erisaCriterion?.score).toBe(19);
-      expect(erisaCriterion?.status).toBe("strong");
+      expect(erisaCriterion?.score).toBe(4);
+      expect(erisaCriterion?.status).toBe("weak");
 
       const precedentCriterion = result.scoringBreakdown.find((c) => c.category === "precedent_strength");
       expect(precedentCriterion?.score).toBe(4);
@@ -62,7 +62,9 @@ describe("Evidentiary Degradation & Provisional Review Gating", () => {
 
       expect(result.scoreStatus).toBe("provisional_capped");
       expect(result.riskLevel).toBe("complex_litigation");
-      expect(result.overturnProbabilityScore).toBe(36);
+      expect(result.overturnProbabilityScore).toBe(21);
+      expect(result.appealReadinessScore).toBe(21);
+      expect(result.evidenceCoverageScore).toBe(21);
       expect(result.degradationWarnings).toBeDefined();
       expect(result.degradationWarnings?.[0]).toContain("CPB");
     });
@@ -522,6 +524,101 @@ describe("Evidentiary Degradation & Provisional Review Gating", () => {
         (call) => call.status === "ready_for_review"
       );
       expect(finalStatusUpdate).toBeDefined();
+    });
+  });
+
+  describe("Issue 21: Canonical Appeal Readiness, Evidence Coverage & Honest Floor", () => {
+    it("ensures fallback statutory baseline hits the floor (21), not the 40 cap", () => {
+      const claim = {
+        cptCodes: ["29881"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+      };
+      const fallbackEvidence = [{ ...ERISA_STATUTORY_EVIDENCE }];
+      const result = calculateDeterministicRubric(claim, fallbackEvidence, []);
+
+      // Pillar 3 should be 4 (unsubstantiated standing floor), not gifted 19
+      const erisaCriterion = result.scoringBreakdown.find((c) => c.category === "statutory_erisa");
+      expect(erisaCriterion?.score).toBe(4);
+      expect(erisaCriterion?.status).toBe("weak");
+
+      // Degraded dossier hits floor 21, not cap 40
+      expect(result.appealReadinessScore).toBe(21);
+      expect(result.evidenceCoverageScore).toBe(21);
+      expect(result.overturnProbabilityScore).toBe(21);
+      expect(result.scoreStatus).toBe("provisional_capped");
+      expect(result.riskLevel).toBe("complex_litigation");
+    });
+
+    it("does not award CO-50 special-case forcing bonus when precedent lacks code match", () => {
+      const claim = {
+        cptCodes: ["29881"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+      };
+      const evidences = [
+        {
+          sourceType: "payer_cpb",
+          citationClause: "Sec 2",
+          extractedEvidenceMarkdown: "Covered indication",
+        },
+      ];
+      // Precedent matches vector similarity only, but has no CARC CO-50 and no CPT 29881
+      const precedentWithoutCodeMatch = [
+        {
+          title: "Generic Appeal Ruling",
+          outcome: "Overturned",
+          vectorScore: 0.85,
+          combinedScore: 0.85,
+          carcCodes: ["CO-197"],
+          cptCodes: ["99213"],
+        },
+      ];
+
+      const result = calculateDeterministicRubric(claim, evidences, precedentWithoutCodeMatch);
+      const precedentCriterion = result.scoringBreakdown.find((c) => c.category === "precedent_strength");
+
+      // baseScore (12) + similarityBonus (3) + codeMatchBonus (0) = 15.
+      // Must NOT be forced to 19 by old CO-50 special case!
+      expect(precedentCriterion?.score).toBe(15);
+    });
+
+    it("calculates distinct appealReadinessScore and evidenceCoverageScore when degraded", () => {
+      const claim = {
+        cptCodes: ["29881"],
+        denialReasonCode: "CO-16",
+        denialReasonDescription: "Claim lacked information",
+      };
+      // Robust clinical docs and genuine legal precedent with raw sum > 40, but cpb is degraded
+      const evidences = [
+        {
+          sourceType: "pubmed_study",
+          citationClause: "Study 1",
+          extractedEvidenceMarkdown: "Clinical efficacy verified",
+        },
+        {
+          sourceType: "pubmed_study",
+          citationClause: "Study 2",
+          extractedEvidenceMarkdown: "Trial verified",
+        },
+        {
+          sourceType: "legal_precedent",
+          citationClause: "Court Ruling",
+          extractedEvidenceMarkdown: "Overturned CO-16 denial",
+        },
+      ];
+
+      const result = calculateDeterministicRubric(claim, evidences, [], {
+        cpbDegraded: true,
+      });
+
+      expect(result.scoreStatus).toBe("provisional_capped");
+      // Appeal readiness held at provisional cap (40)
+      expect(result.appealReadinessScore).toBe(40);
+      // Evidence coverage reflects true documentary completeness without the cap
+      expect(result.evidenceCoverageScore).toBeGreaterThan(40);
+      // overturnProbabilityScore follows appealReadinessScore for backward compatibility
+      expect(result.overturnProbabilityScore).toBe(40);
     });
   });
 });

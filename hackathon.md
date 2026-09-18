@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-18T12:33:00Z
+- **Last updated:** 2026-09-18T13:12:00Z
 
 ## Log
 
@@ -1684,11 +1684,24 @@ Anchored statutory appeal deadlines strictly to denial dates rather than intake 
 - Reactive `useDeadlineAlarm` Hook: Implemented promised `useDeadlineAlarm.ts` hook providing sub-second reactive countdowns, portfolio-wide urgency categorization (`overdue`, `emergency`, `critical`, `urgent`, `normal`), alarm triggers, and statutory countdown metrics.
 - Regression & Verification: Added comprehensive test suite `tests/statutoryDeadlinesAndAlarmHook.test.ts` (15 tests) and verified 1200 passing tests across 77 test suites, 0 lint warnings, 0 typecheck errors, and production build.
 
-### 2026-09-18 - working tree
+### 2026-09-18 - d8c593f
 Harmonized statutory appeal and external review deadlines across docs and code (`README.md`, `PRODUCT.md`, `convex/lib/stateRegulators.ts`, `convex/lib/dateUtils.ts`, `convex/actions/appealSynthesizer.ts`, `convex/actions/p2pDefenseGenerator.ts`, `src/lib/constants.ts`, `src/components/studio/dossier/DossierStatutorySummary.tsx`, `src/components/onboarding/OnboardingWizard.tsx`, `tests/stateRegulators.test.ts`, `tests/statutoryDeadlinesExternalReview.test.ts`, `tests/statutoryEscalation.test.ts`):
 - Multi-Clock Statutory Architecture: Replaced uniform 180-day limitation with full dual-clock architecture separating ERISA 29 CFR § 2560.503-1 180-day internal appeals from ACA 45 CFR § 147.136 4-month (~120-day) external reviews and state 30-day expedited/prompt external review clocks.
 - State-Specific External Review Timelines: Mapped precise statutory external review timelines for California (DMHC/CDI 6-month / 180-day IMR per Cal. Health & Safety Code § 1374.30(j)), Texas (TDI 4-month / 120-day IRO per Tex. Ins. Code § 4201.359 / 28 TAC § 12.502), New York (DFS 4-month / 120-day external appeal per N.Y. Ins. Law § 4914(b)(1)), Florida, Illinois, Pennsylvania, and federal default, with 30-day expedited external review clocks.
 - Intelligent Deadline Resolution: Upgraded `resolveStatutoryDeadline` and created `resolveExternalReviewDeadline` in `convex/lib/dateUtils.ts` to compute statutory clocks and citations based on dispute level, patient state, and urgency posture.
 - Doc-vs-Code Harmonization: Updated `PRODUCT.md`, `stateRegulators.ts`, `OnboardingWizard.tsx`, `DossierStatutorySummary.tsx`, and `constants.ts` to eliminate doc-vs-code contradictions and align with US healthcare regulations.
 - Regression & Verification: Added comprehensive test suite `tests/statutoryDeadlinesExternalReview.test.ts` (14 tests) and updated `tests/stateRegulators.test.ts` and `tests/statutoryEscalation.test.ts`. Verified 78 test suites (1,218 passing tests), 0 type errors, 0 lint warnings, and production build.
+
+### 2026-09-18 - working tree
+Refactored statutory scoring engine and evidentiary degradation gating to eliminate win-probability aliasing, auto-inserted statutory gifts, and hardcoded code match forcing (`README.md`, `convex/actions/precedentMatcher.ts`, `tests/evidentiaryDegradationGating.test.ts`, `tests/actionsPrecedentsAndPipeline.test.ts`):
+- Canonical Appeal Readiness vs Evidence Coverage: Disentangled `evidenceCoverageScore` from the capped appeal readiness sum; `appealReadinessScore` canonically evaluates 0-100 dossier readiness (held at max 40 when evidentially degraded), while `evidenceCoverageScore` honestly reports true documentary completeness across the 4 statutory pillars without synthetic clamping. Retained `overturnProbabilityScore` as backward-compatible alias for existing database schemas and legacy API consumers.
+- Eliminated Statutory Baseline Score Inflation: Fixed Pillar 3 ERISA scoring so auto-inserted fallback boilerplate notices (`isStatutoryBaselineEvidence`, `ERISA_STATUTORY_EVIDENCE`) receive baseline floor (4/weak) rather than gifting 19/20 points, ensuring degraded dossiers with zero substantive evidence hit the honest floor (score 21), not the provisional cap (40).
+- Grounded Code Overlap & Similarity Calibration: Removed hardcoded `CO-50` shortcut branch that artificially forced +4 code match bonus. Integrated authentic domain code matching using `calculateCodeOverlap` from `convex/lib/embeddings.ts` across CARC, CPT, and ICD-10 codes, and calibrated `similarityBonus` so missing/weak vector similarity (<0.40) yields 0 bonus.
+- Regression Coverage & Verification: Added targeted unit tests in `tests/evidentiaryDegradationGating.test.ts` and updated fixtures in `tests/actionsPrecedentsAndPipeline.test.ts`. Synchronized test metrics in `README.md` (1,221 automated tests across 78 test suites). Verified all 78 test suites (1,221 passing tests), 0 type errors, 0 lint warnings, and production build. Convex features: actions, internalAction, mutations.
+
+Follow-up: Enforced evidentiary and statutory grounding in `convex/actions/precedentMatcher.ts` and eliminated unconstrained auto-reply generation loopholes in `convex/actions/mailDispatcher.ts` to match synthesizer clinical safety rules:
+- Precedent Matcher Grounding: `keyPolicyContradictions` now strictly checks against verified, non-blocked, site-matched substantive clinical policy evidence and evaluates to empty (`[]`) when CPB is degraded, pure statutory, or absent, discarding unsupported clinical assertions (`UNSUPPORTED_CLINICAL_CONCLUSION`); `winningPrecedentSummary` reports unverified archive status when unavailable or when no precedents match rather than passing hallucinated court cases; and `suggestedAppealLevel` enforces mandatory internal review (`level_1_internal`) on initial claims, blocking premature external review recommendations without administrative exhaustion.
+- Auto-Reply Draft Hardening: Rewrote `generateAutoReplyDraft` system/user prompts to prohibit asserting that the record 'conclusively demonstrates medical necessity' and remove unverified conservative therapy/imaging demands; filters blocked (403/captcha) and anatomically mismatched evidence; and implements post-generation clinical safety gating with `buildNeutralClinicalBasis` when clinical intake facts are absent.
+- Regression & Verification: Added comprehensive test suite `tests/groundedMatcherAndSafeAutoReply.test.ts` (6 tests). Verified 79 test suites (1,227 passing tests), clean typecheck, clean lint, coverage, and production build. Convex features: actions, internalAction, mutations.
+
 

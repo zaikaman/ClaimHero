@@ -22,6 +22,14 @@ import { rateLimiter } from "../lib/rateLimiter";
 import { resolveClaimPatientName, type ClaimStatus } from "../claims";
 import { ensureAppealPdfStored } from "../lib/pdfGenerator";
 import type { ResolvedPayerContact } from "./payerContactResolver";
+import {
+  isBlockedEvidence,
+  isNegativeOrExclusionEvidence,
+  isEvidenceSiteMismatched,
+  isPayerMismatchedEvidence,
+  UNSUPPORTED_CLINICAL_CONCLUSION,
+  buildNeutralClinicalBasis,
+} from "./appealSynthesizer";
 
 export interface DispatchReceipt {
   transmissionId: string;
@@ -932,8 +940,38 @@ export const generateAutoReplyDraft = action({
       claimNumber: claim.claimNumber,
     });
 
+    const clinicalFacts = claim.appealContext?.clinicalFacts;
+    const clinicalFactFields: Array<[string, string | undefined]> = [
+      ["Symptoms and functional impact", clinicalFacts?.symptomsAndFunctionalImpact],
+      ["Examination findings", clinicalFacts?.examinationFindings],
+      ["Imaging and diagnostic findings", clinicalFacts?.imagingAndDiagnostics],
+      ["Treatment history and response", clinicalFacts?.treatmentHistoryAndResponse],
+      ["Other documented facts", clinicalFacts?.otherDocumentedFacts],
+    ];
+    const presentClinicalFacts = clinicalFactFields.filter(([, value]) => value?.trim());
+    const hasDocumentedClinicalFacts = presentClinicalFacts.length > 0;
+
+    const clinicalFactsPrompt = hasDocumentedClinicalFacts
+      ? `Human-documented patient-specific clinical intake facts (cite and summarize ONLY these documented facts; do NOT extrapolate or invent unverified findings):\n${presentClinicalFacts.map(([k, v]) => `- ${k}: ${v}`).join("\n")}`
+      : `No patient-specific clinical intake facts were provided to ClaimHero. State that the patient's medical records and treating provider documentation on file must be evaluated against plan coverage criteria. NEVER fabricate patient examination findings, radiographic imaging results, or conservative therapy trials. NEVER assert that the clinical record 'conclusively demonstrates medical necessity'.`;
+
+    const evidenceList = Array.isArray(evidences) ? evidences : [];
+    const validEvidences = evidenceList.filter((e: Doc<"clinicalEvidences">) =>
+      !isBlockedEvidence(e) &&
+      !isNegativeOrExclusionEvidence(e) &&
+      !isEvidenceSiteMismatched(e, claim) &&
+      !isPayerMismatchedEvidence(e, claim) &&
+      e.title &&
+      e.citationClause &&
+      e.extractedEvidenceMarkdown
+    );
+
+    const evidencesPrompt = validEvidences.length > 0
+      ? validEvidences.slice(0, 5).map((e: Doc<"clinicalEvidences">) => `${e.title} (${e.citationClause}):\n${e.extractedEvidenceMarkdown}`).join("\n\n")
+      : "No specific clinical policy bulletin quotes indexed. Rely on ERISA 29 C.F.R. § 2560.503-1 disclosure mandates and request full plan documents.";
+
     const systemPrompt = `You are a Board-Certified Physician Appeal Specialist & ERISA Appellate Counsel for ClaimHero.
-You are drafting an immediate Clinical Rebuttal Addendum in response to an insurance payer's (${payer}) request for additional documentation or clarifying review for Claim #${PHI_TOKENS.claimNumber} (Patient: ${PHI_TOKENS.patientName}).
+You are drafting an evidence-grounded Clinical Rebuttal Addendum in response to an insurance payer's (${payer}) request for additional documentation or clarifying review for Claim #${PHI_TOKENS.claimNumber} (Patient: ${PHI_TOKENS.patientName}).
 
 ${PHI_TOKEN_INSTRUCTION}
 
@@ -944,18 +982,25 @@ Clinical Context:
 - Denied Amount: $${claim.deniedAmount}
 - Denial Reason: ${claim.denialReasonCode} - ${claim.denialReasonDescription}
 - Provider: ${claim.providerName}
-- Documented Clinical Facts: ${JSON.stringify(claim.appealContext?.clinicalFacts || {})}
-- Clinical Evidence & CPB Quotes: ${(evidences || []).map((e: { title: string; citationClause: string }) => `${e.title}: ${e.citationClause}`).join("\n")}
+
+${clinicalFactsPrompt}
+
+Indexed Clinical Evidence & CPB Quotes:
+${evidencesPrompt}
 
 Guidelines:
-1. Provide a direct, authoritative, and respectful clinical response that directly supplies the demanded records/explanations.
-2. Formally assert statutory ERISA compliance (29 C.F.R. § 2560.503-1) requiring full and fair review within mandated timelines.
-3. Reiterate that the clinical record conclusively demonstrates medical necessity under published clinical criteria.
-4. Keep the letter structured with a clear salutation, 2-3 focused clinical paragraphs, and a formal closing. Do not use Markdown headings or AI meta-language.`;
+1. Provide a direct, authoritative, and respectful clinical response that directly addresses the payer's inquiry.
+2. Clinical Safety & Grounding:
+   - If documented clinical facts are provided above, reference only those documented facts.
+   - If clinical facts were not provided, state that the clinical records and treating provider notes on file must be evaluated against plan criteria; NEVER assert that the record 'conclusively demonstrates medical necessity' and NEVER fabricate conservative therapy or radiographic imaging findings.
+   - Do not make unsupported medical necessity assertions.
+3. Formally assert statutory ERISA compliance (29 C.F.R. § 2560.503-1) requiring full and fair review within mandated timelines.
+4. Request timely reconsideration and reprocessing according to plan terms.
+5. Keep the letter structured with a clear salutation, 2-3 focused clinical paragraphs, and a formal closing. Do not use Markdown headings or AI meta-language.`;
 
     const userPrompt = args.customPayerInquiry
-      ? `The payer sent the following specific inquiry or request:\n"${args.customPayerInquiry}"\n\nGenerate the complete Clinical Addendum response.`
-      : `Generate a formal Clinical Addendum response providing conservative therapy verification, radiographic diagnostics, and peer-reviewed necessity proof to secure immediate claim overturn.`;
+      ? `The payer sent the following specific inquiry or request:\n"${args.customPayerInquiry}"\n\nGenerate an evidence-grounded Clinical Addendum response addressing this inquiry using only verified clinical facts and indexed policy evidence.`
+      : `Generate an evidence-grounded Clinical Addendum response addressing the adverse determination under ${claim.denialReasonCode || "the plan"}. Ground all clinical statements strictly in the documented clinical facts on file, requesting full and fair review under ERISA 29 C.F.R. § 2560.503-1.`;
 
     const draft = await createChatCompletion({
       systemPrompt,
@@ -964,13 +1009,36 @@ Guidelines:
       phiValues: addendumPhi,
     });
 
-    const trimmedDraft = draft.trim();
+    let safeDraft = draft.trim();
 
-    if (args.inboundMessageId && trimmedDraft) {
+    // Post-generation safety gate: If patient-specific clinical facts were not provided,
+    // ensure no unsupported clinical conclusions ("conclusively demonstrates medical necessity", etc.)
+    // leak into the draft persisted for one-click send.
+    if (!hasDocumentedClinicalFacts && UNSUPPORTED_CLINICAL_CONCLUSION.test(safeDraft)) {
+      const neutralBasis = buildNeutralClinicalBasis({
+        claimNumber: claim.claimNumber,
+        cptCodes: claim.cptCodes,
+        icd10Codes: claim.icd10Codes,
+        deniedAmount: claim.deniedAmount,
+        providerName: claim.providerName,
+      });
+
+      safeDraft = safeDraft
+        .split("\n\n")
+        .map((para) => {
+          if (UNSUPPORTED_CLINICAL_CONCLUSION.test(para)) {
+            return neutralBasis;
+          }
+          return para;
+        })
+        .join("\n\n");
+    }
+
+    if (args.inboundMessageId && safeDraft) {
       try {
         await ctx.runMutation(internal.emails.updateMessageAnalysisInternal, {
           messageId: args.inboundMessageId,
-          autoReplyDraft: trimmedDraft,
+          autoReplyDraft: safeDraft,
           autoReplyStatus: "pending",
         });
       } catch (patchErr) {
@@ -980,7 +1048,7 @@ Guidelines:
 
     return {
       success: true,
-      draftText: trimmedDraft,
+      draftText: safeDraft,
       suggestedSubject: `Re: Formal Medical Appeal | Claim #${claim.claimNumber} | Clinical Reconsideration Addendum`,
     };
   },

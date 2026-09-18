@@ -3,12 +3,20 @@
 import { action, internalAction, ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { createStructuredCompletion } from "../lib/openai";
+import { calculateCodeOverlap } from "../lib/embeddings";
 import { internal } from "../_generated/api";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { logPipelineActivity } from "../lib/pipelineActivity";
 import { rateLimiter } from "../lib/rateLimiter";
 import { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } from "../lib/phiSafe";
 import type { Id, Doc } from "../_generated/dataModel";
+import {
+  isBlockedEvidence,
+  isNegativeOrExclusionEvidence,
+  isEvidenceSiteMismatched,
+  isPayerMismatchedEvidence,
+  UNSUPPORTED_CLINICAL_CONCLUSION,
+} from "./appealSynthesizer";
 
 const OVERTURN_ANALYSIS_SCHEMA = {
   type: "object",
@@ -138,6 +146,7 @@ export function calculateDeterministicRubric(
     cptCodes: string[];
     denialReasonCode: string;
     denialReasonDescription: string;
+    icd10Codes?: string[];
     patient?: { insurancePayer?: string };
   },
   evidences: Array<{
@@ -202,19 +211,25 @@ export function calculateDeterministicRubric(
   }
 
   // Pillar 3. ERISA 29 CFR § 2560.503-1 & Statutory Protections (Max: 20 points; rubric weight tested in tests/claimhero.test.ts:114)
-  // Evaluates statutory procedural standing and disclosure non-compliance
+  // Evaluates statutory procedural standing and disclosure non-compliance.
+  // Auto-inserted statutory baseline notices do NOT substitute for verified non-compliance evidence.
   let erisaScore = 4;
   let erisaRationale = "Unsubstantiated statutory standing: attaching denial letter disclosures and clinical records is required to substantiate ERISA § 2560.503-1 non-compliance.";
 
-  const hasStatutoryAuthority =
-    evidences.some(
-      (e) =>
-        e.sourceType === "statutory_authority" ||
+  const hasSubstantiveStatutoryEvidence = evidences.some(
+    (e) =>
+      !isStatutoryBaselineEvidence(e) &&
+      (e.sourceType === "statutory_authority" ||
         (e.citationClause && e.citationClause.toLowerCase().includes("2560.503-1")) ||
-        (e.title && e.title.toLowerCase().includes("erisa"))
-    ) || matchedPrecedents.some((p) => p.sourceKind === "statutory_authority");
+        (e.title && e.title.toLowerCase().includes("erisa")))
+  );
+  const hasStatutoryPrecedent = matchedPrecedents.some(
+    (p) => p.sourceKind === "statutory_authority"
+  );
+  const hasSubstantiatedStatutoryAuthority =
+    hasSubstantiveStatutoryEvidence || hasStatutoryPrecedent;
 
-  if (hasLegalPrecedent || hasStatutoryAuthority) {
+  if (hasLegalPrecedent || hasSubstantiatedStatutoryAuthority) {
     erisaScore = 19;
     erisaRationale = `Adverse determination violates ERISA 29 CFR § 2560.503-1 disclosure mandates by failing to articulate specific internal clinical review criteria contradicted by documented record.`;
   } else if (hasCpb || substantiveCount >= 2) {
@@ -223,10 +238,13 @@ export function calculateDeterministicRubric(
   } else if (substantiveCount === 1) {
     erisaScore = 12;
     erisaRationale = `Preliminary statutory grounds identified under ERISA 29 CFR § 2560.503-1; supplementary disclosure request recommended to substantiate complete denial rationale omissions.`;
+  } else if (isPureStatutory) {
+    erisaScore = 4;
+    erisaRationale = `Procedural statutory baseline attached; attaching specific insurer denial disclosures and clinical records is required to substantiate ERISA § 2560.503-1 violations.`;
   }
 
   // Pillar 4. External Review Precedents & Evidentiary Coverage (Max: 20 points; rubric weight tested in tests/claimhero.test.ts:114)
-  // Strictly grounded in retrieved precedent vectors and verified judicial/appellate rulings
+  // Strictly grounded in retrieved precedent vectors, domain code matching, and verified judicial/appellate rulings
   let precedentScore = 4;
   let precedentRationale = "No controlling appellate rulings or external review precedents indexed or matched to this denial reason.";
 
@@ -240,117 +258,134 @@ export function calculateDeterministicRubric(
     );
 
     if (hasMatchedPrecedents || legalEv) {
-    const isLegalEvFavorable = Boolean(
-      legalEv &&
-        ((legalEv.extractedEvidenceMarkdown &&
-          (legalEv.extractedEvidenceMarkdown.toLowerCase().includes("overturned") ||
-            legalEv.extractedEvidenceMarkdown.toLowerCase().includes("recovered") ||
-            legalEv.extractedEvidenceMarkdown.toLowerCase().includes("remanded"))) ||
-          (legalEv.citationClause && legalEv.citationClause.toLowerCase().includes("imr")))
-    );
-
-    const isExplicitlyAdverse = (p: MatchedPrecedentInput) =>
-      Boolean(
-        p.outcome &&
-          (p.outcome.toLowerCase().includes("affirmed") ||
-            p.outcome.toLowerCase().includes("upheld") ||
-            p.outcome.toLowerCase().includes("denied")) &&
-          !p.outcome.toLowerCase().includes("overturned") &&
-          !p.outcome.toLowerCase().includes("remanded") &&
-          !p.outcome.toLowerCase().includes("recovered")
+      const isLegalEvFavorable = Boolean(
+        legalEv &&
+          ((legalEv.extractedEvidenceMarkdown &&
+            (legalEv.extractedEvidenceMarkdown.toLowerCase().includes("overturned") ||
+              legalEv.extractedEvidenceMarkdown.toLowerCase().includes("recovered") ||
+              legalEv.extractedEvidenceMarkdown.toLowerCase().includes("remanded"))) ||
+            (legalEv.citationClause && legalEv.citationClause.toLowerCase().includes("imr")))
       );
 
-    const favorablePrecedentMatch = matchedPrecedents.find((p) => {
-      if (isExplicitlyAdverse(p)) return false;
-      return (
-        (p.outcome &&
-          (p.outcome.toLowerCase().includes("overturned") ||
-            p.outcome.toLowerCase().includes("recovered") ||
-            p.outcome.toLowerCase().includes("remanded") ||
-            p.outcome.toLowerCase().includes("order"))) ||
-        p.sourceKind === "winning_brief" ||
-        p.sourceKind === "court_overturn"
-      );
-    });
-
-    const isFavorable = Boolean(favorablePrecedentMatch || isLegalEvFavorable);
-
-    const isAffirmedOnly =
-      !isFavorable &&
-      matchedPrecedents.some(
-        (p) =>
+      const isExplicitlyAdverse = (p: MatchedPrecedentInput) =>
+        Boolean(
           p.outcome &&
-          (p.outcome.toLowerCase().includes("affirmed") ||
-            p.outcome.toLowerCase().includes("upheld") ||
-            p.outcome.toLowerCase().includes("denied"))
-      );
+            (p.outcome.toLowerCase().includes("affirmed") ||
+              p.outcome.toLowerCase().includes("upheld") ||
+              p.outcome.toLowerCase().includes("denied")) &&
+            !p.outcome.toLowerCase().includes("overturned") &&
+            !p.outcome.toLowerCase().includes("remanded") &&
+            !p.outcome.toLowerCase().includes("recovered")
+        );
 
-    const topPrecedent = favorablePrecedentMatch || matchedPrecedents[0];
-    const legalCitation =
-      topPrecedent?.citation ||
-      topPrecedent?.title ||
-      legalEv?.citationClause ||
-      "Indexed appellate ruling";
+      const favorablePrecedentMatch = matchedPrecedents.find((p) => {
+        if (isExplicitlyAdverse(p)) return false;
+        return (
+          (p.outcome &&
+            (p.outcome.toLowerCase().includes("overturned") ||
+              p.outcome.toLowerCase().includes("recovered") ||
+              p.outcome.toLowerCase().includes("remanded") ||
+              p.outcome.toLowerCase().includes("order"))) ||
+          p.sourceKind === "winning_brief" ||
+          p.sourceKind === "court_overturn"
+        );
+      });
 
-    if (isAffirmedOnly) {
-      precedentScore = 6;
-      precedentRationale = `Matched precedent (${legalCitation}) affirmed insurer determination; adverse parity detected requiring distinguishing legal facts.`;
-    } else {
-      const baseScore = isFavorable ? 12 : 10;
+      const isFavorable = Boolean(favorablePrecedentMatch || isLegalEvFavorable);
 
-      // Evaluate vector and fusion similarity quality
-      const topSimilarity = topPrecedent
-        ? Math.max(topPrecedent.combinedScore ?? 0, topPrecedent.vectorScore ?? 0)
-        : (legalEv?.relevanceScore !== undefined ? legalEv.relevanceScore : 0.85);
+      const isAffirmedOnly =
+        !isFavorable &&
+        matchedPrecedents.some(
+          (p) =>
+            p.outcome &&
+            (p.outcome.toLowerCase().includes("affirmed") ||
+              p.outcome.toLowerCase().includes("upheld") ||
+              p.outcome.toLowerCase().includes("denied"))
+        );
 
-      let similarityBonus = 1;
-      if (topSimilarity >= 0.75) {
-        similarityBonus = 3;
-      } else if (topSimilarity >= 0.60) {
-        similarityBonus = 2;
+      const topPrecedent = favorablePrecedentMatch || matchedPrecedents[0];
+      const legalCitation =
+        topPrecedent?.citation ||
+        topPrecedent?.title ||
+        legalEv?.citationClause ||
+        "Indexed appellate ruling";
+
+      if (isAffirmedOnly) {
+        precedentScore = 6;
+        precedentRationale = `Matched precedent (${legalCitation}) affirmed insurer determination; adverse parity detected requiring distinguishing legal facts.`;
+      } else {
+        const baseScore = isFavorable ? 12 : 10;
+
+        // Evaluate vector and fusion similarity quality
+        const topSimilarity = topPrecedent
+          ? Math.max(topPrecedent.combinedScore ?? 0, topPrecedent.vectorScore ?? 0)
+          : (legalEv?.relevanceScore !== undefined
+              ? (legalEv.relevanceScore > 1 ? legalEv.relevanceScore / 100 : legalEv.relevanceScore)
+              : 0.70);
+
+        let similarityBonus = 0;
+        if (topSimilarity >= 0.75) {
+          similarityBonus = 3;
+        } else if (topSimilarity >= 0.60) {
+          similarityBonus = 2;
+        } else if (topSimilarity >= 0.40) {
+          similarityBonus = 1;
+        }
+
+        // Evaluate CARC and CPT code overlap using domain code matching and calculateCodeOverlap
+        const topCarcCodes = topPrecedent?.carcCodes || [];
+        const topCptCodes = topPrecedent?.cptCodes || [];
+        const normalizedDenialCode = (claim.denialReasonCode || "").toUpperCase().trim();
+
+        const matchesCarc =
+          topCarcCodes.some((c) => c.toUpperCase().trim() === normalizedDenialCode) ||
+          Boolean(legalEv?.extractedEvidenceMarkdown && legalEv.extractedEvidenceMarkdown.toUpperCase().includes(normalizedDenialCode));
+
+        const claimCptClean = (claim.cptCodes || []).map((c) => c.replace(/\D/g, "")).filter(Boolean);
+        const matchesCpt =
+          claimCptClean.some((c) => topCptCodes.map((x) => x.replace(/\D/g, "")).includes(c)) ||
+          Boolean(legalEv?.extractedEvidenceMarkdown && claimCptClean.some((c) => legalEv.extractedEvidenceMarkdown!.includes(c)));
+
+        const codeOverlapScore = topPrecedent
+          ? calculateCodeOverlap(
+              {
+                icd10Codes: topPrecedent.icd10Codes || [],
+                cptCodes: topPrecedent.cptCodes || [],
+                carcCodes: topPrecedent.carcCodes || [],
+              },
+              {
+                cptCodes: claim.cptCodes || [],
+                icd10Codes: claim.icd10Codes || [],
+                denialReasonCode: claim.denialReasonCode || "",
+                denialReasonDescription: claim.denialReasonDescription || "",
+              }
+            )
+          : (matchesCarc && matchesCpt ? 1 : matchesCarc ? 0.5 : 0);
+
+        let codeMatchBonus = 0;
+        if (matchesCarc && matchesCpt) {
+          codeMatchBonus = 4;
+        } else if (matchesCarc || codeOverlapScore >= 0.5) {
+          codeMatchBonus = 3;
+        } else if (matchesCpt || codeOverlapScore >= 0.25) {
+          codeMatchBonus = 2;
+        } else if (codeOverlapScore > 0 || (topPrecedent?.codeOverlap !== undefined && topPrecedent.codeOverlap > 0)) {
+          codeMatchBonus = 1;
+        }
+
+        precedentScore = Math.min(20, Math.max(4, baseScore + similarityBonus + codeMatchBonus));
+
+        const simPercent = Math.round(topSimilarity * 100);
+        const matchType =
+          matchesCarc && matchesCpt
+            ? "Exact CARC & CPT parity"
+            : matchesCarc
+              ? `Exact ${claim.denialReasonCode} parity`
+              : `${simPercent}% semantic alignment`;
+
+        precedentRationale = `External review precedent (${legalCitation}) establishes favorable documentation parity for ${claim.denialReasonCode || "denial"} (${matchType}).`;
       }
-
-      // Evaluate CARC and CPT code overlap
-      let codeMatchBonus = 0;
-      const topCarcCodes = topPrecedent?.carcCodes || [];
-      const topCptCodes = topPrecedent?.cptCodes || [];
-      const matchesCarc =
-        topCarcCodes.includes(claim.denialReasonCode) ||
-        (topPrecedent?.codeOverlap !== undefined && topPrecedent.codeOverlap > 0) ||
-        Boolean(legalEv?.extractedEvidenceMarkdown && legalEv.extractedEvidenceMarkdown.includes(claim.denialReasonCode)) ||
-        Boolean(claim.denialReasonCode === "CO-50" && isFavorable);
-
-      const matchesCpt =
-        claim.cptCodes.some((c) => topCptCodes.includes(c)) ||
-        Boolean(legalEv?.extractedEvidenceMarkdown && claim.cptCodes.some((c) => legalEv.extractedEvidenceMarkdown!.includes(c)));
-
-      if (matchesCarc && matchesCpt) {
-        codeMatchBonus = 4;
-      } else if (matchesCarc) {
-        codeMatchBonus = 3;
-      } else if (matchesCpt) {
-        codeMatchBonus = 2;
-      } else if (topPrecedent?.codeOverlap && topPrecedent.codeOverlap > 0) {
-        codeMatchBonus = 2;
-      }
-
-      if (claim.denialReasonCode === "CO-50" && matchesCarc) {
-        codeMatchBonus = Math.max(codeMatchBonus, 4);
-      }
-
-      precedentScore = Math.min(20, Math.max(4, baseScore + similarityBonus + codeMatchBonus));
-
-      const simPercent = Math.round(topSimilarity * 100);
-      const matchType =
-        matchesCarc && matchesCpt
-          ? "Exact CARC & CPT parity"
-          : matchesCarc
-            ? `Exact ${claim.denialReasonCode} parity`
-            : `${simPercent}% semantic alignment`;
-
-      precedentRationale = `External review precedent (${legalCitation}) establishes favorable documentation parity for ${claim.denialReasonCode || "denial"} (${matchType}).`;
     }
-  }
   }
 
   const scoringBreakdown: ScoringCriterionResult[] = [
@@ -411,9 +446,21 @@ export function calculateDeterministicRubric(
   }
 
   const rawSum = scoringBreakdown.reduce((sum, item) => sum + item.score, 0);
-  const overturnProbabilityScore = isEvidentiallyDegraded
+
+  // Appeal Readiness Score: Canonical 0-100 dossier readiness checklist score.
+  // When evidentially degraded, readiness is held at the provisional cap (max 40)
+  // to require explicit human review before transmission.
+  const appealReadinessScore = isEvidentiallyDegraded
     ? Math.min(40, Math.max(5, rawSum))
     : Math.min(99, Math.max(5, rawSum));
+
+  // Evidence Coverage Score: True un-capped evidentiary completeness across the 4 pillars (0-100),
+  // evaluating actual documentary support rather than serving as an outcome prediction alias.
+  const evidenceCoverageScore = Math.min(100, Math.max(5, rawSum));
+
+  // Backward-compatibility alias for existing database schema and legacy API consumers.
+  // Follows appealReadinessScore.
+  const overturnProbabilityScore = appealReadinessScore;
 
   const scoreStatus: "certified" | "provisional_capped" = isEvidentiallyDegraded
     ? "provisional_capped"
@@ -422,16 +469,16 @@ export function calculateDeterministicRubric(
   const riskLevel: "high_confidence" | "moderate" | "complex_litigation" =
     isEvidentiallyDegraded
       ? "complex_litigation"
-      : overturnProbabilityScore >= 80
+      : appealReadinessScore >= 80
         ? "high_confidence"
-        : overturnProbabilityScore >= 55
+        : appealReadinessScore >= 55
           ? "moderate"
           : "complex_litigation";
 
   return {
     overturnProbabilityScore,
-    appealReadinessScore: overturnProbabilityScore,
-    evidenceCoverageScore: overturnProbabilityScore,
+    appealReadinessScore,
+    evidenceCoverageScore,
     policyAlignmentScore: policyScore,
     documentationCompletenessScore: clinicalScore,
     riskLevel,
@@ -592,17 +639,145 @@ ${evidencesSummary}`,
     };
   }
 
-  // Merge rich rationales if generated by LLM, while keeping deterministic numerical points
+  // Determine evidence posture and substantive clinical policy evidence
+  const isPureStatutory = evidences.length > 0 && evidences.every(isStatutoryBaselineEvidence);
+  const substantivePolicyEvidences = evidences.filter((e) => {
+    if (isStatutoryBaselineEvidence(e)) return false;
+    if (e.sourceType === "legal_precedent") return false;
+    if (isBlockedEvidence(e)) return false;
+    if (isNegativeOrExclusionEvidence(e)) return false;
+    if (isEvidenceSiteMismatched(e, claim)) return false;
+    if (isPayerMismatchedEvidence(e, claim)) return false;
+    return Boolean(e.title && e.citationClause && e.extractedEvidenceMarkdown);
+  });
+
+  // 1. Ground keyPolicyContradictions vs substantive clinical policy evidence
+  // Synthesizer discards ungrounded LLM cites; matcher must not emit ungrounded policy contradictions
+  let groundedKeyPolicyContradictions: string[] = [];
+  if (llmAvailable && generatedBy !== "fallback" && !args.cpbDegraded && !isPureStatutory && substantivePolicyEvidences.length > 0) {
+    const cleanedCandidates = (llmAnalysis.keyPolicyContradictions || [])
+      .map((c) => c.replace(/\*\*/g, "").replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .filter((c) => !UNSUPPORTED_CLINICAL_CONCLUSION.test(c));
+
+    const evidenceKeywords = substantivePolicyEvidences.map((e) => ({
+      title: (e.title || "").toLowerCase(),
+      clause: (e.citationClause || "").toLowerCase(),
+      excerpt: (e.extractedEvidenceMarkdown || "").toLowerCase(),
+      sourceType: (e.sourceType || "").toLowerCase(),
+    }));
+
+    const groundedCandidates = cleanedCandidates.filter((candidate) => {
+      const lower = candidate.toLowerCase();
+      return evidenceKeywords.some((ek) => {
+        if (ek.title && lower.includes(ek.title)) return true;
+        if (ek.clause && lower.includes(ek.clause)) return true;
+        const titleTokens = ek.title.split(/[^a-z0-9]+/i).filter((t) => t.length >= 3);
+        if (titleTokens.length > 0 && titleTokens.some((t) => lower.includes(t))) return true;
+        if (lower.includes("cpb") && ek.sourceType.includes("cpb")) return true;
+        if (lower.includes("nccn") && ek.sourceType.includes("nccn")) return true;
+        if (lower.includes("clinical criteria") || lower.includes("coverage criteria")) return true;
+        return false;
+      });
+    });
+
+    if (groundedCandidates.length > 0) {
+      groundedKeyPolicyContradictions = groundedCandidates.slice(0, 4);
+    } else {
+      groundedKeyPolicyContradictions = substantivePolicyEvidences.slice(0, 3).map((e) => {
+        const clausePart = e.citationClause ? ` (${e.citationClause})` : "";
+        const denialPart = claim.denialReasonCode ? ` for ${claim.denialReasonCode}` : "";
+        return `${e.title}${clausePart}: Published clinical criteria establish coverage indications that contradict the adverse determination${denialPart}.`;
+      });
+    }
+  }
+
+  // 2. Ground winningPrecedentSummary vs retrieved precedents and legal authorities
+  let groundedWinningPrecedentSummary: string;
+  if (args.precedentsUnavailable) {
+    groundedWinningPrecedentSummary = "Precedent Vector Archive was unavailable during evaluation; external judicial documentation benchmark is unverified.";
+  } else {
+    const legalEvidences = evidences.filter(
+      (e) => e.sourceType === "legal_precedent" && !isStatutoryBaselineEvidence(e)
+    );
+    if (resolvedPrecedents.length === 0 && legalEvidences.length === 0) {
+      groundedWinningPrecedentSummary = "No controlling appellate rulings or external review precedents indexed or matched to this denial reason.";
+    } else {
+      const cleaned = (llmAnalysis.winningPrecedentSummary || "").replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
+      const allPrecedentTokens = [
+        ...resolvedPrecedents.flatMap((p) => [p.title?.toLowerCase(), p.citation?.toLowerCase()]),
+        ...legalEvidences.flatMap((e) => [e.title?.toLowerCase(), e.citationClause?.toLowerCase()]),
+      ].filter((t): t is string => Boolean(t && t.length > 3));
+
+      const isGrounded =
+        cleaned.length > 0 &&
+        !UNSUPPORTED_CLINICAL_CONCLUSION.test(cleaned) &&
+        (allPrecedentTokens.some((tok) => cleaned.toLowerCase().includes(tok)) ||
+         cleaned.toLowerCase().includes("erisa") ||
+         cleaned.toLowerCase().includes("precedent") ||
+         cleaned.toLowerCase().includes("overturned") ||
+         cleaned.toLowerCase().includes("appellate") ||
+         cleaned.toLowerCase().includes("binding precedent"));
+
+      if (isGrounded) {
+        groundedWinningPrecedentSummary = cleaned;
+      } else {
+        const top = resolvedPrecedents[0];
+        if (top) {
+          const cite = top.citation || top.title || "Controlling appellate ruling";
+          const outcome = top.outcome || "Overturned";
+          groundedWinningPrecedentSummary = `${cite}: Historical precedent establishes ${outcome} determination parity for ${claim.denialReasonCode || "denial"} claims.`;
+        } else if (legalEvidences[0]) {
+          groundedWinningPrecedentSummary = `${legalEvidences[0].citationClause || legalEvidences[0].title}: Controlling legal authority establishes statutory documentation parity for ${claim.denialReasonCode || "denial"} determinations.`;
+        } else {
+          groundedWinningPrecedentSummary = "Deterministic rubric baseline evaluated against statutory procedural requirements and indexed policy evidence.";
+        }
+      }
+    }
+  }
+
+  // 3. Ground suggestedAppealLevel vs procedural posture and ERISA exhaustion rules
+  const hasDraftedAppeal = Boolean(claim.latestAppeal);
+  const isEvidentiallyDegraded = deterministicCalculation.scoreStatus === "provisional_capped";
+
+  let groundedSuggestedAppealLevel: "level_1_internal" | "level_2_grievance" | "level_3_external_state_review" = "level_1_internal";
+  if (isEvidentiallyDegraded) {
+    groundedSuggestedAppealLevel = "level_1_internal";
+  } else if (!hasDraftedAppeal) {
+    // Under ERISA 29 CFR § 2560.503-1 and ACA Section 2719, initial adverse determinations
+    // cannot jump to external review without administrative exhaustion.
+    if (llmAnalysis.suggestedAppealLevel === "level_2_grievance" && deterministicCalculation.riskLevel === "complex_litigation") {
+      groundedSuggestedAppealLevel = "level_2_grievance";
+    } else {
+      groundedSuggestedAppealLevel = "level_1_internal";
+    }
+  } else {
+    if (
+      llmAnalysis.suggestedAppealLevel === "level_1_internal" ||
+      llmAnalysis.suggestedAppealLevel === "level_2_grievance" ||
+      llmAnalysis.suggestedAppealLevel === "level_3_external_state_review"
+    ) {
+      groundedSuggestedAppealLevel = llmAnalysis.suggestedAppealLevel;
+    } else {
+      groundedSuggestedAppealLevel = deterministicCalculation.riskLevel === "complex_litigation" ? "level_2_grievance" : "level_1_internal";
+    }
+  }
+
+  // Merge rich rationales if generated by LLM, while keeping deterministic numerical points and rejecting unsupported conclusions
   const finalBreakdown: ScoringCriterionResult[] = deterministicCalculation.scoringBreakdown.map((item) => {
     let customRationale = item.rationale;
     if (item.category === "policy_alignment" && llmAnalysis.policyAlignmentRationale) {
-      customRationale = llmAnalysis.policyAlignmentRationale.replace(/\*\*/g, "");
+      const candidate = llmAnalysis.policyAlignmentRationale.replace(/\*\*/g, "");
+      if (!UNSUPPORTED_CLINICAL_CONCLUSION.test(candidate)) customRationale = candidate;
     } else if (item.category === "clinical_documentation" && llmAnalysis.clinicalDocumentationRationale) {
-      customRationale = llmAnalysis.clinicalDocumentationRationale.replace(/\*\*/g, "");
+      const candidate = llmAnalysis.clinicalDocumentationRationale.replace(/\*\*/g, "");
+      if (!UNSUPPORTED_CLINICAL_CONCLUSION.test(candidate)) customRationale = candidate;
     } else if (item.category === "statutory_erisa" && llmAnalysis.statutoryErisaRationale) {
-      customRationale = llmAnalysis.statutoryErisaRationale.replace(/\*\*/g, "");
+      const candidate = llmAnalysis.statutoryErisaRationale.replace(/\*\*/g, "");
+      if (!UNSUPPORTED_CLINICAL_CONCLUSION.test(candidate)) customRationale = candidate;
     } else if (item.category === "precedent_strength" && llmAnalysis.precedentStrengthRationale) {
-      customRationale = llmAnalysis.precedentStrengthRationale.replace(/\*\*/g, "");
+      const candidate = llmAnalysis.precedentStrengthRationale.replace(/\*\*/g, "");
+      if (!UNSUPPORTED_CLINICAL_CONCLUSION.test(candidate)) customRationale = candidate;
     }
     return {
       ...item,
@@ -618,9 +793,9 @@ ${evidencesSummary}`,
     documentationCompletenessScore: deterministicCalculation.documentationCompletenessScore,
     riskLevel: deterministicCalculation.riskLevel,
     scoringBreakdown: finalBreakdown,
-    keyPolicyContradictions: (llmAnalysis.keyPolicyContradictions || []).map((c) => c.replace(/\*\*/g, "")),
-    winningPrecedentSummary: llmAnalysis.winningPrecedentSummary?.replace(/\*\*/g, "") || "",
-    suggestedAppealLevel: llmAnalysis.suggestedAppealLevel,
+    keyPolicyContradictions: groundedKeyPolicyContradictions,
+    winningPrecedentSummary: groundedWinningPrecedentSummary,
+    suggestedAppealLevel: groundedSuggestedAppealLevel,
     llmAvailable,
     generatedBy,
     scoreStatus: deterministicCalculation.scoreStatus,
@@ -629,8 +804,6 @@ ${evidencesSummary}`,
 
   // 5. Update claim in database with deterministic score, risk level, and criteria breakdown
   // Do not regress status if the claim has already drafted an appeal brief or reached dispatch/resolution
-  const hasDraftedAppeal = Boolean(claim.latestAppeal);
-  const isEvidentiallyDegraded = deterministicCalculation.scoreStatus === "provisional_capped";
   const targetReviewStatus = isEvidentiallyDegraded ? "review_provisional" : "ready_for_review";
 
   const preservesAdvancedStatus =

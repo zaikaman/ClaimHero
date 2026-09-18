@@ -196,10 +196,10 @@ export interface AppealSynthesizerClaimContext {
   };
 }
 
-const UNSUPPORTED_CLINICAL_CONCLUSION =
+export const UNSUPPORTED_CLINICAL_CONCLUSION =
   /clinical documentation confirms|meets? (?:the |applicable )?criteria|does not present with|does not document (?:any )?active joint or systemic infection|does not document (?:any )?(?:active )?(?:joint|systemic) infection|no (?:absolute )?contraindications?|absence of (?:an )?(?:active )?(?:joint|systemic) infection|(?:failed|failure of|exhausted) conservative|end[- ]stage|bone[- ]on[- ]bone|necessitated the surgical intervention|supports? (?:the )?medical necessity|is medically appropriate|is medically necessary|we maintain that treatment was medically appropriate/i;
 
-function buildNeutralClinicalBasis(claim: AppealSynthesizerClaimContext): string {
+export function buildNeutralClinicalBasis(claim: AppealSynthesizerClaimContext): string {
   const procedureCodes = claim.cptCodes?.join(", ") || "the procedure listed on the claim";
   const diagnosisCodes = claim.icd10Codes?.join(", ") || "the diagnosis listed on the claim";
 
@@ -253,7 +253,7 @@ function buildGroundedClinicalBasis(
     : buildNeutralClinicalBasis(claim);
 }
 
-function isNegativeOrExclusionEvidence(evidence: { title?: string; extractedEvidenceMarkdown?: string; citationClause?: string }): boolean {
+export function isNegativeOrExclusionEvidence(evidence: { title?: string; extractedEvidenceMarkdown?: string; citationClause?: string }): boolean {
   const title = (evidence.title || "").toLowerCase();
   const quote = (evidence.extractedEvidenceMarkdown || "").toLowerCase();
   const text = `${title} ${evidence.citationClause || ""} ${quote}`;
@@ -311,7 +311,7 @@ function buildSignature(providerName?: string, sender?: AppealSenderDetails): st
     : `Sincerely,\n\n${senderLines.join("\n")}`;
 }
 
-function isExternalEvidence(evidence: {
+export function isExternalEvidence(evidence: {
   sourceType?: string;
   title?: string;
   citationClause?: string;
@@ -331,7 +331,7 @@ function isExternalEvidence(evidence: {
     !/(?:vector similarity|combined score|winning brief|claimhero overturned)/i.test(searchableText);
 }
 
-function isBlockedEvidence(evidence: {
+export function isBlockedEvidence(evidence: {
   title?: string;
   citationClause?: string;
   extractedEvidenceMarkdown?: string;
@@ -355,7 +355,7 @@ function isBlockedEvidence(evidence: {
   return false;
 }
 
-function isPayerMismatchedEvidence(
+export function isPayerMismatchedEvidence(
   evidence: { sourceUrl?: string },
   claim: { patient?: { insurancePayer?: string }; payer?: string }
 ): boolean {
@@ -537,7 +537,7 @@ function cleanEvidenceSummary(value?: string): string {
   return `${summary.slice(0, 217).replace(/\s+\S*$/, "")}...`;
 }
 
-function buildGroundedPolicyCitations(evidences: Array<{
+export function buildGroundedPolicyCitations(evidences: Array<{
   sourceType?: string;
   title?: string;
   citationClause?: string;

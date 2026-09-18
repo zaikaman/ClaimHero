@@ -515,7 +515,8 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
         {
           sourceType: "legal_precedent",
           citationClause: "IMR 2024-11",
-          extractedEvidenceMarkdown: "Overturned upon objective imaging submission",
+          extractedEvidenceMarkdown: "Overturned CO-50 denial for CPT 63047 upon objective imaging submission",
+          relevanceScore: 0.85,
         },
         {
           sourceType: "pubmed_study",
@@ -558,6 +559,8 @@ describe("Convex Actions: Precedent Archive, Matcher & Autonomous Pipeline", () 
           outcome: "Overturned. Full payment ordered.",
           sourceKind: "court_overturn",
           combinedScore: 0.89,
+          carcCodes: ["CO-50"],
+          cptCodes: ["27447"],
         },
       ];
 
