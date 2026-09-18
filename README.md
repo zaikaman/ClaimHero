@@ -263,11 +263,11 @@ npm run build           # Production bundle
 npm run verify          # Full local verification gate
 ```
 
-The repository includes 1,175 automated tests across 76 suites, covering the
+The repository includes 1,185 automated tests across 76 suites, covering the
 Convex workflows, authorization boundaries, OCR/redaction, vault-tokenized
 PHI-safe LLM boundaries, Firecrawl and AgentMail integrations, precedent
-scoring, audit chains, deadline logic, collaboration, and provisional
-evidence gating.
+scoring, audit chains, deadline logic, collaboration, provisional
+evidence gating, and secondary dispatch review boundaries.
 
 ## Project structure
 

@@ -37,6 +37,15 @@ export interface DispatchReceipt {
   approvalNotes?: string;
 }
 
+export interface OutboundMessageReceipt {
+  success: boolean;
+  messageId?: string;
+  threadId?: string;
+  pdfAttached?: boolean;
+  humanApproved?: boolean;
+  approvedBy?: string;
+}
+
 interface ClaimMailboxes {
   claimInboxId: string;
   claimEmail: string;
@@ -137,6 +146,17 @@ export async function performDispatchAppealPacket(
   if (claim.status !== "ready_for_review") {
     throw new Error(
       `Cannot dispatch appeal: claim status is "${claim.status}". Mandatory human review requires claim status to be "ready_for_review" before appellate dispatch.`
+    );
+  }
+
+  // Mandatory Evidentiary Integrity Gate: Check for unacknowledged provisional degradation
+  if (
+    claim.evidenceIntegrity?.requiresEvidentiaryAcknowledgement ||
+    (claim.evidenceIntegrity?.scoreStatus === "provisional_capped" &&
+      !claim.evidenceIntegrity.acknowledgedAt)
+  ) {
+    throw new Error(
+      `Cannot dispatch appeal: claim has unacknowledged provisional evidentiary degradation ("${claim.evidenceIntegrity?.scoreStatus || claim.status}"). Mandatory evidentiary review requires formal acknowledgment before appellate dispatch.`
     );
   }
 
@@ -458,13 +478,18 @@ export const dispatchAppealPacketInternal = internalAction({
   },
 });
 
-const sendOutboundMessageArgs = {
+export const sendOutboundMessageArgs = {
   claimId: v.id("claims"),
   threadId: v.optional(v.id("emailThreads")),
   text: v.string(),
   customRecipient: v.optional(v.string()),
   customSubject: v.optional(v.string()),
   waiveRedaction: v.optional(v.boolean()),
+  humanApproved: v.optional(v.boolean()),
+  approvedBy: v.optional(v.string()),
+  approvalNotes: v.optional(v.string()),
+  attachPdf: v.optional(v.boolean()),
+  appealId: v.optional(v.id("appeals")),
 };
 
 async function performSendOutboundMessage(
@@ -476,9 +501,112 @@ async function performSendOutboundMessage(
     customRecipient?: string;
     customSubject?: string;
     waiveRedaction?: boolean;
+    humanApproved?: boolean;
+    approvedBy?: string;
+    approvalNotes?: string;
+    attachPdf?: boolean;
+    appealId?: Id<"appeals">;
   },
-  claim: Doc<"claims"> & { patient?: Doc<"patients"> | null }
-) {
+  claim: Doc<"claims"> & { patient?: Doc<"patients"> | null },
+  userId?: string
+): Promise<OutboundMessageReceipt> {
+  // Mandatory Gate 1: Check for unacknowledged provisional degradation
+  if (
+    claim.status === "review_provisional" ||
+    claim.evidenceIntegrity?.requiresEvidentiaryAcknowledgement ||
+    (claim.evidenceIntegrity?.scoreStatus === "provisional_capped" &&
+      !claim.evidenceIntegrity.acknowledgedAt)
+  ) {
+    throw new Error(
+      `Cannot send outbound correspondence: claim has provisional evidentiary degradation ("${claim.evidenceIntegrity?.scoreStatus || claim.status}"). Mandatory human review and evidentiary acknowledgment are required before any outbound communication or addendum transmission.`
+    );
+  }
+
+  // Mandatory Gate 2: Claim status must be ready_for_review or an active post-dispatch status
+  const ALLOWED_OUTBOUND_STATUSES = new Set([
+    "ready_for_review",
+    "dispatched",
+    "delivered",
+    "under_review",
+    "escalated",
+    "won",
+  ]);
+  const claimStatus = claim.status;
+  if (!claimStatus || !ALLOWED_OUTBOUND_STATUSES.has(claimStatus)) {
+    throw new Error(
+      `Cannot send outbound correspondence: claim status is "${claimStatus || "unknown"}". Claim must be "ready_for_review" or an active post-dispatch status before outbound transmission.`
+    );
+  }
+
+  if (userId && typeof (ctx as any).runMutation === "function") {
+    // Enforce rate limiting per user
+    const limitStatus = await rateLimiter.limit(ctx, "mailDispatcher", {
+      key: userId || "global",
+    });
+    if (!limitStatus.ok) {
+      throw new Error(
+        `Rate limit reached for outbound payer transmission. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+      );
+    }
+  }
+
+  let appeal: Doc<"appeals"> | null = null;
+  if (args.appealId) {
+    appeal = await ctx.runQuery(internal.appeals.getByIdInternal, {
+      appealId: args.appealId,
+    });
+  }
+  if (!appeal) {
+    appeal = await ctx.runQuery(internal.appeals.getLatestByClaimInternal, {
+      claimId: args.claimId,
+    });
+  }
+
+  // Mandatory Gate 3: Explicit Human Approval Record Required
+  const hasExistingApproval = Boolean(
+    (claim as any).isHumanApproved || appeal?.isHumanApproved
+  );
+  const hasExplicitApprovalArg = Boolean(args.humanApproved);
+
+  if (!hasExistingApproval && !hasExplicitApprovalArg) {
+    throw new Error(
+      "Cannot send outbound correspondence: explicit human approval is required. In accordance with clinical safety protocols, an authorized human must approve every clinical assertion, legal assertion, recipient, and outbound message before dispatch."
+    );
+  }
+
+  const rawPatientName = claim.patient?.name || claim.patientName;
+  const patientName = resolveClaimPatientName(rawPatientName, claim.claimNumber, claim.patient?.memberId);
+
+  let effectiveApprover: string | undefined =
+    (claim as any).approvedBy ||
+    appeal?.approvedBy ||
+    args.approvedBy;
+
+  // Persist human approval record if not already recorded on the appeal or claim
+  if (!hasExistingApproval && hasExplicitApprovalArg) {
+    effectiveApprover =
+      args.approvedBy ||
+      (claim.appealContext?.sender?.name ? claim.appealContext.sender.name : null) ||
+      (patientName && patientName !== "Not specified in denial notice" ? `Authorized Representative for ${patientName}` : null) ||
+      "Authorized Human Reviewer";
+
+    if (appeal) {
+      await ctx.runMutation(internal.appeals.recordHumanApprovalInternal, {
+        appealId: appeal._id,
+        claimId: claim._id,
+        approvedBy: effectiveApprover,
+        notes: args.approvalNotes || "Human review and authorization confirmed for outbound correspondence.",
+      });
+    } else {
+      await ctx.runMutation(internal.claims.updateStatusInternal, {
+        claimId: claim._id,
+        status: claim.status as any,
+        actor: effectiveApprover,
+        details: args.approvalNotes || "Human review and authorization confirmed for outbound correspondence.",
+      });
+    }
+  }
+
   let threadData: {
     thread: Doc<"emailThreads"> | null;
     messages: Doc<"emailMessages">[];
@@ -567,8 +695,6 @@ async function performSendOutboundMessage(
   }
 
   const outboundText = args.text;
-  const rawPatientName = claim.patient?.name || claim.patientName;
-  const patientName = resolveClaimPatientName(rawPatientName, claim.claimNumber, claim.patient?.memberId);
 
   const correspondenceEmail = formatCorrespondenceEmail(outboundText, {
     claimNumber: claim.claimNumber,
@@ -599,6 +725,41 @@ async function performSendOutboundMessage(
     );
   }
 
+  // Formal PDF brief compilation/retrieval when requested or required for exhibit delivery
+  let storedPdf: { storageId: Id<"_storage">; buffer: Buffer; filename: string } | null = null;
+  let pdfMissing = false;
+  if (args.attachPdf) {
+    if (appeal) {
+      try {
+        storedPdf = await ensureAppealPdfStored(ctx, claim, appeal);
+      } catch (pdfErr) {
+        console.warn("Failed to pull or compile PDF brief for outbound correspondence:", pdfErr);
+        pdfMissing = true;
+      }
+    } else {
+      pdfMissing = true;
+    }
+
+    if (pdfMissing) {
+      await ctx.runMutation(internal.auditLogs.logEventInternal, {
+        claimId: args.claimId,
+        eventType: "correspondence_dispatch_pdf_missing_warning",
+        actor: "AgentMail Dispatcher",
+        details: "Warning: Outbound correspondence was transmitted without compiled PDF brief attachment because PDF compilation/storage could not be completed.",
+      });
+    }
+  }
+
+  const outgoingAttachments = storedPdf
+    ? [
+        {
+          filename: storedPdf.filename,
+          content: storedPdf.buffer.toString("base64"),
+          contentType: "application/pdf",
+        },
+      ]
+    : undefined;
+
   let liveTransmission: AgentMailSendResult | null = null;
   if (lastInboundMessageId) {
     try {
@@ -608,6 +769,7 @@ async function performSendOutboundMessage(
         to: resolvedRecipient,
         text: correspondenceEmail.text,
         html: correspondenceEmail.html,
+        attachments: outgoingAttachments,
         ...(Object.keys(headers).length > 0 ? { headers } : {}),
         ctx,
       });
@@ -623,6 +785,7 @@ async function performSendOutboundMessage(
       subject,
       text: correspondenceEmail.text,
       html: correspondenceEmail.html,
+      attachments: outgoingAttachments,
       ...(Object.keys(headers).length > 0 ? { headers } : {}),
       ctx,
     });
@@ -643,6 +806,17 @@ async function performSendOutboundMessage(
     subject,
   });
 
+  const messageAttachments = storedPdf
+    ? [
+        {
+          storageId: storedPdf.storageId,
+          filename: storedPdf.filename,
+          contentType: "application/pdf",
+          size: storedPdf.buffer.byteLength,
+        },
+      ]
+    : undefined;
+
   await ctx.runMutation(internal.emails.insertMessageInternal, withAgentMailMessageId({
     threadId,
     claimId: args.claimId,
@@ -652,10 +826,25 @@ async function performSendOutboundMessage(
     subject,
     bodyHtml: correspondenceEmail.html,
     bodyText: correspondenceEmail.text,
-    hasAttachments: false,
+    hasAttachments: Boolean(storedPdf),
+    attachments: messageAttachments,
   }, liveTransmission.messageId, liveTransmission.outboundId));
 
-  return { success: true };
+  await ctx.runMutation(internal.auditLogs.logEventInternal, {
+    claimId: args.claimId,
+    eventType: "outbound_correspondence_dispatched",
+    actor: effectiveApprover || "Authorized Human Reviewer",
+    details: `Transmitted correspondence/addendum to ${payer} (${resolvedRecipient}) via dedicated inbox ${sender}.${storedPdf ? ` Attached compiled PDF brief ${storedPdf.filename}.` : ""}`,
+  });
+
+  return {
+    success: true,
+    messageId: liveTransmission.messageId,
+    threadId: recordedThreadId || threadId,
+    pdfAttached: Boolean(storedPdf),
+    humanApproved: true,
+    approvedBy: effectiveApprover,
+  };
 }
 
 /**
@@ -663,9 +852,9 @@ async function performSendOutboundMessage(
  */
 export const sendOutboundMessage = action({
   args: sendOutboundMessageArgs,
-  handler: async (ctx, args) => {
-    const { claim } = await requireClaimOwnerAction(ctx, args.claimId);
-    return await performSendOutboundMessage(ctx, args, claim);
+  handler: async (ctx, args): Promise<OutboundMessageReceipt> => {
+    const { claim, userId } = await requireClaimOwnerAction(ctx, args.claimId);
+    return await performSendOutboundMessage(ctx, args, claim as Doc<"claims"> & { patient?: Doc<"patients"> | null }, userId);
   },
 });
 
@@ -677,7 +866,7 @@ export const sendOutboundMessageInternal = internalAction({
   handler: async (
     ctx,
     args
-  ): Promise<{ success: boolean }> => {
+  ): Promise<OutboundMessageReceipt> => {
     const claim = await ctx.runQuery(internal.claims.getByIdInternal, {
       claimId: args.claimId,
     });
@@ -686,7 +875,7 @@ export const sendOutboundMessageInternal = internalAction({
       throw new Error(`Claim ${args.claimId} not found`);
     }
 
-    return await performSendOutboundMessage(ctx, args, claim);
+    return await performSendOutboundMessage(ctx, args, claim, claim.userId);
   },
 });
 

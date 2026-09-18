@@ -529,7 +529,7 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
 
               {isDiffExpanded && (
                 <div className="grid grid-cols-1 gap-2.5 pt-1">
-                  {latestDrift.detectedChanges.map((change, idx) => (
+                  {latestDrift.detectedChanges.map((change: any, idx: number) => (
                     <div
                       key={idx}
                       className={cn(

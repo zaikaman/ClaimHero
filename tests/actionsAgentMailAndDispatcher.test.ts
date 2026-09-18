@@ -5,6 +5,7 @@ import * as actionMailDispatcher from "../convex/actions/mailDispatcher";
 import * as libAgentMail from "../convex/lib/agentMail";
 import * as libAgentMailWebhook from "../convex/lib/agentMailWebhook";
 import * as libOpenAI from "../convex/lib/openai";
+import * as libPdfGenerator from "../convex/lib/pdfGenerator";
 import { rateLimiter } from "../convex/lib/rateLimiter";
 // @ts-ignore getAuthUserId is injected by vi.mock("@convex-dev/auth/server")
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -1063,6 +1064,37 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       }));
     });
 
+    it("dispatchAppealPacket: rejects dispatch when claim has unacknowledged provisional_capped degradation even in ready_for_review status", async () => {
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+
+      const mockClaim = {
+        _id: "c_prov_gate",
+        claimNumber: "CLM-PROV-GATE",
+        userId: "user_123",
+        status: "ready_for_review",
+        isHumanApproved: true,
+        patient: { name: "Marcus Holloway", insurancePayer: "UnitedHealthcare" },
+        evidenceIntegrity: {
+          scoreStatus: "provisional_capped",
+          requiresEvidentiaryAcknowledgement: true,
+        },
+      };
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(mockClaim),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await expect(
+        (actionMailDispatcher.dispatchAppealPacket as any)._handler(mockCtx, {
+          claimId: "c_prov_gate",
+          recipientEmail: "advocate@test.com",
+        })
+      ).rejects.toThrow(/unacknowledged provisional evidentiary degradation/i);
+    });
+
     it("sendOutboundMessage: transmits outbound message to custom recipient", async () => {
       process.env.AGENTMAIL_API_KEY = "test_key";
       process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
@@ -1072,6 +1104,8 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         _id: "c1",
         claimNumber: "CLM-100",
         userId: "user_123",
+        status: "ready_for_review",
+        isHumanApproved: true,
         deniedAmount: 5000,
         patient: { name: "John Doe", insurancePayer: "Aetna" },
       };
@@ -1118,6 +1152,8 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         _id: "c_self_route",
         claimNumber: "CLM-SELF-ROUTE",
         userId: "user_123",
+        status: "ready_for_review",
+        isHumanApproved: true,
         deniedAmount: 5000,
         patient: { name: "John Doe", insurancePayer: "Aetna" },
       };
@@ -1157,6 +1193,8 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         _id: "c1",
         claimNumber: "CLM-100",
         userId: "user_123",
+        status: "ready_for_review",
+        isHumanApproved: true,
         deniedAmount: 5000,
         patient: { name: "John Doe", insurancePayer: "GeoBlue" },
       };
@@ -1229,6 +1267,8 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         _id: "c1",
         claimNumber: "CLM-100",
         userId: "user_123",
+        status: "ready_for_review",
+        isHumanApproved: true,
         deniedAmount: 5000,
         patient: { name: "John Doe", insurancePayer: "GeoBlue" },
       };
@@ -1282,6 +1322,297 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
           "References": "<msg_initial_123@agentmail.to>",
         },
       }));
+    });
+
+    describe("Second Path Security & Mandatory Review Gates (sendOutboundMessage)", () => {
+      it("rejects transmission when claim is in review_provisional status", async () => {
+        const mockClaim = {
+          _id: "claim_prov_second",
+          claimNumber: "CLM-PROV-2",
+          userId: "user_123",
+          status: "review_provisional",
+          evidenceIntegrity: {
+            scoreStatus: "provisional_capped",
+            requiresEvidentiaryAcknowledgement: true,
+          },
+        };
+        const mockCtx: any = {
+          runQuery: vi.fn().mockResolvedValue(mockClaim),
+          runMutation: vi.fn().mockResolvedValue(undefined),
+        };
+
+        await expect(
+          (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+            claimId: "claim_prov_second",
+            text: "Exfiltrating provisional dossier",
+          })
+        ).rejects.toThrow(/provisional evidentiary degradation/i);
+      });
+
+      it("rejects transmission when claim has unacknowledged provisional_capped degradation", async () => {
+        const mockClaim = {
+          _id: "claim_prov_capped",
+          claimNumber: "CLM-PROV-CAPPED",
+          userId: "user_123",
+          status: "ready_for_review",
+          evidenceIntegrity: {
+            scoreStatus: "provisional_capped",
+            requiresEvidentiaryAcknowledgement: true,
+          },
+        };
+        const mockCtx: any = {
+          runQuery: vi.fn().mockResolvedValue(mockClaim),
+          runMutation: vi.fn().mockResolvedValue(undefined),
+        };
+
+        await expect(
+          (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+            claimId: "claim_prov_capped",
+            text: "Exfiltrating provisional dossier",
+          })
+        ).rejects.toThrow(/provisional evidentiary degradation/i);
+      });
+
+      it("rejects transmission when claim status is in an unready drafting state", async () => {
+        const mockClaim = {
+          _id: "claim_drafting",
+          claimNumber: "CLM-DRAFT-1",
+          userId: "user_123",
+          status: "drafting",
+        };
+        const mockCtx: any = {
+          runQuery: vi.fn().mockResolvedValue(mockClaim),
+          runMutation: vi.fn().mockResolvedValue(undefined),
+        };
+
+        await expect(
+          (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+            claimId: "claim_drafting",
+            text: "Addendum on incomplete draft",
+          })
+        ).rejects.toThrow(/Claim must be "ready_for_review" or an active post-dispatch status/i);
+      });
+
+      it("rejects transmission when explicit human approval is absent", async () => {
+        const mockClaim = {
+          _id: "claim_unapproved",
+          claimNumber: "CLM-UNAPPROVED",
+          userId: "user_123",
+          status: "ready_for_review",
+          isHumanApproved: false,
+          patient: { name: "Jane Doe", insurancePayer: "Aetna" },
+          payerContact: { officialAppealsEmail: "appeals@aetna.com", isVerified: true },
+        };
+        const mockCtx: any = {
+          runQuery: vi.fn().mockImplementation((_, args) => {
+            if (args.claimId) return Promise.resolve(mockClaim);
+            return Promise.resolve(null);
+          }),
+          runMutation: vi.fn().mockResolvedValue(undefined),
+        };
+
+        await expect(
+          (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+            claimId: "claim_unapproved",
+            text: "Unreviewed transmission",
+          })
+        ).rejects.toThrow(/explicit human approval is required/i);
+      });
+
+      it("allows transmission and records approval when args.humanApproved is provided", async () => {
+        process.env.AGENTMAIL_API_KEY = "test_key";
+        process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+        process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+
+        const mockClaim = {
+          _id: "claim_to_approve",
+          claimNumber: "CLM-APPROVE-1",
+          userId: "user_123",
+          status: "ready_for_review",
+          isHumanApproved: false,
+          patient: { name: "Jane Doe", insurancePayer: "Aetna" },
+          payerContact: { officialAppealsEmail: "appeals@aetna.com", isVerified: true },
+        };
+        const mockAppeal = {
+          _id: "appeal_1",
+          claimId: "claim_to_approve",
+          version: 1,
+        };
+
+        vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+          messageId: "live_approved_msg",
+        } as any);
+
+        let queryCalls = 0;
+        const mockCtx: any = {
+          runQuery: vi.fn().mockImplementation(() => {
+            queryCalls++;
+            if (queryCalls === 1) return Promise.resolve(mockClaim);
+            if (queryCalls === 2) return Promise.resolve(mockAppeal);
+            return Promise.resolve(null);
+          }),
+          runMutation: vi.fn().mockResolvedValue("thread_new"),
+        };
+
+        const res = await (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+          claimId: "claim_to_approve",
+          text: "Authorized clinical addendum",
+          humanApproved: true,
+          approvedBy: "Dr. Gregory House",
+        });
+
+        expect(res.success).toBe(true);
+        expect(res.humanApproved).toBe(true);
+        expect(res.approvedBy).toBe("Dr. Gregory House");
+        const approvalCall = mockCtx.runMutation.mock.calls.find(
+          (call: any[]) => call[1]?.approvedBy === "Dr. Gregory House"
+        );
+        expect(approvalCall).toBeDefined();
+        expect(approvalCall[1].appealId).toBe("appeal_1");
+      });
+
+      it("attaches compiled PDF brief when attachPdf is requested", async () => {
+        process.env.AGENTMAIL_API_KEY = "test_key";
+        process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+        process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+
+        const mockClaim = {
+          _id: "claim_pdf_attach",
+          claimNumber: "CLM-PDF-1",
+          userId: "user_123",
+          status: "dispatched",
+          isHumanApproved: true,
+          patient: { name: "Jane Doe", insurancePayer: "Aetna" },
+          payerContact: { officialAppealsEmail: "appeals@aetna.com", isVerified: true },
+        };
+        const mockAppeal = {
+          _id: "appeal_pdf",
+          claimId: "claim_pdf_attach",
+          version: 1,
+          fullAppealMarkdown: "# Legal Appeal",
+        };
+
+        const mockStoredPdf = {
+          storageId: "storage_pdf_123",
+          buffer: Buffer.from("%PDF-1.4 Mock Brief"),
+          filename: "Appeal_Brief_CLM-PDF-1.pdf",
+        };
+        vi.spyOn(libPdfGenerator, "ensureAppealPdfStored").mockResolvedValue(mockStoredPdf as any);
+
+        const sendSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+          messageId: "live_pdf_msg",
+        } as any);
+
+        const mockCtx: any = {
+          runQuery: vi.fn().mockImplementation((_, args) => {
+            if (args.claimId) return Promise.resolve(mockClaim);
+            return Promise.resolve(mockAppeal);
+          }),
+          runMutation: vi.fn().mockResolvedValue("thread_pdf"),
+        };
+
+        const res = await (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+          claimId: "claim_pdf_attach",
+          text: "Transmitting full exhibit packet",
+          attachPdf: true,
+          humanApproved: true,
+        });
+
+        expect(res.success).toBe(true);
+        expect(res.pdfAttached).toBe(true);
+        expect(sendSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            attachments: [
+              expect.objectContaining({
+                filename: "Appeal_Brief_CLM-PDF-1.pdf",
+                contentType: "application/pdf",
+              }),
+            ],
+          })
+        );
+      });
+
+      it("rejects transmission when rate limit is exceeded for sendOutboundMessage", async () => {
+        const mockClaim = {
+          _id: "claim_ratelimit",
+          claimNumber: "CLM-RL-1",
+          userId: "user_123",
+          status: "ready_for_review",
+          isHumanApproved: true,
+        };
+
+        vi.spyOn(rateLimiter, "limit").mockResolvedValue({
+          ok: false,
+          retryAfter: 5000,
+        } as any);
+
+        const mockCtx: any = {
+          runQuery: vi.fn().mockResolvedValue(mockClaim),
+          runMutation: vi.fn().mockResolvedValue(undefined),
+        };
+
+        await expect(
+          (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+            claimId: "claim_ratelimit",
+            text: "Testing rate limit",
+          })
+        ).rejects.toThrow(/Rate limit reached for outbound payer transmission/i);
+      });
+
+      it("rejects transmission when claim status is missing or undefined", async () => {
+        const mockClaim = {
+          _id: "claim_no_status",
+          claimNumber: "CLM-NO-STATUS",
+          userId: "user_123",
+          status: undefined,
+          isHumanApproved: true,
+        };
+
+        const mockCtx: any = {
+          runQuery: vi.fn().mockResolvedValue(mockClaim),
+          runMutation: vi.fn().mockResolvedValue(undefined),
+        };
+
+        await expect(
+          (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+            claimId: "claim_no_status",
+            text: "Testing invalid status",
+          })
+        ).rejects.toThrow(/claim status is "unknown"/i);
+      });
+
+      it("sendOutboundMessageInternal enforces rate limiting via claim.userId", async () => {
+        const mockClaim = {
+          _id: "claim_internal_rl",
+          claimNumber: "CLM-INT-1",
+          userId: "user_internal_rl",
+          status: "ready_for_review",
+          isHumanApproved: true,
+        };
+
+        const rateSpy = vi.spyOn(rateLimiter, "limit").mockResolvedValue({
+          ok: false,
+          retryAfter: 3000,
+        } as any);
+
+        const mockCtx: any = {
+          runQuery: vi.fn().mockResolvedValue(mockClaim),
+          runMutation: vi.fn().mockResolvedValue(undefined),
+        };
+
+        await expect(
+          (actionMailDispatcher.sendOutboundMessageInternal as any)._handler(mockCtx, {
+            claimId: "claim_internal_rl",
+            text: "Internal message test",
+          })
+        ).rejects.toThrow(/Rate limit reached for outbound payer transmission/i);
+
+        expect(rateSpy).toHaveBeenCalledWith(
+          mockCtx,
+          "mailDispatcher",
+          { key: "user_internal_rl" }
+        );
+      });
     });
 
     it("generateAutoReplyDraft: deduplicates and returns existing draft without re-synthesizing", async () => {

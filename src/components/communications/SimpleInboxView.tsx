@@ -66,6 +66,7 @@ export interface SimpleInboxViewProps {
   onOpenAuditDrawer?: () => void;
   onAcknowledgeDegradation?: () => Promise<void>;
   isAcknowledging?: boolean;
+  isProvisionalDegraded?: boolean;
   effectiveAppeal?: Appeal | null;
 }
 
@@ -106,6 +107,7 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
   onOpenAuditDrawer,
   onAcknowledgeDegradation,
   isAcknowledging,
+  isProvisionalDegraded = false,
   effectiveAppeal,
 }) => {
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(new Set());
@@ -611,7 +613,7 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
             <Button
               size="xs"
               onClick={onApproveAndSendDraft}
-              disabled={isSending || !activeAutoDraft.trim() || isSynthesizing}
+              disabled={isSending || !activeAutoDraft.trim() || isSynthesizing || isProvisionalDegraded}
               className="gap-1.5 h-8 px-3 text-xs font-medium cursor-pointer"
             >
               {isSending ? (

@@ -329,7 +329,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   };
 
   const handleApproveAndSendDraft = async () => {
-    if (!activeAutoDraft.trim() || isSending) return;
+    if (!activeAutoDraft.trim() || isSending || isProvisionalDegraded) return;
     setIsSending(true);
     try {
       await onSendMessage(activeAutoDraft);
@@ -431,9 +431,16 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     customEmail.trim().toLowerCase() === assignedEmail.toLowerCase()
   );
 
+  const isProvisionalDegraded = Boolean(
+    claim.status === "review_provisional" ||
+    claim.evidenceIntegrity?.requiresEvidentiaryAcknowledgement ||
+    (claim.evidenceIntegrity?.scoreStatus === "provisional_capped" &&
+      !claim.evidenceIntegrity?.acknowledgedAt)
+  );
+
   const canDispatch =
     isReadyForReview &&
-    !claim.evidenceIntegrity?.requiresEvidentiaryAcknowledgement &&
+    !isProvisionalDegraded &&
     isSenderGatewayConfigured &&
     (!isPatientUnspecified || hasSender) &&
     (dispatchMode === "custom_email"
@@ -487,7 +494,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replyText.trim() || isSending) return;
+    if (!replyText.trim() || isSending || isProvisionalDegraded) return;
 
     setIsSending(true);
     try {
@@ -556,6 +563,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
           onOpenAuditDrawer={onOpenAuditDrawer}
           onAcknowledgeDegradation={handleAcknowledgeDegradation}
           isAcknowledging={isAcknowledging}
+          isProvisionalDegraded={isProvisionalDegraded}
           effectiveAppeal={effectiveAppeal}
         />
 
@@ -1717,7 +1725,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                 <Button
                   size="xs"
                   onClick={handleApproveAndSendDraft}
-                  disabled={isSending || !activeAutoDraft.trim() || isSynthesizing}
+                  disabled={isSending || !activeAutoDraft.trim() || isSynthesizing || isProvisionalDegraded}
                   className="gap-1.5 h-7 px-3 text-xs font-medium"
                 >
                   {isSending ? (
@@ -1767,6 +1775,24 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
 
           {/* Dedicated Addendum & Transmission Console */}
           <div className="mt-auto shrink-0 border-t border-border/80 bg-muted/20 backdrop-blur-sm">
+            {/* Evidentiary Degradation Gating Notice */}
+            {isProvisionalDegraded && (
+              <div className="mx-3 mt-3 p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <WarningCircle className="size-4 shrink-0" />
+                  <span className="truncate">Evidentiary degradation requires acknowledgment before outbound transmission.</span>
+                </div>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={handleAcknowledgeDegradation}
+                  disabled={isAcknowledging}
+                  className="shrink-0 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 h-6 text-[11px] cursor-pointer"
+                >
+                  {isAcknowledging ? "Confirming..." : "Acknowledge"}
+                </Button>
+              </div>
+            )}
 
             {/* Reply Composer Form */}
             <form onSubmit={handleSendReply} className="p-3 space-y-2">
@@ -1793,17 +1819,19 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   placeholder={
-                    recipientEmail
+                    isProvisionalDegraded
+                      ? "Evidentiary acknowledgment required before outbound transmission..."
+                      : recipientEmail
                       ? `Type addendum or reply to ${recipientEmail}...`
                       : "Log addendum note to case docket..."
                   }
                   className="flex-1 bg-background text-xs h-8"
-                  disabled={isSending}
+                  disabled={isSending || isProvisionalDegraded}
                 />
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={isSending || !replyText.trim()}
+                  disabled={isSending || !replyText.trim() || isProvisionalDegraded}
                   className="gap-1.5 h-8 px-3 text-xs shrink-0 cursor-pointer"
                 >
                   {isSending ? (

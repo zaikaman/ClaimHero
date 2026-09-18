@@ -746,6 +746,8 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
           _id: "claim_outbound_fallback" as any,
           claimNumber: "CLM-7777-AET-3333",
           patientName: "John Smith",
+          status: "ready_for_review",
+          isHumanApproved: true,
           patient: { insurancePayer: "Aetna", name: "John Smith" },
           deniedAmount: 12000,
           payerContact: {
