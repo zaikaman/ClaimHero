@@ -14,6 +14,8 @@ approves the final transmission.
   &nbsp; · &nbsp;
   <a href="https://www.youtube.com/watch?v=M04LMuJRilg"><strong>Watch the 3-minute demo</strong></a>
   &nbsp; · &nbsp;
+  <a href="https://x.com/ThinhDinh1706/status/2101307320781402115"><strong>X post</strong></a>
+  &nbsp; · &nbsp;
   <a href="./hackathon.md"><strong>Read the build log</strong></a>
 </p>
 
@@ -300,6 +302,7 @@ ClaimHero/
 
 - **Live app:** https://kindhearted-elephant-992.convex.site
 - **Demo video:** https://www.youtube.com/watch?v=M04LMuJRilg
+- **X post:** https://x.com/ThinhDinh1706/status/2101307320781402115
 - **Repository:** https://github.com/zaikaman/ClaimHero
 - **Build log:** [`hackathon.md`](./hackathon.md)
 - **Product contract:** [`PRODUCT.md`](./PRODUCT.md)
