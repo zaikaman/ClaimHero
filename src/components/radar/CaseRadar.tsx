@@ -134,6 +134,15 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   const [radarTab, setRadarTab] = useState<"family" | "teams">(() => isDetailed ? "teams" : "family");
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const [statusFilter, setStatusFilter] = useState("all");
   const [payerFilter, setPayerFilter] = useState(() => initialPayerFilter || "all");
   const [isPiiMasked, setIsPiiMasked] = useState(true);
@@ -165,7 +174,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
 
   const statusArg = statusFilter !== "all" ? statusFilter : undefined;
   const payerArg = payerFilter !== "all" ? payerFilter : undefined;
-  const searchArg = searchQuery.trim() ? searchQuery.trim() : undefined;
+  const searchArg = debouncedSearchQuery.trim() ? debouncedSearchQuery.trim() : undefined;
   const isFiltered = Boolean(statusArg || payerArg || searchArg);
 
   // Server-side filtered query for active cases
@@ -231,7 +240,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
       return score !== undefined && score >= 80;
     }).length;
     const criticalCount = activeClaims.filter(
-      (c) => c.daysRemaining <= 14 && c.status !== "won"
+      (c) => c.daysRemaining !== undefined && c.daysRemaining <= 14 && c.status !== "won"
     ).length;
 
     return { totalDisputed, totalWon, avgScore, highRiskCount, criticalCount };
@@ -273,7 +282,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
       if (counts[c.status] !== undefined) {
         counts[c.status]++;
       }
-      if (c.daysRemaining <= 14 && c.status !== "won") {
+      if (c.daysRemaining !== undefined && c.daysRemaining <= 14 && c.status !== "won") {
         counts.critical_deadline++;
       }
     }
@@ -285,7 +294,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     return activeClaims.filter((c) => {
       // 1. Status / Alarm filter
       if (statusFilter === "critical_deadline") {
-        if (c.daysRemaining > 14 || c.status === "won") return false;
+        if (c.daysRemaining === undefined || c.daysRemaining > 14 || c.status === "won") return false;
       } else if (statusFilter !== "all" && c.status !== statusFilter) {
         return false;
       }
@@ -299,20 +308,20 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
       }
 
       // 3. Search query filter
-      if (searchQuery) {
-        return matchesClaimSearch(c, searchQuery);
+      if (debouncedSearchQuery) {
+        return matchesClaimSearch(c, debouncedSearchQuery);
       }
 
       return true;
     });
-  }, [activeClaims, statusFilter, payerFilter, searchQuery]);
+  }, [activeClaims, statusFilter, payerFilter, debouncedSearchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
   // Reset page when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, payerFilter, searchQuery]);
+  }, [statusFilter, payerFilter, debouncedSearchQuery]);
 
   const paginatedClaims = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -962,7 +971,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                   const isSelected = claim._id === selectedClaimId;
                   const isWon = claim.status === "won";
                   const denialReason = DENIAL_REASON_CODES[claim.denialReasonCode];
-                  const primaryCpt = claim.cptCodes[0] || "";
+                  const primaryCpt = claim?.cptCodes?.[0] || "";
                   const cptInfo = primaryCpt ? CPT_CODES[primaryCpt] : undefined;
                   const payerLabel = formatPayerName(claim.patient?.insurancePayer);
 

@@ -187,9 +187,19 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB limit
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        setErrorMessage("File exceeds the maximum 10MB size limit. Please upload a smaller PDF or image.");
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
       setSelectedFile(file);
       setErrorMessage(null);
     }
@@ -405,6 +415,11 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
   const handleProcessFile = async () => {
     if (!selectedFile) {
       setErrorMessage("Please select a denial letter PDF or image file.");
+      return;
+    }
+
+    if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
+      setErrorMessage("File exceeds the maximum 10MB size limit. Please upload a smaller PDF or image.");
       return;
     }
 
@@ -825,7 +840,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {selectedFile
                     ? `${(selectedFile.size / 1024).toFixed(1)} KB — Ready to upload`
-                    : "Supports PDF, PNG, JPG, JPEG, and TXT denial notices"}
+                    : "Supports PDF, PNG, JPG, JPEG, and TXT denial notices (max 10MB, up to 10 pages)"}
                 </p>
               </div>
 

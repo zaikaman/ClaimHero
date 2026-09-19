@@ -46,10 +46,23 @@ export async function extractTextFromPdf(
     throw new Error("Invalid PDF input: expected File, Blob, or ArrayBuffer.");
   }
 
+  const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024; // 10MB maximum limit
+  if (arrayBuffer.byteLength > MAX_PDF_SIZE_BYTES) {
+    throw new Error("Document exceeds the 10MB maximum size limit. Please upload a smaller document.");
+  }
+
   onProgress?.("Reading digital PDF pages...");
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
   const pdfDoc = await loadingTask.promise;
   const numPages = pdfDoc.numPages;
+
+  const MAX_PAGE_LIMIT = 10;
+  if (numPages > MAX_PAGE_LIMIT) {
+    throw new Error(
+      `Document has ${numPages} pages, exceeding the 10-page limit. Please upload a document with 10 or fewer pages.`
+    );
+  }
+
   const pageTexts: string[] = [];
 
   for (let pageNum = 1; pageNum <= numPages; pageNum++) {
@@ -120,6 +133,14 @@ export async function extractTextFromImage(
   imageSource: File | Blob | string,
   onProgress?: (progressText: string) => void
 ): Promise<{ text: string; sourceProvenance: DocumentSourceProvenance }> {
+  const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB limit
+  if (typeof imageSource !== "string" && "size" in imageSource && imageSource.size > MAX_IMAGE_SIZE_BYTES) {
+    throw new Error("Document exceeds the 10MB maximum size limit. Please upload a smaller document.");
+  }
+  if (typeof imageSource === "string" && imageSource.length > 14 * 1024 * 1024) {
+    throw new Error("Document exceeds the 10MB maximum size limit. Please upload a smaller document.");
+  }
+
   onProgress?.("Loading in-browser optical engine...");
   const worker = await createWorker("eng");
   try {

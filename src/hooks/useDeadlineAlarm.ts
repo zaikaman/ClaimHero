@@ -55,7 +55,7 @@ const ONE_DAY_MS = 24 * ONE_HOUR_MS;
  * Pure calculation function for live deadline countdown.
  */
 export function calculateLiveCountdown(
-  statutoryDeadline: number,
+  statutoryDeadline?: number | null,
   now: number = Date.now(),
   options?: {
     status?: string;
@@ -85,6 +85,25 @@ export function calculateLiveCountdown(
       isUrgent: false,
       urgencyTier: "resolved",
       formattedCountdown: "Case Resolved & Overturned",
+      progressPercent: 100,
+      shouldAlarm: false,
+    };
+  }
+
+  if (typeof statutoryDeadline !== "number" || isNaN(statutoryDeadline) || statutoryDeadline <= 0) {
+    return {
+      diffMs: Infinity,
+      days: 0,
+      hours: 0,
+      minutes: 0,
+      seconds: 0,
+      isOverdue: false,
+      isDueToday: false,
+      isEmergency: false,
+      isCritical: false,
+      isUrgent: false,
+      urgencyTier: "normal",
+      formattedCountdown: "Statutory Clock Pending Notice",
       progressPercent: 100,
       shouldAlarm: false,
     };
@@ -202,7 +221,7 @@ export function calculatePortfolioDeadlineStats(
 
   const hasActiveAlarm = overdueCount > 0 || criticalCount > 0;
   const nearestDaysRemaining =
-    nearestDeadlineClaim !== null
+    nearestDeadlineClaim !== null && nearestDeadlineClaim.statutoryDeadline !== undefined
       ? calculateLiveCountdown(nearestDeadlineClaim.statutoryDeadline, now).days
       : null;
 

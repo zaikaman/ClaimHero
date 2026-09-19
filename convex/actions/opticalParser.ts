@@ -207,7 +207,52 @@ function detectFileFormat(
     }
   }
 
-  return { type: "unsupported", mime: normType };
+  return { type: "unsupported", mime: normType || "application/octet-stream" };
+}
+
+export function validateOcrAppealsEmail(
+  rawEmail: unknown,
+  patientEmail?: string,
+): string | null {
+  if (typeof rawEmail !== "string") return null;
+  const trimmed = rawEmail.trim();
+  if (!trimmed || trimmed.includes(" ") || trimmed.length > 254) return null;
+
+  // Strict email regex matching valid format with domain and TLD
+  const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!EMAIL_REGEX.test(trimmed)) return null;
+
+  const lower = trimmed.toLowerCase();
+  const [localPart, domain] = lower.split("@");
+  if (!localPart || !domain || !domain.includes(".")) return null;
+
+  // Reject file/image/binary extensions
+  const assetRegex = /\.(png|jpg|jpeg|gif|svg|webp|css|js|ico|pdf|bmp|tiff)$/i;
+  if (assetRegex.test(domain)) return null;
+
+  // Reject placeholder / dummy / tech vendor domains
+  const ignoredDomains = [
+    "example.com",
+    "test.com",
+    "placeholder.com",
+    "domain.com",
+    "invalid.org",
+    "invalid.com",
+    "w3.org",
+    "schema.org",
+    "sentry.io",
+    "github.com",
+    "google.com",
+    "facebook.com",
+    "twitter.com",
+    "localhost",
+  ];
+  if (ignoredDomains.includes(domain)) return null;
+
+  // Reject if matches patient email to avoid sending payer appeals to patient
+  if (patientEmail && lower === patientEmail.trim().toLowerCase()) return null;
+
+  return trimmed;
 }
 
 /**
@@ -596,7 +641,7 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         groupNumber: resolvedGroupNumber || undefined,
         dateOfBirth: resolvedDob || undefined,
         insurancePayer: extraction.insurancePayer?.trim() || "Unspecified Payer",
-        state: args.patientState || "California",
+        state: (args.patientState || "").trim() || "Unspecified",
         claimNumber: extraction.claimNumber?.trim() || "",
         serviceDate: resolvedServiceDate,
         denialDate: resolvedDenialDate || undefined,
@@ -633,64 +678,69 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
     }
 
     // Autonomously resolve the payer intake gateway without blocking extraction return.
-    // The Document OCR overlay (when present) is applied immediately so the claim is
-    // usable instantly; live gateway search runs in the background and the sentinel
-    // pipeline re-resolves on demand if payerContact is still missing.
-    const ocrAppealsEmail = extraction.payerAppealsEmail;
-    const hasOcrContact =
-      typeof ocrAppealsEmail === "string" && ocrAppealsEmail.includes("@");
-    if (hasOcrContact) {
+    // An OCR-extracted email is validated and treated as a provisional candidate (isVerified: false)
+    // and must NEVER skip the background search. The background search independently
+    // verifies or discovers the authoritative payer intake route via live Firecrawl search,
+    // ensuring single OCR misreads never become verified PHI destinations.
+    const validatedOcrEmail = validateOcrAppealsEmail(
+      extraction.payerAppealsEmail,
+      args.patientEmail
+    );
+
+    if (validatedOcrEmail) {
       try {
         await ctx.runMutation(internal.claims.updatePayerContactInternal, {
           claimId,
           payerContact: {
-            officialAppealsEmail: ocrAppealsEmail as string,
+            officialAppealsEmail: validatedOcrEmail,
             statutoryPoBox:
               extraction.payerAppealsAddress ||
               `${extraction.insurancePayer} Appeals Unit`,
-            isVerified: true,
+            isVerified: false,
             source: "document_ocr",
+            submissionPolicyNote:
+              "Provisional contact candidate extracted from document OCR; pending background intake gateway verification.",
           },
         });
       } catch (contactErr) {
         console.warn("Auto payer gateway resolution note:", contactErr);
       }
-      // Document-OCR contact is authoritative: skip background search so the
-      // scheduled resolver cannot overwrite document provenance. The sentinel
-      // pipeline only auto-resolves when payerContact is missing.
-    } else {
-      try {
-        const scheduler = (
-          ctx as unknown as {
-            scheduler?: {
-              runAfter: (delayMs: number, fn: unknown, args: unknown) => Promise<unknown>;
-            };
-          }
-        ).scheduler;
-        if (scheduler && typeof scheduler.runAfter === "function") {
-          await scheduler.runAfter(
-            0,
-            internal.actions.payerContactResolver.resolvePayerGatewayInternal,
-            {
-              claimId,
-              payerName: extraction.insurancePayer,
-            }
-          );
-        } else {
-          // Fallback for isolated test runners without scheduler: resolve inline.
-          // The sentinel pipeline also auto-resolves when payerContact is missing.
-          void ctx
-            .runAction(internal.actions.payerContactResolver.resolvePayerGatewayInternal, {
-              claimId,
-              payerName: extraction.insurancePayer,
-            })
-            .catch((contactErr: unknown) => {
-              console.warn("Auto payer gateway resolution note:", contactErr);
-            });
+    }
+
+    // Always run background search so the live gateway resolver can discover or
+    // corroborate the authoritative payer intake route via live Firecrawl search,
+    // ensuring single OCR misreads never become verified PHI destinations.
+    try {
+      const scheduler = (
+        ctx as unknown as {
+          scheduler?: {
+            runAfter: (delayMs: number, fn: unknown, args: unknown) => Promise<unknown>;
+          };
         }
-      } catch (contactErr) {
-        console.warn("Auto payer gateway resolution note:", contactErr);
+      ).scheduler;
+      if (scheduler && typeof scheduler.runAfter === "function") {
+        await scheduler.runAfter(
+          0,
+          internal.actions.payerContactResolver.resolvePayerGatewayInternal,
+          {
+            claimId,
+            payerName: extraction.insurancePayer,
+          }
+        );
+      } else {
+        // Fallback for isolated test runners without scheduler: resolve inline.
+        // The sentinel pipeline also auto-resolves when payerContact is missing.
+        void ctx
+          .runAction(internal.actions.payerContactResolver.resolvePayerGatewayInternal, {
+            claimId,
+            payerName: extraction.insurancePayer,
+          })
+          .catch((contactErr: unknown) => {
+            console.warn("Auto payer gateway resolution note:", contactErr);
+          });
       }
+    } catch (contactErr) {
+      console.warn("Auto payer gateway resolution note:", contactErr);
     }
 
     let pipelineResult: Record<string, unknown> | undefined = undefined;

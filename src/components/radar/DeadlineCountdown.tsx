@@ -5,8 +5,8 @@ import { Badge } from "../ui/badge";
 import { Progress } from "../ui/progress";
 
 interface DeadlineCountdownProps {
-  daysRemaining: number;
-  statutoryDeadline: number;
+  daysRemaining?: number;
+  statutoryDeadline?: number;
   appealFilingDeadlineDays?: number;
   size?: "sm" | "md" | "lg";
   showDetails?: boolean;
@@ -33,7 +33,9 @@ export const DeadlineCountdown: React.FC<DeadlineCountdownProps> = ({
     ? 100
     : isOverdue
     ? 0
-    : Math.min(100, Math.max(0, (daysRemaining / totalDays) * 100));
+    : daysRemaining !== undefined
+    ? Math.min(100, Math.max(0, (daysRemaining / totalDays) * 100))
+    : 100;
 
   if (size === "sm") {
     if (isWon) {
@@ -44,6 +46,18 @@ export const DeadlineCountdown: React.FC<DeadlineCountdownProps> = ({
         >
           <CheckCircle className="size-3 text-emerald-500" />
           <span>Case Resolved</span>
+        </Badge>
+      );
+    }
+
+    if (daysRemaining === undefined) {
+      return (
+        <Badge
+          variant="outline"
+          className="font-mono text-[10px] gap-1 px-2 py-0.5 text-muted-foreground border-border/60"
+        >
+          <Clock className="size-3 text-muted-foreground" />
+          <span>Pending notice</span>
         </Badge>
       );
     }
@@ -187,13 +201,18 @@ export const DeadlineCountdown: React.FC<DeadlineCountdownProps> = ({
         <div className="text-right font-mono">
           {isOverdue ? (
             <>
-              <span className="text-base font-bold text-destructive">-{Math.abs(daysRemaining)}d</span>
+              <span className="text-base font-bold text-destructive">-{Math.abs(daysRemaining ?? 0)}d</span>
               <span className="text-[10px] text-destructive/80 block uppercase font-semibold">Overdue ({totalDays}d Bar)</span>
             </>
           ) : isDueToday ? (
             <>
               <span className="text-base font-bold text-destructive">Due Today</span>
               <span className="text-[10px] text-destructive/80 block uppercase font-semibold">{totalDays}d Bar</span>
+            </>
+          ) : daysRemaining === undefined ? (
+            <>
+              <span className="text-base font-bold text-muted-foreground">--</span>
+              <span className="text-[10px] text-muted-foreground block">Pending</span>
             </>
           ) : (
             <>

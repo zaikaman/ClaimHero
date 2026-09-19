@@ -364,6 +364,25 @@ Extract the authentic appeals/grievance/claims intake gateway details for ${paye
       }
     }
 
+    // Corroborate provisional OCR candidate email if live search evidence confirms it
+    const provisionalOcrEmail =
+      claim.payerContact?.source === "document_ocr" && claim.payerContact.officialAppealsEmail
+        ? claim.payerContact.officialAppealsEmail.trim().toLowerCase()
+        : undefined;
+
+    if (!extractedEmail && provisionalOcrEmail && hasLiveSearchEvidence) {
+      const ocrDomain = provisionalOcrEmail.split("@")[1];
+      const ocrInSearch =
+        webSearchContext.toLowerCase().includes(provisionalOcrEmail) ||
+        Boolean(ocrDomain && ocrDomain.length > 3 && webSearchContext.toLowerCase().includes(ocrDomain));
+      const ocrInDetected = detectedPriorityEmails.some(
+        (e) => e.toLowerCase() === provisionalOcrEmail
+      );
+      if (ocrInSearch || ocrInDetected) {
+        extractedEmail = claim.payerContact?.officialAppealsEmail;
+      }
+    }
+
     const intakePortalUrl = cleanField(aiExtraction.intakePortalUrl);
     const portalName = cleanField(aiExtraction.portalName);
     const appealsFax = cleanField(aiExtraction.appealsFax);

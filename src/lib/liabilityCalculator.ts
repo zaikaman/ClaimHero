@@ -297,7 +297,7 @@ export function calculateErisaPenalties(
   const deadlineDate = new Date(requestDate.getTime() + STATUTORY_DISCLOSURE_GRACE_DAYS * 24 * 60 * 60 * 1000);
   const disclosureDeadlineDateStr = formatDateISO(deadlineDate);
 
-  const dailyPenaltyRate = input.dailyPenaltyRate ?? (input.useDolInflation ? DOL_INFLATION_ADJUSTED_DAILY_RATE : STATUTORY_DAILY_PENALTY_RATE);
+  const dailyPenaltyRate = input.dailyPenaltyRate ?? (input.useDolInflation === false ? STATUTORY_DAILY_PENALTY_RATE : DOL_INFLATION_ADJUSTED_DAILY_RATE);
   const complianceStatus: StatutoryComplianceStatus = input.complianceStatus ?? "defaulted";
   const requestedDocuments = input.requestedDocuments && input.requestedDocuments.length > 0
     ? input.requestedDocuments
@@ -467,7 +467,7 @@ Pursuant to ERISA Section 503 [29 U.S.C. § 1133] and federal claims procedure r
 ${docBulletList}
 
 STATUTORY DISCLOSURE NOTICE:
-Under 29 U.S.C. § 1132(c)(1)(B), the Plan Administrator is required by federal law to furnish these requested records within thirty (30) calendar days of receipt. Failure to timely provide these documents exposes the Plan Administrator to personal statutory penalties of up to $110.00 per day under 29 C.F.R. § 2575.502c-1 starting from ${ctx.disclosureDeadlineDate}, in addition to mandatory attorney's fees under 29 U.S.C. § 1132(g)(1).`;
+Under 29 U.S.C. § 1132(c)(1)(B), the Plan Administrator is required by federal law to furnish these requested records within thirty (30) calendar days of receipt. Failure to timely provide these documents exposes the Plan Administrator to personal statutory penalties of up to $${ctx.dailyPenaltyRate.toFixed(2)} per day under 29 C.F.R. § 2575.502c-1 starting from ${ctx.disclosureDeadlineDate}, in addition to mandatory attorney's fees under 29 U.S.C. § 1132(g)(1).`;
   }
 
   return `FORMAL NOTICE OF STATUTORY ERISA § 502(c) DEFAULT & PENALTY DEMAND
@@ -482,7 +482,7 @@ Under 29 U.S.C. § 1132(c)(1)(B) [ERISA Section 502(c)(1)(B)] and 29 C.F.R. § 2
 
 As of ${ctx.calculationDate}, the Plan Administrator has remained in persistent default for ${ctx.daysInDefault} consecutive calendar days past the statutory deadline (${ctx.disclosureDeadlineDate}).
 
-Pursuant to the Federal Civil Penalties Inflation Adjustment Act and 29 C.F.R. § 2575.502c-1, statutory penalties of $110.00 per day have accrued and continue to accrue daily:
+Pursuant to the Federal Civil Penalties Inflation Adjustment Act and 29 C.F.R. § 2575.502c-1, statutory penalties of $${ctx.dailyPenaltyRate.toFixed(2)} per day have accrued and continue to accrue daily:
   - Days in Statutory Non-Compliance: ${ctx.daysInDefault} days
   - Daily Statutory Penalty Rate: $${ctx.dailyPenaltyRate.toFixed(2)} / day
   - Total Accrued ERISA § 502(c) Penalties: $${ctx.accruedPenaltyAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
@@ -543,7 +543,7 @@ export function getDefaultErisaPenalties(
   const requestDate = new Date(now.getTime() - 48 * 24 * 60 * 60 * 1000); // 48 days ago -> 18 days default
   const patientState = claim.patient?.state;
   const statePromptPay = getPromptPayRateForState(patientState);
-  const dailyPenaltyRate = options?.useDolInflation ? DOL_INFLATION_ADJUSTED_DAILY_RATE : 110.0;
+  const dailyPenaltyRate = options?.useDolInflation === false ? STATUTORY_DAILY_PENALTY_RATE : DOL_INFLATION_ADJUSTED_DAILY_RATE;
 
   const result = calculateErisaPenalties(
     {
@@ -586,7 +586,7 @@ export function getSeverityTierMeta(tier: StatutorySeverityTier): {
       return {
         label: "Actionable ERISA § 502(c) Default",
         badgeVariant: "warning",
-        description: "1-30 days overdue; statutory penalties actively accruing at $110/day",
+        description: "1-30 days overdue; statutory penalties actively accruing at $164/day",
         colorClass: "text-amber-400 border-amber-500/30 bg-amber-950/40",
       };
     case "egregious_noncompliance":

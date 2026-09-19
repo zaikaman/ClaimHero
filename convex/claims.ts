@@ -430,7 +430,7 @@ export const list = query({
         : paginatedResult.page;
 
       if (isCriticalDeadline) {
-        page = page.filter((c) => c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost");
+        page = page.filter((c) => c.daysRemaining !== undefined && c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost");
       }
       if (hasSearch) {
         page = page.filter((c) => matchesClaimSearch(c, trimmedSearch));
@@ -536,7 +536,7 @@ export const list = query({
       }
       if (isCriticalDeadline) {
         filtered = filtered.filter(
-          (c) => c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost"
+          (c) => c.daysRemaining !== undefined && c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost"
         );
       }
       if (hasSearch) {
@@ -550,7 +550,7 @@ export const list = query({
           }
           if (hasStatus && c.status !== args.status) return false;
           if (hasPayer && c.insurancePayer !== args.payer) return false;
-          if (isCriticalDeadline && !(c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost")) {
+          if (isCriticalDeadline && !(c.daysRemaining !== undefined && c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost")) {
             return false;
           }
           return matchesClaimSearch(c, trimmedSearch);
@@ -562,7 +562,7 @@ export const list = query({
         }
       } else if (isCriticalDeadline) {
         const matchingShared = sharedClaims.filter(
-          (c) => c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost"
+          (c) => c.daysRemaining !== undefined && c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost"
         );
         for (const shared of matchingShared) {
           if (!filtered.some((c) => c._id === shared._id)) {
@@ -1312,6 +1312,12 @@ async function applyCreateWithPatient(
 
   let patientId: Id<"patients">;
 
+  const resolvedState = (args.state || matchingPatient?.state || "").trim();
+  if (!resolvedState) {
+    throw new Error("Patient state jurisdiction is required to determine the governing Department of Insurance (DOI) statutory clock.");
+  }
+  const resolvedPayer = (args.insurancePayer || matchingPatient?.insurancePayer || "").trim() || "Unspecified Payer";
+
   if (matchingPatient) {
     patientId = matchingPatient._id;
     await ctx.db.patch(patientId, {
@@ -1321,8 +1327,8 @@ async function applyCreateWithPatient(
       memberId: cleanMemberId || matchingPatient.memberId || "PENDING",
       groupNumber: cleanGroupNumber || matchingPatient.groupNumber,
       dateOfBirth: cleanDateOfBirth || matchingPatient.dateOfBirth,
-      insurancePayer: args.insurancePayer || matchingPatient.insurancePayer || "Molina Healthcare",
-      state: args.state || matchingPatient.state || "FL",
+      insurancePayer: resolvedPayer,
+      state: resolvedState,
     });
   } else {
     patientId = await ctx.db.insert("patients", {
@@ -1332,8 +1338,8 @@ async function applyCreateWithPatient(
       memberId: cleanMemberId || "PENDING",
       groupNumber: cleanGroupNumber,
       dateOfBirth: cleanDateOfBirth || undefined,
-      insurancePayer: args.insurancePayer || "Molina Healthcare",
-      state: args.state || "FL",
+      insurancePayer: resolvedPayer,
+      state: resolvedState,
       createdAt: now,
     });
   }
@@ -1355,7 +1361,7 @@ async function applyCreateWithPatient(
     userId: effectiveUserId,
     patientId,
     patientName: resolvedPatientName,
-    insurancePayer: args.insurancePayer || "Molina Healthcare",
+    insurancePayer: resolvedPayer,
     claimNumber,
     serviceDate: cleanServiceDate,
     denialDate: cleanDenialDate || undefined,
@@ -1381,7 +1387,7 @@ async function applyCreateWithPatient(
     searchContent: buildClaimSearchContent({
       claimNumber,
       patientName: resolvedPatientName,
-      insurancePayer: args.insurancePayer || "Molina Healthcare",
+      insurancePayer: resolvedPayer,
       providerName: resolveClaimProviderName(args.providerName),
       denialReasonCode: args.denialReasonCode,
       denialReasonDescription: args.denialReasonDescription,
@@ -2291,6 +2297,7 @@ async function executeSweepDeadlinesBatch(
 
   for (const claim of pageResult.page) {
     if (claim.status === "won" || claim.status === "lost") continue;
+    if (claim.statutoryDeadline === undefined) continue;
 
     const exactRemaining = calculateDaysRemaining(claim.statutoryDeadline, now);
 
@@ -2301,7 +2308,7 @@ async function executeSweepDeadlinesBatch(
       });
       batchUpdated++;
 
-      if (exactRemaining <= 14 && claim.daysRemaining > 14) {
+      if (exactRemaining <= 14 && (claim.daysRemaining === undefined || claim.daysRemaining > 14)) {
         // Deduplication check: verify no statutory_alarm_critical was already logged for this claim within the last 24 hours
         const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
         let recentAlarm: unknown = null;
@@ -2537,7 +2544,7 @@ export const getPortfolioStats = query({
       if (claimsByStatus[c.status] !== undefined) {
         claimsByStatus[c.status]++;
       }
-      if (c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost") {
+      if (c.daysRemaining !== undefined && c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost") {
         criticalDeadlinesCountInScope++;
       }
     }
@@ -2546,7 +2553,7 @@ export const getPortfolioStats = query({
     let activeClaims: Doc<"claims">[];
     if (isCriticalDeadline) {
       activeClaims = searchMatching.filter(
-        (c) => c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost"
+        (c) => c.daysRemaining !== undefined && c.daysRemaining <= 14 && c.status !== "won" && c.status !== "lost"
       );
     } else if (hasStatus) {
       activeClaims = searchMatching.filter((c) => c.status === args.status);
@@ -2593,9 +2600,9 @@ export const getPortfolioStats = query({
         scoredCount++;
       }
 
-      if (claim.daysRemaining <= 14 && claim.status !== "won" && claim.status !== "lost") {
+      if (claim.daysRemaining !== undefined && claim.daysRemaining <= 14 && claim.status !== "won" && claim.status !== "lost") {
         criticalDeadlinesCount++;
-      } else if (claim.daysRemaining <= 45 && claim.status !== "won" && claim.status !== "lost") {
+      } else if (claim.daysRemaining !== undefined && claim.daysRemaining <= 45 && claim.status !== "won" && claim.status !== "lost") {
         urgentDeadlinesCount++;
       }
 

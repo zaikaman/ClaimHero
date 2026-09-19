@@ -97,13 +97,23 @@ export function formatDateTime(timestamp: number | string | undefined | null): s
 /**
  * Format statutory deadline countdown, preserving negative overdue state.
  */
-export function formatDeadlineRemaining(days: number): {
+export function formatDeadlineRemaining(days?: number): {
   text: string;
   badgeClass: string;
   isUrgent: boolean;
   isCritical: boolean;
   isOverdue: boolean;
 } {
+  if (days === undefined || isNaN(days)) {
+    return {
+      text: "Deadline Pending",
+      badgeClass: "bg-muted/60 text-muted-foreground border-border/60",
+      isUrgent: false,
+      isCritical: false,
+      isOverdue: false,
+    };
+  }
+
   if (days <= 0) {
     return {
       text: "Deadline Expired",

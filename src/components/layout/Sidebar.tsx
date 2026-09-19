@@ -222,7 +222,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   const isCurrent = selectedClaim?._id === c._id && isCaseWorkspaceActive;
                   const isWon = c.status === "won";
                   const isDispatched = c.status === "dispatched";
-                  const isUrgent = c.daysRemaining <= 14 && !isWon && !isDispatched;
+                  const isUrgent = c.daysRemaining !== undefined && c.daysRemaining <= 14 && !isWon && !isDispatched;
 
                   return (
                     <div

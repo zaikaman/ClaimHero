@@ -632,6 +632,7 @@ export const savePolicySnapshotInternal = internalMutation({
     extractedJson: v.optional(v.string()),
     screenshotStorageId: v.optional(v.id("_storage")),
     screenshotUrl: v.optional(v.string()),
+    expiresAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -639,6 +640,7 @@ export const savePolicySnapshotInternal = internalMutation({
       args.screenshotUrl && args.screenshotUrl.startsWith("http") && args.screenshotUrl.length < 2048
         ? args.screenshotUrl
         : undefined;
+    const expiresAt = args.expiresAt ?? now + 7 * 24 * 60 * 60 * 1000;
 
     const existing = await ctx.db
       .query("policySnapshots")
@@ -653,6 +655,7 @@ export const savePolicySnapshotInternal = internalMutation({
         screenshotStorageId: args.screenshotStorageId ?? existing.screenshotStorageId,
         screenshotUrl: cleanScreenshotUrl ?? existing.screenshotUrl,
         capturedAt: now,
+        expiresAt,
       });
       return existing._id;
     }
@@ -666,6 +669,7 @@ export const savePolicySnapshotInternal = internalMutation({
       screenshotStorageId: args.screenshotStorageId,
       screenshotUrl: cleanScreenshotUrl,
       capturedAt: now,
+      expiresAt,
     });
   },
 });

@@ -170,11 +170,15 @@ export function formatWhatHappenedSentence(claim: {
   const patientPrefix = claim.patient?.name ? `${claim.patient.name}'s` : "Your";
   const procedure = getPlainProcedureName(claim.cptCodes, claim.serviceDescription || "treatment");
   const payer = claim.patient?.insurancePayer || "the insurer";
+  const safeAmount =
+    typeof claim.deniedAmount === "number" && !isNaN(claim.deniedAmount) && isFinite(claim.deniedAmount)
+      ? claim.deniedAmount
+      : 0;
   const amountStr = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
-  }).format(claim.deniedAmount);
+  }).format(safeAmount);
 
   const plainReason = getPlainDenialReason(claim.denialReasonCode);
   if (plainReason) {
@@ -186,12 +190,32 @@ export function formatWhatHappenedSentence(claim: {
   return `${patientPrefix} ${procedure} was denied (${amountStr}) by ${payer}.`;
 }
 
-export function formatDeadlineSentence(statutoryDeadline: number, daysRemaining: number): string {
-  const dateStr = new Date(statutoryDeadline).toLocaleDateString("en-US", {
+export function formatDeadlineSentence(
+  statutoryDeadline?: number | null,
+  daysRemaining?: number | null
+): string {
+  if (
+    typeof statutoryDeadline !== "number" ||
+    isNaN(statutoryDeadline) ||
+    statutoryDeadline <= 0
+  ) {
+    return "Appeal deadline: Unknown (pending denial notice date)";
+  }
+
+  const date = new Date(statutoryDeadline);
+  if (isNaN(date.getTime())) {
+    return "Appeal deadline: Unknown (pending denial notice date)";
+  }
+
+  const dateStr = date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
-  return `Appeal deadline: ${dateStr} (${daysRemaining} days left)`;
+
+  if (typeof daysRemaining === "number" && !isNaN(daysRemaining)) {
+    return `Appeal deadline: ${dateStr} (${daysRemaining} days left)`;
+  }
+  return `Appeal deadline: ${dateStr}`;
 }
 

@@ -56,8 +56,8 @@ export default defineSchema({
     denialReasonCode: v.string(),
     denialReasonDescription: v.string(),
     status: v.string(), // ingested, parsing, analyzing, precedent_matched, drafting, review_provisional, ready_for_review, dispatched, won, lost, escalated
-    statutoryDeadline: v.number(),
-    daysRemaining: v.number(),
+    statutoryDeadline: v.optional(v.number()),
+    daysRemaining: v.optional(v.number()),
     denialDate: v.optional(v.string()),
     appealFilingDeadlineDays: v.optional(v.number()),
     appealReadinessScore: v.optional(v.number()), // Canonical 0-100 dossier readiness checklist score (capped at 40 if degraded)

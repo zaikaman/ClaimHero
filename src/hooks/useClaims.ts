@@ -124,7 +124,7 @@ export function useClaims(options?: {
         scoreCount++;
       }
 
-      if (c.daysRemaining <= 14 && c.status !== "won") {
+      if (c.daysRemaining !== undefined && c.daysRemaining <= 14 && c.status !== "won") {
         criticalDeadlinesCount++;
       }
     }
@@ -179,7 +179,7 @@ export function useClaims(options?: {
       if (counts[c.status] !== undefined) {
         counts[c.status]++;
       }
-      if (c.daysRemaining <= 14 && c.status !== "won") {
+      if (c.daysRemaining !== undefined && c.daysRemaining <= 14 && c.status !== "won") {
         counts.critical_deadline++;
       }
     }

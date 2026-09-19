@@ -112,12 +112,12 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
     ];
 
     const rows = stats.payerBreakdown.map((p) => [
-      `"${p.payer.replace(/"/g, '""')}"`,
-      p.totalClaims,
-      p.totalDisputed.toFixed(2),
-      p.wonAmount.toFixed(2),
-      Math.round((p.wonCount / (p.totalClaims || 1)) * 100),
-      p.averageScore,
+      `"${(p.payer || "Unknown").replace(/"/g, '""')}"`,
+      p.totalClaims || 0,
+      Number(p.totalDisputed || 0).toFixed(2),
+      Number(p.wonAmount || 0).toFixed(2),
+      Math.round(((p.wonCount || 0) / (p.totalClaims || 1)) * 100),
+      p.averageScore ?? 0,
     ]);
 
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");

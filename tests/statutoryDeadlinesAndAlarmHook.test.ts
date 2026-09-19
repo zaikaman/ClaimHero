@@ -53,7 +53,7 @@ describe("Statutory Deadline Anchoring, Non-Fabrication & Precision Alarm Timing
       expect(result.daysRemaining).toBe(132); // 180 - 48
     });
 
-    it("falls back to ingestion time only when neither denialDate nor serviceDate is valid", () => {
+    it("falls back to unknown without fabricating a deadline when neither denialDate nor serviceDate is valid", () => {
       const now = Date.UTC(2026, 8, 18, 12, 0, 0);
 
       const result = resolveStatutoryDeadline({
@@ -63,8 +63,10 @@ describe("Statutory Deadline Anchoring, Non-Fabrication & Precision Alarm Timing
         now,
       });
 
-      expect(result.anchorType).toBe("ingestion");
-      expect(result.daysRemaining).toBe(180);
+      expect(result.anchorType).toBe("unknown");
+      expect(result.statutoryDeadline).toBeUndefined();
+      expect(result.daysRemaining).toBeUndefined();
+      expect(result.anchorDate).toBe("Unknown");
     });
 
     it("preserves negative values for overdue claims without clamping to 0", () => {

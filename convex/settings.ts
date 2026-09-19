@@ -155,6 +155,7 @@ export const triggerManualSweepAndSync = mutation({
     let updatedCount = 0;
 
     for (const claim of claims) {
+      if (claim.statutoryDeadline === undefined) continue;
       const daysRemaining = calculateDaysRemaining(claim.statutoryDeadline, now);
       if (claim.daysRemaining !== daysRemaining) {
         await ctx.db.patch(claim._id, {

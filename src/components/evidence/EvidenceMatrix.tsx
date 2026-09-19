@@ -43,7 +43,7 @@ interface EvidenceMatrixProps {
   evidences: ClinicalEvidence[];
   discoveredPolicies?: DiscoveredPolicy[];
   isLoadingEvidences?: boolean;
-  onCrawlPolicy: (claimId: string, customUrl?: string) => Promise<unknown>;
+  onCrawlPolicy: (claimId: string, customUrl?: string, forceRescan?: boolean) => Promise<unknown>;
   onCrawlPubMed?: (claimId: string, query?: string, customUrl?: string) => Promise<unknown>;
   onCrawlFDA?: (claimId: string, customUrl?: string, deviceName?: string) => Promise<unknown>;
   onCrawlCustomUrl?: (claimId: string, url: string, category?: string, notes?: string) => Promise<unknown>;
@@ -122,7 +122,8 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
     setErrorMessage(null);
     const toastId = toast.loading("Crawling payer Clinical Policy Bulletin & auditing Statutory Appeal Readiness...");
     try {
-      await onCrawlPolicy(claim._id);
+      const hasPriorCpb = evidences.some((e) => e.sourceType === "payer_cpb");
+      await onCrawlPolicy(claim._id, undefined, hasPriorCpb);
       const result = await onComputeScore(claim._id);
       setScoringResult(result);
       toast.success("Policy indexed & Statutory Appeal Readiness evaluated successfully", { id: toastId });

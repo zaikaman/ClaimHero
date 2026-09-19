@@ -111,11 +111,11 @@ export type StatutoryClockType =
   | "custom";
 
 export interface StatutoryDeadlineResolution {
-  statutoryDeadline: number;
-  daysRemaining: number;
-  anchorTimestamp: number;
+  statutoryDeadline?: number;
+  daysRemaining?: number;
+  anchorTimestamp?: number;
   anchorDate: string;
-  anchorType: "denial" | "service" | "ingestion";
+  anchorType: "denial" | "service" | "ingestion" | "unknown";
   effectiveDeadlineDays: number;
   clockType?: StatutoryClockType;
   regulatoryCitation?: string;
@@ -124,9 +124,9 @@ export interface StatutoryDeadlineResolution {
 /**
  * Resolves the statutory deadline and days remaining for a claim.
  * Follows statutory priority:
- * 1. Denial Date (date of adverse benefit determination)
- * 2. Service Date (fallback if denial date not explicitly documented)
- * 3. Ingestion Time (fallback only when neither date exists)
+ * 1. Denial Date (date of adverse benefit determination per ERISA 29 C.F.R. § 2560.503-1(h)(2)(i))
+ * 2. Service Date (fallback only when denial date not explicitly documented)
+ * 3. Unknown (does not fabricate an ingestion-anchored deadline)
  *
  * Automatically resolves the statutory clock:
  * - When appealLevel is "level_3_external_state_review", computes external review clock:
@@ -176,7 +176,7 @@ export function resolveStatutoryDeadline(options: {
 
   let anchorTimestamp: number;
   let anchorDate: string;
-  let anchorType: "denial" | "service" | "ingestion";
+  let anchorType: "denial" | "service" | "unknown";
 
   if (denialTs !== null) {
     anchorTimestamp = denialTs;
@@ -187,9 +187,18 @@ export function resolveStatutoryDeadline(options: {
     anchorDate = options.serviceDate!.trim();
     anchorType = "service";
   } else {
-    anchorTimestamp = now;
-    anchorDate = new Date(now).toISOString().slice(0, 10);
-    anchorType = "ingestion";
+    // Ingestion-anchored 180d deadline violates ERISA 29 CFR 2560.503-1(h)(2)(i).
+    // Fall back to Unknown, don't fabricate.
+    return {
+      statutoryDeadline: undefined,
+      daysRemaining: undefined,
+      anchorTimestamp: undefined,
+      anchorDate: "Unknown",
+      anchorType: "unknown",
+      effectiveDeadlineDays,
+      clockType,
+      regulatoryCitation: "Unknown (pending denial notice date under ERISA 29 C.F.R. § 2560.503-1(h)(2)(i))",
+    };
   }
 
   const statutoryDeadline = anchorTimestamp + effectiveDeadlineDays * ONE_DAY_MS;

@@ -70,8 +70,8 @@ export interface Claim {
   denialDate?: string;
   appealFilingDeadlineDays?: number;
   status: ClaimStatus;
-  statutoryDeadline: number;
-  daysRemaining: number;
+  statutoryDeadline?: number;
+  daysRemaining?: number;
   /** Canonical 0-100 dossier readiness checklist score (held at max 40 when evidentially degraded) */
   appealReadinessScore?: number;
   /** True un-capped evidentiary completeness score (0-100) across the 4 statutory pillars */

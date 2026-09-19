@@ -62,8 +62,8 @@ export interface CertificateOfServiceData {
   mxRecord: MxRecordInfo;
 
   // Statutory Timing & Compliance
-  statutoryDeadline: number;
-  statutoryDeadlineIso: string;
+  statutoryDeadline?: number;
+  statutoryDeadlineIso?: string;
   statutoryFilingWindowDays: number;
   daysElapsedSinceService: number;
   daysRemainingAtDispatch: number;
@@ -391,14 +391,20 @@ export async function buildCertificateData(
     ? Math.max(0, Math.floor((dispatchedAt - anchorTs) / (1000 * 60 * 60 * 24)))
     : 0;
 
-  const diffMs = claim.statutoryDeadline - dispatchedAt;
-  const daysRemainingAtDispatch = diffMs >= 0
-    ? Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-    : Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const deadline = claim.statutoryDeadline;
+  const hasDeadline = typeof deadline === "number" && !isNaN(deadline);
+  const diffMs = hasDeadline ? deadline - dispatchedAt : 0;
+  const daysRemainingAtDispatch = hasDeadline
+    ? diffMs >= 0
+      ? Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+      : Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    : 0;
 
-  const isTimelyFiled = dispatchedAt <= claim.statutoryDeadline;
+  const isTimelyFiled = hasDeadline ? dispatchedAt <= deadline : true;
   let timelinessStatement: string;
-  if (!isTimelyFiled) {
+  if (!hasDeadline) {
+    timelinessStatement = "Filed Without Recorded Statutory Deadline: Transmitted under 29 C.F.R. § 2560.503-1(h) (Service/denial date unrecorded in source notice).";
+  } else if (!isTimelyFiled) {
     const overdueDays = Math.abs(daysRemainingAtDispatch);
     timelinessStatement = hasVerifiableAnchor
       ? `Emergency Submission: Transmitted ${overdueDays} days past statutory deadline bar under 29 C.F.R. § 2560.503-1(h) (Day ${daysElapsedSinceService} post-notice).`
@@ -456,8 +462,8 @@ export async function buildCertificateData(
 
     mxRecord,
 
-    statutoryDeadline: claim.statutoryDeadline,
-    statutoryDeadlineIso: new Date(claim.statutoryDeadline).toISOString(),
+    statutoryDeadline: hasDeadline ? deadline : undefined,
+    statutoryDeadlineIso: hasDeadline ? new Date(deadline).toISOString() : undefined,
     statutoryFilingWindowDays,
     daysElapsedSinceService,
     daysRemainingAtDispatch,

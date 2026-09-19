@@ -292,7 +292,7 @@ describe("Feature H: Financial Liability & Statutory ERISA Penalty Calculator", 
         complianceStatus: "defaulted",
       });
       expect(res3.data.severityTier).toBe("bad_faith_enforcement");
-      expect(res3.data.accruedPenaltyAmount).toBe(76 * 110);
+      expect(res3.data.accruedPenaltyAmount).toBe(76 * 164);
     });
 
     it("computes future 30/60/90/120-day penalty trajectory projections", () => {
@@ -337,7 +337,7 @@ describe("Feature H: Financial Liability & Statutory ERISA Penalty Calculator", 
 
     it("derives sensible default ERISA penalty data with actionable default days", () => {
       const defaultErisa = getDefaultErisaPenalties(mockClaim);
-      expect(defaultErisa.dailyPenaltyRate).toBe(110.0);
+      expect(defaultErisa.dailyPenaltyRate).toBe(164.0);
       expect(defaultErisa.daysInDefault).toBeGreaterThan(0);
       expect(defaultErisa.accruedPenaltyAmount).toBeGreaterThan(0);
       expect(defaultErisa.statutoryDemandLanguage).toContain("29 U.S.C. § 1132(c)(1)(B)");

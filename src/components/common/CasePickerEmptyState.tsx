@@ -160,7 +160,7 @@ export const CasePickerEmptyState: React.FC<CasePickerEmptyStateProps> = ({
                 : "PT";
 
               const isWon = claim.status === "won";
-              const isUrgent = claim.daysRemaining <= 14 && !isWon;
+              const isUrgent = claim.daysRemaining !== undefined && claim.daysRemaining <= 14 && !isWon;
 
               return (
                 <Card

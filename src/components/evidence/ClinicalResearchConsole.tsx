@@ -35,7 +35,7 @@ interface ClinicalResearchConsoleProps {
   claim: Claim;
   evidences: ClinicalEvidence[];
   discoveredPolicies?: DiscoveredPolicy[];
-  onCrawlCPB: (claimId: string, customUrl?: string) => Promise<unknown>;
+  onCrawlCPB: (claimId: string, customUrl?: string, forceRescan?: boolean) => Promise<unknown>;
   onCrawlPubMed: (claimId: string, query?: string, customUrl?: string) => Promise<unknown>;
   onCrawlFDA: (claimId: string, customUrl?: string, deviceName?: string) => Promise<unknown>;
   onCrawlCustomUrl: (
@@ -257,6 +257,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
   const [directoryLimit, setDirectoryLimit] = useState<number>(30);
   const [saveDiscoveredToEvidence, setSaveDiscoveredToEvidence] = useState<boolean>(true);
   const [discoveredList, setDiscoveredList] = useState<DiscoveredPolicy[]>(discoveredPolicies || []);
+  const [forceRescan, setForceRescan] = useState<boolean>(false);
 
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [elapsedMs, setElapsedMs] = useState<number>(0);
@@ -415,7 +416,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
             : "Reading the source and pulling out the rules that apply...",
           "info"
         );
-        result = (await onCrawlCPB(claim._id, customUrl || undefined)) as unknown as Record<string, unknown>;
+        result = (await onCrawlCPB(claim._id, customUrl || undefined, forceRescan)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} clinical policy clauses: "${result?.policyTitle || "Policy Bulletin"}"`, "success");
       } else if (activeMode === "pubmed_trials") {
@@ -1094,6 +1095,22 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                     <p className="text-[10.5px] text-muted-foreground leading-tight pt-0.5">
                       ClaimHero automatically crawls official {claim.patient?.insurancePayer} bulletins for CPT {claim.cptCodes.join(", ")}. Enter a URL only to override with an unindexed state or plan bulletin.
                     </p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        type="checkbox"
+                        id="force-rescan-checkbox"
+                        checked={forceRescan}
+                        onChange={(e) => setForceRescan(e.target.checked)}
+                        disabled={isExecuting}
+                        className="rounded border-border/80 bg-muted/30 text-primary focus:ring-primary/30 size-3.5 cursor-pointer"
+                      />
+                      <label
+                        htmlFor="force-rescan-checkbox"
+                        className="text-[11px] font-sans text-muted-foreground hover:text-foreground cursor-pointer select-none"
+                      >
+                        Bypass cache and force fresh live re-crawl
+                      </label>
+                    </div>
                   </div>
                 )}
               </div>

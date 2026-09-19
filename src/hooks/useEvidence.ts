@@ -92,7 +92,7 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
 
   // Trigger Firecrawl policy crawler with claim parameters
   const crawlPolicy = useCallback(
-    async (targetClaimId?: string, customPolicyUrl?: string) => {
+    async (targetClaimId?: string, customPolicyUrl?: string, forceRescan?: boolean) => {
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
       if (!activeClaimId) throw new Error("No claim specified for policy crawl");
 
@@ -109,6 +109,7 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
         denialReasonCode,
         denialReasonDescription: claim?.denialReasonDescription,
         customPolicyUrl,
+        forceRescan,
       });
     },
     [crawlPolicyAction, claim]
@@ -284,11 +285,11 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
 
   // Run unified complete analysis (Crawl CPB + Compute Score in 1 step)
   const runCompleteAnalysis = useCallback(
-    async (targetClaimId?: string, customPolicyUrl?: string) => {
+    async (targetClaimId?: string, customPolicyUrl?: string, forceRescan?: boolean) => {
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
       if (!activeClaimId) throw new Error("No claim selected for analysis");
 
-      await crawlPolicy(activeClaimId, customPolicyUrl);
+      await crawlPolicy(activeClaimId, customPolicyUrl, forceRescan);
       return await computeOverturnScore(activeClaimId);
     },
     [crawlPolicy, computeOverturnScore, claim]

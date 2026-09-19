@@ -1571,12 +1571,15 @@ export function selectFirecrawlPolicySource(payload: unknown): FirecrawlPolicySo
   return sources.length > 0 ? sources[0] : null;
 }
 
+export const DEFAULT_POLICY_SNAPSHOT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7-day policy snapshot cache TTL
+
 export interface ScrapeExtractionOptions {
   payer?: string;
   cptCodes?: string[];
   denialReasonCode?: string;
   forceRescan?: boolean;
   captureScreenshot?: boolean;
+  maxAgeMs?: number;
 }
 
 /**
@@ -1730,24 +1733,32 @@ export async function scrapeFirecrawlPolicySource(
         urlHash,
       });
       if (cached && cached.markdown && !isAccessDeniedDocument(cached.markdown)) {
-        let parsedJson: unknown = undefined;
-        if (cached.extractedJson) {
-          try {
-            parsedJson = JSON.parse(cached.extractedJson);
-          } catch {
-            parsedJson = undefined;
+        const now = Date.now();
+        const maxAgeMs = extractionOptions?.maxAgeMs ?? DEFAULT_POLICY_SNAPSHOT_TTL_MS;
+        const isExpired =
+          (typeof cached.expiresAt === "number" && now > cached.expiresAt) ||
+          (typeof cached.capturedAt === "number" && now - cached.capturedAt > maxAgeMs);
+
+        if (!isExpired) {
+          let parsedJson: unknown = undefined;
+          if (cached.extractedJson) {
+            try {
+              parsedJson = JSON.parse(cached.extractedJson);
+            } catch {
+              parsedJson = undefined;
+            }
           }
+          return {
+            markdown: cached.markdown,
+            sourceUrl: cached.url,
+            json: parsedJson,
+            screenshot: cached.screenshotUrl,
+            screenshotStorageId: cached.screenshotStorageId,
+            cached: true,
+            capturedAt: cached.capturedAt,
+            extractionEngine: parsedJson ? "firecrawl_native" : "openai_fallback",
+          };
         }
-        return {
-          markdown: cached.markdown,
-          sourceUrl: cached.url,
-          json: parsedJson,
-          screenshot: cached.screenshotUrl,
-          screenshotStorageId: cached.screenshotStorageId,
-          cached: true,
-          capturedAt: cached.capturedAt,
-          extractionEngine: parsedJson ? "firecrawl_native" : "openai_fallback",
-        };
       }
     } catch {
       // Continue to live scrape on cache lookup error
@@ -1927,6 +1938,10 @@ export async function scrapeFirecrawlPolicySource(
     screenshotStorageId = await storeScreenshotInStorage(ctx, screenshot);
   }
 
+  const snapshotNow = Date.now();
+  const snapshotTtlMs = extractionOptions?.maxAgeMs ?? DEFAULT_POLICY_SNAPSHOT_TTL_MS;
+  const expiresAt = snapshotNow + snapshotTtlMs;
+
   try {
     await ctx.runMutation(internal.clinicalEvidences.savePolicySnapshotInternal, {
       urlHash,
@@ -1936,6 +1951,7 @@ export async function scrapeFirecrawlPolicySource(
       extractedJson: doc.json ? JSON.stringify(doc.json) : undefined,
       screenshotStorageId,
       screenshotUrl: screenshot?.startsWith("http") ? screenshot : undefined,
+      expiresAt,
     });
   } catch {
     // Non-fatal cache persistence error

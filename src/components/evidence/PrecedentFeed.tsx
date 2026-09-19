@@ -22,7 +22,8 @@ interface PrecedentFeedProps {
   claim: Claim;
 }
 
-function similarityPercent(score: number): number {
+function similarityPercent(score: number | undefined | null): number {
+  if (typeof score !== "number" || isNaN(score)) return 0;
   return Math.round(Math.max(0, Math.min(1, (score + 1) / 2)) * 1000) / 10;
 }
 
@@ -49,7 +50,7 @@ export const PrecedentFeed: React.FC<PrecedentFeedProps> = ({ claim }) => {
   const { isDetailed } = useDetailMode();
   const { matches, isLoading, error, retrievePrecedents } = usePrecedents(claim);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
-  const primaryCpt = claim.cptCodes[0] || "N/A";
+  const primaryCpt = claim?.cptCodes?.[0] || "N/A";
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);

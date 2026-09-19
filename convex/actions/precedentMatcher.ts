@@ -551,8 +551,8 @@ export async function performComputeOverturnScore(
           title: e.title,
           citation: e.citationClause,
           outcome: outcomeMatch ? outcomeMatch[1].trim() : (md.toLowerCase().includes("overturned") ? "Overturned" : "Affirmed"),
-          vectorScore: vectorMatch ? parseFloat(vectorMatch[1]) : (e.relevanceScore ?? 0.7),
-          combinedScore: combinedMatch ? parseFloat(combinedMatch[1]) : (e.relevanceScore ?? 0.7),
+          vectorScore: vectorMatch ? parseFloat(vectorMatch[1]) : (e.relevanceScore ?? 0),
+          combinedScore: combinedMatch ? parseFloat(combinedMatch[1]) : (e.relevanceScore ?? 0),
           rrfScore: rrfMatch ? parseFloat(rrfMatch[1]) : undefined,
           codeOverlap: md.includes(claim.denialReasonCode) ? 1 : 0,
         };

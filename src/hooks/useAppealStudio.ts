@@ -589,6 +589,7 @@ export function useAppealStudio(
       customNotes?: string,
       customSender?: AppealSenderDetails
     ) => {
+      if (isSynthesizing) return;
       if (!claim?._id) {
         throw new Error("No claim selected for appeal synthesis");
       }
@@ -632,6 +633,7 @@ export function useAppealStudio(
     },
     [
       claim,
+      isSynthesizing,
       appealLevel,
       physicianNotes,
       senderName,
