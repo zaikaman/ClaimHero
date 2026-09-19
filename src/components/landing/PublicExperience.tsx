@@ -126,6 +126,7 @@ export function PublicExperience({
       >
         <AuthPage
           embedBackground={false}
+          active={isLogin}
           onNavigate={onNavigate}
           onSuccess={() => {
             const nextView =

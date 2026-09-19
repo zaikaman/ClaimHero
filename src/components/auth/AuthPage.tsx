@@ -37,12 +37,21 @@ interface AuthPageProps {
   onNavigate: (view: NavigationView) => void;
   onSuccess?: () => void;
   embedBackground?: boolean;
+  /**
+   * Whether the auth form is the currently visible surface.
+   * Inside PublicExperience the form stays mounted (hidden) alongside the
+   * landing hero to keep the ambient video transition seamless. While hidden
+   * it must not auto-navigate an already-authenticated visitor away from the
+   * landing page. Defaults to true for standalone usage.
+   */
+  active?: boolean;
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({
   onNavigate,
   onSuccess,
   embedBackground = true,
+  active = true,
 }) => {
   const { signIn: signInPassword, pending: isSigningIn } = useSignInWithPassword(api.auth.signInWithPassword);
   const { signUp: signUpPassword, pending: isSigningUp } = useSignUpWithPassword(api.auth.signUpWithPassword);
@@ -97,9 +106,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   // (covers the Google redirect return, which has no submit handler to call
   // onSuccess). Runs alongside the App-level redirect guard; whichever fires
   // first wins and the router dedupes identical targets.
+  // Gated on `active` so the hidden pre-mounted form inside PublicExperience
+  // never bounces an authenticated visitor off the landing page.
   const didAutoNavigateRef = useRef<boolean>(false);
   useEffect(() => {
-    if (!isAuthenticated || didAutoNavigateRef.current) return;
+    if (!isAuthenticated || didAutoNavigateRef.current || !active) return;
     didAutoNavigateRef.current = true;
     setIsGoogleLoading(false);
     setIsAnonymousLoading(false);
@@ -109,7 +120,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     } else {
       onNavigate("radar");
     }
-  }, [isAuthenticated, onNavigate, onSuccess]);
+  }, [isAuthenticated, onNavigate, onSuccess, active]);
 
   const videoRef = React.useRef<HTMLVideoElement>(null);
 

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-19T07:22:36Z
+- **Last updated:** 2026-09-19T07:46:06Z
 
 ## Log
 
@@ -1812,8 +1812,11 @@ Hardened policy crawler caching, optical intake email validation, statutory calc
 - UI Stability & Defensive Guards: Guarded against `claim.cptCodes[0]` and `NaN%` in `PrecedentFeed.tsx`; sanitized `$NaN` in `plainCopy.ts:formatWhatHappenedSentence` and guarded invalid/missing deadlines in `formatDeadlineSentence`; prevented `toFixed` crashes in `ExecutiveReportModal.tsx` on nullish values; prevented double-submit in `useAppealStudio.ts:synthesizeAppeal`; debounced search queries (250ms) in `CaseRadar.tsx`.
 - Regression Coverage & Verification: Added comprehensive suite in `tests/productionReliabilityHardening.test.ts` (15 tests) and updated `tests/statutoryDeadlinesAndAlarmHook.test.ts` and `tests/financialErisaCalculator.test.ts`. Verified all 82 test files (1,302 passing tests), clean typecheck (`tsc --noEmit`), clean lint (`eslint src convex`), and clean production build (`vite build`). Convex features: schema, tables, indexes, queries, mutations, actions, internalMutation, internalAction.
 
-### 2026-09-19 - working tree
+### 2026-09-19 - 6989bf6
 Hardened auth boundaries, crawl budgets, delete cascades, appeal versioning, and liability math (`convex/clinicalEvidences.ts`, `convex/chatbot.ts`, `convex/claims.ts`, `convex/appeals.ts`, `convex/actions/policyCrawler.ts`, `convex/crons.ts`, `convex/lib/rateLimiter.ts`, `convex/schema.ts`, `src/hooks/useEvidence.ts`, `src/hooks/useLiabilityCalculator.ts`, `src/lib/liabilityCalculator.ts`, `src/lib/dossierBuilder.ts`, `src/components/evidence/ClinicalResearchConsole.tsx`, `src/components/calculator/FinancialLiabilityCalculator.tsx`, `tests/ingestionAndDeletionPipeline.test.ts`). Closed discovered-policy enumeration, added collaborator-aware chatbot ownership checks and a secure denial-letter download URL, clamped policy-snapshot TTL with a daily expiry sweep, capped per-claim Firecrawl spend with forceRescan on explicit Re-run, fixed collaborator purge and email-attachment cascades plus appeal revision conflicts, moved ERISA deadline math to UTC, and gated No Surprises Act protection and placeholder benefits out of dossiers. Verified with `npm run verify` (typecheck, lint, 1,302 tests, production build clean). Convex features: queries, mutations, actions, crons, scheduled functions, file storage.
+
+### 2026-09-19 - working tree
+Fixed authenticated users being bounced off the landing page: the hidden pre-mounted `AuthPage` inside `PublicExperience` auto-navigated to `radar` on mount whenever a session existed. Added an `active` prop gating the auto-navigate effect (`src/components/auth/AuthPage.tsx`) and wired `active={isLogin}` from `PublicExperience` (`src/components/landing/PublicExperience.tsx`), so the login form only redirects while visible. Verified with typecheck and targeted suites (46 tests).
 
 
 
