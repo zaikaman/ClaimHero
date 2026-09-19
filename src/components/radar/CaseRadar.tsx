@@ -212,15 +212,24 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
     const totalWon = wonClaims.reduce((acc, c) => acc + c.deniedAmount, 0);
     const avgScore = activeClaims.length
       ? Math.round(
-          activeClaims.reduce((acc, c) => acc + (c.overturnProbabilityScore || 0), 0) /
-            activeClaims.length
+          activeClaims.reduce(
+            (acc, c) =>
+              acc +
+              (c.appealReadinessScore ??
+                c.evidenceCoverageScore ??
+                c.overturnProbabilityScore ??
+                0),
+            0
+          ) / activeClaims.length
         )
       : 0;
-    const highRiskCount = activeClaims.filter(
-      (c) =>
-        c.overturnProbabilityScore !== undefined &&
-        c.overturnProbabilityScore >= 80
-    ).length;
+    const highRiskCount = activeClaims.filter((c) => {
+      const score =
+        c.appealReadinessScore ??
+        c.evidenceCoverageScore ??
+        c.overturnProbabilityScore;
+      return score !== undefined && score >= 80;
+    }).length;
     const criticalCount = activeClaims.filter(
       (c) => c.daysRemaining <= 14 && c.status !== "won"
     ).length;
@@ -1116,15 +1125,15 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                               <span>100% Won</span>
                             </Badge>
                           </div>
-                        ) : claim.overturnProbabilityScore !== undefined ? (
+                        ) : (claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore) !== undefined ? (
                           <div className="flex items-center gap-1 font-mono" title={isDetailed ? "Statutory Appeal Readiness Score: 4-pillar evidentiary completeness audit" : "Case strength: how complete your proof is"}>
                             <span className="font-bold text-xs text-foreground">
-                              {claim.overturnProbabilityScore}/100
+                              {claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore}/100
                             </span>
                             <Badge
                               variant="secondary"
                               className={`text-[9px] px-1 py-0 ${
-                                claim.overturnProbabilityScore >= 80
+                                (claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore)! >= 80
                                   ? "text-emerald-600 dark:text-emerald-400"
                                   : "text-amber-500"
                               }`}

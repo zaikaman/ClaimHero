@@ -35,6 +35,8 @@ export const ADVERSARY_RFI_CHECKLIST = [
 export interface AdversaryClaimContext {
   claimNumber: string;
   deniedAmount: number;
+  appealReadinessScore?: number;
+  evidenceCoverageScore?: number;
   overturnProbabilityScore?: number;
   evidenceCount?: number;
   appealLength?: number;
@@ -65,7 +67,8 @@ function hashClaimRound(claimNumber: string, round: number): number {
  */
 export function pickAdversaryCountermove(ctx: AdversaryClaimContext): AdversaryCountermove {
   const round = Math.max(0, ctx.negotiationRound ?? 0);
-  const score = ctx.overturnProbabilityScore ?? 0.5;
+  const rawScore = ctx.appealReadinessScore ?? ctx.evidenceCoverageScore ?? ctx.overturnProbabilityScore ?? 0.5;
+  const score = rawScore > 1 ? rawScore / 100 : rawScore;
   const evidenceCount = ctx.evidenceCount ?? 0;
 
   // Late rounds concede: sustained cited rebuttals force approval.

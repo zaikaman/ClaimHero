@@ -694,8 +694,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               </p>
               <p className="text-[11px] text-amber-800/80 dark:text-amber-300/70">
                 {isDetailed
-                  ? `Readiness score is capped (${claim.overturnProbabilityScore ?? 0}/100) and 1-click dispatch is held in provisional review until you acknowledge this statutory posture.`
-                  : `Your score is capped (${claim.overturnProbabilityScore ?? 0}/100) and sending is paused until you review and confirm.`}
+                  ? `Readiness score is capped (${claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore ?? 0}/100) and 1-click dispatch is held in provisional review until you acknowledge this statutory posture.`
+                  : `Your score is capped (${claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore ?? 0}/100) and sending is paused until you review and confirm.`}
               </p>
             </div>
           </div>

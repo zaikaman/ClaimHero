@@ -85,7 +85,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
       number: 1,
       title: isDetailed ? "1. Evidence & CPB" : "1. Your proof",
       subtitle: hasEvidence
-        ? `${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}/100 ${isDetailed ? "Readiness" : "Strength"}` : `${evidencesCount} ${isDetailed ? "Clauses" : "documents"}`}`
+        ? `${(claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore) !== undefined ? `${claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore}/100 ${isDetailed ? "Readiness" : "Strength"}` : `${evidencesCount} ${isDetailed ? "Clauses" : "documents"}`}`
         : isDetailed ? "Pending analysis" : "Not checked yet",
       view: "evidence" as FlowView,
       icon: FileMagnifyingGlass,
@@ -396,11 +396,11 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
                 {isDetailed ? "Overturned & Won" : "Won"}
               </span>
             </div>
-          ) : claim.overturnProbabilityScore !== undefined ? (
+          ) : (claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore) !== undefined ? (
             <div className="flex items-center gap-1 text-xs font-mono px-2 py-1 rounded bg-secondary/80 border border-border/60">
               <TrendUp className="size-3 text-emerald-500" />
               <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                {claim.overturnProbabilityScore}/100 {isDetailed ? "Readiness" : "Strength"}
+                {claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore}/100 {isDetailed ? "Readiness" : "Strength"}
               </span>
             </div>
           ) : null}

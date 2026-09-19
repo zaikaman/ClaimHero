@@ -41,8 +41,8 @@ erDiagram
         string denialReasonCode
         string denialReasonDescription
         string status
-        number statutoryDeadline
-        number daysRemaining
+        number appealReadinessScore
+        number evidenceCoverageScore
         number overturnProbabilityScore
         string riskLevel
         string assignedAgentEmail
@@ -152,7 +152,9 @@ The core appeal case record.
 | `status` | `v.string()` | Yes | Enum: `intake_received`, `analyzing_policy`, `evidence_assembled`, `appeal_drafted`, `dispatched`, `under_review`, `overturned_won`, `escalated_external`. |
 | `statutoryDeadline` | `v.number()` | Yes | Unix timestamp of statutory filing cutoff (e.g., 180 days from denial date). |
 | `daysRemaining` | `v.number()` | Yes | Precalculated days remaining until statutory deadline. |
-| `overturnProbabilityScore` | `v.optional(v.number())` | No | AI-calculated win likelihood score (0 to 100). |
+| `appealReadinessScore` | `v.optional(v.number())` | No | Statutory 4-pillar appeal readiness score (0 to 100), held at provisional cap (40) when evidentially degraded. |
+| `evidenceCoverageScore` | `v.optional(v.number())` | No | Evidence coverage & precedent match score (0 to 100) evaluating documentary completeness across the 4 statutory pillars without synthetic outcome prediction. |
+| `overturnProbabilityScore` | `v.optional(v.number())` | No | Deprecated legacy alias for `appealReadinessScore`; retained strictly for DB backward compatibility. |
 | `riskLevel` | `v.optional(v.string())` | No | Enum: `high_confidence` (80-100), `moderate` (50-79), `complex_litigation` (<50). |
 | `assignedAgentEmail` | `v.string()` | Yes | Dedicated AgentMail inbox (e.g. `appeal-claim-8942@claimhero.agentmail.com`). |
 | `denialLetterStorageId` | `v.optional(v.id("_storage"))` | No | Convex File Storage ID for original denial letter PDF. |

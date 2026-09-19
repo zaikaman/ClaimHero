@@ -1297,11 +1297,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     extractedResult.pipelineResult !== null &&
                     (("appealReadinessScore" in extractedResult.pipelineResult &&
                       typeof (extractedResult.pipelineResult as { appealReadinessScore?: unknown }).appealReadinessScore === "number") ||
+                     ("evidenceCoverageScore" in extractedResult.pipelineResult &&
+                      typeof (extractedResult.pipelineResult as { evidenceCoverageScore?: unknown }).evidenceCoverageScore === "number") ||
                      ("overturnProbabilityScore" in extractedResult.pipelineResult &&
                       typeof (extractedResult.pipelineResult as { overturnProbabilityScore?: unknown }).overturnProbabilityScore === "number")) && (
                       <Badge variant="secondary" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px]">
                         <TrendUp className="size-3 mr-1" />
-                        {Number((extractedResult.pipelineResult as { appealReadinessScore?: number; overturnProbabilityScore?: number }).appealReadinessScore ?? (extractedResult.pipelineResult as { appealReadinessScore?: number; overturnProbabilityScore?: number }).overturnProbabilityScore)}/100 {isDetailed ? "Readiness Score" : "Case strength"}
+                        {Number(
+                          (extractedResult.pipelineResult as { appealReadinessScore?: number; evidenceCoverageScore?: number; overturnProbabilityScore?: number }).appealReadinessScore ??
+                          (extractedResult.pipelineResult as { appealReadinessScore?: number; evidenceCoverageScore?: number; overturnProbabilityScore?: number }).evidenceCoverageScore ??
+                          (extractedResult.pipelineResult as { appealReadinessScore?: number; evidenceCoverageScore?: number; overturnProbabilityScore?: number }).overturnProbabilityScore
+                        )}/100 {isDetailed ? "Readiness Score" : "Case strength"}
                       </Badge>
                     )}
                 </div>

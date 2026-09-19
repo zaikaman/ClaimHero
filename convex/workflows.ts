@@ -402,9 +402,9 @@ export async function executeDurableClaimPipeline(
         details: isEvidentiallyDegraded
           ? `Durable pipeline completed with degraded evidence caveat: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore ?? 0}/100 provisional score computed. Held in review_provisional awaiting evidentiary acknowledgment before dispatch.`
           : `Durable pipeline completed: ${crawlResult?.clausesExtracted || 0} evidence clauses indexed, ${scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore ?? 0}/100 readiness score computed, and formal brief synthesized. Held in ready_for_review for mandatory human approval before dispatch.`,
-        overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
         appealReadinessScore: scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore,
-        evidenceCoverageScore: scoreResult?.evidenceCoverageScore ?? scoreResult?.overturnProbabilityScore,
+        evidenceCoverageScore: scoreResult?.evidenceCoverageScore ?? scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore,
+        overturnProbabilityScore: scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore,
         riskLevel: scoreResult?.riskLevel,
         scoringBreakdown: scoreResult?.scoringBreakdown,
         evidenceIntegrity,
@@ -432,9 +432,9 @@ export async function executeDurableClaimPipeline(
         claimId: args.claimId,
         policyTitle: crawlResult?.policyTitle,
         clausesExtracted: crawlResult?.clausesExtracted,
-        overturnProbabilityScore: scoreResult?.overturnProbabilityScore,
         appealReadinessScore: scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore,
-        evidenceCoverageScore: scoreResult?.evidenceCoverageScore ?? scoreResult?.overturnProbabilityScore,
+        evidenceCoverageScore: scoreResult?.evidenceCoverageScore ?? scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore,
+        overturnProbabilityScore: scoreResult?.appealReadinessScore ?? scoreResult?.overturnProbabilityScore,
         riskLevel: scoreResult?.riskLevel,
         appealId: synthesisResult?.appealId,
         dispatched: wasDispatched,

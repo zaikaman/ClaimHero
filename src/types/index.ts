@@ -72,10 +72,12 @@ export interface Claim {
   status: ClaimStatus;
   statutoryDeadline: number;
   daysRemaining: number;
-  /** Evidence Coverage & Precedent Match audit score (0-100) based on 4 statutory pillars */
-  overturnProbabilityScore?: number;
+  /** Canonical 0-100 dossier readiness checklist score (held at max 40 when evidentially degraded) */
   appealReadinessScore?: number;
+  /** True un-capped evidentiary completeness score (0-100) across the 4 statutory pillars */
   evidenceCoverageScore?: number;
+  /** @deprecated Stale legacy alias for appealReadinessScore. Retained for database backward-compatibility. */
+  overturnProbabilityScore?: number;
   riskLevel?: RiskLevel;
   scoringBreakdown?: ScoringCriterion[];
   assignedAgentEmail: string;
@@ -465,9 +467,10 @@ export interface DenialExtractionResult {
 }
 
 export interface OverturnScoringResult {
-  overturnProbabilityScore: number;
   appealReadinessScore: number;
   evidenceCoverageScore: number;
+  /** @deprecated Stale legacy alias for appealReadinessScore. Retained for backward-compatibility. */
+  overturnProbabilityScore?: number;
   policyAlignmentScore?: number;
   documentationCompletenessScore?: number;
   riskLevel: RiskLevel;

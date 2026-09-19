@@ -1699,12 +1699,12 @@ async function applyStatusUpdate(ctx: MutationCtx, args: StatusUpdateArgs) {
     updatedAt: now,
   };
 
-  const scoreToApply =
+  const fallbackScore =
     args.appealReadinessScore ?? args.evidenceCoverageScore ?? args.overturnProbabilityScore;
-  if (scoreToApply !== undefined) {
-    patchData.overturnProbabilityScore = scoreToApply;
-    patchData.appealReadinessScore = scoreToApply;
-    patchData.evidenceCoverageScore = scoreToApply;
+  if (fallbackScore !== undefined) {
+    patchData.appealReadinessScore = args.appealReadinessScore ?? fallbackScore;
+    patchData.evidenceCoverageScore = args.evidenceCoverageScore ?? fallbackScore;
+    patchData.overturnProbabilityScore = args.appealReadinessScore ?? fallbackScore;
   }
   if (args.riskLevel !== undefined) {
     patchData.riskLevel = args.riskLevel;

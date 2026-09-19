@@ -161,8 +161,8 @@ describe("Convex Claims CRUD, Financials & Analytics Engine", () => {
 
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const mockClaims = [
-        { _id: "c1", status: "won", deniedAmount: 5000, daysRemaining: 30, overturnProbabilityScore: 90 },
-        { _id: "c2", status: "ready_for_review", deniedAmount: 10000, daysRemaining: 5, overturnProbabilityScore: 80 },
+        { _id: "c1", status: "won", deniedAmount: 5000, daysRemaining: 30, appealReadinessScore: 90, evidenceCoverageScore: 90, overturnProbabilityScore: 90 },
+        { _id: "c2", status: "ready_for_review", deniedAmount: 10000, daysRemaining: 5, appealReadinessScore: 80, evidenceCoverageScore: 80, overturnProbabilityScore: 80 },
       ];
       mockDb.query().withIndex().order().take.mockResolvedValue(mockClaims);
 
@@ -425,6 +425,8 @@ describe("Convex Claims CRUD, Financials & Analytics Engine", () => {
         status: "won",
         actor: "Adjudicator",
         details: "Won claim",
+        appealReadinessScore: 95,
+        evidenceCoverageScore: 95,
         overturnProbabilityScore: 95,
         riskLevel: "high_confidence",
       });

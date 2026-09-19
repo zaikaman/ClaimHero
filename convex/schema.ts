@@ -59,9 +59,9 @@ export default defineSchema({
     daysRemaining: v.number(),
     denialDate: v.optional(v.string()),
     appealFilingDeadlineDays: v.optional(v.number()),
-    overturnProbabilityScore: v.optional(v.number()),
-    appealReadinessScore: v.optional(v.number()),
-    evidenceCoverageScore: v.optional(v.number()),
+    appealReadinessScore: v.optional(v.number()), // Canonical 0-100 dossier readiness checklist score (capped at 40 if degraded)
+    evidenceCoverageScore: v.optional(v.number()), // True un-capped 0-100 evidentiary completeness across 4 statutory pillars
+    overturnProbabilityScore: v.optional(v.number()), // Stale legacy alias; retained strictly for DB backward compatibility
     riskLevel: v.optional(v.string()), // high_confidence, moderate, complex_litigation
     scoringBreakdown: v.optional(
       v.array(

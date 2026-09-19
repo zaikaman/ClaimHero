@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-19T03:10:30Z
+- **Last updated:** 2026-09-19T04:10:30Z
 
 ## Log
 
@@ -1750,7 +1750,7 @@ Resolved destination address discrepancy in communication inbox and message comp
 - Defensive Correspondence Action Dispatch: Hardened `sendMessage` in `src/hooks/useCommunications.ts` with layered fallback across thread payer email, latest outbound recipient, and latest inbound sender before falling back to payer registry email.
 - Regression Coverage: Added unit test in `tests/simpleInboxUx.test.ts` asserting that custom dispatched appeals truthfully prompt for and display the typed recipient instead of official production email. Verified 80 test suites (1,259 passing tests), clean typecheck, clean lint, and production build.
 
-### 2026-09-19 - working tree
+### 2026-09-19 - 3d22395
 Remediated critical and high security audit findings across authentication, webhooks, storage IDOR, and collaboration systems while preserving full anonymous judge and evaluator workflows:
 - Anti-Squatting Account Defense (Item 9): Hardened `createPasswordUser` in `convex/users.ts` to strictly throw a `ConvexError` on existing email collisions. Updated `createGoogleUser` to enforce `providerAccountId` verification and safely upgrade unverified password accounts only when `emailVerified` is guaranteed by Google OAuth. Bound collaborator invitations by email until explicit user acceptance in `convex/claimCollaborators.ts`.
 - Full Anonymous Evaluator Experience (Item 10 Rollback): Maintained unhindered end-to-end evaluation capabilities in `convex/lib/auth.ts` (`requireNonAnonymousUser`) so hackathon judges and evaluators exploring demo sessions retain full access to case creation, OCR parsing, precedent search, and appeal brief synthesis.
@@ -1758,6 +1758,13 @@ Remediated critical and high security audit findings across authentication, webh
 - Storage IDOR Triad & Viewer Bearer Protection (Item 13): Implemented `assertStorageOwnership` in `convex/lib/storageAuth.ts` with indexed lookups (`by_denial_letter_storage_id` on `claims`, `by_pdf_export_storage_id` on `appeals`) across `updatePdfStorageId`, `claims.applyCreateWithPatient`, `clinicalEvidences.applyBatchInsert`, and `emails.applyInsertMessage`. Suppressed signed bearer URLs via `ctx.storage.getUrl()` for read-only viewer collaborators in `clinicalEvidences.ts` and `emails.ts`.
 - Collaborator Grant Scale & Shared Communications (Item 14): Added compound index `by_user_and_status` on `claimCollaborators` to eliminate `.take(20)` scan truncation. Extended communication access in `convex/emails.ts` (`listComponentInboundMessages`, `getOutboundDeliveryStatus`) to active collaborators.
 - Regression Coverage & Verification: Added comprehensive security suite in `tests/securityAuditRemediation.test.ts` with 16 targeted tests. Verified 81 test files (1,275 passing tests), clean typecheck, clean lint, coverage thresholds, and production build. Convex features: schema, tables, indexes, queries, mutations, internalMutation, internalQuery, httpAction, storage.
+
+### 2026-09-19 - working tree
+Replaced stale `overturnProbabilityScore` throughout the codebase with canonical 4-pillar evidence scoring (`appealReadinessScore` and `evidenceCoverageScore`) per `README.md` ("Evidence coverage, not outcome prediction: ClaimHero's 0–100 Evidence Coverage & Precedent Match Score is a readiness checklist, not a prediction that an appeal will win"):
+- Grounded Data Model & Types: Updated `src/types/index.ts` (`Claim`, `OverturnScoringResult`), `convex/schema.ts`, and `specs/001-appeal-sentinel/data-model.md` to establish `appealReadinessScore` (0-100 dossier readiness checklist, capped at 40 when evidentially degraded) and `evidenceCoverageScore` (un-capped 0-100 documentary completeness across the 4 statutory pillars) as canonical primary fields, deprecating legacy `overturnProbabilityScore`.
+- Backend Pipeline & Seeder Modernization: Updated `convex/demoSeeder.ts` to explicitly populate `appealReadinessScore` and `evidenceCoverageScore` (96, 94, 91) across Eleanor Vance, Marcus Sterling, and Elena Rostova demo fixtures. Hardened `applyStatusUpdate` in `convex/claims.ts` to preserve distinct readiness and coverage scores without flattening. Prioritized canonical scores in `convex/workflows.ts`, `convex/actions/sentinelPipeline.ts`, `convex/chatbot.ts`, and `convex/lib/adversaryNegotiation.ts`.
+- Frontend Presentation & Aggregations: Replaced legacy score lookups and calculations in `CaseRadar.tsx` (average portfolio score and high-readiness count), `EvidenceMatrix.tsx` (score gauge, analysis toast, and footer counters), `SentinelFlowStepper.tsx` (step 1 subtitle and header badge), `SimpleEvidenceView.tsx`, `AgentMailDrawer.tsx` (provisional cap banner), `IngestionModal.tsx`, and `OnboardingWizard.tsx`.
+- Regression Coverage: Updated `tests/anonymousAuthAndSeeder.test.ts` and `tests/convexClaimsFull.test.ts` to assert canonical scoring fields; verified all 81 test files (1,274 tests passing), typecheck (`tsc --noEmit`), and lint (`eslint src convex`).
 
 
 

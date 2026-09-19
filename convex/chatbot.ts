@@ -209,8 +209,9 @@ export const getClaimDataForChatbot = internalQuery({
       denialReasonDescription: claim.denialReasonDescription,
       status: claim.status,
       statutoryDeadline: claim.statutoryDeadline,
-      daysRemaining: claim.daysRemaining,
-      overturnProbabilityScore: claim.overturnProbabilityScore,
+      appealReadinessScore: claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore,
+      evidenceCoverageScore: claim.evidenceCoverageScore ?? claim.appealReadinessScore ?? claim.overturnProbabilityScore,
+      overturnProbabilityScore: claim.appealReadinessScore ?? claim.overturnProbabilityScore,
       riskLevel: claim.riskLevel,
       scoringBreakdown: claim.scoringBreakdown,
       appealContext: claim.appealContext,
@@ -309,8 +310,9 @@ export const searchClaimsForChatbot = internalQuery({
           denialReasonCode: c.denialReasonCode,
           denialReasonDescription: c.denialReasonDescription,
           status: c.status,
-          daysRemaining: c.daysRemaining,
-          overturnProbabilityScore: c.overturnProbabilityScore,
+          appealReadinessScore: c.appealReadinessScore ?? c.evidenceCoverageScore ?? c.overturnProbabilityScore,
+          evidenceCoverageScore: c.evidenceCoverageScore ?? c.appealReadinessScore ?? c.overturnProbabilityScore,
+          overturnProbabilityScore: c.appealReadinessScore ?? c.overturnProbabilityScore,
         };
       })
     );

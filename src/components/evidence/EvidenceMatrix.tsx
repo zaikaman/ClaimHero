@@ -99,6 +99,8 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
 
   const hasAnalyzedEvidence = Boolean(
     (evidences && evidences.length > 0) ||
+    claim.appealReadinessScore !== undefined ||
+    claim.evidenceCoverageScore !== undefined ||
     claim.overturnProbabilityScore !== undefined ||
     scoringResult !== null ||
     (claim.evidenceCount !== undefined && claim.evidenceCount > 0)
@@ -140,7 +142,8 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
     try {
       const result = await onComputeScore(claim._id);
       setScoringResult(result);
-      toast.success(`Evidence Coverage: ${result.overturnProbabilityScore}/100 evaluated`, { id: toastId });
+      const displayedScore = result.appealReadinessScore ?? result.evidenceCoverageScore ?? result.overturnProbabilityScore;
+      toast.success(`Evidence Coverage: ${displayedScore}/100 evaluated`, { id: toastId });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to calculate Evidence Coverage.";
       setErrorMessage(msg);
@@ -368,14 +371,14 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       )}
 
       {/* Case strength showcase banner */}
-      {(claim.overturnProbabilityScore !== undefined || scoringResult) && (
+      {((claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore) !== undefined || scoringResult) && (
         <Card className="p-4 border-emerald-500/30 bg-emerald-500/5 space-y-3">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border/60 pb-3">
             <div className="flex items-center gap-3.5">
               <div className="flex h-12 min-w-[5rem] shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 font-mono text-lg font-bold tracking-tight tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-xl">
                 {scoringResult
-                  ? scoringResult.overturnProbabilityScore
-                  : claim.overturnProbabilityScore}
+                  ? (scoringResult.appealReadinessScore ?? scoringResult.evidenceCoverageScore ?? scoringResult.overturnProbabilityScore)
+                  : (claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore)}
                 <span className="text-xs font-normal text-emerald-600/70 dark:text-emerald-400/70 ml-1">/100</span>
               </div>
               <div>
@@ -384,9 +387,13 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                     {isDetailed ? "Evidence Coverage & Precedent Match" : "Your case strength"}
                   </h3>
                   <Badge variant="secondary" className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">
-                    {(scoringResult ? scoringResult.overturnProbabilityScore : (claim.overturnProbabilityScore ?? 0)) >= 80
+                    {(scoringResult
+                      ? (scoringResult.appealReadinessScore ?? scoringResult.evidenceCoverageScore ?? scoringResult.overturnProbabilityScore)
+                      : (claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore ?? 0)) >= 80
                       ? (isDetailed ? "Comprehensive Coverage" : "Strong case")
-                      : (scoringResult ? scoringResult.overturnProbabilityScore : (claim.overturnProbabilityScore ?? 0)) >= 55
+                      : (scoringResult
+                          ? (scoringResult.appealReadinessScore ?? scoringResult.evidenceCoverageScore ?? scoringResult.overturnProbabilityScore)
+                          : (claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore ?? 0)) >= 55
                         ? (isDetailed ? "Evidence Gaps Identified" : "Missing some proof")
                         : (isDetailed ? "Incomplete Coverage" : "Needs more proof")}
                   </Badge>
@@ -821,7 +828,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
           </Badge>
           <span className="text-xs text-muted-foreground">
             {evidences.length > 0
-              ? `${evidences.length} ${isDetailed ? "Clinical Clauses Indexed" : "proof documents"} • Score: ${claim.overturnProbabilityScore !== undefined ? `${claim.overturnProbabilityScore}/100` : "Calculated"}`
+              ? `${evidences.length} ${isDetailed ? "Clinical Clauses Indexed" : "proof documents"} • Score: ${(claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore) !== undefined ? `${claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore}/100` : "Calculated"}`
               : (isDetailed ? "Review clinical evidence before proceeding to brief synthesis" : "Check your proof before writing your letter")}
           </span>
         </div>

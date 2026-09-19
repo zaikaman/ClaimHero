@@ -53,6 +53,7 @@ export const SimpleEvidenceView: React.FC<SimpleEvidenceViewProps> = ({
 
   const activeScore =
     scoringResult?.appealReadinessScore ??
+    scoringResult?.evidenceCoverageScore ??
     scoringResult?.overturnProbabilityScore ??
     claim.appealReadinessScore ??
     claim.evidenceCoverageScore ??

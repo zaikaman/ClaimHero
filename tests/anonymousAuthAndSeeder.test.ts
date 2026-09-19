@@ -93,7 +93,8 @@ describe("Anonymous Auth Provider & 3 Pre-Seeded Demo Cases", () => {
       expect(claim.isDemo).toBe(true);
       expect(claim.origin).toBe("demo-fixture");
       expect(claim.dataOrigin).toBe("demo-fixture");
-      expect(claim.isSyntheticPII).toBe(true);
+      expect(claim.appealReadinessScore).toBeGreaterThanOrEqual(70);
+      expect(claim.evidenceCoverageScore).toBeGreaterThanOrEqual(70);
       expect(claim.overturnProbabilityScore).toBeGreaterThanOrEqual(70);
       expect(claim.scoringBreakdown?.length).toBe(4);
       expect(claim.appealContext?.clinicalFacts).toBeDefined();

@@ -57,9 +57,10 @@ export interface ScoringCriterionResult {
 }
 
 export interface OverturnScoringResult {
-  overturnProbabilityScore: number;
   appealReadinessScore: number;
   evidenceCoverageScore: number;
+  /** @deprecated Stale legacy alias for appealReadinessScore. Retained for backward-compatibility. */
+  overturnProbabilityScore?: number;
   policyAlignmentScore?: number;
   documentationCompletenessScore?: number;
   riskLevel: "high_confidence" | "moderate" | "complex_litigation";
