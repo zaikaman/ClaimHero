@@ -2,7 +2,7 @@ import { internalMutation, internalQuery, mutation, query, MutationCtx } from ".
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
+import { getAuthUserId, getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
 import { assertStorageOwnership } from "./lib/storageAuth";
 import { appendAuditLog } from "./auditLogs";
 
@@ -777,7 +777,13 @@ export const saveDiscoveredPoliciesInternal = internalMutation({
 });
 
 /**
- * List discovered policy directory bulletins for a claim or by payer & specialty
+ * List discovered policy directory bulletins for a claim or by payer & specialty.
+ *
+ * Security: all paths require an authenticated caller. The claimId path is
+ * scoped via getClaimIfAuthorized (owner + active collaborators). The
+ * payer/specialty path is filtered to bulletins linked to claims the caller
+ * may access, preventing cross-tenant enumeration of other users' crawls.
+ * Unfiltered listing is denied (returns []) to close global enumeration.
  */
 export const listDiscoveredPolicies = query({
   args: {
@@ -787,12 +793,61 @@ export const listDiscoveredPolicies = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<Doc<"discoveredPolicies">[]> => {
-    const maxItems = args.limit || 50;
+    const callerId = await getAuthUserId(ctx);
+    if (!callerId) return [];
+    const maxItems = Math.max(1, Math.min(args.limit ?? 50, 50));
 
     if (args.claimId) {
       const authorized = await getClaimIfAuthorized(ctx, args.claimId);
       if (!authorized) return [];
 
+      return await ctx.db
+        .query("discoveredPolicies")
+        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+        .order("desc")
+        .take(maxItems);
+    }
+
+    if (args.payer && args.specialty) {
+      const candidates = await ctx.db
+        .query("discoveredPolicies")
+        .withIndex("by_payer_and_specialty", (q) =>
+          q.eq("payer", args.payer!).eq("specialty", args.specialty!)
+        )
+        .order("desc")
+        .take(maxItems * 2);
+      // Filter to bulletins the caller is authorized to see: either unlinked
+      // global snapshots are excluded, or claim-linked rows whose claim the
+      // caller owns / collaborates on.
+      const visible: Doc<"discoveredPolicies">[] = [];
+      for (const row of candidates) {
+        if (!row.claimId) continue;
+        const authorized = await getClaimIfAuthorized(ctx, row.claimId);
+        if (authorized) visible.push(row);
+        if (visible.length >= maxItems) break;
+      }
+      return visible;
+    }
+
+    // No filter: deny global enumeration.
+    return [];
+  },
+});
+
+/**
+ * Internal query for background actions to retrieve discovered policies
+ */
+export const listDiscoveredPoliciesInternal = internalQuery({
+  args: {
+    claimId: v.optional(v.id("claims")),
+    payer: v.optional(v.string()),
+    specialty: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<Doc<"discoveredPolicies">[]> => {
+    const maxItems = Math.max(1, Math.min(args.limit ?? 50, 50));
+
+    if (args.claimId) {
       return await ctx.db
         .query("discoveredPolicies")
         .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
@@ -818,40 +873,43 @@ export const listDiscoveredPolicies = query({
 });
 
 /**
- * Internal query for background actions to retrieve discovered policies
+ * TTL enforcement sweep for cached Firecrawl policy snapshots.
+ * Deletes rows past expiresAt (or older than 30d without expiresAt) in
+ * bounded batches so the policySnapshots cache cannot grow unbounded and
+ * stale clinical criteria are never served past their TTL.
  */
-export const listDiscoveredPoliciesInternal = internalQuery({
-  args: {
-    claimId: v.optional(v.id("claims")),
-    payer: v.optional(v.string()),
-    specialty: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args): Promise<Doc<"discoveredPolicies">[]> => {
-    const maxItems = args.limit || 50;
-
-    if (args.claimId) {
-      return await ctx.db
-        .query("discoveredPolicies")
-        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-        .order("desc")
-        .take(maxItems);
+export const sweepExpiredPolicySnapshotsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    let purgedCount = 0;
+    // Bounded scan: index by captured_at is ascending; take oldest first.
+    const batch = await ctx.db
+      .query("policySnapshots")
+      .withIndex("by_captured_at")
+      .take(100);
+    for (const snap of batch) {
+      const expiredByAt =
+        typeof snap.expiresAt === "number" && now > snap.expiresAt;
+      const expiredByAge =
+        typeof snap.capturedAt === "number" && now - snap.capturedAt > thirtyDaysMs;
+      if (expiredByAt || expiredByAge) {
+        if (snap.screenshotStorageId) {
+          try {
+            await ctx.storage.delete(snap.screenshotStorageId);
+          } catch {
+            // Already purged.
+          }
+        }
+        await ctx.db.delete(snap._id);
+        purgedCount += 1;
+      }
     }
-
-    if (args.payer && args.specialty) {
-      return await ctx.db
-        .query("discoveredPolicies")
-        .withIndex("by_payer_and_specialty", (q) =>
-          q.eq("payer", args.payer!).eq("specialty", args.specialty!)
-        )
-        .order("desc")
-        .take(maxItems);
+    if (batch.length >= 100) {
+      await ctx.scheduler.runAfter(0, internal.clinicalEvidences.sweepExpiredPolicySnapshotsInternal, {});
     }
-
-    return await ctx.db
-      .query("discoveredPolicies")
-      .order("desc")
-      .take(maxItems);
+    return { purgedCount };
   },
 });
 

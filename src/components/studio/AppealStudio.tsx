@@ -906,7 +906,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       {/* Main Studio Dual Pane Editor & Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Left 8 Cols: Markdown Editor & Live Preview (Responsive height on mobile, fixed on desktop) */}
-        <Card className="lg:col-span-8 min-h-[380px] h-[60vh] lg:h-[640px] xl:h-[700px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden min-w-0">
+        <Card className="lg:col-span-8 min-h-[480px] h-[72vh] lg:h-[660px] xl:h-[720px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden min-w-0">
           {/* Sub-view Viewport Switcher */}
           <div className="h-10 shrink-0 flex items-center justify-between border-b border-border px-4 py-2 bg-muted/30">
             <div className="flex items-center gap-1.5">
@@ -1030,7 +1030,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                       }
                     }
                   }}
-                  className="h-5.5 px-2 rounded border border-border/60 bg-background/60 hover:bg-muted/80 hover:border-border text-muted-foreground hover:text-foreground shrink-0 cursor-pointer transition-all text-[10px] inline-flex items-center justify-center leading-none"
+                  className="h-[22px] px-2 rounded border border-border/60 bg-background/60 hover:bg-muted/80 hover:border-border text-muted-foreground hover:text-foreground shrink-0 cursor-pointer transition-all text-[10px] inline-flex items-center justify-center leading-none"
                 >
                   {sec.label}
                 </button>
@@ -1040,45 +1040,64 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
           {/* Editor & Preview Panes with Internal Scrolling */}
           <div
-            className={`flex-1 overflow-hidden grid grid-cols-1 ${
+            className={`flex-1 min-h-0 overflow-hidden grid grid-cols-1 ${
               activeTab === "split"
-                ? "xl:grid-cols-2 divide-y xl:divide-y-0 xl:divide-x divide-border"
+                ? "md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border"
                 : ""
             }`}
           >
             {/* Panel 1: Editor Pane */}
             {(activeTab === "edit" || activeTab === "split") && (
-              <div className="h-full overflow-hidden flex flex-col p-4 sm:p-5 min-w-0">
-                <textarea
-                  ref={registerEditor}
-                  value={markdownContent}
-                  onChange={(e) => {
-                    setMarkdownContent(e.target.value);
-                    markEditingBrief();
-                  }}
-                  onFocus={markEditingBrief}
-                  readOnly={readOnly || editorSyncLocked}
-                  placeholder={
-                    readOnly
-                      ? "You have viewer access to this shared case. Ask the owner for editor access to modify the brief."
-                      : editorSyncLocked
-                        ? "Syncing live session… editing unlocks in a moment."
-                        : "The appeal brief will appear here once synthesized, or write manually..."
-                  }
-                  className="studio-editor-textarea w-full h-full bg-transparent text-foreground text-xs font-mono resize-none focus:outline-none leading-relaxed placeholder:text-muted-foreground overflow-y-auto disabled:opacity-80"
-                />
+              <div className="min-h-0 min-w-0 overflow-hidden flex flex-col bg-muted/20">
+                <div className="shrink-0 px-4 sm:px-5 pt-3 pb-2 flex items-center justify-between border-b border-border/50 bg-muted/30">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                    Markdown source
+                  </span>
+                  <span className="text-[10px] font-mono text-muted-foreground/70">
+                    auto-saved
+                  </span>
+                </div>
+                <div className="flex-1 min-h-0 p-4 sm:p-5">
+                  <textarea
+                    ref={registerEditor}
+                    value={markdownContent}
+                    onChange={(e) => {
+                      setMarkdownContent(e.target.value);
+                      markEditingBrief();
+                    }}
+                    onFocus={markEditingBrief}
+                    readOnly={readOnly || editorSyncLocked}
+                    placeholder={
+                      readOnly
+                        ? "You have viewer access to this shared case. Ask the owner for editor access to modify the brief."
+                        : editorSyncLocked
+                          ? "Syncing live session… editing unlocks in a moment."
+                          : "The appeal brief will appear here once synthesized, or write manually..."
+                    }
+                    className="studio-editor-textarea w-full h-full min-h-[320px] bg-transparent text-foreground text-xs font-mono resize-none focus:outline-none leading-[1.7] placeholder:text-muted-foreground overflow-y-auto disabled:opacity-80"
+                  />
+                </div>
               </div>
             )}
 
             {/* Panel 2: Rendered Markdown Preview Pane */}
             {(activeTab === "preview" || activeTab === "split") && (
-              <div className="studio-preview-pane h-full overflow-y-auto p-4 sm:p-6 bg-background/40 min-w-0">
+              <div className="studio-preview-pane min-h-0 min-w-0 overflow-y-auto overflow-x-hidden scroll-pt-4 p-4 sm:p-6 bg-background min-w-0">
                 {markdownContent ? (
-                  <div className="w-full max-w-full rounded-xl border border-border/80 bg-card/70 p-5 sm:p-7 shadow-xs min-w-0">
-                    <AppealBriefRenderer content={markdownContent} />
+                  <div className="mx-auto w-full max-w-[72ch] min-w-0">
+                    <div className="mb-3 flex items-center justify-between gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <Eye className="size-3" />
+                        Formatted brief
+                      </span>
+                      <span>updates as you type</span>
+                    </div>
+                    <div className="w-full rounded-xl border border-border bg-card p-5 sm:p-8 shadow-sm min-w-0">
+                      <AppealBriefRenderer content={markdownContent} />
+                    </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-3 text-muted-foreground my-auto">
+                  <div className="flex flex-col items-center justify-center min-h-[320px] h-full text-center p-8 space-y-3 text-muted-foreground my-auto">
                     <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                       <FileText className="size-6" />
                     </div>
@@ -1127,8 +1146,8 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         </Card>
 
         {/* Panel 3: Right 4 Cols Citation Sidebar (Responsive height matched with left card) */}
-        <Card className="lg:col-span-4 min-h-[380px] h-[60vh] lg:h-[640px] xl:h-[700px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden">
-          <div className="h-full overflow-y-auto p-4">
+        <Card className="lg:col-span-4 min-h-[380px] h-[72vh] lg:h-[660px] xl:h-[720px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
             <CitationSidebar
               evidences={evidences}
               vectorMatches={vectorMatches}

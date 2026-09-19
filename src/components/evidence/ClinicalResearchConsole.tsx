@@ -44,7 +44,7 @@ interface ClinicalResearchConsoleProps {
     category?: string,
     notes?: string
   ) => Promise<unknown>;
-  onCrawlMultiSource: (claimId: string, customUrl?: string) => Promise<unknown>;
+  onCrawlMultiSource: (claimId: string, customUrl?: string, forceRescan?: boolean) => Promise<unknown>;
   onDiscoverDirectory?: (
     claimId: string,
     options?: {
@@ -399,7 +399,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
             : "Reading the source and pulling out the rules that apply...",
           "info"
         );
-        result = (await onCrawlMultiSource(claim._id, customUrl || undefined)) as unknown as Record<string, unknown>;
+        result = (await onCrawlMultiSource(claim._id, customUrl || undefined, forceRescan || (evidences?.length || 0) > 0)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog(
           "Audit",
@@ -416,7 +416,12 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
             : "Reading the source and pulling out the rules that apply...",
           "info"
         );
-        result = (await onCrawlCPB(claim._id, customUrl || undefined, forceRescan)) as unknown as Record<string, unknown>;
+        // Explicit Re-run bypasses the 7-day snapshot cache: when evidence
+        // already exists for this claim, force a live rescan even if the
+        // checkbox is unchecked, so Re-run never returns stale cache as fresh.
+        const hasExistingEvidence = (evidences?.length || 0) > 0;
+        const effectiveForceRescan = forceRescan || hasExistingEvidence;
+        result = (await onCrawlCPB(claim._id, customUrl || undefined, effectiveForceRescan)) as unknown as Record<string, unknown>;
         setCurrentStageIndex(3);
         addLog("Audit", `Extracted ${result?.clausesExtracted || 0} clinical policy clauses: "${result?.policyTitle || "Policy Bulletin"}"`, "success");
       } else if (activeMode === "pubmed_trials") {

@@ -13,6 +13,7 @@ import {
   calculateErisaPenalties,
   getDefaultFinancialLiability,
   getDefaultErisaPenalties,
+  isPlaceholderLiabilityData,
 } from "../lib/liabilityCalculator";
 
 import { Id } from "../../convex/_generated/dataModel";
@@ -152,14 +153,22 @@ export function useLiabilityCalculator(claim?: Claim | null) {
     []
   );
 
-  const saveToClaim = useCallback(async (): Promise<boolean> => {
+  const saveToClaim = useCallback(async (options?: { allowPlaceholder?: boolean }): Promise<boolean> => {
     if (!claim?._id) return false;
     setIsSaving(true);
     setErrorMessage(null);
     try {
+      // Placeholder gate: estimated benchmarks must not persist as facts
+      // unless the advocate explicitly confirms them.
+      if (isPlaceholderLiabilityData(liabilityResult.data) && !options?.allowPlaceholder) {
+        throw new Error(
+          "Estimated placeholder benefits are not saved to the case. Confirm real deductible, coinsurance, copay, and OOP-max values first, or explicitly allow placeholder save."
+        );
+      }
       await updateFinancialLiabilityMutation({
         claimId: claim._id as Id<"claims">,
         financialLiability: liabilityResult.data,
+        allowPlaceholder: options?.allowPlaceholder,
       });
 
       await updateErisaPenaltiesMutation({

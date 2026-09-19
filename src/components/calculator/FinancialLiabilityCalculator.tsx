@@ -342,7 +342,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
             <Button
               variant="outline"
               size="sm"
-              onClick={saveToClaim}
+              onClick={() => { void saveToClaim(); }}
               disabled={isSaving}
               className="h-8 rounded-md px-2.5 text-xs gap-1.5 shrink-0 border-border/70 cursor-pointer"
             >

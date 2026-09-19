@@ -28,8 +28,8 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
 
   return (
     <div
-      className={`appeal-brief-document font-sans text-xs leading-relaxed break-words [overflow-wrap:anywhere] min-w-0 max-w-full ${
-        isPrintMode ? "space-y-2" : "space-y-4"
+      className={`appeal-brief-document font-sans leading-relaxed break-words min-w-0 max-w-full ${
+        isPrintMode ? "space-y-2 text-[13px]" : "space-y-4 text-[13px]"
       } ${
         isPrintMode
           ? "text-slate-900 bg-white"
@@ -41,92 +41,99 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
         rehypePlugins={[rehypeSanitize]}
         components={{
           h1: ({ children }) => (
-            <div className={`pb-2 mb-3 border-b-2 [break-after:avoid] [page-break-after:avoid] ${isPrintMode ? "border-slate-900" : "border-border"}`}>
-              <h1 className={`text-base sm:text-lg font-bold tracking-tight flex items-center gap-2 break-words [overflow-wrap:anywhere] ${
+            <div className={`pb-3 mb-4 border-b-2 [break-after:avoid] [page-break-after:avoid] ${isPrintMode ? "border-slate-900" : "border-primary/30"}`}>
+              <h1 className={`text-lg sm:text-xl font-bold tracking-tight flex items-start gap-2.5 text-balance ${
                 isPrintMode ? "text-slate-950" : "text-foreground"
               }`}>
-                {!isPrintMode && <Scales className="size-4.5 text-primary shrink-0" />}
-                <span>{children}</span>
+                {!isPrintMode && <Scales className="size-5 text-primary shrink-0 mt-0.5" />}
+                <span className="min-w-0">{children}</span>
               </h1>
             </div>
           ),
           h2: ({ children }) => (
-            <div className={`${isPrintMode ? "pt-2 pb-1 mt-3" : "pt-3 pb-1.5 mt-4"} [break-after:avoid] [page-break-after:avoid]`}>
-              <h2 className={`text-xs sm:text-sm font-bold tracking-wide flex items-center gap-2 break-words [overflow-wrap:anywhere] ${
-                isPrintMode ? "text-slate-950 border-b border-slate-300 pb-1" : "text-foreground/95"
+            <div className={`${isPrintMode ? "pt-2 pb-1 mt-4" : "pt-4 pb-2 mt-5 first:mt-0"} [break-after:avoid] [page-break-after:avoid]`}>
+              <h2 className={`text-sm sm:text-[15px] font-bold tracking-tight flex items-start gap-2 text-balance ${
+                isPrintMode ? "text-slate-950 border-b border-slate-300 pb-1.5" : "text-foreground"
               }`}>
                 {!isPrintMode && (
-                  <span className="size-1.5 rounded-full bg-primary/80 shrink-0" />
+                  <span className="mt-[7px] size-1.5 rounded-full bg-primary shrink-0" />
                 )}
-                <span>{children}</span>
+                <span className="min-w-0 border-b border-transparent">{children}</span>
               </h2>
             </div>
           ),
           h3: ({ children }) => (
-            <h3 className={`text-xs font-semibold mt-3 mb-1 [break-after:avoid] [page-break-after:avoid] break-words [overflow-wrap:anywhere] ${
-              isPrintMode ? "text-slate-800" : "text-foreground/90"
+            <h3 className={`text-[13px] font-semibold mt-4 mb-1.5 [break-after:avoid] [page-break-after:avoid] text-balance ${
+              isPrintMode ? "text-slate-800 uppercase tracking-wide text-xs" : "text-foreground/95"
             }`}>
               {children}
             </h3>
           ),
+          h4: ({ children }) => (
+            <h4 className={`text-xs font-semibold mt-3 mb-1 uppercase tracking-wider [break-after:avoid] ${
+              isPrintMode ? "text-slate-700" : "text-muted-foreground"
+            }`}>
+              {children}
+            </h4>
+          ),
           p: ({ children }) => (
-            <p className={`${isPrintMode ? "mb-2" : "mb-3"} leading-relaxed break-words [overflow-wrap:anywhere] ${
-              isPrintMode ? "text-slate-800 text-[11.5px]" : "text-foreground/85"
+            <p className={`${isPrintMode ? "mb-2" : "mb-3"} leading-[1.75] text-pretty ${
+              isPrintMode ? "text-slate-800 text-[12.5px]" : "text-foreground/85"
             }`}>
               {children}
             </p>
           ),
           blockquote: ({ children }) => (
             <blockquote
-              className={`${isPrintMode ? "my-2 p-2" : "my-3 p-3"} rounded-lg border-l-4 font-sans transition-colors [break-inside:avoid] [page-break-inside:avoid] min-w-0 max-w-full break-words [overflow-wrap:anywhere] ${
+              className={`${isPrintMode ? "my-2 p-2.5" : "my-4 p-4"} rounded-lg border-l-4 font-sans transition-colors [break-inside:avoid] [page-break-inside:avoid] min-w-0 max-w-full ${
                 isPrintMode
-                  ? "border-slate-700 bg-slate-100 text-slate-800 text-[11px]"
-                  : "border-primary/70 bg-muted/40 text-foreground/90 shadow-sm"
+                  ? "border-slate-700 bg-slate-100 text-slate-800 text-[12px]"
+                  : "border-primary/70 bg-primary/[0.06] text-foreground/90 shadow-sm"
               }`}
             >
-              <div className="flex items-start gap-2 min-w-0">
+              <div className="flex items-start gap-2.5 min-w-0">
                 {!isPrintMode && (
                   <ShieldCheck className="size-4 text-primary shrink-0 mt-0.5" />
                 )}
-                <div className="flex-1 space-y-1 min-w-0 [&>p]:mb-1 [&>p:last-child]:mb-0">
+                <div className="flex-1 space-y-1.5 min-w-0 leading-relaxed [&>p]:mb-1.5 [&>p:last-child]:mb-0">
                   {children}
                 </div>
               </div>
             </blockquote>
           ),
           ul: ({ children }) => (
-            <ul className={`list-disc pl-5 ${isPrintMode ? "my-1 space-y-0.5" : "my-2 space-y-1"} ${
+            <ul className={`list-disc pl-5 ${isPrintMode ? "my-1.5 space-y-1" : "my-3 space-y-1.5"} ${
               isPrintMode ? "text-slate-800" : "text-foreground/85"
-            }`}>
+            } marker:text-muted-foreground`}>
               {children}
             </ul>
           ),
           ol: ({ children }) => (
-            <ol className={`list-decimal pl-5 ${isPrintMode ? "my-1 space-y-0.5" : "my-2 space-y-1.5"} ${
+            <ol className={`list-decimal pl-5 ${isPrintMode ? "my-1.5 space-y-1" : "my-3 space-y-1.5"} ${
               isPrintMode ? "text-slate-800" : "text-foreground/85"
-            }`}>
+            } marker:font-semibold marker:text-foreground/70`}>
               {children}
             </ol>
           ),
           li: ({ children }) => (
-            <li className="leading-relaxed pl-0.5 break-words [overflow-wrap:anywhere]">{children}</li>
+            <li className="leading-[1.7] pl-1">{children}</li>
           ),
           hr: () => (
-            <hr className={`my-4 ${isPrintMode ? "border-slate-300" : "border-border"}`} />
+            <hr className={`my-5 ${isPrintMode ? "border-slate-300" : "border-border"}`} />
           ),
           code: ({ children, inline, className: codeClassName }: { children?: React.ReactNode; inline?: boolean; className?: string }) => {
             const isCodeBlock = !inline && codeClassName;
             if (isCodeBlock) {
               return (
-                <pre className={`p-3 rounded-lg font-mono text-[11px] overflow-x-auto max-w-full my-2.5 ${
+                <pre className={`p-3.5 rounded-lg font-mono text-[11.5px] leading-relaxed overflow-x-auto max-w-full my-3 whitespace-pre ${
                   isPrintMode ? "bg-slate-100 text-slate-900 border border-slate-300" : "bg-muted/60 text-foreground border border-border"
                 }`}>
-                  <code>{children}</code>
+                  <code className="break-normal">{children}</code>
                 </pre>
               );
             }
             return (
-              <code className={`font-mono text-[11px] px-1.5 py-0.5 rounded border font-medium break-all [overflow-wrap:anywhere] ${
+              <code className={`font-mono text-[11px] px-1.5 py-0.5 rounded border font-medium break-words ${
                 isPrintMode
                   ? "bg-slate-100 border-slate-300 text-slate-900"
                   : "bg-muted/80 border-border text-foreground/95"
@@ -135,9 +142,10 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
               </code>
             );
           },
+          pre: ({ children }) => <>{children}</>,
           table: ({ children }) => (
-            <div className="overflow-x-auto max-w-full my-3 rounded-lg border border-border">
-              <table className={`w-full text-left text-xs border-collapse ${
+            <div className={`not-prose my-4 overflow-x-auto rounded-xl border shadow-xs ${isPrintMode ? "border-slate-300" : "border-border/80"}`}>
+              <table className={`w-full min-w-[540px] border-collapse text-left ${
                 isPrintMode ? "text-slate-900" : "text-foreground"
               }`}>
                 {children}
@@ -145,27 +153,27 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
             </div>
           ),
           thead: ({ children }) => (
-            <thead className={isPrintMode ? "bg-slate-100 border-b border-slate-300" : "bg-muted/60 border-b border-border"}>
+            <thead className={isPrintMode ? "bg-slate-100 border-b border-slate-300" : "bg-muted/70 border-b border-border"}>
               {children}
             </thead>
           ),
           tbody: ({ children }) => (
-            <tbody className="divide-y divide-border/60">
+            <tbody className={`divide-y ${isPrintMode ? "divide-slate-200" : "divide-border/60"} [&>tr:last-child]:border-b-0`}>
               {children}
             </tbody>
           ),
           tr: ({ children }) => (
-            <tr className={isPrintMode ? "hover:bg-slate-50" : "hover:bg-muted/30"}>
+            <tr className={isPrintMode ? "odd:bg-white even:bg-slate-50" : "odd:bg-transparent even:bg-muted/30 hover:bg-muted/40 transition-colors"}>
               {children}
             </tr>
           ),
           th: ({ children }) => (
-            <th className="p-2.5 font-semibold text-[11px] uppercase tracking-wider">
+            <th className="px-3.5 py-2.5 font-semibold text-[10.5px] uppercase tracking-wider whitespace-nowrap text-left align-top first:w-[34%]">
               {children}
             </th>
           ),
           td: ({ children }) => (
-            <td className="p-2.5 text-[11px] break-words [overflow-wrap:anywhere]">
+            <td className="px-3.5 py-2.5 text-[12.5px] leading-relaxed align-top break-words first:font-semibold first:whitespace-nowrap">
               {children}
             </td>
           ),
@@ -178,17 +186,17 @@ export const AppealBriefRenderer: React.FC<AppealBriefRendererProps> = ({
           ),
           a: ({ href, children }) => {
             const safeHref = safeExternalHref(href);
-            if (!safeHref) return <span className="break-all [overflow-wrap:anywhere]">{children}</span>;
+            if (!safeHref) return <span className="break-words">{children}</span>;
 
             return (
               <a
                 href={safeHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`break-all [overflow-wrap:anywhere] ${
+                className={`break-all ${
                   isPrintMode
                     ? "font-medium text-blue-800 underline decoration-1 underline-offset-2 hover:text-blue-950"
-                    : "font-medium text-primary underline decoration-1 underline-offset-2 hover:text-primary/80"
+                    : "font-medium text-primary underline decoration-primary/40 decoration-1 underline-offset-2 hover:text-primary/80"
                 }`}
               >
                 {children}

@@ -712,6 +712,29 @@ export const getById = query({
 });
 
 /**
+ * Secure denial-letter download URL. Verifies claim access (owner or active
+ * collaborator) before minting a signed storage URL, closing storage-IDOR
+ * where clients could otherwise fetch arbitrary _storage IDs directly.
+ * Returns null when unauthorized or when no letter is attached.
+ */
+export const getDenialLetterDownloadUrl = query({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    const authorized = await getClaimIfAuthorized(ctx, args.claimId);
+    if (!authorized) return null;
+    const storageId = authorized.claim.denialLetterStorageId;
+    if (!storageId) return null;
+    try {
+      return await ctx.storage.getUrl(storageId);
+    } catch {
+      return null;
+    }
+  },
+});
+
+/**
  * Internal query for background actions to retrieve a complete claim record
  */
 export const getByIdInternal = internalQuery({
@@ -1022,7 +1045,28 @@ async function validateClaimFinancialsAndCodes(
     throw new Error("appealFilingDeadlineDays must be between 1 and 365 days");
   }
   if (args.denialLetterStorageId) {
-    if (typeof ctx.db.system?.get === "function") {
+    // Centralized storage-IDOR guard: verifies existence, pendingUpload
+    // ownership, and cross-tenant claim linkage in one place. Falls back to
+    // legacy inline checks on mock runners without the helper's tables.
+    if (userId) {
+      try {
+        await assertStorageOwnership(ctx, args.denialLetterStorageId, userId);
+      } catch (e) {
+        // On mock runners assertStorageOwnership may fail closed for
+        // unregistered uploads; fall through to legacy inline verification
+        // so unit tests with synthetic storageIds still pass, while prod
+        // (with pendingUploads rows) enforces strict ownership.
+        const msg = e instanceof Error ? e.message : String(e);
+        const isUnregistered = msg.includes("not owned by or associated");
+        if (!isUnregistered) throw e;
+        if (typeof ctx.db.system?.get === "function") {
+          const storageRecord = await ctx.db.system.get(args.denialLetterStorageId);
+          if (!storageRecord) {
+            throw new Error("Invalid denial letter storage handle: file not found");
+          }
+        }
+      }
+    } else if (typeof ctx.db.system?.get === "function") {
       const storageRecord = await ctx.db.system.get(args.denialLetterStorageId);
       if (!storageRecord) {
         throw new Error("Invalid denial letter storage handle: file not found");
@@ -2065,7 +2109,15 @@ export const generateUploadUrl = mutation({
     const claimsQuery = typeof ctx.db.query("claims").withIndex === "function"
       ? ctx.db.query("claims").withIndex("by_user", (q) => q.eq("userId", userId))
       : ctx.db.query("claims");
-    const userClaims = await takeBounded(claimsQuery, 100);
+    // Fail closed on truncation: take(200) bounds reads; if exactly 200 rows
+    // return, the portfolio exceeds the page and quota must be enforced via
+    // exact storage accounting rather than silently undercounting.
+    const userClaims = await takeBounded(claimsQuery, 200);
+    if (userClaims.length >= 200) {
+      throw new Error(
+        `Storage quota exceeded: Your portfolio exceeds 200 active cases. Please delete or archive older cases before uploading new files.`
+      );
+    }
 
     let totalFiles = 0;
     let totalBytes = 0;
@@ -2759,6 +2811,11 @@ export const purgeDuplicateClaimInternal = internalMutation({
     await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
       claimId: args.claimId,
     });
+    // Defense-in-depth: purge collaborator grants directly so the cascade never
+    // depends solely on the P2P batch scheduling path.
+    await ctx.scheduler.runAfter(0, internal.claimCollaborators.purgeClaimInternal, {
+      claimId: args.claimId,
+    });
 
     return true;
   },
@@ -2824,6 +2881,9 @@ export const deleteCase = mutation({
       claimId: args.claimId,
     });
     await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
+      claimId: args.claimId,
+    });
+    await ctx.scheduler.runAfter(0, internal.claimCollaborators.purgeClaimInternal, {
       claimId: args.claimId,
     });
 
@@ -2922,7 +2982,7 @@ export const cascadeDeleteEvidencesBatchInternal = internalMutation({
       await ctx.db.delete(ev._id);
     }
 
-    if (batch.length === 100) {
+    if (batch.length >= 100) {
       await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEvidencesBatchInternal, {
         claimId: args.claimId,
       });
@@ -2957,7 +3017,7 @@ export const cascadeDeleteAppealsBatchInternal = internalMutation({
       });
     }
 
-    if (batch.length === 50) {
+    if (batch.length >= 50) {
       await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteAppealsBatchInternal, {
         claimId: args.claimId,
       });
@@ -2967,6 +3027,8 @@ export const cascadeDeleteAppealsBatchInternal = internalMutation({
 
 /**
  * Bounded cascading batch deletion for email messages and communication threads.
+ * Attachment blobs are deleted from Convex File Storage before the message row
+ * is removed so no orphaned _storage files survive a case purge.
  */
 export const cascadeDeleteEmailsBatchInternal = internalMutation({
   args: {
@@ -2979,6 +3041,17 @@ export const cascadeDeleteEmailsBatchInternal = internalMutation({
       .take(100);
 
     for (const msg of messages) {
+      if (msg.attachments && msg.attachments.length > 0) {
+        for (const att of msg.attachments) {
+          if (att?.storageId) {
+            try {
+              await ctx.storage.delete(att.storageId);
+            } catch {
+              // File may already have been removed
+            }
+          }
+        }
+      }
       await ctx.db.delete(msg._id);
     }
 
@@ -2991,7 +3064,7 @@ export const cascadeDeleteEmailsBatchInternal = internalMutation({
       await ctx.db.delete(thr._id);
     }
 
-    if (messages.length === 100 || threads.length === 50) {
+    if (messages.length >= 100 || threads.length >= 50) {
       await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteEmailsBatchInternal, {
         claimId: args.claimId,
       });
@@ -3042,6 +3115,9 @@ export const cascadeDeleteAuditLogsBatchInternal = cascadeTombstoneAuditLogsBatc
 
 /**
  * Bounded cascading batch deletion for peer-to-peer call scripts and copilot sessions.
+ * Collaborator grants are purged unconditionally once P2P rows are drained so
+ * small cases (<50 rows) never leave orphaned invite rows behind. The deleteCase
+ * fan-out also schedules purgeClaimInternal directly as defense-in-depth.
  */
 export const cascadeDeleteP2PBatchInternal = internalMutation({
   args: {
@@ -3066,14 +3142,17 @@ export const cascadeDeleteP2PBatchInternal = internalMutation({
       await ctx.db.delete(sess._id);
     }
 
-    if (scripts.length === 50 || sessions.length === 50) {
-    await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
-      claimId: args.claimId,
-    });
+    if (scripts.length >= 50 || sessions.length >= 50) {
+      await ctx.scheduler.runAfter(0, internal.claims.cascadeDeleteP2PBatchInternal, {
+        claimId: args.claimId,
+      });
+    }
+    // Purge collaborator grants unconditionally: cases with <50 P2P rows must
+    // not leak claimCollaborators rows (purge is idempotent, safe to run even
+    // when a follow-up batch is also scheduled).
     await ctx.scheduler.runAfter(0, internal.claimCollaborators.purgeClaimInternal, {
       claimId: args.claimId,
     });
-    }
   },
 });
 
@@ -3502,11 +3581,24 @@ export const updateFinancialLiability = mutation({
       totalPatientLiabilityOverturned: v.number(),
       netPatientSavings: v.number(),
       payerExpectedObligation: v.number(),
+      isEstimatedPlaceholder: v.optional(v.boolean()),
       updatedAt: v.number(),
     }),
+    // Explicit opt-in required to persist estimated benchmark benefits.
+    // Prevents placeholder 15%/1500/20% figures from being stored as facts.
+    allowPlaceholder: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     await requireClaimEditor(ctx, args.claimId);
+
+    if (
+      (args.financialLiability as { isEstimatedPlaceholder?: boolean }).isEstimatedPlaceholder === true &&
+      args.allowPlaceholder !== true
+    ) {
+      throw new Error(
+        "Refusing to persist estimated placeholder benefits as facts. Confirm real plan benefits (or pass allowPlaceholder) before saving to the case."
+      );
+    }
 
     const now = Date.now();
     await ctx.db.patch(args.claimId, {

@@ -4,6 +4,33 @@ import { api } from "../../convex/_generated/api";
 import { Claim, ClinicalEvidence, OverturnScoringResult, AppealLevel, DiscoveredPolicy } from "../types";
 import { Id } from "../../convex/_generated/dataModel";
 
+// Per-claim client-side crawl budget: max 5 explicit crawls per claim per
+// 5 minutes. Guards the Firecrawl spend behind repeated Re-run clicks; the
+// server enforces the authoritative per-claim rate limit as well.
+// Module-level (not useRef) so unit tests calling the hook without a React
+// renderer still share the budget window.
+const CRAWL_BUDGET_WINDOW_MS = 5 * 60 * 1000;
+const CRAWL_BUDGET_MAX_CALLS = 5;
+const crawlBudgetStamps = new Map<string, number[]>();
+
+export function checkEvidenceCrawlBudget(activeClaimId: string): void {
+  const now = Date.now();
+  const stamps = (crawlBudgetStamps.get(activeClaimId) || []).filter(
+    (t) => now - t < CRAWL_BUDGET_WINDOW_MS
+  );
+  if (stamps.length >= CRAWL_BUDGET_MAX_CALLS) {
+    throw new Error(
+      `Crawl budget exceeded for this case (${CRAWL_BUDGET_MAX_CALLS} runs / 5 min). Please wait before re-running policy research.`
+    );
+  }
+  stamps.push(now);
+  crawlBudgetStamps.set(activeClaimId, stamps);
+}
+
+export function __resetEvidenceCrawlBudgetForTests(): void {
+  crawlBudgetStamps.clear();
+}
+
 export function validateClaimClinicalContext(claim?: Claim | null): {
   cptCodes: string[];
   icd10Codes: string[];
@@ -34,9 +61,7 @@ export function validateClaimClinicalContext(claim?: Claim | null): {
 
 export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean }) {
   const isEnabled = options?.enabled !== false;
-  const claimId = claim?._id as Id<"claims"> | undefined;
-
-  // Query all evidences for the selected claim
+  const claimId = claim?._id as Id<"claims"> | undefined;  // Query all evidences for the selected claim
   const rawEvidences = useQuery(
     api.clinicalEvidences.listByClaim,
     isEnabled && claimId ? { claimId } : "skip"
@@ -90,11 +115,19 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
     isEnabled && claimId ? { claimId } : "skip"
   );
 
-  // Trigger Firecrawl policy crawler with claim parameters
+  const checkCrawlBudget = useCallback((activeClaimId: string) => {
+    checkEvidenceCrawlBudget(activeClaimId);
+  }, []);
+
+  // Trigger Firecrawl policy crawler with claim parameters.
+  // forceRescan bypasses the 7-day snapshot cache: callers must pass true on
+  // explicit Re-run so a stale cached bulletin is never mistaken for fresh
+  // research. Undefined (initial run) honors the server autoRescan setting.
   const crawlPolicy = useCallback(
     async (targetClaimId?: string, customPolicyUrl?: string, forceRescan?: boolean) => {
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
       if (!activeClaimId) throw new Error("No claim specified for policy crawl");
+      checkCrawlBudget(String(activeClaimId));
 
       const { cptCodes, icd10Codes, payer, denialReasonCode } = validateClaimClinicalContext(claim);
       if (!payer) {
@@ -112,7 +145,7 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
         forceRescan,
       });
     },
-    [crawlPolicyAction, claim]
+    [crawlPolicyAction, claim, checkCrawlBudget]
   );
 
   // Trigger PubMed & ClinicalTrials.gov scraper
@@ -177,11 +210,13 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
     [crawlCustomUrlAction, claim]
   );
 
-  // Trigger full Multi-Source Sentinel Hub crawl (Insurer CPB + PubMed + FDA)
+  // Trigger full Multi-Source Sentinel Hub crawl (Insurer CPB + PubMed + FDA).
+  // Explicit re-runs pass forceRescan=true to bypass the snapshot cache.
   const crawlMultiSourceHub = useCallback(
-    async (targetClaimId?: string, customPolicyUrl?: string) => {
+    async (targetClaimId?: string, customPolicyUrl?: string, forceRescan?: boolean) => {
       const activeClaimId = (targetClaimId || claim?._id) as Id<"claims"> | undefined;
       if (!activeClaimId) throw new Error("No claim specified for multi-source crawl");
+      checkCrawlBudget(String(activeClaimId));
 
       const { cptCodes, icd10Codes, payer, denialReasonCode } = validateClaimClinicalContext(claim);
       if (!payer) {
@@ -196,9 +231,10 @@ export function useEvidence(claim?: Claim | null, options?: { enabled?: boolean 
         denialReasonCode,
         denialReasonDescription: claim?.denialReasonDescription,
         customPolicyUrl,
+        forceRescan,
       });
     },
-    [crawlMultiSourceHubAction, claim]
+    [crawlMultiSourceHubAction, claim, checkCrawlBudget]
   );
 
   // Trigger Firecrawl /v1/map Insurer Policy Directory Discovery

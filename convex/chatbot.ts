@@ -148,6 +148,36 @@ export const incrementSessionMessageCount = internalMutation({
 /* ========================================================================= */
 
 /**
+ * Server-resolved identity note: `userId` on these internalQueries is NOT
+ * LLM-controlled. Sentinel agent tools resolve it server-side via
+ * ctx.userId / getAuthUserId(ctx) (see actions/sentinelAgent.ts) and pass it
+ * through ctx.runQuery. The checks below treat it as the authenticated
+ * principal and verify claim access (owner or active collaborator) before
+ * returning any PHI. Direct client invocation is impossible (internal).
+ */
+async function isChatbotClaimAccessible(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ctx: any,
+  claim: { _id: unknown; userId?: unknown } | null,
+  userId: unknown
+): Promise<boolean> {
+  if (!claim || !claim.userId || !userId) return false;
+  if (claim.userId === userId) return true;
+  try {
+    const grants = await ctx.db
+      .query("claimCollaborators")
+      .withIndex("by_claim", (q: never) => (q as unknown as { eq: (f: string, v: unknown) => never }).eq("claimId", (claim as { _id: unknown })._id))
+      .take(100);
+    for (const g of grants || []) {
+      if (g && g.status === "active" && g.userId === userId) return true;
+    }
+  } catch {
+    // Fall closed on lookup failure (owner check already failed).
+  }
+  return false;
+}
+
+/**
  * Tool: Fetch full claim data
  */
 export const getClaimDataForChatbot = internalQuery({
@@ -165,12 +195,22 @@ export const getClaimDataForChatbot = internalQuery({
         .query("claims")
         .withIndex("by_claim_number", (q) => q.eq("claimNumber", args.claimNumber!))
         .take(5);
+      // Prefer owner match, then active collaborator match; never return a
+      // stranger's claim with the same human-readable number.
       claim = candidateClaims.find((c) => c.userId === args.userId) || null;
+      if (!claim) {
+        for (const cand of candidateClaims) {
+          if (await isChatbotClaimAccessible(ctx, cand, args.userId)) {
+            claim = cand;
+            break;
+          }
+        }
+      }
     }
 
     if (!claim) return null;
 
-    if (!claim.userId || claim.userId !== args.userId) {
+    if (!(await isChatbotClaimAccessible(ctx, claim, args.userId))) {
       return null;
     }
 
@@ -234,7 +274,7 @@ export const searchClaimsForChatbot = internalQuery({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const limit = Math.max(1, Math.min(args.limit ?? 5, 100));
+    const limit = Math.max(1, Math.min(args.limit ?? 5, 50));
     const term = args.searchTerm?.trim();
     let claims: Doc<"claims">[] = [];
     let usedSearchIndex = false;
@@ -254,7 +294,9 @@ export const searchClaimsForChatbot = internalQuery({
           })
           .take(limit);
 
-        // Augment with direct claimNumber match if search results have capacity
+        // Augment with direct claimNumber match if search results have capacity.
+        // Owner match first; fall back to active-collaborator match. Never leak
+        // a stranger's claim sharing the same human-readable number.
         if (searchResults.length < limit) {
           const directMatch = await ctx.db
             .query("claims")
@@ -262,8 +304,8 @@ export const searchClaimsForChatbot = internalQuery({
             .first();
           if (
             directMatch &&
-            directMatch.userId === args.userId &&
-            (!args.status || args.status === "all" || directMatch.status === args.status)
+            (!args.status || args.status === "all" || directMatch.status === args.status) &&
+            (await isChatbotClaimAccessible(ctx, directMatch, args.userId))
           ) {
             if (!searchResults.some((r) => r._id === directMatch._id)) {
               searchResults.push(directMatch);
@@ -345,7 +387,7 @@ export const getEvidencesForChatbot = internalQuery({
   },
   handler: async (ctx, args) => {
     const claim = await ctx.db.get(args.claimId);
-    if (!claim || !claim.userId || claim.userId !== args.userId) {
+    if (!(await isChatbotClaimAccessible(ctx, claim, args.userId))) {
       return [];
     }
 
@@ -376,7 +418,7 @@ export const getAppealBriefForChatbot = internalQuery({
   },
   handler: async (ctx, args) => {
     const claim = await ctx.db.get(args.claimId);
-    if (!claim || !claim.userId || claim.userId !== args.userId) {
+    if (!(await isChatbotClaimAccessible(ctx, claim, args.userId))) {
       return null;
     }
 
@@ -414,7 +456,7 @@ export const getP2PScriptForChatbot = internalQuery({
   },
   handler: async (ctx, args) => {
     const claim = await ctx.db.get(args.claimId);
-    if (!claim || !claim.userId || claim.userId !== args.userId) {
+    if (!(await isChatbotClaimAccessible(ctx, claim, args.userId))) {
       return null;
     }
 
@@ -448,7 +490,7 @@ export const getAuditLogsForChatbot = internalQuery({
   },
   handler: async (ctx, args) => {
     const claim = await ctx.db.get(args.claimId);
-    if (!claim || !claim.userId || claim.userId !== args.userId) {
+    if (!(await isChatbotClaimAccessible(ctx, claim, args.userId))) {
       return [];
     }
 

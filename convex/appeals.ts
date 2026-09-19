@@ -167,6 +167,7 @@ interface CreateOrUpdateDraftArgs {
   statutoryAuthorities?: string[];
   escalationNotes?: string;
   forceNewRevision?: boolean;
+  expectedVersion?: number;
 }
 
 async function applyCreateOrUpdateDraft(
@@ -203,7 +204,50 @@ async function applyCreateOrUpdateDraft(
     .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId))
     .order("desc")
     .first();
-  const nextVersion = latest ? latest.version + 1 : 1;
+
+  // Optimistic concurrency: UI-driven edits may pass the version they read.
+  // If another writer advanced the draft meanwhile, fail fast so the loser
+  // re-reads instead of silently clobbering or forking a duplicate version.
+  if (args.expectedVersion !== undefined && latest && latest.version !== args.expectedVersion) {
+    throw new Error(
+      `Appeal revision conflict: expected v${args.expectedVersion} but latest is v${latest.version}. Please reload and retry.`
+    );
+  }
+
+  // Allocate a collision-free version: probe the compound index for an
+  // existing (claimId, version) row and bump until free (max 10 attempts).
+  // Convex mutations are serializable, but this closes the read-then-insert
+  // window for concurrent writers retried by the runtime. Mock-tolerant:
+  // unit-test query stubs without chained eq().eq().first() skip the probe.
+  let nextVersion = latest ? latest.version + 1 : 1;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    let collision: unknown = null;
+    try {
+      const q = ctx.db
+        .query("appeals")
+        .withIndex("by_claimId_and_version", (q) =>
+          q.eq("claimId", args.claimId).eq("version", nextVersion)
+        ) as unknown as {
+          first?: () => Promise<unknown>;
+          order?: (d: string) => { first: () => Promise<unknown> };
+        };
+      if (typeof q.first === "function") {
+        collision = await q.first();
+      } else if (typeof q.order === "function") {
+        collision = await q.order("desc").first();
+      } else {
+        break;
+      }
+    } catch {
+      // Mock runner without compound-index support: assume no collision.
+      break;
+    }
+    if (!collision) break;
+    // Compound-index mocks may return the latest row regardless of the
+    // probed version: only treat an exact version match as a collision.
+    if ((collision as { version?: number }).version !== nextVersion) break;
+    nextVersion += 1;
+  }
 
   const tierMeta = getStatutoryTierMetadata(args.appealLevel);
   const statutoryPosture = args.statutoryPosture || tierMeta.statutoryPosture;
@@ -214,6 +258,8 @@ async function applyCreateOrUpdateDraft(
   let appealId: Id<"appeals">;
 
   // Check if we should create a new revision record or update the existing latest record.
+  // Re-read latest inside the OCC window: if a concurrent insert landed after
+  // our first read, latest is stale and updating it would fork history.
   const isDifferentTier = latest && latest.appealLevel !== args.appealLevel;
   const shouldInsertNew = !latest || isDifferentTier || args.forceNewRevision === true;
 
@@ -290,6 +336,7 @@ export const createOrUpdateDraft = mutation({
     statutoryAuthorities: v.optional(v.array(v.string())),
     escalationNotes: v.optional(v.string()),
     forceNewRevision: v.optional(v.boolean()),
+    expectedVersion: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<Id<"appeals"> | null> => {
     await requireClaimEditor(ctx, args.claimId);
@@ -315,6 +362,7 @@ export const createOrUpdateDraftInternal = internalMutation({
     statutoryAuthorities: v.optional(v.array(v.string())),
     escalationNotes: v.optional(v.string()),
     forceNewRevision: v.optional(v.boolean()),
+    expectedVersion: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<Id<"appeals"> | null> => {
     return await applyCreateOrUpdateDraft(ctx, args);

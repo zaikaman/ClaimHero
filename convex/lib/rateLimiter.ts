@@ -23,6 +23,14 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 10,
   },
+  // Per-claim clinical policy crawl budget (burst: 5, rate: 5/10min) — bounds
+  // Firecrawl spend for repeated explicit re-runs on a single case.
+  policyCrawlPerClaim: {
+    kind: "token bucket",
+    rate: 5,
+    period: 10 * MINUTE,
+    capacity: 5,
+  },
   // Legal memorandum AI synthesis (burst: 10, rate: 10/min)
   appealSynthesizer: {
     kind: "token bucket",

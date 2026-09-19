@@ -2,6 +2,7 @@ import { Claim, Appeal, ClinicalEvidence, AppealLevel, FinancialLiabilityData, E
 import { getPayerAppellateContact } from "./constants";
 import { fastSanitizeText } from "./redactionEngine";
 import { formatCurrency } from "./utils";
+import { getDossierFinancialLiability } from "./liabilityCalculator";
 import { getStateRegulator } from "../../convex/lib/stateRegulators";
 
 export interface DossierExhibitItem {
@@ -416,7 +417,9 @@ export function buildDossierData(
     icd10Codes: claim.icd10Codes || [],
     denialReasonCode: claim.denialReasonCode || "CO-50",
     denialReasonDescription: claim.denialReasonDescription || "Service denied as not medically necessary by payer.",
-    financialLiability: claim.financialLiability,
+    // Placeholder gate: estimated benchmark benefits are omitted from the
+    // legal dossier until the advocate confirms real plan benefits.
+    financialLiability: getDossierFinancialLiability(claim.financialLiability),
     erisaPenalties: claim.erisaPenalties,
     
     executiveSummary,

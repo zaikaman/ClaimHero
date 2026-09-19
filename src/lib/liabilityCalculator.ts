@@ -79,9 +79,12 @@ export function calculateFinancialLiability(
   const remainingOopCapacity = Math.max(0, outOfPocketMax - outOfPocketSpent);
 
   const networkStatus = input.networkStatus ?? "in_network";
-  // The No Surprises Act (42 U.S.C. § 300gg-111 / 45 CFR § 149.410) protects patients against surprise
-  // balance billing for out-of-network emergency services and OON providers at in-network facilities.
-  const noSurprisesActProtected = input.noSurprisesActProtected ?? (networkStatus === "out_of_network");
+  // The No Surprises Act (42 U.S.C. § 300gg-111 / 45 CFR § 149.410) protects
+  // ONLY out-of-network emergency services and OON providers at in-network
+  // facilities — never elective OON care. Default is unprotected; callers must
+  // explicitly attest NSA eligibility (e.g. emergency flag + facility type).
+  // Defaulting all OON to protected understates balance-billing exposure.
+  const noSurprisesActProtected = input.noSurprisesActProtected ?? false;
 
   // Step 1: Deductible applied to this claim
   const deductibleApplied = Math.min(allowedAmount, remainingDeductible);
@@ -288,13 +291,13 @@ export function calculateErisaPenalties(
   const calculationDateStr = input.calculationDate || formatDateISO(new Date());
   const calcDate = parseDateSafe(calculationDateStr);
 
-  // Document Request Date defaults to ~45 days ago or input
-  const defaultRequestDate = new Date(calcDate.getTime() - 45 * 24 * 60 * 60 * 1000);
+  // Document Request Date defaults to ~45 days ago or input (UTC midnight).
+  const defaultRequestDate = new Date(startOfDayUtcMs(calcDate) - 45 * 24 * 60 * 60 * 1000);
   const documentRequestDateStr = input.documentRequestDate || formatDateISO(defaultRequestDate);
   const requestDate = parseDateSafe(documentRequestDateStr);
 
-  // 30-Day Disclosure Deadline
-  const deadlineDate = new Date(requestDate.getTime() + STATUTORY_DISCLOSURE_GRACE_DAYS * 24 * 60 * 60 * 1000);
+  // 30-Day Disclosure Deadline (UTC calendar days).
+  const deadlineDate = new Date(startOfDayUtcMs(requestDate) + STATUTORY_DISCLOSURE_GRACE_DAYS * 24 * 60 * 60 * 1000);
   const disclosureDeadlineDateStr = formatDateISO(deadlineDate);
 
   const dailyPenaltyRate = input.dailyPenaltyRate ?? (input.useDolInflation === false ? STATUTORY_DAILY_PENALTY_RATE : DOL_INFLATION_ADJUSTED_DAILY_RATE);
@@ -303,9 +306,9 @@ export function calculateErisaPenalties(
     ? input.requestedDocuments
     : DEFAULT_REQUESTED_DOCUMENTS;
 
-  // Elapsed calendar days
-  const msElapsed = calcDate.getTime() - requestDate.getTime();
-  const daysElapsedSinceRequest = Math.max(0, Math.floor(msElapsed / (1000 * 60 * 60 * 24)));
+  // Elapsed calendar days on UTC-midnight boundaries (immune to local TZ/DST).
+  const msElapsed = startOfDayUtcMs(calcDate) - startOfDayUtcMs(requestDate);
+  const daysElapsedSinceRequest = Math.max(0, Math.round(msElapsed / (1000 * 60 * 60 * 24)));
 
   const graceDaysRemaining = Math.max(0, STATUTORY_DISCLOSURE_GRACE_DAYS - daysElapsedSinceRequest);
   const isPastDeadline = daysElapsedSinceRequest > STATUTORY_DISCLOSURE_GRACE_DAYS;
@@ -361,7 +364,7 @@ export function calculateErisaPenalties(
   const isNonCompliant = complianceStatus !== "compliant";
   const horizons = [30, 60, 90, 120];
   const trajectories: ErisaPenaltyTrajectoryItem[] = horizons.map((h) => {
-    const futureDateObj = new Date(calcDate.getTime() + h * 24 * 60 * 60 * 1000);
+    const futureDateObj = new Date(startOfDayUtcMs(calcDate) + h * 24 * 60 * 60 * 1000);
     const projectedDaysInDefault = isNonCompliant ? daysInDefault + h : 0;
     const projectedPenalties = projectedDaysInDefault * dailyPenaltyRate;
     const projectedInterest = Math.round(
@@ -500,7 +503,11 @@ Demand is hereby made for immediate disclosure of all outstanding records within
 }
 
 /**
- * Returns sensible default financial liability data derived from an existing claim.
+ * Returns placeholder financial liability estimates for display only.
+ * These 15%/1500/20%/50/6000/1800 benchmarks are NEVER dossier-grade: the
+ * dossier builder (getDossierFinancialLiability) and save path exclude them
+ * until the advocate confirms real plan benefits. Persisting them as facts
+ * would misstate patient liability in a legal filing.
  */
 export function getDefaultFinancialLiability(claim: Claim): FinancialLiabilityData {
   const billedAmount = claim.deniedAmount ?? 0;
@@ -540,7 +547,8 @@ export function getDefaultErisaPenalties(
   options?: { useDolInflation?: boolean }
 ): ErisaPenaltyData {
   const now = new Date();
-  const requestDate = new Date(now.getTime() - 48 * 24 * 60 * 60 * 1000); // 48 days ago -> 18 days default
+  const nowUtcMidnight = startOfDayUtcMs(now);
+  const requestDate = new Date(nowUtcMidnight - 48 * 24 * 60 * 60 * 1000); // 48 days ago -> 18 days default
   const patientState = claim.patient?.state;
   const statePromptPay = getPromptPayRateForState(patientState);
   const dailyPenaltyRate = options?.useDolInflation === false ? STATUTORY_DAILY_PENALTY_RATE : DOL_INFLATION_ADJUSTED_DAILY_RATE;
@@ -573,8 +581,7 @@ export function getSeverityTierMeta(tier: StatutorySeverityTier): {
   badgeVariant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info";
   description: string;
   colorClass: string;
-} {
-  switch (tier) {
+} {  switch (tier) {
     case "grace_period":
       return {
         label: "30-Day Statutory Grace Window",
@@ -606,10 +613,45 @@ export function getSeverityTierMeta(tier: StatutorySeverityTier): {
   }
 }
 
+/**
+ * Placeholder gate: estimated benchmark benefits must never enter the legal
+ * dossier as facts. Returns true when the liability record is still an
+ * unconfirmed estimate (explicit flag or all-default benchmark shape).
+ */
+export function isPlaceholderLiabilityData(
+  data?: Partial<FinancialLiabilityData> | null
+): boolean {
+  if (!data) return true;
+  if ((data as { isEstimatedPlaceholder?: boolean }).isEstimatedPlaceholder === true) return true;
+  // Heuristic: untouched benchmark shape from getDefaultFinancialLiability.
+  return (
+    data.deductibleTotal === 1500 &&
+    data.deductibleMet === 500 &&
+    data.coinsuranceRate === 20 &&
+    data.copayAmount === 50 &&
+    data.outOfPocketMax === 6000 &&
+    data.outOfPocketSpent === 1800
+  );
+}
+
+/**
+ * Dossier-safe accessor: returns the stored financial liability only when it
+ * is advocate-confirmed (non-placeholder). Placeholders resolve to undefined
+ * so dossier/exhibit builders omit fabricated benefits instead of filing them.
+ */
+export function getDossierFinancialLiability(
+  data?: Partial<FinancialLiabilityData> | null
+): FinancialLiabilityData | undefined {
+  if (!data || isPlaceholderLiabilityData(data)) return undefined;
+  return data as FinancialLiabilityData;
+}
+
 function formatDateISO(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  // UTC standard: deadline math must not shift ±1 day with the viewer's local
+  // timezone (AGENTS.md UTC requirement). All dossier dates are YYYY-MM-DD UTC.
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -619,10 +661,16 @@ function parseDateSafe(dateStr: string): Date {
     const y = parseInt(parts[0], 10);
     const m = parseInt(parts[1], 10) - 1;
     const d = parseInt(parts[2], 10);
-    return new Date(y, m, d);
+    if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+      return new Date(Date.UTC(y, m, d));
+    }
   }
   const parsed = new Date(dateStr);
   return isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+function startOfDayUtcMs(d: Date): number {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
 function formatPercent(num: number): string {

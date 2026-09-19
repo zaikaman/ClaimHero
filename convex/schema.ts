@@ -152,6 +152,7 @@ export default defineSchema({
         totalPatientLiabilityOverturned: v.number(),
         netPatientSavings: v.number(),
         payerExpectedObligation: v.number(),
+        isEstimatedPlaceholder: v.optional(v.boolean()),
         updatedAt: v.number(),
       })
     ),

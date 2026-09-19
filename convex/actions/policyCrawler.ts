@@ -605,7 +605,6 @@ interface FirecrawlSearchResult {
   };
 }
 
-const MAX_POLICY_SEARCH_ROUNDS = 2;
 const MAX_POLICY_SOURCE_CANDIDATES = 6;
 
 const DISALLOWED_MARKETING_DOMAINS = new Set([
@@ -1572,6 +1571,15 @@ export function selectFirecrawlPolicySource(payload: unknown): FirecrawlPolicySo
 }
 
 export const DEFAULT_POLICY_SNAPSHOT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7-day policy snapshot cache TTL
+export const MIN_POLICY_SNAPSHOT_TTL_MS = 60 * 60 * 1000; // 1h floor: prevents cache-bypass via maxAgeMs=0
+export const MAX_POLICY_SNAPSHOT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30d ceiling: stale clinical criteria must revalidate
+export const MAX_FIRECRAWL_SCRAPES_PER_CRAWL = 8; // per-claim budget cap: bounds Firecrawl spend per crawlInsurerPolicy run
+export const MAX_POLICY_SEARCH_ROUNDS = 2;
+
+export function clampSnapshotTtlMs(raw?: number): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return DEFAULT_POLICY_SNAPSHOT_TTL_MS;
+  return Math.min(Math.max(Math.floor(raw), MIN_POLICY_SNAPSHOT_TTL_MS), MAX_POLICY_SNAPSHOT_TTL_MS);
+}
 
 export interface ScrapeExtractionOptions {
   payer?: string;
@@ -1726,7 +1734,9 @@ export async function scrapeFirecrawlPolicySource(
   const requestedUrl = sourceUrl.trim();
   const urlHash = crypto.createHash("sha256").update(requestedUrl.toLowerCase()).digest("hex");
 
-  // Check cached policy snapshots first (honoring autoRescanPolicies setting)
+  // Check cached policy snapshots first (honoring autoRescanPolicies setting).
+  // TTL is clamped to [1h, 30d] so callers cannot bypass expiry with maxAgeMs=0
+  // or pin stale criteria with an unbounded maxAgeMs.
   if (!extractionOptions?.forceRescan) {
     try {
       const cached = await ctx.runQuery(internal.clinicalEvidences.getPolicySnapshotInternal, {
@@ -1734,7 +1744,7 @@ export async function scrapeFirecrawlPolicySource(
       });
       if (cached && cached.markdown && !isAccessDeniedDocument(cached.markdown)) {
         const now = Date.now();
-        const maxAgeMs = extractionOptions?.maxAgeMs ?? DEFAULT_POLICY_SNAPSHOT_TTL_MS;
+        const maxAgeMs = clampSnapshotTtlMs(extractionOptions?.maxAgeMs);
         const isExpired =
           (typeof cached.expiresAt === "number" && now > cached.expiresAt) ||
           (typeof cached.capturedAt === "number" && now - cached.capturedAt > maxAgeMs);
@@ -1939,7 +1949,7 @@ export async function scrapeFirecrawlPolicySource(
   }
 
   const snapshotNow = Date.now();
-  const snapshotTtlMs = extractionOptions?.maxAgeMs ?? DEFAULT_POLICY_SNAPSHOT_TTL_MS;
+  const snapshotTtlMs = clampSnapshotTtlMs(extractionOptions?.maxAgeMs);
   const expiresAt = snapshotNow + snapshotTtlMs;
 
   try {
@@ -3050,13 +3060,23 @@ export async function performCrawlInsurerPolicy(
     const yearMatch = effectiveDate.match(/\b(20\d{2})\b/);
     const targetYear = yearMatch ? yearMatch[1] : `${new Date().getFullYear()}`;
 
-    // Enforce rate limiting
+    // Enforce rate limiting (global/user bucket) plus a strict per-claim
+    // budget cap so one case cannot burn unbounded Firecrawl spend via
+    // repeated explicit re-runs. Per-claim bucket: 5 crawls / 10 min.
     const limitStatus = await rateLimiter.limit(ctx, "policyCrawler", {
       key: userId || args.payer || "global",
     });
     if (!limitStatus.ok) {
       throw new Error(
         `Rate limit reached for clinical policy crawling. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+      );
+    }
+    const claimLimitStatus = await rateLimiter.limit(ctx, "policyCrawlPerClaim", {
+      key: String(args.claimId),
+    });
+    if (!claimLimitStatus.ok) {
+      throw new Error(
+        `Per-case crawl budget exceeded (5 crawls / 10 min). Please wait ${Math.ceil((claimLimitStatus.retryAfter || 60000) / 1000)}s before re-running policy research for this case.`
       );
     }
 
@@ -3082,8 +3102,23 @@ export async function performCrawlInsurerPolicy(
     });
 
     let policySource: FirecrawlPolicySource | null = null;
+    // Per-crawl Firecrawl scrape budget (defined before both branches so the
+    // custom-URL fast path also counts against the per-claim cap).
+    let liveScrapesAttempted = 0;
+    const budgetedScrape = async (
+      targetUrl: string,
+      opts: { payer?: string; cptCodes: string[]; denialReasonCode?: string; forceRescan?: boolean; captureScreenshot?: boolean }
+    ): Promise<FirecrawlPolicySource> => {
+      if (liveScrapesAttempted >= MAX_FIRECRAWL_SCRAPES_PER_CRAWL) {
+        throw new Error(
+          `Per-case Firecrawl scrape budget exceeded (${MAX_FIRECRAWL_SCRAPES_PER_CRAWL} live scrapes). Stopping further policy fetches for this run.`
+        );
+      }
+      liveScrapesAttempted += 1;
+      return await scrapeFirecrawlPolicySource(ctx, targetUrl, opts);
+    };
     if (args.customPolicyUrl) {
-      const candidateSource = await scrapeFirecrawlPolicySource(ctx, args.customPolicyUrl, {
+      const candidateSource = await budgetedScrape(args.customPolicyUrl, {
         payer: args.payer,
         cptCodes: args.cptCodes,
         denialReasonCode: args.denialReasonCode,
@@ -3143,6 +3178,9 @@ export async function performCrawlInsurerPolicy(
       const searchFailures: string[] = [];
       const seenSourceUrls = new Set<string>();
       let discoveredSourceCount = 0;
+      // Note: liveScrapesAttempted / budgetedScrape defined above (covers both
+      // custom-URL and search branches); cached snapshots bypass the counter
+      // inside scrapeFirecrawlPolicySource's early return.
       // Best-available vintage fallback: the first substantive document rejected
       // ONLY for archived/outdated vintage (not wrong anatomy, billing, landing,
       // or payer mismatch). Used when no active edition is retrievable so the
@@ -3166,7 +3204,7 @@ export async function performCrawlInsurerPolicy(
         seenSourceUrls.add(sourceUrl);
         discoveredSourceCount += 1;
         try {
-          const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl, {
+          const candidateSource = await budgetedScrape(sourceUrl, {
             payer: args.payer,
             cptCodes: args.cptCodes,
             denialReasonCode: args.denialReasonCode,
@@ -3331,7 +3369,7 @@ export async function performCrawlInsurerPolicy(
           const scrapedBatch = await Promise.all(
             batch.map(async (sourceUrl) => {
               try {
-                const candidateSource = await scrapeFirecrawlPolicySource(ctx, sourceUrl, {
+                const candidateSource = await budgetedScrape(sourceUrl, {
                   payer: args.payer,
                   cptCodes: args.cptCodes,
                   denialReasonCode: args.denialReasonCode,
@@ -3392,7 +3430,7 @@ export async function performCrawlInsurerPolicy(
                 seenSourceUrls.add(childUrl);
                 discoveredSourceCount += 1;
                 try {
-                  const childSource = await scrapeFirecrawlPolicySource(ctx, childUrl, {
+                  const childSource = await budgetedScrape(childUrl, {
                     payer: args.payer,
                     cptCodes: args.cptCodes,
                     denialReasonCode: args.denialReasonCode,
@@ -4443,6 +4481,14 @@ async function performDiscoverInsurerPolicyDirectory(
   if (!limitStatus.ok) {
     throw new Error(
       `Rate limit reached for policy directory discovery. Please retry in ${Math.ceil((limitStatus.retryAfter || 1000) / 1000)} seconds.`
+    );
+  }
+  const dirClaimLimit = await rateLimiter.limit(ctx, "policyCrawlPerClaim", {
+    key: String(args.claimId),
+  });
+  if (!dirClaimLimit.ok) {
+    throw new Error(
+      `Per-case crawl budget exceeded (5 crawls / 10 min). Please wait ${Math.ceil((dirClaimLimit.retryAfter || 60000) / 1000)}s before re-running directory discovery for this case.`
     );
   }
 

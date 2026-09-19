@@ -38,4 +38,17 @@ crons.interval(
   {}
 );
 
+/**
+ * Daily Expired Policy Snapshot Sweep Cron:
+ * Enforces the 7-day (clamped 1h-30d) TTL on cached Firecrawl policy
+ * snapshots so stale clinical criteria cannot be served indefinitely and
+ * snapshot storage stays bounded.
+ */
+crons.interval(
+  "sweep-expired-policy-snapshots",
+  { hours: 24 },
+  internal.clinicalEvidences.sweepExpiredPolicySnapshotsInternal,
+  {}
+);
+
 export default crons;

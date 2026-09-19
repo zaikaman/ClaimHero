@@ -246,7 +246,13 @@ describe("Ingestion Pipeline & Cascading Deletion Hardening", () => {
 
       expect(mockCtx.db.delete).toHaveBeenCalledWith("p2p_script_1");
       expect(mockCtx.db.delete).toHaveBeenCalledWith("p2p_session_1");
-      expect(mockCtx.scheduler.runAfter).not.toHaveBeenCalled();
+      // Collaborator grants must purge even for small cases (<50 rows):
+      // cascade must not depend on a full-page condition.
+      expect(mockCtx.scheduler.runAfter).toHaveBeenCalledWith(
+        0,
+        internal.claimCollaborators.purgeClaimInternal,
+        { claimId: "claim_p2p" }
+      );
     });
   });
 
