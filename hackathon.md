@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-19T04:10:30Z
+- **Last updated:** 2026-09-19T04:35:00Z
 
 ## Log
 
@@ -1759,12 +1759,19 @@ Remediated critical and high security audit findings across authentication, webh
 - Collaborator Grant Scale & Shared Communications (Item 14): Added compound index `by_user_and_status` on `claimCollaborators` to eliminate `.take(20)` scan truncation. Extended communication access in `convex/emails.ts` (`listComponentInboundMessages`, `getOutboundDeliveryStatus`) to active collaborators.
 - Regression Coverage & Verification: Added comprehensive security suite in `tests/securityAuditRemediation.test.ts` with 16 targeted tests. Verified 81 test files (1,275 passing tests), clean typecheck, clean lint, coverage thresholds, and production build. Convex features: schema, tables, indexes, queries, mutations, internalMutation, internalQuery, httpAction, storage.
 
-### 2026-09-19 - working tree
+### 2026-09-19 - 5dcc39a
 Replaced stale `overturnProbabilityScore` throughout the codebase with canonical 4-pillar evidence scoring (`appealReadinessScore` and `evidenceCoverageScore`) per `README.md` ("Evidence coverage, not outcome prediction: ClaimHero's 0–100 Evidence Coverage & Precedent Match Score is a readiness checklist, not a prediction that an appeal will win"):
 - Grounded Data Model & Types: Updated `src/types/index.ts` (`Claim`, `OverturnScoringResult`), `convex/schema.ts`, and `specs/001-appeal-sentinel/data-model.md` to establish `appealReadinessScore` (0-100 dossier readiness checklist, capped at 40 when evidentially degraded) and `evidenceCoverageScore` (un-capped 0-100 documentary completeness across the 4 statutory pillars) as canonical primary fields, deprecating legacy `overturnProbabilityScore`.
 - Backend Pipeline & Seeder Modernization: Updated `convex/demoSeeder.ts` to explicitly populate `appealReadinessScore` and `evidenceCoverageScore` (96, 94, 91) across Eleanor Vance, Marcus Sterling, and Elena Rostova demo fixtures. Hardened `applyStatusUpdate` in `convex/claims.ts` to preserve distinct readiness and coverage scores without flattening. Prioritized canonical scores in `convex/workflows.ts`, `convex/actions/sentinelPipeline.ts`, `convex/chatbot.ts`, and `convex/lib/adversaryNegotiation.ts`.
 - Frontend Presentation & Aggregations: Replaced legacy score lookups and calculations in `CaseRadar.tsx` (average portfolio score and high-readiness count), `EvidenceMatrix.tsx` (score gauge, analysis toast, and footer counters), `SentinelFlowStepper.tsx` (step 1 subtitle and header badge), `SimpleEvidenceView.tsx`, `AgentMailDrawer.tsx` (provisional cap banner), `IngestionModal.tsx`, and `OnboardingWizard.tsx`.
 - Regression Coverage: Updated `tests/anonymousAuthAndSeeder.test.ts` and `tests/convexClaimsFull.test.ts` to assert canonical scoring fields; verified all 81 test files (1,274 tests passing), typecheck (`tsc --noEmit`), and lint (`eslint src convex`).
+
+### 2026-09-19 - working tree
+Fixed critical PHI dispatch security vulnerability where unverified LLM-hallucinated contacts were marked verified and passed outbound transmission gates (`convex/actions/payerContactResolver.ts`, `convex/actions/mailDispatcher.ts`, `convex/claims.ts`, `README.md`, `tests/actionsClinicalAndParser.test.ts`, `tests/securityComplianceHardening.test.ts`):
+- Strict Anti-Hallucination Contact Corroboration: In `convex/actions/payerContactResolver.ts`, enforced `hasLiveSearchEvidence` as a strict prerequisite for `isLiveCorroborated`. Zero search results ("No live search results available") or search errors can never resolve as verified (`isVerified: false`, `source: "unresolved"`, `officialAppealsEmail: undefined`), eliminating synthetic `ai_knowledge` verified contacts. Discarded ungrounded emails from LLM completions that have no provenance in live crawl content or discovered payer domains. Ensured `reverifyPayerContactForDispatch` strictly requires `resolved.source === "firecrawl_live"` when checking email channels.
+- Hardened Outbound Mail Dispatch Gate: In `convex/actions/mailDispatcher.ts`, hardened the pre-transmission validation gate (`sendOutboundMessage:652`) to explicitly reject contacts originating from `ai_knowledge`, `registry_fallback`, `unresolved`, or uncorroborated sources, strictly requiring verified `firecrawl_live` or `document_ocr` provenance for automated transmissions even when an email thread was previously pre-populated with an unverified address. In `dispatchAppealPacket`, restricted verified gateway resolution to `firecrawl_live` and `document_ocr`.
+- Thread Payer Email Protection: In `convex/claims.ts` (`applyPayerContactUpdate`), restricted patching `emailThreads.payerEmail` to contacts that are explicitly verified with `firecrawl_live` or `document_ocr` provenance, preventing unverified or hallucinated contacts from leaking into thread reply addresses.
+- Regression Coverage & Verification: Added comprehensive regression tests in `tests/actionsClinicalAndParser.test.ts` and `tests/securityComplianceHardening.test.ts` verifying that empty search results with LLM-invented emails resolve unverified, hallucinated emails with ungrounded domains are discarded, and outbound mail dispatch strictly rejects `ai_knowledge` and `unresolved` contacts (including pre-existing thread matches). Updated `README.md` (1,279 automated tests across 81 suites). Verified full local gate via `npm run verify` (100% typecheck, 0 lint warnings/errors, 1,279 passing tests across 81 suites with full backend coverage, and production build).
 
 
 

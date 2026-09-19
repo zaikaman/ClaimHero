@@ -268,7 +268,11 @@ export async function performDispatchAppealPacket(
         }
       }
 
-      if (reverifiedContact?.isVerified && reverifiedContact.officialAppealsEmail) {
+      if (
+        reverifiedContact?.isVerified &&
+        reverifiedContact.source === "firecrawl_live" &&
+        reverifiedContact.officialAppealsEmail
+      ) {
         recipient = reverifiedContact.officialAppealsEmail;
       } else if (
         claim.payerContact?.isVerified &&
@@ -637,6 +641,17 @@ async function performSendOutboundMessage(
     }
   }
 
+  const priorMessages = threadData?.messages || [];
+  const messageIds = priorMessages
+    .map((m) => m.agentMailMessageId?.trim())
+    .filter((id): id is string => Boolean(id));
+
+  // Find the last inbound message received in this correspondence, if any
+  const lastInbound = [...priorMessages].reverse().find(
+    (m) => m.direction === "inbound" && m.agentMailMessageId?.trim()
+  );
+  const lastInboundMessageId = lastInbound?.agentMailMessageId?.trim();
+
   const recipient =
     args.customRecipient ||
     threadData?.thread?.payerEmail ||
@@ -646,10 +661,16 @@ async function performSendOutboundMessage(
 
   if (
     !args.customRecipient &&
-    !threadData?.thread?.payerEmail &&
-    claim.payerContact?.officialAppealsEmail
+    claim.payerContact?.officialAppealsEmail &&
+    (!threadData?.thread?.payerEmail ||
+      threadData.thread.payerEmail === claim.payerContact.officialAppealsEmail)
   ) {
-    if (!claim.payerContact.isVerified || claim.payerContact.source === "registry_fallback") {
+    if (
+      !claim.payerContact.isVerified ||
+      claim.payerContact.source === "registry_fallback" ||
+      claim.payerContact.source === "ai_knowledge" ||
+      claim.payerContact.source === "unresolved"
+    ) {
       throw new Error(
         `Verified contact for ${payer} could not be confirmed via live verification (${claim.payerContact.registryDate || "historical baseline"}). Please provide a recipient email or use the verified intake route on file.`
       );
@@ -669,17 +690,6 @@ async function performSendOutboundMessage(
     const rawSubject = `Re: Formal Medical Appeal | Claim #${claim.claimNumber} | Addendum`;
     subject = rawSubject.includes(claimTag) ? rawSubject : `${claimTag} ${rawSubject}`;
   }
-
-  const priorMessages = threadData?.messages || [];
-  const messageIds = priorMessages
-    .map((m) => m.agentMailMessageId?.trim())
-    .filter((id): id is string => Boolean(id));
-
-  // Find the last inbound message received in this correspondence, if any
-  const lastInbound = [...priorMessages].reverse().find(
-    (m) => m.direction === "inbound" && m.agentMailMessageId?.trim()
-  );
-  const lastInboundMessageId = lastInbound?.agentMailMessageId?.trim();
 
   const lastMsgId = messageIds[messageIds.length - 1];
   const inReplyTo = lastMsgId ? formatMessageIdHeader(lastMsgId) : undefined;

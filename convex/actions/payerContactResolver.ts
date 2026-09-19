@@ -220,6 +220,7 @@ export async function performResolvePayerGateway(
   // 2. Dynamic Discovery via Multi-Query Firecrawl Search + Candidate Extraction
   let webSearchContext = "";
   let detectedPriorityEmails: string[] = [];
+  let deduplicatedItems: Array<{ title: string; url: string; markdown: string }> = [];
 
   try {
     const searchQueries = [
@@ -248,7 +249,7 @@ export async function performResolvePayerGateway(
     }
 
     const seenUrls = new Set<string>();
-    const deduplicatedItems: Array<{ title: string; url: string; markdown: string }> = [];
+    deduplicatedItems = [];
 
     for (const item of allRawItems) {
       const normUrl = (item.url || "").toLowerCase().split("?")[0].replace(/\/+$/, "");
@@ -325,8 +326,34 @@ Extract the authentic appeals/grievance/claims intake gateway details for ${paye
       return trimmed;
     };
 
+    const hasLiveSearchEvidence = Boolean(
+      webSearchContext &&
+        webSearchContext.trim().length > 0 &&
+        deduplicatedItems.length > 0
+    );
+
     let extractedEmail = cleanField(aiExtraction.officialAppealsEmail);
-    // Dynamic Grounding Recovery: if LLM omitted email but crawl evidence contained verified priority emails
+
+    // Strict Anti-Hallucination Email Verification:
+    // Any email extracted by the LLM must have verifiable provenance in the live search text.
+    // An LLM cannot mark an email verified if that email does not exist in the crawl evidence.
+    if (extractedEmail && extractedEmail.includes("@")) {
+      const emailLower = extractedEmail.toLowerCase();
+      const domain = emailLower.split("@")[1];
+      const inSearchEvidence =
+        hasLiveSearchEvidence &&
+        (webSearchContext.toLowerCase().includes(emailLower) ||
+          Boolean(domain && domain.length > 3 && webSearchContext.toLowerCase().includes(domain)));
+      const inDetectedEmails = detectedPriorityEmails.some(
+        (e) => e.toLowerCase() === emailLower
+      );
+      if (!inSearchEvidence && !inDetectedEmails) {
+        // Discard ungrounded / hallucinated email
+        extractedEmail = undefined;
+      }
+    }
+
+    // Dynamic Grounding Recovery: if LLM omitted or hallucinated email but crawl evidence contained verified priority emails
     if ((!extractedEmail || !extractedEmail.includes("@")) && detectedPriorityEmails.length > 0) {
       const best =
         detectedPriorityEmails.find((e) =>
@@ -349,10 +376,14 @@ Extract the authentic appeals/grievance/claims intake gateway details for ${paye
       extractedEmail || intakePortalUrl || appealsFax || statutoryPoBox
     );
 
+    // Corroboration MUST require actual live search evidence.
+    // Zero search results ("No live search results available") or pure LLM parametric
+    // knowledge (ai_knowledge) can NEVER be marked isVerified: true.
     const isLiveCorroborated = Boolean(
-      hasLiveContact &&
+      hasLiveSearchEvidence &&
+        hasLiveContact &&
         (aiExtraction.isVerified ||
-          (webSearchContext && (extractedEmail || intakePortalUrl || appealsFax)))
+          Boolean(extractedEmail || intakePortalUrl || appealsFax))
     );
 
     if (isLiveCorroborated) {
@@ -373,7 +404,7 @@ Extract the authentic appeals/grievance/claims intake gateway details for ${paye
         submissionPolicyNote:
           submissionPolicyNote ||
           "Submissions accepted via verified official payer channels.",
-        source: webSearchContext ? "firecrawl_live" : "ai_knowledge",
+        source: "firecrawl_live",
       };
     } else {
       resolvedContact = {
@@ -520,7 +551,11 @@ export const reverifyPayerContactForDispatch = action({
 
     const isTargetChannelVerified =
       args.intendedChannel === "email"
-        ? Boolean(resolved.isVerified && resolved.officialAppealsEmail)
+        ? Boolean(
+            resolved.isVerified &&
+              resolved.source === "firecrawl_live" &&
+              resolved.officialAppealsEmail
+          )
         : args.intendedChannel === "fax"
           ? Boolean(resolved.isVerified && resolved.appealsFax)
           : args.intendedChannel === "portal"

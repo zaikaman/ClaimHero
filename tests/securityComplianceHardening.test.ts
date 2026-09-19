@@ -772,6 +772,115 @@ describe("Security, PHI Compliance & Abuse Prevention Hardening", () => {
       ).rejects.toThrow(/Verified contact for .* could not be confirmed/i);
     });
 
+    it("sendOutboundMessage: blocks dispatch to ai_knowledge contact even if isVerified is true (prevents PHI leakage to hallucinated email)", async () => {
+      vi.spyOn(auth, "requireClaimOwnerAction").mockResolvedValue({
+        claim: {
+          _id: "claim_outbound_ai_knowledge" as any,
+          claimNumber: "CLM-8888-AET-4444",
+          patientName: "Jane Roe",
+          status: "ready_for_review",
+          isHumanApproved: true,
+          patient: { insurancePayer: "Aetna", name: "Jane Roe" },
+          deniedAmount: 15000,
+          payerContact: {
+            officialAppealsEmail: "hallucinated_appeals@aetna.com",
+            isVerified: true,
+            source: "ai_knowledge",
+          },
+        } as any,
+        userId: "user_123" as any,
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(null),
+      };
+
+      await expect(
+        (mailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+          claimId: "claim_outbound_ai_knowledge",
+          text: "Here is our clinical addendum containing PHI.",
+        })
+      ).rejects.toThrow(/Verified contact for .* could not be confirmed/i);
+    });
+
+    it("sendOutboundMessage: blocks dispatch when payerContact source is unresolved", async () => {
+      vi.spyOn(auth, "requireClaimOwnerAction").mockResolvedValue({
+        claim: {
+          _id: "claim_outbound_unresolved" as any,
+          claimNumber: "CLM-8888-UNR-5555",
+          patientName: "Jane Roe",
+          status: "ready_for_review",
+          isHumanApproved: true,
+          patient: { insurancePayer: "Regional Care", name: "Jane Roe" },
+          deniedAmount: 15000,
+          payerContact: {
+            officialAppealsEmail: "unverified@regionalcare.org",
+            isVerified: false,
+            source: "unresolved",
+          },
+        } as any,
+        userId: "user_123" as any,
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(null),
+      };
+
+      await expect(
+        (mailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+          claimId: "claim_outbound_unresolved",
+          text: "Here is our clinical addendum.",
+        })
+      ).rejects.toThrow(/Verified contact for .* could not be confirmed/i);
+    });
+
+    it("sendOutboundMessage: blocks dispatch even when email thread was pre-populated with unverified payerContact", async () => {
+      vi.spyOn(auth, "requireClaimOwnerAction").mockResolvedValue({
+        claim: {
+          _id: "claim_outbound_legacy_thread" as any,
+          claimNumber: "CLM-8888-LEG-6666",
+          patientName: "Jane Roe",
+          status: "ready_for_review",
+          isHumanApproved: true,
+          patient: { insurancePayer: "Legacy Health", name: "Jane Roe" },
+          deniedAmount: 15000,
+          payerContact: {
+            officialAppealsEmail: "hallucinated_legacy@legacyhealth.org",
+            isVerified: true,
+            source: "ai_knowledge",
+          },
+        } as any,
+        userId: "user_123" as any,
+      });
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation(async (_ref, args) => {
+          if (args?.claimId === "claim_outbound_legacy_thread") {
+            return [{ _id: "thread_legacy_1" }];
+          }
+          if (args?.threadId === "thread_legacy_1") {
+            return {
+              thread: {
+                _id: "thread_legacy_1",
+                claimId: "claim_outbound_legacy_thread",
+                payerEmail: "hallucinated_legacy@legacyhealth.org",
+                subject: "Appeal CLM-8888-LEG-6666",
+              },
+              messages: [],
+            };
+          }
+          return null;
+        }),
+      };
+
+      await expect(
+        (mailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+          claimId: "claim_outbound_legacy_thread",
+          text: "Here is our clinical addendum containing PHI.",
+        })
+      ).rejects.toThrow(/Verified contact for .* could not be confirmed/i);
+    });
+
     it("healRedactedPatientNamesInternal: rejects missing confirm flag before performing any database work", async () => {
       const mockCtx: any = { db: {} };
 

@@ -2999,7 +2999,13 @@ async function applyPayerContactUpdate(ctx: MutationCtx, args: PayerContactUpdat
     .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
     .first();
 
-  if (thread && args.payerContact.officialAppealsEmail) {
+  if (
+    thread &&
+    args.payerContact.officialAppealsEmail &&
+    args.payerContact.isVerified &&
+    (args.payerContact.source === "firecrawl_live" ||
+      args.payerContact.source === "document_ocr")
+  ) {
     await ctx.db.patch(thread._id, {
       payerEmail: args.payerContact.officialAppealsEmail,
     });

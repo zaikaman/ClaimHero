@@ -644,5 +644,102 @@ describe("Convex Actions: Clinical Intake, Optical Parser & Payer Contact Resolv
         })
       ).rejects.toThrow(/Claim c_missing not found/);
     });
+
+    it("resolvePayerGateway: rejects LLM hallucinated email and isVerified=true when live search results are empty", async () => {
+      const mockClaim = {
+        _id: "c_empty_live",
+        claimNumber: "CLM-EMPTY-1",
+        userId: "user_123",
+        patient: { insurancePayer: "Phantom Health Insurance", state: "NY" },
+      };
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(mockClaim),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+        runAction: vi.fn().mockResolvedValue({ web: [] }),
+      };
+
+      // LLM hallucinates an appeals email and asserts isVerified: true despite empty search results
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        officialAppealsEmail: "appeals@phantomhealth.com",
+        intakePortalUrl: "https://phantomhealth.com/portal",
+        portalName: "Phantom Appeals Portal",
+        appealsFax: "1-800-555-0199",
+        statutoryPoBox: "PO Box 123",
+        ediPayerId: "12345",
+        tollFreeHelpline: "1-800-555-0100",
+        isVerified: true,
+        submissionPolicyNote: "Discovered via AI parametric memory",
+        source: "ai_knowledge",
+      } as any);
+
+      const res = await (actionPayerContactResolver.resolvePayerGateway as any)._handler(mockCtx, {
+        claimId: "c_empty_live",
+        payerName: "Phantom Health Insurance",
+      });
+
+      // Must be rejected and marked unverified
+      expect(res.isVerified).toBe(false);
+      expect(res.source).toBe("unresolved");
+      expect(res.officialAppealsEmail).toBeUndefined();
+      expect(res.intakePortalUrl).toBeUndefined();
+      expect(res.appealsFax).toBeUndefined();
+      expect(res.submissionPolicyNote).toContain("could not be verified automatically");
+      expect(mockCtx.runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        claimId: "c_empty_live",
+        payerContact: expect.objectContaining({
+          isVerified: false,
+          source: "unresolved",
+          officialAppealsEmail: undefined,
+        }),
+      }));
+    });
+
+    it("resolvePayerGateway: discards hallucinated email not corroborated by live crawl evidence", async () => {
+      const mockClaim = {
+        _id: "c_ungrounded_email",
+        claimNumber: "CLM-UNGROUNDED-1",
+        userId: "user_123",
+        patient: { insurancePayer: "State Farm Mutual", state: "IL" },
+      };
+      const mockCtx: any = {
+        runQuery: vi.fn().mockResolvedValue(mockClaim),
+        runMutation: vi.fn().mockResolvedValue(undefined),
+        runAction: vi.fn().mockResolvedValue({
+          web: [
+            {
+              title: "State Farm Filing Procedure",
+              url: "https://statefarm.com/claims/appeals",
+              markdown: "All appeals must be submitted online through the State Farm Provider Portal or via fax at 800-555-4321. Do not submit appeals via email.",
+            },
+          ],
+        }),
+      };
+
+      // LLM invents an email address on an ungrounded domain not present in search results
+      vi.spyOn(libOpenAI, "createStructuredCompletion").mockResolvedValue({
+        officialAppealsEmail: "claims-appeals@unverified-thirdparty-intake.com",
+        intakePortalUrl: "https://statefarm.com/claims/appeals",
+        portalName: "State Farm Provider Portal",
+        appealsFax: "800-555-4321",
+        statutoryPoBox: "",
+        ediPayerId: "",
+        tollFreeHelpline: "",
+        isVerified: true,
+        submissionPolicyNote: "Live verified portal and fax.",
+        source: "firecrawl_live",
+      } as any);
+
+      const res = await (actionPayerContactResolver.resolvePayerGateway as any)._handler(mockCtx, {
+        claimId: "c_ungrounded_email",
+        payerName: "State Farm Mutual",
+      });
+
+      // Portal and fax are corroborated, but hallucinated email must be discarded
+      expect(res.isVerified).toBe(true);
+      expect(res.source).toBe("firecrawl_live");
+      expect(res.officialAppealsEmail).toBeUndefined();
+      expect(res.intakePortalUrl).toBe("https://statefarm.com/claims/appeals");
+      expect(res.appealsFax).toBe("800-555-4321");
+    });
   });
 });
