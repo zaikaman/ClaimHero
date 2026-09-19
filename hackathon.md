@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-19T12:25:00Z
+- **Last updated:** 2026-09-19T13:28:00Z
 
 ## Log
 
@@ -1821,7 +1821,7 @@ Fixed authenticated users being bounced off the landing page: the hidden pre-mou
 ### 2026-09-19 - c66ae6d
 Replaced the video-backed public surface with an editorial black-and-white landing over one shared Unicorn Studio WebGL backdrop: new `TemplateLanding.tsx` story (serif hero, stat row, workspace/denial/demo/artifact/trust/start sections), new `UnicornBackground.tsx` scene host (`bmaMERjX2VZDtPrh4Zwx`, runtime-injected CDN script, single instance shared by landing and login), scrollable `PublicExperience.tsx` container, and `CinematicHero.tsx` stripped to transparent chrome with no video element. Restyled `AuthPage.tsx` to sharp-corner monochrome (black fields, white CTAs, uppercase labels) and added Playfair Display serif (`index.html`, `tailwind.config.js`). Replaced stock art with 4 domain-accurate 16:9 visuals (`public/artifacts/`), rewrote `BRIEF.md` into the full All Gas brief, added `DEMO_SCRIPT.md` (2m55s judge path), and updated coverage to `tests/landingSections.test.ts` plus WebGL-asserting `tests/publicExperienceTransition.test.ts` (`README.md`: 1,304 tests, 83 suites). Convex features: static hosting.
 
-### 2026-09-19 - working tree
+### 2026-09-19 - 8189442
 Fixed layout overflow, multiline text wrapping, and header layout shifting in `src/components/communications/AuditTrailDrawer.tsx`: upgraded drawer container to `sm:max-w-2xl`, renamed the secondary tab header from `"Workflow Observability Timeline"` to `"Pipeline Timeline"` to eliminate ellipsis truncation, removed `flex-wrap` so claim badges remain strictly inline beside the title across both tabs without expanding header height, enforced `whitespace-nowrap` and `shrink-0` across statutory audit and pipeline timeline switcher buttons, prevented ERISA 29 CFR § 2560.503-1 regulatory indicator hyphen-splitting, and added `overflow-x-auto scrollbar-none` protective bounds. Tuned spoken pacing in `DEMO_SCRIPT.md`. Updated regression assertions in `tests/auditTrailDrawer.test.ts` and verified clean typecheck, lint, and all 1,304 tests across 83 test suites.
 
 

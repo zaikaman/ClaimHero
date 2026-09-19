@@ -12,7 +12,7 @@ approves the final transmission.
 <p align="center">
   <a href="https://kindhearted-elephant-992.convex.site"><strong>Open the live app</strong></a>
   &nbsp; · &nbsp;
-  <a href="https://www.youtube.com/watch?v=wLW_ZL093a8"><strong>Watch the 3-minute demo</strong></a>
+  <a href="https://www.youtube.com/watch?v=M04LMuJRilg"><strong>Watch the 3-minute demo</strong></a>
   &nbsp; · &nbsp;
   <a href="./hackathon.md"><strong>Read the build log</strong></a>
 </p>
@@ -299,7 +299,7 @@ ClaimHero/
 ## Submission links
 
 - **Live app:** https://kindhearted-elephant-992.convex.site
-- **Demo video:** https://www.youtube.com/watch?v=wLW_ZL093a8
+- **Demo video:** https://www.youtube.com/watch?v=M04LMuJRilg
 - **Repository:** https://github.com/zaikaman/ClaimHero
 - **Build log:** [`hackathon.md`](./hackathon.md)
 - **Product contract:** [`PRODUCT.md`](./PRODUCT.md)

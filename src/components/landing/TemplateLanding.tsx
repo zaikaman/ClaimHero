@@ -682,7 +682,7 @@ export function TemplateLanding({ onEnterConsole }: TemplateLandingProps) {
                     Demo Video
                   </h4>
                   <a
-                    href="https://www.youtube.com/watch?v=wLW_ZL093a8"
+                    href="https://www.youtube.com/watch?v=M04LMuJRilg"
                     target="_blank"
                     rel="noreferrer"
                     className="text-sm text-white/70 transition-colors hover:text-white"
