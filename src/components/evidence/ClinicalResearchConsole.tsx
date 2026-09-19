@@ -27,7 +27,7 @@ import { Input } from "../ui/input";
 import { Select } from "../ui/select";
 import { Alert, AlertDescription } from "../ui/alert";
 import { stripMarkdownFormatting } from "../../lib/utils";
-import { getPayerClinicalDirectoryUrl } from "../../lib/constants";
+import { getPayerClinicalDirectoryUrl, deduceClaimSpecialty } from "../../lib/constants";
 import { useDetailMode } from "../../hooks/useDetailMode";
 import { PLAIN_FIRST_RUN, getPlainProcedureName } from "../../lib/plainCopy";
 
@@ -251,7 +251,9 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
   const [directoryDomain, setDirectoryDomain] = useState<string>(
     getPayerClinicalDirectoryUrl(claim.patient?.insurancePayer)
   );
-  const [directorySpecialty, setDirectorySpecialty] = useState<string>("Orthopedics");
+  const [directorySpecialty, setDirectorySpecialty] = useState<string>(
+    deduceClaimSpecialty(claim.cptCodes || [], claim.icd10Codes || [])
+  );
   const [directoryLimit, setDirectoryLimit] = useState<number>(30);
   const [saveDiscoveredToEvidence, setSaveDiscoveredToEvidence] = useState<boolean>(true);
   const [discoveredList, setDiscoveredList] = useState<DiscoveredPolicy[]>(discoveredPolicies || []);
@@ -274,9 +276,10 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
 
   useEffect(() => {
     setDirectoryDomain(getPayerClinicalDirectoryUrl(claim.patient?.insurancePayer));
+    setDirectorySpecialty(deduceClaimSpecialty(claim.cptCodes || [], claim.icd10Codes || []));
     setErrorMessage(null);
     setSuccessSummary(null);
-  }, [claim._id, claim.patient?.insurancePayer]);
+  }, [claim._id, claim.patient?.insurancePayer, claim.cptCodes, claim.icd10Codes]);
 
   const stages = activeMode === "directory_discovery" ? [
     { name: "Handshake", desc: isDetailed ? "Firecrawl /v1/map gateway" : "Connecting to the policy site" },
@@ -860,11 +863,13 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                           Payer Presets:
                         </span>
                         {[
-                          { label: isDetailed ? "Aetna CPB" : "Aetna rules", url: "https://www.aetna.com/cpb", spec: "Orthopedics", match: "aetna" },
-                          { label: "Cigna Policies", url: "https://www.cigna.com/coveragePolicies", spec: "Orthopedics", match: "cigna" },
-                          { label: "UHC Commercial", url: "https://www.uhcprovider.com/en/policies-protocols/commercial-policies.html", spec: "Orthopedics", match: "uhc" },
-                          { label: "Anthem / BCBS", url: "https://www.anthem.com/provider/policies", spec: "Orthopedics", match: "anthem" },
-                          { label: "Molina Guidelines", url: "https://www.molinahealthcare.com/providers/common/medicaid/clinical-guidelines.aspx", spec: "Orthopedics", match: "molina" },
+                          { label: isDetailed ? "CMS / Medicare MCD" : "Medicare rules", url: "https://www.cms.gov/medicare-coverage-database", match: "cms.gov" },
+                          { label: isDetailed ? "Aetna CPB" : "Aetna rules", url: "https://www.aetna.com/cpb", match: "aetna" },
+                          { label: "Cigna Policies", url: "https://www.cigna.com/coveragePolicies", match: "cigna" },
+                          { label: "UHC Commercial", url: "https://www.uhcprovider.com/en/policies-protocols/commercial-policies.html", match: "uhc" },
+                          { label: "Anthem / BCBS", url: "https://www.anthem.com/provider/policies", match: "anthem" },
+                          { label: "Humana Guidance", url: "https://www.humana.com/provider/medical-resources/clinical-guidance/medical-policies", match: "humana" },
+                          { label: "Molina Guidelines", url: "https://www.molinahealthcare.com/providers/common/medicaid/clinical-guidelines.aspx", match: "molina" },
                         ].map((p, idx) => {
                           const isMatch = directoryDomain.toLowerCase().includes(p.match);
                           return (
@@ -873,7 +878,6 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                               type="button"
                               onClick={() => {
                                 setDirectoryDomain(p.url);
-                                setDirectorySpecialty(p.spec);
                               }}
                               disabled={isExecuting}
                               className={`text-[11px] font-sans px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
@@ -906,6 +910,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                           className="h-8 text-xs font-sans bg-muted/30 border-border/80 w-full"
                           disabled={isExecuting}
                         >
+                          <option value="General Medicine">General Medicine</option>
                           <option value="Orthopedics">Orthopedics &amp; Musculoskeletal</option>
                           <option value="Spine & Orthopedics">Spine &amp; Orthopedics</option>
                           <option value="Oncology">Oncology &amp; Chemotherapy</option>
@@ -1341,7 +1346,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
 
                   <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-muted-foreground border-t border-border/40">
                     <span className="truncate max-w-[200px]" title={item.url}>{item.url}</span>
-                    <span className="text-violet-400 shrink-0">{item.specialty || "Orthopedics"}</span>
+                    <span className="text-violet-400 shrink-0">{item.specialty || directorySpecialty || "General Medicine"}</span>
                   </div>
                 </div>
               ))}

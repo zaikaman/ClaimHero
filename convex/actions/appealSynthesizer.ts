@@ -412,10 +412,69 @@ export function isPayerMismatchedEvidence(
 import { sanitizePublicPolicyUrl } from "./policyCrawler";
 
 const CPT_EXPECTED_SITES: Record<string, string[]> = {
+  // Orthopedics & Musculoskeletal
   "27447": ["knee", "arthroplasty", "tka", "27447"],
-  "63047": ["spine", "lumbar", "laminectomy", "facetectomy", "63047"],
-  "73721": ["mri", "73721"],
+  "27130": ["hip", "arthroplasty", "tha", "27130"],
   "29881": ["knee", "meniscectomy", "arthroscopy", "29881"],
+  "29877": ["knee", "debridement", "chondroplasty", "29877"],
+  "29827": ["shoulder", "rotator", "cuff", "29827"],
+  "23412": ["shoulder", "rotator", "cuff", "23412"],
+  "20610": ["arthrocentesis", "joint", "injection", "20610"],
+  "28285": ["hammertoe", "toe", "28285"],
+  "28296": ["bunion", "bunionectomy", "hallux", "28296"],
+
+  // Spine & Neurosurgery
+  "63047": ["spine", "lumbar", "laminectomy", "facetectomy", "decompression", "63047"],
+  "22633": ["spine", "lumbar", "arthrodesis", "fusion", "22633"],
+  "22558": ["spine", "lumbar", "anterior", "fusion", "22558"],
+  "63030": ["spine", "lumbar", "discectomy", "laminotomy", "63030"],
+  "64483": ["spine", "lumbar", "epidural", "transforaminal", "64483"],
+  "62322": ["spine", "lumbar", "sacral", "epidural", "62322"],
+
+  // Oncology & Hematology
+  "96413": ["chemotherapy", "infusion", "oncology", "cancer", "antineoplastic", "96413"],
+  "96415": ["chemotherapy", "infusion", "oncology", "96415"],
+  "J9271": ["pembrolizumab", "keytruda", "oncology", "cancer", "immunotherapy", "j9271"],
+  "J9312": ["rituximab", "rituxan", "lymphoma", "oncology", "cancer", "j9312"],
+  "J9035": ["bevacizumab", "avastin", "oncology", "cancer", "j9035"],
+  "77427": ["radiation", "radiotherapy", "oncology", "cancer", "77427"],
+  "77301": ["imrt", "intensity modulated", "radiation", "oncology", "77301"],
+  "38500": ["lymph", "biopsy", "lymphadenectomy", "oncology", "38500"],
+
+  // Cardiology & Vascular
+  "93458": ["catheterization", "angiography", "coronary", "cardiac", "heart", "93458"],
+  "93451": ["catheterization", "right heart", "cardiac", "heart", "93451"],
+  "92928": ["stent", "angioplasty", "coronary", "cardiac", "heart", "92928"],
+  "33533": ["cabg", "bypass", "coronary", "cardiac", "heart", "33533"],
+  "93306": ["echocardiogram", "echocardiography", "cardiac", "heart", "93306"],
+  "93000": ["electrocardiogram", "ecg", "ekg", "cardiac", "heart", "93000"],
+  "33405": ["aortic", "valve", "cardiac", "heart", "33405"],
+  "93653": ["ablation", "arrhythmia", "cardiac", "electrophysiologic", "93653"],
+
+  // Radiology & Imaging
+  "73721": ["mri", "knee", "lower extremity", "73721"],
+  "70553": ["mri", "brain", "neuro", "70553"],
+  "71275": ["cta", "ct", "chest", "angiography", "71275"],
+  "74177": ["ct", "abdomen", "pelvis", "74177"],
+  "72148": ["mri", "spine", "lumbar", "72148"],
+  "73221": ["mri", "upper extremity", "shoulder", "73221"],
+
+  // Gastroenterology
+  "43239": ["endoscopy", "egd", "esophagogastroduodenoscopy", "gastric", "biopsy", "43239"],
+  "45378": ["colonoscopy", "colorectal", "polyp", "colon", "45378"],
+  "45380": ["colonoscopy", "biopsy", "colon", "45380"],
+  "45385": ["colonoscopy", "polypectomy", "snare", "colon", "45385"],
+
+  // General Surgery
+  "47562": ["cholecystectomy", "gallbladder", "laparoscopic", "47562"],
+  "49505": ["hernia", "inguinal", "herniorrhaphy", "49505"],
+  "44950": ["appendectomy", "appendix", "44950"],
+
+  // Evaluation & Management
+  "99213": ["outpatient", "office visit", "evaluation", "management", "99213"],
+  "99214": ["outpatient", "office visit", "evaluation", "management", "99214"],
+  "99215": ["outpatient", "office visit", "evaluation", "management", "99215"],
+  "99285": ["emergency", "department", "evaluation", "management", "99285"],
 };
 
 const ANATOMICAL_CONFLICT_RULES: Array<{
@@ -423,16 +482,16 @@ const ANATOMICAL_CONFLICT_RULES: Array<{
   conflictTokens: string[];
 }> = [
   {
-    primaryTokens: ["knee", "tka", "patella", "meniscus", "27447", "29881"],
-    conflictTokens: ["hip", "tha", "shoulder", "spine", "lumbar", "cervical", "foot", "ankle", "wrist", "elbow", "bunion", "hallux"],
+    primaryTokens: ["knee", "tka", "patella", "meniscus", "27447", "29881", "29877"],
+    conflictTokens: ["hip", "tha", "shoulder", "spine", "lumbar", "cervical", "foot", "ankle", "wrist", "elbow", "bunion", "hallux", "chemotherapy", "cardiac catheterization", "colonoscopy", "endoscopy", "cholecystectomy"],
   },
   {
     primaryTokens: ["hip", "tha", "acetabular", "27130"],
-    conflictTokens: ["knee", "tka", "shoulder", "spine", "lumbar", "cervical", "foot", "ankle", "wrist", "elbow", "bunion", "hallux"],
+    conflictTokens: ["knee", "tka", "shoulder", "spine", "lumbar", "cervical", "foot", "ankle", "wrist", "elbow", "bunion", "hallux", "chemotherapy", "colonoscopy", "endoscopy", "cholecystectomy"],
   },
   {
-    primaryTokens: ["spine", "lumbar", "laminectomy", "facetectomy", "vertebroplasty", "63047"],
-    conflictTokens: ["knee", "tka", "hip", "tha", "shoulder", "foot", "ankle", "wrist", "elbow", "bunion", "hallux"],
+    primaryTokens: ["spine", "lumbar", "laminectomy", "facetectomy", "vertebroplasty", "63047", "22633", "22558", "63030"],
+    conflictTokens: ["knee", "tka", "hip", "tha", "shoulder", "foot", "ankle", "wrist", "elbow", "bunion", "hallux", "chemotherapy", "coronary stent", "colonoscopy", "endoscopy", "cholecystectomy"],
   },
   {
     primaryTokens: ["cervical"],
@@ -443,12 +502,28 @@ const ANATOMICAL_CONFLICT_RULES: Array<{
     conflictTokens: ["cervical", "thoracic", "knee", "hip", "foot", "ankle"],
   },
   {
-    primaryTokens: ["shoulder", "rotator", "glenoid", "29827"],
+    primaryTokens: ["shoulder", "rotator", "glenoid", "29827", "23412"],
     conflictTokens: ["knee", "tka", "hip", "tha", "spine", "lumbar", "cervical", "foot", "ankle", "wrist"],
   },
   {
-    primaryTokens: ["foot", "ankle", "hallux", "bunion", "bunionectomy", "metatarsal"],
-    conflictTokens: ["knee", "hip", "shoulder", "spine", "lumbar", "cervical"],
+    primaryTokens: ["foot", "ankle", "hallux", "bunion", "bunionectomy", "metatarsal", "28285", "28296"],
+    conflictTokens: ["knee", "hip", "shoulder", "spine", "lumbar", "cervical", "chemotherapy"],
+  },
+  {
+    primaryTokens: ["chemotherapy", "antineoplastic", "pembrolizumab", "keytruda", "rituximab", "rituxan", "bevacizumab", "avastin", "imrt", "96413", "96415", "j9271", "j9312", "j9035", "77427", "77301"],
+    conflictTokens: ["arthroplasty", "tka", "tha", "laminectomy", "facetectomy", "meniscectomy", "rotator cuff", "bunionectomy", "cardiac catheterization", "coronary stent", "colonoscopy", "endoscopy"],
+  },
+  {
+    primaryTokens: ["coronary", "catheterization", "angioplasty", "stent", "cabg", "echocardiogram", "cardiac", "93458", "93451", "92928", "33533", "93306", "93000", "33405", "93653"],
+    conflictTokens: ["arthroplasty", "tka", "tha", "laminectomy", "meniscectomy", "rotator cuff", "bunionectomy", "chemotherapy", "pembrolizumab", "colonoscopy", "endoscopy", "cholecystectomy"],
+  },
+  {
+    primaryTokens: ["endoscopy", "colonoscopy", "egd", "colorectal", "polyp", "gastric", "esophagogastroduodenoscopy", "43239", "45378", "45380", "45385"],
+    conflictTokens: ["arthroplasty", "tka", "tha", "laminectomy", "facetectomy", "meniscectomy", "rotator cuff", "bunionectomy", "chemotherapy", "pembrolizumab", "coronary stent", "cardiac catheterization"],
+  },
+  {
+    primaryTokens: ["cholecystectomy", "gallbladder", "hernia", "inguinal", "herniorrhaphy", "appendectomy", "47562", "49505", "44950"],
+    conflictTokens: ["arthroplasty", "tka", "tha", "laminectomy", "facetectomy", "meniscectomy", "rotator cuff", "bunionectomy", "chemotherapy", "pembrolizumab", "coronary stent", "cardiac catheterization"],
   },
 ];
 
@@ -456,11 +531,17 @@ export function isEvidenceSiteMismatched(
   evidence: { title?: string; citationClause?: string; extractedEvidenceMarkdown?: string; sourceUrl?: string },
   claim: { cptCodes?: string[] }
 ): boolean {
-  const cptCodes: string[] = claim?.cptCodes || [];
-  const hasKnown = cptCodes.some((c) => CPT_EXPECTED_SITES[c]);
+  const rawCodes = claim?.cptCodes || [];
+  const cptCodes: string[] = (Array.isArray(rawCodes) ? rawCodes : [])
+    .filter((c): c is string => typeof c === "string")
+    .map((c) => c.trim().toUpperCase());
+  const baseCodes = cptCodes.map((c) => c.split(/[-_]/)[0]);
+  const allCodes = [...new Set([...cptCodes, ...baseCodes])];
+
+  const hasKnown = allCodes.some((c) => CPT_EXPECTED_SITES[c]);
   if (!hasKnown) return false;
 
-  const expected = new Set(cptCodes.flatMap((c) => CPT_EXPECTED_SITES[c] || [c.toLowerCase()]));
+  const expected = new Set(allCodes.flatMap((c) => CPT_EXPECTED_SITES[c] || [c.toLowerCase()]));
   const titleAndClause = `${evidence.title || ""} ${evidence.citationClause || ""}`.toLowerCase();
   const haystack = [evidence.title, evidence.citationClause, evidence.extractedEvidenceMarkdown, evidence.sourceUrl]
     .join(" ")
@@ -471,14 +552,14 @@ export function isEvidenceSiteMismatched(
   // explicitly names a conflicting anatomical site without the target site in its title/clause.
   for (const rule of ANATOMICAL_CONFLICT_RULES) {
     const isTargetGroup = rule.primaryTokens.some((tok) => {
-      return cptCodes.some((c) => c.toLowerCase() === tok) || [...expected].some((e) => e === tok);
+      return allCodes.some((c) => c.toLowerCase() === tok) || [...expected].some((e) => e === tok);
     });
 
     if (isTargetGroup) {
       const hasConflictInTitle = rule.conflictTokens.some((conflict) => {
         const regex = new RegExp(`\\b${conflict}\\b`, "i");
         return regex.test(titleAndClause);
-    });
+      });
 
       const hasPrimaryInTitle = rule.primaryTokens.some((primary) => {
         const regex = new RegExp(`\\b${primary}\\b`, "i");
@@ -494,33 +575,40 @@ export function isEvidenceSiteMismatched(
   const hasExpected = [...expected].some((kw) => haystack.includes(kw));
   if (hasExpected) return false;
 
-  // If the excerpt is generic and mentions no anatomical site at all, do not treat it as mismatched;
-  // the full policy document was already vetted at crawl time. Only flag when it clearly
-  // mentions a different site (foot/bunion vs knee, etc.).
-  const anatomicalLexicon = [
-    "knee",
-    "hip",
-    "spine",
-    "lumbar",
-    "cervical",
-    "shoulder",
-    "foot",
-    "ankle",
-    "hallux",
-    "bunion",
-    "bunionectomy",
-    "metatarsal",
-    "intermetatarsal",
-    "mtp",
-    "valgus",
-    "hand",
-    "wrist",
-    "elbow",
-    "femur",
-    "tibia",
-  ];
-  const mentionsOtherSite = anatomicalLexicon.some((site) => !expected.has(site) && haystack.includes(site));
-  return mentionsOtherSite;
+  // 2. Anatomical Lexicon check scoped strictly to musculoskeletal / limb / spine procedures.
+  // Prevents false rejections on cardiology (femoral sheath access) or oncology (IV access).
+  const isMusculoskeletalClaim = [...expected].some((kw) =>
+    ["knee", "hip", "spine", "lumbar", "cervical", "shoulder", "foot", "ankle", "hallux", "bunion", "tka", "tha", "meniscus"].includes(kw)
+  );
+
+  if (isMusculoskeletalClaim) {
+    const anatomicalLexicon = [
+      "knee",
+      "hip",
+      "spine",
+      "lumbar",
+      "cervical",
+      "shoulder",
+      "foot",
+      "ankle",
+      "hallux",
+      "bunion",
+      "bunionectomy",
+      "metatarsal",
+      "intermetatarsal",
+      "mtp",
+      "valgus",
+      "hand",
+      "wrist",
+      "elbow",
+      "femur",
+      "tibia",
+    ];
+    const mentionsOtherSite = anatomicalLexicon.some((site) => !expected.has(site) && haystack.includes(site));
+    return mentionsOtherSite;
+  }
+
+  return false;
 }
 
 function cleanEvidenceSummary(value?: string): string {

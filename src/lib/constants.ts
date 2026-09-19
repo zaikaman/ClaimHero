@@ -43,49 +43,193 @@ export const PAYER_CLINICAL_DIRECTORIES: Record<string, { name: string; domainUr
   aetna: {
     name: "Aetna",
     domainUrl: "https://www.aetna.com/cpb",
-    defaultSpecialty: "Orthopedics",
+    defaultSpecialty: "General Medicine",
   },
   cigna: {
     name: "Cigna",
     domainUrl: "https://www.cigna.com/coveragePolicies",
-    defaultSpecialty: "Orthopedics",
+    defaultSpecialty: "General Medicine",
   },
   unitedhealthcare: {
     name: "UnitedHealthcare",
     domainUrl: "https://www.uhcprovider.com/en/policies-protocols/commercial-policies.html",
-    defaultSpecialty: "Orthopedics",
+    defaultSpecialty: "General Medicine",
   },
   humana: {
     name: "Humana",
     domainUrl: "https://www.humana.com/provider/medical-resources/clinical-guidance/medical-policies",
-    defaultSpecialty: "Cardiology",
+    defaultSpecialty: "General Medicine",
   },
   anthem: {
     name: "Anthem / BCBS",
     domainUrl: "https://www.anthem.com/provider/policies",
-    defaultSpecialty: "Orthopedics",
+    defaultSpecialty: "General Medicine",
   },
   molina: {
     name: "Molina Healthcare",
     domainUrl: "https://www.molinahealthcare.com/providers/common/medicaid/clinical-guidelines.aspx",
-    defaultSpecialty: "Orthopedics",
+    defaultSpecialty: "General Medicine",
+  },
+  medicare: {
+    name: "Medicare / CMS MCD",
+    domainUrl: "https://www.cms.gov/medicare-coverage-database",
+    defaultSpecialty: "General Medicine",
+  },
+  carelon: {
+    name: "Carelon Medical Benefits Management",
+    domainUrl: "https://guidelines.carelonmedicalbenefitsmanagement.com",
+    defaultSpecialty: "General Medicine",
+  },
+  centene: {
+    name: "Centene / Ambetter",
+    domainUrl: "https://www.centene.com/clinical-criteria.html",
+    defaultSpecialty: "General Medicine",
+  },
+  highmark: {
+    name: "Highmark BCBS",
+    domainUrl: "https://www.highmarkprc.com/medical-policies.html",
+    defaultSpecialty: "General Medicine",
+  },
+  carefirst: {
+    name: "CareFirst BlueCross BlueShield",
+    domainUrl: "https://provider.carefirst.com/providers/medical-policies.page",
+    defaultSpecialty: "General Medicine",
+  },
+  oscar: {
+    name: "Oscar Health",
+    domainUrl: "https://www.hioscar.com/clinical-guidelines",
+    defaultSpecialty: "General Medicine",
   },
 };
 
 export const getPayerClinicalDirectoryUrl = (payerName?: string): string => {
-  if (!payerName) return "https://www.aetna.com/cpb";
-  const norm = payerName.toLowerCase();
-  if (norm.includes("aetna")) return "https://www.aetna.com/cpb";
-  if (norm.includes("cigna")) return "https://www.cigna.com/coveragePolicies";
+  if (!payerName) return "https://www.cms.gov/medicare-coverage-database";
+  const norm = payerName.toLowerCase().trim();
+  if (norm.includes("aetna") || norm.includes("cvs")) return "https://www.aetna.com/cpb";
+  if (norm.includes("cigna") || norm.includes("evernorth")) return "https://www.cigna.com/coveragePolicies";
   if (norm.includes("united") || norm.includes("uhc") || norm.includes("optum")) {
     return "https://www.uhcprovider.com/en/policies-protocols/commercial-policies.html";
   }
   if (norm.includes("humana")) return "https://www.humana.com/provider/medical-resources/clinical-guidance/medical-policies";
-  if (norm.includes("anthem") || norm.includes("blue") || norm.includes("bcbs")) {
+  if (norm.includes("highmark")) return "https://www.highmarkprc.com/medical-policies.html";
+  if (norm.includes("carefirst")) return "https://provider.carefirst.com/providers/medical-policies.page";
+  if (norm.includes("anthem") || norm.includes("blue") || norm.includes("bcbs") || norm.includes("elevance")) {
     return "https://www.anthem.com/provider/policies";
   }
   if (norm.includes("molina")) return "https://www.molinahealthcare.com/providers/common/medicaid/clinical-guidelines.aspx";
-  return "https://www.aetna.com/cpb";
+  if (norm.includes("kaiser")) return "https://healthy.kaiserpermanente.org/clinical-library";
+  if (norm.includes("medicare") || norm.includes("cms") || norm.includes("medicaid")) {
+    return "https://www.cms.gov/medicare-coverage-database";
+  }
+  if (norm.includes("carelon") || norm.includes("aim")) {
+    return "https://guidelines.carelonmedicalbenefitsmanagement.com";
+  }
+  if (norm.includes("centene") || norm.includes("ambetter") || norm.includes("wellcare")) {
+    return "https://www.centene.com/clinical-criteria.html";
+  }
+  if (norm.includes("oscar")) return "https://www.hioscar.com/clinical-guidelines";
+  if (norm.includes("tricare")) return "https://manuals.health.mil";
+
+  // If the payer value itself contains a web domain, use it as directory root
+  if (norm.includes(".com") || norm.includes(".org") || norm.includes(".gov") || norm.includes(".net")) {
+    const domainMatch = norm.match(/([a-z0-9-]+\.[a-z0-9.-]+)/);
+    if (domainMatch) return `https://${domainMatch[1]}`;
+  }
+
+  // National neutral federal coverage benchmark under ERISA & ACA
+  return "https://www.cms.gov/medicare-coverage-database";
+};
+
+/**
+ * Deduce medical specialty from claim procedure and diagnosis codes.
+ * Returns an unbiased clinical specialty; falls back to "General Medicine" when undetermined.
+ */
+export const deduceClaimSpecialty = (cptCodes: string[] = [], icd10Codes: string[] = []): string => {
+  const safeCpts = (Array.isArray(cptCodes) ? cptCodes : [])
+    .filter((c): c is string => typeof c === "string")
+    .map((c) => c.trim().toUpperCase());
+  const safeIcds = (Array.isArray(icd10Codes) ? icd10Codes : [])
+    .filter((d): d is string => typeof d === "string")
+    .map((d) => d.trim().toUpperCase());
+
+  // Base procedure codes without modifier suffixes (e.g. "27447-LT" -> "27447", "64483-50" -> "64483")
+  const baseCpts = safeCpts.map((c) => c.split(/[-_]/)[0]);
+  const allCpts = [...new Set([...safeCpts, ...baseCpts])];
+
+  const codes = safeCpts.concat(safeIcds).join(" ").toLowerCase();
+
+  // 1. Oncology & Hematology
+  if (
+    allCpts.some((c) => c.startsWith("964") || c.startsWith("965") || c.startsWith("J9") || ["77427", "77301", "38500"].includes(c)) ||
+    safeIcds.some((d) => d.startsWith("C") || (d.startsWith("D") && !d.startsWith("D5") && !d.startsWith("D6") && !d.startsWith("D7") && !d.startsWith("D8"))) ||
+    codes.includes("cancer") || codes.includes("neoplasm") || codes.includes("chemo") || codes.includes("oncology") || codes.includes("carcinoma") || codes.includes("infusion") || codes.includes("tumor") || codes.includes("radiation") || codes.includes("pembrolizumab")
+  ) {
+    return "Oncology";
+  }
+
+  // 2. Cardiology & Vascular
+  if (
+    allCpts.some((c) => c.startsWith("93") || c.startsWith("33") || c.startsWith("35") || c.startsWith("36") || ["92928", "92920", "92924"].includes(c)) ||
+    safeIcds.some((d) => d.startsWith("I")) ||
+    codes.includes("cardiac") || codes.includes("cardiology") || codes.includes("coronary") || codes.includes("stent") || codes.includes("angioplasty") || codes.includes("catheterization") || codes.includes("arrhythmia") || codes.includes("bypass") || codes.includes("cabg") || codes.includes("myocardial")
+  ) {
+    return "Cardiology";
+  }
+
+  // 3. Radiology & Diagnostic Imaging (evaluated before musculoskeletal diagnosis fallback)
+  if (
+    allCpts.some((c) => c.startsWith("7") && !c.startsWith("77")) ||
+    codes.includes("mri") || codes.includes("ct scan") || codes.includes("ultrasound") || codes.includes("pet scan") || codes.includes("radiography")
+  ) {
+    return "Radiology";
+  }
+
+  // 4. Neurology & Spine
+  if (
+    allCpts.some((c) => ["63047", "22633", "22558", "63030", "64483", "62322"].includes(c) || (c.startsWith("22") && !c.startsWith("2285")) || (c.startsWith("63") && !c.startsWith("6300"))) ||
+    safeIcds.some((d) => d.startsWith("G") || d.startsWith("M50") || d.startsWith("M51") || d.startsWith("M54") || d.startsWith("M47") || d.startsWith("M48")) ||
+    codes.includes("lumbar") || codes.includes("spine") || codes.includes("spinal") || codes.includes("decompression") || codes.includes("laminectomy") || codes.includes("facetectomy") || codes.includes("radiculopathy") || codes.includes("stenosis") || codes.includes("spondylolisthesis")
+  ) {
+    return "Spine & Orthopedics";
+  }
+
+  // 5. Orthopedics & Musculoskeletal (excluding spine)
+  if (
+    allCpts.some((c) => ["27447", "27130", "29881", "29877", "29827", "23412", "20610", "28285", "28296"].includes(c) || (c.startsWith("27") || c.startsWith("29") || c.startsWith("23") || c.startsWith("28") || c.startsWith("20"))) ||
+    safeIcds.some((d) => d.startsWith("M") && !d.startsWith("M5") && !d.startsWith("M4")) ||
+    codes.includes("knee") || codes.includes("hip") || codes.includes("shoulder") || codes.includes("arthroplasty") || codes.includes("meniscus") || codes.includes("meniscectomy") || codes.includes("rotator") || codes.includes("bunion") || codes.includes("joint") || codes.includes("osteoarthritis")
+  ) {
+    return "Orthopedics";
+  }
+
+  // 6. General Surgery (evaluated before generic GI diagnosis codes)
+  if (
+    allCpts.some((c) => ["47562", "49505", "44950"].includes(c) || c.startsWith("47") || c.startsWith("49") || c.startsWith("44")) ||
+    codes.includes("cholecystectomy") || codes.includes("hernia") || codes.includes("appendectomy")
+  ) {
+    return "General Surgery";
+  }
+
+  // 7. Gastroenterology
+  if (
+    allCpts.some((c) => ["43239", "45378", "45380", "45385"].includes(c) || c.startsWith("432") || c.startsWith("453")) ||
+    safeIcds.some((d) => d.startsWith("K")) ||
+    codes.includes("colonoscopy") || codes.includes("endoscopy") || codes.includes("egd") || codes.includes("polyp") || codes.includes("colorectal")
+  ) {
+    return "Gastroenterology";
+  }
+
+  // 8. Pulmonology & Respiratory
+  if (
+    allCpts.some((c) => c.startsWith("316") || c.startsWith("940")) ||
+    safeIcds.some((d) => d.startsWith("J")) ||
+    codes.includes("bronchoscopy") || codes.includes("pulmonary") || codes.includes("copd") || codes.includes("asthma")
+  ) {
+    return "Pulmonology";
+  }
+
+  // 9. Unbiased Fallback
+  return "General Medicine";
 };
 
 // Common CARC (Claim Adjustment Reason Codes) & Descriptions

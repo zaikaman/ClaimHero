@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-19T04:35:00Z
+- **Last updated:** 2026-09-19T05:05:00Z
 
 ## Log
 
@@ -1766,12 +1766,22 @@ Replaced stale `overturnProbabilityScore` throughout the codebase with canonical
 - Frontend Presentation & Aggregations: Replaced legacy score lookups and calculations in `CaseRadar.tsx` (average portfolio score and high-readiness count), `EvidenceMatrix.tsx` (score gauge, analysis toast, and footer counters), `SentinelFlowStepper.tsx` (step 1 subtitle and header badge), `SimpleEvidenceView.tsx`, `AgentMailDrawer.tsx` (provisional cap banner), `IngestionModal.tsx`, and `OnboardingWizard.tsx`.
 - Regression Coverage: Updated `tests/anonymousAuthAndSeeder.test.ts` and `tests/convexClaimsFull.test.ts` to assert canonical scoring fields; verified all 81 test files (1,274 tests passing), typecheck (`tsc --noEmit`), and lint (`eslint src convex`).
 
-### 2026-09-19 - working tree
+### 2026-09-19 - 2e9b117
 Fixed critical PHI dispatch security vulnerability where unverified LLM-hallucinated contacts were marked verified and passed outbound transmission gates (`convex/actions/payerContactResolver.ts`, `convex/actions/mailDispatcher.ts`, `convex/claims.ts`, `README.md`, `tests/actionsClinicalAndParser.test.ts`, `tests/securityComplianceHardening.test.ts`):
 - Strict Anti-Hallucination Contact Corroboration: In `convex/actions/payerContactResolver.ts`, enforced `hasLiveSearchEvidence` as a strict prerequisite for `isLiveCorroborated`. Zero search results ("No live search results available") or search errors can never resolve as verified (`isVerified: false`, `source: "unresolved"`, `officialAppealsEmail: undefined`), eliminating synthetic `ai_knowledge` verified contacts. Discarded ungrounded emails from LLM completions that have no provenance in live crawl content or discovered payer domains. Ensured `reverifyPayerContactForDispatch` strictly requires `resolved.source === "firecrawl_live"` when checking email channels.
 - Hardened Outbound Mail Dispatch Gate: In `convex/actions/mailDispatcher.ts`, hardened the pre-transmission validation gate (`sendOutboundMessage:652`) to explicitly reject contacts originating from `ai_knowledge`, `registry_fallback`, `unresolved`, or uncorroborated sources, strictly requiring verified `firecrawl_live` or `document_ocr` provenance for automated transmissions even when an email thread was previously pre-populated with an unverified address. In `dispatchAppealPacket`, restricted verified gateway resolution to `firecrawl_live` and `document_ocr`.
 - Thread Payer Email Protection: In `convex/claims.ts` (`applyPayerContactUpdate`), restricted patching `emailThreads.payerEmail` to contacts that are explicitly verified with `firecrawl_live` or `document_ocr` provenance, preventing unverified or hallucinated contacts from leaking into thread reply addresses.
 - Regression Coverage & Verification: Added comprehensive regression tests in `tests/actionsClinicalAndParser.test.ts` and `tests/securityComplianceHardening.test.ts` verifying that empty search results with LLM-invented emails resolve unverified, hallucinated emails with ungrounded domains are discarded, and outbound mail dispatch strictly rejects `ai_knowledge` and `unresolved` contacts (including pre-existing thread matches). Updated `README.md` (1,279 automated tests across 81 suites). Verified full local gate via `npm run verify` (100% typecheck, 0 lint warnings/errors, 1,279 passing tests across 81 suites with full backend coverage, and production build).
+
+### 2026-09-19 - working tree
+Eliminated hardcoded Orthopedic and Aetna bias across clinical policy crawling, directory fallbacks, appeal brief synthesis, and research console (`src/lib/constants.ts`, `convex/actions/policyCrawler.ts`, `convex/actions/appealSynthesizer.ts`, `convex/actions/policyDriftSentinel.ts`, `src/components/evidence/ClinicalResearchConsole.tsx`, `tests/firecrawlDirectoryMap.test.ts`, `tests/claimhero.test.ts`):
+- Payer Directory & Statutory Neutral Fallback: Replaced hardcoded `aetna.com/cpb` and default Orthopedics in `src/lib/constants.ts` with multi-payer coverage (CMS Medicare Coverage Database, Centene, Highmark, CareFirst, Oscar, Carelon) and neutral statutory federal ERISA/ACA benchmark fallback (`cms.gov/medicare-coverage-database`).
+- Multi-Specialty Clinical Deduction: Built comprehensive `deduceClaimSpecialty` in `src/lib/constants.ts` and `convex/actions/policyCrawler.ts` handling CPT modifiers, case insensitivity, and ICD-10 prefixes across Oncology, Cardiology, Spine, Musculoskeletal/Orthopedics, General Surgery, Gastroenterology, Pulmonology, and General Medicine fallback.
+- Crawler Search & Alignment Neutrality: Expanded procedure dictionaries with 35+ procedure codes and synonyms across major specialties; updated search query generation for multi-specialty clinical societies (NCCN/ASCO, ACC/AHA, NASS, AAOS, ACR, ACG); added cross-specialty conflict detection in candidate scoring and alignment validation.
+- Appeal Synthesizer Site & Conflict Rules: Expanded `CPT_EXPECTED_SITES` and `ANATOMICAL_CONFLICT_RULES` in `convex/actions/appealSynthesizer.ts` across Oncology, Cardiology, Gastroenterology, Surgery, and Spine; scoped musculoskeletal anatomical lexicon checks to prevent false-positive rejections on vascular access or IV sites in cardiac and oncology claims.
+- Research Console Synchronization: Connected dynamic specialty deduction and neutral directory presets in `ClinicalResearchConsole.tsx`, eliminating hardcoded Orthopedic badge fallbacks.
+- Regression Coverage & Verification: Added multi-specialty test coverage in `tests/firecrawlDirectoryMap.test.ts` and `tests/claimhero.test.ts`. Verified all 81 test files (1,279 passing tests), clean typecheck, clean lint, coverage, and production build. Convex features: actions.
+
 
 
 

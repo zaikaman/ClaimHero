@@ -264,7 +264,7 @@ export const detectPolicyDriftAction = action({
         targetPolicyUrl = cpbEvidence.sourceUrl;
       } else {
         // Fall back to default payer clinical directory URL
-        targetPolicyUrl = getPayerClinicalDirectoryUrl(claim.insurancePayer || "Aetna") || "https://www.aetna.com/cpb";
+        targetPolicyUrl = getPayerClinicalDirectoryUrl(claim.insurancePayer) || "https://www.cms.gov/medicare-coverage-database";
       }
     }
 

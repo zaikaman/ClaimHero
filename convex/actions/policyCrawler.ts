@@ -1101,12 +1101,20 @@ export function getPayerHostKeyword(payer: string): string | null {
   if (clean.includes("molina")) return "molina";
   if (clean.includes("bcbsfl") || clean.includes("bluecrossblueshieldflorida")) return "bcbsfl";
   if (clean.includes("geoblue") || clean.includes("geo_blue")) return "geoblue";
+  if (clean.includes("carefirst")) return "carefirst";
+  if (clean.includes("highmark")) return "highmark";
+  if (clean.includes("priorityhealth")) return "priorityhealth";
   if (clean.includes("bcbs") || clean.includes("bluecross") || clean.includes("anthem") || clean.includes("elevance") || clean.includes("globalcore")) return "bcbs";
   if (clean.includes("aetna") || clean.includes("cvs")) return "aetna";
   if (clean.includes("cigna") || clean.includes("evernorth")) return "cigna";
   if (clean.includes("united") || clean.includes("uhc") || clean.includes("optum")) return "uhc";
   if (clean.includes("humana")) return "humana";
   if (clean.includes("kaiser")) return "kaiser";
+  if (clean.includes("centene") || clean.includes("ambetter")) return "centene";
+  if (clean.includes("wellcare")) return "wellcare";
+  if (clean.includes("oscar")) return "oscar";
+  if (clean.includes("medicare") || clean.includes("cms") || clean.includes("medicaid")) return "medicare";
+  if (clean.includes("tricare")) return "tricare";
   return null;
 }
 
@@ -1296,14 +1304,20 @@ export function selectFirecrawlPolicyUrls(
         }
       }
 
-      // Conflicting anatomical term penalty in search snippet/URL (e.g. foot/bunion on a knee claim)
+      // Conflicting anatomical & clinical specialty penalty in search snippet/URL (e.g. foot/bunion on a knee claim, or ortho on oncology)
       const isKnee = relevanceTerms.some((t) => t === "knee" || t === "27447" || t === "29881");
       const isLumbar = relevanceTerms.some((t) => t === "lumbar" || t === "spine" || t === "63047");
+      const isOncology = relevanceTerms.some((t) => t === "oncology" || t === "cancer" || t === "chemo" || t.startsWith("964") || t.startsWith("j9"));
+      const isCardiology = relevanceTerms.some((t) => t === "cardiology" || t === "cardiac" || t.startsWith("93") || t === "33533");
       let anatomicalPenalty = 0;
-      if (isKnee && (searchableText.includes("bunion") || searchableText.includes("foot") || searchableText.includes("ankle") || searchableText.includes("cervical"))) {
+      if (isKnee && (searchableText.includes("bunion") || searchableText.includes("foot") || searchableText.includes("ankle") || searchableText.includes("cervical") || searchableText.includes("chemotherapy"))) {
         anatomicalPenalty = 15;
-      } else if (isLumbar && (searchableText.includes("knee") || searchableText.includes("bunion") || searchableText.includes("foot"))) {
+      } else if (isLumbar && (searchableText.includes("knee") || searchableText.includes("bunion") || searchableText.includes("foot") || searchableText.includes("chemotherapy"))) {
         anatomicalPenalty = 15;
+      } else if (isOncology && (searchableText.includes("bunion") || searchableText.includes("arthroplasty") || searchableText.includes("laminectomy") || searchableText.includes("rotator cuff") || searchableText.includes("meniscectomy"))) {
+        anatomicalPenalty = 20;
+      } else if (isCardiology && (searchableText.includes("bunion") || searchableText.includes("arthroplasty") || searchableText.includes("laminectomy") || searchableText.includes("meniscectomy") || searchableText.includes("chemotherapy"))) {
+        anatomicalPenalty = 20;
       }
 
       // Generic wrong-procedure penalty: the result URL/title is specifically about a
@@ -1960,90 +1974,236 @@ function extractSignificantTerms(text: string): string[] {
 }
 
 const CPT_CLINICAL_NAMES: Record<string, string> = {
+  // Orthopedics & Musculoskeletal
   "27447": "Total Knee Arthroplasty (TKA)",
-  "63047": "Laminectomy / Facetectomy (Lumbar Spine)",
-  "73721": "MRI Lower Extremity Joint Without Contrast",
-  "99214": "Office / Outpatient Visit Moderate Complexity",
+  "27130": "Total Hip Arthroplasty (THA)",
   "29881": "Arthroscopy Knee Meniscectomy",
+  "29877": "Arthroscopy Knee Debridement Chondroplasty",
+  "29827": "Arthroscopy Shoulder Rotator Cuff Repair",
+  "23412": "Rotator Cuff Repair Open",
+  "20610": "Arthrocentesis Major Joint Injection",
+  "28285": "Hammertoe Correction",
+  "28296": "Bunionectomy Hallux Valgus Correction",
+
+  // Spine & Neurosurgery
+  "63047": "Laminectomy / Facetectomy (Lumbar Spine)",
+  "22633": "Lumbar Arthrodesis Interbody Fusion",
+  "22558": "Arthrodesis Anterior Interbody Lumbar",
+  "63030": "Laminotomy Discectomy Lumbar",
+  "64483": "Transforaminal Epidural Injection Lumbar",
+  "62322": "Epidural Steroid Injection Lumbar",
+
+  // Oncology & Hematology
+  "96413": "Chemotherapy Administration Intravenous Infusion Technique First Hour",
+  "96415": "Chemotherapy Administration Intravenous Infusion Technique Additional Hour",
+  "J9271": "Injection Pembrolizumab Keytruda 1mg",
+  "J9312": "Injection Rituximab Rituxan 10mg",
+  "J9035": "Injection Bevacizumab Avastin 10mg",
+  "77427": "Radiation Treatment Management 5 Treatments",
+  "77301": "Intensity Modulated Radiation Therapy (IMRT) Plan",
+  "38500": "Biopsy or Excision Lymph Node",
+
+  // Cardiology & Vascular
+  "93458": "Left Heart Catheterization with Coronary Angiography",
+  "93451": "Right Heart Catheterization",
+  "92928": "Percutaneous Transcatheter Coronary Stent Placement",
+  "33533": "Coronary Artery Bypass Graft (CABG)",
+  "93306": "Echocardiography Transthoracic Complete",
+  "93000": "Electrocardiogram Routine (ECG/EKG)",
+  "33405": "Replacement Aortic Valve with Cardiopulmonary Bypass",
+  "93653": "Comprehensive Electrophysiologic Evaluation with Catheter Ablation",
+
+  // Radiology & Imaging
+  "73721": "MRI Lower Extremity Joint Without Contrast",
+  "70553": "MRI Brain Without and With Contrast",
+  "71275": "Computed Tomographic Angiography (CTA) Chest",
+  "74177": "Computed Tomography (CT) Abdomen and Pelvis With Contrast",
+  "72148": "MRI Lumbar Spine Without Contrast",
+  "73221": "MRI Upper Extremity Joint Without Contrast",
+
+  // Gastroenterology
+  "43239": "Esophagogastroduodenoscopy (EGD) with Biopsy",
+  "45378": "Diagnostic Flexible Colonoscopy",
+  "45380": "Colonoscopy Flexible with Biopsy",
+  "45385": "Colonoscopy Flexible with Polyp Removal Snare",
+
+  // General Surgery
+  "47562": "Laparoscopic Cholecystectomy",
+  "49505": "Inguinal Hernia Repair Initial Reducible",
+  "44950": "Appendectomy",
+
+  // Evaluation & Management
+  "99213": "Office / Outpatient Visit Low Complexity",
+  "99214": "Office / Outpatient Visit Moderate Complexity",
+  "99215": "Office / Outpatient Visit High Complexity",
+  "99285": "Emergency Department Visit High Severity",
 };
 
 /**
  * Generic clinical synonym ontology keyed by CPT.
- * These are standard procedure/anatomy synonyms from orthopedic, neurosurgical,
- * and radiology vocabularies — not template-specific hardcodes. They prevent
- * false deterministic rejections when a guideline uses "decompression" or
- * "stenosis" instead of the literal token "laminectomy".
+ * These are standard procedure/anatomy synonyms across medical specialties
+ * (orthopedics, spine, cardiology, oncology, gastroenterology, radiology).
  */
 const CPT_CLINICAL_SYNONYMS: Record<string, string[]> = {
   "27447": [
-    "knee",
-    "arthroplasty",
-    "replacement",
-    "tka",
-    "osteoarthritis",
-    "tricompartmental",
-    "unicompartmental",
-    "prosthesis",
+    "knee", "arthroplasty", "replacement", "tka", "osteoarthritis",
+    "tricompartmental", "unicompartmental", "prosthesis",
+  ],
+  "27130": [
+    "hip", "arthroplasty", "replacement", "tha", "osteoarthritis",
+    "acetabular", "femoral", "prosthesis",
+  ],
+  "29881": [
+    "arthroscopy", "arthroscopic", "meniscectomy", "meniscus",
+    "meniscal", "knee", "debridement", "chondroplasty", "locking", "catching",
+  ],
+  "29877": [
+    "arthroscopy", "arthroscopic", "knee", "debridement", "chondroplasty",
+    "chondral", "cartilage",
+  ],
+  "29827": [
+    "arthroscopy", "shoulder", "rotator", "cuff", "supraspinatus", "tendon",
+  ],
+  "23412": [
+    "shoulder", "rotator", "cuff", "tendon", "repair", "supraspinatus",
+  ],
+  "20610": [
+    "arthrocentesis", "injection", "aspiration", "joint", "hyaluronic", "corticosteroid",
+  ],
+  "28285": [
+    "hammertoe", "pip", "interphalangeal", "toe", "correction",
+  ],
+  "28296": [
+    "bunion", "bunionectomy", "hallux", "valgus", "metatarsal", "osteotomy",
   ],
   "63047": [
-    "laminectomy",
-    "facetectomy",
-    "foraminotomy",
-    "laminotomy",
-    "lamina",
-    "decompression",
-    "decompress",
-    "stenosis",
-    "stenotic",
-    "lumbar",
-    "spine",
-    "spinal",
-    "spondylosis",
-    "discectomy",
-    "diskectomy",
-    "claudication",
-    "radiculopathy",
-    "radicular",
-    "sciatica",
-    "neurogenic",
-    "cauda",
-    "myelopathy",
+    "laminectomy", "facetectomy", "foraminotomy", "laminotomy", "lamina",
+    "decompression", "decompress", "stenosis", "stenotic", "lumbar",
+    "spine", "spinal", "spondylosis", "discectomy", "diskectomy",
+    "claudication", "radiculopathy", "radicular", "sciatica", "neurogenic",
+    "cauda", "myelopathy",
+  ],
+  "22633": [
+    "arthrodesis", "fusion", "interbody", "lumbar", "spine", "tlif", "plif",
+    "spondylolisthesis", "instability",
+  ],
+  "22558": [
+    "arthrodesis", "anterior", "interbody", "lumbar", "spine", "alif",
+  ],
+  "63030": [
+    "laminotomy", "discectomy", "herniation", "disc", "disk", "lumbar", "radiculopathy",
+  ],
+  "64483": [
+    "epidural", "transforaminal", "steroid", "tfesi", "radiculopathy", "lumbar",
+  ],
+  "62322": [
+    "epidural", "injection", "interlaminar", "steroid", "lumbar", "sacral",
+  ],
+  "96413": [
+    "chemotherapy", "infusion", "intravenous", "antineoplastic", "chemo",
+    "cancer", "oncology", "regimen", "cytotoxic",
+  ],
+  "96415": [
+    "chemotherapy", "infusion", "prolonged", "antineoplastic", "chemo", "oncology",
+  ],
+  "J9271": [
+    "pembrolizumab", "keytruda", "checkpoint", "immunotherapy", "pdl1",
+    "melanoma", "carcinoma", "oncology",
+  ],
+  "J9312": [
+    "rituximab", "rituxan", "cd20", "lymphoma", "monoclonal", "oncology",
+  ],
+  "J9035": [
+    "bevacizumab", "avastin", "vegf", "colorectal", "angiogenesis", "oncology",
+  ],
+  "77427": [
+    "radiation", "radiotherapy", "radiation management", "fractionation", "oncology",
+  ],
+  "77301": [
+    "imrt", "intensity modulated", "radiation therapy", "dosimetry", "oncology",
+  ],
+  "38500": [
+    "lymph", "node", "biopsy", "lymphadenectomy", "staging", "lymphoma",
+  ],
+  "93458": [
+    "catheterization", "angiography", "coronary", "cardiac", "arteriography",
+    "ischemia", "stenosis", "ventriculography", "cad",
+  ],
+  "93451": [
+    "right heart", "catheterization", "pulmonary artery", "wedge", "hemodynamics",
+  ],
+  "92928": [
+    "stent", "angioplasty", "percutaneous", "coronary", "pci", "interventional",
+    "atherosclerosis", "revascularization",
+  ],
+  "33533": [
+    "cabg", "bypass", "arterial", "graft", "coronary", "lima", "revascularization",
+  ],
+  "93306": [
+    "echocardiogram", "echocardiography", "transthoracic", "tte", "doppler",
+    "ejection fraction", "valvular",
+  ],
+  "93000": [
+    "electrocardiogram", "ecg", "ekg", "rhythm", "arrhythmia", "infarction",
+  ],
+  "33405": [
+    "aortic", "valve", "replacement", "avr", "stenosis", "cardiopulmonary",
+  ],
+  "93653": [
+    "ablation", "electrophysiologic", "arrhythmia", "svt", "flutter", "tachycardia",
   ],
   "73721": [
-    "mri",
-    "magnetic",
-    "resonance",
-    "imaging",
-    "meniscus",
-    "meniscal",
-    "meniscectomy",
-    "knee",
-    "cartilage",
-    "ligament",
-    "radiology",
+    "mri", "magnetic", "resonance", "imaging", "meniscus", "meniscal",
+    "knee", "cartilage", "ligament", "radiology",
   ],
+  "70553": [
+    "mri", "brain", "neuroimaging", "intracranial", "contrast", "radiology",
+  ],
+  "71275": [
+    "cta", "computed tomography", "angiography", "chest", "pulmonary embolism", "aorta",
+  ],
+  "74177": [
+    "ct", "abdomen", "pelvis", "computed tomography", "contrast", "radiology",
+  ],
+  "72148": [
+    "mri", "lumbar", "spine", "canal", "stenosis", "radiculopathy",
+  ],
+  "73221": [
+    "mri", "upper extremity", "shoulder", "wrist", "elbow", "joint",
+  ],
+  "43239": [
+    "egd", "esophagogastroduodenoscopy", "endoscopy", "biopsy", "gastritis",
+    "duodenitis", "esophagitis", "barrett",
+  ],
+  "45378": [
+    "colonoscopy", "colorectal", "screening", "polyp", "colon",
+  ],
+  "45380": [
+    "colonoscopy", "biopsy", "polyp", "colitis", "colon",
+  ],
+  "45385": [
+    "colonoscopy", "polyp", "polypectomy", "snare", "lesion",
+  ],
+  "47562": [
+    "cholecystectomy", "gallbladder", "laparoscopic", "cholelithiasis", "cholecystitis",
+  ],
+  "49505": [
+    "hernia", "inguinal", "herniorrhaphy", "groin", "reducible",
+  ],
+  "44950": [
+    "appendectomy", "appendix", "appendicitis",
+  ],
+  "99213": ["office", "outpatient", "visit", "evaluation", "management"],
   "99214": ["office", "outpatient", "visit", "evaluation", "management"],
-  "29881": [
-    "arthroscopy",
-    "arthroscopic",
-    "meniscectomy",
-    "meniscus",
-    "meniscal",
-    "knee",
-    "debridement",
-    "chondroplasty",
-    "locking",
-    "catching",
-  ],
+  "99215": ["office", "outpatient", "visit", "evaluation", "management", "high complexity"],
+  "99285": ["emergency", "department", "evaluation", "management", "severe"],
 };
 
 export function getCptKeywords(cptCodes: string[]): string[] {
   const terms: string[] = [];
-  let hasKnown = false;
   for (const code of cptCodes) {
     const name = CPT_CLINICAL_NAMES[code];
     if (name) {
-      hasKnown = true;
       const acronymMatch = name.match(/\(([A-Z]{2,})\)/);
       if (acronymMatch) terms.push(acronymMatch[1].toLowerCase());
       const cleaned = name.replace(/\(.*?\)/g, " ");
@@ -2058,7 +2218,6 @@ export function getCptKeywords(cptCodes: string[]): string[] {
       terms.push(code.toLowerCase());
     }
   }
-  if (!hasKnown) return [];
   return [...new Set(terms)];
 }
 
@@ -2120,12 +2279,21 @@ export function isPolicyAlignedWithClaim(
 
   // Lenient conflict-only veto: only reject when the document is clearly about a
   // different anatomy/procedure (e.g. foot bunion guide for a lumbar decompression
-  // claim). Generic titles like "Recommendations" with no conflicting anatomy
+  // claim, or knee ortho guide for an oncology chemo claim). Generic titles like "Recommendations" with no conflicting anatomy
   // defer to the LLM relevance judge instead of hard-failing on a missing token.
   const codeSet = new Set(cptCodes.map((c) => c.trim()));
-  const isSpineClaim = codeSet.has("63047");
+  const isSpineClaim = codeSet.has("63047") || codeSet.has("22633") || codeSet.has("22558") || codeSet.has("63030");
   const isKneeClaim =
-    codeSet.has("27447") || codeSet.has("29881") || codeSet.has("73721");
+    codeSet.has("27447") || codeSet.has("29881") || codeSet.has("73721") || codeSet.has("29877");
+  const isOncologyClaim = [...codeSet].some(
+    (c) => c.startsWith("964") || c.startsWith("J9") || ["77427", "77301", "38500"].includes(c)
+  );
+  const isCardiologyClaim = [...codeSet].some(
+    (c) => c.startsWith("93") || ["33533", "92928", "33405"].includes(c)
+  );
+  const isGastroenterologyClaim = [...codeSet].some(
+    (c) => c.startsWith("432") || c.startsWith("453") || ["43239", "45378", "45380", "45385"].includes(c)
+  );
 
   const SPINE_SIGNALS = [
     "lumbar", "spine", "spinal", "stenosis", "decompress", "laminect",
@@ -2138,21 +2306,57 @@ export function isPolicyAlignedWithClaim(
   ];
   const FOOT_SIGNALS = ["bunion", "hallux", "plantar", "foot ", "ankle"];
   const CERVICAL_SIGNALS = ["cervical", "neck pain"];
+  const ONCOLOGY_SIGNALS = [
+    "chemotherapy", "infusion", "oncology", "cancer", "carcinoma",
+    "neoplasm", "pembrolizumab", "radiation", "tumor", "lymphoma", "leukemia",
+  ];
+  const CARDIOLOGY_SIGNALS = [
+    "cardiac", "cardiology", "coronary", "catheterization", "angioplasty",
+    "stent", "cabg", "bypass", "myocardial", "heart", "echocardiogram",
+  ];
+  const GASTROENTEROLOGY_SIGNALS = [
+    "endoscopy", "colonoscopy", "egd", "colorectal", "polyp", "gastric",
+    "esophagogastroduodenoscopy", "gastrointestinal", "bowel", "biopsy",
+  ];
 
   const hasSpine = SPINE_SIGNALS.some((t) => haystack.includes(t));
   const hasKnee = KNEE_SIGNALS.some((t) => haystack.includes(t));
   const hasFoot = FOOT_SIGNALS.some((t) => haystack.includes(t));
   const hasCervical = CERVICAL_SIGNALS.some((t) => haystack.includes(t));
+  const hasOncology = ONCOLOGY_SIGNALS.some((t) => haystack.includes(t));
+  const hasCardiology = CARDIOLOGY_SIGNALS.some((t) => haystack.includes(t));
+  const hasGastroenterology = GASTROENTEROLOGY_SIGNALS.some((t) => haystack.includes(t));
 
-  if (isSpineClaim && !hasSpine && (hasKnee || hasFoot || hasCervical)) {
-    const conflict = hasKnee ? "knee" : hasFoot ? "foot/ankle" : "cervical";
+  if (isOncologyClaim && !hasOncology && (hasSpine || hasKnee || hasFoot || hasCardiology || hasGastroenterology)) {
+    const conflict = hasKnee ? "knee" : hasSpine ? "lumbar/spine" : hasFoot ? "foot/ankle" : hasCardiology ? "cardiology" : "gastroenterology";
+    return {
+      aligned: false,
+      reason: `Document appears to address ${conflict} pathology without oncology or chemotherapy criteria for CPT ${cptCodes.join(", ")}. Title was: "${policyTitle}".`,
+    };
+  }
+  if (isCardiologyClaim && !hasCardiology && (hasSpine || hasKnee || hasFoot || hasOncology || hasGastroenterology)) {
+    const conflict = hasKnee ? "knee" : hasSpine ? "lumbar/spine" : hasFoot ? "foot/ankle" : hasOncology ? "oncology" : "gastroenterology";
+    return {
+      aligned: false,
+      reason: `Document appears to address ${conflict} pathology without cardiology or vascular criteria for CPT ${cptCodes.join(", ")}. Title was: "${policyTitle}".`,
+    };
+  }
+  if (isGastroenterologyClaim && !hasGastroenterology && (hasSpine || hasKnee || hasFoot || hasOncology || hasCardiology)) {
+    const conflict = hasKnee ? "knee" : hasSpine ? "lumbar/spine" : hasFoot ? "foot/ankle" : hasOncology ? "oncology" : "cardiology";
+    return {
+      aligned: false,
+      reason: `Document appears to address ${conflict} pathology without gastroenterology or endoscopy criteria for CPT ${cptCodes.join(", ")}. Title was: "${policyTitle}".`,
+    };
+  }
+  if (isSpineClaim && !hasSpine && (hasKnee || hasFoot || hasCervical || hasOncology || hasCardiology || hasGastroenterology)) {
+    const conflict = hasKnee ? "knee" : hasFoot ? "foot/ankle" : hasCervical ? "cervical" : hasOncology ? "oncology" : hasCardiology ? "cardiology" : "gastroenterology";
     return {
       aligned: false,
       reason: `Document appears to address ${conflict} pathology without lumbar/spine decompression criteria for CPT ${cptCodes.join(", ")}. Title was: "${policyTitle}".`,
     };
   }
-  if (isKneeClaim && !hasKnee && (hasSpine || hasFoot || hasCervical)) {
-    const conflict = hasSpine ? "lumbar/spine" : hasFoot ? "foot/ankle" : "cervical";
+  if (isKneeClaim && !hasKnee && (hasSpine || hasFoot || hasCervical || hasOncology || hasCardiology || hasGastroenterology)) {
+    const conflict = hasSpine ? "lumbar/spine" : hasFoot ? "foot/ankle" : hasCervical ? "cervical" : hasOncology ? "oncology" : hasCardiology ? "cardiology" : "gastroenterology";
     return {
       aligned: false,
       reason: `Document appears to address ${conflict} pathology without knee criteria for CPT ${cptCodes.join(", ")}. Title was: "${policyTitle}".`,
@@ -2179,16 +2383,10 @@ export function extractGuidelineLinksFromMarkdown(
     "clinical guideline",
     "coverage policy",
     "medical necessity",
-    "lumbar",
-    "spinal",
-    "spine",
-    "stenosis",
-    "decompression",
-    "laminectomy",
-    "knee",
-    "meniscus",
-    "arthroplasty",
-    "surgery",
+    "coverage criteria",
+    "clinical criteria",
+    "clinical appropriateness",
+    "medical policy",
   ].map((k) => k.toLowerCase());
 
   const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)/g;
@@ -2629,14 +2827,14 @@ Query Strategy:
      * Aetna (including Aetna International, which uses parent Aetna Clinical Policy Bulletins / CPBs) and UnitedHealthcare utilize direct Clinical Policy Bulletins (CPBs). For Aetna / Aetna International knee MRI (CPT 73721), target Aetna CPB 0171 (Magnetic Resonance Imaging of the Extremities).
    - Target the active guideline in effect for ${targetYear} (e.g. ${primaryProcedureName} ${primaryCpt} Carelon clinical guideline ${targetYear} -archived OR coverage criteria ${searchPayer}).
 2. Clinical Specialty Society Standard-of-Care Guideline Query:
-   - Target authoritative national medical specialty guidelines (NASS for spine/lumbar, AAOS for orthopedics/joint, ACR for imaging/radiology, NCCN for oncology) that establish active clinical necessity and conservative therapy criteria.
-   - Example: ${primaryProcedureName} ${primaryCpt} NASS clinical practice guideline ${targetYear} pdf OR indications
+   - Target authoritative national medical specialty guidelines (NCCN/ASCO for oncology, ACC/AHA for cardiology, NASS for spine/lumbar, AAOS for orthopedics/joint, ACR for imaging/radiology, ACG for gastroenterology) that establish active clinical necessity and conservative therapy criteria.
+   - Example: ${primaryProcedureName} ${primaryCpt} clinical practice guideline ${targetYear} pdf OR indications
 3. National Statutory & CMS Coverage Query:
    - Target CMS Local Coverage Determinations (LCD) or standard medical necessity criteria for ${targetYear}.
    - Example: ${primaryProcedureName} ${primaryCpt} CMS LCD medical necessity criteria indications ${targetYear}
 
 Rules:
-- Always include the clinical procedure title (e.g. "lumbar laminectomy decompression", "knee arthroscopy meniscectomy", "total knee arthroplasty", "knee MRI").
+- Always include the clinical procedure title (e.g. "cardiac catheterization coronary angiography", "intravenous chemotherapy infusion", "lumbar laminectomy decompression", "knee arthroscopy meniscectomy", "total knee arthroplasty", "chest CT angiography").
 - Combine procedure names with primary CPT codes and authoritative keywords (Carelon, NASS, AAOS, ACR, CMS LCD, coverage criteria).
 - Do NOT search for past years older than ${targetYear}; explicitly seek active guidelines for ${targetYear} and exclude archived versions.
 - Do NOT search for international/travel subsidiary brand names for clinical policies (e.g. search parent insurer 'Cigna' or 'Aetna', not 'Cigna Global' or 'Aetna International' which are expat sales portals without clinical bulletins).
@@ -3915,10 +4113,10 @@ export const crawlMultiSourceHub = action({
  */
 export function getPayerClinicalDirectoryDomain(payer: string): string {
   const norm = (payer || "").toLowerCase().trim();
-  if (norm.includes("aetna")) {
+  if (norm.includes("aetna") || norm.includes("cvs")) {
     return "https://www.aetna.com/cpb";
   }
-  if (norm.includes("cigna")) {
+  if (norm.includes("cigna") || norm.includes("evernorth")) {
     return "https://www.cigna.com/coveragePolicies";
   }
   if (norm.includes("united") || norm.includes("uhc") || norm.includes("optum")) {
@@ -3927,7 +4125,13 @@ export function getPayerClinicalDirectoryDomain(payer: string): string {
   if (norm.includes("humana")) {
     return "https://www.humana.com/provider/medical-resources/clinical-guidance/medical-policies";
   }
-  if (norm.includes("anthem") || norm.includes("blue") || norm.includes("bcbs")) {
+  if (norm.includes("highmark")) {
+    return "https://www.highmarkprc.com/medical-policies.html";
+  }
+  if (norm.includes("carefirst")) {
+    return "https://provider.carefirst.com/providers/medical-policies.page";
+  }
+  if (norm.includes("anthem") || norm.includes("blue") || norm.includes("bcbs") || norm.includes("elevance")) {
     return "https://www.anthem.com/provider/policies";
   }
   if (norm.includes("molina")) {
@@ -3936,8 +4140,30 @@ export function getPayerClinicalDirectoryDomain(payer: string): string {
   if (norm.includes("kaiser")) {
     return "https://healthy.kaiserpermanente.org/clinical-library";
   }
-  // Default to Aetna CPB directory as the standard benchmark directory
-  return "https://www.aetna.com/cpb";
+  if (norm.includes("medicare") || norm.includes("cms") || norm.includes("medicaid")) {
+    return "https://www.cms.gov/medicare-coverage-database";
+  }
+  if (norm.includes("carelon") || norm.includes("aim")) {
+    return "https://guidelines.carelonmedicalbenefitsmanagement.com";
+  }
+  if (norm.includes("centene") || norm.includes("ambetter") || norm.includes("wellcare")) {
+    return "https://www.centene.com/clinical-criteria.html";
+  }
+  if (norm.includes("oscar")) {
+    return "https://www.hioscar.com/clinical-guidelines";
+  }
+  if (norm.includes("tricare")) {
+    return "https://manuals.health.mil";
+  }
+
+  // Preserve explicit domain if caller provided a web address
+  if (norm.includes(".com") || norm.includes(".org") || norm.includes(".gov") || norm.includes(".net")) {
+    const domainMatch = norm.match(/([a-z0-9-]+\.[a-z0-9.-]+)/);
+    if (domainMatch) return `https://${domainMatch[1]}`;
+  }
+
+  // Neutral national federal coverage benchmark under ERISA/ACA — never bias to Aetna
+  return "https://www.cms.gov/medicare-coverage-database";
 }
 
 /**
@@ -3963,52 +4189,95 @@ export function extractBulletinIdentifier(url: string, title?: string): string |
 }
 
 /**
- * Deduce medical specialty from claim procedure and diagnosis codes
+ * Deduce medical specialty from claim procedure and diagnosis codes.
+ * Returns an unbiased clinical specialty; falls back to "General Medicine" when undetermined.
  */
 export function deduceClaimSpecialty(cptCodes: string[] = [], icd10Codes: string[] = []): string {
-  const codes = cptCodes.concat(icd10Codes).join(" ").toLowerCase();
+  const safeCpts = (Array.isArray(cptCodes) ? cptCodes : [])
+    .filter((c): c is string => typeof c === "string")
+    .map((c) => c.trim().toUpperCase());
+  const safeIcds = (Array.isArray(icd10Codes) ? icd10Codes : [])
+    .filter((d): d is string => typeof d === "string")
+    .map((d) => d.trim().toUpperCase());
 
-  // Orthopedics & Musculoskeletal
-  if (
-    cptCodes.some((c) => ["27447", "29881", "29877", "29827", "23412", "27130", "20610"].includes(c)) ||
-    codes.includes("knee") || codes.includes("arthroplasty") || codes.includes("meniscus") || codes.includes("m17")
-  ) {
-    return "Orthopedics";
-  }
+  // Base procedure codes without modifier suffixes (e.g. "27447-LT" -> "27447", "64483-50" -> "64483")
+  const baseCpts = safeCpts.map((c) => c.split(/[-_]/)[0]);
+  const allCpts = [...new Set([...safeCpts, ...baseCpts])];
 
-  // Neurology & Spine
-  if (
-    cptCodes.some((c) => ["63047", "22633", "22558", "63030", "64483", "62322"].includes(c)) ||
-    codes.includes("lumbar") || codes.includes("spine") || codes.includes("decompression") || codes.includes("m54")
-  ) {
-    return "Spine & Orthopedics";
-  }
+  const codes = safeCpts.concat(safeIcds).join(" ").toLowerCase();
 
-  // Oncology & Hematology
+  // 1. Oncology & Hematology
   if (
-    cptCodes.some((c) => c.startsWith("964") || c.startsWith("J9") || ["77427", "77301"].includes(c)) ||
-    codes.includes("cancer") || codes.includes("neoplasm") || codes.includes("chemo") || codes.includes("c50")
+    allCpts.some((c) => c.startsWith("964") || c.startsWith("965") || c.startsWith("J9") || ["77427", "77301", "38500"].includes(c)) ||
+    safeIcds.some((d) => d.startsWith("C") || (d.startsWith("D") && !d.startsWith("D5") && !d.startsWith("D6") && !d.startsWith("D7") && !d.startsWith("D8"))) ||
+    codes.includes("cancer") || codes.includes("neoplasm") || codes.includes("chemo") || codes.includes("oncology") || codes.includes("carcinoma") || codes.includes("infusion") || codes.includes("tumor") || codes.includes("radiation") || codes.includes("pembrolizumab")
   ) {
     return "Oncology";
   }
 
-  // Cardiology & Vascular
+  // 2. Cardiology & Vascular
   if (
-    cptCodes.some((c) => c.startsWith("93") || ["33533", "92928", "93458"].includes(c)) ||
-    codes.includes("cardiac") || codes.includes("stent") || codes.includes("angioplasty") || codes.includes("i25")
+    allCpts.some((c) => c.startsWith("93") || c.startsWith("33") || c.startsWith("35") || c.startsWith("36") || ["92928", "92920", "92924"].includes(c)) ||
+    safeIcds.some((d) => d.startsWith("I")) ||
+    codes.includes("cardiac") || codes.includes("cardiology") || codes.includes("coronary") || codes.includes("stent") || codes.includes("angioplasty") || codes.includes("catheterization") || codes.includes("arrhythmia") || codes.includes("bypass") || codes.includes("cabg") || codes.includes("myocardial")
   ) {
     return "Cardiology";
   }
 
-  // Radiology & Imaging
+  // 3. Radiology & Diagnostic Imaging (evaluated before musculoskeletal diagnosis fallback)
   if (
-    cptCodes.some((c) => c.startsWith("7")) ||
-    codes.includes("mri") || codes.includes("ct scan") || codes.includes("ultrasound")
+    allCpts.some((c) => c.startsWith("7") && !c.startsWith("77")) ||
+    codes.includes("mri") || codes.includes("ct scan") || codes.includes("ultrasound") || codes.includes("pet scan") || codes.includes("radiography")
   ) {
     return "Radiology";
   }
 
-  return "Orthopedics";
+  // 4. Neurology & Spine
+  if (
+    allCpts.some((c) => ["63047", "22633", "22558", "63030", "64483", "62322"].includes(c) || (c.startsWith("22") && !c.startsWith("2285")) || (c.startsWith("63") && !c.startsWith("6300"))) ||
+    safeIcds.some((d) => d.startsWith("G") || d.startsWith("M50") || d.startsWith("M51") || d.startsWith("M54") || d.startsWith("M47") || d.startsWith("M48")) ||
+    codes.includes("lumbar") || codes.includes("spine") || codes.includes("spinal") || codes.includes("decompression") || codes.includes("laminectomy") || codes.includes("facetectomy") || codes.includes("radiculopathy") || codes.includes("stenosis") || codes.includes("spondylolisthesis")
+  ) {
+    return "Spine & Orthopedics";
+  }
+
+  // 5. Orthopedics & Musculoskeletal (excluding spine)
+  if (
+    allCpts.some((c) => ["27447", "27130", "29881", "29877", "29827", "23412", "20610", "28285", "28296"].includes(c) || (c.startsWith("27") || c.startsWith("29") || c.startsWith("23") || c.startsWith("28") || c.startsWith("20"))) ||
+    safeIcds.some((d) => d.startsWith("M") && !d.startsWith("M5") && !d.startsWith("M4")) ||
+    codes.includes("knee") || codes.includes("hip") || codes.includes("shoulder") || codes.includes("arthroplasty") || codes.includes("meniscus") || codes.includes("meniscectomy") || codes.includes("rotator") || codes.includes("bunion") || codes.includes("joint") || codes.includes("osteoarthritis")
+  ) {
+    return "Orthopedics";
+  }
+
+  // 6. General Surgery (evaluated before generic GI diagnosis codes)
+  if (
+    allCpts.some((c) => ["47562", "49505", "44950"].includes(c) || c.startsWith("47") || c.startsWith("49") || c.startsWith("44")) ||
+    codes.includes("cholecystectomy") || codes.includes("hernia") || codes.includes("appendectomy")
+  ) {
+    return "General Surgery";
+  }
+
+  // 7. Gastroenterology
+  if (
+    allCpts.some((c) => ["43239", "45378", "45380", "45385"].includes(c) || c.startsWith("432") || c.startsWith("453")) ||
+    safeIcds.some((d) => d.startsWith("K")) ||
+    codes.includes("colonoscopy") || codes.includes("endoscopy") || codes.includes("egd") || codes.includes("polyp") || codes.includes("colorectal")
+  ) {
+    return "Gastroenterology";
+  }
+
+  // 8. Pulmonology & Respiratory
+  if (
+    allCpts.some((c) => c.startsWith("316") || c.startsWith("940")) ||
+    safeIcds.some((d) => d.startsWith("J")) ||
+    codes.includes("bronchoscopy") || codes.includes("pulmonary") || codes.includes("copd") || codes.includes("asthma")
+  ) {
+    return "Pulmonology";
+  }
+
+  // 9. Unbiased Fallback
+  return "General Medicine";
 }
 
 export const discoverInsurerPolicyDirectoryArgs = {

@@ -37,8 +37,23 @@ describe("Firecrawl Map API: Insurer CPB Directory Discovery", () => {
       expect(getPayerClinicalDirectoryDomain("Molina Healthcare")).toBe(
         "https://www.molinahealthcare.com/providers/common/medicaid/clinical-guidelines.aspx"
       );
-      // Unknown fallback defaults to Aetna CPB benchmark
-      expect(getPayerClinicalDirectoryDomain("Regional Payer X")).toBe("https://www.aetna.com/cpb");
+      expect(getPayerClinicalDirectoryDomain("Medicare Part B")).toBe(
+        "https://www.cms.gov/medicare-coverage-database"
+      );
+      expect(getPayerClinicalDirectoryDomain("Centene Corp")).toBe(
+        "https://www.centene.com/clinical-criteria.html"
+      );
+      expect(getPayerClinicalDirectoryDomain("Highmark BCBS")).toBe(
+        "https://www.highmarkprc.com/medical-policies.html"
+      );
+      expect(getPayerClinicalDirectoryDomain("CareFirst")).toBe(
+        "https://provider.carefirst.com/providers/medical-policies.page"
+      );
+      expect(getPayerClinicalDirectoryDomain("Carelon Medical Management")).toBe(
+        "https://guidelines.carelonmedicalbenefitsmanagement.com"
+      );
+      // Unknown fallback defaults to neutral federal CMS MCD benchmark, never Aetna
+      expect(getPayerClinicalDirectoryDomain("Regional Payer X")).toBe("https://www.cms.gov/medicare-coverage-database");
     });
 
     it("extractBulletinIdentifier: extracts policy numbers from titles and URLs", () => {
@@ -81,8 +96,30 @@ describe("Firecrawl Map API: Insurer CPB Directory Discovery", () => {
       // Radiology
       expect(deduceClaimSpecialty(["73721"], ["M25.561"])).toBe("Radiology");
 
-      // Fallback
-      expect(deduceClaimSpecialty([], [])).toBe("Orthopedics");
+      // Gastroenterology
+      expect(deduceClaimSpecialty(["43239"], ["K21.9"])).toBe("Gastroenterology");
+
+      // General Surgery
+      expect(deduceClaimSpecialty(["47562"], ["K80.20"])).toBe("General Surgery");
+
+      // Pulmonology
+      expect(deduceClaimSpecialty(["31622"], ["J44.1"])).toBe("Pulmonology");
+
+      // Neutral Fallback — never defaults to Orthopedics
+      expect(deduceClaimSpecialty([], [])).toBe("General Medicine");
+      expect(deduceClaimSpecialty(["99999"], ["Z00.00"])).toBe("General Medicine");
+
+      // Robust Edge Cases: Lowercase HCPCS, Whitespace, Modifiers, Null/Undefined Defensive Handling
+      expect(deduceClaimSpecialty(["j9271"], [])).toBe("Oncology");
+      expect(deduceClaimSpecialty([" 27447 "], [" m17.11 "])).toBe("Orthopedics");
+      expect(deduceClaimSpecialty(["27447-LT"], [])).toBe("Orthopedics");
+      expect(deduceClaimSpecialty(["64483-50"], [])).toBe("Spine & Orthopedics");
+      expect(deduceClaimSpecialty(["92928-RC"], [])).toBe("Cardiology");
+      expect(deduceClaimSpecialty(["43239-59"], [])).toBe("Gastroenterology");
+      expect(deduceClaimSpecialty(["77427-26"], [])).toBe("Oncology");
+      expect(deduceClaimSpecialty(null as any, null as any)).toBe("General Medicine");
+      expect(deduceClaimSpecialty(undefined, undefined)).toBe("General Medicine");
+      expect(deduceClaimSpecialty(["", "   "], [])).toBe("General Medicine");
     });
   });
 

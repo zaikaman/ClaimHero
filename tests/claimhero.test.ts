@@ -516,6 +516,56 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
       { cptCodes: ["27447"] }
     )).toBe(true);
 
+    // Cross-Specialty & Non-Musculoskeletal Site Mismatch Tests
+    expect(isEvidenceSiteMismatched(
+      { title: "Left Heart Catheterization and Coronary Angiography Criteria", citationClause: "Femoral or radial sheath approach indications" },
+      { cptCodes: ["93458"] }
+    )).toBe(false);
+    expect(isEvidenceSiteMismatched(
+      { title: "Total Knee Arthroplasty Criteria", citationClause: "Joint replacement indication" },
+      { cptCodes: ["93458"] }
+    )).toBe(true);
+    expect(isEvidenceSiteMismatched(
+      { title: "Pembrolizumab (Keytruda) Oncology Infusion Protocol", citationClause: "Metastatic melanoma criteria" },
+      { cptCodes: ["96413"] }
+    )).toBe(false);
+    expect(isEvidenceSiteMismatched(
+      { title: "Lumbar Laminectomy Guidelines", citationClause: "Spinal canal stenosis decompression" },
+      { cptCodes: ["96413"] }
+    )).toBe(true);
+
+    // Gastroenterology & General Surgery Tests
+    expect(isEvidenceSiteMismatched(
+      { title: "Diagnostic Upper Gastrointestinal Endoscopy with Biopsy", citationClause: "Gastric ulcer indications" },
+      { cptCodes: ["43239"] }
+    )).toBe(false);
+    expect(isEvidenceSiteMismatched(
+      { title: "Total Knee Arthroplasty Criteria", citationClause: "TKA indications" },
+      { cptCodes: ["43239"] }
+    )).toBe(true);
+    expect(isEvidenceSiteMismatched(
+      { title: "Diagnostic Flexible Colonoscopy Guidelines", citationClause: "Colorectal polyp screening" },
+      { cptCodes: ["27447"] }
+    )).toBe(true);
+    expect(isEvidenceSiteMismatched(
+      { title: "Laparoscopic Cholecystectomy Clinical Policy", citationClause: "Gallbladder disease indications" },
+      { cptCodes: ["47562"] }
+    )).toBe(false);
+    expect(isEvidenceSiteMismatched(
+      { title: "Cardiac Catheterization and Coronary Angiography", citationClause: "Coronary artery disease" },
+      { cptCodes: ["96413"] }
+    )).toBe(true);
+
+    // Modifier & Lowercase CPT Handling
+    expect(isEvidenceSiteMismatched(
+      { title: "Total Hip Arthroplasty Medical Necessity Criteria", citationClause: "Covered Indications - THA" },
+      { cptCodes: ["27447-LT"] }
+    )).toBe(true);
+    expect(isEvidenceSiteMismatched(
+      { title: "Total Knee Arthroplasty Criteria", citationClause: "Joint replacement indication" },
+      { cptCodes: ["j9271"] }
+    )).toBe(true);
+
     expect(selectFirecrawlPolicySource({
       data: {
         web: [
