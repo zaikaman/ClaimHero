@@ -18,15 +18,15 @@
 
 **Voiceover:**
 
-“Imagine a family opening the mail and finding a denial for an important medical procedure. The insurer says the care was not medically necessary, but the letter does not make the next steps easy. The family has to find the rule behind the decision, prove what the medical records already show, identify what is missing, find the right appeal destination, and beat a filing deadline that is already running. That is the moment ClaimHero is built for.”
+“Yesterday, a family received a denial for an important procedure. The insurer says it was not medically necessary. Now they need the rule, the missing evidence, the right destination, and the deadline — all in one place. That is what ClaimHero is built for.”
 
 ## 0:25–0:38 — Sign in and frame the product
 
-**On screen:** ClaimHero login page. Click **Continue with Google**, then land on **Case Radar**.
+**On screen:** ClaimHero login page. Click **Continue with Google**, land on **Case Radar**, then switch the toggle from **Simple** to **Details on**.
 
 **Voiceover:**
 
-“ClaimHero gives denial teams one authenticated workspace to turn that denial into a sourced appeal and keep the case moving until a human approves the response.”
+“ClaimHero works in two modes. Simple keeps the language clear for patients and families; Details puts the codes, policy, and ERISA context in front of advocates and denial teams. I’m switching to Details for this demo.”
 
 ## 0:38–0:58 — Start a controlled live case
 
@@ -34,7 +34,7 @@
 
 **Voiceover:**
 
-“I’ll use one of ClaimHero’s synthetic demo presets so the case is safe to show on camera and repeatable for judges. These fixtures are not mocked results: ClaimHero still runs the extraction, policy crawl, evidence scoring, and appeal drafting pipeline on the selected denial.”
+“For a repeatable demo, I’ll choose a synthetic preset. It is safe to show, but the extraction, policy crawl, scoring, and drafting are live.”
 
 ## 0:58–1:18 — Confirm the facts
 
@@ -42,7 +42,7 @@
 
 **Voiceover:**
 
-“Before analysis begins, ClaimHero gives me a chance to check the extracted facts and the clinical context. I confirm that these details come from the available records, then move into the case workspace.”
+“I check the extracted facts and clinical context, confirm they come from the records, and continue.”
 
 ## 1:18–1:48 — Watch the live pipeline
 
@@ -50,7 +50,7 @@
 
 **Voiceover:**
 
-“Saving the context activates the Sentinel Pipeline automatically. This is live work on the new case, not a prewritten result. The activity feed shows the stages as they happen: review, policy search, win scoring, past-case retrieval, and brief drafting. Firecrawl discovers the insurer’s policy sources, OpenAI handles structured extraction and drafting, and Convex keeps the workflow and results reactive.”
+“The Sentinel Pipeline is now running. The live feed shows policy search, scoring, past cases, and brief drafting as they happen. Firecrawl finds the policy, OpenAI helps extract and draft, and Convex keeps the case updated.”
 
 ## 1:48–2:13 — Evidence & CPB
 
@@ -58,7 +58,7 @@
 
 **Voiceover:**
 
-“The first case step is **Evidence & CPB**. ClaimHero places the denial beside the insurer’s own policy requirements, supporting clinical evidence, missing proof, and retrieved precedents. The readiness score explains how complete the evidence package is; it is not a prediction that the appeal will win.”
+“Here I can see exactly why the claim was denied, which part of the insurer’s policy applies, what the records support, and what is still missing. The score is just a readiness check; it does not predict the result.”
 
 ## 2:13–2:38 — Appeal Brief
 
@@ -66,7 +66,7 @@
 
 **Voiceover:**
 
-“Next is the **Appeal Brief**. The generated document is editable, versioned, and tied to inspectable sources. I can review the Markdown source, preview the formatted brief, and open the citation sidebar instead of accepting unsupported model output.”
+“Next is the **Appeal Brief**. It is editable, versioned, and sourced. I can inspect the Markdown, preview the letter, and review citations before anything goes out.”
 
 ## 2:38–2:50 — Payer Dispatch and the human gate
 
@@ -74,7 +74,7 @@
 
 **Voiceover:**
 
-“The final step is **Payer Dispatch**. The communications inbox keeps the recipient, appeal packet, exhibits, delivery evidence, and future replies with the same case. Nothing goes out automatically: the authorized advocate must review the recipient and message before choosing **Approve & Transmit to Official Gateway**.”
+“Finally, **Payer Dispatch** shows the recipient, exhibits, delivery channel, and the **Human Review Mandatory** gate. The advocate reviews everything before **Approve & Transmit to Official Gateway**.”
 
 ## 2:50–2:58 — Show the system around the letter
 
@@ -82,7 +82,7 @@
 
 **Voiceover:**
 
-“The letter is only one part of the case. ClaimHero keeps the deadline, pipeline history, source trail, and tamper-proof case log together, so the team can see what happened and what still needs attention.”
+“The letter is only one part of the case. The deadline, source trail, pipeline history, and tamper-proof log stay attached to it.”
 
 ## 2:58–3:00 — Close
 
@@ -90,4 +90,4 @@
 
 **Voiceover:**
 
-“That is ClaimHero: a live, reviewable appeal workflow built on Convex, Firecrawl, OpenAI, and AgentMail.”
+“ClaimHero turns a denial into a live, reviewable appeal workflow.”

@@ -438,7 +438,7 @@ describe("Audit Trail Activation, Drawer & Timeline Verification", () => {
         });
 
         const str = JSON.stringify(element);
-        expect(str).toContain("Workflow Observability Timeline");
+        expect(str).toContain("Pipeline Timeline");
         expect(str).toContain("Workflow Observability");
         expect(str).toContain("run_alpha_01");
         expect(str).toContain("act_1");
