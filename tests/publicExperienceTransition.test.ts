@@ -30,34 +30,50 @@ vi.mock("@convex-dev/auth/providers/anonymous/react", () => ({
 
 import {
   PublicExperience,
-  AmbientBackgroundVideo,
-  AMBIENT_VIDEO_SRC,
 } from "../src/components/landing/PublicExperience";
 import { CinematicHero } from "../src/components/landing/CinematicHero";
 import { AuthPage } from "../src/components/auth/AuthPage";
 
 describe("PublicExperience & Seamless Landing-Auth Transition", () => {
-  describe("1. AmbientBackgroundVideo Specifications", () => {
-    it("exports the verified CloudFront video source URL", () => {
-      expect(AMBIENT_VIDEO_SRC).toContain("d8j0ntlcm91z4.cloudfront.net");
-      expect(AMBIENT_VIDEO_SRC).toContain(".mp4");
+  describe("1. Shared Backdrop Specifications", () => {
+    it("mounts the shared WebGL scene as the sole public backdrop", () => {
+      const html = renderToStaticMarkup(
+        React.createElement(PublicExperience, {
+          currentView: "landing",
+          onNavigate: vi.fn(),
+          isAuthenticated: false,
+          isAuthLoading: false,
+          hasCachedSession: false,
+          pendingTargetView: null,
+          setPendingTargetView: vi.fn(),
+        })
+      );
+      expect(html).toContain('data-us-project="bmaMERjX2VZDtPrh4Zwx"');
     });
 
-    it("renders persistent ambient video tag with preload auto and bottom blur mask", () => {
-      const html = renderToStaticMarkup(React.createElement(AmbientBackgroundVideo));
-      expect(html).toContain("<video");
-      expect(html).toContain(AMBIENT_VIDEO_SRC);
-      expect(html).toContain('preload="auto"');
-      expect(html).toContain("bottom-blur-mask");
-      expect(html).toContain("backdrop-blur-xl");
+    it("renders no ambient video element anywhere on the public surface", () => {
+      for (const view of ["landing", "login"] as const) {
+        const html = renderToStaticMarkup(
+          React.createElement(PublicExperience, {
+            currentView: view,
+            onNavigate: vi.fn(),
+            isAuthenticated: false,
+            isAuthLoading: false,
+            hasCachedSession: false,
+            pendingTargetView: null,
+            setPendingTargetView: vi.fn(),
+          })
+        );
+        expect(html).not.toContain("<video");
+        expect(html).not.toContain("cloudfront");
+      }
     });
   });
 
-  describe("2. CinematicHero embedBackground Prop", () => {
-    it("renders with bg-transparent and skips duplicate video when embedBackground is false", () => {
+  describe("2. CinematicHero Rendering", () => {
+    it("renders transparent chrome with no video element", () => {
       const html = renderToStaticMarkup(
         React.createElement(CinematicHero, {
-          embedBackground: false,
           onEnterConsole: vi.fn(),
           isAuthenticated: false,
           isAuthLoading: false,
@@ -66,46 +82,19 @@ describe("PublicExperience & Seamless Landing-Auth Transition", () => {
       );
       expect(html).toContain("bg-transparent");
       expect(html).not.toContain("<video");
-      expect(html).not.toContain("bottom-blur-mask");
-    });
-
-    it("renders standalone video and bg-black when embedBackground defaults to true", () => {
-      const html = renderToStaticMarkup(
-        React.createElement(CinematicHero, {
-          onEnterConsole: vi.fn(),
-          isAuthenticated: false,
-          isAuthLoading: false,
-          hasCachedSession: false,
-        })
-      );
-      expect(html).toContain("bg-black");
-      expect(html).toContain("<video");
-      expect(html).toContain(AMBIENT_VIDEO_SRC);
     });
   });
 
-  describe("3. AuthPage embedBackground Prop", () => {
-    it("renders with bg-transparent and skips duplicate video when embedBackground is false", () => {
+  describe("3. AuthPage Rendering", () => {
+    it("renders transparent with no video element", () => {
       const html = renderToStaticMarkup(
         React.createElement(AuthPage, {
-          embedBackground: false,
           onNavigate: vi.fn(),
         })
       );
       expect(html).toContain("bg-transparent");
       expect(html).not.toContain("<video");
       expect(html).toContain("Back to Overview");
-    });
-
-    it("renders standalone video and bg-black when embedBackground defaults to true", () => {
-      const html = renderToStaticMarkup(
-        React.createElement(AuthPage, {
-          onNavigate: vi.fn(),
-        })
-      );
-      expect(html).toContain("bg-black");
-      expect(html).toContain("<video");
-      expect(html).toContain(AMBIENT_VIDEO_SRC);
     });
 
     it("renders the Explore as Anonymous Advocate button under Google auth", () => {
@@ -134,9 +123,9 @@ describe("PublicExperience & Seamless Landing-Auth Transition", () => {
         })
       );
 
-      // Must include persistent ambient video
-      expect(html).toContain("<video");
-      expect(html).toContain(AMBIENT_VIDEO_SRC);
+      // Shared WebGL backdrop sits behind both views, no video anywhere
+      expect(html).toContain('data-us-project="bmaMERjX2VZDtPrh4Zwx"');
+      expect(html).not.toContain("<video");
 
       // Landing container should be visible and interactive
       expect(html).toContain("opacity-100 pointer-events-auto visible");
@@ -160,9 +149,9 @@ describe("PublicExperience & Seamless Landing-Auth Transition", () => {
         })
       );
 
-      // Persistent ambient video must remain in the DOM
-      expect(html).toContain("<video");
-      expect(html).toContain(AMBIENT_VIDEO_SRC);
+      // Shared WebGL backdrop persists across the transition, no video
+      expect(html).toContain('data-us-project="bmaMERjX2VZDtPrh4Zwx"');
+      expect(html).not.toContain("<video");
 
       // Auth container should be visible and interactive
       expect(html).toContain("opacity-100 pointer-events-auto visible");
@@ -183,9 +172,10 @@ describe("PublicExperience & Seamless Landing-Auth Transition", () => {
         })
       );
 
-      // Unauthenticated non-landing route displays Auth card
+      // Unauthenticated non-landing route displays Auth card over the shared scene
       expect(html).toContain("Welcome Back");
-      expect(html).toContain("<video");
+      expect(html).toContain('data-us-project="bmaMERjX2VZDtPrh4Zwx"');
+      expect(html).not.toContain("<video");
     });
 
     it("coordinates both views and keeps persistent ambient background in DOM", () => {
@@ -200,7 +190,7 @@ describe("PublicExperience & Seamless Landing-Auth Transition", () => {
           setPendingTargetView: vi.fn(),
         })
       );
-      expect(html).toContain(AMBIENT_VIDEO_SRC);
+      expect(html).toContain('data-us-project="bmaMERjX2VZDtPrh4Zwx"');
       expect(html).toContain("Back to Overview");
       expect(html).toContain("Sign In");
     });
@@ -238,7 +228,6 @@ describe("PublicExperience & Seamless Landing-Auth Transition", () => {
       const html = renderToStaticMarkup(
         React.createElement(AuthPage, {
           onNavigate: vi.fn(),
-          embedBackground: false,
         })
       );
       expect(html).toContain("scrollbar-none");

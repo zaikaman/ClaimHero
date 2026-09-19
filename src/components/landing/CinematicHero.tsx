@@ -29,7 +29,6 @@ interface CinematicHeroProps {
   isAuthenticated?: boolean;
   isAuthLoading?: boolean;
   hasCachedSession?: boolean;
-  embedBackground?: boolean;
   active?: boolean;
 }
 
@@ -104,7 +103,6 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
   isAuthenticated: isAuthenticatedProp,
   isAuthLoading: isAuthLoadingProp,
   hasCachedSession: hasCachedSessionProp,
-  embedBackground = true,
   active = true,
 }) => {
   const {
@@ -174,28 +172,6 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [active]);
 
-  const videoRef = React.useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (!embedBackground || typeof window === "undefined" || !window.matchMedia) return;
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncMotionPreference = (matches: boolean) => {
-      if (videoRef.current) {
-        if (matches) {
-          videoRef.current.pause();
-        } else {
-          videoRef.current.play().catch(() => {});
-        }
-      }
-    };
-
-    syncMotionPreference(mediaQuery.matches);
-
-    const listener = (e: MediaQueryListEvent) => syncMotionPreference(e.matches);
-    mediaQuery.addEventListener("change", listener);
-    return () => mediaQuery.removeEventListener("change", listener);
-  }, [embedBackground]);
-
   const navLinks = LANDING_NAV_LINKS;
 
   const Badge1Icon = slide.badge1.icon;
@@ -203,29 +179,8 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
   const Badge3Icon = slide.badge3.icon;
 
   return (
-    <div className={`h-screen h-[100dvh] w-screen overflow-hidden relative ${embedBackground ? "bg-black" : "bg-transparent"} text-white font-sans select-none flex flex-col justify-between`}>
-      {/* 1. Full-Screen Ambient Background Video (z-index 0) */}
-      {embedBackground && (
-        <>
-          <div className="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none bg-radial from-slate-900 to-black">
-            <video
-              ref={videoRef}
-              src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260406_094145_4a271a6c-3869-4f1c-8aa7-aeb0cb227994.mp4"
-              autoPlay
-              loop
-              muted
-              playsInline
-              preload="metadata"
-              className="w-full h-full object-cover"
-            />
-          </div>
-
-          {/* 2. Bottom Optical Blur Overlay (no dark artificial gradient, pure backdrop-blur-xl masked) */}
-          <div className="fixed inset-0 w-full h-full z-[1] pointer-events-none backdrop-blur-xl bottom-blur-mask" />
-        </>
-      )}
-
-      {/* 3. Horizontal Navbar (z-index 50) */}
+    <div className="min-h-screen min-h-[100dvh] w-full relative bg-transparent text-white font-sans select-none flex flex-col">
+      {/* 1. Horizontal Navbar (z-index 50) */}
       <header className="relative z-50 px-4 sm:px-6 md:px-12 py-4 md:py-6 flex items-center justify-between">
         {/* Left: Brand Showcase Logo */}
         <div
@@ -327,7 +282,7 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
         </div>
       </header>
 
-      {/* 4. Mobile Menu Dropdown (below lg breakpoint) */}
+      {/* 2. Mobile Menu Dropdown (below lg breakpoint) */}
       <div
         className={`lg:hidden absolute top-[72px] inset-x-4 sm:inset-x-6 z-40 bg-gray-900/95 backdrop-blur-lg border-t border-b border-gray-800 shadow-2xl rounded-2xl p-4 transition-all duration-500 ease-out ${
           isMobileMenuOpen
@@ -405,8 +360,8 @@ export const CinematicHero: React.FC<CinematicHeroProps> = ({
         </div>
       </div>
 
-      {/* 5. Showcase Hero Content (Bottom of viewport, z-index 10) */}
-      <main className="flex-1 flex flex-col justify-end px-4 sm:px-6 md:px-12 pb-8 md:pb-16 z-10">
+      {/* 3. Showcase Hero Content (Bottom of first viewport, z-index 10) */}
+      <main className="flex-1 flex flex-col justify-end min-h-[calc(100dvh-88px)] px-4 sm:px-6 md:px-12 pb-8 md:pb-16 z-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
           {/* Left Side: Metadata, Title, Description, Showcase CTAs */}
           <div

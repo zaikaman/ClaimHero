@@ -36,11 +36,10 @@ import {
 interface AuthPageProps {
   onNavigate: (view: NavigationView) => void;
   onSuccess?: () => void;
-  embedBackground?: boolean;
   /**
    * Whether the auth form is the currently visible surface.
    * Inside PublicExperience the form stays mounted (hidden) alongside the
-   * landing hero to keep the ambient video transition seamless. While hidden
+   * landing story to keep the transition seamless. While hidden
    * it must not auto-navigate an already-authenticated visitor away from the
    * landing page. Defaults to true for standalone usage.
    */
@@ -50,7 +49,6 @@ interface AuthPageProps {
 export const AuthPage: React.FC<AuthPageProps> = ({
   onNavigate,
   onSuccess,
-  embedBackground = true,
   active = true,
 }) => {
   const { signIn: signInPassword, pending: isSigningIn } = useSignInWithPassword(api.auth.signInWithPassword);
@@ -121,28 +119,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       onNavigate("radar");
     }
   }, [isAuthenticated, onNavigate, onSuccess, active]);
-
-  const videoRef = React.useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (!embedBackground || typeof window === "undefined" || !window.matchMedia) return;
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncMotionPreference = (matches: boolean) => {
-      if (videoRef.current) {
-        if (matches) {
-          videoRef.current.pause();
-        } else {
-          videoRef.current.play().catch(() => {});
-        }
-      }
-    };
-
-    syncMotionPreference(mediaQuery.matches);
-
-    const listener = (e: MediaQueryListEvent) => syncMotionPreference(e.matches);
-    mediaQuery.addEventListener("change", listener);
-    return () => mediaQuery.removeEventListener("change", listener);
-  }, [embedBackground]);
 
   // Countdown timer for reset email resends
   useEffect(() => {
@@ -420,29 +396,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   };
 
   return (
-    <div className={`min-h-screen h-screen w-screen ${embedBackground ? "bg-black" : "bg-transparent"} text-white font-sans flex items-center justify-center p-3 sm:p-5 md:p-6 lg:p-8 relative overflow-hidden select-none`}>
-      
-      {/* 1. Fullscreen Ambient Video Background (when standalone) */}
-      {embedBackground && (
-        <div className="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none bg-radial from-slate-900 to-black">
-          <video
-            ref={videoRef}
-            src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260406_094145_4a271a6c-3869-4f1c-8aa7-aeb0cb227994.mp4"
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-            className="w-full h-full object-cover scale-105"
-          />
-        </div>
-      )}
+    <div className="min-h-screen h-screen w-screen bg-transparent text-white font-sans flex items-center justify-center p-3 sm:p-5 md:p-6 lg:p-8 relative overflow-hidden select-none">
 
-      {/* 2. Main Split-Card Auth Container with Seamless Middle Blend */}
-      <div className="relative z-10 w-full max-w-[1240px] h-auto min-h-0 sm:h-[88vh] sm:min-h-[500px] max-h-[96vh] sm:max-h-[820px] rounded-[28px] sm:rounded-[36px] lg:rounded-[40px] p-2 sm:p-2.5 border-[1.5px] border-white/40 shadow-2xl grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-y-auto sm:overflow-hidden backdrop-blur-xs">
+      {/* 1. Main Split-Card Auth Container */}
+      <div className="relative z-10 w-full max-w-[1240px] h-auto min-h-0 sm:h-[88vh] sm:min-h-[500px] max-h-[96vh] sm:max-h-[820px] rounded-none p-2 sm:p-2.5 border border-white/20 shadow-2xl grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-y-auto sm:overflow-hidden backdrop-blur-xs">
         
         {/* ================= LEFT COLUMN: Pure See-Through Window to Fullscreen Video Behind ================= */}
-        <div className="hidden lg:flex lg:col-span-6 relative h-full flex-col justify-between p-6 sm:p-8 lg:p-9 xl:p-12 bg-gradient-to-t from-black/90 via-black/25 to-black/35 bg-gradient-to-r from-transparent via-transparent to-black/40 rounded-l-[24px] sm:rounded-l-[32px] lg:rounded-l-[36px] rounded-r-none overflow-hidden">
+        <div className="hidden lg:flex lg:col-span-6 relative h-full flex-col justify-between p-6 sm:p-8 lg:p-9 xl:p-12 bg-gradient-to-t from-black/90 via-black/25 to-black/35 bg-gradient-to-r from-transparent via-transparent to-black/40 rounded-none overflow-hidden">
           
           {/* Subtle Right Edge Hairline Divider Line for seamless middle blending */}
           <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-gradient-to-b from-white/10 via-white/35 to-white/10 pointer-events-none z-20" />
@@ -452,7 +412,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <button
               type="button"
               onClick={() => onNavigate("landing")}
-              className="liquid-glass flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-white/90 hover:text-white transition-all active:scale-95 cursor-pointer hover:bg-white/10 shadow-md backdrop-blur-md"
+              className="flex items-center gap-2 border border-white/20 bg-black/60 px-3.5 py-1.5 text-xs font-medium uppercase tracking-widest text-white/90 transition-all hover:border-white/40 hover:text-white active:scale-95 cursor-pointer backdrop-blur-md"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Overview</span>
@@ -469,21 +429,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           {/* Bottom Headline & Subtext (Tailored to ClaimHero) */}
           <div className="relative z-10 space-y-3 pb-1">
             <h2 className="text-3xl sm:text-4xl lg:text-4xl xl:text-5xl font-serif font-normal tracking-tight text-white leading-[1.08]">
-              Defend <br />
-              Every Claim. <br />
-              Ground <br />
-              Every Appeal.
+              Fight the <br />
+              denial. <br />
+              <span className="italic">Keep your <br />
+              coverage.</span>
             </h2>
 
             <p className="text-xs sm:text-sm text-gray-200/90 leading-relaxed font-light max-w-md">
-              Add a denial letter and we show you why the insurer said no, find their own rules,
-              and write the appeal letter you send. You approve everything before it goes out.
+              Turn a denial letter into a cited, dispatch-ready appeal: the
+              insurer&apos;s own policy, your clinical evidence, and every
+              deadline tracked. You approve before anything is sent.
             </p>
           </div>
         </div>
 
-        {/* ================= RIGHT COLUMN: Fully Opaque Solid White Form Card ================= */}
-        <div className="col-span-1 lg:col-span-6 bg-white text-zinc-900 rounded-[24px] sm:rounded-[32px] lg:rounded-r-[36px] lg:rounded-l-none p-4 sm:p-5 lg:p-6 xl:p-8 flex flex-col justify-between shadow-2xl lg:shadow-[-20px_0_40px_-10px_rgba(0,0,0,0.35)] h-full overflow-y-auto scrollbar-none relative z-10 border-l border-zinc-100 lg:border-l-zinc-200/80">
+        {/* ================= RIGHT COLUMN: Editorial dark form card (landing language) ================= */}
+        <div className="col-span-1 lg:col-span-6 bg-[#1a1a1a] text-white rounded-none p-4 sm:p-5 lg:p-6 xl:p-8 flex flex-col justify-between shadow-2xl h-full overflow-y-auto scrollbar-none relative z-10 lg:border-l lg:border-white/20">
           <div className="space-y-2.5 sm:space-y-3 max-w-sm lg:max-w-md mx-auto w-full my-auto">
             
             {/* Mobile / Tablet Top Back Button */}
@@ -491,12 +452,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigate("landing")}
-                className="flex items-center gap-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900 transition-colors py-1 cursor-pointer"
+                className="flex items-center gap-1.5 text-xs font-medium text-white/60 hover:text-white transition-colors py-1 cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Back to Overview</span>
               </button>
-              <span className="text-[10px] font-mono tracking-wider text-zinc-400 uppercase">
+              <span className="text-[10px] font-mono tracking-wider text-white/40 uppercase">
                 SENTINEL
               </span>
             </div>
@@ -505,7 +466,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <div className="flex items-center justify-center">
               <BrandLogo
                 size="sm"
-                theme="light"
+                theme="auto"
                 glow={false}
                 interactive={true}
                 onClick={() => onNavigate("landing")}
@@ -514,10 +475,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
             {/* Header Title & Subtitle */}
             <div className="space-y-1 text-center pt-0.5">
-              <h1 className="text-xl sm:text-2xl xl:text-3xl font-serif font-normal tracking-tight text-zinc-900 leading-tight">
+              <h1 className="text-xl sm:text-2xl xl:text-3xl font-serif font-normal tracking-tight text-white leading-tight">
                 {flow === "signIn" ? "Welcome Back" : "Create Account"}
               </h1>
-              <p className="text-xs text-zinc-500 font-light max-w-sm mx-auto text-balance">
+              <p className="text-xs text-white/60 font-light max-w-sm mx-auto text-balance">
                 {flow === "signIn"
                   ? "Enter your email and password to access your account"
                   : "Sign up to start preparing evidence-grounded clinical appeals"}
@@ -526,16 +487,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
             {/* Error Banner */}
             {error && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm flex items-start gap-2.5 animate-fadeIn">
-                <WarningCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+              <div className="p-3 rounded-none bg-red-500/10 border border-red-500/30 text-red-200 text-xs sm:text-sm flex items-start gap-2.5 animate-fadeIn">
+                <WarningCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
                 <p>{error}</p>
               </div>
             )}
 
             {/* Completing Google sign-in status (OAuth redirect return) */}
             {isCompletingOAuth && !error && (
-              <div className="p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 text-xs sm:text-sm flex items-center gap-2.5">
-                <CircleNotch className="w-4 h-4 shrink-0 animate-spin text-zinc-600" />
+              <div className="p-3 rounded-none bg-black border border-white/20 text-white/70 text-xs sm:text-sm flex items-center gap-2.5">
+                <CircleNotch className="w-4 h-4 shrink-0 animate-spin text-white/60" />
                 <p>Completing Google sign-in, entering your workspace...</p>
               </div>
             )}
@@ -545,33 +506,33 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               {/* Optional Name field in sign up mode */}
               {flow === "signUp" && (
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-zinc-700">Full Name</label>
+                  <label className="text-xs font-medium uppercase tracking-widest text-white/70">Full Name</label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Dr. Jordan Vance, MD"
-                    className="h-10 sm:h-11 w-full rounded-xl bg-[#f5f6f9] border border-[#eaedf3] px-3.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all dark:bg-[#f5f6f9] dark:text-zinc-900 dark:border-[#eaedf3]"
+                    className="h-10 sm:h-11 w-full rounded-none bg-black border border-white/20 px-3.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white transition-all"
                   />
                 </div>
               )}
 
               {/* Email Field */}
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-700">Email</label>
+                <label className="text-xs font-medium uppercase tracking-widest text-white/70">Email</label>
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="h-10 sm:h-11 w-full rounded-xl bg-[#f5f6f9] border border-[#eaedf3] px-3.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all dark:bg-[#f5f6f9] dark:text-zinc-900 dark:border-[#eaedf3]"
+                  className="h-10 sm:h-11 w-full rounded-none bg-black border border-white/20 px-3.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white transition-all"
                 />
               </div>
 
               {/* Password Field */}
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-700">Password</label>
+                <label className="text-xs font-medium uppercase tracking-widest text-white/70">Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -579,12 +540,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="h-10 sm:h-11 w-full rounded-xl bg-[#f5f6f9] border border-[#eaedf3] px-3.5 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all dark:bg-[#f5f6f9] dark:text-zinc-900 dark:border-[#eaedf3]"
+                    className="h-10 sm:h-11 w-full rounded-none bg-black border border-white/20 px-3.5 pr-10 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors cursor-pointer p-1"
                     title={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? (
@@ -598,12 +559,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
               {/* Remember Me & Forgot Password Row */}
               <div className="flex items-center justify-between text-xs pt-0.5">
-                <label className="flex items-center gap-2 text-zinc-600 cursor-pointer select-none">
+                <label className="flex items-center gap-2 text-white/60 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="rounded border-zinc-300 text-zinc-900 focus:ring-0 focus:ring-offset-0 size-4 cursor-pointer"
+                    className="size-4 cursor-pointer accent-white"
                   />
                   <span>Remember me</span>
                 </label>
@@ -620,7 +581,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       setResetStep("request");
                       setIsResetDialogOpen(true);
                     }}
-                    className="text-zinc-600 hover:text-zinc-900 transition-colors cursor-pointer text-xs font-medium"
+                    className="text-white/60 hover:text-white transition-colors cursor-pointer text-xs font-medium"
                   >
                     Forgot Password
                   </button>
@@ -631,11 +592,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <button
                 type="submit"
                 disabled={isLoading || isSigningIn || isSigningUp || showGoogleBusy || isCompletingOAuth}
-                className="w-full h-10 sm:h-11 rounded-xl bg-black text-white font-medium text-sm hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-md mt-1.5"
+                className="w-full h-10 sm:h-11 rounded-none bg-white text-black font-bold uppercase tracking-widest text-sm hover:bg-gray-200 transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-md mt-1.5"
               >
                 {isLoading || isSigningIn || isSigningUp ? (
                   <>
-                    <CircleNotch className="w-4 h-4 animate-spin text-white" />
+                    <CircleNotch className="w-4 h-4 animate-spin text-black" />
                     <span>{flow === "signIn" ? "Signing in..." : "Creating account..."}</span>
                   </>
                 ) : (
@@ -645,9 +606,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
               {/* Or Divider */}
               <div className="flex items-center my-1">
-                <div className="flex-grow border-t border-zinc-200"></div>
-                <span className="px-3 text-[11px] font-mono uppercase tracking-wider text-zinc-400">or</span>
-                <div className="flex-grow border-t border-zinc-200"></div>
+                <div className="flex-grow border-t border-white/20"></div>
+                <span className="px-3 text-[11px] font-mono uppercase tracking-wider text-white/50">or</span>
+                <div className="flex-grow border-t border-white/20"></div>
               </div>
 
               {/* Google Sign In Button */}
@@ -655,10 +616,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 type="button"
                 onClick={handleGoogleAuth}
                 disabled={isLoading || isSigningIn || isSigningUp || showGoogleBusy || isAnonymousLoading || isCompletingOAuth}
-                className="w-full h-10 sm:h-11 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-medium text-sm transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs"
+                className="w-full h-10 sm:h-11 rounded-none border border-white/20 bg-black hover:bg-white hover:text-black text-white font-medium text-sm transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 {showGoogleBusy ? (
-                  <CircleNotch className="w-4 h-4 animate-spin text-zinc-700" />
+                  <CircleNotch className="w-4 h-4 animate-spin text-current" />
                 ) : (
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path
@@ -687,17 +648,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 type="button"
                 onClick={handleAnonymousAuth}
                 disabled={isLoading || isSigningIn || isSigningUp || showGoogleBusy || isAnonymousLoading || isCompletingOAuth}
-                className="w-full h-10 sm:h-11 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-medium text-sm transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs"
+                className="w-full h-10 sm:h-11 rounded-none border border-white/20 bg-black hover:bg-white hover:text-black text-white font-medium text-sm transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 {isAnonymousLoading ? (
-                  <CircleNotch className="w-4 h-4 animate-spin text-zinc-700" />
+                  <CircleNotch className="w-4 h-4 animate-spin text-current" />
                 ) : (
-                  <Flask className="w-4 h-4 text-zinc-600" />
+                  <Flask className="w-4 h-4 opacity-70" />
                 )}
                 <span>
                   {isAnonymousLoading ? "Entering Demo Workspace..." : "Explore as Anonymous Advocate"}
                 </span>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-white/60 bg-black border border-white/20 px-1.5 py-0.5 rounded-none font-medium">
                   Demo
                 </span>
               </button>
@@ -705,7 +666,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </div>
 
           {/* Bottom Mode Switcher */}
-          <div className="pt-1 text-center text-xs sm:text-sm text-zinc-500">
+          <div className="pt-1 text-center text-xs sm:text-sm text-white/50">
             {flow === "signIn" ? (
               <p>
                 Don&apos;t have an account?{" "}
@@ -715,7 +676,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     setError(null);
                     setFlow("signUp");
                   }}
-                  className="font-semibold text-zinc-900 hover:underline cursor-pointer ml-1"
+                  className="font-semibold text-white hover:underline cursor-pointer ml-1"
                 >
                   Sign Up
                 </button>
@@ -729,7 +690,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     setError(null);
                     setFlow("signIn");
                   }}
-                  className="font-semibold text-zinc-900 hover:underline cursor-pointer ml-1"
+                  className="font-semibold text-white hover:underline cursor-pointer ml-1"
                 >
                   Sign In
                 </button>
@@ -749,24 +710,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           setResetConfirmPassword("");
         }
       }}>
-        <DialogContent className="sm:max-w-md p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xl">
+        <DialogContent className="sm:max-w-md p-6 bg-[#1a1a1a] border border-white/20 text-white shadow-xl rounded-none">
           <DialogHeader className="space-y-1.5 pb-2">
             <div className="flex items-center gap-2.5">
-              <div className="size-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center">
+              <div className="size-8 rounded-none bg-black border border-white/20 text-white flex items-center justify-center">
                 {resetStep === "success" ? (
                   <ShieldCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
                 ) : (
-                  <Key className="size-4 text-zinc-700 dark:text-zinc-300" />
+                  <Key className="size-4 text-white" />
                 )}
               </div>
-              <DialogTitle className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              <DialogTitle className="text-base font-semibold text-white">
                 {resetStep === "request" && "Reset Account Password"}
                 {resetStep === "verify" && "Enter Verification Code"}
                 {resetStep === "token" && "Create New Password"}
                 {resetStep === "success" && "Password Updated"}
               </DialogTitle>
             </div>
-            <DialogDescription className="text-xs text-zinc-500 dark:text-zinc-400">
+            <DialogDescription className="text-xs text-white/60">
               {resetStep === "request" &&
                 "Enter your account email. If registered, a 6-digit verification code will be dispatched via the claimhero-sender AgentMail gateway."}
               {resetStep === "verify" &&
@@ -780,7 +741,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
           {/* Error Banner */}
           {resetError && (
-            <div role="alert" aria-live="polite" className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 flex items-start gap-2.5 text-xs text-red-700 dark:text-red-400">
+            <div role="alert" aria-live="polite" className="rounded-none border border-red-500/30 bg-red-500/10 p-3 flex items-start gap-2.5 text-xs text-red-200">
               <WarningCircle className="size-4 shrink-0 mt-0.5" />
               <div className="leading-relaxed font-medium">{resetError}</div>
             </div>
@@ -790,7 +751,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           {resetStep === "request" && (
             <form onSubmit={handleRequestReset} className="space-y-4 py-1">
               <div className="space-y-1.5">
-                <label htmlFor="reset-email" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                <label htmlFor="reset-email" className="text-xs font-medium uppercase tracking-widest text-white/70">
                   Account Email Address
                 </label>
                 <input
@@ -801,7 +762,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   placeholder="advocate@hospital.org"
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                  className="w-full h-10 px-3 rounded-none border border-white/20 bg-black text-xs text-white focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white"
                 />
               </div>
 
@@ -809,14 +770,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsResetDialogOpen(false)}
-                  className="px-3.5 h-9 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                  className="px-3.5 h-9 rounded-none border border-white/20 text-xs font-medium text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingReset || !resetEmail.trim() || !resetEmail.includes("@")}
-                  className="px-4 h-9 rounded-xl bg-black dark:bg-white text-white dark:text-black text-xs font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-4 h-9 rounded-none bg-white text-black text-xs font-medium hover:bg-gray-200 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   {isSubmittingReset ? (
                     <>
@@ -834,11 +795,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           {/* STEP 2: Verify Code & Set New Password */}
           {resetStep === "verify" && (
             <form onSubmit={handleVerifyAndReset} className="space-y-3.5 py-1">
-              <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/60 p-3 text-xs space-y-1">
-                <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
+              <div className="rounded-none border border-white/20 bg-black p-3 text-xs space-y-1">
+                <div className="flex items-center justify-between text-white/60">
                   <span className="flex items-center gap-1.5">
                     <EnvelopeSimple className="size-3.5" />
-                    <span>Sent to <strong className="text-zinc-900 dark:text-zinc-100 font-mono">{resetEmail}</strong></span>
+                    <span>Sent to <strong className="text-white font-mono">{resetEmail}</strong></span>
                   </span>
                   <button
                     type="button"
@@ -846,18 +807,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       setResetStep("request");
                       setResetError(null);
                     }}
-                    className="text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 underline cursor-pointer"
+                    className="text-[11px] text-white/50 hover:text-white underline cursor-pointer"
                   >
                     Change
                   </button>
                 </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal">
+                <p className="text-[11px] text-white/50 leading-normal">
                   Dispatched via ClaimHero Security gateway (claimhero-sender). Check spam/junk if not visible in 2 minutes.
                 </p>
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="reset-code" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                <label htmlFor="reset-code" className="text-xs font-medium uppercase tracking-widest text-white/70">
                   6-Digit Verification Code
                 </label>
                 <input
@@ -872,16 +833,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   placeholder="123456"
                   value={resetCode}
                   onChange={(e) => setResetCode(e.target.value.replace(/[^0-9]/g, ""))}
-                  className="w-full h-11 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-base text-center font-mono font-bold tracking-[0.35em] text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                  className="w-full h-11 px-3 rounded-none border border-white/20 bg-black text-base text-center font-mono font-bold tracking-[0.35em] text-white focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white"
                 />
               </div>
 
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="reset-new-password" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  <label htmlFor="reset-new-password" className="text-xs font-medium uppercase tracking-widest text-white/70">
                     New Password
                   </label>
-                  <span className="text-[10px] text-zinc-500">Min. 8 characters</span>
+                  <span className="text-[10px] text-white/50">Min. 8 characters</span>
                 </div>
                 <div className="relative">
                   <input
@@ -893,14 +854,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     placeholder="Enter new password"
                     value={resetNewPassword}
                     onChange={(e) => setResetNewPassword(e.target.value)}
-                    className="w-full h-10 px-3 pr-9 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                    className="w-full h-10 px-3 pr-9 rounded-none border border-white/20 bg-black text-xs text-white focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white"
                   />
                   <button
                     type="button"
                     aria-label={showResetPassword ? "Hide password" : "Show password"}
                     title={showResetPassword ? "Hide password" : "Show password"}
                     onClick={() => setShowResetPassword((prev) => !prev)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 cursor-pointer"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white p-1 cursor-pointer"
                   >
                     {showResetPassword ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
                   </button>
@@ -908,7 +869,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="reset-confirm-password" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                <label htmlFor="reset-confirm-password" className="text-xs font-medium uppercase tracking-widest text-white/70">
                   Confirm New Password
                 </label>
                 <div className="relative">
@@ -921,7 +882,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     placeholder="Re-enter new password"
                     value={resetConfirmPassword}
                     onChange={(e) => setResetConfirmPassword(e.target.value)}
-                    className="w-full h-10 px-3 pr-9 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                    className="w-full h-10 px-3 pr-9 rounded-none border border-white/20 bg-black text-xs text-white focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white"
                   />
                 </div>
               </div>
@@ -931,7 +892,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   type="button"
                   disabled={resendCooldown > 0 || isSubmittingReset}
                   onClick={handleResendCode}
-                  className="text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                  className="text-xs font-medium text-white/60 hover:text-white disabled:opacity-40 flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
                 >
                   <ArrowCounterClockwise className={`size-3.5 ${isSubmittingReset ? "animate-spin" : ""}`} />
                   <span>{resendCooldown > 0 ? `Resend (${resendCooldown}s)` : "Resend Code"}</span>
@@ -941,14 +902,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsResetDialogOpen(false)}
-                    className="px-3 h-9 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                    className="px-3 h-9 rounded-none border border-white/20 text-xs font-medium text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmittingReset || resetCode.trim().length !== 6 || resetNewPassword.length < 8}
-                    className="px-4 h-9 rounded-xl bg-black dark:bg-white text-white dark:text-black text-xs font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1.5"
+                    className="px-4 h-9 rounded-none bg-white text-black text-xs font-medium hover:bg-gray-200 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1.5"
                   >
                     {isSubmittingReset ? (
                       <>
@@ -969,10 +930,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <form onSubmit={handleResetWithToken} className="space-y-3.5 py-1">
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="token-new-password" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  <label htmlFor="token-new-password" className="text-xs font-medium uppercase tracking-widest text-white/70">
                     New Password
                   </label>
-                  <span className="text-[10px] text-zinc-500">Min. 8 characters</span>
+                  <span className="text-[10px] text-white/50">Min. 8 characters</span>
                 </div>
                 <div className="relative">
                   <input
@@ -984,14 +945,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     placeholder="Enter new password"
                     value={resetNewPassword}
                     onChange={(e) => setResetNewPassword(e.target.value)}
-                    className="w-full h-10 px-3 pr-9 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                    className="w-full h-10 px-3 pr-9 rounded-none border border-white/20 bg-black text-xs text-white focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white"
                   />
                   <button
                     type="button"
                     aria-label={showResetPassword ? "Hide password" : "Show password"}
                     title={showResetPassword ? "Hide password" : "Show password"}
                     onClick={() => setShowResetPassword((prev) => !prev)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 cursor-pointer"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white p-1 cursor-pointer"
                   >
                     {showResetPassword ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
                   </button>
@@ -999,7 +960,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="token-confirm-password" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                <label htmlFor="token-confirm-password" className="text-xs font-medium uppercase tracking-widest text-white/70">
                   Confirm New Password
                 </label>
                 <input
@@ -1011,7 +972,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   placeholder="Re-enter new password"
                   value={resetConfirmPassword}
                   onChange={(e) => setResetConfirmPassword(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                  className="w-full h-10 px-3 rounded-none border border-white/20 bg-black text-xs text-white focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white"
                 />
               </div>
 
@@ -1019,14 +980,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsResetDialogOpen(false)}
-                  className="px-3.5 h-9 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                  className="px-3.5 h-9 rounded-none border border-white/20 text-xs font-medium text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingReset || resetNewPassword.length < 8 || !resetNewPassword}
-                  className="px-4 h-9 rounded-xl bg-black dark:bg-white text-white dark:text-black text-xs font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-4 h-9 rounded-none bg-white text-black text-xs font-medium hover:bg-gray-200 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   {isSubmittingReset ? (
                     <>
@@ -1044,11 +1005,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           {/* STEP 4: Success */}
           {resetStep === "success" && (
             <div className="space-y-4 py-2">
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-start gap-3 text-emerald-800 dark:text-emerald-300">
+              <div className="rounded-none border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-start gap-3 text-emerald-200">
                 <CheckCircle className="size-5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
                 <div className="text-xs space-y-1">
                   <p className="font-semibold text-sm">Password Updated Successfully</p>
-                  <p className="text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed">
+                  <p className="text-emerald-200/90 leading-relaxed">
                     Your account password has been updated. You can now sign in using your new credentials.
                   </p>
                 </div>
@@ -1059,7 +1020,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   setIsResetDialogOpen(false);
                   setFlow("signIn");
                 }}
-                className="w-full h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black font-medium text-xs hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors cursor-pointer"
+                className="w-full h-10 rounded-none bg-white text-black font-medium text-xs hover:bg-gray-200 transition-colors cursor-pointer"
               >
                 Sign In Now
               </button>

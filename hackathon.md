@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-19T07:46:06Z
+- **Last updated:** 2026-09-19T11:31:19Z
 
 ## Log
 
@@ -1815,8 +1815,11 @@ Hardened policy crawler caching, optical intake email validation, statutory calc
 ### 2026-09-19 - 6989bf6
 Hardened auth boundaries, crawl budgets, delete cascades, appeal versioning, and liability math (`convex/clinicalEvidences.ts`, `convex/chatbot.ts`, `convex/claims.ts`, `convex/appeals.ts`, `convex/actions/policyCrawler.ts`, `convex/crons.ts`, `convex/lib/rateLimiter.ts`, `convex/schema.ts`, `src/hooks/useEvidence.ts`, `src/hooks/useLiabilityCalculator.ts`, `src/lib/liabilityCalculator.ts`, `src/lib/dossierBuilder.ts`, `src/components/evidence/ClinicalResearchConsole.tsx`, `src/components/calculator/FinancialLiabilityCalculator.tsx`, `tests/ingestionAndDeletionPipeline.test.ts`). Closed discovered-policy enumeration, added collaborator-aware chatbot ownership checks and a secure denial-letter download URL, clamped policy-snapshot TTL with a daily expiry sweep, capped per-claim Firecrawl spend with forceRescan on explicit Re-run, fixed collaborator purge and email-attachment cascades plus appeal revision conflicts, moved ERISA deadline math to UTC, and gated No Surprises Act protection and placeholder benefits out of dossiers. Verified with `npm run verify` (typecheck, lint, 1,302 tests, production build clean). Convex features: queries, mutations, actions, crons, scheduled functions, file storage.
 
-### 2026-09-19 - working tree
+### 2026-09-19 - a161b0d
 Fixed authenticated users being bounced off the landing page: the hidden pre-mounted `AuthPage` inside `PublicExperience` auto-navigated to `radar` on mount whenever a session existed. Added an `active` prop gating the auto-navigate effect (`src/components/auth/AuthPage.tsx`) and wired `active={isLogin}` from `PublicExperience` (`src/components/landing/PublicExperience.tsx`), so the login form only redirects while visible. Verified with typecheck and targeted suites (46 tests).
+
+### 2026-09-19 - working tree
+Replaced the video-backed public surface with an editorial black-and-white landing over one shared Unicorn Studio WebGL backdrop: new `TemplateLanding.tsx` story (serif hero, stat row, workspace/denial/demo/artifact/trust/start sections), new `UnicornBackground.tsx` scene host (`bmaMERjX2VZDtPrh4Zwx`, runtime-injected CDN script, single instance shared by landing and login), scrollable `PublicExperience.tsx` container, and `CinematicHero.tsx` stripped to transparent chrome with no video element. Restyled `AuthPage.tsx` to sharp-corner monochrome (black fields, white CTAs, uppercase labels) and added Playfair Display serif (`index.html`, `tailwind.config.js`). Replaced stock art with 4 domain-accurate 16:9 visuals (`public/artifacts/`), rewrote `BRIEF.md` into the full All Gas brief, added `DEMO_SCRIPT.md` (2m55s judge path), and updated coverage to `tests/landingSections.test.ts` plus WebGL-asserting `tests/publicExperienceTransition.test.ts` (`README.md`: 1,304 tests, 83 suites). Convex features: static hosting.
 
 
 
