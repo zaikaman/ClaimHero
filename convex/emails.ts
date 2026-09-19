@@ -3,7 +3,8 @@ import { v, ConvexError } from "convex/values";
 import { OutboundId } from "@agentmail/convex";
 import type { Doc, Id } from "./_generated/dataModel";
 import { components, internal } from "./_generated/api";
-import { getClaimIfAuthorized, requireAuthUser, requireClaimEditor } from "./lib/auth";
+import { getClaimIfAuthorized, requireAuthUser, requireClaimEditor, getClaimAccessRole } from "./lib/auth";
+import { assertStorageOwnership } from "./lib/storageAuth";
 import { rateLimiter } from "./lib/rateLimiter";
 import { appendAuditLog } from "./auditLogs";
 
@@ -32,7 +33,11 @@ async function fetchThreadsForClaim(ctx: QueryCtx, claimId: Id<"claims">): Promi
 /**
  * Internal helper to query thread with messages and resolved attachment URLs
  */
-async function fetchThreadWithMessages(ctx: QueryCtx, thread: Doc<"emailThreads">) {
+async function fetchThreadWithMessages(
+  ctx: QueryCtx,
+  thread: Doc<"emailThreads">,
+  canDownloadAttachments = true
+) {
   const msgQuery = ctx.db
     .query("emailMessages")
     .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
@@ -48,7 +53,7 @@ async function fetchThreadWithMessages(ctx: QueryCtx, thread: Doc<"emailThreads"
       const attachmentsWithUrls = await Promise.all(
         msg.attachments.map(async (att) => ({
           ...att,
-          url: await ctx.storage.getUrl(att.storageId),
+          url: canDownloadAttachments ? await ctx.storage.getUrl(att.storageId) : undefined,
         }))
       );
       return {
@@ -105,7 +110,8 @@ export const getThreadWithMessages = query({
     const auth = await getClaimIfAuthorized(ctx, thread.claimId);
     if (!auth) return null;
 
-    return await fetchThreadWithMessages(ctx, thread);
+    const canDownloadAttachments = auth.accessRole !== "viewer";
+    return await fetchThreadWithMessages(ctx, thread, canDownloadAttachments);
   },
 });
 
@@ -271,8 +277,11 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
     if (args.attachments.length > 20) {
       throw new Error("Maximum 20 email attachments allowed per message");
     }
+    const claim = await ctx.db.get(args.claimId);
     for (const att of args.attachments) {
-      if (typeof ctx.db.system?.get === "function") {
+      if (claim) {
+        await assertStorageOwnership(ctx, att.storageId, claim.userId, args.claimId);
+      } else if (typeof ctx.db.system?.get === "function") {
         const meta = await ctx.db.system.get(att.storageId);
         if (!meta) {
           throw new Error(`Invalid attachment storage ID: file ${att.filename} does not exist in storage`);
@@ -1203,8 +1212,13 @@ export const listComponentInboundMessages = query({
       if (!claim) {
         throw new Error(`Claim ${args.claimId} not found`);
       }
-      if (!claim.userId || claim.userId !== userId) {
-        throw new Error("Forbidden: You do not have permission to access this claim");
+      if (claim.userId && claim.userId === userId) {
+        // Owner access granted
+      } else {
+        const role = await getClaimAccessRole(ctx, claim, userId);
+        if (!role) {
+          throw new Error("Forbidden: You do not have permission to access this claim");
+        }
       }
       targetThreadId = args.threadId || claim.agentMailThreadId;
     } else if (args.threadId) {
@@ -1214,10 +1228,10 @@ export const listComponentInboundMessages = query({
         .withIndex("by_threadId", (q) => q.eq("agentMailThreadId", trimmedThreadId))
         .first();
 
-      if (!claim) {
+      if (!claim && typeof ctx.db.normalizeId === "function") {
         // Fallback check if threadId references an emailThreads record
         const normThreadId = ctx.db.normalizeId("emailThreads", trimmedThreadId);
-        if (normThreadId) {
+        if (normThreadId && typeof ctx.db.get === "function") {
           const emailThread = await ctx.db.get(normThreadId);
           if (emailThread) {
             claim = await ctx.db.get(emailThread.claimId);
@@ -1228,8 +1242,13 @@ export const listComponentInboundMessages = query({
       if (!claim) {
         throw new Error("Forbidden: Thread not found or not associated with an accessible claim");
       }
-      if (!claim.userId || claim.userId !== userId) {
-        throw new Error("Forbidden: You do not have permission to access this thread");
+      if (claim.userId && claim.userId === userId) {
+        // Owner access granted
+      } else {
+        const role = await getClaimAccessRole(ctx, claim, userId);
+        if (!role) {
+          throw new Error("Forbidden: You do not have permission to access this thread");
+        }
       }
       targetThreadId = trimmedThreadId;
     } else {
@@ -1248,8 +1267,8 @@ export const listComponentInboundMessages = query({
 });
 
 /**
- * Owner-scoped query for live delivery status of an outbound email from the AgentMail component.
- * Requires authentication and verifies ownership of the claim that sent the message.
+ * Access-scoped query for live delivery status of an outbound email from the AgentMail component.
+ * Requires authentication and verifies access (owner or collaborator) of the claim that sent the message.
  * Anonymous or unauthenticated visitors are rejected to prevent PHI exposure.
  */
 export const getOutboundDeliveryStatus = query({
@@ -1268,8 +1287,13 @@ export const getOutboundDeliveryStatus = query({
       if (!claim) {
         throw new Error(`Claim ${args.claimId} not found`);
       }
-      if (!claim.userId || claim.userId !== userId) {
-        throw new Error("Forbidden: You do not have permission to access this claim");
+      if (claim.userId && claim.userId === userId) {
+        // Owner access granted
+      } else {
+        const role = await getClaimAccessRole(ctx, claim, userId);
+        if (!role) {
+          throw new Error("Forbidden: You do not have permission to access this claim");
+        }
       }
     }
 
@@ -1280,8 +1304,16 @@ export const getOutboundDeliveryStatus = query({
 
     if (message) {
       const claim = await ctx.db.get(message.claimId);
-      if (!claim || claim.userId !== userId) {
+      if (!claim) {
         throw new Error("Forbidden: You do not have permission to access this outbound delivery status");
+      }
+      if (claim.userId && claim.userId === userId) {
+        // Owner access granted
+      } else {
+        const role = await getClaimAccessRole(ctx, claim, userId);
+        if (!role) {
+          throw new Error("Forbidden: You do not have permission to access this outbound delivery status");
+        }
       }
     } else if (!args.claimId) {
       // Outbound message not yet indexed in emailMessages and no claimId specified

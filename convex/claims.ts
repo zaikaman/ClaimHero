@@ -4,7 +4,14 @@ import { v, ConvexError, type Infer } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { claimsAggregate } from "./lib/aggregates";
-import { getClaimIfAuthorized, requireAuthUser, requireClaimOwner, requireClaimEditor, getAuthUserId } from "./lib/auth";
+import {
+  getClaimIfAuthorized,
+  requireAuthUser,
+  requireClaimOwner,
+  requireClaimEditor,
+  getAuthUserId,
+} from "./lib/auth";
+import { assertStorageOwnership } from "./lib/storageAuth";
 import { normalizeCollaboratorEmail } from "./lib/auth";
 import { rateLimiter } from "./lib/rateLimiter";
 import { isInternalAgentMailAddress } from "./lib/agentMailWebhook";
@@ -21,10 +28,18 @@ async function getActiveSharedGrants(
   userId: Id<"users">
 ): Promise<Doc<"claimCollaborators">[]> {
   try {
-    const grantsByUser = await ctx.db
-      .query("claimCollaborators")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .take(50);
+    let grantsByUser: Doc<"claimCollaborators">[] = [];
+    try {
+      grantsByUser = await ctx.db
+        .query("claimCollaborators")
+        .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
+        .take(100);
+    } catch {
+      grantsByUser = await ctx.db
+        .query("claimCollaborators")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .take(100);
+    }
     let grantsByEmail: Doc<"claimCollaborators">[] = [];
     try {
       const user = await ctx.db.get(userId);
@@ -1009,10 +1024,18 @@ async function validateClaimFinancialsAndCodes(
           throw new Error("Forbidden: This storage file belongs to another user");
         }
       }
-      const otherClaim = await ctx.db
-        .query("claims")
-        .filter((q) => q.eq(q.field("denialLetterStorageId"), args.denialLetterStorageId))
-        .first();
+      let otherClaim: Doc<"claims"> | null = null;
+      try {
+        otherClaim = await ctx.db
+          .query("claims")
+          .withIndex("by_denial_letter_storage_id", (q) => q.eq("denialLetterStorageId", args.denialLetterStorageId))
+          .first();
+      } catch {
+        otherClaim = await ctx.db
+          .query("claims")
+          .filter((q) => q.eq(q.field("denialLetterStorageId"), args.denialLetterStorageId))
+          .first();
+      }
       if (otherClaim && otherClaim.userId !== userId) {
         throw new Error("Forbidden: This storage file is already linked to another user's claim");
       }
@@ -1351,21 +1374,8 @@ async function applyCreateWithPatient(
     updatedAt: now,
   });
 
-  if (args.denialLetterStorageId && typeof ctx.db.query("pendingUploads")?.withIndex === "function") {
-    const pending = await ctx.db
-      .query("pendingUploads")
-      .withIndex("by_storageId", (q) => q.eq("storageId", args.denialLetterStorageId!))
-      .first();
-    if (pending) {
-      if (pending.userId !== effectiveUserId) {
-        throw new Error("Forbidden: This storage file belongs to another user");
-      }
-      await ctx.db.patch(pending._id, {
-        status: "consumed",
-        claimId,
-        updatedAt: now,
-      });
-    }
+  if (args.denialLetterStorageId) {
+    await assertStorageOwnership(ctx, args.denialLetterStorageId, effectiveUserId, claimId);
   }
 
   await ctx.scheduler.runAfter(
@@ -2095,10 +2105,18 @@ export const verifyStorageOwnershipInternal = internalMutation({
     }
 
     // 2. Check if storageId is attached to an existing claim owned by the caller (re-parse flow)
-    const existingClaim = await ctx.db
-      .query("claims")
-      .filter((q) => q.eq(q.field("denialLetterStorageId"), args.storageId))
-      .first();
+    let existingClaim: Doc<"claims"> | null = null;
+    try {
+      existingClaim = await ctx.db
+        .query("claims")
+        .withIndex("by_denial_letter_storage_id", (q) => q.eq("denialLetterStorageId", args.storageId))
+        .first();
+    } catch {
+      existingClaim = await ctx.db
+        .query("claims")
+        .filter((q) => q.eq(q.field("denialLetterStorageId"), args.storageId))
+        .first();
+    }
 
     if (existingClaim) {
       if (existingClaim.userId !== args.userId) {

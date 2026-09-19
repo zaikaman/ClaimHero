@@ -11,7 +11,6 @@ import { rateLimiter } from "./lib/rateLimiter";
 import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { components } from "./_generated/api";
 import { agentmail } from "./lib/agentMail";
-import { Webhook } from "svix";
 
 const http = httpRouter();
 
@@ -189,16 +188,7 @@ http.route({
       const verified = await verifyAndParseSvixWebhook(request, "AgentMail webhook");
       if (!verified.success) return verified.response;
 
-      const { rawPayload, payload, verification } = verified;
-
-      if (verification.stale) {
-        // Authentic provider retry (or late first delivery) reusing the
-        // original timestamp. The downstream pipeline is idempotent on
-        // AgentMail message ID, so process normally and acknowledge.
-        console.log(
-          `AgentMail webhook accepted stale retry timestampAgeSec=${verification.timestampAgeSec ?? "unknown"} payloadBytes=${rawPayload.length}`
-        );
-      }
+      const { payload } = verified;
 
       const event = normalizeAgentMailWebhook(
         payload,
@@ -274,13 +264,7 @@ http.route({
       const verified = await verifyAndParseSvixWebhook(request, "AgentMail component webhook");
       if (!verified.success) return verified.response;
 
-      const { rawPayload, payload, verification } = verified;
-
-      if (verification.stale) {
-        console.log(
-          `AgentMail component webhook accepted stale retry timestampAgeSec=${verification.timestampAgeSec ?? "unknown"} payloadBytes=${rawPayload.length}`
-        );
-      }
+      const { rawPayload, payload } = verified;
 
       const event = normalizeAgentMailWebhook(
         payload,
@@ -316,26 +300,9 @@ http.route({
         );
       }
 
-      const forwardedHeaders = new Headers(request.headers);
-      if (verification.stale) {
-        const webhookSecret = process.env.AGENTMAIL_WEBHOOK_SECRET?.trim();
-        if (webhookSecret) {
-          try {
-            const svixId = request.headers.get("svix-id") || request.headers.get("webhook-id") || "stale";
-            const wh = new Webhook(webhookSecret);
-            const now = new Date();
-            const freshSig = wh.sign(svixId, now, rawPayload);
-            forwardedHeaders.set("svix-timestamp", String(Math.floor(now.getTime() / 1000)));
-            forwardedHeaders.set("svix-signature", freshSig);
-          } catch {
-            // If re-signing fails, proceed with original headers
-          }
-        }
-      }
-
       const forwardedRequest = new Request(request.url, {
         method: request.method,
-        headers: forwardedHeaders,
+        headers: request.headers,
         body: rawPayload,
       });
 

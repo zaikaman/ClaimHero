@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-18T17:56:00Z
+- **Last updated:** 2026-09-19T03:10:30Z
 
 ## Log
 
@@ -1742,13 +1742,22 @@ Replaced mock setTimeout in AuthPage password reset dialog with production-grade
 - Multi-Step Modal & URL Param Detection: Upgraded `AuthPage.tsx` dialog to handle code request, 6-digit code verification, 60s resend cooldown timer, direct `?resetToken=...` query param recovery, accessible error/success alerts, and auto-return to sign-in.
 - Regression & Verification: Added `tests/passwordReset.test.ts` with 16 targeted unit tests covering email rendering, XSS sanitization, anti-enumeration protection, rate-limiting, expired/used token rejection, CRLF header injection defense, and password complexity error handling. Verified 80 test suites (1,258 passing tests), clean typecheck (`tsc --noEmit`), clean lint (`eslint src convex`), and production build (`npm run build`). Convex features: actions, internalAction, internalMutation, internalQuery, mutations, rateLimiter, schema, tables.
 
-### 2026-09-18 - working tree
+### 2026-09-18 - ce6bfb4
 Resolved destination address discrepancy in communication inbox and message composer (`src/components/communications/SimpleInboxView.tsx`, `src/components/communications/AgentMailDrawer.tsx`, `src/hooks/useCommunications.ts`, `tests/simpleInboxUx.test.ts`):
 - Truthful Counterparty & Active Recipient Resolution: Resolved conversation recipient dynamically from `threads[0]?.payerEmail`, latest outbound message recipient (`msg.recipient`), and latest inbound message sender (`msg.sender`), preventing stale fallbacks to default production email (`officialEmail`) when an appeal was dispatched to a custom typed email address.
 - Delivered Status Banner & Quick Composer Synchronization: Updated `SimpleInboxView.tsx` and `AgentMailDrawer.tsx` to prompt follow-ups and display delivery confirmation using the actual dispatched recipient (`conversationRecipient`) across top status card ("Delivered to [recipient]"), quick composer placeholder ("Send a note or follow-up to [recipient]..."), and accessibility aria-labels. Preserved `effectiveRecipient` specifically for the re-dispatch configuration panel.
 - Prior Custom Recipient Memory: Added automatic pre-population of `customEmail` in `AgentMailDrawer.tsx` when re-dispatching if prior transmissions were sent to a custom recipient, eliminating redundant retyping.
 - Defensive Correspondence Action Dispatch: Hardened `sendMessage` in `src/hooks/useCommunications.ts` with layered fallback across thread payer email, latest outbound recipient, and latest inbound sender before falling back to payer registry email.
 - Regression Coverage: Added unit test in `tests/simpleInboxUx.test.ts` asserting that custom dispatched appeals truthfully prompt for and display the typed recipient instead of official production email. Verified 80 test suites (1,259 passing tests), clean typecheck, clean lint, and production build.
+
+### 2026-09-19 - working tree
+Remediated critical and high security audit findings across authentication, webhooks, storage IDOR, and collaboration systems while preserving full anonymous judge and evaluator workflows:
+- Anti-Squatting Account Defense (Item 9): Hardened `createPasswordUser` in `convex/users.ts` to strictly throw a `ConvexError` on existing email collisions. Updated `createGoogleUser` to enforce `providerAccountId` verification and safely upgrade unverified password accounts only when `emailVerified` is guaranteed by Google OAuth. Bound collaborator invitations by email until explicit user acceptance in `convex/claimCollaborators.ts`.
+- Full Anonymous Evaluator Experience (Item 10 Rollback): Maintained unhindered end-to-end evaluation capabilities in `convex/lib/auth.ts` (`requireNonAnonymousUser`) so hackathon judges and evaluators exploring demo sessions retain full access to case creation, OCR parsing, precedent search, and appeal brief synthesis.
+- Webhook Replay & Raw Verification (Item 12): Hardened AgentMail webhook verification in `convex/lib/agentMailWebhook.ts` and `convex/http.ts` to strictly enforce a 300-second timestamp freshness window, eliminated intermediate payload re-signing and forgery vectors, and restricted Svix verification to untampered raw bytes.
+- Storage IDOR Triad & Viewer Bearer Protection (Item 13): Implemented `assertStorageOwnership` in `convex/lib/storageAuth.ts` with indexed lookups (`by_denial_letter_storage_id` on `claims`, `by_pdf_export_storage_id` on `appeals`) across `updatePdfStorageId`, `claims.applyCreateWithPatient`, `clinicalEvidences.applyBatchInsert`, and `emails.applyInsertMessage`. Suppressed signed bearer URLs via `ctx.storage.getUrl()` for read-only viewer collaborators in `clinicalEvidences.ts` and `emails.ts`.
+- Collaborator Grant Scale & Shared Communications (Item 14): Added compound index `by_user_and_status` on `claimCollaborators` to eliminate `.take(20)` scan truncation. Extended communication access in `convex/emails.ts` (`listComponentInboundMessages`, `getOutboundDeliveryStatus`) to active collaborators.
+- Regression Coverage & Verification: Added comprehensive security suite in `tests/securityAuditRemediation.test.ts` with 16 targeted tests. Verified 81 test files (1,275 passing tests), clean typecheck, clean lint, coverage thresholds, and production build. Convex features: schema, tables, indexes, queries, mutations, internalMutation, internalQuery, httpAction, storage.
 
 
 

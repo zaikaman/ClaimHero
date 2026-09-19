@@ -1,9 +1,10 @@
 import { query, internalQuery, internalMutation, mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { getAuthUserId } from "./lib/auth";
 
 /**
  * Creates a user row when an account signs up with password.
+ * Strictly throws on email collision to prevent account takeover and invite theft.
  */
 export const createPasswordUser = internalMutation({
   args: {
@@ -21,12 +22,14 @@ export const createPasswordUser = internalMutation({
       .withIndex("by_email", (q) => q.eq("email", email))
       .first();
     if (existing) {
-      return existing._id;
+      throw new ConvexError("An account with this email address already exists. Please sign in instead.");
     }
 
     return await ctx.db.insert("users", {
       name: rawUsername.split("@")[0],
       email: email,
+      provider: "password",
+      providerAccountId: args.providerAccountId,
       role: "advocate",
       createdAt: Date.now(),
     });
@@ -37,6 +40,7 @@ import { vGoogleProfile } from "@convex-dev/auth/providers/oauth/google";
 
 /**
  * Creates or links a user row when an account signs in with Google OAuth.
+ * Enforces providerAccountId verification and blocks linking to unverified squatted accounts.
  */
 export const createGoogleUser = internalMutation({
   args: {
@@ -52,9 +56,20 @@ export const createGoogleUser = internalMutation({
         .withIndex("by_email", (q) => q.eq("email", args.profile.email))
         .first();
       if (existing) {
+        if (existing.providerAccountId && existing.providerAccountId !== args.providerAccountId) {
+          throw new ConvexError("This email is already associated with another account.");
+        }
+        if (!existing.emailVerificationTime && existing.provider === "password") {
+          if (!args.profile.emailVerified) {
+            throw new ConvexError("An unverified account with this email already exists. Please sign in or verify ownership.");
+          }
+        }
+
         await ctx.db.patch(existing._id, {
           name: existing.name || args.profile.name || undefined,
           image: existing.image || args.profile.picture || undefined,
+          provider: "google",
+          providerAccountId: args.providerAccountId,
           emailVerificationTime: args.profile.emailVerified ? Date.now() : existing.emailVerificationTime,
         });
         return existing._id;
@@ -65,6 +80,8 @@ export const createGoogleUser = internalMutation({
       name: args.profile.name || (args.profile.email ? args.profile.email.split("@")[0] : "Advocate"),
       email: args.profile.email || undefined,
       image: args.profile.picture || undefined,
+      provider: "google",
+      providerAccountId: args.providerAccountId,
       emailVerificationTime: args.profile.emailVerified ? Date.now() : undefined,
       role: "advocate",
       createdAt: Date.now(),
@@ -84,9 +101,11 @@ export const createAnonymousUser = internalMutation({
     profile: v.object({}),
   },
   returns: v.id("users"),
-  handler: async (ctx, _args) => {
+  handler: async (ctx, args) => {
     const userId = await ctx.db.insert("users", {
       name: "Anonymous Advocate",
+      provider: "anonymous",
+      providerAccountId: args.providerAccountId,
       role: "advocate",
       isAnonymous: true,
       createdAt: Date.now(),

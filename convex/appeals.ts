@@ -2,6 +2,7 @@ import { MutationCtx, internalMutation, internalQuery, mutation, query } from ".
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
+import { assertStorageOwnership } from "./lib/storageAuth";
 import { appendAuditLog } from "./auditLogs";
 import {
   STATUTORY_APPEAL_LEVELS,
@@ -408,7 +409,8 @@ export const updatePdfStorageId = mutation({
       throw new Error(`Appeal ${args.appealId} not found`);
     }
 
-    await requireClaimEditor(ctx, appeal.claimId);
+    const { userId } = await requireClaimEditor(ctx, appeal.claimId);
+    await assertStorageOwnership(ctx, args.pdfExportStorageId, userId, appeal.claimId);
 
     await ctx.db.patch(args.appealId, {
       pdfExportStorageId: args.pdfExportStorageId,

@@ -26,18 +26,12 @@ export const collaboratorStatusValidator = v.union(
 export const MAX_PENDING_INVITES_PER_EMAIL = 50;
 
 async function resolveUserIdByEmail(
-  ctx: MutationCtx,
-  email: string
+  _ctx: MutationCtx,
+  _email: string
 ): Promise<Id<"users"> | undefined> {
-  try {
-    const existing = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", email))
-      .first();
-    return existing?._id;
-  } catch {
-    return undefined;
-  }
+  // Never bind userId to pending invites prior to explicit acceptance
+  // to prevent pre-registration squatting from stealing case invites.
+  return undefined;
 }
 
 /**
@@ -45,6 +39,7 @@ async function resolveUserIdByEmail(
  * covers invites sent before the recipient signed up. When both match, the
  * userId-linked grant wins so a duplicate-email account cannot claim an
  * invite already linked to someone else. Returns null when never invited.
+ * Uses indexed lookups to avoid .take(20) truncation.
  */
 async function findMyGrant(
   ctx: QueryCtx | MutationCtx,
@@ -53,15 +48,46 @@ async function findMyGrant(
 ) {
   const user = typeof ctx.db.get === "function" ? await ctx.db.get(userId) : null;
   const userEmail = user?.email ? normalizeCollaboratorEmail(user.email) : null;
+
+  // 1. Try direct indexed lookup by claim and userId
+  try {
+    const rawByUser = await ctx.db
+      .query("claimCollaborators")
+      .withIndex("by_claim_and_user", (q) => q.eq("claimId", claimId).eq("userId", userId))
+      .first();
+    const byUserId = Array.isArray(rawByUser) ? rawByUser[0] : rawByUser;
+    if (byUserId && byUserId.userId === userId) return byUserId;
+  } catch {
+    // index may not exist in unit mocks
+  }
+
+  // 2. Try direct indexed lookup by claim and email
+  if (userEmail) {
+    try {
+      const rawByEmail = await ctx.db
+        .query("claimCollaborators")
+        .withIndex("by_claim_and_email", (q) => q.eq("claimId", claimId).eq("email", userEmail))
+        .first();
+      const byEmail = Array.isArray(rawByEmail) ? rawByEmail[0] : rawByEmail;
+      if (byEmail && byEmail.email && normalizeCollaboratorEmail(byEmail.email) === userEmail) {
+        return byEmail;
+      }
+    } catch {
+      // index may not exist in unit mocks
+    }
+  }
+
+  // 3. Fallback scan bounded to 200 (prevents 20-item truncation)
   const grants = await ctx.db
     .query("claimCollaborators")
     .withIndex("by_claim", (q) => q.eq("claimId", claimId))
-    .take(20);
-  const byUserId = grants.find((grant) => grant.userId && grant.userId === userId);
-  if (byUserId) return byUserId;
+    .take(200);
+  if (!Array.isArray(grants)) return null;
+  const byUserIdFallback = grants.find((grant) => grant && grant.userId && grant.userId === userId);
+  if (byUserIdFallback) return byUserIdFallback;
   if (!userEmail) return null;
   return (
-    grants.find((grant) => grant.email && normalizeCollaboratorEmail(grant.email) === userEmail) ??
+    grants.find((grant) => grant && grant.email && normalizeCollaboratorEmail(grant.email) === userEmail) ??
     null
   );
 }
@@ -84,16 +110,57 @@ export const getRoleInternal = internalQuery({
     if (!claim.userId) return null;
     const user = await ctx.db.get(userId);
     const userEmail = user?.email ? normalizeCollaboratorEmail(user.email) : null;
+
+    // 1. Direct indexed lookup by claim and user
+    try {
+      const rawByUser = await ctx.db
+        .query("claimCollaborators")
+        .withIndex("by_claim_and_user", (q) => q.eq("claimId", args.claimId).eq("userId", userId))
+        .first();
+      const grantByUser = Array.isArray(rawByUser) ? rawByUser[0] : rawByUser;
+      if (grantByUser && grantByUser.userId === userId && grantByUser.status === "active") {
+        if (grantByUser.role === "editor" || grantByUser.role === "viewer") return grantByUser.role;
+      }
+    } catch {
+      // index may not exist in unit mocks
+    }
+
+    // 2. Direct indexed lookup by claim and email
+    if (userEmail) {
+      try {
+        const rawByEmail = await ctx.db
+          .query("claimCollaborators")
+          .withIndex("by_claim_and_email", (q) => q.eq("claimId", args.claimId).eq("email", userEmail))
+          .first();
+        const grantByEmail = Array.isArray(rawByEmail) ? rawByEmail[0] : rawByEmail;
+        if (
+          grantByEmail &&
+          grantByEmail.email &&
+          normalizeCollaboratorEmail(grantByEmail.email) === userEmail &&
+          grantByEmail.status === "active"
+        ) {
+          if (grantByEmail.role === "editor" || grantByEmail.role === "viewer") return grantByEmail.role;
+        }
+      } catch {
+        // index may not exist in unit mocks
+      }
+    }
+
+    // 3. Fallback scan bounded to 200 (prevents 20-item truncation)
     const grants = await ctx.db
       .query("claimCollaborators")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .take(20);
+      .take(200);
     for (const grant of grants) {
       if (!grant || grant.status !== "active") continue;
       if (grant.userId && grant.userId === userId) {
         if (grant.role === "editor" || grant.role === "viewer") return grant.role;
       }
-      if (userEmail && grant.email && normalizeCollaboratorEmail(grant.email) === userEmail) {
+      if (
+        userEmail &&
+        grant.email &&
+        normalizeCollaboratorEmail(grant.email) === userEmail
+      ) {
         if (grant.role === "editor" || grant.role === "viewer") return grant.role;
       }
     }
@@ -228,7 +295,7 @@ export const listByClaim = query({
     const grants = await ctx.db
       .query("claimCollaborators")
       .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-      .take(50);
+      .take(200);
     const owner = await ctx.db.get(authorized.claim.userId);
     const showAll = authorized.accessRole === "owner";
     const roster: Array<{

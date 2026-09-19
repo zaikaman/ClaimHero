@@ -1437,11 +1437,10 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         messageId: "live_msg_2",
       } as any);
 
-      let queryCalls = 0;
       const mockCtx: any = {
-        runQuery: vi.fn().mockImplementation(() => {
-          queryCalls++;
-          if (queryCalls === 1) return Promise.resolve(mockClaim);
+        runQuery: vi.fn().mockImplementation((_query, args) => {
+          if (args?.userId) return Promise.resolve({ _id: args.userId, isAnonymous: false });
+          if (args?.claimId) return Promise.resolve(mockClaim);
           return Promise.resolve(mockThread);
         }),
         runMutation: vi.fn().mockResolvedValue("t1"),
@@ -1548,11 +1547,10 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         threadId: "thr_conv_1",
       });
 
-      let queryCalls = 0;
       const mockCtx: any = {
-        runQuery: vi.fn().mockImplementation(() => {
-          queryCalls++;
-          if (queryCalls === 1) return Promise.resolve(mockClaim);
+        runQuery: vi.fn().mockImplementation((_query, args) => {
+          if (args?.userId) return Promise.resolve({ _id: args.userId, isAnonymous: false });
+          if (args?.claimId) return Promise.resolve(mockClaim);
           return Promise.resolve(mockThread);
         }),
         runMutation: vi.fn().mockResolvedValue("t1"),
@@ -1615,11 +1613,10 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
         threadId: "thr_conv_1",
       });
 
-      let queryCalls = 0;
       const mockCtx: any = {
-        runQuery: vi.fn().mockImplementation(() => {
-          queryCalls++;
-          if (queryCalls === 1) return Promise.resolve(mockClaim);
+        runQuery: vi.fn().mockImplementation((_query, args) => {
+          if (args?.userId) return Promise.resolve({ _id: args.userId, isAnonymous: false });
+          if (args?.claimId) return Promise.resolve(mockClaim);
           return Promise.resolve(mockThread);
         }),
         runMutation: vi.fn().mockResolvedValue("t1"),
@@ -1762,12 +1759,15 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
           messageId: "live_approved_msg",
         } as any);
 
-        let queryCalls = 0;
+        let claimQueryCalls = 0;
         const mockCtx: any = {
-          runQuery: vi.fn().mockImplementation(() => {
-            queryCalls++;
-            if (queryCalls === 1) return Promise.resolve(mockClaim);
-            if (queryCalls === 2) return Promise.resolve(mockAppeal);
+          runQuery: vi.fn().mockImplementation((_query, args) => {
+            if (args?.userId) return Promise.resolve({ _id: args.userId, isAnonymous: false });
+            if (args?.claimId) {
+              claimQueryCalls++;
+              if (claimQueryCalls === 1) return Promise.resolve(mockClaim);
+              return Promise.resolve(mockAppeal);
+            }
             return Promise.resolve(null);
           }),
           runMutation: vi.fn().mockResolvedValue("thread_new"),

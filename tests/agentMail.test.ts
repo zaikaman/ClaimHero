@@ -324,8 +324,11 @@ Paragraph text with **bold** and *italic*.
       expect(result.error).toBeUndefined();
     });
 
-    it("verifies signatures when payload is formatted as pretty-printed JSON vs canonical", async () => {
-      const obj = { event_type: "message.received", message: { id: "m1" } };
+    it("rejects payloads when JSON formatting is tampered or re-formatted (no 6-variant mutation)", async () => {
+      const obj = {
+        event: "message.received",
+        data: { id: "123", text: "Hello, ClaimHero" },
+      };
       const compact = JSON.stringify(obj);
       const pretty = JSON.stringify(obj, null, 2);
 
@@ -334,7 +337,7 @@ Paragraph text with **bold** and *italic*.
       // Sign the compact JSON representation
       const signature = await computeSvixSignature(id, timestamp, compact, testSecret);
 
-      // Verify with the pretty-printed JSON payload
+      // Verify with the pretty-printed JSON payload: fails because payload bytes were modified
       const result = await verifySvixWebhook({
         payload: pretty,
         headers: {
@@ -345,7 +348,7 @@ Paragraph text with **bold** and *italic*.
         secret: testSecret,
       });
 
-      expect(result.valid).toBe(true);
+      expect(result.valid).toBe(false);
     });
 
     it("supports Headers object format with alternative webhook-* header names", async () => {
@@ -458,7 +461,7 @@ Paragraph text with **bold** and *italic*.
       expect(result.error).toContain("Invalid timestamp header value");
     });
 
-    it("accepts authentic expired timestamps as stale for idempotent retry processing", async () => {
+    it("rejects authentic expired timestamps exceeding tolerance to prevent replay attacks", async () => {
       const id = "msg_exp_1";
       const oldTimestamp = (Math.floor(Date.now() / 1000) - 400).toString(); // 400s old > 300s
       const signature = await computeSvixSignature(id, oldTimestamp, testPayload, testSecret);
@@ -474,8 +477,8 @@ Paragraph text with **bold** and *italic*.
         toleranceInSeconds: 300,
       });
 
-      expect(result.valid).toBe(true);
-      expect(result.stale).toBe(true);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("outside allowed tolerance");
       expect(result.timestampAgeSec).toBeGreaterThan(300);
     });
 
@@ -687,7 +690,7 @@ Paragraph text with **bold** and *italic*.
       expect(resultCommaOnly.valid).toBe(true);
     });
 
-    it("verifies payloads normalized across CRLF and LF gateway transformations", async () => {
+    it("rejects payloads when CRLF/LF line endings are modified (strict raw byte verification)", async () => {
       const id = "msg_crlf_1";
       const timestamp = Math.floor(Date.now() / 1000).toString();
 
@@ -707,7 +710,7 @@ Paragraph text with **bold** and *italic*.
         },
         secret: testSecret,
       });
-      expect(result.valid).toBe(true);
+      expect(result.valid).toBe(false);
     });
 
     it("verifies base64url and unpadded signatures", async () => {

@@ -60,6 +60,7 @@ import type * as lib_redactionEngine from "../lib/redactionEngine.js";
 import type * as lib_sentinelPrompt from "../lib/sentinelPrompt.js";
 import type * as lib_stateRegulators from "../lib/stateRegulators.js";
 import type * as lib_statutoryTierValidators from "../lib/statutoryTierValidators.js";
+import type * as lib_storageAuth from "../lib/storageAuth.js";
 import type * as lib_textract from "../lib/textract.js";
 import type * as model_auth from "../model/auth.js";
 import type * as p2pCallSessions from "../p2pCallSessions.js";
@@ -134,6 +135,7 @@ declare const fullApi: ApiFromModules<{
   "lib/sentinelPrompt": typeof lib_sentinelPrompt;
   "lib/stateRegulators": typeof lib_stateRegulators;
   "lib/statutoryTierValidators": typeof lib_statutoryTierValidators;
+  "lib/storageAuth": typeof lib_storageAuth;
   "lib/textract": typeof lib_textract;
   "model/auth": typeof model_auth;
   p2pCallSessions: typeof p2pCallSessions;

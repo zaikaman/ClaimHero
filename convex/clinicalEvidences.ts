@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getClaimIfAuthorized, requireClaimEditor } from "./lib/auth";
+import { assertStorageOwnership } from "./lib/storageAuth";
 import { appendAuditLog } from "./auditLogs";
 
 /**
@@ -66,14 +67,17 @@ export const listByClaim = query({
       evidences = fallback.sort((a, b) => b.relevanceScore - a.relevanceScore);
     }
 
+    const canViewScreenshots = authorized.accessRole !== "viewer";
     return await Promise.all(
       evidences.map(async (item) => {
         let screenshotUrl = item.screenshotUrl;
-        if (item.screenshotStorageId) {
+        if (canViewScreenshots && item.screenshotStorageId) {
           const resolved = await ctx.storage.getUrl(item.screenshotStorageId);
           if (resolved) {
             screenshotUrl = resolved;
           }
+        } else if (!canViewScreenshots) {
+          screenshotUrl = undefined;
         }
         return {
           ...item,
@@ -151,14 +155,17 @@ export const listByClaimAndSource = query({
       )
       .take(50);
 
+    const canViewScreenshots = authorized.accessRole !== "viewer";
     return await Promise.all(
       evidences.map(async (item) => {
         let screenshotUrl = item.screenshotUrl;
-        if (item.screenshotStorageId) {
+        if (canViewScreenshots && item.screenshotStorageId) {
           const resolved = await ctx.storage.getUrl(item.screenshotStorageId);
           if (resolved) {
             screenshotUrl = resolved;
           }
+        } else if (!canViewScreenshots) {
+          screenshotUrl = undefined;
         }
         return {
           ...item,
@@ -201,6 +208,9 @@ async function applyBatchInsert(ctx: MutationCtx, args: BatchInsertEvidenceArgs)
   const now = Date.now();
   const insertedIds: Id<"clinicalEvidences">[] = [];
   for (const item of args.evidences) {
+    if (item.screenshotStorageId) {
+      await assertStorageOwnership(ctx, item.screenshotStorageId, claim.userId, args.claimId);
+    }
     // Strictly sanitize screenshotUrl: never persist base64 data URIs or raw base64 payloads into database rows
     const cleanScreenshotUrl =
       item.screenshotUrl && item.screenshotUrl.startsWith("http") && item.screenshotUrl.length < 2048
@@ -425,6 +435,11 @@ async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArg
       ? args.screenshotUrl
       : undefined;
 
+  const claim = typeof ctx.db.get === "function" ? await ctx.db.get(args.claimId) : null;
+  if (args.screenshotStorageId && claim) {
+    await assertStorageOwnership(ctx, args.screenshotStorageId, claim.userId, args.claimId);
+  }
+
   const id = await ctx.db.insert("clinicalEvidences", {
     claimId: args.claimId,
     sourceType: args.sourceType,
@@ -440,7 +455,6 @@ async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArg
     createdAt: now,
   });
 
-  const claim = typeof ctx.db.get === "function" ? await ctx.db.get(args.claimId) : null;
   if (claim && typeof ctx.db.patch === "function") {
     await ctx.db.patch(args.claimId, {
       evidenceCount: (claim.evidenceCount || 0) + 1,

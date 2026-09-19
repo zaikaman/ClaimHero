@@ -17,6 +17,8 @@ export default defineSchema({
     phone: v.optional(v.string()),
     phoneVerificationTime: v.optional(v.number()),
     isAnonymous: v.optional(v.boolean()),
+    provider: v.optional(v.string()),
+    providerAccountId: v.optional(v.string()),
     role: v.optional(v.string()),
     createdAt: v.optional(v.number()),
   })
@@ -210,6 +212,7 @@ export default defineSchema({
     .index("by_assigned_agent_email", ["assignedAgentEmail"])
     .index("by_created", ["createdAt"])
     .index("by_threadId", ["agentMailThreadId"])
+    .index("by_denial_letter_storage_id", ["denialLetterStorageId"])
     .searchIndex("search_claims", {
       searchField: "searchContent",
       filterFields: ["userId", "status", "denialReasonCode"],
@@ -264,7 +267,8 @@ export default defineSchema({
   })
     .index("by_claim", ["claimId"])
     .index("by_claimId_and_appealLevel", ["claimId", "appealLevel"])
-    .index("by_claimId_and_version", ["claimId", "version"]),
+    .index("by_claimId_and_version", ["claimId", "version"])
+    .index("by_pdf_export_storage_id", ["pdfExportStorageId"]),
 
   // Autonomous AgentMail Communication Threads
   emailThreads: defineTable({
@@ -644,7 +648,9 @@ export default defineSchema({
   })
     .index("by_claim", ["claimId"])
     .index("by_claim_and_email", ["claimId", "email"])
+    .index("by_claim_and_user", ["claimId", "userId"])
     .index("by_user", ["userId"])
+    .index("by_user_and_status", ["userId", "status"])
     .index("by_email_and_status", ["email", "status"]),
 
   // Yjs CRDT operation log for true realtime co-editing of appeal briefs.

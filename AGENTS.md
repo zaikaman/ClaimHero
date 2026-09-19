@@ -39,6 +39,7 @@ Hardened structured model response handling in `convex/lib/openai.ts` with two s
 - Do not use emojis anywhere, docs, frontend code, no where.
 - You don't have to run npm run deploy or deploy to prod, we already have github actions that do that when it's pushed to Github, and do not commit anything yourself.
 - Upon completing your work, spawn a subagent to do a full and thorough quality pass through it for any remaining bugs, issues or QoL improvements, but only if the change is large or high-risk, do not spawn it for simple work that you're sure is good enough.
+- If there are changes in the tests, make sure to update the README.md
 
 <!-- convex-ai-start -->
 

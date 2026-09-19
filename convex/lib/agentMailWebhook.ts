@@ -229,13 +229,6 @@ export interface VerifySvixWebhookOptions {
 export interface SvixVerificationResult {
   valid: boolean;
   error?: string;
-  /**
-   * True when the signature is authentic but the timestamp is older than the
-   * allowed tolerance (a provider retry or late first delivery). Callers
-   * should accept and process these idempotently (returning 2xx) instead of
-   * responding 401, which would trigger an endless provider retry storm.
-   */
-  stale?: boolean;
   /** Age of the webhook timestamp in seconds relative to now (if parseable). */
   timestampAgeSec?: number;
   /** Non-sensitive diagnostics for attribution when verification fails */
@@ -320,42 +313,13 @@ export async function verifySvixWebhook(
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // Candidate payload string variants:
-  // 1. Raw body received
-  // 2. Stripped BOM
-  // 3. Normalized CRLF -> LF
-  // 4. Normalized LF -> CRLF
-  // 5. Trimmed
-  // 6. Canonical JSON re-stringification
+  // Strict payload verification: signatures must be verified on the exact raw bytes received
   const candidatePayloads = [payload];
-  if (payload.charCodeAt(0) === 0xfeff) {
-    candidatePayloads.push(payload.slice(1));
-  }
-  if (payload.includes("\r\n")) {
-    candidatePayloads.push(payload.replace(/\r\n/g, "\n"));
-  } else if (payload.includes("\n")) {
-    candidatePayloads.push(payload.replace(/(?<!\r)\n/g, "\r\n"));
-  }
-  if (payload.trim() !== payload) {
-    candidatePayloads.push(payload.trim());
-  }
-  try {
-    const parsed = JSON.parse(payload);
-    const reStringified = JSON.stringify(parsed);
-    if (!candidatePayloads.includes(reStringified)) {
-      candidatePayloads.push(reStringified);
-    }
-  } catch {
-    // Not valid JSON; ignore
-  }
-
-  // Candidate payload byte arrays (for direct HMAC without UTF-16 re-encoding drift)
   const candidateBytePayloads: Uint8Array[] = [];
   if (rawBytes && rawBytes.length > 0) {
     candidateBytePayloads.push(rawBytes);
-  }
-  for (const p of candidatePayloads) {
-    candidateBytePayloads.push(new TextEncoder().encode(p));
+  } else {
+    candidateBytePayloads.push(new TextEncoder().encode(payload));
   }
 
   // Candidate timestamps: integer seconds (standardwebhooks standard) and raw string
@@ -492,23 +456,16 @@ export async function verifySvixWebhook(
   const nowSec = Math.floor(Date.now() / 1000);
   const ageSec = nowSec - timestampNum;
   if (Math.abs(ageSec) > toleranceInSeconds) {
-    if (ageSec > 0) {
-      // Reject stale replays exceeding 7 days (604,800 seconds) to prevent unbounded replay attacks
-      const MAX_STALE_TOLERANCE_SECONDS = 7 * 24 * 60 * 60;
-      if (ageSec > MAX_STALE_TOLERANCE_SECONDS) {
-        return {
-          valid: false,
-          error: `Webhook timestamp expired: replay exceeds maximum allowed window of 7 days (${ageSec}s old)`,
-          timestampAgeSec: ageSec,
-        };
-      }
-      // Authentic signature with an old timestamp within 7 days: this is a provider retry
-      // reusing the original timestamp, or a late first delivery after an
-      // outage. The inbound pipeline is idempotent on AgentMail message ID,
-      // so the caller should process it normally and acknowledge with 2xx.
-      return { valid: true, stale: true, timestampAgeSec: ageSec };
-    }
-    return { valid: false, error: `Webhook timestamp outside allowed tolerance of ${toleranceInSeconds} seconds` };
+    return {
+      valid: false,
+      error: `Webhook timestamp expired: replay exceeds maximum allowed window of ${toleranceInSeconds} seconds (${ageSec}s old, outside allowed tolerance)`,
+      timestampAgeSec: ageSec,
+      diagnostics: {
+        svixId: cleanId,
+        timestamp: rawTimestamp,
+        lastError: `Timestamp age ${ageSec}s exceeds tolerance of ${toleranceInSeconds}s`,
+      },
+    };
   }
 
   return { valid: true, timestampAgeSec: ageSec };

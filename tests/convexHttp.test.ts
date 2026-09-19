@@ -431,7 +431,7 @@ describe("Convex HTTP Router & Webhook Endpoints", () => {
       expect(handleWebhookSpy).not.toHaveBeenCalled();
     });
 
-    it("re-signs and forwards authentic stale retries to agentmail.handleWebhook", async () => {
+    it("preserves original svix headers and forwards authentic retries without re-signing or forging timestamps", async () => {
       process.env.AGENTMAIL_WEBHOOK_SECRET = "whsec_test123";
       vi.spyOn(agentMailWebhook, "verifySvixWebhook").mockResolvedValue({
         valid: true,
@@ -467,9 +467,8 @@ describe("Convex HTTP Router & Webhook Endpoints", () => {
       const response = await handler(mockCtx, mockReq);
       expect(response.status).toBe(204);
       expect(forwardedReqReceived).not.toBeNull();
-      const forwardedTimestamp = parseInt((forwardedReqReceived as any).headers.get("svix-timestamp"), 10);
-      const nowSec = Math.floor(Date.now() / 1000);
-      expect(Math.abs(nowSec - forwardedTimestamp)).toBeLessThan(5);
+      expect((forwardedReqReceived as any).headers.get("svix-timestamp")).toBe("1720000000");
+      expect((forwardedReqReceived as any).headers.get("svix-signature")).toBe("v1,oldSig");
     });
 
     it("returns 500 when an unexpected internal error occurs", async () => {
