@@ -29,6 +29,7 @@ export interface PhiValues {
   patientName?: string;
   memberId?: string;
   groupNumber?: string;
+  dateOfBirth?: string;
   claimNumber?: string;
   serviceDate?: string;
   patientEmail?: string;
@@ -41,6 +42,7 @@ export const PHI_TOKENS = {
   patientName: "[PATIENT]",
   memberId: "[MEMBER_ID]",
   groupNumber: "[GROUP_NUMBER]",
+  dateOfBirth: "[DOB]",
   claimNumber: "[CLAIM_REF]",
   serviceDate: "[SERVICE_DATE]",
   patientEmail: "[PATIENT_EMAIL]",
@@ -142,6 +144,12 @@ export function buildPhiReplacements(phi: PhiValues): PhiReplacement[] {
     }
   }
 
+  if (phi.dateOfBirth) {
+    for (const variant of serviceDateVariants(phi.dateOfBirth)) {
+      replacements.push({ raw: variant, token: PHI_TOKENS.dateOfBirth, caseInsensitive: false });
+    }
+  }
+
   if (phi.patientName) {
     const full = phi.patientName.trim();
     if (isMeaningfulIdentifier(full)) {
@@ -182,6 +190,7 @@ export function collectPhiValues(source: {
     name?: string | null;
     memberId?: string | null;
     groupNumber?: string | null;
+    dateOfBirth?: string | null;
     email?: string | null;
   } | null;
   patientName?: string | null;
@@ -189,6 +198,7 @@ export function collectPhiValues(source: {
   patientEmail?: string | null;
   memberId?: string | null;
   groupNumber?: string | null;
+  dateOfBirth?: string | null;
   claimNumber?: string | null;
   serviceDate?: string | null;
   senderEmail?: string | null;
@@ -203,6 +213,7 @@ export function collectPhiValues(source: {
     memberId:
       source.patient?.memberId || source.patientMemberId || source.memberId || undefined,
     groupNumber: source.patient?.groupNumber || source.groupNumber || undefined,
+    dateOfBirth: source.patient?.dateOfBirth || source.dateOfBirth || undefined,
     claimNumber: source.claimNumber || undefined,
     serviceDate: source.serviceDate || undefined,
     patientEmail: source.patient?.email || source.patientEmail || undefined,
@@ -233,6 +244,7 @@ export function assertNoPhiLeak(sanitizedText: string, phi: PhiValues): void {
     [phi.patientName?.trim(), "patient name", true],
     [phi.memberId?.trim(), "member ID", false],
     [phi.groupNumber?.trim(), "group number", false],
+    [phi.dateOfBirth?.trim(), "date of birth", false],
     [phi.patientEmail?.trim(), "patient email", true],
     [phi.senderEmail?.trim(), "sender email", true],
     [phi.senderPhone?.trim(), "sender phone", false],
@@ -254,6 +266,14 @@ export function assertNoPhiLeak(sanitizedText: string, phi: PhiValues): void {
     for (const variant of serviceDateVariants(phi.serviceDate)) {
       if (sanitizedText.includes(variant)) {
         throw new PhiLeakError("date of service");
+      }
+    }
+  }
+
+  if (phi.dateOfBirth) {
+    for (const variant of serviceDateVariants(phi.dateOfBirth)) {
+      if (sanitizedText.includes(variant)) {
+        throw new PhiLeakError("date of birth");
       }
     }
   }
@@ -315,6 +335,7 @@ export function rehydrateForDisplay(text: string, phi?: PhiValues): string {
     [phi.patientName, PHI_TOKENS.patientName],
     [phi.memberId, PHI_TOKENS.memberId],
     [phi.groupNumber, PHI_TOKENS.groupNumber],
+    [phi.dateOfBirth, PHI_TOKENS.dateOfBirth],
     [phi.claimNumber, PHI_TOKENS.claimNumber],
     [phi.serviceDate, PHI_TOKENS.serviceDate],
     [phi.patientEmail, PHI_TOKENS.patientEmail],

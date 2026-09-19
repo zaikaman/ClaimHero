@@ -281,7 +281,7 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
     soundEffects.play("extraction_complete");
     // Show the context form instantly with safe defaults; denial-specific
     // prompts upgrade in the background without blocking the user.
-    setExtractedResult({ ...result, pipelineResult: null });
+    setExtractedResult({ ...result, memberId: result.memberId || preset?.memberId || "", pipelineResult: null });
     setContextSubmitted(false);
     setActivePreset(preset || null);
 

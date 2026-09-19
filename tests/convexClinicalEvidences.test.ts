@@ -147,6 +147,42 @@ describe("Convex Clinical Evidences Database & Retrieval Functions", () => {
       }));
     });
 
+    it("replaceForClaimInternal: successfully inserts crawler-generated evidences with screenshotStorageId", async () => {
+      const mockClaim = { _id: "claim_1", userId: "user_123" };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              take: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+          insert: vi.fn().mockResolvedValue("ev_id_internal_1"),
+          patch: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      const res = await (clinicalEvidences.replaceForClaimInternal as any)._handler(mockCtx, {
+        claimId: "claim_1",
+        evidences: [
+          {
+            sourceType: "payer_cpb",
+            title: "Cigna CPB",
+            citationClause: "Section 1",
+            extractedEvidenceMarkdown: "Conservative therapy failed",
+            relevanceScore: 92,
+            screenshotStorageId: "st_crawler_generated" as any,
+          },
+        ],
+      });
+
+      expect(res).toEqual(["ev_id_internal_1"]);
+      expect(mockCtx.db.insert).toHaveBeenCalledWith("clinicalEvidences", expect.objectContaining({
+        claimId: "claim_1",
+        screenshotStorageId: "st_crawler_generated",
+      }));
+    });
+
     it("clearByClaim: deletes all clinical evidences for a claim", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const mockClaim = { _id: "claim_1", userId: "user_123" };

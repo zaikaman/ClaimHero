@@ -107,6 +107,8 @@ export function isMaskedIdentifierValue(raw: string | undefined | null): boolean
     trimmed.includes("[CLAIM") ||
     trimmed.includes("[SERVICE") ||
     trimmed.includes("[DATE") ||
+    trimmed.includes("[DOB") ||
+    trimmed.includes("[GROUP") ||
     trimmed.includes("**") ||
     trimmed === "Patient" ||
     trimmed === "Patient Record" ||
@@ -772,6 +774,18 @@ export const getByIdInternal = internalQuery({
 });
 
 /**
+ * Internal query to lookup a patient record by ID
+ */
+export const getPatientByIdInternal = internalQuery({
+  args: {
+    patientId: v.id("patients"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.patientId);
+  },
+});
+
+/**
  * Internal query for webhook processors and background actions to list claims
  */
 export const listAllInternal = internalQuery({
@@ -1194,6 +1208,7 @@ interface CreateWithPatientArgs {
   patientEmail?: string;
   memberId?: string;
   groupNumber?: string;
+  dateOfBirth?: string;
   insurancePayer: string;
   state?: string;
   serviceDate: string;
@@ -1256,6 +1271,7 @@ async function applyCreateWithPatient(
   // storing (and later displaying) "[REDACTED MEMBER ID]".
   const cleanMemberId = resolveClaimMemberId(args.memberId);
   const cleanGroupNumber = resolveClaimGroupNumber(args.groupNumber) || undefined;
+  const cleanDateOfBirth = isMaskedIdentifierValue(args.dateOfBirth) ? "" : args.dateOfBirth?.trim() || "";
   const cleanClaimNumberArg = isMaskedIdentifierValue(args.claimNumber) ? "" : args.claimNumber.trim();
   const cleanServiceDate = isMaskedIdentifierValue(args.serviceDate) ? "" : args.serviceDate.trim();
   const cleanDenialDate = isMaskedIdentifierValue(args.denialDate) ? "" : args.denialDate?.trim() || "";
@@ -1304,6 +1320,7 @@ async function applyCreateWithPatient(
       email: cleanEmail || matchingPatient.email || "",
       memberId: cleanMemberId || matchingPatient.memberId || "PENDING",
       groupNumber: cleanGroupNumber || matchingPatient.groupNumber,
+      dateOfBirth: cleanDateOfBirth || matchingPatient.dateOfBirth,
       insurancePayer: args.insurancePayer || matchingPatient.insurancePayer || "Molina Healthcare",
       state: args.state || matchingPatient.state || "FL",
     });
@@ -1314,6 +1331,7 @@ async function applyCreateWithPatient(
       email: cleanEmail,
       memberId: cleanMemberId || "PENDING",
       groupNumber: cleanGroupNumber,
+      dateOfBirth: cleanDateOfBirth || undefined,
       insurancePayer: args.insurancePayer || "Molina Healthcare",
       state: args.state || "FL",
       createdAt: now,
@@ -1417,6 +1435,7 @@ export const createWithPatient = mutation({
     insurancePayer: v.string(),
     state: v.string(),
     groupNumber: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()),
     claimNumber: v.string(),
     serviceDate: v.string(),
     denialDate: v.optional(v.string()),
@@ -1464,6 +1483,7 @@ export const createWithPatientInternal = internalMutation({
     insurancePayer: v.string(),
     state: v.string(),
     groupNumber: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()),
     claimNumber: v.string(),
     serviceDate: v.string(),
     denialDate: v.optional(v.string()),
@@ -1799,6 +1819,87 @@ export const updateStatusInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     return await applyStatusUpdate(ctx, args);
+  },
+});
+
+/**
+ * Internal mutation to retract an outbound dispatch and reset a claim to ready_for_review
+ */
+export const resetDispatchedClaimInternal = internalMutation({
+  args: {
+    claimId: v.id("claims"),
+  },
+  handler: async (ctx, args) => {
+    const claim = await ctx.db.get(args.claimId);
+    if (!claim) throw new Error("Claim not found");
+
+    // 1. Delete all messages for this claim & clean up attachments from storage
+    const messages = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .collect();
+
+    for (const msg of messages) {
+      if (msg.attachments && msg.attachments.length > 0) {
+        for (const att of msg.attachments) {
+          try {
+            await ctx.storage.delete(att.storageId);
+          } catch (e) {
+            console.warn("Could not delete attachment storage:", e);
+          }
+        }
+      }
+      await ctx.db.delete(msg._id);
+    }
+
+    // 2. Delete threads for this claim
+    const threads = await ctx.db
+      .query("emailThreads")
+      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .collect();
+
+    for (const thread of threads) {
+      await ctx.db.delete(thread._id);
+    }
+
+    // 3. Clear pdfExportStorageId from appeals & delete the stored PDF
+    const appeals = await ctx.db
+      .query("appeals")
+      .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
+      .collect();
+
+    for (const appeal of appeals) {
+      if (appeal.pdfExportStorageId) {
+        try {
+          await ctx.storage.delete(appeal.pdfExportStorageId);
+        } catch (e) {
+          console.warn("Could not delete appeal PDF storage:", e);
+        }
+        await ctx.db.patch(appeal._id, { pdfExportStorageId: undefined });
+      }
+    }
+
+    // 4. Reset claim status to ready_for_review
+    await ctx.db.patch(args.claimId, {
+      status: "ready_for_review",
+      agentMailThreadId: undefined,
+    });
+
+    // 5. Append audit log
+    await ctx.db.insert("appealAuditLogs", {
+      claimId: args.claimId,
+      eventType: "dispatched_state_reset",
+      actor: "System Administrator",
+      timestamp: Date.now(),
+      details: "Retracted outbound appeal dispatch and reset claim status to ready_for_review for re-transmission.",
+    });
+
+    return {
+      success: true,
+      deletedMessages: messages.length,
+      deletedThreads: threads.length,
+      resetAppeals: appeals.length,
+    };
   },
 });
 

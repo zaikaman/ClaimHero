@@ -341,7 +341,7 @@ describe("Phase 5: Appeal Brief & Studio Document Synthesis", () => {
 
     // The final body should be complete but not an automatically padded dossier.
     expect(brief.length).toBeGreaterThan(1200);
-    expect(brief.length).toBeLessThan(4000);
+    expect(brief.length).toBeLessThan(4500);
   });
 
   it("keeps internal precedent retrieval artifacts out of the assembled email", async () => {
@@ -1422,6 +1422,77 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
     expect(formatted.html).toContain("Unspecified Claim Reference");
     expect(formatted.text).not.toContain("@example.com");
     expect(formatted.text).not.toContain("appeals@claimhero.com");
+  });
+
+  it("assembles adjudication matrix table with Date of Birth, Member ID, and Enclosure Checklist", async () => {
+    const { assembleProfessionalAppealEmail } = await import("../convex/actions/appealSynthesizer");
+
+    const fullClaim = {
+      claimNumber: "CLM-8942-CIG-7173",
+      providerName: "Dr. Robert Langston, MD",
+      serviceDate: "2026-06-12",
+      deniedAmount: 6400,
+      denialReasonCode: "CO-50",
+      denialReasonDescription: "Service denied as not medically necessary",
+      cptCodes: ["29881"],
+      icd10Codes: ["M23.22"],
+      patient: {
+        name: "Eleanor Vance",
+        memberId: "CIG-982341-01",
+        groupNumber: "GRP-4412",
+        dateOfBirth: "1968-04-14",
+        insurancePayer: "Cigna Global Health Benefits",
+      },
+    };
+
+    const mockResult = {
+      executiveSummary: "Summary",
+      statutoryRightsNotice: "Notice",
+      medicalNecessityArguments: "Patient satisfies Cigna CPB 0066 criteria §1 through §4 based on documented mechanical locking and conservative therapy failure.",
+      policyCitations: [],
+      formalDemandForPayment: "Demand",
+      fullAppealMarkdown: "",
+    };
+
+    const brief = assembleProfessionalAppealEmail(
+      fullClaim,
+      "level_1_internal",
+      mockResult,
+      [],
+      "PATIENT: Eleanor Vance | DOB: 04/14/1968 | DOS: 06/12/2026",
+      [],
+      { name: "Jordan Lee", email: "jordan.lee@orthoclinic.org" },
+      {
+        symptomsAndFunctionalImpact: "Mechanical locking and joint pain.",
+        examinationFindings: "Positive McMurray click and 5 degree extension block.",
+        recordsAreIncomplete: false,
+      }
+    );
+
+    // Verify Case Adjudication Matrix table
+    expect(brief).toContain("### Case Adjudication & Dispute Summary");
+    expect(brief).toContain("| **Patient / Member** | Eleanor Vance |");
+    expect(brief).toContain("| **Date of Birth** | April 14, 1968 |");
+    expect(brief).toContain("| **Member ID** | CIG-982341-01 |");
+    expect(brief).toContain("| **Group Number** | GRP-4412 |");
+    expect(brief).toContain("| **Procedure Code(s)** | 29881 |");
+    expect(brief).toContain("| **Diagnosis Code(s)** | M23.22 |");
+    expect(brief).toContain("| **Disputed Charges** | $6,400 |");
+
+    // Verify bullet points with DOB
+    expect(brief).toContain("- Patient/member: Eleanor Vance");
+    expect(brief).toContain("- Member ID: CIG-982341-01");
+    expect(brief).toContain("- Date of birth: April 14, 1968");
+
+    // Verify Clinical Criteria Crosswalk & Necessity Rationale
+    expect(brief).toContain("### Clinical Policy Criteria Crosswalk & Necessity Rationale");
+    expect(brief).toContain("Patient satisfies Cigna CPB 0066 criteria");
+
+    // Verify Enclosures checklist
+    expect(brief).toContain("## Enclosures & Accompanying Clinical Documentation");
+    expect(brief).toContain("Pre-operative clinical consultation report");
+    expect(brief).toContain("Diagnostic radiology and imaging reports");
+    expect(brief).toContain("Provider-directed conservative management records");
   });
 });
 

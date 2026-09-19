@@ -670,6 +670,24 @@ const DISALLOWED_MARKETING_DOMAINS = new Set([
   "www.medicalbillingandcoding.org",
   "findacode.com",
   "www.findacode.com",
+  // Consumer review & local directory platforms that Firecrawl rejects or lack clinical guidelines
+  "yelp.com",
+  "www.yelp.com",
+  "m.yelp.com",
+  "yellowpages.com",
+  "www.yellowpages.com",
+  "angi.com",
+  "www.angi.com",
+  "bbb.org",
+  "www.bbb.org",
+  "tripadvisor.com",
+  "www.tripadvisor.com",
+  "mapquest.com",
+  "www.mapquest.com",
+  "trustpilot.com",
+  "www.trustpilot.com",
+  "citysearch.com",
+  "superpages.com",
 ]);
 
 /**
@@ -819,6 +837,19 @@ export function isAcceptableSourceUrl(value: unknown): value is string {
     }
 
     if (isPrivateMcgViewerUrl(value.trim())) return false;
+
+    // Exclude search result pages and directory query URLs (never clinical policy documents)
+    if (
+      url.pathname === "/search" ||
+      url.pathname.startsWith("/search/") ||
+      url.searchParams.has("find_desc") ||
+      url.searchParams.has("find_loc") ||
+      url.searchParams.has("search_query")
+    ) {
+      if (!hostname.includes("cms.gov")) {
+        return false;
+      }
+    }
 
     // Exclude student travel / study-abroad / exchange insurance / non-clinical educational pages
     if (/\/(?:global-safety-security|study-abroad|travel-health|student-insurance|for-students|student-health|international-travel|academic-programs|admissions)\//i.test(url.pathname)) {
@@ -1158,18 +1189,20 @@ export function isPayerMismatchedSource(payer: string, sourceUrl: string): boole
       "mcgs",
       "providence",
       "horizon",
+      "clover",
     ];
 
-    const hostContainsPayerKeyword = knownPayerKeywords.find((kw) => host.includes(kw));
-    if (hostContainsPayerKeyword) {
-      // If the host belongs to a known payer brand, it must match the claim's payer brand
-      if (host.includes(payerKeyword)) return false;
+    const hostOrPath = `${host}${url.pathname}`.toLowerCase();
+    const matchedPayerKeyword = knownPayerKeywords.find((kw) => hostOrPath.includes(kw));
+    if (matchedPayerKeyword) {
+      // If the host or path belongs to a known payer brand, it must match the claim's payer brand
+      if (hostOrPath.includes(payerKeyword)) return false;
       // Allow general bcbs variants for bcbsfl/bcbs
-      if (payerKeyword === "bcbsfl" && host.includes("bcbs")) return false;
-      if (payerKeyword === "bcbs" && (host.includes("bcbs") || host.includes("bluecross") || host.includes("blueshield"))) return false;
-      if (payerKeyword === "geoblue" && (host.includes("geo-blue") || host.includes("geoblue") || host.includes("bcbsglobalcore"))) return false;
+      if (payerKeyword === "bcbsfl" && hostOrPath.includes("bcbs")) return false;
+      if (payerKeyword === "bcbs" && (hostOrPath.includes("bcbs") || hostOrPath.includes("bluecross") || hostOrPath.includes("blueshield"))) return false;
+      if (payerKeyword === "geoblue" && (hostOrPath.includes("geo-blue") || hostOrPath.includes("geoblue") || hostOrPath.includes("bcbsglobalcore"))) return false;
 
-      // Host belongs to a different payer -> strictly mismatched competitor
+      // Belongs to a different payer -> strictly mismatched competitor
       return true;
     }
 
@@ -1543,6 +1576,25 @@ export interface ScrapeExtractionOptions {
   cptCodes?: string[];
   denialReasonCode?: string;
   forceRescan?: boolean;
+  captureScreenshot?: boolean;
+}
+
+/**
+ * Parses Firecrawl rate-limit responses to extract wait time in milliseconds for resilient backoff.
+ */
+export function extractFirecrawlRetryAfterMs(errorMessage: string): number | null {
+  if (!errorMessage || typeof errorMessage !== "string") return null;
+  const match = errorMessage.match(/retry after\s*(\d+)\s*s/i);
+  if (match && match[1]) {
+    const seconds = parseInt(match[1], 10);
+    if (!Number.isNaN(seconds) && seconds >= 0 && seconds <= 35) {
+      return (seconds + 1) * 1000;
+    }
+  }
+  if (/429|rate limit/i.test(errorMessage)) {
+    return 10000;
+  }
+  return null;
 }
 
 /**
@@ -1553,6 +1605,90 @@ export interface ScrapeExtractionOptions {
 export function isCarelonGuidelineUrl(url: string | undefined): boolean {
   if (!url || typeof url !== "string") return false;
   return /carelon|aimspecialty/i.test(url);
+}
+
+/**
+ * Capture visual proof screenshot via Firecrawl with Carelon modal handling.
+ */
+export async function capturePolicyScreenshot(
+  ctx: ActionCtx,
+  workingUrl: string,
+): Promise<string | undefined> {
+  const isCarelon = isCarelonGuidelineUrl(workingUrl);
+  if (isCarelon) {
+    try {
+      const carelonShot = await firecrawl.scrape(ctx, workingUrl, {
+        formats: [{ type: "screenshot", fullPage: false }],
+        actions: [
+          { type: "wait", milliseconds: 2000 },
+          {
+            type: "click",
+            selector:
+              "input.termsagree, input[name='wptp_agree'], input[value='I ACCEPT'], .tthebutton .termsagree",
+          },
+          { type: "wait", milliseconds: 3500 },
+          { type: "screenshot" },
+        ],
+        onlyMainContent: true,
+        proxy: "auto",
+        timeout: 30000,
+        waitFor: 0,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        blockAds: true,
+      });
+      return extractScreenshotFromDoc(carelonShot);
+    } catch (carelonErr) {
+      const carelonMsg = carelonErr instanceof Error ? carelonErr.message : String(carelonErr);
+      console.warn(
+        `Carelon modal dismissal screenshot capture failed for ${workingUrl} (${carelonMsg}); falling back to default capture.`
+      );
+      try {
+        const fallbackShot = await firecrawl.scrape(ctx, workingUrl, {
+          formats: [{ type: "screenshot", fullPage: false }],
+          onlyMainContent: true,
+          proxy: "auto",
+          timeout: 15000,
+          waitFor: 0,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+          blockAds: true,
+        });
+        return extractScreenshotFromDoc(fallbackShot);
+      } catch (shotErr) {
+        const shotMsg = shotErr instanceof Error ? shotErr.message : String(shotErr);
+        console.warn(`Visual proof screenshot unavailable for ${workingUrl} (${shotMsg}); proceeding with markdown evidence.`);
+        return undefined;
+      }
+    }
+  } else {
+    try {
+      const shot = await firecrawl.scrape(ctx, workingUrl, {
+        formats: [{ type: "screenshot", fullPage: false }],
+        onlyMainContent: true,
+        proxy: "auto",
+        timeout: 15000,
+        waitFor: 0,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        blockAds: true,
+      });
+      return extractScreenshotFromDoc(shot);
+    } catch (shotErr) {
+      const shotMsg = shotErr instanceof Error ? shotErr.message : String(shotErr);
+      console.warn(`Visual proof screenshot unavailable for ${workingUrl} (${shotMsg}); proceeding with markdown evidence.`);
+      return undefined;
+    }
+  }
 }
 
 /**
@@ -1627,6 +1763,7 @@ export async function scrapeFirecrawlPolicySource(
       ? [requestedUrl, sanitizedUrl]
       : [requestedUrl];
 
+  let hasRetriedRateLimit = false;
   const scrapeMarkdown = async (targetUrl: string): Promise<FirecrawlDocument> => {
     const isPdfTarget = /\.(pdf|ashx)(\?|#|$)/i.test(targetUrl);
     const richFormats: Format[] = ["markdown"];
@@ -1657,9 +1794,37 @@ export async function scrapeFirecrawlPolicySource(
       });
     } catch (primaryErr) {
       const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
-      // If rate limited, fail fast to avoid worsening the 429
-      if (primaryMsg.includes("429") || primaryMsg.includes("rate limit") || primaryMsg.includes("Rate limit")) {
+
+      // Handle Firecrawl 429 rate limits with backoff
+      if (primaryMsg.includes("429") || /rate limit/i.test(primaryMsg)) {
+        const retryAfterMs = extractFirecrawlRetryAfterMs(primaryMsg);
+        if (retryAfterMs && retryAfterMs <= 25000 && !hasRetriedRateLimit) {
+          hasRetriedRateLimit = true;
+          console.warn(`Firecrawl rate limited (429); pausing ${Math.round(retryAfterMs / 1000)}s before retrying ${targetUrl}...`);
+          await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
+          return await firecrawl.scrape(ctx, targetUrl, {
+            formats: richFormats,
+            onlyMainContent: true,
+            proxy: "auto",
+            timeout: 30000,
+            waitFor: isPdfTarget ? 0 : 300,
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+              "Accept-Language": "en-US,en;q=0.9",
+            },
+            blockAds: true,
+          });
+        }
         throw new Error(`Firecrawl rate limit: ${primaryMsg}`);
+      }
+
+      // If site is unsupported by Firecrawl, fail fast without wasting another request
+      if (
+        primaryMsg.includes("do not support this site") ||
+        primaryMsg.includes("not support this site") ||
+        (primaryMsg.includes("403") && primaryMsg.includes("apologize"))
+      ) {
+        throw new Error(`Firecrawl unsupported domain (${targetUrl}): ${primaryMsg}`);
       }
 
       // Resilient fallback: If rich scrape (with native json) timed out (408),
@@ -1681,7 +1846,7 @@ export async function scrapeFirecrawlPolicySource(
         });
       } catch (fallbackErr) {
         const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-        if (fallbackMsg.includes("concurrency") || fallbackMsg.includes("timed out") || fallbackMsg.includes("408") || fallbackMsg.includes("rate limit")) {
+        if (fallbackMsg.includes("concurrency") || fallbackMsg.includes("timed out") || fallbackMsg.includes("408") || fallbackMsg.includes("rate limit") || fallbackMsg.includes("429")) {
           throw new Error(`Firecrawl concurrency/timeout: ${fallbackMsg}`);
         }
         throw fallbackErr;
@@ -1747,85 +1912,8 @@ export async function scrapeFirecrawlPolicySource(
   // decode, 408 timeout, unsupported viewport) are swallowed so they never
   // invalidate an otherwise substantive markdown policy document.
   let screenshot: string | undefined = doc.screenshot;
-  if (!screenshot) {
-    const isCarelon = isCarelonGuidelineUrl(workingUrl);
-    if (isCarelon) {
-      // Carelon / AIM Clinical Guidelines display an asynchronous terms modal (wp-terms-popup).
-      // Firecrawl must wait for the modal DOM to load, click "I ACCEPT", and wait for the modal
-      // and backdrop to fully dismiss before capturing the visual proof screenshot.
-      try {
-        const carelonShot = await firecrawl.scrape(ctx, workingUrl, {
-          formats: [{ type: "screenshot", fullPage: false }],
-          actions: [
-            { type: "wait", milliseconds: 2000 },
-            {
-              type: "click",
-              selector:
-                "input.termsagree, input[name='wptp_agree'], input[value='I ACCEPT'], .tthebutton .termsagree",
-            },
-            { type: "wait", milliseconds: 3500 },
-            { type: "screenshot" },
-          ],
-          onlyMainContent: true,
-          proxy: "auto",
-          timeout: 30000,
-          waitFor: 0,
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-          },
-          blockAds: true,
-        });
-        screenshot = extractScreenshotFromDoc(carelonShot);
-      } catch (carelonErr) {
-        const carelonMsg = carelonErr instanceof Error ? carelonErr.message : String(carelonErr);
-        console.warn(
-          `Carelon modal dismissal screenshot capture failed for ${workingUrl} (${carelonMsg}); falling back to default capture.`
-        );
-        try {
-          const fallbackShot = await firecrawl.scrape(ctx, workingUrl, {
-            formats: [{ type: "screenshot", fullPage: false }],
-            onlyMainContent: true,
-            proxy: "auto",
-            timeout: 15000,
-            waitFor: 0,
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-              "Accept-Language": "en-US,en;q=0.9",
-            },
-            blockAds: true,
-          });
-          screenshot = extractScreenshotFromDoc(fallbackShot);
-        } catch (shotErr) {
-          const shotMsg = shotErr instanceof Error ? shotErr.message : String(shotErr);
-          console.warn(`Visual proof screenshot unavailable for ${workingUrl} (${shotMsg}); proceeding with markdown evidence.`);
-          screenshot = undefined;
-        }
-      }
-    } else {
-      try {
-        const shot = await firecrawl.scrape(ctx, workingUrl, {
-          formats: [{ type: "screenshot", fullPage: false }],
-          onlyMainContent: true,
-          proxy: "auto",
-          timeout: 15000,
-          waitFor: 0,
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-          },
-          blockAds: true,
-        });
-        screenshot = extractScreenshotFromDoc(shot);
-      } catch (shotErr) {
-        const shotMsg = shotErr instanceof Error ? shotErr.message : String(shotErr);
-        console.warn(`Visual proof screenshot unavailable for ${workingUrl} (${shotMsg}); proceeding with markdown evidence.`);
-        screenshot = undefined;
-      }
-    }
+  if (!screenshot && extractionOptions?.captureScreenshot !== false && !/\.(pdf|ashx)(\?|#|$)/i.test(workingUrl)) {
+    screenshot = await capturePolicyScreenshot(ctx, workingUrl);
   }
 
   const scrapedSourceUrl = getAcceptableResultUrl({
@@ -3232,6 +3320,7 @@ export async function performCrawlInsurerPolicy(
                   cptCodes: args.cptCodes,
                   denialReasonCode: args.denialReasonCode,
                   forceRescan: shouldForceRescan,
+                  captureScreenshot: false,
                 });
                 return { ok: true as const, sourceUrl, candidateSource };
               } catch (error) {
@@ -3433,12 +3522,25 @@ For each clause:
 
     const cleanPolicySourceUrl = sanitizePublicPolicyUrl(policySourceUrl);
 
-    let screenshotStorageId: Id<"_storage"> | undefined = undefined;
-    let capturedAt: number | undefined = undefined;
-    if (policySource.screenshot) {
+    let screenshotStorageId: Id<"_storage"> | undefined = policySource.screenshotStorageId;
+    let capturedAt: number | undefined = policySource.capturedAt;
+    if (!screenshotStorageId && policySource.screenshot) {
       screenshotStorageId = await storeScreenshotInStorage(ctx, policySource.screenshot);
       if (screenshotStorageId) {
         capturedAt = Date.now();
+      }
+    } else if (!screenshotStorageId && !policySource.screenshot && !/\.(pdf|ashx)(\?|#|$)/i.test(policySourceUrl)) {
+      try {
+        const shot = await capturePolicyScreenshot(ctx, policySourceUrl);
+        if (shot) {
+          screenshotStorageId = await storeScreenshotInStorage(ctx, shot);
+          if (screenshotStorageId) {
+            capturedAt = Date.now();
+            policySource.screenshot = shot;
+          }
+        }
+      } catch (shotErr) {
+        console.warn(`Visual proof screenshot unavailable for ${policySourceUrl}:`, shotErr);
       }
     }
 

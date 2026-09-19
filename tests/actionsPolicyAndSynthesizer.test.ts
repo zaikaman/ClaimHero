@@ -86,6 +86,28 @@ describe("Convex Actions: Policy Crawler & Appeal Synthesizer", () => {
       // Allows legitimate public guidelines
       expect(isAcceptableSourceUrl("https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=33394")).toBe(true);
       expect(isAcceptableSourceUrl("https://www.nccn.org/guidelines/category_1")).toBe(true);
+
+      // Rejects consumer review / directory sites and search queries
+      expect(isAcceptableSourceUrl("https://m.yelp.com/search?find_desc=Cold+Laser+Therapy&find_loc=Torrance%2C+CA")).toBe(false);
+      expect(isAcceptableSourceUrl("https://www.yellowpages.com/search?search_terms=doctor")).toBe(false);
+      expect(isAcceptableSourceUrl("https://some-clinic.com/search?query=laser")).toBe(false);
+    });
+
+    it("isPayerMismatchedSource: detects mismatched competitor payers in path or host", async () => {
+      const { isPayerMismatchedSource } = actionPolicyCrawler;
+
+      expect(isPayerMismatchedSource("Cigna", "https://praxigen.dev/prior-authorization/clover-health/knee-arthroscopy")).toBe(true);
+      expect(isPayerMismatchedSource("Cigna", "https://www.evicore.com/sites/default/files/clinical-guidelines/2026-04/Cigna_CMM-312.pdf")).toBe(false);
+      expect(isPayerMismatchedSource("Aetna", "https://www.cigna.com/coveragePolicies/cp123")).toBe(true);
+    });
+
+    it("extractFirecrawlRetryAfterMs: extracts backoff milliseconds from rate-limit errors", async () => {
+      const { extractFirecrawlRetryAfterMs } = actionPolicyCrawler;
+
+      expect(extractFirecrawlRetryAfterMs("Rate limit exceeded. please retry after 17s, resets at...")).toBe(18000);
+      expect(extractFirecrawlRetryAfterMs("Rate limit exceeded. please retry after 10s")).toBe(11000);
+      expect(extractFirecrawlRetryAfterMs("General 429 rate limit")).toBe(10000);
+      expect(extractFirecrawlRetryAfterMs("Different error message")).toBeNull();
     });
 
     it("crawlCustomResearchUrl: throws when provided link-local or private URL", async () => {

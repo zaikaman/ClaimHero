@@ -177,6 +177,186 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
         }
       );
     });
+
+    it("renders Case Adjudication table cleanly as a styled PDF grid with Date of Birth and clean citations", () => {
+      const markdown = [
+        "# Appeal of Adverse Benefit Determination",
+        "**Claim reference:** #CLM-8942-CIG-3917",
+        "",
+        "### Case Adjudication & Dispute Summary",
+        "",
+        "| Parameter | Case Record Detail |",
+        "| :--- | :--- |",
+        "| **Patient / Member** | Eleanor Vance |",
+        "| **Date of Birth** | April 14, 1968 |",
+        "| **Member ID** | CIG-982341-01 |",
+        "| **Claim Reference** | #CLM-8942-CIG-3917 |",
+        "| **Date of Service** | June 12, 2026 |",
+        "| **Procedure Code(s)** | 29881 |",
+        "| **Diagnosis Code(s)** | M23.22 |",
+        "| **Denial Code & Rationale** | CO-50 - Service denied as not medically necessary |",
+        "| **Disputed Charges** | $6,400 |",
+        "",
+        "**Claim details**",
+        "- Patient/member: Eleanor Vance",
+        "- Member ID: CIG-982341-01",
+        "- Date of birth: April 14, 1968",
+        "- Date of service: June 12, 2026",
+        "",
+        "Dear Appeals and Grievances Team,",
+        "",
+        "I request reconsideration of the adverse benefit determination for Claim #CLM-8942-CIG-3917.",
+        "",
+        "## Supporting documentation for review",
+        "- **Knee Surgery Guidelines** - Prior Authorization ([Official source](https://www.evicore.com/sites/default/files/clinical-guidelines/2026-04/Cigna_CMM-312%20Knee%20Surg%20Arthro%20Open%20Proc_V2.0.2025_Eff03.07.2026_upd04.14.2026.pdf)): Documented failure of conservative management.",
+      ].join("\n");
+
+      const buffer = generateFormalAppealPdf({
+        claimNumber: "CLM-8942-CIG-3917",
+        patientName: "Eleanor Vance",
+        memberId: "CIG-982341-01",
+        dateOfBirth: "1968-04-14",
+        insurancePayer: "CIGNA GLOBAL HEALTH BENEFITS",
+        serviceDate: "06/12/2026",
+        deniedAmount: 6400,
+        denialReason: "CO-50 - Service denied as not medically necessary",
+        appealMarkdown: markdown,
+        providerName: "Dr. Robert Langston, MD",
+        cptCodes: ["29881"],
+        icd10Codes: ["M23.22"],
+      });
+
+      const pdfText = buffer.toString("binary");
+      expect(pdfText).toContain("April 14, 1968");
+      expect(pdfText).toContain("CIG-982341-01");
+      expect(pdfText).toContain("Case Adjudication & Dispute Summary");
+      expect(pdfText).toContain("Patient / Member");
+      expect(pdfText).toContain("Disputed Charges");
+      expect(pdfText).not.toContain("/ :--- / :--- /");
+      expect(pdfText).not.toContain("/ Parameter / Case Record Detail /");
+      expect(pdfText).toContain("evicore.com");
+      expect(pdfText).not.toContain("Cigna_CMM-312%20Knee%20Surg%20Arthro%20Open%20Proc_V2.0.2025_Eff03.07.2026_upd04.14.2026.pdf");
+    });
+
+    it("formats raw storage URLs cleanly and compiles full multi-section appeal into a balanced 4-page dossier without orphan pages", () => {
+      const fullEleanorBrief = [
+        "# Appeal of Adverse Benefit Determination",
+        "**Claim reference:** #CLM-8942-CIG-9781",
+        "",
+        "### Case Adjudication & Dispute Summary",
+        "",
+        "| Parameter | Case Record Detail |",
+        "| :--- | :--- |",
+        "| **Patient / Member** | Eleanor Vance |",
+        "| **Date of Birth** | April 14, 1968 |",
+        "| **Member ID** | CIG-982341-01 |",
+        "| **Claim Reference** | #CLM-8942-CIG-9781 |",
+        "| **Date of Service** | June 12, 2026 |",
+        "| **Procedure Code(s)** | 29881 |",
+        "| **Diagnosis Code(s)** | M23.22 |",
+        "| **Denial Code & Rationale** | CO-50 - Service denied as not medically necessary |",
+        "| **Disputed Charges** | $6,400 |",
+        "",
+        "Dear Appeals and Grievances Team,",
+        "",
+        "I request reconsideration of the adverse benefit determination for Claim #CLM-8942-CIG-9781, relating to the service provided on June 12, 2026. The denial notice cites CO-50 — These are non-covered services because this is not deemed a medical necessity by the payer. Please review the submitted clinical records and applicable plan criteria and reprocess the claim if benefits are payable under the plan.",
+        "",
+        "## Clinical basis for reconsideration",
+        "",
+        "The following clinical summary and documented patient-specific findings are submitted in support of this reconsideration request:",
+        "",
+        "Symptoms and functional impact:",
+        "> Patient exhibits persistent right knee medial joint line pain (7/10 VAS) with painful catching and true mechanical locking episodes during ambulation, severely impairing weight-bearing activities of daily living.",
+        "",
+        "Examination findings:",
+        "> Distinct right medial joint line tenderness, positive McMurray test reproducing painful medial clicking, mild reactive effusion, and painful extension block at 5 degrees.",
+        "",
+        "Imaging and diagnostic findings:",
+        "> High-resolution MRI of the right knee (05/10/2026) confirms a complex posterior horn medial meniscus tear extending to the inferior articular surface with localized parameniscal cyst formation.",
+        "",
+        "Treatment history and response:",
+        "> Completed 8 consecutive weeks of formal outpatient physical therapy (2x/weekly, Feb-Apr 2026) with zero symptomatic relief, 3-month trial of oral meloxicam 15mg daily, and one image-guided intra-articular steroid injection (03/20/2026) yielding only 4 days of transient relief.",
+        "",
+        "Other documented facts:",
+        "> Dr. Robert Langston, MD certified that non-operative modalities have failed and arthroscopic partial medial meniscectomy (CPT 29881) is medically necessary under Cigna Medical Coverage Policy 0066 to resolve mechanical locking and prevent chondral degradation.",
+        "",
+        "Additional clinical information supplied for review (treating clinician consultation note and attestation):",
+        "> PATIENT: Eleanor Vance | DOB: 04/14/1968 | DOS: 06/12/2026",
+        "> TREATING PHYSICIAN CLINICAL ATTESTATION & CONSERVATIVE THERAPY RECORD:",
+        "> Patient Eleanor Vance is a 58-year-old female presenting with symptomatic right medial meniscus complex tear (ICD-10 M23.22) with recurrent mechanical knee locking, painful catching, and severe medial joint line tenderness.",
+        "> CONSERVATIVE THERAPY MODALITIES COMPLETED & FAILED:",
+        "> 1. Supervised Physical Therapy: Completed 8 consecutive weeks of formal outpatient physical therapy (2 sessions/week from 02/03/2026 through 04/07/2026 at Sunstate Rehabilitation; 16 total sessions completed). Therapy discharge summary demonstrates zero improvement in mechanical catching symptoms.",
+        "> 2. Pharmacotherapy: 3-month trial of prescription Meloxicam (15 mg PO daily) with inadequate analgesic relief.",
+        "> 3. Intra-articular Injections: Image-guided right knee corticosteroid injection (Triamcinolone 40 mg on 03/20/2026) yielding only 4 days of transient partial relief.",
+        "",
+        "CLINICAL NECESSITY DETERMINATION:",
+        "Under Cigna Medical Coverage Policy 0066 (Knee Arthroscopy and Open Procedures), the patient has completed and failed all non-operative conservative management. Arthroscopic partial meniscectomy (CPT 29881) is medically necessary to resolve mechanical joint locking and prevent secondary articular cartilage damage.",
+        "Attending Orthopedic Surgeon: Dr. Robert Langston, MD, FAAOS (Metropolitan Surgical Hospital)",
+        "",
+        "## Supporting documentation for review",
+        "The following policy materials are identified as review references. They should be evaluated together with the patient-specific clinical records:",
+        "- CIGNA Guidelines for Arthroscopic Surgery in Degenerative Knee Conditions - Medical Necessity Criteria Sec. 2 (Official source: https://pmc.ncbi.nlm.nih.gov/articles/PMC8673957): Failure of conservative management for a reasonable duration, typically at least 6 weeks.",
+        "- CIGNA Guidelines for Arthroscopic Surgery in Degenerative Knee Conditions - Medical Necessity Criteria Sec. 1 (Official source: https://pmc.ncbi.nlm.nih.gov/articles/PMC8673957): Diagnosis of degenerative meniscal tear confirmed by clinical examination and imaging studies.",
+        "- CIGNA Guidelines for Arthroscopic Surgery in Degenerative Knee Conditions - Prior Authorization (Official source: https://pmc.ncbi.nlm.nih.gov/articles/PMC8673957): Prior authorization is required for arthroscopy in cases of degenerative meniscal tear.",
+        "- CIGNA Guidelines for Arthroscopic Surgery in Degenerative Knee Conditions - Contraindications (Official source: https://pmc.ncbi.nlm.nih.gov/articles/PMC8673957): Patients with concomitant severe osteoarthritis.",
+        "- AAOS Guidelines on Knee Arthroscopy - 2: (Official source: https://pmc.ncbi.nlm.nih.gov/articles/PMC8673957): Arthroscopic partial meniscectomy can be used for the treatment of meniscal tears.",
+        "",
+        "## Evidentiary Exhibits & Proof of Policy on Date of Service",
+        "Pursuant to ERISA 29 C.F.R. Sec. 2560.503-1(h)(2)(iii), claimant incorporates visual archive exhibits captured at the time of clinical verification to preserve active clinical policy bulletin metadata and document provenance against retrospective modifications:",
+        "",
+        "### Exhibit A: Proof of Policy on Date of Service - CIGNA Guidelines for Arthroscopic Surgery in Degenerative Knee Conditions",
+        "- Verified policy bulletin visual capture recorded on 2026-09-19 (Source: https://pmc.ncbi.nlm.nih.gov/articles/PMC8673957/)",
+        "- Document provenance: Preserves active clinical policy bulletin metadata (Document ID, effective date, and review history) on Date of Service against retrospective alterations.",
+        "- Visual Proof Archive URL: https://peaceful-sparrow-520.convex.cloud/api/storage/4f529fb2-6f64-4544-bf46-43df382a401c",
+        "",
+        "## Review requested",
+        "Please:",
+        "1. Reconsider and reprocess Claim #CLM-8942-CIG-9781 under the applicable plan terms. If benefits are payable, please issue payment according to the plan and applicable provider agreement for the covered amount.",
+        "2. If the denial is upheld, provide the specific clinical rationale, plan provision, criteria applied, and documents relied upon.",
+        "3. Confirm receipt of this appeal and identify the applicable decision timeframe and any further review or external-review instructions.",
+        "",
+        "## Enclosures & Accompanying Clinical Documentation",
+        "The following objective medical records and documentation are attached and incorporated by reference in support of this appeal:",
+        "1. Pre-operative clinical consultation report and treating clinician attestation (DOS: June 12, 2026, Treating Provider: Dr. Robert Langston, MD)",
+        "2. Diagnostic radiology and imaging reports confirming clinical meniscal/structural derangement",
+        "3. Provider-directed conservative management records (including physical therapy progress logs and medication history)",
+        "4. Original Explanation of Benefits (EOB) / Adverse Benefit Determination notice for Claim #CLM-8942-CIG-9781",
+        "5. Date-of-service clinical policy bulletin visual archive exhibits",
+        "",
+        "Please process this appeal under the plan's claims and appeals procedure and the instructions in the denial notice.",
+        "Thank you for your review. Please reference Claim #CLM-8942-CIG-9781 in any response.",
+        "",
+        "Sincerely,",
+        "Jordan Lee",
+        "Appeals Coordinator",
+        "jordan.lee@orthoclinic.org",
+        "(555) 234-8901",
+        "Treating provider listed in the claim: Dr. Robert Langston, MD",
+      ].join("\n");
+
+      const buffer = generateFormalAppealPdf({
+        claimNumber: "CLM-8942-CIG-9781",
+        patientName: "Eleanor Vance",
+        memberId: "CIG-982341-01",
+        dateOfBirth: "1968-04-14",
+        insurancePayer: "CIGNA GLOBAL HEALTH BENEFITS",
+        serviceDate: "06/12/2026",
+        deniedAmount: 6400,
+        denialReason: "CO-50 - Service denied as not medically necessary",
+        appealMarkdown: fullEleanorBrief,
+        providerName: "Dr. Robert Langston, MD",
+        cptCodes: ["29881"],
+        icd10Codes: ["M23.22"],
+      });
+
+      const pdfText = buffer.toString("binary");
+      expect(pdfText).toContain("Page 1 of 4");
+      expect(pdfText).toContain("Page 4 of 4");
+      expect(pdfText).not.toContain("Page 5 of");
+      expect(pdfText).toContain("api/storage/4f529fb2...");
+      expect(pdfText).not.toContain("-bf46-43df382a401c");
+      expect(pdfText).toContain("PHYSICIAN & ADVOCATE ATTESTATION STATEMENT");
+    });
   });
 
   describe("Outbound PDF Dossier Dispatch (convex/actions/mailDispatcher)", () => {

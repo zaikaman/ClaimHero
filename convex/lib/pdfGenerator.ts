@@ -6,6 +6,7 @@ export interface AppealPdfOptions {
   claimNumber: string;
   patientName: string;
   memberId?: string;
+  dateOfBirth?: string;
   insurancePayer: string;
   serviceDate?: string;
   deniedAmount?: number;
@@ -56,6 +57,64 @@ function escapePdfText(text: string): string {
 }
 
 /**
+ * Formats long URLs cleanly for professional print citations instead of
+ * wrapping awkwardly across multiple lines with hex encodings.
+ */
+function cleanUrlForPrint(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "");
+    const pathname = parsed.pathname;
+    const segments = pathname.split("/").filter(Boolean);
+    const lastSegment = segments.pop() || "";
+
+    // Handle Convex Storage URLs cleanly: convex.cloud/api/storage/4f529fb2...
+    if (pathname.includes("/api/storage/")) {
+      const shortId = lastSegment.length > 12 ? `${lastSegment.slice(0, 8)}...${lastSegment.slice(-4)}` : lastSegment;
+      return `${host}/api/storage/${shortId}`;
+    }
+
+    const cleanLast = decodeURIComponent(lastSegment).replace(/[%_]+/g, " ").trim();
+    if (cleanLast && segments.length > 0) {
+      const summary = `${host}/.../${cleanLast}`;
+      return summary.length <= 55 ? summary : `${host}/${cleanLast.slice(0, 48)}...`;
+    }
+    return `${host}${pathname}`.slice(0, 55);
+  } catch {
+    return url.length > 55 ? `${url.slice(0, 52)}...` : url;
+  }
+}
+
+/**
+ * Formats a date string into standard appellate long-form text (Month Day, Year).
+ */
+function formatDateForPdf(dateStr?: string): string {
+  if (!dateStr) return "On File";
+  const trimmed = dateStr.trim();
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  const usMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (usMatch) {
+    const [, month, day, year] = usMatch;
+    return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  return trimmed;
+}
+
+/**
  * Strips Markdown formatting so the formal dossier reads as professional
  * business correspondence instead of raw markup.
  * - `([text](url))` -> `(text: url)`
@@ -66,14 +125,16 @@ function escapePdfText(text: string): string {
 function cleanInlineMarkdown(text: string): string {
   let t = text.replace(/\r/g, "");
   // Malformed double-paren link fragments seen in the wild: "((Official source](url))" -> "(Official source: url)"
-  t = t.replace(/\(\(\s*([^()[\]]+?)\s*\]\(([^)]+)\)\)/g, "($1: $2)");
-  t = t.replace(/\(\s*([^()[\]]+?)\s*\]\(([^)]+)\)/g, "($1: $2)");
+  t = t.replace(/\(\(\s*([^()[\]]+?)\s*\]\(([^)]+)\)\)/g, (_m, label, url) => `(${label}: ${cleanUrlForPrint(url)})`);
+  t = t.replace(/\(\s*([^()[\]]+?)\s*\]\(([^)]+)\)/g, (_m, label, url) => `(${label}: ${cleanUrlForPrint(url)})`);
   // Parenthesized markdown link first: " ([Official source](url))" -> " (Official source: url)"
-  t = t.replace(/\s*\(\[([^\]]+)\]\(([^)]+)\)\)/g, " ($1: $2)");
+  t = t.replace(/\s*\(\[([^\]]+)\]\(([^)]+)\)\)/g, (_m, label, url) => ` (${label}: ${cleanUrlForPrint(url)})`);
   // Generic markdown link: "[text](url)" -> "text (url)"
-  t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)");
+  t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, url) => `${label} (${cleanUrlForPrint(url)})`);
   // Any surviving "](" fragments are broken link markup; render as a clean separator
   t = t.replace(/\]\s*\(/g, ": (");
+  // Clean raw HTTP/HTTPS URLs not already enclosed in markdown links
+  t = t.replace(/(https?:\/\/[^\s),]+)/g, (url) => cleanUrlForPrint(url));
   // Bold / italic / code / strikethrough
   t = t.replace(/\*\*([^*]+)\*\*/g, "$1");
   t = t.replace(/__([^_]+)__/g, "$1");
@@ -86,8 +147,6 @@ function cleanInlineMarkdown(text: string): string {
   t = t.replace(/\[/g, "").replace(/\]/g, "");
   // Collapse redundant parentheses left by malformed link markup: "((" -> "(", "))" -> ")"
   t = t.replace(/\(\s*\(\s*/g, "(").replace(/\s*\)\s*\)/g, ")");
-  // Markdown tables read poorly in print; use a neutral separator
-  t = t.replace(/\|/g, " / ");
   // Collapse whitespace
   t = t.replace(/[ \t]+/g, " ").trim();
   return t;
@@ -141,8 +200,8 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
   const PAGE_HEIGHT = 792; // US Letter height in points
   const MARGIN_LEFT = 45;
   const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_LEFT * 2; // 522 pt
-  const TOP_MARGIN = 740;
-  const BOTTOM_MARGIN = 55;
+  const TOP_MARGIN = 745;
+  const BOTTOM_MARGIN = 48;
 
   let currentY = TOP_MARGIN;
 
@@ -198,16 +257,20 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
         `Member ID: ${options.memberId || "On File"}`,
       ],
       [
+        `Date of Birth: ${options.dateOfBirth ? formatDateForPdf(options.dateOfBirth) : "On File"}`,
         `Date of Service: ${options.serviceDate || "Documented in Records"}`,
-        `Treating Provider: ${options.providerName || "Documented Provider"}`,
       ],
       [
+        `Treating Provider: ${options.providerName || "Documented Provider"}`,
         `Disputed / Denied Amount: $${(options.deniedAmount || 0).toLocaleString()}`,
-        `Denial Reason: ${options.denialReason || "Adverse Benefit Determination"}`,
       ],
       [
         `CPT Procedure Codes: ${(options.cptCodes || []).join(", ") || "Documented"}`,
         `ICD-10 Diagnoses: ${(options.icd10Codes || []).join(", ") || "Documented"}`,
+      ],
+      [
+        `Denial Reason: ${options.denialReason || "Adverse Benefit Determination"}`,
+        "",
       ],
     ];
 
@@ -317,8 +380,8 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
       config.marginBottom +
       (config.underline ? 4 : 0);
 
-    // Keep heading together with at least 25pt of following content to avoid orphaned headings at page boundaries
-    checkSpace(totalHeadingHeight + 25);
+    // Keep heading together with at least 50pt of following content to avoid orphaned headings at page boundaries
+    checkSpace(totalHeadingHeight + 50);
 
     currentY -= config.marginTop;
 
@@ -358,45 +421,205 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
     }
   }
 
-  for (const rawLine of rawLines) {
+  function renderMarkdownTable(tableLines: string[]) {
+    // Filter out separator rows like | :--- | :--- |
+    const cleanRows = tableLines
+      .filter((line) => !/^\|?\s*[-:]+[-| :]*\s*\|?$/.test(line.trim()))
+      .map((line) =>
+        line
+          .replace(/^\|/, "")
+          .replace(/\|$/, "")
+          .split("|")
+          .map((c) => cleanInlineMarkdown(c).trim())
+      )
+      .filter((row) => row.length > 0 && row.some((c) => c.length > 0));
+
+    if (cleanRows.length === 0) return;
+
+    const colCount = Math.max(...cleanRows.map((r) => r.length));
+    const isTwoCol = colCount === 2;
+    const colWidths = isTwoCol
+      ? [150, CONTENT_WIDTH - 150]
+      : Array.from({ length: colCount }, () => CONTENT_WIDTH / colCount);
+
+    const rowHeights: number[] = [];
+    const wrappedRows: Array<string[][]> = [];
+
+    for (let r = 0; r < cleanRows.length; r++) {
+      const row = cleanRows[r];
+      const cellLines: string[][] = [];
+      for (let c = 0; c < colCount; c++) {
+        const cellText = row[c] || "";
+        const maxChars = isTwoCol ? (c === 0 ? 28 : 72) : Math.floor(colWidths[c] / 5);
+        cellLines.push(wrapLine(cellText, maxChars));
+      }
+      wrappedRows.push(cellLines);
+      const maxLinesInRow = Math.max(1, ...cellLines.map((lines) => lines.length));
+      rowHeights.push(Math.max(16, maxLinesInRow * 11 + 6));
+    }
+
+    const totalTableHeight = rowHeights.reduce((a, b) => a + b, 0);
+
+    // Keep table together on the page
+    checkSpace(totalTableHeight + 15);
+
+    addCommand("q");
+    // Outer bounding border
+    addCommand("0.78 0.82 0.88 RG 0.75 w");
+    addCommand(`${MARGIN_LEFT} ${currentY - totalTableHeight} ${CONTENT_WIDTH} ${totalTableHeight} re S`);
+
+    let rowY = currentY;
+
+    for (let r = 0; r < cleanRows.length; r++) {
+      const h = rowHeights[r];
+      const isHeader = r === 0;
+
+      // Header row background
+      if (isHeader) {
+        addCommand("0.93 0.95 0.98 rg");
+        addCommand(`${MARGIN_LEFT} ${rowY - h} ${CONTENT_WIDTH} ${h} re f`);
+        addCommand("0.75 0.8 0.86 RG 1 w");
+        addCommand(`${MARGIN_LEFT} ${rowY - h} m ${MARGIN_LEFT + CONTENT_WIDTH} ${rowY - h} l S`);
+      } else {
+        if (r % 2 === 0) {
+          addCommand("0.98 0.99 1.0 rg");
+          addCommand(`${MARGIN_LEFT} ${rowY - h} ${CONTENT_WIDTH} ${h} re f`);
+        }
+        if (r < cleanRows.length - 1) {
+          addCommand("0.88 0.9 0.93 RG 0.5 w");
+          addCommand(`${MARGIN_LEFT} ${rowY - h} m ${MARGIN_LEFT + CONTENT_WIDTH} ${rowY - h} l S`);
+        }
+      }
+
+      // Render cell text
+      let colX = MARGIN_LEFT;
+      for (let c = 0; c < colCount; c++) {
+        const lines = wrappedRows[r][c] || [];
+        const font = isHeader ? "/F2 8 Tf" : (c === 0 ? "/F2 7.5 Tf" : "/F1 7.5 Tf");
+        const color = isHeader
+          ? "0.1 0.16 0.32 rg"
+          : (c === 0 ? "0.18 0.24 0.36 rg" : "0.1 0.14 0.2 rg");
+
+        let textY = rowY - 11;
+        for (const line of lines) {
+          addCommand("BT");
+          addCommand(font);
+          addCommand(color);
+          addCommand(`${colX + 6} ${textY} Td`);
+          addCommand(`(${escapePdfText(line)}) Tj`);
+          addCommand("ET");
+          textY -= 11;
+        }
+        colX += colWidths[c];
+      }
+
+      rowY -= h;
+    }
+
+    // Vertical column divider line
+    if (isTwoCol) {
+      addCommand("0.85 0.88 0.92 RG 0.5 w");
+      addCommand(`${MARGIN_LEFT + 150} ${currentY - totalTableHeight} m ${MARGIN_LEFT + 150} ${currentY} l S`);
+    }
+
+    addCommand("Q");
+    currentY -= (totalTableHeight + 12);
+  }
+
+  let hasRenderedTable = false;
+  let lineIdx = 0;
+
+  while (lineIdx < rawLines.length) {
+    const rawLine = rawLines[lineIdx];
     const trimmed = rawLine.trim();
 
     if (!trimmed) {
-      currentY -= 8;
+      currentY -= 5;
+      lineIdx++;
       continue;
     }
 
-    // Horizontal rules from markdown ("---", "***", "___") become vertical spacing
+    // Markdown Table Detection
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      const tableLines: string[] = [];
+      while (
+        lineIdx < rawLines.length &&
+        rawLines[lineIdx].trim().startsWith("|") &&
+        rawLines[lineIdx].trim().endsWith("|")
+      ) {
+        tableLines.push(rawLines[lineIdx].trim());
+        lineIdx++;
+      }
+      renderMarkdownTable(tableLines);
+      hasRenderedTable = true;
+      continue;
+    }
+
+    // Redundant bullet list suppression: if Case Adjudication table was just rendered,
+    // skip the immediate plain-text "Claim details" bullet block
+    if (hasRenderedTable && /^\*{0,2}Claim details\*{0,2}$/i.test(trimmed)) {
+      lineIdx++;
+      while (lineIdx < rawLines.length) {
+        const nextTrimmed = rawLines[lineIdx].trim();
+        if (/^[-*+•]\s+(?:Patient\/member|Member ID|Date of birth|Group number|Date of service|Procedure code|Diagnosis code|Denial reason|Amount at issue)/i.test(nextTrimmed)) {
+          lineIdx++;
+        } else if (!nextTrimmed) {
+          lineIdx++;
+        } else {
+          break;
+        }
+      }
+      continue;
+    }
+
+    // Exhibit block lookahead: keep the exhibit heading and its accompanying evidence bullets together on the same page
+    const isExhibitHeader = /^(?:#{1,6}\s+)?(?:\*{0,2}Exhibit\s+[A-Z]:|Proof of Policy on Date of Service)/i.test(trimmed);
+    if (isExhibitHeader) {
+      checkSpace(115);
+    }
+
+    // Subheading protection against page-break orphans (e.g. "CLINICAL NECESSITY DETERMINATION:" or "Please:")
+    const isSubheading =
+      trimmed.endsWith(":") &&
+      (trimmed.length <= 65 || /^[A-Z0-9\s,&/()'-]+:$/.test(trimmed));
+    if (isSubheading) {
+      checkSpace(38);
+    }
+
+    // Horizontal rules
     if (/^(-{3,}|_{3,}|\*{3,})$/.test(trimmed)) {
-      currentY -= 6;
+      currentY -= 5;
+      lineIdx++;
       continue;
     }
 
     // Heading 1
     if (/^#\s+/.test(trimmed)) {
       renderHeading(trimmed.replace(/^#\s+/, ""), {
-        fontSize: "13",
-        lineHeight: 16,
-        marginTop: 14,
-        marginBottom: 8,
+        fontSize: "12.5",
+        lineHeight: 15,
+        marginTop: 12,
+        marginBottom: 6,
         color: "0.08 0.12 0.22 rg",
         wrapChars: 64,
         underline: true,
       });
+      lineIdx++;
       continue;
     }
 
     // Heading 2
     if (/^##\s+/.test(trimmed)) {
       renderHeading(trimmed.replace(/^##\s+/, ""), {
-        fontSize: "11",
-        lineHeight: 14,
-        marginTop: 12,
-        marginBottom: 6,
+        fontSize: "10.5",
+        lineHeight: 13.5,
+        marginTop: 10,
+        marginBottom: 5,
         color: "0.1 0.18 0.35 rg",
         wrapChars: 70,
         underline: false,
       });
+      lineIdx++;
       continue;
     }
 
@@ -405,47 +628,55 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
       renderHeading(trimmed.replace(/^#{3,6}\s+/, ""), {
         fontSize: "9.5",
         lineHeight: 13,
-        marginTop: 10,
+        marginTop: 9,
         marginBottom: 5,
         color: "0.12 0.2 0.38 rg",
         wrapChars: 74,
         underline: false,
       });
+      lineIdx++;
       continue;
     }
 
-    // Blockquotes ("> quoted clinical fact") render as indented italic without ">"
+    // Blockquotes
     if (/^>/.test(trimmed)) {
       let quoteText = trimmed;
       while (/^>\s*/.test(quoteText.trim())) {
         quoteText = quoteText.trim().replace(/^>\s?/, "");
       }
       const cleaned = cleanInlineMarkdown(quoteText);
-      if (!cleaned) continue;
+      if (!cleaned) {
+        lineIdx++;
+        continue;
+      }
       const wrapped = wrapLine(cleaned, 76);
-      checkSpace(wrapped.length * 12 + 8);
+      checkSpace(wrapped.length * 11.5 + 6);
       for (const line of wrapped) {
-        checkSpace(13);
+        checkSpace(12);
         addCommand("BT");
         addCommand("/F3 8.5 Tf");
         addCommand("0.3 0.35 0.42 rg");
         addCommand(`${MARGIN_LEFT + 12} ${currentY} Td`);
         addCommand(`(${escapePdfText(line)}) Tj`);
         addCommand("ET");
-        currentY -= 12;
+        currentY -= 11.5;
       }
+      lineIdx++;
       continue;
     }
 
-    // Unordered bullet points ("-", "*", "+", "•") render with a professional dash
+    // Unordered bullet points
     if (/^[-*+•]\s+/.test(trimmed)) {
       const bulletText = trimmed.replace(/^[-*+•]\s+/, "").replace(/^\[[ xX]\]\s+/, "");
       const cleaned = cleanInlineMarkdown(bulletText);
-      if (!cleaned) continue;
+      if (!cleaned) {
+        lineIdx++;
+        continue;
+      }
       const wrapped = wrapLine(cleaned, 72);
-      checkSpace(wrapped.length * 12 + 8);
+      checkSpace(wrapped.length * 11.5 + 6);
       for (let i = 0; i < wrapped.length; i++) {
-        checkSpace(13);
+        checkSpace(12);
         addCommand("BT");
         addCommand("/F1 8.5 Tf");
         addCommand("0.15 0.18 0.22 rg");
@@ -457,21 +688,25 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
           addCommand(`(${escapePdfText(wrapped[i])}) Tj`);
         }
         addCommand("ET");
-        currentY -= 12;
+        currentY -= 11.5;
       }
+      lineIdx++;
       continue;
     }
 
-    // Ordered lists ("1.", "1)") keep numbering with hanging indent
+    // Ordered lists
     const orderedMatch = trimmed.match(/^(\d+)[.)]\s+(.*)$/);
     if (orderedMatch) {
       const cleaned = cleanInlineMarkdown(orderedMatch[2]);
-      if (!cleaned) continue;
+      if (!cleaned) {
+        lineIdx++;
+        continue;
+      }
       const prefix = `${orderedMatch[1]}. `;
       const wrapped = wrapLine(cleaned, 70);
-      checkSpace(wrapped.length * 12 + 8);
+      checkSpace(wrapped.length * 11.5 + 6);
       for (let i = 0; i < wrapped.length; i++) {
-        checkSpace(13);
+        checkSpace(12);
         addCommand("BT");
         addCommand("/F1 8.5 Tf");
         addCommand("0.15 0.18 0.22 rg");
@@ -483,38 +718,40 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
           addCommand(`(${escapePdfText(wrapped[i])}) Tj`);
         }
         addCommand("ET");
-        currentY -= 12;
+        currentY -= 11.5;
       }
+      lineIdx++;
       continue;
     }
 
-    // Standard Paragraph Text (markdown fully stripped)
+    // Standard Paragraph Text
     const cleanText = cleanInlineMarkdown(trimmed);
-    if (!cleanText) continue;
-
-    const wrapped = wrapLine(cleanText, 82);
-    renderBodyLines(wrapped, MARGIN_LEFT, "/F1 8.5 Tf", "0.15 0.18 0.22 rg", 12);
+    if (cleanText) {
+      const wrapped = wrapLine(cleanText, 82);
+      renderBodyLines(wrapped, MARGIN_LEFT, "/F1 8.5 Tf", "0.15 0.18 0.22 rg", 11.5);
+    }
+    lineIdx++;
   }
 
   // Formal Attestation and Signature Block
-  checkSpace(110);
-  currentY -= 10;
+  checkSpace(80);
+  currentY -= 6;
   addCommand("q");
   addCommand("0.85 0.88 0.92 RG 1 w");
   addCommand(`${MARGIN_LEFT} ${currentY} m ${MARGIN_LEFT + CONTENT_WIDTH} ${currentY} l S`);
-  currentY -= 14;
+  currentY -= 10;
 
   addCommand("BT");
-  addCommand("/F2 9 Tf");
+  addCommand("/F2 8.5 Tf");
   addCommand("0.1 0.15 0.25 rg");
   addCommand(`${MARGIN_LEFT} ${currentY} Td`);
   addCommand(`(${escapePdfText("PHYSICIAN & ADVOCATE ATTESTATION STATEMENT")}) Tj`);
   addCommand("ET");
-  currentY -= 12;
+  currentY -= 10;
 
   const attestation =
     "I declare under penalty of perjury that the clinical evidence, peer-reviewed medical guidelines, and factual circumstances submitted in this appellate dossier are true, accurate, and establish medical necessity pursuant to standard clinical guidelines.";
-  const wrappedAttest = wrapLine(attestation, 82);
+  const wrappedAttest = wrapLine(attestation, 84);
   for (const line of wrappedAttest) {
     addCommand("BT");
     addCommand("/F3 8 Tf");
@@ -522,27 +759,27 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
     addCommand(`${MARGIN_LEFT} ${currentY} Td`);
     addCommand(`(${escapePdfText(line)}) Tj`);
     addCommand("ET");
-    currentY -= 11;
+    currentY -= 10;
   }
 
-  currentY -= 8;
-  checkSpace(13);
+  currentY -= 6;
+  checkSpace(12);
   addCommand("BT");
-  addCommand("/F2 8.5 Tf");
+  addCommand("/F2 8 Tf");
   addCommand("0.15 0.2 0.3 rg");
   addCommand(`${MARGIN_LEFT} ${currentY} Td`);
   addCommand(`(${escapePdfText("Authorized Clinical Representative: ClaimHero Autonomous Appellate Sentinel")}) Tj`);
   addCommand("ET");
-  currentY -= 13;
+  currentY -= 11;
 
-  checkSpace(13);
+  checkSpace(12);
   addCommand("BT");
-  addCommand("/F1 8 Tf");
+  addCommand("/F1 7.5 Tf");
   addCommand("0.4 0.45 0.5 rg");
   addCommand(`${MARGIN_LEFT} ${currentY} Td`);
   addCommand(`(${escapePdfText(`Date of Transmission: ${new Date().toISOString().split("T")[0]}`)}) Tj`);
   addCommand("ET");
-  currentY -= 12;
+  currentY -= 10;
   addCommand("Q");
 
   // Add Page Footers to All Pages (shortened so the claim line and page number never collide)
@@ -586,12 +823,37 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
   const fontItalic = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique >>");
   const fontCourier = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>");
 
+  function getUtf8ByteLength(text: string): number {
+    if (typeof Buffer !== "undefined" && typeof Buffer.byteLength === "function") {
+      return Buffer.byteLength(text, "utf8");
+    }
+    return new TextEncoder().encode(text).length;
+  }
+
+  function getBinaryByteLength(text: string): number {
+    if (typeof Buffer !== "undefined" && typeof Buffer.byteLength === "function") {
+      return Buffer.byteLength(text, "binary");
+    }
+    return text.length;
+  }
+
+  function toBinaryBuffer(binaryString: string): Buffer {
+    if (typeof Buffer !== "undefined" && typeof Buffer.from === "function") {
+      return Buffer.from(binaryString, "binary");
+    }
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i) & 0xff;
+    }
+    return bytes as unknown as Buffer;
+  }
+
   // Page objects and content streams
   const pageObjNums: number[] = [];
 
   for (const page of pages) {
     const streamContent = page.commands.join("\n");
-    const streamLength = Buffer.byteLength(streamContent, "utf8");
+    const streamLength = getUtf8ByteLength(streamContent);
 
     const streamObjNum = addObject(
       `<< /Length ${streamLength} >>\nstream\n${streamContent}\nendstream`
@@ -613,11 +875,11 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
 
   for (let i = 0; i < objects.length; i++) {
     const objNum = i + 1;
-    offsets.push(Buffer.byteLength(pdfOutput, "binary"));
+    offsets.push(getBinaryByteLength(pdfOutput));
     pdfOutput += `${objNum} 0 obj\n${objects[i]}\nendobj\n`;
   }
 
-  const startXref = Buffer.byteLength(pdfOutput, "binary");
+  const startXref = getBinaryByteLength(pdfOutput);
   pdfOutput += `xref\n0 ${objects.length + 1}\n`;
   pdfOutput += "0000000000 65535 f \n";
 
@@ -628,7 +890,7 @@ export function generateFormalAppealPdf(options: AppealPdfOptions): Buffer {
 
   pdfOutput += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF\n`;
 
-  return Buffer.from(pdfOutput, "binary");
+  return toBinaryBuffer(pdfOutput);
 }
 
 /**
@@ -675,11 +937,53 @@ export async function ensureAppealPdfStored(
   }
 
   // 2. Dynamically compile formal administrative PDF dossier
-  const rawPatientName = claim.patientName || "Insured Policyholder";
+  const rawPatientName = (claim as unknown as { patient?: { name?: string } }).patient?.name || claim.patientName || "Insured Policyholder";
+  let resolvedMemberId = (claim as unknown as { patient?: { memberId?: string } }).patient?.memberId;
+  let resolvedDob = (claim as unknown as { patient?: { dateOfBirth?: string } }).patient?.dateOfBirth;
+
+  // Fallback 1: look up patient document if not joined on claim
+  if ((!resolvedMemberId || !resolvedDob) && claim.patientId) {
+    try {
+      const patientDoc = await ctx.runQuery(internal.claims.getPatientByIdInternal, {
+        patientId: claim.patientId,
+      });
+      if (patientDoc) {
+        resolvedMemberId = resolvedMemberId || patientDoc.memberId;
+        resolvedDob = resolvedDob || patientDoc.dateOfBirth;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Fallback 2: extract from appeal markdown if present
+  if (!resolvedMemberId && appeal.fullAppealMarkdown) {
+    const mMatch = appeal.fullAppealMarkdown.match(/Member ID:\s*([A-Za-z0-9-]+)/i);
+    if (mMatch && !mMatch[1].includes("REDACTED") && mMatch[1] !== "PENDING") {
+      resolvedMemberId = mMatch[1].trim();
+    }
+  }
+  if (!resolvedDob && appeal.fullAppealMarkdown) {
+    const dMatch = appeal.fullAppealMarkdown.match(/(?:Date of birth|DOB)[\s:]*([A-Za-z0-9, /-]+)/i);
+    if (dMatch && !dMatch[1].includes("REDACTED") && dMatch[1] !== "PENDING") {
+      resolvedDob = dMatch[1].trim();
+    }
+  }
+
+  const cleanMemberId =
+    resolvedMemberId &&
+    resolvedMemberId !== "PENDING" &&
+    resolvedMemberId !== "MBN-UNASSIGNED" &&
+    !resolvedMemberId.includes("REDACTED") &&
+    !resolvedMemberId.includes("[MEMBER")
+      ? resolvedMemberId
+      : undefined;
+
   const pdfBuffer = generateFormalAppealPdf({
     claimNumber: claim.claimNumber,
     patientName: rawPatientName,
-    memberId: claim.patientId ? undefined : undefined,
+    memberId: cleanMemberId,
+    dateOfBirth: resolvedDob,
     insurancePayer: claim.insurancePayer || "Health Insurer",
     serviceDate: claim.serviceDate,
     deniedAmount: claim.deniedAmount,

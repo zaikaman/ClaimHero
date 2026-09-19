@@ -115,23 +115,27 @@ describe("Anonymous Auth Provider & 3 Pre-Seeded Demo Cases", () => {
     expect(sourceTypes).toContain("nccn_guideline");
     expect(sourceTypes).toContain("legal_precedent");
 
-    // Verify appeals briefs exist and are full 4-page synthesized briefs
+    // Verify appeals briefs exist and are full 4-page synthesized briefs with Case Adjudication table
     expect(insertedRecords.appeals.length).toBe(3);
     for (const appeal of insertedRecords.appeals) {
       expect(appeal.appealLevel).toBe("level_1_internal");
       expect(appeal.targetAuthority).toBe("Payer Medical Director Review");
       expect(appeal.fullAppealMarkdown).toBeDefined();
       expect(appeal.fullAppealMarkdown.length).toBeGreaterThan(1000);
+      expect(appeal.fullAppealMarkdown).toContain("Case Adjudication & Dispute Summary");
+      expect(appeal.fullAppealMarkdown).toContain("Enclosures & Accompanying Clinical Documentation");
       expect(appeal.executiveSummary).toBeDefined();
       expect(appeal.medicalNecessityArguments).toBeDefined();
+      expect(appeal.medicalNecessityArguments).toContain("Clinical Policy Criteria Crosswalk & Necessity Rationale");
       expect(appeal.legalCitations).toBeDefined();
     }
 
-    // Verify won claim has approved appeal
+    // Verify won claim has approved appeal and compiled formal PDF packet
     const wonClaim = insertedRecords.claims.find((c) => c.status === "won");
     expect(wonClaim).toBeDefined();
     const wonAppeal = insertedRecords.appeals.find((a) => a.claimId === wonClaim._id);
     expect(wonAppeal?.isHumanApproved).toBe(true);
+    expect(wonAppeal?.pdfExportStorageId).toBeDefined();
 
     // Verify each unsent ready_for_review claim has a brief but no approval (not sent)
     const readyClaims = insertedRecords.claims.filter((c) => c.status === "ready_for_review");
@@ -172,15 +176,20 @@ describe("Anonymous Auth Provider & 3 Pre-Seeded Demo Cases", () => {
     expect(eventTypes).toContain("appeal_dispatched");
     expect(eventTypes).toContain("decision_recorded");
 
-    // Verify professional AgentMail thread & correspondence for overturned Case 3
+    // Verify professional AgentMail thread & correspondence for overturned Case 3 with attached formal PDF packet
     expect(insertedRecords.emailThreads.length).toBe(1);
     expect(insertedRecords.emailMessages.length).toBe(2);
 
     const outboundMsg = insertedRecords.emailMessages.find((m) => m.direction === "outbound");
     expect(outboundMsg).toBeDefined();
+    expect(outboundMsg?.hasAttachments).toBe(true);
+    expect(outboundMsg?.attachments?.length).toBe(1);
+    expect(outboundMsg?.attachments?.[0]?.contentType).toBe("application/pdf");
+    expect(outboundMsg?.attachments?.[0]?.filename).toContain("Formal-Appeal-Packet-");
     expect(outboundMsg?.bodyText.length).toBeGreaterThan(1000);
     expect(outboundMsg?.bodyText).toContain("FORMAL DEMAND FOR ADMINISTRATIVE RECONSIDERATION");
     expect(outboundMsg?.bodyText).toContain("Aetna CPB 0171");
+    expect(outboundMsg?.bodyHtml).toContain("Appeal of Adverse Benefit Determination");
 
     const winningMsg = insertedRecords.emailMessages.find(
       (m) => m.detectedDetermination === "OVERTURNED_APPROVED"

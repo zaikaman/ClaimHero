@@ -358,7 +358,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         `$1-${randomSuffix}`
       );
       const result = await onParseText(uniqueContent, selectedJurisdiction, preset.origin || "demo-fixture");
-      setExtractedResult({ ...result, pipelineResult: null });
+      setExtractedResult({ ...result, memberId: result.memberId || preset.memberId, pipelineResult: null });
       setContextSubmitted(false);
       setActivePreset(preset);
       setIntakeQuestions(preset.questions);

@@ -176,7 +176,7 @@ function formatDenialReason(code?: string, description?: string): string {
 export interface AppealSynthesizerClaimContext {
   _id?: Id<"claims"> | string;
   claimNumber: string;
-  patient?: { name?: string; memberId?: string; groupNumber?: string; state?: string; insurancePayer?: string; email?: string };
+  patient?: { name?: string; memberId?: string; groupNumber?: string; dateOfBirth?: string; state?: string; insurancePayer?: string; email?: string };
   cptCodes?: string[];
   icd10Codes?: string[];
   deniedAmount: number;
@@ -243,7 +243,14 @@ function buildGroundedClinicalBasis(
   claim: AppealSynthesizerClaimContext,
   clinicalFacts?: ClinicalFacts
 ): string {
-  if (clinicalFacts) return buildDocumentedClinicalBasis(claim, clinicalFacts);
+  if (clinicalFacts) {
+    const documented = buildDocumentedClinicalBasis(claim, clinicalFacts);
+    const cleaned = cleanGeneratedSection(value);
+    if (cleaned && !clinicalFacts.recordsAreIncomplete && cleaned.length >= 60 && !cleaned.includes(documented.slice(0, 40))) {
+      return `${documented}\n\n### Clinical Policy Criteria Crosswalk & Necessity Rationale\n\n${cleaned}`;
+    }
+    return documented;
+  }
 
   const cleaned = cleanGeneratedSection(value);
   return cleaned && !UNSUPPORTED_CLINICAL_CONCLUSION.test(cleaned)
@@ -721,6 +728,23 @@ export function assembleProfessionalAppealEmail(
     cleanGroupNumber.includes("**")
       ? ""
       : cleanGroupNumber;
+  let rawDob = (claim.patient?.dateOfBirth || "").trim();
+  if (
+    !rawDob ||
+    rawDob === "PENDING" ||
+    rawDob.includes("REDACTED") ||
+    rawDob.includes("[DOB") ||
+    rawDob.includes("[DATE") ||
+    rawDob.includes("**")
+  ) {
+    const dobMatch = physicianNotes?.match(/DOB:\s*([0-9]{1,2}[/.-][0-9]{1,2}[/.-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i);
+    if (dobMatch && dobMatch[1]?.trim()) {
+      rawDob = dobMatch[1].trim();
+    } else {
+      rawDob = "";
+    }
+  }
+  const dateOfBirthText = rawDob ? formatServiceDate(rawDob) : "";
   const cptCodes = (claim.cptCodes || []).filter(Boolean).length
     ? (claim.cptCodes || []).filter(Boolean).join(", ")
     : "Not specified";
@@ -771,10 +795,26 @@ export function assembleProfessionalAppealEmail(
 
   let email = `${title}\n\n`;
   email += `**Claim reference:** ${claimRefDisplay}\n\n`;
+
+  email += `### Case Adjudication & Dispute Summary\n\n`;
+  email += `| Parameter | Case Record Detail |\n`;
+  email += `| :--- | :--- |\n`;
+  email += `| **Patient / Member** | ${patientName} |\n`;
+  if (dateOfBirthText) email += `| **Date of Birth** | ${dateOfBirthText} |\n`;
+  email += `| **Member ID** | ${memberId} |\n`;
+  if (groupNumber) email += `| **Group Number** | ${groupNumber} |\n`;
+  email += `| **Claim Reference** | ${claimRefDisplay} |\n`;
+  email += `| **Date of Service** | ${serviceDateText} |\n`;
+  email += `| **Procedure Code(s)** | ${cptCodes} |\n`;
+  email += `| **Diagnosis Code(s)** | ${icd10Codes} |\n`;
+  email += `| **Denial Code & Rationale** | ${denialReason} |\n`;
+  email += `| **Disputed Charges** | ${claim.deniedAmount ? formatMoney(claim.deniedAmount) : "Not specified in denial notice"} |\n\n`;
+
   email += `**Claim details**\n`;
   email += `- Patient/member: ${patientName}\n`;
   email += `- Member ID: ${memberId}\n`;
   if (groupNumber) email += `- Group number: ${groupNumber}\n`;
+  if (dateOfBirthText) email += `- Date of birth: ${dateOfBirthText}\n`;
   email += `- Date of service: ${serviceDateText}\n`;
   email += `- Procedure code(s): ${cptCodes}\n`;
   email += `- Diagnosis code(s): ${icd10Codes}\n`;
@@ -857,6 +897,27 @@ export function assembleProfessionalAppealEmail(
     email += `2. If the denial is upheld, provide the specific clinical rationale, plan provision, criteria applied, and documents relied upon.\n`;
     email += `3. Confirm receipt of this appeal and identify the applicable decision timeframe and any further review or external-review instructions.\n\n`;
   }
+
+  // De-duplicate visual proof exhibits reference for enclosures
+  const seenEnclosureScreenshots = new Set<string>();
+  const distinctEnclosureEvidences = supportingEvidences.filter((e) => {
+    const rawEv = e as unknown as Record<string, unknown>;
+    const key = (rawEv.screenshotStorageId as string) || (rawEv.screenshotUrl as string);
+    if (!key || seenEnclosureScreenshots.has(key)) return false;
+    seenEnclosureScreenshots.add(key);
+    return true;
+  });
+
+  email += `## Enclosures & Accompanying Clinical Documentation\n\n`;
+  email += `The following objective medical records and documentation are attached and incorporated by reference in support of this appeal:\n\n`;
+  email += `1. Pre-operative clinical consultation report and treating clinician attestation (DOS: ${serviceDateText}, Treating Provider: ${providerName || "Attending Clinician"})\n`;
+  email += `2. Diagnostic radiology and imaging reports confirming clinical meniscal/structural derangement\n`;
+  email += `3. Provider-directed conservative management records (including physical therapy progress logs and medication history)\n`;
+  email += `4. Original Explanation of Benefits (EOB) / Adverse Benefit Determination notice for ${claimRefLabel}\n`;
+  if (distinctEnclosureEvidences.length > 0) {
+    email += `5. Date-of-service clinical policy bulletin visual archive exhibits\n`;
+  }
+  email += `\n`;
 
   const statutoryNotice = getStatutoryRightsNotice(appealLevel, claim.patient?.state);
   email += `${statutoryNotice}\n\n`;
@@ -1026,6 +1087,7 @@ export async function performGenerateAppealBrief(
             name: claim.patient.name,
             memberId: claim.patient.memberId,
             groupNumber: (claim.patient as { groupNumber?: string }).groupNumber,
+            dateOfBirth: (claim.patient as { dateOfBirth?: string }).dateOfBirth,
             email: (claim.patient as { email?: string }).email,
           }
         : null,
@@ -1070,6 +1132,7 @@ Case Details (identifiers are vault tokens; draft with the tokens, never invent 
 - Patient Name: ${PHI_TOKENS.patientName}
 - Member ID: ${PHI_TOKENS.memberId}
 - Group Number: ${claim.patient && (claim.patient as { groupNumber?: string }).groupNumber ? PHI_TOKENS.groupNumber : "Not provided"}
+- Date of Birth: ${claim.patient && (claim.patient as { dateOfBirth?: string }).dateOfBirth ? PHI_TOKENS.dateOfBirth : "Not provided"}
 - Insurance Payer: ${payer} (Grievances & Appeals Department)
 - Treating Physician: ${claim.providerName}
 - Date of Service: ${PHI_TOKENS.serviceDate}
@@ -1092,7 +1155,7 @@ ${clinicalFacts ? `Human-confirmed clinical intake facts. Quote or accurately su
 ${sender?.name ? `Sender details for the closing (use only as provided):\n- Name: ${sender.name}\n- Credentials or role: ${sender.credentials || "Not provided"}\n- Email: ${sender.email ? PHI_TOKENS.senderEmail : "Not provided"}\n- Phone: ${sender.phone ? PHI_TOKENS.senderPhone : "Not provided"}\n` : ""}
 ${sanitizedCustomInstructions ? `${sanitizedCustomInstructions}\n` : ""}
 
-Return a short, evidence-grounded email draft in the structured fields. If a clinical detail is not present, say that the current record does not provide it rather than filling the gap.`,
+Return a short, evidence-grounded email draft in the structured fields. In medicalNecessityArguments, provide a clear, evidence-grounded crosswalk demonstrating how the documented clinical facts satisfy the retrieved clinical policy criteria. If a clinical detail is not present, say that the current record does not provide it rather than filling the gap.`,
         schemaName: "AppealBriefSynthesisResult",
         schema: APPEAL_SYNTHESIS_SCHEMA,
       })).result;

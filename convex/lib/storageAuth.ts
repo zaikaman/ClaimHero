@@ -102,7 +102,59 @@ export async function assertStorageOwnership(
       // ignore table/schema differences on mock runners
     }
 
-    // 5. If storage file cannot be attributed to the user, deny access
+    // 5. Check if already linked to clinical evidences
+    try {
+      let otherEvidence: Doc<"clinicalEvidences"> | null = null;
+      try {
+        otherEvidence = await ctx.db
+          .query("clinicalEvidences")
+          .filter((q) => q.eq(q.field("screenshotStorageId"), storageId))
+          .first();
+      } catch {
+        // ignore table/schema differences on mock runners
+      }
+
+      if (otherEvidence) {
+        if (!claimId || otherEvidence.claimId === claimId) {
+          return;
+        }
+        const evidenceClaim = typeof ctx.db.get === "function" ? ((await ctx.db.get(otherEvidence.claimId)) as Doc<"claims"> | null) : null;
+        if (evidenceClaim && (evidenceClaim.userId === userId || evidenceClaim._id === claimId)) {
+          return;
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith("Forbidden:")) {
+        throw err;
+      }
+      // ignore table/schema differences on mock runners
+    }
+
+    // 6. Check if linked to public policy snapshots (crawled insurer CPBs/guidelines)
+    try {
+      let snapshot: Doc<"policySnapshots"> | null = null;
+      try {
+        snapshot = await ctx.db
+          .query("policySnapshots")
+          .filter((q) => q.eq(q.field("screenshotStorageId"), storageId))
+          .first();
+      } catch {
+        // ignore table/schema differences on mock runners
+      }
+
+      if (snapshot) {
+        // Public insurer clinical policy snapshots are referenceable across claims
+        return;
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith("Forbidden:")) {
+        throw err;
+      }
+      // ignore table/schema differences on mock runners
+    }
+
+    // 7. If storage file cannot be attributed to the user, deny access
     throw new Error("Forbidden: Access denied to storage file. File is not owned by or associated with user.");
   }
 }
+

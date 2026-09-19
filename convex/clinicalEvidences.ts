@@ -198,7 +198,11 @@ interface BatchInsertEvidenceArgs {
   evidences: ClinicalEvidenceItem[];
 }
 
-async function applyBatchInsert(ctx: MutationCtx, args: BatchInsertEvidenceArgs): Promise<Id<"clinicalEvidences">[]> {
+async function applyBatchInsert(
+  ctx: MutationCtx,
+  args: BatchInsertEvidenceArgs,
+  options?: { isInternal?: boolean }
+): Promise<Id<"clinicalEvidences">[]> {
   const claim = await ctx.db.get(args.claimId);
   if (!claim) {
     console.warn(`Claim ${args.claimId} not found during insertBatch; skipping.`);
@@ -208,7 +212,7 @@ async function applyBatchInsert(ctx: MutationCtx, args: BatchInsertEvidenceArgs)
   const now = Date.now();
   const insertedIds: Id<"clinicalEvidences">[] = [];
   for (const item of args.evidences) {
-    if (item.screenshotStorageId) {
+    if (item.screenshotStorageId && !options?.isInternal) {
       await assertStorageOwnership(ctx, item.screenshotStorageId, claim.userId, args.claimId);
     }
     // Strictly sanitize screenshotUrl: never persist base64 data URIs or raw base64 payloads into database rows
@@ -279,7 +283,7 @@ export const insertBatch = mutation({
   },
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">[]> => {
     await requireClaimEditor(ctx, args.claimId);
-    return await applyBatchInsert(ctx, args);
+    return await applyBatchInsert(ctx, args, { isInternal: false });
   },
 });
 
@@ -292,7 +296,7 @@ export const insertBatchInternal = internalMutation({
     evidences: v.array(evidenceValidator),
   },
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">[]> => {
-    return await applyBatchInsert(ctx, args);
+    return await applyBatchInsert(ctx, args, { isInternal: true });
   },
 });
 
@@ -307,7 +311,7 @@ export const replaceForClaimInternal = internalMutation({
   },
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">[]> => {
     await applyClearByClaim(ctx, args.claimId);
-    return await applyBatchInsert(ctx, args);
+    return await applyBatchInsert(ctx, args, { isInternal: true });
   },
 });
 
@@ -427,7 +431,11 @@ interface InsertSingleEvidenceArgs extends ClinicalEvidenceItem {
   claimId: Id<"claims">;
 }
 
-async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArgs): Promise<Id<"clinicalEvidences">> {
+async function applyInsertSingle(
+  ctx: MutationCtx,
+  args: InsertSingleEvidenceArgs,
+  options?: { isInternal?: boolean }
+): Promise<Id<"clinicalEvidences">> {
   const now = Date.now();
   const cleanClause = sanitizeCitationClause(args.citationClause);
   const cleanScreenshotUrl =
@@ -436,7 +444,7 @@ async function applyInsertSingle(ctx: MutationCtx, args: InsertSingleEvidenceArg
       : undefined;
 
   const claim = typeof ctx.db.get === "function" ? await ctx.db.get(args.claimId) : null;
-  if (args.screenshotStorageId && claim) {
+  if (args.screenshotStorageId && claim && !options?.isInternal) {
     await assertStorageOwnership(ctx, args.screenshotStorageId, claim.userId, args.claimId);
   }
 
@@ -495,7 +503,7 @@ export const insertSingle = mutation({
   args: singleEvidenceArgs,
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">> => {
     await requireClaimEditor(ctx, args.claimId);
-    return await applyInsertSingle(ctx, args);
+    return await applyInsertSingle(ctx, args, { isInternal: false });
   },
 });
 
@@ -505,7 +513,7 @@ export const insertSingle = mutation({
 export const insertSingleInternal = internalMutation({
   args: singleEvidenceArgs,
   handler: async (ctx, args): Promise<Id<"clinicalEvidences">> => {
-    return await applyInsertSingle(ctx, args);
+    return await applyInsertSingle(ctx, args, { isInternal: true });
   },
 });
 

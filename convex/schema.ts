@@ -31,6 +31,7 @@ export default defineSchema({
     email: v.string(),
     memberId: v.string(),
     groupNumber: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()),
     insurancePayer: v.string(),
     state: v.string(),
     createdAt: v.number(),

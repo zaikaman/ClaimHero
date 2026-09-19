@@ -273,6 +273,67 @@ describe("Security Audit Remediation (Items 9, 10, 12, 13, 14)", () => {
       ).resolves.toBeUndefined();
     });
 
+    it("assertStorageOwnership passes when storage file is linked to public policySnapshots", async () => {
+      const mockCtx: any = {
+        db: {
+          system: {
+            get: vi.fn().mockResolvedValue({ _id: "st_snapshot", size: 1024 }),
+          },
+          query: vi.fn().mockImplementation((table: string) => {
+            if (table === "policySnapshots") {
+              return {
+                filter: vi.fn().mockReturnValue({
+                  first: vi.fn().mockResolvedValue({
+                    screenshotStorageId: "st_snapshot",
+                    url: "https://cigna.com/policy",
+                  }),
+                }),
+              };
+            }
+            return {
+              withIndex: vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValue(null) }),
+              filter: vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValue(null) }),
+            };
+          }),
+        },
+      };
+
+      await expect(
+        assertStorageOwnership(mockCtx, "st_snapshot" as any, "user_any" as any)
+      ).resolves.toBeUndefined();
+    });
+
+    it("assertStorageOwnership passes when storage file is linked to clinicalEvidences for the claim", async () => {
+      const mockCtx: any = {
+        db: {
+          system: {
+            get: vi.fn().mockResolvedValue({ _id: "st_evidence", size: 1024 }),
+          },
+          get: vi.fn().mockResolvedValue({ _id: "claim_1", userId: "user_owner" }),
+          query: vi.fn().mockImplementation((table: string) => {
+            if (table === "clinicalEvidences") {
+              return {
+                filter: vi.fn().mockReturnValue({
+                  first: vi.fn().mockResolvedValue({
+                    screenshotStorageId: "st_evidence",
+                    claimId: "claim_1",
+                  }),
+                }),
+              };
+            }
+            return {
+              withIndex: vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValue(null) }),
+              filter: vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValue(null) }),
+            };
+          }),
+        },
+      };
+
+      await expect(
+        assertStorageOwnership(mockCtx, "st_evidence" as any, "user_owner" as any, "claim_1" as any)
+      ).resolves.toBeUndefined();
+    });
+
     it("updatePdfStorageId enforces storage ownership before updating appeal packet", async () => {
       const mockCtx: any = {
         db: {
