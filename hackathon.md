@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-20T13:43:30Z
+- **Last updated:** 2026-09-20T13:58:06Z
 
 ## Log
 
@@ -1836,17 +1836,9 @@ Resolved Mobile Safari runtime crash `Can't find variable: Iterator` triggered o
   3. Replaced static OCR import in `AgentMailDrawer.tsx` with dynamic `import("../../lib/clientOcr")` on user attachment extraction, isolating the heavy OCR pipeline chunk from drawer mounting.
 - Verified with clean typecheck, lint, and production Vite build without introducing tests. Convex features: static hosting.
 
-### 2026-09-20 - working tree
+### 2026-09-20 - 091bd0b
 Added `@convex-dev/action-retrier`, `@convex-dev/workpool`, and `@convex-dev/batch-worker` to strengthen external reliability, rate-limit protection during bulk denial intake, and chunked background deadline sweeps (`package.json`, `convex/convex.config.ts`, `convex/schema.ts`, `convex/lib/retrier.ts`, `convex/actions/adversarialRetrier.ts`, `convex/lib/intakeWorkpool.ts`, `convex/bulkIntake.ts`, `convex/actions/bulkIntakeWorker.ts`, `convex/statutoryDeadlineWorker.ts`, `convex/crons.ts`, `tests/convexComponentsScaleAndReliability.test.ts`, `README.md`):
 - Action Retrier: Configured `actionRetrier` in `convex/convex.config.ts` and `convex/lib/retrier.ts` with exponential backoff and jitter (`initialBackoffMs: 1000, base: 2, maxFailures: 4`). Wrapped Firecrawl crawler and AgentMail dispatch actions in `convex/actions/adversarialRetrier.ts` so transient 503s and mail timeouts do not fail appeal preparation.
 - Bulk Denial Intake Workpool: Mounted `workpool` in `convex/convex.config.ts` and configured `intakeWorkpool` in `convex/lib/intakeWorkpool.ts` with `maxParallelism: 3` and `maxAttempts: 3`. Added `bulkIntakeBatches` and `bulkIntakeItems` tables in `convex/schema.ts`. Implemented `enqueueBulkIntake` mutation, `processBulkIntakeItemAction` worker action, and reactive status queries in `convex/bulkIntake.ts` to queue batches of denial documents without blowing OpenAI TPM or memory limits.
 - Statutory Batch Worker: Configured `batchWorker` in `convex/convex.config.ts` and implemented `convex/statutoryDeadlineWorker.ts` with cursor-based pagination in chunks of 50. Recalculates statutory clocks and triggers 14-day critical deadline alarms with 24-hour deduplication. Wired daily cron in `convex/crons.ts` to trigger the sweep with automatic cursor reset.
 - Regression Coverage & Verification: Added comprehensive integration test suite (`tests/convexComponentsScaleAndReliability.test.ts`, 23 tests) asserting retry backoff, workpool queueing and error isolation, and batch worker cursor progression. Verified with `npm run verify` (1,327 passing tests across 84 suites, 100% clean typecheck, lint, coverage, and production build). Convex features: schema, tables, indexes, queries, mutations, internalMutation, actions, internalAction, crons, scheduled functions, action retrier, workpool, batch worker.
-
-
-
-
-
-
-
-
