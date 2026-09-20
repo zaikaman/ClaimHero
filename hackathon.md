@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-20T16:18:00Z
+- **Last updated:** 2026-09-20T16:21:20Z
 
 ## Log
 
@@ -1843,7 +1843,7 @@ Added `@convex-dev/action-retrier`, `@convex-dev/workpool`, and `@convex-dev/bat
 - Statutory Batch Worker: Configured `batchWorker` in `convex/convex.config.ts` and implemented `convex/statutoryDeadlineWorker.ts` with cursor-based pagination in chunks of 50. Recalculates statutory clocks and triggers 14-day critical deadline alarms with 24-hour deduplication. Wired daily cron in `convex/crons.ts` to trigger the sweep with automatic cursor reset.
 - Regression Coverage & Verification: Added comprehensive integration test suite (`tests/convexComponentsScaleAndReliability.test.ts`, 23 tests) asserting retry backoff, workpool queueing and error isolation, and batch worker cursor progression. Verified with `npm run verify` (1,327 passing tests across 84 suites, 100% clean typecheck, lint, coverage, and production build). Convex features: schema, tables, indexes, queries, mutations, internalMutation, actions, internalAction, crons, scheduled functions, action retrier, workpool, batch worker.
 
-### 2026-09-20 - working tree
+### 2026-09-20 - 887e295
 Removed all remnants of the Autonomous AI Adjudicator across schema, queries, mutations, webhook handlers, and test suites (`convex/schema.ts`, `convex/claims.ts`, `convex/actions/agentMail.ts`, `convex/lib/agentMailWebhook.ts`, `convex/lib/adversaryNegotiation.ts`, `tests/productionReadinessFixes.test.ts`, `tests/adversaryNegotiation.test.ts`, `tests/formalPdfAttachments.test.ts`, `IDEA.md`):
 - Dropped `agentMailAdjudicatorInboxId` and `agentMailAdjudicatorEmail` optional fields and `by_adjudicator_email` index from `convex/schema.ts`.
 - Removed `by_adjudicator_email` index queries, `claimhero-adjudicator@` checks, and adjudicator inbox mutation parameters from `convex/claims.ts` (`findMatchingClaimInternal`, `getByInboxEmailInternal`, `setAgentMailInboxes`).
