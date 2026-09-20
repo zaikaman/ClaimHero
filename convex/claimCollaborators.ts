@@ -15,12 +15,6 @@ import { rateLimiter } from "./lib/rateLimiter";
 import { appendAuditLog } from "./auditLogs";
 
 export const collaboratorRoleValidator = v.union(v.literal("editor"), v.literal("viewer"));
-export const collaboratorStatusValidator = v.union(
-  v.literal("pending"),
-  v.literal("active"),
-  v.literal("declined"),
-  v.literal("revoked")
-);
 
 /** Recipient-side spam cap: bounds how many unanswered invites one inbox can hold. */
 export const MAX_PENDING_INVITES_PER_EMAIL = 50;

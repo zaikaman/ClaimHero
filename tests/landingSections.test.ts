@@ -103,4 +103,20 @@ describe("TemplateLanding editorial story", () => {
     // Auth card speaks the same editorial language as the landing
     expect(html).toContain("bg-[#1a1a1a]");
   });
+
+  it("updates navigation header and CTAs dynamically when user is authenticated", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(TemplateLanding, {
+        onEnterConsole: vi.fn(),
+        isAuthenticated: true,
+        userName: "Dr. Eleanor Vance",
+        userEmail: "eleanor@example.com",
+        userInitial: "E",
+        onSignOut: vi.fn(),
+      })
+    );
+    expect(html).toContain("Open Workspace");
+    expect(html).not.toContain("Sign Out");
+    expect(html).not.toContain("Sign In");
+  });
 });

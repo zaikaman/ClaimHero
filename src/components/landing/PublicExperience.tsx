@@ -18,6 +18,8 @@ export function PublicExperience({
   currentView,
   onNavigate,
   isAuthenticated,
+  isAuthLoading: _isAuthLoading,
+  hasCachedSession: _hasCachedSession,
   pendingTargetView,
   setPendingTargetView,
 }: PublicExperienceProps) {
@@ -55,7 +57,10 @@ export function PublicExperience({
         }`}
         aria-hidden={isLogin}
       >
-        <TemplateLanding onEnterConsole={handleEnterConsole} />
+        <TemplateLanding
+          onEnterConsole={handleEnterConsole}
+          isAuthenticated={isAuthenticated}
+        />
       </div>
 
       {/* 3. Auth View Container (smooth opacity cross-fade, see-through window directly over the shared 3D scene) */}

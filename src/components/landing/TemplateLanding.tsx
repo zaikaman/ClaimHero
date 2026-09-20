@@ -15,9 +15,11 @@ import {
 } from "@phosphor-icons/react";
 import { NavigationView } from "../layout/Sidebar";
 import { GlobalDisclaimer } from "../common/GlobalDisclaimer";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 
-interface TemplateLandingProps {
+export interface TemplateLandingProps {
   onEnterConsole: (view?: NavigationView) => void;
+  isAuthenticated?: boolean;
 }
 
 const NAV_LINKS = [
@@ -134,8 +136,14 @@ const JUDGE_STEPS = [
  * workspace cards, divider, denial grid, live demo, artifacts, trust,
  * start CTA, and footer. Sharp corners and uppercase labels throughout.
  */
-export function TemplateLanding({ onEnterConsole }: TemplateLandingProps) {
+export function TemplateLanding({
+  onEnterConsole,
+  isAuthenticated: propIsAuthenticated,
+}: TemplateLandingProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const userContext = useCurrentUser();
+
+  const isAuthenticated = propIsAuthenticated ?? userContext.isAuthenticated;
 
   return (
     <div className="relative z-10 w-full text-white antialiased selection:bg-white selection:text-black">
@@ -161,26 +169,39 @@ export function TemplateLanding({ onEnterConsole }: TemplateLandingProps) {
             ))}
           </div>
 
-          <div className="hidden items-center gap-3 md:flex">
-            <button
-              type="button"
-              onClick={() => onEnterConsole("login")}
-              className="text-xs font-medium uppercase tracking-widest text-slate-400 transition-colors hover:text-white"
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => onEnterConsole("radar")}
-              className="flex items-center gap-2 border border-white bg-transparent px-6 py-2 text-xs font-medium uppercase tracking-widest text-white transition-colors hover:bg-white hover:text-black"
-            >
-              <span>Launch Sentinel</span>
-            </button>
-          </div>
+          {isAuthenticated ? (
+            <div className="hidden items-center md:flex">
+              <button
+                type="button"
+                onClick={() => onEnterConsole("radar")}
+                className="flex items-center gap-2 border border-white bg-transparent px-6 py-2 text-xs font-medium uppercase tracking-widest text-white transition-colors hover:bg-white hover:text-black cursor-pointer"
+              >
+                <Compass className="size-3.5 shrink-0" />
+                <span>Open Workspace</span>
+              </button>
+            </div>
+          ) : (
+            <div className="hidden items-center gap-3 md:flex">
+              <button
+                type="button"
+                onClick={() => onEnterConsole("login")}
+                className="text-xs font-medium uppercase tracking-widest text-slate-400 transition-colors hover:text-white cursor-pointer"
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => onEnterConsole("radar")}
+                className="flex items-center gap-2 border border-white bg-transparent px-6 py-2 text-xs font-medium uppercase tracking-widest text-white transition-colors hover:bg-white hover:text-black cursor-pointer"
+              >
+                <span>Launch Sentinel</span>
+              </button>
+            </div>
+          )}
 
           <button
             type="button"
-            className="text-slate-100 md:hidden"
+            className="text-slate-100 md:hidden cursor-pointer"
             aria-label="Toggle menu"
             aria-expanded={isMobileMenuOpen}
             onClick={() => setIsMobileMenuOpen((prev) => !prev)}
@@ -214,40 +235,56 @@ export function TemplateLanding({ onEnterConsole }: TemplateLandingProps) {
           <div className="overflow-hidden min-h-0">
             <div className="border-t border-white/10 px-6">
               <div className="flex flex-col py-4">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center justify-between py-3 text-sm text-gray-200 transition-colors hover:text-white"
-              >
-                <span>{link.label}</span>
-                <ArrowRight className="size-4 text-gray-500" />
-              </a>
-            ))}
-            <div className="mt-2 flex flex-col gap-2 border-t border-white/10 pt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  onEnterConsole("radar");
-                }}
-                className="flex w-full items-center justify-center gap-2 border border-white bg-transparent px-4 py-2.5 text-xs font-medium uppercase tracking-widest text-white"
-              >
-                <Compass className="size-4" />
-                <span>Launch Sentinel</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  onEnterConsole("login");
-                }}
-                className="flex w-full items-center justify-center gap-2 bg-white px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-black hover:bg-gray-200"
-              >
-                <span>Sign In</span>
-              </button>
-            </div>
+                {NAV_LINKS.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between py-3 text-sm text-gray-200 transition-colors hover:text-white"
+                  >
+                    <span>{link.label}</span>
+                    <ArrowRight className="size-4 text-gray-500" />
+                  </a>
+                ))}
+                {isAuthenticated ? (
+                  <div className="mt-2 flex flex-col gap-2 border-t border-white/10 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onEnterConsole("radar");
+                      }}
+                      className="flex w-full items-center justify-center gap-2 border border-white bg-transparent px-4 py-2.5 text-xs font-medium uppercase tracking-widest text-white hover:bg-white hover:text-black cursor-pointer"
+                    >
+                      <Compass className="size-4" />
+                      <span>Open Workspace</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-2 flex flex-col gap-2 border-t border-white/10 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onEnterConsole("radar");
+                      }}
+                      className="flex w-full items-center justify-center gap-2 border border-white bg-transparent px-4 py-2.5 text-xs font-medium uppercase tracking-widest text-white cursor-pointer"
+                    >
+                      <Compass className="size-4" />
+                      <span>Launch Sentinel</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onEnterConsole("login");
+                      }}
+                      className="flex w-full items-center justify-center gap-2 bg-white px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-black hover:bg-gray-200 cursor-pointer"
+                    >
+                      <span>Sign In</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -284,9 +321,9 @@ export function TemplateLanding({ onEnterConsole }: TemplateLandingProps) {
             <button
               type="button"
               onClick={() => onEnterConsole("radar")}
-              className="inline-flex items-center justify-center gap-2 bg-[#1a1a1a] px-8 py-4 text-sm font-bold uppercase tracking-widest text-white transition-all hover:bg-[#2a2a2a]"
+              className="inline-flex items-center justify-center gap-2 bg-[#1a1a1a] px-8 py-4 text-sm font-bold uppercase tracking-widest text-white transition-all hover:bg-[#2a2a2a] cursor-pointer"
             >
-              Launch Sentinel
+              {isAuthenticated ? "Open Workspace" : "Launch Sentinel"}
             </button>
           </div>
 
@@ -721,17 +758,19 @@ export function TemplateLanding({ onEnterConsole }: TemplateLandingProps) {
             <button
               type="button"
               onClick={() => onEnterConsole("radar")}
-              className="mt-8 w-full bg-white py-4 text-sm font-bold uppercase tracking-widest text-black transition-colors hover:bg-gray-200"
+              className="mt-8 w-full bg-white py-4 text-sm font-bold uppercase tracking-widest text-black transition-colors hover:bg-gray-200 cursor-pointer"
             >
-              Launch Sentinel
+              {isAuthenticated ? "Open Workspace" : "Launch Sentinel"}
             </button>
-            <button
-              type="button"
-              onClick={() => onEnterConsole("login")}
-              className="mt-3 w-full border border-white/20 bg-transparent py-4 text-sm font-bold uppercase tracking-widest text-white transition-colors hover:bg-white hover:text-black"
-            >
-              Sign In
-            </button>
+            {!isAuthenticated && (
+              <button
+                type="button"
+                onClick={() => onEnterConsole("login")}
+                className="mt-3 w-full border border-white/20 bg-transparent py-4 text-sm font-bold uppercase tracking-widest text-white transition-colors hover:bg-white hover:text-black cursor-pointer"
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </div>
       </section>

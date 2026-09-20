@@ -27,10 +27,6 @@ export function checkEvidenceCrawlBudget(activeClaimId: string): void {
   crawlBudgetStamps.set(activeClaimId, stamps);
 }
 
-export function __resetEvidenceCrawlBudgetForTests(): void {
-  crawlBudgetStamps.clear();
-}
-
 export function validateClaimClinicalContext(claim?: Claim | null): {
   cptCodes: string[];
   icd10Codes: string[];

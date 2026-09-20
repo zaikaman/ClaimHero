@@ -5,15 +5,13 @@ import { AppealBriefRenderer } from "../src/components/studio/AppealBriefRendere
 import {
   formatCurrency,
   formatDeadlineRemaining,
-  getScoreColor,
   stripMarkdownFormatting,
 } from "../src/lib/utils";
 import {
   CPT_CODES,
   DENIAL_REASON_CODES,
-  STATUTORY_REGULATIONS,
   getPayerAppellateContact,
-  SAMPLE_CASE_PRESETS,
+  DEMO_CASE_FIXTURES,
 } from "../src/lib/constants";
 import { extractEmailAddress, normalizeAgentMailWebhook } from "../convex/lib/agentMailWebhook";
 
@@ -43,25 +41,9 @@ describe("ClaimHero Domain Utilities & Formatting", () => {
     expect(expired.isCritical).toBe(true);
     expect(expired.text).toBe("Deadline Expired");
   });
-
-  it("calculates win probability color gradients across risk bands", () => {
-    const highWin = getScoreColor(91);
-    expect(highWin.text).toBe("text-emerald-400");
-
-    const moderateWin = getScoreColor(65);
-    expect(moderateWin.text).toBe("text-amber-400");
-
-    const lowWin = getScoreColor(35);
-    expect(lowWin.text).toBe("text-rose-400");
-  });
 });
 
 describe("ClaimHero Regulatory & Clinical Dictionary", () => {
-  it("contains standard ERISA 29 CFR § 2560.503-1 statutory rules", () => {
-    expect(STATUTORY_REGULATIONS.ERISA_CITATION).toBe("29 CFR § 2560.503-1");
-    expect(STATUTORY_REGULATIONS.DEADLINE_DAYS_INTERNAL_APPEAL).toBe(180);
-    expect(STATUTORY_REGULATIONS.PAYER_RESPONSE_STANDARD_DAYS).toBe(30);
-  });
 
   it("maps core medical CPT procedure codes accurately", () => {
     expect(CPT_CODES["27447"]).toBeDefined();
@@ -1194,15 +1176,15 @@ describe("ClaimHero Production-Grade Case Deletion & Cascading Purge", () => {
 
 describe("ClaimHero Template Presets & Documented Clinical Context", () => {
   it("provides 3 complete preset template denials with distinct clinical criteria", () => {
-    expect(SAMPLE_CASE_PRESETS.length).toBe(3);
-    const presetIds = SAMPLE_CASE_PRESETS.map((p) => p.id);
+    expect(DEMO_CASE_FIXTURES.length).toBe(3);
+    const presetIds = DEMO_CASE_FIXTURES.map((p) => p.id);
     expect(presetIds).toContain("cignaglobal_meniscus");
     expect(presetIds).toContain("geoblue_spine");
     expect(presetIds).toContain("aetnaintl_mri");
   });
 
   it("includes valid sender contact information across all 3 template presets", () => {
-    for (const preset of SAMPLE_CASE_PRESETS) {
+    for (const preset of DEMO_CASE_FIXTURES) {
       expect(preset.sender.name.trim().length).toBeGreaterThan(0);
       expect(preset.sender.email.trim().length).toBeGreaterThan(0);
       expect(preset.sender.phone.trim().length).toBeGreaterThan(0);
@@ -1216,7 +1198,7 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
       aetnaintl_mri: { patientName: "Michael Patel", memberId: "AET-773419-02" },
     };
 
-    for (const preset of SAMPLE_CASE_PRESETS) {
+    for (const preset of DEMO_CASE_FIXTURES) {
       const match = expected[preset.id as keyof typeof expected];
       expect(match).toBeDefined();
       expect(preset.patientName).toBe(match.patientName);
@@ -1236,7 +1218,7 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
       "otherDocumentedFacts",
     ];
 
-    for (const preset of SAMPLE_CASE_PRESETS) {
+    for (const preset of DEMO_CASE_FIXTURES) {
       expect(preset.questions.length).toBe(5);
       const fields = preset.questions.map((q) => q.field);
       for (const req of requiredFields) {
@@ -1250,7 +1232,7 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
   });
 
   it("validates exact tailored knee imaging questions for Aetna International Knee MRI", () => {
-    const aetna = SAMPLE_CASE_PRESETS.find((p) => p.id === "aetnaintl_mri");
+    const aetna = DEMO_CASE_FIXTURES.find((p) => p.id === "aetnaintl_mri");
     expect(aetna).toBeDefined();
     if (!aetna) return;
 
@@ -1278,7 +1260,7 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
   });
 
   it("guarantees pre-written, non-empty clinical facts for judges across all 3 template presets", () => {
-    for (const preset of SAMPLE_CASE_PRESETS) {
+    for (const preset of DEMO_CASE_FIXTURES) {
       expect(preset.clinicalFacts.symptomsAndFunctionalImpact.trim().length).toBeGreaterThan(20);
       expect(preset.clinicalFacts.examinationFindings.trim().length).toBeGreaterThan(20);
       expect(preset.clinicalFacts.imagingAndDiagnostics.trim().length).toBeGreaterThan(20);
@@ -1289,24 +1271,24 @@ describe("ClaimHero Template Presets & Documented Clinical Context", () => {
   });
 
   it("guarantees authentic pre-written physician notes across all 3 template presets", () => {
-    for (const preset of SAMPLE_CASE_PRESETS) {
+    for (const preset of DEMO_CASE_FIXTURES) {
       expect(preset.physicianNotes).toBeDefined();
       expect(preset.physicianNotes.trim().length).toBeGreaterThan(100);
       expect(preset.physicianNotes).toContain("PATIENT:");
       expect(preset.physicianNotes).toContain("Attending");
     }
 
-    const meniscus = SAMPLE_CASE_PRESETS.find((p) => p.id === "cignaglobal_meniscus");
+    const meniscus = DEMO_CASE_FIXTURES.find((p) => p.id === "cignaglobal_meniscus");
     expect(meniscus?.physicianNotes).toContain("Dr. Robert Langston");
     expect(meniscus?.physicianNotes).toContain("8 consecutive weeks");
     expect(meniscus?.physicianNotes).toContain("Cigna Medical Coverage Policy");
 
-    const geoblue = SAMPLE_CASE_PRESETS.find((p) => p.id === "geoblue_spine");
+    const geoblue = DEMO_CASE_FIXTURES.find((p) => p.id === "geoblue_spine");
     expect(geoblue?.physicianNotes).toContain("Dr. Sarah Chen");
     expect(geoblue?.physicianNotes).toContain("SURG.00011");
     expect(geoblue?.physicianNotes).toContain("foot drop");
 
-    const aetna = SAMPLE_CASE_PRESETS.find((p) => p.id === "aetnaintl_mri");
+    const aetna = DEMO_CASE_FIXTURES.find((p) => p.id === "aetnaintl_mri");
     expect(aetna?.physicianNotes).toContain("Dr. Angela Martinez");
     expect(aetna?.physicianNotes).toContain("CPB 0171");
     expect(aetna?.physicianNotes).toContain("05/20/2026");

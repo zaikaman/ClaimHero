@@ -472,38 +472,4 @@ export const searchTextPrecedents = query({
   },
 });
 
-/**
- * Internal mutation to enforce vector retention policies across archived precedents.
- */
-export const applyRetentionPolicyInternal = internalMutation({
-  args: {
-    maxAgeDays: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const maxAgeDays = args.maxAgeDays ?? 365 * 7; // Standard 7-year ERISA retention window
-    const now = Date.now();
-    const cutoff = now - maxAgeDays * 24 * 60 * 60 * 1000;
-    const candidates = await ctx.db.query("precedents").take(50);
-    let updated = 0;
-
-    for (const doc of candidates) {
-      if (!doc.retentionPolicy) {
-        await ctx.db.patch(doc._id, {
-          retentionPolicy: "active_statutory",
-          retentionExpiresAt: doc.createdAt + maxAgeDays * 24 * 60 * 60 * 1000,
-        });
-        updated++;
-      } else if (doc.createdAt < cutoff && !doc.embedding_redacted) {
-        await ctx.db.patch(doc._id, {
-          embedding_redacted: true,
-          retentionPolicy: "archived_statutory",
-        });
-        updated++;
-      }
-    }
-
-    return { processed: candidates.length, updated };
-  },
-});
-
 

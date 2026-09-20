@@ -1,7 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { CLAIM_STATUS_CONFIG, ClaimStatus } from "./constants";
-import { RiskLevel } from "../types";
 
 /**
  * Merge Tailwind classes cleanly without conflicts
@@ -150,94 +148,6 @@ export function formatDeadlineRemaining(days?: number): {
     isUrgent: false,
     isCritical: false,
     isOverdue: false,
-  };
-}
-
-/**
- * Get visual styling configuration for a claim status
- */
-export function getStatusConfig(status: ClaimStatus | string) {
-  return (
-    CLAIM_STATUS_CONFIG[status as ClaimStatus] || {
-      label: status,
-      color: "text-slate-400",
-      bg: "bg-slate-800/60",
-      border: "border-slate-700",
-      glow: "shadow-none",
-    }
-  );
-}
-
-/**
- * Get visual styling configuration for AI win risk level
- */
-export function getRiskBadgeConfig(riskLevel?: RiskLevel | string) {
-  switch (riskLevel) {
-    case "high_confidence":
-      return {
-        label: "Comprehensive Dossier",
-        color: "text-emerald-300",
-        bg: "bg-emerald-950/60",
-        border: "border-emerald-500/50",
-        glow: "shadow-emerald-glow",
-      };
-    case "moderate":
-      return {
-        label: "Moderate Contestation",
-        color: "text-amber-300",
-        bg: "bg-amber-950/60",
-        border: "border-amber-500/50",
-        glow: "shadow-amber-glow",
-      };
-    case "complex_litigation":
-      return {
-        label: "Complex ERISA Litigation",
-        color: "text-rose-300",
-        bg: "bg-rose-950/60",
-        border: "border-rose-500/50",
-        glow: "shadow-crimson-glow",
-      };
-    default:
-      return {
-        label: "Evaluating...",
-        color: "text-cyan-300",
-        bg: "bg-cyan-950/40",
-        border: "border-cyan-500/30",
-        glow: "shadow-none",
-      };
-  }
-}
-
-/**
- * Get color gradient for Statutory Appeal Readiness score (0-100)
- */
-export function getScoreColor(score: number): {
-  text: string;
-  border: string;
-  glow: string;
-  bgGradient: string;
-} {
-  if (score >= 80) {
-    return {
-      text: "text-emerald-400",
-      border: "border-emerald-500/60",
-      glow: "shadow-emerald-glow",
-      bgGradient: "from-emerald-500/20 to-teal-500/10",
-    };
-  }
-  if (score >= 50) {
-    return {
-      text: "text-amber-400",
-      border: "border-amber-500/60",
-      glow: "shadow-amber-glow",
-      bgGradient: "from-amber-500/20 to-orange-500/10",
-    };
-  }
-  return {
-    text: "text-rose-400",
-    border: "border-rose-500/60",
-    glow: "shadow-crimson-glow",
-    bgGradient: "from-rose-500/20 to-red-500/10",
   };
 }
 

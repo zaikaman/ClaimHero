@@ -16,9 +16,6 @@
  * Isolate-safe: no Convex imports, safe for `convex/` actions and `src/`.
  */
 
-export const FEDERAL_APPEAL_ENGINE_LABEL =
-  "Federal ERISA engine (29 CFR § 2560.503-1, 180-day internal clock) + ACA External Review (45 CFR § 147.136, 120-day clock)";
-
 /** Standard ERISA internal appeal filing window: 180 days. */
 export const FEDERAL_INTERNAL_APPEAL_WINDOW_DAYS = 180;
 export const FEDERAL_FILING_WINDOW_DAYS = 180; // Backwards-compatible alias

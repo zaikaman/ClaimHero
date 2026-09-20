@@ -225,36 +225,6 @@ export async function requireClaimOwnerAction(
 }
 
 /**
- * Require any active claim access (owner, editor, or viewer) in an ActionCtx.
- * Used for read-only operations where viewers are legitimate participants.
- */
-export async function requireClaimAccessAction(
-  ctx: ActionCtx,
-  claimId: Id<"claims">
-): Promise<{ claim: ClaimWithDetails; userId: Id<"users">; accessRole: ClaimAccessRole }> {
-  const userId = await requireAuthUser(ctx);
-  const claim = await ctx.runQuery(internal.claims.getByIdInternal, { claimId });
-  if (!claim) {
-    throw new Error(`Claim ${claimId} not found`);
-  }
-  if (claim.userId && claim.userId === userId) {
-    return { claim: claim as ClaimWithDetails, userId, accessRole: "owner" };
-  }
-  if (!claim.userId) {
-    throw new Error("Forbidden: You do not have permission to access this claim");
-  }
-  try {
-    const role = await ctx.runQuery(internal.claimCollaborators.getRoleInternal, { claimId });
-    if (role === "editor" || role === "viewer") {
-      return { claim: claim as ClaimWithDetails, userId, accessRole: role };
-    }
-  } catch {
-    // Fall through to Forbidden below.
-  }
-  throw new Error("Forbidden: You do not have permission to access this claim");
-}
-
-/**
  * For queries that should return null/empty when unauthenticated or unauthorized
  * instead of throwing. Owners and active collaborators (editor/viewer) are
  * authorized. Returns the resolved accessRole alongside claim and userId.

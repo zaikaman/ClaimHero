@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { DEMO_CASE_FIXTURES, SAMPLE_CASE_PRESETS } from "../src/lib/constants";
+import { DEMO_CASE_FIXTURES } from "../src/lib/constants";
 import { buildDossierData } from "../src/lib/dossierBuilder";
 import { Claim, Appeal } from "../src/types";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -21,10 +21,6 @@ describe("Demo Isolation, Provenance Attribution & Honest Evaluation Pipeline", 
         expect(fixture.cpt).toBeDefined();
         expect(fixture.carc).toBeDefined();
       }
-    });
-
-    it("maintains backward compatibility with SAMPLE_CASE_PRESETS alias", () => {
-      expect(SAMPLE_CASE_PRESETS).toBe(DEMO_CASE_FIXTURES);
     });
   });
 

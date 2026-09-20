@@ -504,16 +504,6 @@ export interface AppealBriefSynthesisResult {
   fullAppealMarkdown: string;
 }
 
-// Simulation & Navigation Types
-export interface SimulationProgress {
-  currentStage: number;
-  totalStages: number;
-  stageName: string;
-  stageDescription: string;
-  isComplete: boolean;
-  claimId?: string;
-}
-
 export interface DashboardStats {
   totalClaims: number;
   activeDisputedAmount: number;
@@ -532,52 +522,6 @@ export type ResearchMode =
   | "fda_labels"
   | "custom_url";
 
-export interface ResearchProgressStep {
-  id: string;
-  label: string;
-  detail: string;
-  status: "pending" | "running" | "completed" | "error";
-  durationMs?: number;
-}
-
-export interface MultiSourceCrawlResult {
-  success: boolean;
-  cpbClauses: number;
-  pubMedClauses: number;
-  fdaClauses: number;
-  errors: string[];
-}
-
-export interface PubMedScrapeResult {
-  studyTitle: string;
-  identifier: string;
-  studyDesign: string;
-  clausesExtracted: number;
-  evidences: Array<{
-    sourceType: string;
-    title: string;
-    sourceUrl?: string;
-    citationClause: string;
-    extractedEvidenceMarkdown: string;
-    relevanceScore: number;
-  }>;
-}
-
-export interface FdaScrapeResult {
-  productName: string;
-  applicationNumber: string;
-  approvalDate: string;
-  clausesExtracted: number;
-  evidences: Array<{
-    sourceType: string;
-    title: string;
-    sourceUrl?: string;
-    citationClause: string;
-    extractedEvidenceMarkdown: string;
-    relevanceScore: number;
-  }>;
-}
-
 export interface DiscoveredPolicy {
   _id?: string;
   claimId?: string;
@@ -589,21 +533,6 @@ export interface DiscoveredPolicy {
   description?: string;
   bulletinNumber?: string;
   discoveredAt?: number;
-}
-
-export interface DiscoverPolicyDirectoryResult {
-  success: boolean;
-  payer: string;
-  specialty: string;
-  domain: string;
-  totalDiscovered: number;
-  bulletins: Array<{
-    url: string;
-    title: string;
-    description?: string;
-    bulletinNumber?: string;
-  }>;
-  savedToEvidence: boolean;
 }
 
 // Case collaboration (Appeal Studio presence + invites)
@@ -750,49 +679,6 @@ export interface P2PCallSession {
   winScore: number;
   readinessScore?: number;
   summaryNotes?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export type DriftSeverity = "none" | "minor" | "moderate" | "critical_bad_faith";
-
-export interface DetectedPolicyChangeItem {
-  category: "added_step_therapy" | "added_exclusion" | "tightened_criteria" | "modified_criterion" | "removed_pathway" | string;
-  title: string;
-  baselineText?: string;
-  liveText: string;
-  impact: string;
-  isAdverseToClaim: boolean;
-}
-
-export interface PolicyDriftReport {
-  _id: string;
-  claimId: string;
-  policyUrl: string;
-  policyTitle: string;
-  payer?: string;
-  baselineSnapshotId?: string;
-  baselineCapturedAt: number;
-  baselineContentHash: string;
-  baselineEffectiveDate?: string;
-  baselineMarkdown: string;
-  liveCapturedAt: number;
-  liveContentHash: string;
-  liveEffectiveDate?: string;
-  liveMarkdown: string;
-  hasDrift: boolean;
-  isRetroactiveAlteration: boolean;
-  severity: DriftSeverity;
-  summary: string;
-  denialDate?: string;
-  serviceDate?: string;
-  detectedChanges: DetectedPolicyChangeItem[];
-  erisaNoticeDraft?: string;
-  erisaNoticeGeneratedAt?: number;
-  governingFramework?: string;
-  noticePosture?: string;
-  status: "analyzing" | "completed" | "failed";
-  errorMessage?: string;
   createdAt: number;
   updatedAt: number;
 }

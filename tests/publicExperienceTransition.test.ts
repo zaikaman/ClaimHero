@@ -31,7 +31,7 @@ vi.mock("@convex-dev/auth/providers/anonymous/react", () => ({
 import {
   PublicExperience,
 } from "../src/components/landing/PublicExperience";
-import { CinematicHero } from "../src/components/landing/CinematicHero";
+import { TemplateLanding } from "../src/components/landing/TemplateLanding";
 import { AuthPage } from "../src/components/auth/AuthPage";
 
 describe("PublicExperience & Seamless Landing-Auth Transition", () => {
@@ -70,17 +70,14 @@ describe("PublicExperience & Seamless Landing-Auth Transition", () => {
     });
   });
 
-  describe("2. CinematicHero Rendering", () => {
-    it("renders transparent chrome with no video element", () => {
+  describe("2. TemplateLanding Rendering", () => {
+    it("renders editorial landing story with no video element", () => {
       const html = renderToStaticMarkup(
-        React.createElement(CinematicHero, {
+        React.createElement(TemplateLanding, {
           onEnterConsole: vi.fn(),
-          isAuthenticated: false,
-          isAuthLoading: false,
-          hasCachedSession: false,
         })
       );
-      expect(html).toContain("bg-transparent");
+      expect(html).toContain("Fight the denial.");
       expect(html).not.toContain("<video");
     });
   });
@@ -195,16 +192,13 @@ describe("PublicExperience & Seamless Landing-Auth Transition", () => {
       expect(html).toContain("Sign In");
     });
 
-    it("renders mobile menu toggle button with aria-expanded attribute", () => {
+    it("renders navigation and launch sentinel CTAs in TemplateLanding", () => {
       const html = renderToStaticMarkup(
-        React.createElement(CinematicHero, {
+        React.createElement(TemplateLanding, {
           onEnterConsole: vi.fn(),
-          isAuthenticated: false,
-          isAuthLoading: false,
-          hasCachedSession: false,
         })
       );
-      expect(html).toContain('aria-expanded="false"');
+      expect(html).toContain("Launch Sentinel");
     });
 
     it("safely sanitizes pendingTargetView so login or landing cannot trap the user", () => {
@@ -231,6 +225,22 @@ describe("PublicExperience & Seamless Landing-Auth Transition", () => {
         })
       );
       expect(html).toContain("scrollbar-none");
+    });
+
+    it("renders landing page directly without completing sign-in banner when returning user has cached Google session", () => {
+      const html = renderToStaticMarkup(
+        React.createElement(PublicExperience, {
+          currentView: "landing",
+          onNavigate: vi.fn(),
+          isAuthenticated: false,
+          isAuthLoading: true,
+          hasCachedSession: true,
+          pendingTargetView: null,
+          setPendingTargetView: vi.fn(),
+        })
+      );
+      expect(html).not.toContain("Completing Google sign-in");
+      expect(html).toContain("Fight the denial.");
     });
   });
 });

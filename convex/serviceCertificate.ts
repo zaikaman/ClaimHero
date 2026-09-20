@@ -1,4 +1,4 @@
-import { query, internalQuery, QueryCtx } from "./_generated/server";
+import { query, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { requireClaimOwner } from "./lib/auth";
@@ -490,23 +490,6 @@ export const getCertificateOfServiceData = query({
   },
   handler: async (ctx, args): Promise<CertificateOfServiceData> => {
     const { claim } = await requireClaimOwner(ctx, args.claimId);
-    return await buildCertificateData(ctx, claim, args.messageId);
-  },
-});
-
-/**
- * Internal query for system actions, test harnesses, and automated reports.
- */
-export const getCertificateOfServiceDataInternal = internalQuery({
-  args: {
-    claimId: v.id("claims"),
-    messageId: v.optional(v.id("emailMessages")),
-  },
-  handler: async (ctx, args): Promise<CertificateOfServiceData> => {
-    const claim = await ctx.db.get(args.claimId);
-    if (!claim) {
-      throw new Error(`Claim ${args.claimId} not found`);
-    }
     return await buildCertificateData(ctx, claim, args.messageId);
   },
 });

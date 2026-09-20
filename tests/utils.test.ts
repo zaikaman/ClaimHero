@@ -5,19 +5,14 @@ import {
   formatDate,
   formatDateTime,
   formatDeadlineRemaining,
-  getStatusConfig,
-  getRiskBadgeConfig,
-  getScoreColor,
   stripMarkdownFormatting,
 } from "../src/lib/utils";
 import {
   getPayerAppellateContact,
   DENIAL_REASON_CODES,
   CPT_CODES,
-  STATUTORY_REGULATIONS,
   CLAIM_STATUS_CONFIG,
   SIMULATION_STAGES,
-  SAMPLE_CASE_PRESETS,
 } from "../src/lib/constants";
 
 describe("src/lib/utils Unit Tests", () => {
@@ -81,44 +76,6 @@ describe("src/lib/utils Unit Tests", () => {
     expect(standard.text).toBe("90d Statutory Clock");
   });
 
-  it("getStatusConfig returns correct configuration or fallback", () => {
-    const known = getStatusConfig("ready_for_review");
-    expect(known.label).toBe("Ready for Review");
-    expect(known.color).toBe("text-cyan-300");
-
-    const unknown = getStatusConfig("custom_unknown_status");
-    expect(unknown.label).toBe("custom_unknown_status");
-    expect(unknown.color).toBe("text-slate-400");
-  });
-
-  it("getRiskBadgeConfig returns appropriate badge styles", () => {
-    const high = getRiskBadgeConfig("high_confidence");
-    expect(high.label).toBe("Comprehensive Dossier");
-    expect(high.color).toBe("text-emerald-300");
-
-    const mod = getRiskBadgeConfig("moderate");
-    expect(mod.label).toBe("Moderate Contestation");
-    expect(mod.color).toBe("text-amber-300");
-
-    const complex = getRiskBadgeConfig("complex_litigation");
-    expect(complex.label).toBe("Complex ERISA Litigation");
-    expect(complex.color).toBe("text-rose-300");
-
-    const fallback = getRiskBadgeConfig("unknown_level" as any);
-    expect(fallback.label).toBe("Evaluating...");
-  });
-
-  it("getScoreColor categorizes appeal readiness scores properly", () => {
-    const high = getScoreColor(92);
-    expect(high.text).toBe("text-emerald-400");
-
-    const mid = getScoreColor(65);
-    expect(mid.text).toBe("text-amber-400");
-
-    const low = getScoreColor(30);
-    expect(low.text).toBe("text-rose-400");
-  });
-
   it("stripMarkdownFormatting removes bold, italic, and backticks cleanly", () => {
     expect(stripMarkdownFormatting("**Important Notice**")).toBe("Important Notice");
     expect(stripMarkdownFormatting("*Note:* `CPT 27447`")).toBe("Note: CPT 27447");
@@ -153,12 +110,10 @@ describe("src/lib/constants Unit Tests", () => {
     expect(customPayer.ediPayerId).toBeUndefined();
   });
 
-  it("exports valid CARC denial codes, CPT dictionary, statutory constants, and presets", () => {
+  it("exports valid CARC denial codes, CPT dictionary, and claim status config", () => {
     expect(DENIAL_REASON_CODES["CO-50"].overturnCategory).toContain("Clinical Necessity");
     expect(CPT_CODES["27447"].name).toContain("Total Knee Arthroplasty");
-    expect(STATUTORY_REGULATIONS.DEADLINE_DAYS_INTERNAL_APPEAL).toBe(180);
     expect(CLAIM_STATUS_CONFIG.won.label).toBe("Resolved / Approved");
     expect(SIMULATION_STAGES).toHaveLength(5);
-    expect(SAMPLE_CASE_PRESETS).toHaveLength(3);
   });
 });

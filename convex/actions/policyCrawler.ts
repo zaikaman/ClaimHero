@@ -4633,20 +4633,3 @@ export const discoverInsurerPolicyDirectory = action({
   },
 });
 
-/**
- * Discover Insurer Policy Directory Action (Internal):
- * For background jobs and durable workflow orchestration.
- */
-export const discoverInsurerPolicyDirectoryInternal = internalAction({
-  args: discoverInsurerPolicyDirectoryArgs,
-  handler: async (ctx, args): Promise<DiscoverInsurerPolicyDirectoryResult> => {
-    const claim = (await ctx.runQuery(internal.claims.getByIdInternal, {
-      claimId: args.claimId,
-    })) as Doc<"claims"> | null;
-    if (!claim) {
-      throw new Error(`Claim ${args.claimId} not found`);
-    }
-    return await performDiscoverInsurerPolicyDirectory(ctx, args, claim, claim.userId);
-  },
-});
-

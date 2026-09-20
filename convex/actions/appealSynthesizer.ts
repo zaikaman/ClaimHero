@@ -647,22 +647,6 @@ export function buildGroundedPolicyCitations(evidences: Array<{
     }));
 }
 
-export function formatVectorPrecedentSection(vectorPrecedents?: VectorPrecedentMatch[]): string {
-  if (!vectorPrecedents || vectorPrecedents.length === 0) {
-    return "";
-  }
-
-  let section = `### Vector-Retrieved Controlling Authorities\n\n`;
-  section += `Convex native vector search against the Precedent Vector Archive (indexed by ICD-10, CPT, and CARC) returned the following highest-scoring historical winning arguments. Proven statutory language is incorporated herein:\n\n`;
-  vectorPrecedents.forEach((match, idx) => {
-    const similarity = Math.round(Math.max(0, Math.min(1, match.vectorScore)) * 1000) / 10;
-    section += `**${idx + 1}. ${match.title}** — \`${match.citation}\` (similarity ${similarity}%)\n\n`;
-    section += `> ${match.statutoryLanguage}\n\n`;
-    section += `${match.winningArgument}\n\n`;
-  });
-  return section.trim();
-}
-
 export function assembleProfessionalAppealEmail(
   claim: AppealSynthesizerClaimContext,
   appealLevel: string = "level_1_internal",

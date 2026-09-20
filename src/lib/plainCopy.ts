@@ -4,20 +4,6 @@
  * Route keys and domain logic never change — only surface labels.
  */
 
-export const PLAIN_NAV = {
-  radarTitleSimple: "My Cases",
-  radarTitleDetailed: "Case Radar",
-  radarSubtitleSimple: "Bills the insurer refused to pay",
-  radarSubtitleDetailed:
-    "Active medical denial records with plan coverage, CPT codes, CARC reason, and statutory ERISA clock.",
-  addDenialSimple: "Add denial letter",
-  addDenialShortSimple: "Add denial",
-  addDenialDetailed: "Ingest Denial",
-  activeCasesSimple: "Your cases",
-  erisaClockSimple: "Time left",
-  settingsSimple: "Settings",
-} as const;
-
 /**
  * Canonical first-run labels for the three terms a new user must never meet
  * as jargon. These are the words shown by default on the landing page and
@@ -28,18 +14,6 @@ export const PLAIN_FIRST_RUN = {
   insurerRule: "Insurer's own rule",
   whyDenied: "Why they said no",
   yourLetter: "Your letter",
-} as const;
-
-export const PLAIN_FLOW_STEPS = {
-  evidenceSimple: "1. Your proof",
-  evidenceDetailed: "1. Evidence & CPB",
-  studioSimple: "2. Your letter",
-  studioDetailed: "2. Appeal Brief",
-  dispatchSimple: "3. Send & track",
-  dispatchDetailed: "3. Payer Dispatch",
-  evidenceHintSimple: "Why this denial can be challenged",
-  letterHintSimple: "We write it, you approve it",
-  dispatchHintSimple: "You approve before anything sends",
 } as const;
 
 export const PLAIN_PILLARS: Array<{

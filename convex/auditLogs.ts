@@ -554,18 +554,6 @@ export const sealClaimAuditChain = mutation({
 });
 
 /**
- * Internal mutation to seal audit chains from background crons, workers, and pipelines.
- */
-export const sealClaimAuditChainInternal = internalMutation({
-  args: {
-    claimId: v.id("claims"),
-  },
-  handler: async (ctx, args) => {
-    return await sealAuditChainForClaimHelper(ctx, args.claimId);
-  },
-});
-
-/**
  * Verify the cryptographic Merkle/audit chain for a claim under ERISA 29 CFR § 2560.503-1.
  * Recomputes the deterministic rolling SHA-256 hash across all chronological records
  * to detect any backdating, alteration, or tampering.

@@ -1,4 +1,4 @@
-import { ActionRetrier, type RunId, type RunStatus } from "@convex-dev/action-retrier";
+import { ActionRetrier, type RunStatus } from "@convex-dev/action-retrier";
 import { components } from "../_generated/api";
 import type { ActionCtx } from "../_generated/server";
 import type { FunctionReference, FunctionArgs, FunctionVisibility } from "convex/server";
@@ -14,13 +14,6 @@ export const actionRetrier = new ActionRetrier(components.actionRetrier, {
   base: 2,
   maxFailures: 4,
 });
-
-export interface RetriedExecutionResult<T = unknown> {
-  success: boolean;
-  runId: RunId;
-  returnValue?: T;
-  error?: string;
-}
 
 /**
  * Execute an action with ActionRetrier and await its final result.

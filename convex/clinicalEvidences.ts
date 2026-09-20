@@ -835,44 +835,6 @@ export const listDiscoveredPolicies = query({
 });
 
 /**
- * Internal query for background actions to retrieve discovered policies
- */
-export const listDiscoveredPoliciesInternal = internalQuery({
-  args: {
-    claimId: v.optional(v.id("claims")),
-    payer: v.optional(v.string()),
-    specialty: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args): Promise<Doc<"discoveredPolicies">[]> => {
-    const maxItems = Math.max(1, Math.min(args.limit ?? 50, 50));
-
-    if (args.claimId) {
-      return await ctx.db
-        .query("discoveredPolicies")
-        .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-        .order("desc")
-        .take(maxItems);
-    }
-
-    if (args.payer && args.specialty) {
-      return await ctx.db
-        .query("discoveredPolicies")
-        .withIndex("by_payer_and_specialty", (q) =>
-          q.eq("payer", args.payer!).eq("specialty", args.specialty!)
-        )
-        .order("desc")
-        .take(maxItems);
-    }
-
-    return await ctx.db
-      .query("discoveredPolicies")
-      .order("desc")
-      .take(maxItems);
-  },
-});
-
-/**
  * TTL enforcement sweep for cached Firecrawl policy snapshots.
  * Deletes rows past expiresAt (or older than 30d without expiresAt) in
  * bounded batches so the policySnapshots cache cannot grow unbounded and

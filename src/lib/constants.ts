@@ -39,69 +39,6 @@ export const getPayerAppellateContact = (payerName?: string): PayerAppellateCont
   };
 };
 
-export const PAYER_CLINICAL_DIRECTORIES: Record<string, { name: string; domainUrl: string; defaultSpecialty: string }> = {
-  aetna: {
-    name: "Aetna",
-    domainUrl: "https://www.aetna.com/cpb",
-    defaultSpecialty: "General Medicine",
-  },
-  cigna: {
-    name: "Cigna",
-    domainUrl: "https://www.cigna.com/coveragePolicies",
-    defaultSpecialty: "General Medicine",
-  },
-  unitedhealthcare: {
-    name: "UnitedHealthcare",
-    domainUrl: "https://www.uhcprovider.com/en/policies-protocols/commercial-policies.html",
-    defaultSpecialty: "General Medicine",
-  },
-  humana: {
-    name: "Humana",
-    domainUrl: "https://www.humana.com/provider/medical-resources/clinical-guidance/medical-policies",
-    defaultSpecialty: "General Medicine",
-  },
-  anthem: {
-    name: "Anthem / BCBS",
-    domainUrl: "https://www.anthem.com/provider/policies",
-    defaultSpecialty: "General Medicine",
-  },
-  molina: {
-    name: "Molina Healthcare",
-    domainUrl: "https://www.molinahealthcare.com/providers/common/medicaid/clinical-guidelines.aspx",
-    defaultSpecialty: "General Medicine",
-  },
-  medicare: {
-    name: "Medicare / CMS MCD",
-    domainUrl: "https://www.cms.gov/medicare-coverage-database",
-    defaultSpecialty: "General Medicine",
-  },
-  carelon: {
-    name: "Carelon Medical Benefits Management",
-    domainUrl: "https://guidelines.carelonmedicalbenefitsmanagement.com",
-    defaultSpecialty: "General Medicine",
-  },
-  centene: {
-    name: "Centene / Ambetter",
-    domainUrl: "https://www.centene.com/clinical-criteria.html",
-    defaultSpecialty: "General Medicine",
-  },
-  highmark: {
-    name: "Highmark BCBS",
-    domainUrl: "https://www.highmarkprc.com/medical-policies.html",
-    defaultSpecialty: "General Medicine",
-  },
-  carefirst: {
-    name: "CareFirst BlueCross BlueShield",
-    domainUrl: "https://provider.carefirst.com/providers/medical-policies.page",
-    defaultSpecialty: "General Medicine",
-  },
-  oscar: {
-    name: "Oscar Health",
-    domainUrl: "https://www.hioscar.com/clinical-guidelines",
-    defaultSpecialty: "General Medicine",
-  },
-};
-
 export const getPayerClinicalDirectoryUrl = (payerName?: string): string => {
   if (!payerName) return "https://www.cms.gov/medicare-coverage-database";
   const norm = payerName.toLowerCase().trim();
@@ -304,18 +241,6 @@ export const CPT_CODES: Record<string, { code: string; name: string; category: s
     category: "Orthopedic Surgery",
     averageBilled: 8900,
   },
-};
-
-// ERISA, ACA & Statutory Regulations
-export const STATUTORY_REGULATIONS = {
-  ERISA_CITATION: "29 CFR § 2560.503-1",
-  ERISA_TITLE: "Employee Retirement Income Security Act Claims Procedure Rule",
-  DEADLINE_DAYS_INTERNAL_APPEAL: 180, // 180 days from receipt of initial denial
-  PAYER_RESPONSE_STANDARD_DAYS: 30, // 30 days for pre-service / post-service claims
-  PAYER_RESPONSE_URGENT_HOURS: 72, // 72 hours for urgent care
-  EXTERNAL_REVIEW_DAYS: 120, // 4 months for federal/state external review (ACA 45 CFR § 147.136)
-  ACA_EXTERNAL_REVIEW_DAYS: 120, // 4 months for federal ACA external review
-  STATE_EXTERNAL_REVIEW_EXPEDITED_DAYS: 30, // 30-day state expedited external review clock
 };
 
 // Claim Processing Statuses
@@ -794,7 +719,5 @@ Magnetic Resonance Imaging of the knee without contrast (CPT 73721) is medically
 Attending Physician: Dr. Angela Martinez, MD (Global Diagnostic Imaging Group)`,
   },
 ];
-
-export const SAMPLE_CASE_PRESETS: SampleCasePreset[] = DEMO_CASE_FIXTURES;
 
 

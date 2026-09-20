@@ -77,14 +77,15 @@ export default function App() {
 
   const { isAuthenticated, isAuthLoading, hasCachedSession, user } = useCurrentUser();
   const [isOAuthReturnAtBoot] = useState<boolean>(() => wasOAuthCallbackAtBoot());
-  // True while the Google code exchange (or a returning session refresh) is
-  // still verifying: show a completing state instead of the static login form.
+  // True while the Google code exchange is verifying on login/auth routes.
+  // Never shown when visiting the landing page or for ordinary returning cached sessions.
   const isCompletingSignIn = shouldShowCompletingSignIn({
     isAuthenticated,
     isAuthLoading,
     hasCachedSession,
     isOAuthReturn: isOAuthReturnAtBoot,
     hasPendingFlow: hasPendingOAuthFlow(),
+    currentView,
   });
   const isDashboardActive = isAuthenticated && currentView !== "landing" && currentView !== "login" && currentView !== "notFound";
 
@@ -278,9 +279,9 @@ export default function App() {
     );
   }
 
-  // Google redirect return (or returning session) still verifying: show a
-  // completing state instead of the static login form.
-  if (isCompletingSignIn) {
+  // Google redirect return still verifying: show a
+  // completing state instead of the static login form (never on landing).
+  if (isCompletingSignIn && currentView !== "landing") {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
         <div className="flex flex-col items-center gap-4">
@@ -296,7 +297,7 @@ export default function App() {
   }
 
   // Public Landing & Auth Experience (persistent ambient video background, zero dark-screen flash)
-  if (currentView === "landing" || currentView === "login" || !isAuthenticated) {
+  if (currentView === "landing" || currentView === "login") {
     return (
       <PublicExperience
         currentView={currentView}
@@ -323,6 +324,21 @@ export default function App() {
           <CircleNotch className="size-4 animate-spin text-muted-foreground mt-1" />
         </div>
       </div>
+    );
+  }
+
+  // Unauthenticated on protected route: render login experience
+  if (!isAuthenticated) {
+    return (
+      <PublicExperience
+        currentView={currentView}
+        onNavigate={setCurrentView}
+        isAuthenticated={isAuthenticated}
+        isAuthLoading={isAuthLoading}
+        hasCachedSession={hasCachedSession}
+        pendingTargetView={pendingTargetView}
+        setPendingTargetView={setPendingTargetView}
+      />
     );
   }
 

@@ -2,8 +2,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
-  PLAIN_NAV,
-  PLAIN_FLOW_STEPS,
   PLAIN_PILLARS,
   PLAIN_TIERS,
   PLAIN_STATUS,
@@ -13,10 +11,8 @@ import {
   formatWhatHappenedSentence,
   formatDeadlineSentence,
 } from "../src/lib/plainCopy";
-import { PlainLabel } from "../src/components/common/ExpertDetail";
 import { DetailModeToggle } from "../src/components/common/DetailModeToggle";
 import { SentinelFlowStepper } from "../src/components/common/SentinelFlowStepper";
-import { HERO_SLIDES, LANDING_NAV_LINKS } from "../src/components/landing/CinematicHero";
 import { ClinicalResearchConsole } from "../src/components/evidence/ClinicalResearchConsole";
 import { PolicyDriftSentinel } from "../src/components/evidence/PolicyDriftSentinel";
 
@@ -99,8 +95,6 @@ describe("Plain Language Copy Dictionaries (plainCopy.ts)", () => {
 
   it("contains zero emojis across all plainCopy definitions", () => {
     const allStrings = [
-      ...Object.values(PLAIN_NAV),
-      ...Object.values(PLAIN_FLOW_STEPS),
       ...PLAIN_PILLARS.flatMap((p) => [p.simple, p.detailed, p.hint]),
       ...Object.values(PLAIN_TIERS).flatMap((t) => [t.simple, t.who, t.detailed]),
       ...Object.values(PLAIN_STATUS).flatMap((s) => [s.simple, s.detailed]),
@@ -130,12 +124,6 @@ describe("Plain Language Copy Dictionaries (plainCopy.ts)", () => {
     expect(statusSimple("custom_unmapped_status")).toBe("custom unmapped status");
   });
 
-  it("defines plain flow steps matching the 3-step sentinel flow", () => {
-    expect(PLAIN_FLOW_STEPS.evidenceSimple).toBe("1. Your proof");
-    expect(PLAIN_FLOW_STEPS.studioSimple).toBe("2. Your letter");
-    expect(PLAIN_FLOW_STEPS.dispatchSimple).toBe("3. Send & track");
-  });
-
   it("exposes the three renamed first-run labels instead of CPB, CARC and brief", () => {
     expect(PLAIN_FIRST_RUN.insurerRule).toBe("Insurer's own rule");
     expect(PLAIN_FIRST_RUN.whyDenied).toBe("Why they said no");
@@ -144,37 +132,6 @@ describe("Plain Language Copy Dictionaries (plainCopy.ts)", () => {
     Object.values(PLAIN_FIRST_RUN).forEach((label) => {
       expect(label).not.toMatch(FIRST_RUN_JARGON);
     });
-  });
-});
-
-describe("First Screen Jargon Removal (landing page)", () => {
-  it("keeps every hero slide badge, headline, description and CTA free of jargon", () => {
-    HERO_SLIDES.forEach((slide) => {
-      const copy = [
-        slide.badge1.label,
-        slide.badge2.label,
-        slide.badge3.label,
-        slide.titleLine1,
-        slide.titleLine2,
-        slide.description,
-        slide.primaryCtaText,
-        slide.secondaryCtaText,
-      ];
-      copy.forEach((text) => {
-        expect(text).not.toMatch(FIRST_RUN_JARGON);
-        expect(text.trim().length).toBeGreaterThan(0);
-      });
-    });
-  });
-
-  it("names landing navigation with everyday words instead of expert surface names", () => {
-    expect(LANDING_NAV_LINKS.map((l) => l.label)).toEqual([
-      "My Cases",
-      "Why it was denied",
-      "Your letter",
-      "Insurer replies",
-      "Resolution progress",
-    ]);
   });
 });
 
@@ -293,29 +250,7 @@ describe("Detail Mode Hook & Storage Synchronization (useDetailMode)", () => {
   });
 });
 
-describe("ExpertDetail & PlainLabel Components", () => {
-  it("renders PlainLabel and respects polymorphism", () => {
-    // By default in simple mode
-    mockLocalStorage.setItem("claimhero_detail_mode", "simple");
-    const markupSimple = renderToStaticMarkup(
-      React.createElement(PlainLabel, {
-        simple: "Everyday Text",
-        detailed: "CPT 99213 Detailed",
-      })
-    );
-    expect(markupSimple).toContain("Everyday Text");
-    expect(markupSimple).not.toContain("CPT 99213 Detailed");
-
-    // In detailed mode
-    mockLocalStorage.setItem("claimhero_detail_mode", "detailed");
-    const markupDetailed = renderToStaticMarkup(
-      React.createElement(PlainLabel, {
-        simple: "Everyday Text",
-        detailed: "CPT 99213 Detailed",
-      })
-    );
-    expect(markupDetailed).toContain("CPT 99213 Detailed");
-  });
+describe("DetailModeToggle Component", () => {
 
   it("renders DetailModeToggle button with appropriate accessibility attributes", () => {
     mockLocalStorage.setItem("claimhero_detail_mode", "simple");

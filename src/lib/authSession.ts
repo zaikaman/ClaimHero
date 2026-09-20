@@ -177,21 +177,22 @@ export function wasOAuthCallbackAtBoot(): boolean {
 
 /**
  * Decide whether the UI must show a "completing sign-in" state instead of the
- * static login form: the session is still verifying AND this is either a
- * returning session or an OAuth redirect completing its code exchange.
- * Anonymous first visits stay on signed-out copy so landing LCP never waits.
+ * static login form: the session is still verifying AND this is an in-flight OAuth
+ * redirect completing its code exchange.
+ * Visiting the landing page or holding a previously established cached session
+ * never triggers this state, so landing page navigation and LCP are never blocked.
  */
 export function shouldShowCompletingSignIn(args: {
   isAuthenticated: boolean;
   isAuthLoading: boolean;
-  hasCachedSession: boolean;
+  hasCachedSession?: boolean;
   isOAuthReturn?: boolean;
   hasPendingFlow?: boolean;
+  currentView?: string;
 }): boolean {
   if (args.isAuthenticated || !args.isAuthLoading) return false;
-  return Boolean(
-    args.hasCachedSession || args.isOAuthReturn || args.hasPendingFlow,
-  );
+  if (args.currentView === "landing") return false;
+  return Boolean(args.isOAuthReturn || args.hasPendingFlow);
 }
 
 /**

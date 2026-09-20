@@ -13,14 +13,6 @@ export type AdversaryCountermove =
   | "POLICY_CONFLICT_CITATION"
   | "DENIAL_UPHELD";
 
-export const ADVERSARY_COUNTERMOVES: AdversaryCountermove[] = [
-  "OVERTURNED_APPROVED",
-  "PARTIAL_SETTLEMENT_OFFER",
-  "ADDITIONAL_RECORDS_REQUIRED",
-  "POLICY_CONFLICT_CITATION",
-  "DENIAL_UPHELD",
-];
-
 /** Insurer opening settlement posture: 40% of the disputed amount. */
 export const PARTIAL_SETTLEMENT_FRACTION = 0.4;
 

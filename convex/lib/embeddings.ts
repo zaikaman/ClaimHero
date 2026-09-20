@@ -139,18 +139,6 @@ export interface HybridRankableHit {
   jurisdiction?: string;
 }
 
-export interface FusedPrecedentHit<T> {
-  hit: T;
-  vectorRank?: number;
-  textRank?: number;
-  rrfScore: number;
-  vectorScore: number;
-  textScore: number;
-  codeOverlap: number;
-  combinedScore: number;
-  retrievalSource: "hybrid_fusion" | "vector_only" | "bm25_only";
-}
-
 /**
  * Extract clean, high-signal lexical query keywords from claim details
  * for Convex BM25 .withSearchIndex("search_precedents") lexical matching.

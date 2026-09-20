@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-20T16:21:20Z
+- **Last updated:** 2026-09-20T17:12:00Z
 
 ## Log
 
@@ -1843,7 +1843,7 @@ Added `@convex-dev/action-retrier`, `@convex-dev/workpool`, and `@convex-dev/bat
 - Statutory Batch Worker: Configured `batchWorker` in `convex/convex.config.ts` and implemented `convex/statutoryDeadlineWorker.ts` with cursor-based pagination in chunks of 50. Recalculates statutory clocks and triggers 14-day critical deadline alarms with 24-hour deduplication. Wired daily cron in `convex/crons.ts` to trigger the sweep with automatic cursor reset.
 - Regression Coverage & Verification: Added comprehensive integration test suite (`tests/convexComponentsScaleAndReliability.test.ts`, 23 tests) asserting retry backoff, workpool queueing and error isolation, and batch worker cursor progression. Verified with `npm run verify` (1,327 passing tests across 84 suites, 100% clean typecheck, lint, coverage, and production build). Convex features: schema, tables, indexes, queries, mutations, internalMutation, actions, internalAction, crons, scheduled functions, action retrier, workpool, batch worker.
 
-### 2026-09-20 - 887e295
+### 2026-09-20 - 8a0cdc4
 Removed all remnants of the Autonomous AI Adjudicator across schema, queries, mutations, webhook handlers, and test suites (`convex/schema.ts`, `convex/claims.ts`, `convex/actions/agentMail.ts`, `convex/lib/agentMailWebhook.ts`, `convex/lib/adversaryNegotiation.ts`, `tests/productionReadinessFixes.test.ts`, `tests/adversaryNegotiation.test.ts`, `tests/formalPdfAttachments.test.ts`, `IDEA.md`):
 - Dropped `agentMailAdjudicatorInboxId` and `agentMailAdjudicatorEmail` optional fields and `by_adjudicator_email` index from `convex/schema.ts`.
 - Removed `by_adjudicator_email` index queries, `claimhero-adjudicator@` checks, and adjudicator inbox mutation parameters from `convex/claims.ts` (`findMatchingClaimInternal`, `getByInboxEmailInternal`, `setAgentMailInboxes`).
@@ -1851,3 +1851,16 @@ Removed all remnants of the Autonomous AI Adjudicator across schema, queries, mu
 - Purged simulated adjudicator bot functions (`pickAdversaryCountermove`, `buildAdversaryStrategyHint`, `hashClaimRound`, `AdversaryClaimContext`) from `convex/lib/adversaryNegotiation.ts` while retaining pure inbound determination parsing and counter-rebuttal helpers.
 - Renamed and streamlined `tests/adversarialAdjudicator.test.ts` to `tests/adversaryNegotiation.test.ts`, updated index assertions in `tests/productionReadinessFixes.test.ts` (12 indexes retained), and updated test suite reference in `IDEA.md`.
 - Verified cleanly with `npm run typecheck`, `npm run lint`, unit tests, and production build (`npm run build`). Convex features: schema, indexes, queries, mutations, actions, static hosting.
+
+### 2026-09-20 - working tree
+Purged unused dead code, upgraded Convex to 1.46.0, and resolved returning user authentication routing and landing navigation states (`package.json`, `package-lock.json`, `src/lib/authSession.ts`, `src/App.tsx`, `src/components/landing/PublicExperience.tsx`, `src/components/landing/TemplateLanding.tsx`, `src/types/index.ts`, `src/hooks/useEvidence.ts`, `convex/actions/appealSynthesizer.ts`, `convex/claimCollaborators.ts`, `convex/lib/adversaryNegotiation.ts`, `convex/lib/auth.ts`, `convex/lib/embeddings.ts`, `convex/lib/retrier.ts`, `convex/lib/stateRegulators.ts`, `tests/authSession.test.ts`, `tests/publicExperienceTransition.test.ts`, `tests/landingSections.test.ts`, `README.md`):
+- Upgraded Convex from 1.45.0 to 1.46.0 (`package.json`), regenerated server code bindings via `npx convex codegen`, and verified full compatibility with `@convex-dev/` component ecosystem.
+- Eliminated false-positive "Completing Google sign-in..." interstitial on returning cached sessions and public landing page visits: refined `shouldShowCompletingSignIn` to bypass when `currentView === 'landing'` and only trigger during active OAuth redirect codes or pending authorization flows rather than generic cached credentials (`src/lib/authSession.ts`, `src/App.tsx`).
+- Dynamically adapted landing page header based on authenticated state (`src/components/landing/TemplateLanding.tsx`, `src/components/landing/PublicExperience.tsx`): when authenticated, cleanly renders exclusively the `Open Workspace` CTA on desktop and mobile without user pills or clutter; when unauthenticated, preserves `Sign In` and `Launch Sentinel` actions.
+- Executed automated AST-level dead code analysis across the entire project and purged all remaining unreferenced code:
+  - Removed uncalled functions and obsolete validators (`formatVectorPrecedentSection` in `convex/actions/appealSynthesizer.ts`, `collaboratorStatusValidator` in `convex/claimCollaborators.ts`, `requireClaimAccessAction` in `convex/lib/auth.ts`, and `__resetEvidenceCrawlBudgetForTests` in `src/hooks/useEvidence.ts`).
+  - Purged unused constants and types (`ADVERSARY_COUNTERMOVES` in `convex/lib/adversaryNegotiation.ts`, `FEDERAL_APPEAL_ENGINE_LABEL` in `convex/lib/stateRegulators.ts`, `RetriedExecutionResult` in `convex/lib/retrier.ts`, `FusedPrecedentHit` in `convex/lib/embeddings.ts`, and legacy interfaces in `src/types/index.ts` including `SimulationProgress`, `ResearchProgressStep`, `MultiSourceCrawlResult`, `PubMedScrapeResult`, `FdaScrapeResult`, `DiscoverPolicyDirectoryResult`, `PolicyDriftReport`, `DriftSeverity`, `DetectedPolicyChangeItem`).
+  - Deleted 3 orphan UI files (`PrivacyRedactionFilter.tsx`, `CinematicHero.tsx`, `ExpertDetail.tsx`), pruned uncalled Convex endpoints across 8 modules, and removed unused package dependencies (`ai`, `jose`).
+- Verified 0 remaining unreferenced files, 0 unused Convex queries/mutations/actions, and 0 unused exported declarations across `src/` and `convex/`.
+- Verified 1,315 automated tests across 84 suites with `npm run verify` (100% clean typecheck, lint, coverage, and production build). Convex features: schema, queries, mutations, actions, crons, scheduled functions, file storage, static hosting.
+

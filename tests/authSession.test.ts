@@ -301,14 +301,35 @@ describe("shouldShowCompletingSignIn", () => {
     ).toBe(true);
   });
 
-  it("shows completing state for a returning session still verifying", () => {
+  it("never shows completing state when visiting the landing page, even with cached session or oauth return", () => {
     expect(
       shouldShowCompletingSignIn({
         isAuthenticated: false,
         isAuthLoading: true,
         hasCachedSession: true,
+        currentView: "landing",
       }),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      shouldShowCompletingSignIn({
+        isAuthenticated: false,
+        isAuthLoading: true,
+        isOAuthReturn: true,
+        currentView: "landing",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not treat returning session with cached credential as completing sign-in", () => {
+    expect(
+      shouldShowCompletingSignIn({
+        isAuthenticated: false,
+        isAuthLoading: true,
+        hasCachedSession: true,
+        isOAuthReturn: false,
+        hasPendingFlow: false,
+      }),
+    ).toBe(false);
   });
 
   it("keeps anonymous visitors on signed-out copy while loading", () => {

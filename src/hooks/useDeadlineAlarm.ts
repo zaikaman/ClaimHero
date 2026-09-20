@@ -1,4 +1,3 @@
-import { useState, useEffect, useMemo } from "react";
 import { Claim, ClaimStatus } from "../types";
 
 export type UrgencyTier = "overdue" | "emergency" | "critical" | "urgent" | "normal" | "resolved";
@@ -39,11 +38,6 @@ export interface PortfolioDeadlineStats {
   nearestDeadlineClaim: Claim | DeadlineAlarmTarget | null;
   nearestDaysRemaining: number | null;
   summaryText: string;
-}
-
-export interface UseDeadlineAlarmOptions {
-  refreshIntervalMs?: number;
-  onCriticalAlarm?: (target: DeadlineAlarmTarget) => void;
 }
 
 const ONE_SECOND_MS = 1000;
@@ -248,73 +242,5 @@ export function calculatePortfolioDeadlineStats(
     nearestDeadlineClaim,
     nearestDaysRemaining,
     summaryText,
-  };
-}
-
-/**
- * Reactive Real-Time Deadline Alarm Hook
- *
- * Implements the real-time countdown & statutory alert calculation promised in
- * PRODUCT.md and the ClaimHero architectural blueprint.
- *
- * Can be invoked in two modes:
- * 1. Single Claim: `useDeadlineAlarm(claim)` -> Returns real-time countdown down to the second.
- * 2. Portfolio: `useDeadlineAlarm(claims)` -> Returns live portfolio alarm metrics & nearest deadline.
- */
-export function useDeadlineAlarm(
-  targetOrList?: DeadlineAlarmTarget | (Claim | DeadlineAlarmTarget)[] | null,
-  options?: UseDeadlineAlarmOptions
-) {
-  const [now, setNow] = useState<number>(() => Date.now());
-  const intervalMs = options?.refreshIntervalMs ?? 1000;
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, intervalMs);
-
-    return () => clearInterval(timer);
-  }, [intervalMs]);
-
-  const isArray = Array.isArray(targetOrList);
-
-  // Single target countdown
-  const singleTarget = useMemo(() => {
-    if (!targetOrList || isArray) return null;
-    return targetOrList as DeadlineAlarmTarget;
-  }, [targetOrList, isArray]);
-
-  const countdown = useMemo<LiveCountdown | null>(() => {
-    if (!singleTarget) return null;
-    return calculateLiveCountdown(singleTarget.statutoryDeadline, now, {
-      status: singleTarget.status,
-      appealFilingDeadlineDays: singleTarget.appealFilingDeadlineDays,
-    });
-  }, [singleTarget, now]);
-
-  // Collection stats
-  const collectionList = useMemo(() => {
-    if (!isArray || !targetOrList) return [];
-    return targetOrList as (Claim | DeadlineAlarmTarget)[];
-  }, [isArray, targetOrList]);
-
-  const portfolioStats = useMemo<PortfolioDeadlineStats>(() => {
-    return calculatePortfolioDeadlineStats(collectionList, now);
-  }, [collectionList, now]);
-
-  // Optional alarm callback
-  useEffect(() => {
-    if (countdown?.shouldAlarm && singleTarget && options?.onCriticalAlarm) {
-      options.onCriticalAlarm(singleTarget);
-    }
-  }, [countdown?.shouldAlarm, singleTarget, options]);
-
-  return {
-    now,
-    countdown,
-    portfolioStats,
-    isOverdue: countdown?.isOverdue ?? portfolioStats.overdueCount > 0,
-    isCritical: countdown?.isCritical ?? portfolioStats.criticalCount > 0,
-    hasActiveAlarm: countdown?.shouldAlarm ?? portfolioStats.hasActiveAlarm,
   };
 }

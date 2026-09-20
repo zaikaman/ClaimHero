@@ -48,28 +48,6 @@ export const getLatestDrift = query({
 });
 
 /**
- * List all policy drift detection history for a claim.
- */
-export const listDrifts = query({
-  args: {
-    claimId: v.id("claims"),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args): Promise<Doc<"policyDrifts">[]> => {
-    const claim = await getClaimIfAuthorized(ctx, args.claimId);
-    if (!claim) return [];
-
-    const limit = Math.max(1, Math.min(args.limit ?? 20, 50));
-
-    return await ctx.db
-      .query("policyDrifts")
-      .withIndex("by_claim_and_created", (q) => q.eq("claimId", args.claimId))
-      .order("desc")
-      .take(limit);
-  },
-});
-
-/**
  * Internal query to fetch baseline snapshot for a policy URL or claim.
  */
 export const getBaselineSnapshotInternal = internalQuery({
