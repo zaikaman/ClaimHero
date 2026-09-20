@@ -374,7 +374,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       claim.status === "parsing");
 
   return (
-    <div className="space-y-4 animate-fadeIn flex flex-col">
+    <div className="space-y-4 animate-fadeIn flex flex-col pb-16">
       {/* 4-Step Guided Sentinel Stepper */}
       <SentinelFlowStepper
         claim={claim}
@@ -541,7 +541,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
           </div>
 
           {/* Quick Actions & Escalation Trigger */}
-          <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
+          <div className="flex flex-wrap items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
             {/* Version History Toggle */}
             <Button
               variant={showVersionHistory ? "secondary" : "outline"}
@@ -908,13 +908,13 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
         {/* Left 8 Cols: Markdown Editor & Live Preview (Responsive height on mobile, fixed on desktop) */}
         <Card className="lg:col-span-8 min-h-[480px] h-[72vh] lg:h-[660px] xl:h-[720px] flex flex-col border border-border bg-card/70 shadow-xs p-0 overflow-hidden min-w-0">
           {/* Sub-view Viewport Switcher */}
-          <div className="h-10 shrink-0 flex items-center justify-between border-b border-border px-4 py-2 bg-muted/30">
-            <div className="flex items-center gap-1.5">
+          <div className="h-10 shrink-0 flex items-center justify-between border-b border-border px-3 sm:px-4 py-2 bg-muted/30 gap-2">
+            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none min-w-0">
               <Button
                 variant={activeTab === "edit" ? "secondary" : "ghost"}
                 size="xs"
                 onClick={() => setActiveTab("edit")}
-                className="gap-1 font-medium h-7 text-xs"
+                className="gap-1 font-medium h-7 text-xs shrink-0"
               >
                 <PencilSimpleLine className="size-3" />
                 <span>{isDetailed ? "Editor" : "Write"}</span>
@@ -923,7 +923,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 variant={activeTab === "split" ? "secondary" : "ghost"}
                 size="xs"
                 onClick={() => setActiveTab("split")}
-                className="hidden md:inline-flex font-medium h-7 text-xs"
+                className="hidden md:inline-flex font-medium h-7 text-xs shrink-0"
               >
                 <span>{isDetailed ? "Split View" : "Side-by-side"}</span>
               </Button>
@@ -931,18 +931,18 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 variant={activeTab === "preview" ? "secondary" : "ghost"}
                 size="xs"
                 onClick={() => setActiveTab("preview")}
-                className="gap-1 font-medium h-7 text-xs"
+                className="gap-1 font-medium h-7 text-xs shrink-0"
               >
                 <Eye className="size-3" />
                 <span>{isDetailed ? "Preview" : "Read"}</span>
               </Button>
-              <div className="h-4 w-px bg-border mx-1 hidden sm:block" />
+              <div className="h-4 w-px bg-border mx-1 hidden sm:block shrink-0" />
               <Button
                 variant="ghost"
                 size="xs"
                 onClick={handleInjectErisaPenalties}
                 disabled={readOnly}
-                className="gap-1 text-xs text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 h-7 disabled:opacity-50"
+                className="gap-1 text-xs text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 h-7 disabled:opacity-50 shrink-0"
                 title={readOnly ? "Viewers have read-only access" : (isDetailed ? "Inject accrued ERISA 29 U.S.C. § 1132(c) statutory non-disclosure penalties into Section IV" : "Add a warning about fees the insurer may owe")}
               >
                 {injectedPenaltiesSuccess ? (
@@ -959,7 +959,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               </Button>
             </div>
 
-            <div className="text-[11px] font-mono text-muted-foreground flex items-center gap-2">
+            <div className="text-[11px] font-mono text-muted-foreground hidden sm:flex items-center gap-2 shrink-0">
               <span>{markdownContent.length} chars</span>
               <span>•</span>
               <span>{markdownContent.split(/\s+/).filter(Boolean).length} words</span>
@@ -1161,19 +1161,19 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
       )}
 
       {/* Sticky Bottom Next-Step Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md p-3 px-4 sm:px-8 flex items-center justify-between shadow-lg print:hidden">
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="font-mono text-xs hidden sm:inline-flex">
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md p-3 px-3 sm:px-8 flex items-center justify-between shadow-lg print:hidden gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Badge variant="outline" className="font-mono text-xs hidden sm:inline-flex shrink-0">
             {isDetailed ? "Step 2 of 3: Appeal Brief" : "Step 2 of 3: Your letter"}
           </Badge>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground truncate hidden md:inline">
             {markdownContent
               ? `${markdownContent.split(/\s+/).filter(Boolean).length} words • ${currentTierConfig.keyStatute} Cited`
               : (isDetailed ? "Synthesize the appeal brief before dispatching to insurer" : "Write your letter before sending it")}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {onNavigateToEvidence && (
             <Button
               variant="outline"
@@ -1183,7 +1183,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               title={isDetailed ? "Back to Clinical Policy & Evidence Matrix" : "Back to your proof"}
             >
               <ArrowLeft className="size-3.5" />
-              <span>{isDetailed ? "Back to Evidence" : "Back to Proof"}</span>
+              <span className="hidden sm:inline">{isDetailed ? "Back to Evidence" : "Back to Proof"}</span>
             </Button>
           )}
 
@@ -1195,7 +1195,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
             title={isDetailed ? "Export printable PDF brief and statutory exhibits" : "Save or print your letter"}
           >
             <Printer className="size-3.5" />
-            <span>{isDetailed ? "Export PDF Dossier" : "Save / Print"}</span>
+            <span className="hidden sm:inline">{isDetailed ? "Export PDF Dossier" : "Save / Print"}</span>
           </Button>
 
           {hasSynthesizedBrief ? (
@@ -1203,10 +1203,11 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               onClick={() => {
                 if (onNavigateToDispatch) onNavigateToDispatch();
               }}
-              className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all h-8"
+              className="gap-1.5 sm:gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all h-8"
               title={isDetailed ? "Proceed to Payer Dispatch to review transmission and send appeal" : "Go to send your letter"}
             >
-              <span>{isDetailed ? "Next: Dispatch Appeal Packet" : "Next: Send it"}</span>
+              <span className="hidden sm:inline">{isDetailed ? "Next: Dispatch Appeal Packet" : "Next: Send it"}</span>
+              <span className="inline sm:hidden">{isDetailed ? "Dispatch" : "Send"}</span>
               <ArrowRight className="size-3.5" />
             </Button>
           ) : (
@@ -1214,7 +1215,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               onClick={handleRunSynthesis}
               disabled={isSynthesizing || isSaving || isEscalating || readOnly || isBackgroundPipelineRunning}
               className={cn(
-                "gap-2 text-xs font-semibold transition-all h-8",
+                "gap-1.5 sm:gap-2 text-xs font-semibold transition-all h-8",
                 isBackgroundPipelineRunning
                   ? "border border-primary/30 bg-primary/10 text-primary cursor-not-allowed shadow-none"
                   : "bg-primary text-primary-foreground shadow-md hover:shadow-lg cursor-pointer"
@@ -1224,17 +1225,18 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
               {isSynthesizing || isEscalating ? (
                 <>
                   <CircleNotch className="size-3.5 animate-spin" />
-                  <span>{isDetailed ? "Synthesizing Brief..." : "Writing..."}</span>
+                  <span>{isDetailed ? "Synthesizing..." : "Writing..."}</span>
                 </>
               ) : isBackgroundPipelineRunning ? (
                 <>
                   <CircleNotch className="size-3.5 animate-spin text-primary" />
-                  <span>{isDetailed ? "Pipeline Running in Background..." : "Writing in background..."}</span>
+                  <span>{isDetailed ? "Running..." : "Working..."}</span>
                 </>
               ) : (
                 <>
                   <FileText className="size-3.5" />
-                  <span>{isDetailed ? "Next: Synthesize Appeal Brief" : "Next: Write my letter"}</span>
+                  <span className="hidden sm:inline">{isDetailed ? "Next: Synthesize Appeal Brief" : "Next: Write my letter"}</span>
+                  <span className="inline sm:hidden">{isDetailed ? "Synthesize" : "Write"}</span>
                   <ArrowRight className="size-3.5" />
                 </>
               )}

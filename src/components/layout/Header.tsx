@@ -51,27 +51,27 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/60 backdrop-blur-xl print:hidden">
-      <div className="flex h-12 items-center justify-between px-4 lg:px-6">
+      <div className="flex h-12 items-center justify-between px-2.5 sm:px-4 lg:px-6 gap-2">
         {/* Left: Sidebar trigger, separator & search input */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={onToggleSidebar}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground shrink-0"
             title="Toggle sidebar (⌘B / Ctrl+B)"
           >
             <Sidebar className="size-4" />
           </Button>
-          <Separator orientation="vertical" className="h-4 mx-1 border-border/50" />
+          <Separator orientation="vertical" className="h-4 mx-0.5 sm:mx-1 border-border/50 shrink-0" />
           <button
             onClick={onOpenCommandPalette}
-            className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 backdrop-blur-sm px-3 py-1 text-xs text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors w-56 sm:w-72"
+            className="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-border/60 bg-muted/30 backdrop-blur-sm px-2 sm:px-3 py-1 text-xs text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors max-w-[125px] xs:max-w-[170px] sm:max-w-xs sm:w-72 min-w-0"
             title={isDetailed ? "Search claims, CPT, or ask Sentinel (⌘K / Ctrl+K)" : "Search your cases or ask for help (⌘K / Ctrl+K)"}
           >
-            <MagnifyingGlass className="size-3.5" />
-            <span className="flex-1 text-left truncate">{isDetailed ? "Search claims, CPT, or ask Sentinel..." : "Search your cases or ask for help..."}</span>
-            <kbd className="pointer-events-none hidden sm:inline-flex h-4 items-center gap-0.5 rounded border border-border/60 bg-muted/60 px-1.5 font-mono text-[9px] font-medium text-muted-foreground">
+            <MagnifyingGlass className="size-3.5 shrink-0" />
+            <span className="flex-1 text-left truncate">{isDetailed ? "Search claims, CPT..." : "Search cases..."}</span>
+            <kbd className="pointer-events-none hidden sm:inline-flex h-4 items-center gap-0.5 rounded border border-border/60 bg-muted/60 px-1.5 font-mono text-[9px] font-medium text-muted-foreground shrink-0">
               ⌘K
             </kbd>
           </button>

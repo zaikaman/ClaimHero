@@ -194,7 +194,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       : "Step 1/3: Initializing Autonomous Sentinel review";
 
   return (
-    <div className="flex flex-col gap-4 animate-fadeIn">
+    <div className="flex flex-col gap-4 animate-fadeIn pb-16">
       {/* 4-Step Guided Sentinel Stepper */}
       <SentinelFlowStepper
         claim={claim}
@@ -545,7 +545,7 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                 </TooltipProvider>
               </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                 {breakdown.map((crit, idx) => {
                   const pct = Math.min(100, Math.round((crit.score / crit.maxScore) * 100));
                   return (
@@ -822,12 +822,12 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
       )}
 
       {/* Sticky Bottom Next-Step Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md p-3 px-4 sm:px-8 flex items-center justify-between shadow-lg print:hidden">
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="font-mono text-xs hidden sm:inline-flex">
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md p-3 px-3 sm:px-8 flex items-center justify-between shadow-lg print:hidden gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Badge variant="outline" className="font-mono text-xs hidden sm:inline-flex shrink-0">
             {isDetailed ? "Step 1 of 3: Evidence & CPB" : "Step 1 of 3: Your proof"}
           </Badge>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground truncate">
             {evidences.length > 0
               ? `${evidences.length} ${isDetailed ? "Clinical Clauses Indexed" : "proof documents"} • Score: ${(claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore) !== undefined ? `${claim.appealReadinessScore ?? claim.evidenceCoverageScore ?? claim.overturnProbabilityScore}/100` : "Calculated"}`
               : (isDetailed ? "Review clinical evidence before proceeding to brief synthesis" : "Check your proof before writing your letter")}
@@ -836,13 +836,16 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
 
         <Button
           onClick={onNavigateToStudio}
-          className="gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all"
+          className="gap-1.5 sm:gap-2 text-xs bg-primary text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all shrink-0"
           title={isDetailed ? "Proceed to Collaborative Appeal Studio to review and synthesize appeal brief" : "Go to your appeal letter"}
         >
-          <span>
+          <span className="hidden sm:inline">
             {hasDraftedBrief
               ? (isDetailed ? "Next: Review Synthesized Appeal Brief in Studio" : "Next: Review your letter")
               : (isDetailed ? "Next: Review & Synthesize Appeal Brief in Studio" : "Next: Write your letter")}
+          </span>
+          <span className="inline sm:hidden">
+            {hasDraftedBrief ? "Next: Studio" : "Next: Letter"}
           </span>
           <ArrowRight className="size-3.5" />
         </Button>

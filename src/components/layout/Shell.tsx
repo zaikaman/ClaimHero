@@ -47,6 +47,24 @@ export const Shell: React.FC<ShellProps> = ({
   children,
 }) => {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+
+  const handleToggleSidebar = useCallback(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setIsMobileSidebarOpen((prev) => !prev);
+    } else {
+      onToggleSidebar?.();
+    }
+  }, [onToggleSidebar]);
+
+  const handleCloseMobileSidebar = useCallback(() => {
+    setIsMobileSidebarOpen(false);
+  }, []);
+
+  // Close mobile sidebar when active view or selected case changes
+  React.useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [currentView, selectedClaim?._id]);
 
   const handleOpenShortcuts = useCallback(() => {
     if (onOpenShortcutsHelp) {
@@ -92,7 +110,7 @@ export const Shell: React.FC<ShellProps> = ({
       <Header
         onSelectView={onSelectView}
         onOpenIngestion={onOpenIngestion}
-        onToggleSidebar={onToggleSidebar}
+        onToggleSidebar={handleToggleSidebar}
         onOpenCommandPalette={onOpenCommandPalette}
         totalDisputedAmount={totalDisputedAmount}
         totalWonAmount={totalWonAmount}
@@ -113,9 +131,11 @@ export const Shell: React.FC<ShellProps> = ({
           onOpenIngestion={onOpenIngestion}
           onDeleteCase={onDeleteCase}
           onOpenSentinel={onOpenSentinel}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={handleCloseMobileSidebar}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 print:overflow-visible print:p-0">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 print:overflow-visible print:p-0">
           <div className="mx-auto max-w-7xl min-h-full flex flex-col">{children}</div>
         </main>
       </div>

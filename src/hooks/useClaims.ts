@@ -2,7 +2,10 @@ import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Claim, ClaimStatus, DashboardStats, DenialExtractionResult } from "../types";
-import { extractDocumentInBrowser, ClientExtractionResult } from "../lib/clientOcr";
+// Type-only: the OCR pipeline (pdfjs-dist + tesseract.js) is loaded on demand
+// via dynamic import at the call site so these heavy native-adjacent libs are
+// never part of the boot-critical chunk and never evaluate on landing.
+import type { ClientExtractionResult } from "../lib/clientOcr";
 
 import { Id } from "../../convex/_generated/dataModel";
 
@@ -232,6 +235,9 @@ export function useClaims(options?: {
       onProgress?.("Extracting document text locally in browser...");
       let clientResult: ClientExtractionResult | null = null;
       try {
+        // Loaded on demand (separate chunk): keeps pdfjs-dist + tesseract.js
+        // out of the boot graph and off the landing page entirely.
+        const { extractDocumentInBrowser } = await import("../lib/clientOcr");
         clientResult = await extractDocumentInBrowser(file, file.name, onProgress);
       } catch (ocrErr) {
         console.warn("Client in-browser extraction note:", ocrErr);

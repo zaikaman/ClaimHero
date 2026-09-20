@@ -17,6 +17,7 @@ import {
   ChartPieSlice,
   ShieldCheck,
   GraduationCap,
+  X,
 } from "@phosphor-icons/react";
 import { Claim } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
@@ -60,6 +61,8 @@ interface SidebarProps {
   onOpenIngestion?: () => void;
   onDeleteCase?: (claimId: string) => Promise<unknown>;
   onOpenSentinel?: () => void;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -72,6 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenIngestion,
   onDeleteCase,
   onOpenSentinel,
+  isMobileOpen = false,
+  onCloseMobile,
 }) => {
   const { viewer, isAuthenticated, userName, userEmail, userInitial, signOut } = useCurrentUser();
   const { isDetailed, toggleDetailMode } = useDetailMode();
@@ -92,35 +97,64 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  return (
-    <aside
-      className={cn(
-        "relative z-10 shrink-0 border-r border-border/50 bg-sidebar/95 backdrop-blur-xl text-sidebar-foreground flex flex-col justify-between p-3 font-sans select-none overflow-y-auto transition-all duration-200 print:hidden",
-        isCollapsed ? "w-16 items-center px-2" : "w-64"
-      )}
-    >
-      <div className="space-y-3.5 w-full">
+  const handleNavSelect = (view: NavigationView) => {
+    onSelectView(view);
+    onCloseMobile?.();
+  };
+
+  const handleSelectCase = (claimId: string) => {
+    handleSelectCaseItem(claimId);
+    onCloseMobile?.();
+  };
+
+  const handleIngest = () => {
+    onOpenIngestion?.();
+    onCloseMobile?.();
+  };
+
+  const handleSentinel = () => {
+    onOpenSentinel?.();
+    onCloseMobile?.();
+  };
+
+  const renderSidebarContent = (collapsed: boolean, isMobile: boolean) => (
+    <>
+<div className="space-y-3.5 w-full">
         {/* Brand Header */}
-        <button
-          onClick={() => onSelectView("landing")}
-          className={cn(
-            "w-full flex items-center gap-2.5 px-2 py-1 rounded-md hover:bg-muted/60 transition-all text-left group cursor-pointer",
-            isCollapsed && "justify-center px-0"
+        <div className={cn("flex items-center justify-between w-full", collapsed && "justify-center")}>
+          <button
+            onClick={() => handleNavSelect("landing")}
+            className={cn(
+              "flex items-center gap-2.5 px-2 py-1 rounded-md hover:bg-muted/60 transition-all text-left group cursor-pointer min-w-0",
+              collapsed && "justify-center px-0"
+            )}
+            title="ClaimHero home"
+          >
+            {collapsed ? (
+              <BrandIcon size="sm" glow interactive />
+            ) : (
+              <BrandLogo size="md" glow interactive />
+            )}
+          </button>
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={onCloseMobile}
+              className="text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+              title="Close navigation drawer"
+              aria-label="Close navigation drawer"
+            >
+              <X className="size-4" />
+            </Button>
           )}
-          title="ClaimHero home"
-        >
-          {isCollapsed ? (
-            <BrandIcon size="sm" glow interactive />
-          ) : (
-            <BrandLogo size="md" glow interactive />
-          )}
-        </button>
+        </div>
 
         {/* Primary Action: Quick Ingest */}
-        {!isCollapsed ? (
+        {!collapsed ? (
           <div className="px-1">
             <button
-              onClick={() => onOpenIngestion?.()}
+              onClick={() => handleIngest()}
               className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground h-9 px-3 text-xs font-semibold hover:bg-primary/90 transition-all shadow-xs cursor-pointer active:scale-[0.98]"
             >
               <PlusCircle className="size-4" weight="bold" />
@@ -131,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex flex-col items-center">
             <Button
               size="icon"
-              onClick={() => onOpenIngestion?.()}
+              onClick={() => handleIngest()}
               className="size-9 rounded-lg shadow-xs"
               title={isDetailed ? "Ingest Denial Notice" : "Add a denial letter"}
             >
@@ -143,11 +177,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Primary Navigation: My Cases (List / Portfolio View) */}
         <div className="space-y-1">
           <button
-            onClick={() => onSelectView("radar")}
-            title={isCollapsed ? (isDetailed ? "Case Radar — Claims Ingestion & Alarms" : "My Cases — bills the insurer refused to pay") : undefined}
+            onClick={() => handleNavSelect("radar")}
+            title={collapsed ? (isDetailed ? "Case Radar — Claims Ingestion & Alarms" : "My Cases — bills the insurer refused to pay") : undefined}
             className={cn(
               "w-full flex items-center rounded-lg text-xs font-medium transition-colors text-left group cursor-pointer",
-              isCollapsed ? "justify-center p-2" : "justify-between px-2.5 py-2",
+              collapsed ? "justify-center p-2" : "justify-between px-2.5 py-2",
               currentView === "radar"
                 ? "bg-secondary text-foreground font-semibold shadow-xs"
                 : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
@@ -160,9 +194,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   currentView === "radar" ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )}
               />
-              {!isCollapsed && <span className="truncate">{isDetailed ? "Case Radar" : "My Cases"}</span>}
+              {!collapsed && <span className="truncate">{isDetailed ? "Case Radar" : "My Cases"}</span>}
             </div>
-            {!isCollapsed && claims.length > 0 && (
+            {!collapsed && claims.length > 0 && (
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
                 {claims.length}
               </span>
@@ -172,7 +206,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Cases Stream (Active Case Workspaces) */}
         <div className="space-y-1.5 pt-1">
-          {!isCollapsed && (
+          {!collapsed && (
             <div className="px-2 flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
               <span>{isDetailed ? "Active Cases" : "Your cases"}</span>
               <span className="text-[9px] text-muted-foreground/80 font-mono">
@@ -182,14 +216,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {/* Collapsed mode: icon list */}
-          {isCollapsed ? (
+          {collapsed ? (
             <div className="space-y-1.5 flex flex-col items-center">
               {claims.slice(0, 6).map((c) => {
                 const isCurrent = selectedClaim?._id === c._id && isCaseWorkspaceActive;
                 return (
                   <button
                     key={c._id}
-                    onClick={() => handleSelectCaseItem(c._id)}
+                    onClick={() => handleSelectCase(c._id)}
                     title={`${c.patient?.name || "Patient"} — ${c.patient?.insurancePayer || "Payer"} (${c.daysRemaining}d left)`}
                     className={cn(
                       "size-9 rounded-lg flex items-center justify-center text-xs font-bold font-mono transition-all cursor-pointer",
@@ -227,7 +261,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   return (
                     <div
                       key={c._id}
-                      onClick={() => handleSelectCaseItem(c._id)}
+                      onClick={() => handleSelectCase(c._id)}
                       className={cn(
                         "group relative flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer text-left",
                         isCurrent
@@ -304,7 +338,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleSelectCaseItem(c._id);
+                                handleSelectCase(c._id);
                               }}
                               className="text-xs cursor-pointer"
                             >
@@ -343,11 +377,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Settings & Portfolio Intelligence */}
         <div className="space-y-0.5">
           <button
-            onClick={() => onSelectView("settings")}
-            title={isCollapsed ? "Settings & Analytics" : undefined}
+            onClick={() => handleNavSelect("settings")}
+            title={collapsed ? "Settings & Analytics" : undefined}
             className={cn(
               "w-full flex items-center rounded-lg text-xs font-medium transition-colors text-left group cursor-pointer",
-              isCollapsed ? "justify-center p-2" : "justify-between px-2.5 py-1.5",
+              collapsed ? "justify-center p-2" : "justify-between px-2.5 py-1.5",
               currentView === "settings" || currentView === "analytics"
                 ? "bg-secondary text-foreground font-semibold shadow-xs"
                 : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
@@ -360,9 +394,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   currentView === "settings" ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )}
               />
-              {!isCollapsed && <span className="truncate">{isDetailed ? "Settings & Platform" : "Settings"}</span>}
+              {!collapsed && <span className="truncate">{isDetailed ? "Settings & Platform" : "Settings"}</span>}
             </div>
-            {!isCollapsed && isDetailed && (
+            {!collapsed && isDetailed && (
               <span className="text-[9px] font-mono text-muted-foreground">
                 Config
               </span>
@@ -370,10 +404,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {!isCollapsed ? (
+        {!collapsed ? (
           <button
             type="button"
-            onClick={onOpenSentinel}
+            onClick={handleSentinel}
             className="w-full text-left rounded-lg border border-border/60 bg-card/60 hover:bg-card/90 hover:border-primary/50 backdrop-blur-md px-2.5 py-2 space-y-1 text-xs shadow-2xs transition-all cursor-pointer group"
             title={isDetailed ? "Open ERISA Sentinel Copilot (⌘J / Ctrl+J)" : "Open appeal helper (⌘J / Ctrl+J)"}
           >
@@ -403,7 +437,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ) : (
           <button
             type="button"
-            onClick={onOpenSentinel}
+            onClick={handleSentinel}
             className="w-full flex justify-center p-2 rounded-lg hover:bg-muted/60 transition-colors text-primary cursor-pointer"
             title={isDetailed ? "Open ERISA Sentinel Copilot (⌘J / Ctrl+J)" : "Open appeal helper (⌘J / Ctrl+J)"}
           >
@@ -413,7 +447,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Global Language / Detail Mode Switch */}
         <div className="w-full">
-          {!isCollapsed ? (
+          {!collapsed ? (
             <DetailModeToggle className="w-full justify-between py-1.5 px-2.5 text-xs border-border/60" />
           ) : (
             <div className="flex justify-center">
@@ -428,7 +462,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               className={cn(
                 "w-full flex items-center justify-between p-1.5 rounded-lg hover:bg-muted/60 transition-colors text-left cursor-pointer",
-                isCollapsed && "justify-center p-1"
+                collapsed && "justify-center p-1"
               )}
             >
               <div className="flex items-center gap-2">
@@ -436,7 +470,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {viewer?.image && <AvatarImage src={viewer.image} alt={userName} />}
                   <AvatarFallback className="text-primary font-bold text-xs">{userInitial}</AvatarFallback>
                 </Avatar>
-                {!isCollapsed && (
+                {!collapsed && (
                   <div className="text-left">
                     <div className="font-semibold text-xs text-foreground leading-tight truncate max-w-[130px]">
                       {userName || "Advocate"}
@@ -447,7 +481,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
               </div>
-              {!isCollapsed && (
+              {!collapsed && (
                 <DotsThreeVertical className="size-3.5 text-muted-foreground" />
               )}
             </button>
@@ -463,11 +497,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <GraduationCap className="size-3.5 text-primary" />
               <span>{isDetailed ? "Switch to Simple Mode" : "Switch to Expert Details"}</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onSelectView("settings")} className="gap-2 cursor-pointer font-medium text-xs">
+            <DropdownMenuItem onClick={() => handleNavSelect("settings")} className="gap-2 cursor-pointer font-medium text-xs">
               <GearSix className="size-3.5 text-primary" />
               <span>Settings</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onSelectView("analytics")} className="gap-2 cursor-pointer font-medium text-xs">
+            <DropdownMenuItem onClick={() => handleNavSelect("analytics")} className="gap-2 cursor-pointer font-medium text-xs">
               <ChartPieSlice className="size-3.5 text-cyan-400" />
               <span>{isDetailed ? "Portfolio Analytics" : "Savings overview"}</span>
             </DropdownMenuItem>
@@ -478,13 +512,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span>Sign Out</span>
               </DropdownMenuItem>
             ) : (
-              <DropdownMenuItem onClick={() => onSelectView("login")} className="gap-2 font-medium text-primary cursor-pointer text-xs">
+              <DropdownMenuItem onClick={() => handleNavSelect("login")} className="gap-2 font-medium text-primary cursor-pointer text-xs">
                 <SignIn className="size-3.5" />
                 <span>Sign In / Create Account</span>
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onOpenIngestion?.()} className="gap-2 cursor-pointer text-xs">
+            <DropdownMenuItem onClick={() => handleIngest()} className="gap-2 cursor-pointer text-xs">
               <CloudArrowUp className="size-3.5" />
               <span>{isDetailed ? "Ingest Denial Notice" : "Add denial letter"}</span>
             </DropdownMenuItem>
@@ -501,6 +535,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </DropdownMenu>
       </div>
 
+
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile Drawer (visible on < md when isMobileOpen is true) */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden print:hidden" role="dialog" aria-modal="true" aria-label="Navigation drawer">
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+            onClick={onCloseMobile}
+            aria-hidden="true"
+          />
+          <aside className="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-sidebar text-sidebar-foreground border-r border-border/50 flex flex-col justify-between p-3 font-sans select-none shadow-2xl overflow-y-auto transition-transform animate-in slide-in-from-left duration-200">
+            {renderSidebarContent(false, true)}
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop Sidebar (hidden on < md, visible on md and up) */}
+      <aside
+        className={cn(
+          "hidden md:flex relative z-10 shrink-0 border-r border-border/50 bg-sidebar/95 backdrop-blur-xl text-sidebar-foreground flex-col justify-between p-3 font-sans select-none overflow-y-auto transition-all duration-200 print:hidden",
+          isCollapsed ? "w-16 items-center px-2" : "w-64"
+        )}
+      >
+        {renderSidebarContent(isCollapsed, false)}
+      </aside>
+
       {/* Delete Case Confirmation Modal */}
       <DeleteCaseModal
         isOpen={Boolean(caseToDelete)}
@@ -508,6 +572,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onClose={() => setCaseToDelete(null)}
         onConfirmDelete={onDeleteCase || (async () => {})}
       />
-    </aside>
+    </>
   );
 };

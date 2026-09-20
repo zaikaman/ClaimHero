@@ -458,8 +458,10 @@ export function detectPiiEntities(
 
   // 1b. Bare 9-digit SSN candidates (no dashes, no prefix). Guarded so the
   // run is standalone (not inside member IDs, phones, or longer numbers) and
-  // validated against SSA area/group/serial issuance rules.
-  const bareSsnRegex = /(?<![A-Za-z0-9])(\d{9})(?![A-Za-z0-9])/g;
+  // validated against SSA area/group/serial issuance rules. The leading
+  // `(?:^|[^...])` is a non-capturing pre-filter (lookbehind-free for legacy
+  // Safari); group 1 stays the payload and offsets resolve via lastIndexOf.
+  const bareSsnRegex = /(?:^|[^A-Za-z0-9])(\d{9})(?![A-Za-z0-9])/g;
   while ((match = bareSsnRegex.exec(text)) !== null) {
     const candidate = match[1];
     if (!isPlausibleSsnDigits(candidate)) continue;
@@ -481,18 +483,20 @@ export function detectPiiEntities(
   // 1c. Spaced 3-3-3 digit runs ("123 456 789"). Ambiguous with spaced
   // quantities, so the concatenated digits must pass SSN issuance rules and
   // confidence stays low.
-  const spacedSsnRegex = /(?<![A-Za-z0-9:])(\d{3}) (\d{3}) (\d{3})(?![A-Za-z0-9])/g;
+  const spacedSsnRegex = /(?:^|[^A-Za-z0-9:])(\d{3}) (\d{3}) (\d{3})(?![A-Za-z0-9])/g;
   while ((match = spacedSsnRegex.exec(text)) !== null) {
     const candidate = `${match[1]}${match[2]}${match[3]}`;
     if (!isPlausibleSsnDigits(candidate)) continue;
-    const raw = match[0];
+    // match[0] may include one consumed boundary char; re-anchor to payload.
+    const raw = `${match[1]} ${match[2]} ${match[3]}`;
+    const startIdx = match.index + match[0].length - raw.length;
     addEntity(
       "ssn",
       "Social Security Number",
       raw,
       maskSsn(raw, standard),
-      match.index,
-      match.index + raw.length,
+      startIdx,
+      startIdx + raw.length,
       "Spaced 3-3-3 SSN-shaped run (area/group/serial validated; verify)",
       0.7
     );
@@ -685,7 +689,7 @@ export function detectPiiEntities(
   // 5b. Unformatted numeric runs: contiguous 10-digit US phones/NPIs and
   // dashed 7-digit fax fragments. Letter/digit lookarounds keep timestamps,
   // member IDs, and ZIP+4 fragments intact (SSN-shaped runs belong to 1b).
-  const contiguousPhoneRegex = /(?<![A-Za-z0-9])(1?[2-9]\d{9})(?![A-Za-z0-9])/g;
+  const contiguousPhoneRegex = /(?:^|[^A-Za-z0-9])(1?[2-9]\d{9})(?![A-Za-z0-9])/g;
   while ((match = contiguousPhoneRegex.exec(text)) !== null) {
     const rawPhone = match[1];
     const fullText = match[0];
@@ -703,7 +707,7 @@ export function detectPiiEntities(
     );
   }
 
-  const shortFaxRegex = /(?<![\d])(\d{3}[-.]\d{4})(?![\d])/g;
+  const shortFaxRegex = /(?:^|[^\d])(\d{3}[-.]\d{4})(?![\d])/g;
   while ((match = shortFaxRegex.exec(text)) !== null) {
     const rawPhone = match[1];
     const fullText = match[0];
@@ -747,16 +751,18 @@ export function detectPiiEntities(
   // digit-inclusive middle would otherwise span forward across words to a street
   // suffix, producing a false match that overlaps a real entity, gets suppressed
   // by collision avoidance, and silently swallows the true address that follows.
-  const addressRegex = /(?<![\d()\-+.])\b\d{1,5}\s+[A-Z0-9\s.,]{3,35}\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Way|Court|Ct|Suite|Ste|Apt|Terrace|Ter|Parkway|Pkwy|Circle|Cir|Place|Pl)\b/gi;
+  const addressRegex = /(?:^|[^\d()\-+.])(\b\d{1,5}\s+[A-Z0-9\s.,]{3,35}\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Way|Court|Ct|Suite|Ste|Apt|Terrace|Ter|Parkway|Pkwy|Circle|Cir|Place|Pl)\b)/gi;
   while ((match = addressRegex.exec(text)) !== null) {
-    const rawAddr = match[0];
+    // Group 1 is the address; match[0] may include one consumed boundary char.
+    const rawAddr = match[1];
+    const startIdx = match.index + match[0].length - rawAddr.length;
     addEntity(
       "address",
       "Street Address",
       rawAddr,
       maskAddress(rawAddr, standard),
-      match.index,
-      match.index + rawAddr.length,
+      startIdx,
+      startIdx + rawAddr.length,
       "Street address physical locator",
       0.82
     );
@@ -767,7 +773,7 @@ export function detectPiiEntities(
   // codes, so: ZIP+4 always redacts (CPT never carries a dash suffix), while
   // a bare 5-digit ZIP only redacts with a state-code anchor ("IL 62701").
   // The state itself is retained (Safe Harbor permits states).
-  const zipPlus4Regex = /(?<![A-Za-z0-9])(\d{5}-\d{4})(?![A-Za-z0-9])/g;
+  const zipPlus4Regex = /(?:^|[^A-Za-z0-9])(\d{5}-\d{4})(?![A-Za-z0-9])/g;
   while ((match = zipPlus4Regex.exec(text)) !== null) {
     const raw = match[1];
     const fullText = match[0];

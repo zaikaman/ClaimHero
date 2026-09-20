@@ -200,14 +200,20 @@ export function TemplateLanding({ onEnterConsole }: TemplateLandingProps) {
           </button>
         </div>
 
+        {/* Collapsible mobile menu: grid-rows animation reserves zero layout
+            height when closed (opacity alone would leave an invisible block
+            pushing the hero down on phones). */}
         <div
-          className={`border-t border-white/10 px-6 transition-all duration-300 md:hidden ${
+          className={`md:hidden grid transition-[grid-template-rows,opacity,visibility] duration-300 ease-out ${
             isMobileMenuOpen
-              ? "pointer-events-auto translate-y-0 opacity-100"
-              : "pointer-events-none -translate-y-2 opacity-0"
+              ? "grid-rows-[1fr] opacity-100 visible"
+              : "grid-rows-[0fr] opacity-0 invisible pointer-events-none"
           }`}
+          aria-hidden={!isMobileMenuOpen}
         >
-          <div className="flex flex-col py-4">
+          <div className="overflow-hidden min-h-0">
+            <div className="border-t border-white/10 px-6">
+              <div className="flex flex-col py-4">
             {NAV_LINKS.map((link) => (
               <a
                 key={link.href}
@@ -241,6 +247,8 @@ export function TemplateLanding({ onEnterConsole }: TemplateLandingProps) {
               >
                 <span>Sign In</span>
               </button>
+            </div>
+              </div>
             </div>
           </div>
         </div>

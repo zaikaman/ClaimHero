@@ -634,7 +634,7 @@ export const SentinelChatbot: React.FC<SentinelChatbotProps> = ({
                 <span>{isDetailed ? "Global Clinical & ERISA Sentinel Active" : "Ready to help with any case"}</span>
               )}
             </div>
-            <span className="shrink-0 text-muted-foreground/50">Enter to send &bull; Shift+Enter for newline</span>
+            <span className="shrink-0 text-muted-foreground/50 hidden sm:inline">Enter to send &bull; Shift+Enter for newline</span>
           </div>
         </div>
       </div>

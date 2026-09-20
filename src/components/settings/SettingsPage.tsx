@@ -177,7 +177,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
     : "Just now";
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto bg-background/50 p-6 max-w-5xl mx-auto w-full space-y-6">
+    <div className="flex flex-col h-full overflow-y-auto bg-background/50 p-3.5 sm:p-6 max-w-5xl mx-auto w-full space-y-6">
       {/* Top Banner & Title Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/60">
         <div>

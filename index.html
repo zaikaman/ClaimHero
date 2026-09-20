@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>ClaimHero — Evidence-Grounded Appeal Preparation Workspace</title>
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
@@ -13,9 +13,30 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap" rel="stylesheet" />
+    <!-- Polyfill global Iterator before module scripts evaluate (Safari < 18.2 / iOS Safari compatibility) -->
+    <script>
+      (function () {
+        try {
+          var g = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : this;
+          if (g && typeof g.Iterator === "undefined") {
+            var proto = typeof Symbol !== "undefined" && Symbol.iterator && typeof [][Symbol.iterator] === "function"
+              ? Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]()))
+              : {};
+            function Iterator() {}
+            Iterator.prototype = proto;
+            g.Iterator = Iterator;
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-background text-foreground min-h-screen antialiased">
     <div id="root"></div>
+    <noscript>
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#090b12;padding:16px;">
+        <p style="color:#e2e8f0;font:14px/1.6 ui-sans-serif,system-ui,sans-serif;text-align:center;">ClaimHero needs JavaScript enabled. Please enable JavaScript and reload.</p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

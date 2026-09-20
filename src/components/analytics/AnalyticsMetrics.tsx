@@ -232,46 +232,48 @@ export const AnalyticsMetrics: React.FC<AnalyticsMetricsProps> = ({
             </span>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Insurance Payer</TableHead>
-                <TableHead>Cases</TableHead>
-                <TableHead>Disputed</TableHead>
-                <TableHead>{isDetailed ? "Resolved in Full" : "Resolved"}</TableHead>
-                <TableHead className="text-right">
-                  {isDetailed ? "Avg Readiness" : "Avg Strength"}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {stats.payerBreakdown.map((payer) => (
-                <TableRow
-                  key={payer.payer}
-                  onClick={() =>
-                    onSelectPayerFilter && onSelectPayerFilter(payer.payer)
-                  }
-                  className="cursor-pointer"
-                >
-                  <TableCell className="font-semibold text-foreground">
-                    {payer.payer}
-                  </TableCell>
-                  <TableCell className="font-mono text-muted-foreground">
-                    {payer.totalClaims}
-                  </TableCell>
-                  <TableCell className="font-mono font-semibold text-destructive">
-                    {formatCurrency(payer.totalDisputed)}
-                  </TableCell>
-                  <TableCell className="font-mono text-emerald-600 dark:text-emerald-400 font-medium">
-                    {formatCurrency(payer.wonAmount)} ({payer.wonCount})
-                  </TableCell>
-                  <TableCell className="font-mono font-bold text-right text-foreground">
-                    {payer.averageScore}/100
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table className="min-w-[550px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Insurance Payer</TableHead>
+                  <TableHead>Cases</TableHead>
+                  <TableHead>Disputed</TableHead>
+                  <TableHead>{isDetailed ? "Resolved in Full" : "Resolved"}</TableHead>
+                  <TableHead className="text-right">
+                    {isDetailed ? "Avg Readiness" : "Avg Strength"}
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {stats.payerBreakdown.map((payer) => (
+                  <TableRow
+                    key={payer.payer}
+                    onClick={() =>
+                      onSelectPayerFilter && onSelectPayerFilter(payer.payer)
+                    }
+                    className="cursor-pointer"
+                  >
+                    <TableCell className="font-semibold text-foreground">
+                      {payer.payer}
+                    </TableCell>
+                    <TableCell className="font-mono text-muted-foreground">
+                      {payer.totalClaims}
+                    </TableCell>
+                    <TableCell className="font-mono font-semibold text-destructive">
+                      {formatCurrency(payer.totalDisputed)}
+                    </TableCell>
+                    <TableCell className="font-mono text-emerald-600 dark:text-emerald-400 font-medium">
+                      {formatCurrency(payer.wonAmount)} ({payer.wonCount})
+                    </TableCell>
+                    <TableCell className="font-mono font-bold text-right text-foreground">
+                      {payer.averageScore}/100
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
 
         {/* Risk & Precedent Confidence Breakdown (4 Cols) */}

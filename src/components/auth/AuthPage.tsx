@@ -396,7 +396,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen h-screen w-screen bg-transparent text-white font-sans flex items-center justify-center p-3 sm:p-5 md:p-6 lg:p-8 relative overflow-hidden select-none">
+    <div className="min-h-screen h-screen w-full bg-transparent text-white font-sans flex items-center justify-center p-3 sm:p-5 md:p-6 lg:p-8 relative overflow-hidden select-none">
 
       {/* 1. Main Split-Card Auth Container */}
       <div className="relative z-10 w-full max-w-[1240px] h-auto min-h-0 sm:h-[88vh] sm:min-h-[500px] max-h-[96vh] sm:max-h-[820px] rounded-none p-2 sm:p-2.5 border border-white/20 shadow-2xl grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-y-auto sm:overflow-hidden backdrop-blur-xs">

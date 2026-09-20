@@ -1,3 +1,4 @@
+import "./polyfills";
 import * as pdfjsLib from "pdfjs-dist";
 import { createWorker } from "tesseract.js";
 import { fastSanitizeText, DetectedPiiEntity } from "./redactionEngine";

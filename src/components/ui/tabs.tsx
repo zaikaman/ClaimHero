@@ -32,7 +32,7 @@ function TabsList({
       data-slot="tabs-list"
       data-variant={variant}
       className={cn(
-        "group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground",
+        "group/tabs-list inline-flex w-fit max-w-full overflow-x-auto scrollbar-none items-center justify-start sm:justify-center rounded-lg p-[3px] text-muted-foreground",
         variant === "default" && "bg-muted/50 backdrop-blur-sm border border-border/50",
         variant === "line" && "gap-1 bg-transparent border-b border-border w-full justify-start rounded-none p-0",
         className

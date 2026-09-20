@@ -149,7 +149,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
   // Minimized Floating Button
   if (isMinimized) {
     return (
-      <div className={cn("fixed right-5 z-40 animate-fadeIn", bottomPositionClass)}>
+      <div className={cn("fixed right-3 sm:right-5 z-40 animate-fadeIn", bottomPositionClass)}>
         <Button
           variant="outline"
           size="sm"
@@ -170,7 +170,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({
   }
 
   return (
-    <Card className={cn("fixed right-5 z-40 w-[340px] sm:w-[370px] bg-card/95 border-border shadow-2xl backdrop-blur-md overflow-hidden text-left p-0 animate-blur-fade-up no-print", bottomPositionClass)}>
+    <Card className={cn("fixed left-3 right-3 sm:left-auto sm:right-5 z-40 w-auto sm:w-[370px] max-w-[calc(100vw-1.5rem)] bg-card/95 border-border shadow-2xl backdrop-blur-md overflow-hidden text-left p-0 animate-blur-fade-up no-print", bottomPositionClass)}>
 
       
       {/* Header Bar */}

@@ -709,7 +709,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
               </CardDescription>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -928,7 +928,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
 
         {/* Data Table */}
         <div className="overflow-x-auto">
-          <Table>
+          <Table className="min-w-[850px]">
             <TableHeader className="bg-muted/30">
               <TableRow>
                 <TableHead>{isDetailed ? "Claim & Patient" : "Case"}</TableHead>

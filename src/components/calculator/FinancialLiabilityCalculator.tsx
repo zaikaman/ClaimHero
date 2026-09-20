@@ -371,7 +371,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
         </div>
 
         {/* Executive 4-Stat Metric Ribbon */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-3.5 border-t border-border/50">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 pt-3.5 border-t border-border/50">
           <div className="p-3 rounded-lg bg-background/50 border border-border/40">
             <div className="text-[10px] uppercase font-mono text-muted-foreground flex items-center gap-1">
               <CurrencyDollar className="size-3 text-cyan-400" />
@@ -662,8 +662,8 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               </Badge>
             </div>
 
-            <div className="rounded-lg border border-border/50 overflow-hidden mt-3">
-              <Table>
+            <div className="rounded-lg border border-border/50 overflow-x-auto mt-3">
+              <Table className="min-w-[480px]">
                 <TableHeader className="bg-muted/40">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="text-[11px] font-mono py-2">Item</TableHead>
@@ -1053,8 +1053,8 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
               </Badge>
             </div>
 
-            <div className="rounded-lg border border-border/50 overflow-hidden mt-2">
-              <Table>
+            <div className="rounded-lg border border-border/50 overflow-x-auto mt-2">
+              <Table className="min-w-[450px]">
                 <TableHeader className="bg-muted/40">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="text-[10px] font-mono py-1.5">{isDetailed ? "Horizon" : "In"}</TableHead>

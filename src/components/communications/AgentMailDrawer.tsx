@@ -42,7 +42,6 @@ import { ServiceCertificateModal } from "./ServiceCertificateModal";
 import { SimpleInboxView } from "./SimpleInboxView";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { soundEffects } from "../../lib/soundEffects";
-import { extractDocumentInBrowser } from "../../lib/clientOcr";
 import { copyToClipboard } from "../../lib/clipboard";
 import { toast } from "sonner";
 
@@ -125,6 +124,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
       const res = await fetch(att.url);
       if (!res.ok) throw new Error("Failed to download attachment for local extraction");
       const blob = await res.blob();
+      const { extractDocumentInBrowser } = await import("../../lib/clientOcr");
       const result = await extractDocumentInBrowser(blob, att.filename);
 
       await updateAttachmentClientOcrMutation({
@@ -796,8 +796,8 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
               </div>
             </div>
 
-            {/* Companion Utility Tools - Single line group of rectangular buttons */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Companion Utility Tools */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               {isRedispatchOpen && (
                 <Button
                   size="sm"

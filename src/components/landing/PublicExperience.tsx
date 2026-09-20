@@ -39,7 +39,10 @@ export function PublicExperience({
   };
 
   return (
-    <div className="relative w-screen h-screen h-[100dvh] overflow-hidden bg-black text-white select-none">
+    // `isolate` pins the backdrop (z-0) / content (z-10) stacking locally so
+    // the background layer can never composite above page content. `w-full`
+    // instead of `w-screen` avoids 100vw scrollbar-overflow quirks on mobile.
+    <div className="relative isolate w-full h-screen h-[100dvh] overflow-hidden bg-black text-white select-none">
       {/* 1. Shared WebGL scene: the sole backdrop for landing and login */}
       <UnicornBackground />
 
