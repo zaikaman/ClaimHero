@@ -6,11 +6,12 @@ const crons = cronJobs();
 /**
  * Daily Statutory Deadline Sweep Cron:
  * Recalculates remaining appeal deadline days for all active cases and triggers alarms for cases near expiry.
+ * Powered by @convex-dev/batch-worker for cursor-based chunking in batches of 50.
  */
 crons.cron(
   "statutory-deadline-daily-sweep",
   "0 0 * * *",
-  internal.claims.sweepDeadlines,
+  internal.statutoryDeadlineWorker.pingStatutoryDeadlineSweepInternal,
   {}
 );
 

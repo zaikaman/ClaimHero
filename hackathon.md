@@ -7,12 +7,12 @@
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://kindhearted-elephant-992.convex.cloud
-- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/workflow, @convex-dev/agent, @convex-dev/presence
-- **Convex features:** schema, tables, indexes, vector search, full-text search, queries, mutations, actions, HTTP actions, crons, scheduled functions, file storage, realtime queries, durable workflows, AI agent streaming
+- **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/workflow, @convex-dev/agent, @convex-dev/presence, @convex-dev/action-retrier, @convex-dev/workpool, @convex-dev/batch-worker
+- **Convex features:** schema, tables, indexes, vector search, full-text search, queries, mutations, actions, HTTP actions, crons, scheduled functions, file storage, realtime queries, durable workflows, AI agent streaming, action retrier, workpool, batch worker
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-20T08:51:40Z
+- **Last updated:** 2026-09-20T13:43:30Z
 
 ## Log
 
@@ -1827,6 +1827,7 @@ Fixed layout overflow, multiline text wrapping, and header layout shifting in `s
 ### 2026-09-20 - ac3aef0
 Hardened mobile boot reliability and delivered an end-to-end responsive overhaul across public landing and inner workspaces (`src/main.tsx`, `src/bootstrap.tsx`, `src/lib/bootReporter.ts`, `src/lib/redactionEngine.ts`, `src/components/layout/Shell.tsx`, `Sidebar.tsx`, `Header.tsx`, `src/components/ui/dialog.tsx`, `tabs.tsx`, `src/components/radar/CaseRadar.tsx`, `IngestionModal.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/studio/AppealStudio.tsx`, `src/components/calculator/FinancialLiabilityCalculator.tsx`, `src/components/analytics/AnalyticsMetrics.tsx`, `src/components/onboarding/OnboardingChecklist.tsx`, `index.html`, `vite.config.ts`). Protected mobile Safari startup with on-device diagnostics reporting, lookbehind-free redaction patterns, zero-height collapsible mobile nav, and dynamic async OCR code-splitting. Made the full application responsive across mobile, tablet, and desktop viewports with a slide-in navigation drawer, fluid search, viewport-capped dialogs, horizontal scroll wrappers for dense clinical/financial tables, and action bar safe-area clearances. Verified clean typecheck, lint, 1,304 passing tests, and production build without introducing tests. Convex features: static hosting.
 
+### 2026-09-20 - 77d39cb
 Resolved Mobile Safari runtime crash `Can't find variable: Iterator` triggered on mobile devices lacking the ECMAScript Iterator Helpers specification (`index.html`, `src/main.tsx`, `src/lib/polyfills.ts`, `src/lib/clientOcr.ts`, `src/components/communications/AgentMailDrawer.tsx`, `patches/pdfjs-dist+6.3.289.patch`):
 - Diagnosed root cause: Older WebKit / Mobile Safari (iOS < 18.2) does not define the global `Iterator` constructor. The top-level module evaluation in `pdfjs-dist` evaluated `if (typeof Iterator.prototype.join !== "function")`, causing a fatal `ReferenceError: Can't find variable: Iterator` when reading `.prototype` from the undefined identifier. In `AgentMailDrawer.tsx`, a static import of `clientOcr` prematurely pulled `pdfjs-dist` into the communications chunk.
 - Multi-tier defense-in-depth resolution:
@@ -1834,6 +1835,14 @@ Resolved Mobile Safari runtime crash `Can't find variable: Iterator` triggered o
   2. Implemented global polyfill (`src/lib/polyfills.ts`) ensuring `globalThis.Iterator` and prototype chain exist, injected via synchronous inline script in `index.html` head before module script execution and imported at entry in `src/main.tsx` and `src/lib/clientOcr.ts`.
   3. Replaced static OCR import in `AgentMailDrawer.tsx` with dynamic `import("../../lib/clientOcr")` on user attachment extraction, isolating the heavy OCR pipeline chunk from drawer mounting.
 - Verified with clean typecheck, lint, and production Vite build without introducing tests. Convex features: static hosting.
+
+### 2026-09-20 - working tree
+Added `@convex-dev/action-retrier`, `@convex-dev/workpool`, and `@convex-dev/batch-worker` to strengthen external reliability, rate-limit protection during bulk denial intake, and chunked background deadline sweeps (`package.json`, `convex/convex.config.ts`, `convex/schema.ts`, `convex/lib/retrier.ts`, `convex/actions/adversarialRetrier.ts`, `convex/lib/intakeWorkpool.ts`, `convex/bulkIntake.ts`, `convex/actions/bulkIntakeWorker.ts`, `convex/statutoryDeadlineWorker.ts`, `convex/crons.ts`, `tests/convexComponentsScaleAndReliability.test.ts`, `README.md`):
+- Action Retrier: Configured `actionRetrier` in `convex/convex.config.ts` and `convex/lib/retrier.ts` with exponential backoff and jitter (`initialBackoffMs: 1000, base: 2, maxFailures: 4`). Wrapped Firecrawl crawler and AgentMail dispatch actions in `convex/actions/adversarialRetrier.ts` so transient 503s and mail timeouts do not fail appeal preparation.
+- Bulk Denial Intake Workpool: Mounted `workpool` in `convex/convex.config.ts` and configured `intakeWorkpool` in `convex/lib/intakeWorkpool.ts` with `maxParallelism: 3` and `maxAttempts: 3`. Added `bulkIntakeBatches` and `bulkIntakeItems` tables in `convex/schema.ts`. Implemented `enqueueBulkIntake` mutation, `processBulkIntakeItemAction` worker action, and reactive status queries in `convex/bulkIntake.ts` to queue batches of denial documents without blowing OpenAI TPM or memory limits.
+- Statutory Batch Worker: Configured `batchWorker` in `convex/convex.config.ts` and implemented `convex/statutoryDeadlineWorker.ts` with cursor-based pagination in chunks of 50. Recalculates statutory clocks and triggers 14-day critical deadline alarms with 24-hour deduplication. Wired daily cron in `convex/crons.ts` to trigger the sweep with automatic cursor reset.
+- Regression Coverage & Verification: Added comprehensive integration test suite (`tests/convexComponentsScaleAndReliability.test.ts`, 23 tests) asserting retry backoff, workpool queueing and error isolation, and batch worker cursor progression. Verified with `npm run verify` (1,327 passing tests across 84 suites, 100% clean typecheck, lint, coverage, and production build). Convex features: schema, tables, indexes, queries, mutations, internalMutation, actions, internalAction, crons, scheduled functions, action retrier, workpool, batch worker.
+
 
 
 

@@ -150,11 +150,14 @@ storage, search, scheduling, collaboration, and AI-agent state.
 | Presence and collaboration | Live teammates and Yjs-based appeal editing transport |
 | Aggregate | Reactive portfolio recovery and resolution statistics |
 | Rate limiter | Protection for model and crawler calls |
+| Action retrier | Automatic exponential backoff with jitter for crawler and email dispatch |
+| Workpool | Concurrency-controlled queue for batch denial intake to prevent rate limits |
+| Batch worker | Chunked cursor-based processing for statutory deadline sweeps |
 | HTTP actions | Signed AgentMail and Firecrawl webhook handling |
 
-The app configures nine components in [`convex/convex.config.ts`](./convex/convex.config.ts):
+The app configures twelve components in [`convex/convex.config.ts`](./convex/convex.config.ts):
 Auth, AgentMail, Firecrawl, Workflow, Agent, Aggregate, Rate Limiter, Presence,
-and Static Hosting.
+Static Hosting, Action Retrier, Workpool, and Batch Worker.
 
 ## Sponsor integrations do real work
 
@@ -208,6 +211,9 @@ Key implementation: [`convex/actions/mailDispatcher.ts`](./convex/actions/mailDi
 | Live pipeline observability | [`convex/pipelineActivities.ts`](./convex/pipelineActivities.ts), [`src/components/communications/PipelineTimeline.tsx`](./src/components/communications/PipelineTimeline.tsx) |
 | Realtime collaboration and presence | [`convex/appealYjs.ts`](./convex/appealYjs.ts), [`convex/presence.ts`](./convex/presence.ts) |
 | Client OCR and PHI-safe intake | [`src/lib/clientOcr.ts`](./src/lib/clientOcr.ts), [`convex/actions/opticalParser.ts`](./convex/actions/opticalParser.ts) |
+| Action retrier for crawler and email dispatch | [`convex/lib/retrier.ts`](./convex/lib/retrier.ts), [`convex/actions/adversarialRetrier.ts`](./convex/actions/adversarialRetrier.ts) |
+| Workpool for controlled batch denial intake | [`convex/lib/intakeWorkpool.ts`](./convex/lib/intakeWorkpool.ts), [`convex/bulkIntake.ts`](./convex/bulkIntake.ts), [`convex/actions/bulkIntakeWorker.ts`](./convex/actions/bulkIntakeWorker.ts) |
+| Batch worker for statutory deadline sweeps | [`convex/statutoryDeadlineWorker.ts`](./convex/statutoryDeadlineWorker.ts), [`convex/crons.ts`](./convex/crons.ts) |
 
 ## Trust and responsible use
 
@@ -269,11 +275,11 @@ npm run build           # Production bundle
 npm run verify          # Full local verification gate
 ```
 
-The repository includes 1,304 automated tests across 83 suites, covering the
+The repository includes 1,327 automated tests across 84 suites, covering the
 Convex workflows, authorization boundaries, OCR/redaction, vault-tokenized
 PHI-safe LLM boundaries, Firecrawl and AgentMail integrations, precedent
 scoring, honest degradation floor gating (preventing unearned statutory baseline score inflation and hardcoded code match forcing), honest workflow crawl failure halting without fake boilerplate ERISA filler, precision policy drift heuristics without false-positive step-therapy triggers, live crawler outage error handling preventing clean masking, adverse determination letter denial date anchoring, evidentiary and statutory matcher grounding, safe auto-reply addendum generation gating (prohibiting ungrounded clinical necessity assertions and phantom diagnostics), canonical 4-pillar appeal readiness vs un-capped evidence coverage validation (with complete replacement of stale outcome-predictive overturn probability scores across demo fixtures, portfolio aggregations, and action contracts), audit chains, denial-anchored statutory deadlines, dual-clock statutory timing (ERISA 180-day internal appeals, ACA 45 CFR § 147.136 4-month external reviews, and state 30-day expedited clocks across CA/TX/NY),
-collaboration, provisional evidence gating, secondary dispatch review boundaries, payer reply keyword classification and settlement provenance tracking, post-resolution adverse action reopening, out-of-network balance billing No Surprises Act protections, 2024 DOL inflation-adjusted penalty calculations ($164/day under 29 CFR § 2575.502c-1) with state prompt-pay interest and dynamic Lodestar fees, non-fabricated financial defaults and truthful statutory document demand placeholders (29 CFR § 2560.503-1(h)(2)(iii)), non-negative [0, 1] cosine similarity clamping and normalized precedent scores, mandatory same-specialty reviewer credential citations (29 CFR § 2560.503-1(h)(3)(ii)–(iii)) and ERISA § 514(a) preemption enforcement in Level 3 briefs, advanced workflow status preservation and graceful pipeline timeout handling, HIPAA Safe Harbor export masking shields, transactional password recovery via AgentMail gateway with rate-limited OTP token buckets, anti-enumeration security, truthful recipient resolution across communication inboxes and quick follow-up composers (reflecting typed-in test destinations over production fallbacks), executive clinical light-mode responsive email templates with bulletproof client centering, anti-squatting account takeover defense across password and OAuth registrations, 300-second strict timestamp freshness and raw-byte Svix webhook verification, storage IDOR prevention across claim attachments, appeals, evidence, and messages with indexed table lookups, viewer bearer URL suppression, and compound-indexed collaborator grant access.
+collaboration, provisional evidence gating, secondary dispatch review boundaries, payer reply keyword classification and settlement provenance tracking, post-resolution adverse action reopening, out-of-network balance billing No Surprises Act protections, 2024 DOL inflation-adjusted penalty calculations ($164/day under 29 CFR § 2575.502c-1) with state prompt-pay interest and dynamic Lodestar fees, non-fabricated financial defaults and truthful statutory document demand placeholders (29 CFR § 2560.503-1(h)(2)(iii)), non-negative [0, 1] cosine similarity clamping and normalized precedent scores, mandatory same-specialty reviewer credential citations (29 CFR § 2560.503-1(h)(3)(ii)–(iii)) and ERISA § 514(a) preemption enforcement in Level 3 briefs, advanced workflow status preservation and graceful pipeline timeout handling, HIPAA Safe Harbor export masking shields, transactional password recovery via AgentMail gateway with rate-limited OTP token buckets, anti-enumeration security, truthful recipient resolution across communication inboxes and quick follow-up composers (reflecting typed-in test destinations over production fallbacks), executive clinical light-mode responsive email templates with bulletproof client centering, anti-squatting account takeover defense across password and OAuth registrations, 300-second strict timestamp freshness and raw-byte Svix webhook verification, storage IDOR prevention across claim attachments, appeals, evidence, and messages with indexed table lookups, viewer bearer URL suppression, compound-indexed collaborator grant access, Action Retrier exponential backoff for Firecrawl and AgentMail gateways, Workpool concurrency-controlled bulk denial intake with per-item error isolation, and cursor-based Batch Worker statutory deadline sweeps in chunks of 50 with 24-hour critical alarm deduplication.
 
 ## Project structure
 

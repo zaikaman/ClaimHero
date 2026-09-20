@@ -36,6 +36,15 @@ import {
   inferGoverningFramework,
 } from "../../../convex/lib/policyDriftNotice";
 
+interface DetectedChangeItem {
+  category: string;
+  title: string;
+  baselineText?: string;
+  liveText: string;
+  impact: string;
+  isAdverseToClaim: boolean;
+}
+
 const FRAMEWORK_OPTIONS: { id: GoverningFramework; label: string; simpleLabel: string; desc: string; simpleDesc: string }[] = [
   {
     id: "erisa_insured",
@@ -529,7 +538,7 @@ export const PolicyDriftSentinel: React.FC<PolicyDriftSentinelProps> = ({
 
               {isDiffExpanded && (
                 <div className="grid grid-cols-1 gap-2.5 pt-1">
-                  {latestDrift.detectedChanges.map((change, idx: number) => (
+                  {latestDrift.detectedChanges.map((change: DetectedChangeItem, idx: number) => (
                     <div
                       key={idx}
                       className={cn(

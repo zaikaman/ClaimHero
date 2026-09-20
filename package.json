@@ -20,13 +20,16 @@
     "@agentmail/convex": "^0.1.0",
     "@ai-sdk/openai": "^4.0.26",
     "@aws-sdk/client-textract": "^3.1131.0",
+    "@convex-dev/action-retrier": "^0.3.1",
     "@convex-dev/agent": "^0.7.1",
     "@convex-dev/aggregate": "^0.3.0",
     "@convex-dev/auth": "^2.0.0-alpha.1",
+    "@convex-dev/batch-worker": "^0.3.2",
     "@convex-dev/presence": "^0.4.0",
     "@convex-dev/rate-limiter": "^0.3.2",
     "@convex-dev/static-hosting": "^0.2.1",
     "@convex-dev/workflow": "0.3.12",
+    "@convex-dev/workpool": "^0.4.11",
     "@firecrawl/firecrawl-convex": "^0.1.1",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-dialog": "^1.1.6",
@@ -73,6 +76,7 @@
   },
   "overrides": {
     "@ai-sdk/provider": "4.0.4",
-    "@ai-sdk/provider-utils": "5.0.17"
+    "@ai-sdk/provider-utils": "5.0.17",
+    "@convex-dev/batch-worker": "^0.3.2"
   }
 }

@@ -31,7 +31,7 @@ function formatTablesAsMarkdown(tables: string[][][]): string {
     .join("\n\n");
 }
 
-const DENIAL_EXTRACTION_SCHEMA = {
+export const DENIAL_EXTRACTION_SCHEMA = {
   type: "object",
   properties: {
     isMedicalClaimDenial: {

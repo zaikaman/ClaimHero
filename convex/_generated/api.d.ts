@@ -8,8 +8,10 @@
  * @module
  */
 
+import type * as actions_adversarialRetrier from "../actions/adversarialRetrier.js";
 import type * as actions_agentMail from "../actions/agentMail.js";
 import type * as actions_appealSynthesizer from "../actions/appealSynthesizer.js";
+import type * as actions_bulkIntakeWorker from "../actions/bulkIntakeWorker.js";
 import type * as actions_clinicalIntake from "../actions/clinicalIntake.js";
 import type * as actions_mailDispatcher from "../actions/mailDispatcher.js";
 import type * as actions_opticalParser from "../actions/opticalParser.js";
@@ -27,6 +29,7 @@ import type * as appealYjs from "../appealYjs.js";
 import type * as appeals from "../appeals.js";
 import type * as auditLogs from "../auditLogs.js";
 import type * as auth from "../auth.js";
+import type * as bulkIntake from "../bulkIntake.js";
 import type * as chatbot from "../chatbot.js";
 import type * as claimCollaborators from "../claimCollaborators.js";
 import type * as claims from "../claims.js";
@@ -47,6 +50,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_dateUtils from "../lib/dateUtils.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_erisaEvidence from "../lib/erisaEvidence.js";
+import type * as lib_intakeWorkpool from "../lib/intakeWorkpool.js";
 import type * as lib_openai from "../lib/openai.js";
 import type * as lib_passwordResetEmail from "../lib/passwordResetEmail.js";
 import type * as lib_pdfGenerator from "../lib/pdfGenerator.js";
@@ -57,6 +61,7 @@ import type * as lib_precedentCorpus from "../lib/precedentCorpus.js";
 import type * as lib_precedentValidators from "../lib/precedentValidators.js";
 import type * as lib_rateLimiter from "../lib/rateLimiter.js";
 import type * as lib_redactionEngine from "../lib/redactionEngine.js";
+import type * as lib_retrier from "../lib/retrier.js";
 import type * as lib_sentinelPrompt from "../lib/sentinelPrompt.js";
 import type * as lib_stateRegulators from "../lib/stateRegulators.js";
 import type * as lib_statutoryTierValidators from "../lib/statutoryTierValidators.js";
@@ -73,6 +78,7 @@ import type * as presence from "../presence.js";
 import type * as sentinelAgentQueries from "../sentinelAgentQueries.js";
 import type * as serviceCertificate from "../serviceCertificate.js";
 import type * as settings from "../settings.js";
+import type * as statutoryDeadlineWorker from "../statutoryDeadlineWorker.js";
 import type * as users from "../users.js";
 import type * as workflows from "../workflows.js";
 
@@ -83,8 +89,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "actions/adversarialRetrier": typeof actions_adversarialRetrier;
   "actions/agentMail": typeof actions_agentMail;
   "actions/appealSynthesizer": typeof actions_appealSynthesizer;
+  "actions/bulkIntakeWorker": typeof actions_bulkIntakeWorker;
   "actions/clinicalIntake": typeof actions_clinicalIntake;
   "actions/mailDispatcher": typeof actions_mailDispatcher;
   "actions/opticalParser": typeof actions_opticalParser;
@@ -102,6 +110,7 @@ declare const fullApi: ApiFromModules<{
   appeals: typeof appeals;
   auditLogs: typeof auditLogs;
   auth: typeof auth;
+  bulkIntake: typeof bulkIntake;
   chatbot: typeof chatbot;
   claimCollaborators: typeof claimCollaborators;
   claims: typeof claims;
@@ -122,6 +131,7 @@ declare const fullApi: ApiFromModules<{
   "lib/dateUtils": typeof lib_dateUtils;
   "lib/embeddings": typeof lib_embeddings;
   "lib/erisaEvidence": typeof lib_erisaEvidence;
+  "lib/intakeWorkpool": typeof lib_intakeWorkpool;
   "lib/openai": typeof lib_openai;
   "lib/passwordResetEmail": typeof lib_passwordResetEmail;
   "lib/pdfGenerator": typeof lib_pdfGenerator;
@@ -132,6 +142,7 @@ declare const fullApi: ApiFromModules<{
   "lib/precedentValidators": typeof lib_precedentValidators;
   "lib/rateLimiter": typeof lib_rateLimiter;
   "lib/redactionEngine": typeof lib_redactionEngine;
+  "lib/retrier": typeof lib_retrier;
   "lib/sentinelPrompt": typeof lib_sentinelPrompt;
   "lib/stateRegulators": typeof lib_stateRegulators;
   "lib/statutoryTierValidators": typeof lib_statutoryTierValidators;
@@ -148,6 +159,7 @@ declare const fullApi: ApiFromModules<{
   sentinelAgentQueries: typeof sentinelAgentQueries;
   serviceCertificate: typeof serviceCertificate;
   settings: typeof settings;
+  statutoryDeadlineWorker: typeof statutoryDeadlineWorker;
   users: typeof users;
   workflows: typeof workflows;
 }>;
@@ -192,4 +204,7 @@ export declare const components: {
   workflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"workflow">;
   agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
   presence: import("@convex-dev/presence/_generated/component.js").ComponentApi<"presence">;
+  actionRetrier: import("@convex-dev/action-retrier/_generated/component.js").ComponentApi<"actionRetrier">;
+  workpool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"workpool">;
+  batchWorker: import("@convex-dev/batch-worker/_generated/component.js").ComponentApi<"batchWorker">;
 };

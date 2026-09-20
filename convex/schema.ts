@@ -739,6 +739,50 @@ export default defineSchema({
     .index("by_email_and_code", ["email", "code"])
     .index("by_email", ["email"])
     .index("by_userId", ["userId"]),
+
+  // High-Volume RCM Clinic Bulk Denial Intake Queue & Batches
+  bulkIntakeBatches: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("partial_failed"),
+      v.literal("failed")
+    ),
+    totalCount: v.number(),
+    processedCount: v.number(),
+    successCount: v.number(),
+    failureCount: v.number(),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_created", ["userId", "createdAt"]),
+
+  bulkIntakeItems: defineTable({
+    batchId: v.id("bulkIntakeBatches"),
+    userId: v.id("users"),
+    fileName: v.string(),
+    storageId: v.optional(v.id("_storage")),
+    rawDocumentText: v.optional(v.string()),
+    patientState: v.optional(v.string()),
+    origin: v.optional(v.string()),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    claimId: v.optional(v.id("claims")),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_batch", ["batchId"])
+    .index("by_batch_status", ["batchId", "status"])
+    .index("by_user", ["userId"]),
 });
 
 

@@ -13,6 +13,9 @@ import agentmail from "@agentmail/convex/convex.config";
 import workflow from "@convex-dev/workflow/convex.config";
 import agent from "@convex-dev/agent/convex.config";
 import presence from "@convex-dev/presence/convex.config";
+import actionRetrier from "@convex-dev/action-retrier/convex.config";
+import workpool from "@convex-dev/workpool/convex.config";
+import batchWorker from "@convex-dev/batch-worker/convex.config";
 
 const app = defineApp({
   env: {
@@ -74,5 +77,8 @@ app.use(agentmail, {
 app.use(workflow);
 app.use(agent);
 app.use(presence);
+app.use(actionRetrier);
+app.use(workpool);
+app.use(batchWorker);
 
 export default app;

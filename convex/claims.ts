@@ -1567,6 +1567,52 @@ export const createWithPatientInternal = internalMutation({
 });
 
 /**
+ * Internal mutation for queued background workpool workers (such as bulk denial intake)
+ * to create a claim for the authenticated clinic user who initiated the batch.
+ */
+export const createWithPatientForUserInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+    patientName: v.string(),
+    patientEmail: v.string(),
+    memberId: v.string(),
+    insurancePayer: v.string(),
+    state: v.string(),
+    groupNumber: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()),
+    claimNumber: v.string(),
+    serviceDate: v.string(),
+    denialDate: v.optional(v.string()),
+    providerName: v.string(),
+    deniedAmount: v.number(),
+    patientOwedAmount: v.number(),
+    cptCodes: v.array(v.string()),
+    icd10Codes: v.array(v.string()),
+    denialReasonCode: v.string(),
+    denialReasonDescription: v.string(),
+    appealFilingDeadlineDays: v.optional(v.number()),
+    denialLetterStorageId: v.optional(v.id("_storage")),
+    isDemo: v.optional(v.boolean()),
+    dataOrigin: v.optional(v.string()),
+    origin: v.optional(v.string()),
+    isSyntheticPII: v.optional(v.boolean()),
+    redactionMetadata: v.optional(
+      v.object({
+        isRedacted: v.boolean(),
+        mode: v.string(),
+        redactedEntityCount: v.number(),
+        maskedCategories: v.array(v.string()),
+        appliedAt: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const { userId, ...claimArgs } = args;
+    return await applyCreateWithPatient(ctx, claimArgs, userId);
+  },
+});
+
+/**
  * Persist the provider-backed AgentMail inboxes created for a claim.
  * This is internal because only the provisioning action may update provider IDs.
  */
