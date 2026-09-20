@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-20T17:12:00Z
+- **Last updated:** 2026-09-20T17:14:00Z
 
 ## Log
 
@@ -1852,7 +1852,7 @@ Removed all remnants of the Autonomous AI Adjudicator across schema, queries, mu
 - Renamed and streamlined `tests/adversarialAdjudicator.test.ts` to `tests/adversaryNegotiation.test.ts`, updated index assertions in `tests/productionReadinessFixes.test.ts` (12 indexes retained), and updated test suite reference in `IDEA.md`.
 - Verified cleanly with `npm run typecheck`, `npm run lint`, unit tests, and production build (`npm run build`). Convex features: schema, indexes, queries, mutations, actions, static hosting.
 
-### 2026-09-20 - working tree
+### 2026-09-20 - 9cd5384
 Purged unused dead code, upgraded Convex to 1.46.0, and resolved returning user authentication routing and landing navigation states (`package.json`, `package-lock.json`, `src/lib/authSession.ts`, `src/App.tsx`, `src/components/landing/PublicExperience.tsx`, `src/components/landing/TemplateLanding.tsx`, `src/types/index.ts`, `src/hooks/useEvidence.ts`, `convex/actions/appealSynthesizer.ts`, `convex/claimCollaborators.ts`, `convex/lib/adversaryNegotiation.ts`, `convex/lib/auth.ts`, `convex/lib/embeddings.ts`, `convex/lib/retrier.ts`, `convex/lib/stateRegulators.ts`, `tests/authSession.test.ts`, `tests/publicExperienceTransition.test.ts`, `tests/landingSections.test.ts`, `README.md`):
 - Upgraded Convex from 1.45.0 to 1.46.0 (`package.json`), regenerated server code bindings via `npx convex codegen`, and verified full compatibility with `@convex-dev/` component ecosystem.
 - Eliminated false-positive "Completing Google sign-in..." interstitial on returning cached sessions and public landing page visits: refined `shouldShowCompletingSignIn` to bypass when `currentView === 'landing'` and only trigger during active OAuth redirect codes or pending authorization flows rather than generic cached credentials (`src/lib/authSession.ts`, `src/App.tsx`).
