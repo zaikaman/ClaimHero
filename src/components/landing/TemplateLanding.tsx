@@ -547,23 +547,23 @@ export function TemplateLanding({
               <div className="mb-4 flex items-center gap-2">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
                 <span className="text-xs font-medium uppercase tracking-widest text-white/60">
-                  Seeded Demo Case
+                  Pre-Loaded Evaluation
                 </span>
               </div>
               <h3 className="mb-4 font-serif text-2xl font-medium tracking-tight text-white">
-                Eleanor Vance
+                Pre-Seeded Cases
               </h3>
               <p className="mb-8 flex-grow text-sm leading-relaxed text-white/70">
-                A synthetic high-dollar denial with extracted codes, policy
-                evidence, a cited draft, and an approval gate, visibly labelled
-                with no real patient data.
+                Explore synthetic high-dollar cases (Eleanor Vance $24,500, Marcus
+                Sterling $18,200, Michael Patel $41,800) with extracted clinical
+                codes, policy evidence, cited drafts, and human approval gates.
               </p>
               <button
                 type="button"
-                onClick={() => onEnterConsole("evidence")}
-                className="inline-flex w-full items-center justify-center gap-2 border border-white/20 bg-black px-8 py-4 text-center text-xs font-bold uppercase tracking-widest text-white transition-all hover:bg-white hover:text-black"
+                onClick={() => onEnterConsole("radar")}
+                className="inline-flex w-full items-center justify-center gap-2 border border-white/20 bg-black px-8 py-4 text-center text-xs font-bold uppercase tracking-widest text-white transition-all hover:bg-white hover:text-black cursor-pointer"
               >
-                Open the Demo Case
+                Explore Demo Cases
                 <ArrowRight className="size-4" />
               </button>
             </div>

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-20T17:14:00Z
+- **Last updated:** 2026-09-20T17:59:00Z
 
 ## Log
 
@@ -1863,4 +1863,8 @@ Purged unused dead code, upgraded Convex to 1.46.0, and resolved returning user 
   - Deleted 3 orphan UI files (`PrivacyRedactionFilter.tsx`, `CinematicHero.tsx`, `ExpertDetail.tsx`), pruned uncalled Convex endpoints across 8 modules, and removed unused package dependencies (`ai`, `jose`).
 - Verified 0 remaining unreferenced files, 0 unused Convex queries/mutations/actions, and 0 unused exported declarations across `src/` and `convex/`.
 - Verified 1,315 automated tests across 84 suites with `npm run verify` (100% clean typecheck, lint, coverage, and production build). Convex features: schema, queries, mutations, actions, crons, scheduled functions, file storage, static hosting.
+
+### 2026-09-20 - working tree
+- Replaced the landing page single-case demo CTA ("Open the Demo Case") with a "Pre-Seeded Cases" evaluation showcase in `src/components/landing/TemplateLanding.tsx`. The card highlights the full portfolio of synthetic evaluation cases (Eleanor Vance $24,500, Marcus Sterling $18,200, Michael Patel $41,800) and routes directly to Case Radar (`radar` view) via "Explore Demo Cases", eliminating the empty case picker friction where judges were previously required to re-select a case. Verified with landing section tests, typecheck, lint, and full Vitest suite.
+- Removed obsolete `VITE_AGENTMAIL_ADJUDICATOR_EMAIL` environment variable fallback from GitHub Actions deployment workflow (`.github/workflows/deploy.yml`) following complete removal of the simulated AI adjudicator mode.
 
