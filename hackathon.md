@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-20T08:34:30Z
+- **Last updated:** 2026-09-20T08:51:40Z
 
 ## Log
 
@@ -1824,7 +1824,7 @@ Replaced the video-backed public surface with an editorial black-and-white landi
 ### 2026-09-19 - 8189442
 Fixed layout overflow, multiline text wrapping, and header layout shifting in `src/components/communications/AuditTrailDrawer.tsx`: upgraded drawer container to `sm:max-w-2xl`, renamed the secondary tab header from `"Workflow Observability Timeline"` to `"Pipeline Timeline"` to eliminate ellipsis truncation, removed `flex-wrap` so claim badges remain strictly inline beside the title across both tabs without expanding header height, enforced `whitespace-nowrap` and `shrink-0` across statutory audit and pipeline timeline switcher buttons, prevented ERISA 29 CFR § 2560.503-1 regulatory indicator hyphen-splitting, and added `overflow-x-auto scrollbar-none` protective bounds. Tuned spoken pacing in `DEMO_SCRIPT.md`. Updated regression assertions in `tests/auditTrailDrawer.test.ts` and verified clean typecheck, lint, and all 1,304 tests across 83 test suites.
 
-### 2026-09-20 - working tree
+### 2026-09-20 - ac3aef0
 Hardened mobile boot reliability and delivered an end-to-end responsive overhaul across public landing and inner workspaces (`src/main.tsx`, `src/bootstrap.tsx`, `src/lib/bootReporter.ts`, `src/lib/redactionEngine.ts`, `src/components/layout/Shell.tsx`, `Sidebar.tsx`, `Header.tsx`, `src/components/ui/dialog.tsx`, `tabs.tsx`, `src/components/radar/CaseRadar.tsx`, `IngestionModal.tsx`, `src/components/evidence/EvidenceMatrix.tsx`, `src/components/studio/AppealStudio.tsx`, `src/components/calculator/FinancialLiabilityCalculator.tsx`, `src/components/analytics/AnalyticsMetrics.tsx`, `src/components/onboarding/OnboardingChecklist.tsx`, `index.html`, `vite.config.ts`). Protected mobile Safari startup with on-device diagnostics reporting, lookbehind-free redaction patterns, zero-height collapsible mobile nav, and dynamic async OCR code-splitting. Made the full application responsive across mobile, tablet, and desktop viewports with a slide-in navigation drawer, fluid search, viewport-capped dialogs, horizontal scroll wrappers for dense clinical/financial tables, and action bar safe-area clearances. Verified clean typecheck, lint, 1,304 passing tests, and production build without introducing tests. Convex features: static hosting.
 
 Resolved Mobile Safari runtime crash `Can't find variable: Iterator` triggered on mobile devices lacking the ECMAScript Iterator Helpers specification (`index.html`, `src/main.tsx`, `src/lib/polyfills.ts`, `src/lib/clientOcr.ts`, `src/components/communications/AgentMailDrawer.tsx`, `patches/pdfjs-dist+6.3.289.patch`):
