@@ -30,7 +30,7 @@ import { isTextractConfigured, extractDocumentWithTextract } from "../lib/textra
 const PAYER_ALERT_COOLDOWN_MS = 10 * 60 * 1000;
 
 /**
- * Binds a claim to the two real AgentMail identities provisioned for the app.
+ * Binds a claim to the verified shared AgentMail sender identity.
  * This action intentionally never creates inboxes: the free-tier limit makes
  * per-claim inbox provisioning unsuitable for production.
  */
@@ -263,9 +263,7 @@ async function handleInboundClaimReply(
         const norm = recipient.toLowerCase();
         if (
           norm.includes("claimhero-sender@") ||
-          norm.includes("claimhero-adjudicator@") ||
-          norm === "claimhero-sender@agentmail.to" ||
-          norm === "claimhero-adjudicator@agentmail.to"
+          norm === "claimhero-sender@agentmail.to"
         ) {
           continue;
         }

@@ -212,7 +212,7 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/backendOptimizationsD1D7.test.ts` (10 tests): Bounded pagination, aggregate safeguards, and performance optimizations.
 * `tests/appealYjs.test.ts` (10 tests): Yjs CRDT op-log transport, vector clocks, and snapshot persistence.
 * `tests/autopilotSLA.test.ts` (7 tests): Automated SLA enforcement and statutory countdown monitoring.
-* `tests/adversarialAdjudicator.test.ts` (9 tests): Insurer adversary negotiation logic, partial settlement calculations, and counter-rebuttal fallbacks.
+* `tests/adversaryNegotiation.test.ts` (6 tests): Insurer determination parsing, partial settlement calculations, and counter-rebuttal fallbacks.
 * `tests/actionsP2PAndChatbot.test.ts` (9 tests): Physician P2P script generation and chatbot retrieval actions.
 * `tests/ingestionAndDeletionPipeline.test.ts` (11 tests): Denial document ingestion and cascading resource deletion.
 * `tests/convexP2P.test.ts` (9 tests): P2P call session records and defense script persistence.

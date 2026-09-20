@@ -419,13 +419,13 @@ describe("Production Readiness Fixes & Hardening", () => {
       expect(indexNames).toContain("by_deadline");
       expect(indexNames).toContain("by_claim_number");
       expect(indexNames).toContain("by_inbox_email");
-      expect(indexNames).toContain("by_adjudicator_email");
+      expect(indexNames).not.toContain("by_adjudicator_email");
       expect(indexNames).toContain("by_assigned_agent_email");
       expect(indexNames).toContain("by_created");
       expect(indexNames).toContain("by_threadId");
       expect(indexNames).toContain("by_user_updated");
       expect(indexNames).toContain("by_denial_letter_storage_id");
-      expect(indexNames.length).toBe(13);
+      expect(indexNames.length).toBe(12);
     });
   });
 

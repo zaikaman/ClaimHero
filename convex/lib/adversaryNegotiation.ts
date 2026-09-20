@@ -1,5 +1,5 @@
 /**
- * Autonomous Insurer Defense Adversary — countermove strategy engine.
+ * Insurer determination parsing and counter-rebuttal negotiation helpers.
  *
  * Pure, side-effect-free helpers used by the inbound challenge pipeline
  * (convex/actions/agentMail.ts) for parsing insurer determinations and drafting rebuttals.
@@ -24,7 +24,7 @@ export const ADVERSARY_COUNTERMOVES: AdversaryCountermove[] = [
 /** Insurer opening settlement posture: 40% of the disputed amount. */
 export const PARTIAL_SETTLEMENT_FRACTION = 0.4;
 
-/** Canonical operative / clinical records the adversary demands in RFI moves. */
+/** Canonical operative / clinical records demanded in RFI determinations. */
 export const ADVERSARY_RFI_CHECKLIST = [
   "Operative notes with indication and technique",
   "Dated diagnostic imaging with radiologist interpretation",
@@ -32,66 +32,9 @@ export const ADVERSARY_RFI_CHECKLIST = [
   "Prior authorization documentation",
 ] as const;
 
-export interface AdversaryClaimContext {
-  claimNumber: string;
-  deniedAmount: number;
-  appealReadinessScore?: number;
-  evidenceCoverageScore?: number;
-  overturnProbabilityScore?: number;
-  evidenceCount?: number;
-  appealLength?: number;
-  negotiationRound?: number;
-}
-
 export function calculatePartialSettlementOffer(deniedAmount: number): number {
   if (!Number.isFinite(deniedAmount) || deniedAmount <= 0) return 0;
   return Math.round(deniedAmount * PARTIAL_SETTLEMENT_FRACTION * 100) / 100;
-}
-
-function hashClaimRound(claimNumber: string, round: number): number {
-  const seed = `${claimNumber.trim().toLowerCase()}::${round}`;
-  let hash = 2166136261;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash ^= seed.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return Math.abs(hash);
-}
-
-/**
- * Deterministic countermove picker. Strong files overturn early; weak or
- * thin files draw realistic insurer defense moves (RFI, conflicting CPB
- * citation, partial 40% settlement, uphold). Later negotiation rounds drift
- * toward concession so multi-agent email threads converge instead of
- * looping forever.
- */
-export function pickAdversaryCountermove(ctx: AdversaryClaimContext): AdversaryCountermove {
-  const round = Math.max(0, ctx.negotiationRound ?? 0);
-  const rawScore = ctx.appealReadinessScore ?? ctx.evidenceCoverageScore ?? ctx.overturnProbabilityScore ?? 0.5;
-  const score = rawScore > 1 ? rawScore / 100 : rawScore;
-  const evidenceCount = ctx.evidenceCount ?? 0;
-
-  // Late rounds concede: sustained cited rebuttals force approval.
-  if (round >= 3 && score >= 0.35) return "OVERTURNED_APPROVED";
-  if (round >= 4) return "OVERTURNED_APPROVED";
-
-  // Overwhelming file wins on first review.
-  if (round === 0 && score >= 0.82 && evidenceCount >= 3) {
-    return "OVERTURNED_APPROVED";
-  }
-
-  // Very weak file: payer holds the line.
-  if (score < 0.25 && evidenceCount === 0) {
-    return round === 0 ? "DENIAL_UPHELD" : "PARTIAL_SETTLEMENT_OFFER";
-  }
-
-  const adversarial: AdversaryCountermove[] = [
-    "ADDITIONAL_RECORDS_REQUIRED",
-    "POLICY_CONFLICT_CITATION",
-    "PARTIAL_SETTLEMENT_OFFER",
-    "DENIAL_UPHELD",
-  ];
-  return adversarial[hashClaimRound(ctx.claimNumber || "unknown", round) % adversarial.length];
 }
 
 /**
@@ -401,16 +344,4 @@ export function buildCounterRebuttalFallback(args: {
         `we formally request immediate escalation to Independent External Review (IRO) under 29 C.F.R. section 2560.503-1. Please provide the designated IRO contact details and statutory appellate documentation requirements.`
       );
   }
-}
-
-/** Strategy hint for round-awareness in iterative appellate negotiation. */
-export function buildAdversaryStrategyHint(ctx: AdversaryClaimContext): string {
-  const round = Math.max(0, ctx.negotiationRound ?? 0);
-  const suggested = pickAdversaryCountermove(ctx);
-  return (
-    `Negotiation round ${round}. Suggested insurer-defense posture for this round: ${suggested}. ` +
-    `You are not bound to the suggestion — rule on the brief — but weight it heavily when the record is ambiguous. ` +
-    `Early rounds favor realistic defense (RFI for operative notes, conflicting CPB citation, or 40% partial settlement); ` +
-    `sustained cited rebuttals in later rounds should concede toward overturn when the advocate cures the deficiency.`
-  );
 }

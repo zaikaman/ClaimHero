@@ -451,8 +451,8 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
 
       vi.spyOn(agentMailLib, "getAgentMailMessage").mockResolvedValue({
         message_id: "msg_inbound_eob",
-        inbox_id: "inbox_adjudicator",
-        from: "appeals-adjudicator@aetna.com",
+        inbox_id: "inbox_payer",
+        from: "appeals-reviewer@aetna.com",
         to: ["claimhero-sender@agentmail.to"],
         subject: "Determination regarding Claim #CH-9900",
         text: "Please find attached formal Explanation of Benefits.",
@@ -505,7 +505,7 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
       };
 
       await (processInboundClaimReply as any)._handler(mockCtx, {
-        inboxId: "inbox_adjudicator",
+        inboxId: "inbox_payer",
         messageId: "msg_inbound_eob",
         eventId: "evt_inbound_1",
       });
@@ -513,7 +513,7 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
       // Assert attachment was downloaded
       expect(agentMailLib.downloadAgentMailAttachment).toHaveBeenCalledWith(
         expect.objectContaining({
-          inboxId: "inbox_adjudicator",
+          inboxId: "inbox_payer",
           messageId: "msg_inbound_eob",
           attachmentId: "att_eob_1",
         })
@@ -582,8 +582,8 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
 
         vi.spyOn(agentMailLib, "getAgentMailMessage").mockResolvedValue({
           message_id: "msg_inbound_eob_fail",
-          inbox_id: "inbox_adjudicator",
-          from: "appeals-adjudicator@aetna.com",
+          inbox_id: "inbox_payer",
+          from: "appeals-reviewer@aetna.com",
           to: ["claimhero-sender@agentmail.to"],
           subject: "Determination regarding Claim #CH-9901",
           text: "Please find attached formal Explanation of Benefits.",
@@ -634,7 +634,7 @@ describe("Formal PDF Appeal Packet Attachments (Outbound & Inbound)", () => {
         };
 
         await (processInboundClaimReply as any)._handler(mockCtx, {
-          inboxId: "inbox_adjudicator",
+          inboxId: "inbox_payer",
           messageId: "msg_inbound_eob_fail",
           eventId: "evt_inbound_fail",
         });

@@ -884,9 +884,7 @@ export const getByInboxEmailInternal = internalQuery({
     // and CANNOT be matched 1-to-1 to an arbitrary claim by recipient alone!
     if (
       normalizedEmail.includes("claimhero-sender@") ||
-      normalizedEmail.includes("claimhero-adjudicator@") ||
       normalizedEmail === "claimhero-sender@agentmail.to" ||
-      normalizedEmail === "claimhero-adjudicator@agentmail.to" ||
       isInternalAgentMailAddress(normalizedEmail)
     ) {
       return null;
@@ -897,12 +895,6 @@ export const getByInboxEmailInternal = internalQuery({
       .withIndex("by_inbox_email", (q) => q.eq("agentMailInboxEmail", normalizedEmail))
       .first();
     if (byInbox) return byInbox;
-
-    const byAdjudicator = await ctx.db
-      .query("claims")
-      .withIndex("by_adjudicator_email", (q) => q.eq("agentMailAdjudicatorEmail", normalizedEmail))
-      .first();
-    if (byAdjudicator) return byAdjudicator;
 
     const byAssigned = await ctx.db
       .query("claims")
@@ -978,9 +970,7 @@ export const findMatchingClaimInternal = internalQuery({
       if (
         !normalized ||
         normalized.includes("claimhero-sender@") ||
-        normalized.includes("claimhero-adjudicator@") ||
         normalized === "claimhero-sender@agentmail.to" ||
-        normalized === "claimhero-adjudicator@agentmail.to" ||
         isInternalAgentMailAddress(normalized)
       ) {
         continue;
@@ -991,12 +981,6 @@ export const findMatchingClaimInternal = internalQuery({
         .withIndex("by_inbox_email", (q) => q.eq("agentMailInboxEmail", normalized))
         .first();
       if (byInbox) return byInbox;
-
-      const byAdjudicator = await ctx.db
-        .query("claims")
-        .withIndex("by_adjudicator_email", (q) => q.eq("agentMailAdjudicatorEmail", normalized))
-        .first();
-      if (byAdjudicator) return byAdjudicator;
 
       const byAssigned = await ctx.db
         .query("claims")
@@ -1621,8 +1605,6 @@ export const setAgentMailInboxes = internalMutation({
     claimId: v.id("claims"),
     claimInboxId: v.optional(v.string()),
     claimInboxEmail: v.optional(v.string()),
-    adjudicatorInboxId: v.optional(v.string()),
-    adjudicatorEmail: v.optional(v.string()),
     agentMailThreadId: v.optional(v.string()),
     status: v.string(),
     error: v.optional(v.string()),
@@ -1643,12 +1625,6 @@ export const setAgentMailInboxes = internalMutation({
     if (args.claimInboxEmail !== undefined) {
       patchData.agentMailInboxEmail = args.claimInboxEmail;
       patchData.assignedAgentEmail = args.claimInboxEmail;
-    }
-    if (args.adjudicatorInboxId !== undefined) {
-      patchData.agentMailAdjudicatorInboxId = args.adjudicatorInboxId;
-    }
-    if (args.adjudicatorEmail !== undefined) {
-      patchData.agentMailAdjudicatorEmail = args.adjudicatorEmail;
     }
     if (args.agentMailThreadId !== undefined) {
       patchData.agentMailThreadId = args.agentMailThreadId;

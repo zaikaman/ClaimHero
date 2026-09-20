@@ -79,8 +79,6 @@ export default defineSchema({
     assignedAgentEmail: v.string(),
     agentMailInboxId: v.optional(v.string()),
     agentMailInboxEmail: v.optional(v.string()),
-    agentMailAdjudicatorInboxId: v.optional(v.string()),
-    agentMailAdjudicatorEmail: v.optional(v.string()),
     agentMailThreadId: v.optional(v.string()),
     autoPilotEnabled: v.optional(v.boolean()),
     lastPayerAlertAt: v.optional(v.number()),
@@ -210,7 +208,6 @@ export default defineSchema({
     .index("by_deadline", ["statutoryDeadline"])
     .index("by_claim_number", ["claimNumber"])
     .index("by_inbox_email", ["agentMailInboxEmail"])
-    .index("by_adjudicator_email", ["agentMailAdjudicatorEmail"])
     .index("by_assigned_agent_email", ["assignedAgentEmail"])
     .index("by_created", ["createdAt"])
     .index("by_threadId", ["agentMailThreadId"])

@@ -473,21 +473,19 @@ export async function verifySvixWebhook(
 
 /**
  * ClaimHero-owned AgentMail identities used to recognise internally generated
- * mail (own sender/adjudicator inboxes). Any sender on the shared AgentMail
+ * mail (own sender inbox). Any sender on the shared AgentMail
  * infrastructure domain is internal: real insurance payers never send from
  * `@agentmail.to` addresses.
  */
 export interface AgentMailIdentities {
   senderEmail?: string;
-  adjudicatorEmail?: string;
   senderInboxId?: string;
-  adjudicatorInboxId?: string;
 }
 
 /**
  * Returns true when an email address belongs to ClaimHero's own AgentMail
  * infrastructure rather than an external payer. Compares against the
- * configured sender/adjudicator emails and inbox IDs, and falls back to the
+ * configured sender email and inbox ID, and falls back to the
  * shared infrastructure domain so loopback detection keeps working even when
  * mailbox configuration is unavailable.
  */
@@ -501,9 +499,7 @@ export function isInternalAgentMailAddress(
 
   const candidates = [
     identities?.senderEmail,
-    identities?.adjudicatorEmail,
     identities?.senderInboxId,
-    identities?.adjudicatorInboxId,
   ]
     .filter((entry): entry is string => typeof entry === "string" && Boolean(entry.trim()))
     .map((entry) => entry.toLowerCase().trim());

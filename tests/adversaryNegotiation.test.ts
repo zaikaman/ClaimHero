@@ -2,79 +2,21 @@ import { describe, it, expect } from "vitest";
 import {
   ADVERSARY_RFI_CHECKLIST,
   PARTIAL_SETTLEMENT_FRACTION,
-  buildAdversaryStrategyHint,
   buildCounterRebuttalFallback,
   calculatePartialSettlementOffer,
   detectAdversaryCountermove,
   getCountermoveClaimStatus,
   getCountermoveHeadline,
   getCountermoveLabel,
-  pickAdversaryCountermove,
 } from "../convex/lib/adversaryNegotiation";
 
-describe("Insurer Defense Adversary negotiation engine", () => {
+describe("Insurer determination parsing and counter-rebuttal negotiation engine", () => {
   it("prices partial settlement at 40% of the disputed amount", () => {
     expect(PARTIAL_SETTLEMENT_FRACTION).toBe(0.4);
     expect(calculatePartialSettlementOffer(10000)).toBe(4000);
     expect(calculatePartialSettlementOffer(18450)).toBe(7380);
     expect(calculatePartialSettlementOffer(0)).toBe(0);
     expect(calculatePartialSettlementOffer(-5)).toBe(0);
-  });
-
-  it("overturns overwhelming files on first review", () => {
-    expect(
-      pickAdversaryCountermove({
-        claimNumber: "CLM-STRONG-1",
-        deniedAmount: 12000,
-        overturnProbabilityScore: 0.9,
-        evidenceCount: 4,
-        negotiationRound: 0,
-      })
-    ).toBe("OVERTURNED_APPROVED");
-  });
-
-  it("holds the line on very weak files, then offers partial settlement", () => {
-    expect(
-      pickAdversaryCountermove({
-        claimNumber: "CLM-WEAK-1",
-        deniedAmount: 8000,
-        overturnProbabilityScore: 0.1,
-        evidenceCount: 0,
-        negotiationRound: 0,
-      })
-    ).toBe("DENIAL_UPHELD");
-    expect(
-      pickAdversaryCountermove({
-        claimNumber: "CLM-WEAK-1",
-        deniedAmount: 8000,
-        overturnProbabilityScore: 0.1,
-        evidenceCount: 0,
-        negotiationRound: 1,
-      })
-    ).toBe("PARTIAL_SETTLEMENT_OFFER");
-  });
-
-  it("concedes late rounds so negotiation threads converge", () => {
-    expect(
-      pickAdversaryCountermove({
-        claimNumber: "CLM-LONG-1",
-        deniedAmount: 9000,
-        overturnProbabilityScore: 0.5,
-        evidenceCount: 1,
-        negotiationRound: 4,
-      })
-    ).toBe("OVERTURNED_APPROVED");
-  });
-
-  it("is deterministic per claim and round", () => {
-    const ctx = {
-      claimNumber: "CLM-DET-42",
-      deniedAmount: 5000,
-      overturnProbabilityScore: 0.55,
-      evidenceCount: 1,
-      negotiationRound: 1,
-    };
-    expect(pickAdversaryCountermove(ctx)).toBe(pickAdversaryCountermove(ctx));
   });
 
   it("classifies RFI, CPB conflict, and partial settlement inbound text", () => {
@@ -184,14 +126,5 @@ describe("Insurer Defense Adversary negotiation engine", () => {
     });
     expect(rfi).toContain("Request for Information");
     expect(ADVERSARY_RFI_CHECKLIST.length).toBeGreaterThan(0);
-  });
-
-  it("builds round-aware strategy hints", () => {
-    const hint = buildAdversaryStrategyHint({
-      claimNumber: "CLM-100",
-      deniedAmount: 10000,
-      negotiationRound: 1,
-    });
-    expect(hint).toContain("Negotiation round 1");
   });
 });
