@@ -10,7 +10,7 @@
 - **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/workflow, @convex-dev/agent, @convex-dev/presence, @convex-dev/action-retrier, @convex-dev/workpool, @convex-dev/batch-worker
 - **Convex features:** schema, tables, indexes, vector search, full-text search, queries, mutations, actions, HTTP actions, crons, scheduled functions, file storage, realtime queries, durable workflows, AI agent streaming, action retrier, workpool, batch worker
 - **Auth:** Convex Auth
-- **AI models:** gpt-5.4-nano
+- **AI models:** gpt-5.4-nano, text-embedding-3-small
 - **Started:** 2026-08-26T10:31:25Z
 - **Last updated:** 2026-09-21T12:49:10Z
 
