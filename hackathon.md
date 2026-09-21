@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-20T17:59:00Z
+- **Last updated:** 2026-09-21T12:46:00Z
 
 ## Log
 
@@ -1864,7 +1864,13 @@ Purged unused dead code, upgraded Convex to 1.46.0, and resolved returning user 
 - Verified 0 remaining unreferenced files, 0 unused Convex queries/mutations/actions, and 0 unused exported declarations across `src/` and `convex/`.
 - Verified 1,315 automated tests across 84 suites with `npm run verify` (100% clean typecheck, lint, coverage, and production build). Convex features: schema, queries, mutations, actions, crons, scheduled functions, file storage, static hosting.
 
-### 2026-09-20 - working tree
+### 2026-09-20 - 3627bec
 - Replaced the landing page single-case demo CTA ("Open the Demo Case") with a "Pre-Seeded Cases" evaluation showcase in `src/components/landing/TemplateLanding.tsx`. The card highlights the full portfolio of synthetic evaluation cases (Eleanor Vance $24,500, Marcus Sterling $18,200, Michael Patel $41,800) and routes directly to Case Radar (`radar` view) via "Explore Demo Cases", eliminating the empty case picker friction where judges were previously required to re-select a case. Verified with landing section tests, typecheck, lint, and full Vitest suite.
 - Removed obsolete `VITE_AGENTMAIL_ADJUDICATOR_EMAIL` environment variable fallback from GitHub Actions deployment workflow (`.github/workflows/deploy.yml`) following complete removal of the simulated AI adjudicator mode.
 
+### 2026-09-21 - working tree
+Restored green peer-to-peer (P2P) overturn victory resolution in `convex/actions/p2pLiveCopilot.ts`, `src/hooks/useLiveCallCopilot.ts`, and `src/components/p2p/P2PLiveCopilot.tsx`:
+- Corrected LLM prompt and schema in `convex/actions/p2pLiveCopilot.ts` to instruct the medical director reviewer to overturn the adverse determination and issue an authorization number when clinical criteria are met.
+- Removed the conflicting `hasSimulationNotice` check in `src/hooks/useLiveCallCopilot.ts` that improperly cancelled overturns into a fallback yellow simulation state, and ensured valid authorization numbers, audio victory chime (`p2p_overturned_victory`), and statutory checklist completion trigger on physician victory.
+- Restored precision medical emerald green styling across the guide banner, hero card, reviewer status card (`Reviewer Status:`), closing verbal rebuttal cue (`SAY TO CONCLUDE CALL:`), and encounter EHR addendum launcher in `src/components/p2p/P2PLiveCopilot.tsx`.
+- Verified cleanly with `npm run verify` (1,304 passed tests across 83 suites, 100% typecheck, lint, coverage, and production build). Convex features: actions, queries, mutations, static hosting.

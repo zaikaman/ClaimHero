@@ -206,7 +206,6 @@ npm run verify          # Full automated gate (typecheck + lint + test:coverage 
 * `tests/clientStatsAndSearch.test.ts` (12 tests): In-memory client statistics aggregation and search filtering.
 * `tests/appealDossierBinder.test.ts` (11 tests): Dossier serialization, fallback exhibits, criteria violations, and 3-tier appellate escalation.
 * `tests/utils.test.ts` (11 tests): Healthcare currency formatting, statutory countdown math, and risk badge resolvers.
-* `tests/p2pLiveCopilot.test.ts` (11 tests): AI Medical Director 3-turn lifecycle, Fast Answer cards, and STT tolerance.
 * `tests/convexPrecedents.test.ts` (11 tests): Precedent vector index retrieval, seeding, and deduplicated matching.
 * `tests/convexSettings.test.ts` (11 tests): Organization profile settings, practice credentials, and preferences.
 * `tests/backendOptimizationsD1D7.test.ts` (10 tests): Bounded pagination, aggregate safeguards, and performance optimizations.

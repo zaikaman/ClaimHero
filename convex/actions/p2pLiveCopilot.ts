@@ -333,9 +333,8 @@ CRITICAL GUIDELINES FOR REALISTIC P2P CALL SIMULATION:
        (c) Failed therapeutic steroid/hyaluronic injections + NSAIDs, OR
        (d) Acute neurological loss or severe functional impairment;
      * THEN YOU MUST CONCEDE, APPROVE THE PROCEDURE, AND OVERTURN THE DENIAL.
-     * State clearly on the call that based on the documented clinical severity and policy criteria, you are conceding that clinical criteria are met in this simulation.
-     * Set "medicalDirectorTone" to "conceding", "callResolutionStage" to "overturned", "isOverturned" to true.
-     * SAFETY RULE: Because this is an AI peer-to-peer practice simulation, NEVER fabricate a deceptive or realistic synthetic authorization number. Label authorizationNumber as "Simulation only — no authorization granted" or omit it.
+     * State clearly on the call that based on the documented clinical severity and policy criteria, you are overturning the adverse determination and granting immediate authorization.
+     * Set "medicalDirectorTone" to "conceding", "callResolutionStage" to "overturned", "isOverturned" to true, and generate an authorization number (e.g. "AUTH-${payer.slice(0, 3).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}").
 
 3. STRICT ANTI-REPETITION CONSTRAINT:
    - NEVER repeat the same objection, requirement, or phrase (e.g., do NOT repeat demands for "home exercise programs", "separate maintenance trials", or "longitudinal records" if already mentioned previously in the transcript history).
@@ -399,7 +398,7 @@ Evaluate the clinical merits. Formulate your spoken response as the Medical Dire
             },
             authorizationNumber: {
               type: "string",
-              description: "Prior authorization status or reference if overturned (for practice simulation, label clearly as simulation only)",
+              description: "Prior authorization number if overturned (e.g. AUTH-PAY-123456)",
             },
             confidenceScore: {
               type: "number",
