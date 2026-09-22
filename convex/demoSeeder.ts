@@ -1,10 +1,11 @@
-import { MutationCtx } from "./_generated/server";
+import { MutationCtx, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { claimsAggregate } from "./lib/aggregates";
 import { buildClaimSearchContent } from "./claims";
 import { appendAuditLog } from "./auditLogs";
 import { generateFormalAppealPdf } from "./lib/pdfGenerator";
 import { formatAppealEmail } from "./lib/appealEmail";
+import { requireAuthUser } from "./lib/auth";
 
 /**
  * Atomically pre-seeds 3 authentic, comprehensive demo cases for newly registered
@@ -2029,3 +2030,28 @@ aetnaintl_appeals@aetna.com | Inquiries: 1-800-555-AETNA`,
     timestamp: now - 1 * DAY_MS,
   });
 }
+
+/**
+ * Public mutation to seed or restore 3 authentic evaluation demo cases for the authenticated user.
+ * Idempotent: if demo cases already exist for this user, it reports alreadySeeded: true
+ * without creating duplicate records.
+ */
+export const seedDemoCases = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuthUser(ctx);
+    const userClaims = await ctx.db
+      .query("claims")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const existingDemo = userClaims.find((c) => c.isDemo || c.dataOrigin === "demo-fixture" || c.origin === "demo-fixture");
+    if (existingDemo) {
+      return { success: true, alreadySeeded: true };
+    }
+
+    await seedDemoCasesForUser(ctx, userId);
+    return { success: true, seeded: true };
+  },
+});
+

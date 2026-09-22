@@ -380,6 +380,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setIsAnonymousLoading(true);
 
     try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("claimhero_include_demo", "true");
+      }
       await signInAnonymous();
       setIsAnonymousLoading(false);
       if (onSuccess) {

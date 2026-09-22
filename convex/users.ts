@@ -1,6 +1,8 @@
 import { query, internalQuery, internalMutation, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { getAuthUserId } from "./lib/auth";
+import { seedDemoCasesForUser } from "./demoSeeder";
+import { vGoogleProfile } from "@convex-dev/auth/providers/oauth/google";
 
 /**
  * Creates a user row when an account signs up with password.
@@ -25,7 +27,7 @@ export const createPasswordUser = internalMutation({
       throw new ConvexError("An account with this email address already exists. Please sign in instead.");
     }
 
-    return await ctx.db.insert("users", {
+    const userId = await ctx.db.insert("users", {
       name: rawUsername.split("@")[0],
       email: email,
       provider: "password",
@@ -33,10 +35,13 @@ export const createPasswordUser = internalMutation({
       role: "advocate",
       createdAt: Date.now(),
     });
+
+    // Atomically pre-seed 3 demo cases for new password accounts
+    await seedDemoCasesForUser(ctx, userId);
+
+    return userId;
   },
 });
-
-import { vGoogleProfile } from "@convex-dev/auth/providers/oauth/google";
 
 /**
  * Creates or links a user row when an account signs in with Google OAuth.
@@ -72,11 +77,21 @@ export const createGoogleUser = internalMutation({
           providerAccountId: args.providerAccountId,
           emailVerificationTime: args.profile.emailVerified ? Date.now() : existing.emailVerificationTime,
         });
+
+        // If existing account has 0 claims in their workspace, seed demo cases so they are ready out of the box
+        const existingClaim = await ctx.db
+          .query("claims")
+          .withIndex("by_user", (q) => q.eq("userId", existing._id))
+          .first();
+        if (!existingClaim) {
+          await seedDemoCasesForUser(ctx, existing._id);
+        }
+
         return existing._id;
       }
     }
 
-    return await ctx.db.insert("users", {
+    const userId = await ctx.db.insert("users", {
       name: args.profile.name || (args.profile.email ? args.profile.email.split("@")[0] : "Advocate"),
       email: args.profile.email || undefined,
       image: args.profile.picture || undefined,
@@ -86,10 +101,13 @@ export const createGoogleUser = internalMutation({
       role: "advocate",
       createdAt: Date.now(),
     });
+
+    // Atomically pre-seed 3 demo cases for new Google OAuth accounts
+    await seedDemoCasesForUser(ctx, userId);
+
+    return userId;
   },
 });
-
-import { seedDemoCasesForUser } from "./demoSeeder";
 
 /**
  * Creates an anonymous user row and atomically seeds 3 comprehensive demo cases.

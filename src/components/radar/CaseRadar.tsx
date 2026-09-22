@@ -125,7 +125,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   onNavigateView,
   onDeleteCase,
   onRunAutonomousPipeline,
-  includeDemo = false,
+  includeDemo = true,
   onToggleIncludeDemo,
   initialPayerFilter,
   onClearPayerFilter,
@@ -155,8 +155,31 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   const [caseToDelete, setCaseToDelete] = useState<Claim | null>(null);
   const [runningPipelineClaimId, setRunningPipelineClaimId] = useState<string | null>(null);
   const [isClearingDemo, setIsClearingDemo] = useState(false);
+  const [isSeedingDemo, setIsSeedingDemo] = useState(false);
 
   const clearDemoDataMutation = useMutation(api.claims.clearDemoData);
+  const seedDemoCasesMutation = useMutation(api.demoSeeder.seedDemoCases);
+
+  const handleSeedDemoData = async () => {
+    setIsSeedingDemo(true);
+    const toastId = toast.loading("Loading authentic evaluation demo cases...");
+    try {
+      const res = await seedDemoCasesMutation({});
+      if (res?.alreadySeeded) {
+        toast.info("Demo cases are already active in your workspace.", { id: toastId });
+      } else {
+        toast.success("Loaded 3 comprehensive evaluation cases.", { id: toastId });
+      }
+      if (onToggleIncludeDemo && !includeDemo) {
+        onToggleIncludeDemo();
+      }
+    } catch (err) {
+      console.error("Failed to seed demo cases:", err);
+      toast.error("Failed to load demo cases", { id: toastId });
+    } finally {
+      setIsSeedingDemo(false);
+    }
+  };
 
   const handleClearDemoData = async () => {
     const toastId = toast.loading("Purging seeded demo records...");
@@ -963,6 +986,17 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                       <p className="text-[11px] text-muted-foreground max-w-xs">
                         Try resetting your search query or switching to &quot;{isDetailed ? "All Cases" : "All"}&quot;.
                       </p>
+                      {!includeDemo && onToggleIncludeDemo && (
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={onToggleIncludeDemo}
+                          className="mt-1 gap-1 text-xs border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 cursor-pointer"
+                        >
+                          <Flask className="size-3.5" />
+                          <span>Show Demo Cases</span>
+                        </Button>
+                      )}
                       {hasActiveFilters && (
                         <Button
                           variant="outline"
@@ -971,6 +1005,22 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
                           className="mt-1"
                         >
                           Clear Filters
+                        </Button>
+                      )}
+                      {activeClaims.length === 0 && (
+                        <Button
+                          variant="default"
+                          size="xs"
+                          onClick={handleSeedDemoData}
+                          disabled={isSeedingDemo}
+                          className="mt-1 gap-1 text-xs bg-primary text-primary-foreground cursor-pointer shadow-2xs"
+                        >
+                          {isSeedingDemo ? (
+                            <CircleNotch className="size-3.5 animate-spin" />
+                          ) : (
+                            <Flask className="size-3.5" />
+                          )}
+                          <span>{isSeedingDemo ? "Loading Cases..." : "Load 3 Evaluation Demo Cases"}</span>
                         </Button>
                       )}
                     </div>

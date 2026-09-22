@@ -13,7 +13,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano, text-embedding-3-small
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-22T13:28:52Z
+- **Last updated:** 2026-09-22T18:45:00Z
 
 ## Log
 
@@ -1939,4 +1939,12 @@ Implemented multi-lingual email reply quote parsing and thread isolation to prev
 - Enhanced `SimpleInboxView.tsx` and `AgentMailDrawer.tsx` to display clean inquiry text and provide an interactive expandable quoted text toggle for email history.
 - Hardened live DNS MX resolution action in `convex/actions/serviceCertificateResolver.ts` with bounded `withTimeout` safeguards (2,500ms on MX queries, 1,000ms on IP lookups) to prevent asynchronous network DNS hangs and runner timeouts in firewalled CI and offline environments.
 - Added unit test coverage in `tests/emailQuoteParser.test.ts` (14 tests) and updated `tests/serviceCertificate.test.ts` with deterministic resolution and fallback mocks, verifying 1,346 passing tests across 86 suites with `npm run verify` (100% clean typecheck, lint, coverage, and production build). Convex features: schema, queries, mutations, actions, HTTP actions, static hosting.
+
+### 2026-09-22 - working tree
+Resolved cross-device case invisibility by defaulting demo cases to visible across client sessions and added production-grade demo seeding mutations for all user registration paths (`src/hooks/useClaims.ts`, `src/components/radar/CaseRadar.tsx`, `src/components/auth/AuthPage.tsx`, `src/components/settings/SettingsPage.tsx`, `convex/demoSeeder.ts`, `convex/users.ts`, `tests/anonymousAuthAndSeeder.test.ts`):
+- Case Storage & Isolation Verification: Confirmed all cases, clinical evidences, briefs, and audit logs are persisted exclusively in Convex Cloud database tables rather than localStorage. Verified that cases were previously hidden on new devices or clean browser profiles because `includeDemo` defaulted to `false` when `claimhero_include_demo` was unset in localStorage.
+- Frontend Default Visibility: Changed the `includeDemo` state in `src/hooks/useClaims.ts` and default prop in `src/components/radar/CaseRadar.tsx` to default to `true`. Updated `AuthPage.tsx` to explicitly write `claimhero_include_demo: "true"` prior to anonymous exploration.
+- Fallback & Empty State UX: Added "Show Demo Cases" and "Load 3 Evaluation Demo Cases" CTA buttons to Case Radar's empty state table row when filters exclude demo data or the portfolio is empty. Added a "Load synthetic evaluation demo data" button to Settings (`SettingsPage.tsx`).
+- Production-Ready Seeding Mutation & Registration Hooks: Exported idempotent public mutation `seedDemoCases` in `convex/demoSeeder.ts` guarded by `requireAuthUser(ctx)`. Wired atomic demo case pre-seeding into `createGoogleUser` and `createPasswordUser` in `convex/users.ts` so all newly registered advocates (OAuth, password, and anonymous) immediately receive the 3 comprehensive evaluation cases.
+- Automated Testing & Full Verification: Added regression unit tests in `tests/anonymousAuthAndSeeder.test.ts` asserting Google/Password account seeding and idempotent `seedDemoCases` execution. Validated 100% clean typecheck, ESLint, 86 test suites (1,349 passing tests), test coverage, and production build with `npm run verify`. Convex features: queries, mutations, internalMutation, auth, static hosting.
 

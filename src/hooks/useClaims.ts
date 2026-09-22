@@ -26,7 +26,7 @@ export function useClaims(options?: {
       const saved = localStorage.getItem("claimhero_include_demo");
       if (saved !== null) return saved === "true";
     }
-    return false; // Default to false so real cases are prioritized without demo fixtures
+    return true; // Default to true so demo cases and seeded cases are immediately visible across devices and new sessions
   });
 
   const setIncludeDemo = useCallback((val: boolean | ((prev: boolean) => boolean)) => {

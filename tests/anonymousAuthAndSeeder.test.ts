@@ -1,7 +1,7 @@
 /// <reference path="./auth-mock.d.ts" />
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createAnonymousUser } from "../convex/users";
-import { seedDemoCasesForUser } from "../convex/demoSeeder";
+import { createAnonymousUser, createGoogleUser, createPasswordUser } from "../convex/users";
+import { seedDemoCasesForUser, seedDemoCases } from "../convex/demoSeeder";
 import { claimsAggregate } from "../convex/lib/aggregates";
 
 describe("Anonymous Auth Provider & 3 Pre-Seeded Demo Cases", () => {
@@ -45,6 +45,7 @@ describe("Anonymous Auth Provider & 3 Pre-Seeded Demo Cases", () => {
       query: vi.fn().mockReturnValue({
         withIndex: vi.fn().mockReturnValue({
           first: vi.fn().mockResolvedValue(null),
+          collect: vi.fn().mockResolvedValue([]),
           take: vi.fn().mockResolvedValue([]),
           order: vi.fn().mockReturnValue({
             first: vi.fn().mockResolvedValue(null),
@@ -208,5 +209,65 @@ describe("Anonymous Auth Provider & 3 Pre-Seeded Demo Cases", () => {
     await seedDemoCasesForUser(ctx, "user_test_999" as any);
 
     expect(aggregateInsertSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("createPasswordUser creates user and atomically seeds demo cases", async () => {
+    const { ctx, insertedRecords } = createMockCtx();
+    vi.spyOn(claimsAggregate, "insert").mockResolvedValue(undefined as any);
+
+    const userId = await (createPasswordUser as any)._handler(ctx, {
+      provider: "password",
+      providerAccountId: "pwd_123",
+      profile: { username: "advocate@test.org" },
+    });
+
+    expect(userId).toBeDefined();
+    expect(insertedRecords.users.length).toBe(1);
+    expect(insertedRecords.claims.length).toBe(3);
+    expect(insertedRecords.patients.length).toBe(3);
+  });
+
+  it("createGoogleUser creates new user and atomically seeds demo cases", async () => {
+    const { ctx, insertedRecords } = createMockCtx();
+    vi.spyOn(claimsAggregate, "insert").mockResolvedValue(undefined as any);
+
+    const userId = await (createGoogleUser as any)._handler(ctx, {
+      provider: "google",
+      providerAccountId: "g_123",
+      profile: { email: "zaikaman123@gmail.com", name: "Zaikaman", emailVerified: true },
+    });
+
+    expect(userId).toBeDefined();
+    expect(insertedRecords.users.length).toBe(1);
+    expect(insertedRecords.claims.length).toBe(3);
+    expect(insertedRecords.patients.length).toBe(3);
+  });
+
+  it("seedDemoCases mutation seeds demo cases idempotently for authenticated caller", async () => {
+    const { ctx, insertedRecords } = createMockCtx();
+    vi.spyOn(claimsAggregate, "insert").mockResolvedValue(undefined as any);
+
+    // Mock authenticated user
+    ctx.auth = {
+      getUserIdentity: vi.fn().mockResolvedValue({ subject: "auth_user_456" }),
+    };
+
+    // First call: seeds cases
+    const res1 = await (seedDemoCases as any)._handler(ctx, {});
+    expect(res1.success).toBe(true);
+    expect(res1.seeded).toBe(true);
+    expect(insertedRecords.claims.length).toBe(3);
+
+    // Mock query with index to return existing demo claims for idempotent second call
+    ctx.db.query = vi.fn().mockReturnValue({
+      withIndex: vi.fn().mockReturnValue({
+        collect: vi.fn().mockResolvedValue(insertedRecords.claims),
+      }),
+    });
+
+    const res2 = await (seedDemoCases as any)._handler(ctx, {});
+    expect(res2.success).toBe(true);
+    expect(res2.alreadySeeded).toBe(true);
+    expect(insertedRecords.claims.length).toBe(3); // No duplicates
   });
 });

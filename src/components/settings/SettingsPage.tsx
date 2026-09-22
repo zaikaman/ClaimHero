@@ -21,6 +21,7 @@ import {
   Play,
   ShieldCheck,
   GraduationCap,
+  Flask,
 } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -64,6 +65,25 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
   const [demoPurgeMessage, setDemoPurgeMessage] = useState<string | null>(null);
 
   const clearDemoDataMutation = useMutation(api.claims.clearDemoData);
+  const seedDemoCasesMutation = useMutation(api.demoSeeder.seedDemoCases);
+  const [isSeedingDemo, setIsSeedingDemo] = useState(false);
+
+  const handleSeedDemoData = async () => {
+    try {
+      setIsSeedingDemo(true);
+      const res = await seedDemoCasesMutation({});
+      if (res.alreadySeeded) {
+        setDemoPurgeMessage("Evaluation demo cases are already active in your workspace.");
+      } else {
+        setDemoPurgeMessage("Successfully loaded 3 comprehensive evaluation demo cases.");
+      }
+      setTimeout(() => setDemoPurgeMessage(null), 4000);
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : "Failed to load demo cases");
+    } finally {
+      setIsSeedingDemo(false);
+    }
+  };
 
   const handleClearDemoData = async () => {
     try {
@@ -812,6 +832,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigateToRadar })
                 {demoPurgeMessage}
               </div>
             )}
+
+            {/* Load / Restore Demo Data */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/40">
+              <div className="space-y-0.5 max-w-lg">
+                <div className="text-xs font-semibold text-foreground">Load synthetic evaluation demo data</div>
+                <div className="text-[11px] text-muted-foreground leading-relaxed">
+                  Seeds 3 authentic, comprehensive evaluation cases (Cigna, GeoBlue, Aetna) with Firecrawl policy bulletins, cited briefs, and P2P defense scripts.
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSeedDemoData}
+                disabled={isSeedingDemo}
+                className="h-8 text-xs font-medium text-primary hover:bg-primary/10 border-primary/30 shrink-0 cursor-pointer"
+              >
+                <Flask className="size-3.5 mr-1" />
+                <span>{isSeedingDemo ? "Loading Cases..." : "Load Demo Cases"}</span>
+              </Button>
+            </div>
 
             {/* Scoped Demo Purge */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-destructive/15">
