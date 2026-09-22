@@ -13,7 +13,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano, text-embedding-3-small
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-22T13:27:23Z
+- **Last updated:** 2026-09-22T13:28:52Z
 
 ## Log
 
@@ -1930,7 +1930,7 @@ Aligned Simple mode communication UX with Details mode by docking the AI suggest
 - Added test coverage in `tests/simpleInboxUx.test.ts` asserting chatbox docking, DOM order (timeline before suggested response, suggested response before composer), and regenerate action, updating `README.md` to 1,331 passing tests across 85 suites.
 - Verified 100% clean with `npm run verify` (typecheck, lint, 1,331 tests, and production build).
 
-### 2026-09-22 - working tree
+### 2026-09-22 - 06b0f2c
 Implemented multi-lingual email reply quote parsing and thread isolation to prevent historical email chains from contaminating payer response analysis, and hardened live DNS MX resolution against CI and network timeouts:
 - Created multi-lingual email reply parser in `convex/lib/emailQuoteParser.ts` stripping attribution lines, Outlook/Exchange headers, RFC-2822 blockquotes, and HTML quote containers while preserving clean inbound text. Hardened attribution matching with date/time and email signatures to prevent false positives on clinical narrative prose and inline lab comparisons.
 - Added `quotedBodyText` and `hasQuotedText` to `emailMessages` table schema in `convex/schema.ts` and mutations in `convex/emails.ts`.
