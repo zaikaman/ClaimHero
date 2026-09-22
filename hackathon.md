@@ -13,7 +13,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano, text-embedding-3-small
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-22T12:35:55Z
+- **Last updated:** 2026-09-22T12:50:00Z
 
 ## Log
 
@@ -1919,4 +1919,14 @@ Eliminated de-identification token (`[CLAIM_REF]`) and clinical date placeholder
 - Implemented outbound fail-closed transmission gate in `sendOutboundMessage` via `hasUnresolvedPlaceholders` to block sending ungrounded drafts to payers.
 - Added sanitization to inbox draft generation, intake, and rendering in `AgentMailDrawer.tsx` and `SimpleInboxView.tsx`.
 - Expanded test coverage across `tests/phiSafe.test.ts`, `tests/groundedMatcherAndSafeAutoReply.test.ts`, and `tests/actionsAgentMailAndDispatcher.test.ts`, verifying 1,330 passing tests across 85 suites with 100% clean typecheck, lint, and production build. Convex features: actions, queries, mutations, static hosting.
+
+### 2026-09-22 - working tree
+Aligned Simple mode communication UX with Details mode by docking the AI suggested rebuttal card directly into the chatbox console above the message composer in `SimpleInboxView.tsx`:
+- Relocated the Suggested Response card from stranded isolation above the message timeline card directly into the conversation console between the scrollable message history stream and the quick message composer form.
+- Eliminated the friction where patients reading an incoming insurer reply at the bottom of the message thread had to scroll up past the entire history to approve the response.
+- Added a "Review Pending Response" quick jump action in the delivered status card for patients viewing from the top of the case.
+- Enhanced "Edit in Composer" to immediately transfer draft text into the adjacent composer input and focus the input element.
+- Added `onRegenerateDraft` prop support in `SimpleInboxView.tsx` and wired it to `handleGenerateSmartDraft` in `AgentMailDrawer.tsx`.
+- Added test coverage in `tests/simpleInboxUx.test.ts` asserting chatbox docking, DOM order (timeline before suggested response, suggested response before composer), and regenerate action, updating `README.md` to 1,331 passing tests across 85 suites.
+- Verified 100% clean with `npm run verify` (typecheck, lint, 1,331 tests, and production build).
 

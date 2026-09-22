@@ -241,6 +241,61 @@ describe("SimpleInboxView UX & Communication Presentation", () => {
     expect(markup).toContain(autoDraftText);
     expect(markup).toContain("Approve &amp; Send Response");
     expect(markup).toContain("Edit in Composer");
+
+    // Assert status card quick action to review pending response in chatbox
+    expect(markup).toContain("Review Pending Response");
+
+    // Assert positioning: Suggested response is docked directly in the chatbox area,
+    // AFTER the message history stream and BEFORE the quick composer input,
+    // so users never have to scroll up above the history to approve.
+    const messageHistoryIndex = markup.indexOf("Letter &amp; Message History");
+    const suggestedResponseIndex = markup.indexOf("Suggested Response to Cigna Global Health");
+    const composerInputIndex = markup.indexOf("Send a note or follow-up to grievances@cigna.com");
+
+    expect(messageHistoryIndex).toBeGreaterThan(-1);
+    expect(suggestedResponseIndex).toBeGreaterThan(messageHistoryIndex);
+    expect(composerInputIndex).toBeGreaterThan(suggestedResponseIndex);
+  });
+
+  it("renders the regenerate button in simple mode when onRegenerateDraft is provided", () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(SimpleInboxView, {
+        claim: { ...mockClaim, status: "under_review" },
+        messages: mockMessages,
+        isLoading: false,
+        payerName: "Cigna Global Health",
+        officialEmail: "grievances@cigna.com",
+        customEmail: "",
+        setCustomEmail: () => {},
+        dispatchMode: "official_payer",
+        setDispatchMode: () => {},
+        effectiveRecipient: "grievances@cigna.com",
+        canDispatch: true,
+        isDispatching: false,
+        onRunDispatch: async () => {},
+        hasPriorTransmissions: true,
+        isReadyForReview: true,
+        isPatientUnspecified: false,
+        hasSender: true,
+        isSenderGatewayConfigured: true,
+        isCustomEmailLoopback: false,
+        activeAutoDraft: "Sample auto draft content",
+        isSynthesizing: false,
+        isSending: false,
+        onApproveAndSendDraft: async () => {},
+        onDismissDraft: async () => {},
+        onRegenerateDraft: async () => {},
+        replyText: "",
+        setReplyText: () => {},
+        onSendReply: () => {},
+        onOpenExportDrawer: () => {},
+        onOpenCertificateModal: () => {},
+        effectiveAppeal: null,
+      })
+    );
+
+    expect(markup).toContain("Regenerate");
+    expect(markup).toContain("Target:");
   });
 
   it("prompts the user with the actual typed custom recipient instead of production address when appeal was dispatched to custom email", () => {

@@ -569,6 +569,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
           isSending={isSending}
           onApproveAndSendDraft={handleApproveAndSendDraft}
           onDismissDraft={handleDismissDraft}
+          onRegenerateDraft={() => handleGenerateSmartDraft()}
           replyText={replyText}
           setReplyText={setReplyText}
           onSendReply={handleSendReply}

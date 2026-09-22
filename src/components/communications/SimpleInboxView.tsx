@@ -18,6 +18,7 @@ import {
   Paperclip,
   CaretDown,
   CaretUp,
+  ArrowDown,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, formatCurrency, cn } from "../../lib/utils";
@@ -57,6 +58,7 @@ export interface SimpleInboxViewProps {
   isSending: boolean;
   onApproveAndSendDraft: () => Promise<void>;
   onDismissDraft: () => Promise<void>;
+  onRegenerateDraft?: () => Promise<void>;
   replyText: string;
   setReplyText: (text: string) => void;
   onSendReply: (e: React.FormEvent) => void;
@@ -100,6 +102,7 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
   isSending,
   onApproveAndSendDraft,
   onDismissDraft,
+  onRegenerateDraft,
   replyText,
   setReplyText,
   onSendReply,
@@ -118,6 +121,8 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(new Set());
   const [showOptionsWhenSent, setShowOptionsWhenSent] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const draftSectionRef = useRef<HTMLDivElement | null>(null);
+  const composerInputRef = useRef<HTMLInputElement | null>(null);
   const isInitialMountRef = useRef(true);
 
   useEffect(() => {
@@ -129,6 +134,12 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages.length]);
+
+  useEffect(() => {
+    if (activeAutoDraft || isSynthesizing) {
+      draftSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [activeAutoDraft, isSynthesizing]);
 
   const isWon = claim.status === "won";
 
@@ -562,7 +573,24 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
             </div>
 
             {/* Quick Actions */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {(activeAutoDraft || isSynthesizing) && !isWon && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    draftSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    composerInputRef.current?.focus();
+                  }}
+                  className="h-8 text-xs px-2.5 gap-1.5 border-primary/40 text-primary bg-primary/10 hover:bg-primary/20 cursor-pointer shadow-2xs"
+                  title="Jump to pending suggested response in chatbox"
+                >
+                  <ShieldCheck className="size-3.5 text-primary" />
+                  <span>Review Pending Response</span>
+                  <ArrowDown className="size-3" />
+                </Button>
+              )}
+
               <Button
                 size="sm"
                 variant="outline"
@@ -594,78 +622,6 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
                 <span>Send Another Copy</span>
               </Button>
             </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Suggested Response (Smart Rebuttal) Card */}
-      {(activeAutoDraft || isSynthesizing) && !isWon && (
-        <Card className="p-4 border-primary/40 bg-primary/5 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className="size-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
-                <ShieldCheck className="size-4" />
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-foreground block">
-                  Suggested Response to {payerName}
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  Prepared from your clinical records and insurer rules. Requires your approval before sending.
-                </span>
-              </div>
-            </div>
-            <Badge variant="outline" className="text-[10px] font-medium border-primary/30 text-primary">
-              Approval Required
-            </Badge>
-          </div>
-
-          {isSynthesizing && !activeAutoDraft ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground p-3 bg-background/80 rounded-lg border border-border">
-              <CircleNotch className="size-3.5 animate-spin text-primary shrink-0" />
-              <span>Preparing recommended response from the insurer&apos;s latest reply...</span>
-            </div>
-          ) : (
-            <div className="max-h-36 overflow-y-auto rounded-lg bg-background/90 p-3 border border-border text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap select-text">
-              {sanitizeRebuttalDraftDisplay(activeAutoDraft, claim.claimNumber, claim.serviceDate)}
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button
-              size="xs"
-              onClick={onApproveAndSendDraft}
-              disabled={isSending || !activeAutoDraft.trim() || isSynthesizing || isProvisionalDegraded}
-              className="gap-1.5 h-8 px-3 text-xs font-medium cursor-pointer"
-            >
-              {isSending ? (
-                <CircleNotch className="size-3.5 animate-spin" />
-              ) : (
-                <PaperPlaneTilt className="size-3.5" />
-              )}
-              <span>Approve &amp; Send Response</span>
-            </Button>
-
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => setReplyText(activeAutoDraft)}
-              disabled={!activeAutoDraft.trim() || isSynthesizing}
-              className="gap-1.5 h-8 px-2.5 text-xs font-medium cursor-pointer"
-            >
-              <FileText className="size-3.5" />
-              <span>Edit in Composer</span>
-            </Button>
-
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={onDismissDraft}
-              disabled={isSynthesizing}
-              className="h-8 px-2 text-xs text-muted-foreground hover:text-rose-400 cursor-pointer"
-            >
-              <span>Dismiss</span>
-            </Button>
           </div>
         </Card>
       )}
@@ -932,31 +888,138 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Suggested Response (Smart Rebuttal) Card - Docked right in the chatbox! */}
+        {(activeAutoDraft || isSynthesizing) && !isWon && (
+          <div
+            ref={draftSectionRef}
+            className="border-t border-primary/30 bg-primary/5 p-4 space-y-3 transition-all animate-fadeIn"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="size-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                  <ShieldCheck className="size-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-foreground">
+                      Suggested Response to {payerName}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-medium border-primary/30 text-primary">
+                      Approval Required
+                    </Badge>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground block mt-0.5 truncate sm:whitespace-normal">
+                    Prepared from your clinical records and insurer rules. Requires your approval before sending.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {isSynthesizing && !activeAutoDraft ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground p-3 bg-background/80 rounded-lg border border-border">
+                <CircleNotch className="size-3.5 animate-spin text-primary shrink-0" />
+                <span>Preparing recommended response from the insurer&apos;s latest reply...</span>
+              </div>
+            ) : (
+              <div className="max-h-36 overflow-y-auto rounded-lg bg-background/90 p-3 border border-border text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap select-text shadow-2xs">
+                {sanitizeRebuttalDraftDisplay(activeAutoDraft, claim.claimNumber, claim.serviceDate)}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button
+                size="xs"
+                onClick={onApproveAndSendDraft}
+                disabled={isSending || !activeAutoDraft.trim() || isSynthesizing || isProvisionalDegraded}
+                className="gap-1.5 h-8 px-3 text-xs font-medium cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
+              >
+                {isSending ? (
+                  <CircleNotch className="size-3.5 animate-spin" />
+                ) : (
+                  <PaperPlaneTilt className="size-3.5" />
+                )}
+                <span>Approve &amp; Send Response</span>
+              </Button>
+
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => {
+                  setReplyText(activeAutoDraft);
+                  setTimeout(() => {
+                    composerInputRef.current?.focus();
+                  }, 50);
+                }}
+                disabled={!activeAutoDraft.trim() || isSynthesizing}
+                className="gap-1.5 h-8 px-2.5 text-xs font-medium cursor-pointer"
+              >
+                <FileText className="size-3.5" />
+                <span>Edit in Composer</span>
+              </Button>
+
+              {onRegenerateDraft && (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => onRegenerateDraft()}
+                  disabled={isSynthesizing}
+                  className="gap-1.5 h-8 px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer"
+                  title="Re-generate response from latest insurer message"
+                >
+                  <ArrowsClockwise className={cn("size-3.5", isSynthesizing && "animate-spin")} />
+                  <span>Regenerate</span>
+                </Button>
+              )}
+
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={onDismissDraft}
+                disabled={isSynthesizing}
+                className="h-8 px-2 text-xs text-muted-foreground hover:text-rose-400 cursor-pointer"
+              >
+                <span>Dismiss</span>
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Quick Message Composer */}
         <div className="border-t border-border/80 p-3 bg-muted/20">
-          <form onSubmit={onSendReply} className="flex items-center gap-2">
-            <Input
-              type="text"
-              aria-label={`Send a note or follow-up to ${conversationRecipient || payerName}`}
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder={`Send a note or follow-up to ${conversationRecipient || payerName}...`}
-              className="flex-1 bg-background text-xs h-9"
-              disabled={isSending}
-            />
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isSending || !replyText.trim()}
-              className="gap-1.5 h-9 px-3.5 text-xs shrink-0 cursor-pointer"
-            >
-              {isSending ? (
-                <CircleNotch className="size-3.5 animate-spin" />
-              ) : (
-                <PaperPlaneTilt className="size-3.5" />
-              )}
-              <span>Send</span>
-            </Button>
+          <form onSubmit={onSendReply} className="space-y-2">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground px-0.5">
+              <span className="truncate max-w-[320px]">
+                Target: <strong className="text-foreground font-mono">{conversationRecipient || payerName}</strong>
+              </span>
+              <span className="text-[9.5px] text-muted-foreground/70 hidden sm:inline">
+                Press Enter to send
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                ref={composerInputRef}
+                type="text"
+                aria-label={`Send a note or follow-up to ${conversationRecipient || payerName}`}
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder={`Send a note or follow-up to ${conversationRecipient || payerName}...`}
+                className="flex-1 bg-background text-xs h-9"
+                disabled={isSending}
+              />
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isSending || !replyText.trim()}
+                className="gap-1.5 h-9 px-3.5 text-xs shrink-0 cursor-pointer"
+              >
+                {isSending ? (
+                  <CircleNotch className="size-3.5 animate-spin" />
+                ) : (
+                  <PaperPlaneTilt className="size-3.5" />
+                )}
+                <span>Send</span>
+              </Button>
+            </div>
           </form>
         </div>
       </Card>
