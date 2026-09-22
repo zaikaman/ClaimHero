@@ -132,6 +132,7 @@ describe("Appeal Studio UX & Progressive Disclosure (SimpleStudioView)", () => {
     expect(markup).not.toContain("T1 First appeal — to your insurer (Saved)");
     expect(markup).not.toContain("Aggressiveness:");
     expect(markup).not.toContain("jump-trans");
+    expect(markup).not.toContain("Embed $164/d Penalties");
     expect(markup).not.toContain("Embed $110/d Penalties");
   });
 

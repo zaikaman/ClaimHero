@@ -232,7 +232,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
 
 ## Statutory remedies & ERISA § 502(c) civil penalties demand
 1. **Immediate Retroactive Coverage**: Claimant demands immediate and retroactive overturn of the adverse benefit determination for CPT codes (${claim.cptCodes?.join(", ") || "disputed clinical services"}), with prompt reimbursement issued at contractual in-network rates.
-2. **Statutory Non-Disclosure Penalties (29 U.S.C. § 1132(c)(1)(B))**: The Plan Administrator failed to disclose the internal clinical criteria, review protocols, and claim files within 30 days of written demand. Pursuant to 29 C.F.R. § 2560.503-1 and 29 C.F.R. § 2575.502c-1, claimant demands accrued statutory civil penalties at $110.00 per calendar day until full disclosure is rendered.
+2. **Statutory Non-Disclosure Penalties (29 U.S.C. § 1132(c)(1)(B))**: The Plan Administrator failed to disclose the internal clinical criteria, review protocols, and claim files within 30 days of written demand. Pursuant to 29 C.F.R. § 2560.503-1 and 29 C.F.R. § 2575.502c-1, claimant demands accrued statutory civil penalties at $164.00 per calendar day until full disclosure is rendered.
 3. **Fee-Shifting Notice (29 U.S.C. § 1132(g)(1))**: Notice is hereby given that claimant will petition the United States District Court for full mandatory and discretionary recovery of reasonable attorney's fees, clinical expert expenses, and taxable litigation costs upon judicial enforcement.`;
 
     if (/civil penalties demand|erisa § 502\(c\)/i.test(markdownContent)) {
@@ -953,7 +953,7 @@ export const AppealStudio: React.FC<AppealStudioProps> = ({
                 ) : (
                   <>
                     <Scales className="size-3" />
-                    <span>{isDetailed ? "Embed $110/d Penalties" : "Add fee warning"}</span>
+                    <span>{isDetailed ? "Embed $164/d Penalties" : "Add fee warning"}</span>
                   </>
                 )}
               </Button>

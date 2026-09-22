@@ -19,7 +19,11 @@ import {
 import { formatCurrency, cn } from "../../lib/utils";
 import { resolvePatientDisplayName, resolveMemberIdDisplay } from "../../lib/displaySafety";
 import { useDetailMode } from "../../hooks/useDetailMode";
-import { getSeverityTierMeta, STATUTORY_DISCLOSURE_GRACE_DAYS } from "../../lib/liabilityCalculator";
+import {
+  getSeverityTierMeta,
+  STATUTORY_DISCLOSURE_GRACE_DAYS,
+  DOL_INFLATION_ADJUSTED_DAILY_RATE,
+} from "../../lib/liabilityCalculator";
 import {
   Calculator,
   Scales,
@@ -70,7 +74,7 @@ export const FinancialLiabilityCalculator: React.FC<FinancialLiabilityCalculator
     saveToClaim,
   } = useLiabilityCalculator(claim);
 
-  // 2-Mode Architecture: "savings" (Patient Bill & Savings) vs "penalties" (ERISA $110/Day Sentinel)
+  // 2-Mode Architecture: "savings" (Patient Bill & Savings) vs "penalties" (ERISA $164/Day Sentinel)
   const { isDetailed } = useDetailMode();
   const [activeMode, setActiveMode] = useState<"savings" | "penalties">("savings");
   const [isPlanAdjustOpen, setIsPlanAdjustOpen] = useState<boolean>(false);
@@ -143,7 +147,7 @@ export const FinancialLiabilityCalculator: React.FC<FinancialLiabilityCalculator
   }
 
   const severityMeta = getSeverityTierMeta(erisaResult.data.severityTier);
-  const dailyPenaltyRate = erisaResult.data.dailyPenaltyRate ?? 110;
+  const dailyPenaltyRate = erisaResult.data.dailyPenaltyRate ?? DOL_INFLATION_ADJUSTED_DAILY_RATE;
 
   const handleCopyDemand = async () => {
     const ok = await copyTextToClipboard(erisaResult.noticeOfDefaultText);
@@ -909,7 +913,7 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
         </div>
       )}
 
-      {/* MODE 2: INSURER PENALTY SENTINEL (ERISA § 502(c) $110/DAY ENFORCEMENT) */}
+      {/* MODE 2: INSURER PENALTY SENTINEL (ERISA § 502(c) $164/DAY ENFORCEMENT) */}
       {activeMode === "penalties" && (
         <div className="space-y-4">
           {/* Plain-English Federal Law Explainer Banner */}
@@ -1143,10 +1147,10 @@ Statutory Authority: 29 U.S.C. § 1132(c)(1)(B) | 29 C.F.R. § 2560.503-1(h)(2)(
                       type="number"
                       min={0}
                       max={1000}
-                      value={erisaInputs.dailyPenaltyRate ?? 110}
+                      value={erisaInputs.dailyPenaltyRate ?? DOL_INFLATION_ADJUSTED_DAILY_RATE}
                       onChange={(e) => {
                         const parsed = parseFloat(e.target.value);
-                        updateErisaField("dailyPenaltyRate", Number.isNaN(parsed) ? 110 : Math.max(0, parsed));
+                        updateErisaField("dailyPenaltyRate", Number.isNaN(parsed) ? DOL_INFLATION_ADJUSTED_DAILY_RATE : Math.max(0, parsed));
                       }}
                       className="h-8 font-mono text-xs"
                     />

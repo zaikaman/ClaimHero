@@ -314,6 +314,7 @@ describe("DetailModeToggle Component", () => {
     // On Step 1, forward navigation to Step 2 (Letter) stays in header like Steps 2/3
     expect(markup).toContain("Review &amp; Approve");
     // Team software elements should NOT be visible in everyday mode
+    expect(markup).not.toContain("$164/day ERISA exposure");
     expect(markup).not.toContain("$110/day ERISA exposure");
     // 3-step navigation strip
     expect(markup).toContain("1. Your proof");

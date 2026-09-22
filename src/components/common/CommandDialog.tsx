@@ -393,7 +393,7 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
       {
         id: "action-calculator",
         label: isDetailed ? "ERISA & Liability Audit" : "What do I owe?",
-        description: isDetailed ? "Patient out-of-pocket exposure & $110/day statutory non-disclosure penalty audit" : "What you might owe and possible late fees",
+        description: isDetailed ? "Patient out-of-pocket exposure & $164/day statutory non-disclosure penalty audit" : "What you might owe and possible late fees",
         icon: Calculator,
         category: "workspace",
         categoryLabel: "Companion Tooling",
@@ -403,6 +403,8 @@ export const CommandDialog: React.FC<CommandDialogProps> = ({
           "financial",
           "penalty",
           "penalties",
+          "164",
+          "$164",
           "110",
           "$110",
           "oop",

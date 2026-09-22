@@ -348,7 +348,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
         }
         addLog("Scrape", `Scraping custom target: ${customUrl.trim()}`, "info");
       } else if (activeMode === "pubmed_trials") {
-        addLog("Scrape", `Querying PubMed & ClinicalTrials for CPT [${claim.cptCodes.join(", ")}]...`, "info");
+        addLog("Scrape", `Querying PubMed & ClinicalTrials for CPT [${claim.cptCodes?.length ? claim.cptCodes.join(", ") : "general clinical services"}]...`, "info");
       } else if (activeMode === "fda_labels") {
         addLog("Scrape", `Searching FDA Drugs@FDA & DailyMed for procedure package inserts...`, "info");
       } else if (activeMode === "payer_cpb") {
@@ -781,7 +781,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                         <p className="text-[11px] text-muted-foreground leading-tight">
                           {isDetailed ? (
                             <>
-                              Target: <strong className="text-foreground">{claim.patient?.insurancePayer || "Insurer"}</strong> clinical bulletin for CPT <strong className="font-mono text-foreground">{claim.cptCodes.join(", ")}</strong>.
+                              Target: <strong className="text-foreground">{claim.patient?.insurancePayer || "Insurer"}</strong> clinical bulletin for CPT <strong className="font-mono text-foreground">{claim.cptCodes?.length ? claim.cptCodes.join(", ") : "general clinical services"}</strong>.
                             </>
                           ) : (
                             <>
@@ -805,7 +805,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                         <p className="text-[11px] text-muted-foreground leading-tight">
                           {isDetailed ? (
                             <>
-                              Target: Efficacy trials & meta-analyses for CPT <strong className="font-mono text-foreground">{claim.cptCodes.join(", ")}</strong>.
+                              Target: Efficacy trials & meta-analyses for CPT <strong className="font-mono text-foreground">{claim.cptCodes?.length ? claim.cptCodes.join(", ") : "general clinical services"}</strong>.
                             </>
                           ) : (
                             "Published trials that support your treatment."
@@ -1033,7 +1033,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                       </span>
                       <Input
                         type="text"
-                        placeholder={`Leave blank to auto-query CPT [${claim.cptCodes.join(", ")}] efficacy, or enter custom medical keywords...`}
+                        placeholder={`Leave blank to auto-query CPT [${claim.cptCodes?.length ? claim.cptCodes.join(", ") : "general clinical services"}] efficacy, or enter custom medical keywords...`}
                         value={customQuery}
                         onChange={(e) => setCustomQuery(e.target.value)}
                         className="h-8 text-xs font-sans"
@@ -1068,7 +1068,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                     </span>
                     <Input
                       type="text"
-                      placeholder={`Leave blank for procedure CPT ${claim.cptCodes[0] || "27447"} indications, or enter specific device (e.g. Persona Knee System)...`}
+                      placeholder={`Leave blank for procedure CPT ${claim.cptCodes?.[0] || "27447"} indications, or enter specific device (e.g. Persona Knee System)...`}
                       value={customQuery}
                       onChange={(e) => setCustomQuery(e.target.value)}
                       className="h-8 text-xs font-sans"
@@ -1098,7 +1098,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                       disabled={isExecuting}
                     />
                     <p className="text-[10.5px] text-muted-foreground leading-tight pt-0.5">
-                      ClaimHero automatically crawls official {claim.patient?.insurancePayer} bulletins for CPT {claim.cptCodes.join(", ")}. Enter a URL only to override with an unindexed state or plan bulletin.
+                      ClaimHero automatically crawls official {claim.patient?.insurancePayer} bulletins for CPT {claim.cptCodes?.length ? claim.cptCodes.join(", ") : "your procedure"}. Enter a URL only to override with an unindexed state or plan bulletin.
                     </p>
                     <div className="flex items-center gap-2 pt-1">
                       <input
@@ -1129,7 +1129,7 @@ export const ClinicalResearchConsole: React.FC<ClinicalResearchConsoleProps> = (
                     <strong className="font-mono text-foreground">#{claim.claimNumber}</strong> &bull;{" "}
                     {claim.patient?.name}
                     {isDetailed
-                      ? ` (CPT ${claim.cptCodes.join(", ")})`
+                      ? (claim.cptCodes?.length ? ` (CPT ${claim.cptCodes.join(", ")})` : "")
                       : ` (${getPlainProcedureName(claim.cptCodes, "your treatment")})`}
                   </span>
                 </div>

@@ -6,6 +6,7 @@ import {
   getDefaultErisaPenalties,
   getSeverityTierMeta,
   STATUTORY_DAILY_PENALTY_RATE,
+  DOL_INFLATION_ADJUSTED_DAILY_RATE,
   STATUTORY_DISCLOSURE_GRACE_DAYS,
 } from "../src/lib/liabilityCalculator";
 import { Claim } from "../src/types";
@@ -203,9 +204,21 @@ describe("Feature H: Financial Liability & Statutory ERISA Penalty Calculator", 
   });
 
   describe("2. Statutory ERISA § 502(c) Failure-to-Disclose Penalty Engine", () => {
-    it("recognizes $110.00/day statutory daily penalty rate and 30-day disclosure grace period", () => {
+    it("recognizes $110.00/day statutory daily penalty rate, $164.00/day DOL inflation rate, and 30-day disclosure grace period", () => {
       expect(STATUTORY_DAILY_PENALTY_RATE).toBe(110.0);
+      expect(DOL_INFLATION_ADJUSTED_DAILY_RATE).toBe(164.0);
       expect(STATUTORY_DISCLOSURE_GRACE_DAYS).toBe(30);
+    });
+
+    it("defaults to $164.00/day DOL inflation adjusted daily penalty rate when dailyPenaltyRate is omitted", () => {
+      const result = calculateErisaPenalties({
+        documentRequestDate: "2026-07-01",
+        calculationDate: "2026-08-25", // 55 days elapsed -> 25 days in default
+        complianceStatus: "defaulted",
+      });
+      expect(result.data.dailyPenaltyRate).toBe(164.0);
+      expect(result.data.daysInDefault).toBe(25);
+      expect(result.data.accruedPenaltyAmount).toBe(25 * 164.0);
     });
 
     it("computes zero penalties when within the 30-day statutory disclosure window", () => {

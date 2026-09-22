@@ -369,7 +369,7 @@ export const SentinelFlowStepper: React.FC<SentinelFlowStepperProps> = ({
               <Scales className="size-3.5 shrink-0 text-primary" />
             )}
             <span className="font-semibold">
-              {isDetailed ? "$110/day ERISA exposure" : "Fees they may owe"}
+              {isDetailed ? "$164/day ERISA exposure" : "Fees they may owe"}
             </span>
             <span className="text-[10px] text-muted-foreground">•</span>
             <span className={cn("font-medium", isUrgent ? "text-destructive font-bold" : "text-foreground/80")}>

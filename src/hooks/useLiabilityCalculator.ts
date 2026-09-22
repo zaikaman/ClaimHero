@@ -14,6 +14,7 @@ import {
   getDefaultFinancialLiability,
   getDefaultErisaPenalties,
   isPlaceholderLiabilityData,
+  DOL_INFLATION_ADJUSTED_DAILY_RATE,
 } from "../lib/liabilityCalculator";
 
 import { Id } from "../../convex/_generated/dataModel";
@@ -48,6 +49,15 @@ export function useLiabilityCalculator(claim?: Claim | null) {
   // ERISA Penalty Input State
   const [erisaInputs, setErisaInputs] = useState<Partial<ErisaPenaltyData>>(() => {
     if (claim?.erisaPenalties) {
+      if (
+        (claim.isDemo || claim.origin === "demo-fixture" || claim.dataOrigin === "demo-fixture") &&
+        claim.erisaPenalties.dailyPenaltyRate === 110
+      ) {
+        return {
+          ...claim.erisaPenalties,
+          dailyPenaltyRate: DOL_INFLATION_ADJUSTED_DAILY_RATE,
+        };
+      }
       return claim.erisaPenalties;
     }
     if (claim) {
@@ -55,7 +65,7 @@ export function useLiabilityCalculator(claim?: Claim | null) {
     }
     return {
       complianceStatus: "compliant",
-      dailyPenaltyRate: 110.0,
+      dailyPenaltyRate: DOL_INFLATION_ADJUSTED_DAILY_RATE,
       statutoryInterestRate: 0,
       requestedDocuments: [],
     };
@@ -75,7 +85,17 @@ export function useLiabilityCalculator(claim?: Claim | null) {
       }
 
       if (claim.erisaPenalties) {
-        setErisaInputs(claim.erisaPenalties);
+        if (
+          (claim.isDemo || claim.origin === "demo-fixture" || claim.dataOrigin === "demo-fixture") &&
+          claim.erisaPenalties.dailyPenaltyRate === 110
+        ) {
+          setErisaInputs({
+            ...claim.erisaPenalties,
+            dailyPenaltyRate: DOL_INFLATION_ADJUSTED_DAILY_RATE,
+          });
+        } else {
+          setErisaInputs(claim.erisaPenalties);
+        }
       } else {
         setErisaInputs(getDefaultErisaPenalties(claim));
       }
@@ -95,7 +115,7 @@ export function useLiabilityCalculator(claim?: Claim | null) {
       });
       setErisaInputs({
         complianceStatus: "compliant",
-        dailyPenaltyRate: 110.0,
+        dailyPenaltyRate: DOL_INFLATION_ADJUSTED_DAILY_RATE,
         statutoryInterestRate: 0,
         requestedDocuments: [],
       });

@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano, text-embedding-3-small
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-22T11:21:00Z
+- **Last updated:** 2026-09-22T11:56:30Z
 
 ## Log
 
@@ -1888,7 +1888,7 @@ Made both 3D backdrops render on 100% of devices with production-grade low-end p
 - Hardened the dashboard Silk shader for weak GPUs: adaptive DPR cap (1x constrained / 1.5x desktop), minimal GL context (no MSAA/alpha/depth/stencil, low-power, failIfMajorPerformanceCaveat false), static demand-rendered frame for reduced-motion instead of blank, clamped frame deltas, context-loss auto-remount, error boundary plus gradient fallback, and viewport-sized layer instead of 120vw overscan.
 - Added `tests/webglBackground.test.ts` (6 tests) and updated `README.md` suite count. Verified with 1,310 passing tests across 84 suites, clean typecheck, lint, and production build (Silk async chunk + on-demand three-bundle intact).
 
-### 2026-09-22 - working tree
+### 2026-09-22 - 645f480
 Hardened case ingestion, precedent scoring integrity, and appellate studio submission guardrails (`convex/claims.ts`, `convex/actions/opticalParser.ts`, `convex/actions/bulkIntakeWorker.ts`, `convex/actions/precedentMatcher.ts`, `convex/p2pScripts.ts`, `src/components/onboarding/OnboardingWizard.tsx`, `src/components/radar/IngestionModal.tsx`, `src/components/radar/CaseRadar.tsx`, `src/hooks/useClaims.ts`, `src/hooks/useAppealStudio.ts`, `tests/productionReliabilityHardening.test.ts`, `tests/convexClaimsFull.test.ts`, `tests/convexP2P.test.ts`, `README.md`):
 - Closed state jurisdiction bypass in `convex/claims.ts`: rejected empty and "Unspecified" state strings to enforce DOI statutory clock requirements, and removed permissive fallback strings from `opticalParser.ts` and `bulkIntakeWorker.ts`.
 - Eliminated fabricated 0.70 precedent similarity bonus in `convex/actions/precedentMatcher.ts` when no precedent or relevance score is present, defaulting top similarity to 0.
@@ -1898,3 +1898,15 @@ Hardened case ingestion, precedent scoring integrity, and appellate studio submi
 - Added synchronous `useRef` lock guards in `useAppealStudio.ts` preventing duplicate same-tick brief synthesis or tier escalation dispatches.
 - Defaulted `includeDemo` to false across `useClaims.ts` and `CaseRadar.tsx`, and added clear `*includes demo` footnote labels next to portfolio financial totals when demo cases are enabled.
 - Added regression tests in `tests/productionReliabilityHardening.test.ts`, `tests/convexClaimsFull.test.ts`, and `tests/convexP2P.test.ts` (1,314 passed tests across 84 suites) and verified 100% clean typecheck, lint, and production build.
+
+### 2026-09-22 - working tree
+Aligned statutory ERISA failure-to-disclose penalty rate with current DOL inflation-adjusted rate ($164.00/day under 29 C.F.R. § 2575.502c-1) and hardened CPT procedure code resilience across codeless claims:
+- Replaced legacy $110.00/day unadjusted fallback rates in `useLiabilityCalculator.ts` with `DOL_INFLATION_ADJUSTED_DAILY_RATE` ($164.00) in initial state and reset handlers.
+- Added automatic upgrade logic in `useLiabilityCalculator.ts` for pre-existing persisted demo fixtures created with legacy $110 rate so demo claims consistently calculate and display at $164/day.
+- Corrected persisted demo case 1 fixture in `convex/demoSeeder.ts` to `dailyPenaltyRate: 164`, updating derived `accruedPenaltyAmount` ($3,444 for 21 days), `totalStatutoryDamages` ($7,059), and `totalPlanAdministratorExposure` ($13,459).
+- Replaced hardcoded $110 input fallbacks and default rate bindings in `FinancialLiabilityCalculator.tsx` with `DOL_INFLATION_ADJUSTED_DAILY_RATE`.
+- Updated statutory non-disclosure penalties clause in `AppealStudio.tsx` line 235 and action button label to demand $164.00 per calendar day.
+- Updated detailed mode exposure label in `SentinelFlowStepper.tsx` line 372 to "$164/day ERISA exposure" and `CommandDialog.tsx` line 396 to "$164/day statutory non-disclosure penalty audit" with 164 keywords.
+- Guarded all unguarded `claim.cptCodes` accessors across `EvidenceMatrix.tsx` line 697 (`claim.cptCodes?.map`), `ClinicalResearchConsole.tsx` lines 351, 784, 808, 1036, 1071, 1101, 1132 (`cptCodes.join` and `cptCodes[0]`), and `CasePickerEmptyState.tsx` line 216, preventing client runtime crashes on codeless or draft claims.
+- Added regression tests in `tests/financialErisaCalculator.test.ts`, `tests/liabilityDefaultsEmptyState.test.ts`, `tests/appealStudioUx.test.ts`, `tests/detailMode.test.ts`, and dedicated test suite `tests/codelessClaimsResilience.test.ts` asserting codeless claim rendering, optional chaining, and $164/day penalty demands and stepper/palette labels.
+- Verified 1,323 tests across 85 suites with `npm run verify` (100% clean typecheck, lint, coverage, and production build). Convex features: schema, queries, mutations, actions, crons, scheduled functions, file storage, static hosting.

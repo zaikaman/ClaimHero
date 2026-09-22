@@ -694,11 +694,17 @@ export const EvidenceMatrix: React.FC<EvidenceMatrixProps> = ({
                     {isDetailed ? "CPT Procedure Codes:" : "Care received:"}
                   </span>
                   <div className="flex flex-wrap gap-1">
-                    {claim.cptCodes.map((cpt) => (
-                      <Badge key={cpt} variant="secondary" className="font-mono">
-                        CPT {cpt}
-                      </Badge>
-                    ))}
+                    {claim.cptCodes?.length ? (
+                      claim.cptCodes?.map((cpt) => (
+                        <Badge key={cpt} variant="secondary" className="font-mono">
+                          CPT {cpt}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">
+                        {isDetailed ? "No CPT codes specified" : "No procedure code listed"}
+                      </span>
+                    )}
                   </div>
                 </div>
 

@@ -3,6 +3,7 @@ import {
   calculateFinancialLiability,
   getDefaultFinancialLiability,
   getDefaultErisaPenalties,
+  DOL_INFLATION_ADJUSTED_DAILY_RATE,
 } from "../src/lib/liabilityCalculator";
 import { Claim } from "../src/types";
 
@@ -69,5 +70,30 @@ describe("P1-15: Liability Calculator Zero Defaults & Honest Empty State", () =>
     expect(defaultErisa.totalPlanAdministratorExposure).toBe(defaultErisa.totalStatutoryDamages);
     expect(defaultErisa.statutoryDemandLanguage).toContain("$0.00");
     expect(defaultErisa.statutoryDemandLanguage).not.toContain("$24,500");
+  });
+
+  it("getDefaultErisaPenalties uses DOL_INFLATION_ADJUSTED_DAILY_RATE ($164/day) by default", () => {
+    const claim: Claim = {
+      _id: "claim-164-test",
+      patientId: "pat-1",
+      claimNumber: "CLM-164",
+      serviceDate: "2026-09-01",
+      providerName: "General Hospital",
+      cptCodes: [],
+      icd10Codes: [],
+      denialReasonCode: "CO-16",
+      denialReasonDescription: "Test",
+      status: "draft",
+      statutoryDeadline: 1781222400000,
+      daysRemaining: 90,
+      assignedAgentEmail: "agent@claimhero.io",
+      deniedAmount: 6400,
+      createdAt: 1770000000000,
+      updatedAt: 1770000000000,
+    };
+
+    const erisa = getDefaultErisaPenalties(claim);
+    expect(erisa.dailyPenaltyRate).toBe(164.0);
+    expect(erisa.dailyPenaltyRate).toBe(DOL_INFLATION_ADJUSTED_DAILY_RATE);
   });
 });
