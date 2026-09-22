@@ -5,6 +5,7 @@
 - **What it does:** Turns a health-insurance denial into a source-linked, human-reviewed appeal workflow with live policy evidence, a cited brief, deadline tracking, and two-way case communication.
 - **Live app:** https://kindhearted-elephant-992.convex.site
 - **Repo:** https://github.com/zaikaman/ClaimHero.git
+- **Demo video:** https://www.youtube.com/watch?v=M04LMuJRilg
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://kindhearted-elephant-992.convex.cloud
 - **Components:** @convex-dev/auth, @convex-dev/static-hosting, @convex-dev/rate-limiter, @convex-dev/aggregate, @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/workflow, @convex-dev/agent, @convex-dev/presence, @convex-dev/action-retrier, @convex-dev/workpool, @convex-dev/batch-worker
@@ -12,7 +13,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano, text-embedding-3-small
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-22T11:56:48Z
+- **Last updated:** 2026-09-22T12:01:27Z
 
 ## Log
 
