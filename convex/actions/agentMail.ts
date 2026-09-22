@@ -577,7 +577,7 @@ async function handleInboundClaimReply(
     let analysis: InboundAnalysisResult | null = null;
     try {
       const { createStructuredCompletion } = await import("../lib/openai");
-      const { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } = await import("../lib/phiSafe");
+      const { PHI_TOKENS, REBUTTAL_PHI_INSTRUCTION, collectPhiValues } = await import("../lib/phiSafe");
       const inboundPhi = collectPhiValues({
         patientName: matchingClaim.patientName,
         claimNumber: matchingClaim.claimNumber,
@@ -587,7 +587,7 @@ async function handleInboundClaimReply(
         systemPrompt: `You are a Senior Appellate Adjudication & Clinical Records Analyst for ClaimHero.
 You are analyzing an inbound communication letter received from an insurance payer or adjudicator (${payer}) regarding Claim #${PHI_TOKENS.claimNumber} (Patient: ${PHI_TOKENS.patientName}).
 
-${PHI_TOKEN_INSTRUCTION}
+${REBUTTAL_PHI_INSTRUCTION}
 
 Clinical Context:
 - CPT Codes: [${(matchingClaim.cptCodes || []).join(", ")}]
@@ -687,6 +687,13 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
         settlementAmount,
         cptCodes: matchingClaim.cptCodes,
       });
+    }
+    const { resolveRebuttalEvidentiaryPlaceholders } = await import("../lib/phiSafe");
+    if (suggestedAutoReply.trim()) {
+      suggestedAutoReply = resolveRebuttalEvidentiaryPlaceholders(
+        suggestedAutoReply,
+        matchingClaim
+      );
     }
 
     // Refine the stored message with deep clinical analysis, auto-reply draft, and attached files

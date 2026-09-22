@@ -10,6 +10,9 @@ import {
   deidentifyForLlm,
   deidentifyPromptPair,
   rehydrateForDisplay,
+  resolveRebuttalEvidentiaryPlaceholders,
+  hasUnresolvedPlaceholders,
+  extractPrerequisiteClinicalDate,
   sanitizeToolOutputForLlm,
   serviceDateVariants,
   type PhiValues,
@@ -128,6 +131,66 @@ describe("phiSafe vault boundary", () => {
     expect(out).not.toContain("Eleanor Vance");
     expect(out).not.toContain("MBN9823412-01");
     expect(out).toContain("27447");
+  });
+
+  it("rehydrates token aliases such as [CLAIM_NUMBER] and [DOS]", () => {
+    const text = "Reviewing [CLAIM_NUMBER] for service on [DOS] for [PATIENT_NAME]";
+    const restored = rehydrateForDisplay(text, PHI);
+    expect(restored).toContain(PHI.claimNumber!);
+    expect(restored).toContain("2026-07-04");
+    expect(restored).toContain("Eleanor Vance");
+  });
+
+  it("resolveRebuttalEvidentiaryPlaceholders: restores [CLAIM_REF] and prerequisite study dates", () => {
+    const claim = {
+      claimNumber: "CLM-3912-AET-4037",
+      patientName: "Michael Patel",
+      serviceDate: "July 18, 2026",
+      appealContext: {
+        clinicalFacts: {
+          imagingAndDiagnostics:
+            "Weight-bearing plain radiographs (AP/Lateral) completed on 05/20/2026 demonstrated no acute fracture, preserved joint spaces, and minimal degenerative changes, confirming compliance with Aetna CPB 0171 x-ray requirements prior to MRI.",
+        },
+      },
+    };
+
+    const draft =
+      "We acknowledge receipt of your correspondence regarding Claim #[CLAIM_REF]. As your response does not address the clinical evidence provided—specifically the weight-bearing radiographs dated [DATE] which satisfy Aetna CPB 0171—we formally contest this summary denial.";
+
+    const resolved = resolveRebuttalEvidentiaryPlaceholders(draft, claim);
+    expect(resolved).toContain("regarding Claim #CLM-3912-AET-4037");
+    expect(resolved).not.toContain("[CLAIM_REF]");
+    expect(resolved).toContain("weight-bearing radiographs dated 05/20/2026");
+    expect(resolved).not.toContain("[DATE]");
+    expect(hasUnresolvedPlaceholders(resolved)).toBe(false);
+  });
+
+  it("resolveRebuttalEvidentiaryPlaceholders: falls back to honest natural phrasing when no prior imaging date is on file", () => {
+    const claimWithoutImagingDate = {
+      claimNumber: "CLM-3912-AET-4037",
+      patientName: "Michael Patel",
+      serviceDate: "July 18, 2026",
+      clinicalFacts: {
+        imagingAndDiagnostics: "Prior radiographs performed without acute findings.",
+      },
+    };
+
+    const draft =
+      "Specifically the weight-bearing radiographs dated [DATE] which satisfy Aetna CPB 0171 criteria.";
+
+    const resolved = resolveRebuttalEvidentiaryPlaceholders(draft, claimWithoutImagingDate);
+    expect(resolved).not.toContain("[DATE]");
+    // Must NOT erroneously claim the radiographs were done on the MRI DOS (July 18, 2026)
+    expect(resolved).not.toContain("July 18, 2026");
+    expect(resolved).toContain("weight-bearing radiographs on file which satisfy Aetna CPB 0171 criteria");
+  });
+
+  it("hasUnresolvedPlaceholders: accurately identifies residual de-identification markers", () => {
+    expect(hasUnresolvedPlaceholders("Claim #[CLAIM_REF] on file")).toBe(true);
+    expect(hasUnresolvedPlaceholders("Radiographs dated [DATE]")).toBe(true);
+    expect(hasUnresolvedPlaceholders("Member [MEMBER_ID]")).toBe(true);
+    expect(hasUnresolvedPlaceholders("Patient [REDACTED NAME]")).toBe(true);
+    expect(hasUnresolvedPlaceholders("Clean text regarding Claim #CLM-123 on 05/20/2026")).toBe(false);
   });
 });
 

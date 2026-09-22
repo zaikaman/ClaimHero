@@ -75,3 +75,26 @@ export function resolveGroupNumberDisplay(raw?: string | null): string {
   if (!id || isRedactedPlaceholder(id)) return "";
   return id;
 }
+
+/**
+ * Sanitize rebuttal draft display on the client.
+ * Defense-in-depth: If a cached or legacy draft still has [CLAIM_REF] or [DATE],
+ * clean it safely so the user never sees raw placeholders in the draft card.
+ */
+export function sanitizeRebuttalDraftDisplay(
+  draft?: string | null,
+  claimNumber?: string | null,
+  serviceDate?: string | null
+): string {
+  if (!draft) return "";
+  let clean = draft;
+  if (claimNumber) {
+    clean = clean.replace(/\[(?:CLAIM_REF|CLAIM_NUMBER|CLAIM_ID)\]/gi, claimNumber.trim());
+  }
+  if (serviceDate) {
+    clean = clean.replace(/\[(?:SERVICE_DATE|DOS|DATE_OF_SERVICE)\]/gi, serviceDate.trim());
+  }
+  clean = clean.replace(/dated\s+\[DATE\]/gi, "on file prior to service");
+  clean = clean.replace(/\[DATE\]/gi, serviceDate?.trim() || "on file");
+  return clean;
+}

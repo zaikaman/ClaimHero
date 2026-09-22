@@ -44,6 +44,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import { soundEffects } from "../../lib/soundEffects";
 import { copyToClipboard } from "../../lib/clipboard";
 import { toast } from "sonner";
+import { sanitizeRebuttalDraftDisplay } from "../../lib/displaySafety";
 
 type DispatchMode = "custom_email" | "official_payer";
 
@@ -242,8 +243,9 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     // 1. If this message already has an autoReplyDraft from DB, immediately use it and avoid any synthesis
     if (latestInbound.autoReplyDraft) {
       trackedInboundIdRef.current = currentInboundId;
-      if (activeAutoDraft !== latestInbound.autoReplyDraft) {
-        setActiveAutoDraft(latestInbound.autoReplyDraft);
+      const cleanDraft = sanitizeRebuttalDraftDisplay(latestInbound.autoReplyDraft, claim.claimNumber, claim.serviceDate);
+      if (activeAutoDraft !== cleanDraft) {
+        setActiveAutoDraft(cleanDraft);
       }
       return;
     }
@@ -285,7 +287,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     })
       .then((res) => {
         if (trackedInboundIdRef.current === currentInboundId && res?.draftText) {
-          setActiveAutoDraft(res.draftText);
+          setActiveAutoDraft(sanitizeRebuttalDraftDisplay(res.draftText, claim.claimNumber, claim.serviceDate));
         }
       })
       .catch((err) => {
@@ -323,7 +325,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
         forceRegenerate: true,
       });
       if (res?.draftText) {
-        setActiveAutoDraft(res.draftText);
+        setActiveAutoDraft(sanitizeRebuttalDraftDisplay(res.draftText, claim.claimNumber, claim.serviceDate));
       }
     } finally {
       setIsGeneratingDraft(false);

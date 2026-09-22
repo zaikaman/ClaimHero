@@ -21,6 +21,7 @@ import {
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, formatCurrency, cn } from "../../lib/utils";
+import { sanitizeRebuttalDraftDisplay } from "../../lib/displaySafety";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -626,7 +627,7 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
             </div>
           ) : (
             <div className="max-h-36 overflow-y-auto rounded-lg bg-background/90 p-3 border border-border text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap select-text">
-              {activeAutoDraft}
+              {sanitizeRebuttalDraftDisplay(activeAutoDraft, claim.claimNumber, claim.serviceDate)}
             </div>
           )}
 

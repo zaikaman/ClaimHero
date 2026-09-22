@@ -6,7 +6,13 @@ import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { requireClaimOwnerAction } from "../lib/auth";
 import { createChatCompletion } from "../lib/openai";
-import { PHI_TOKENS, PHI_TOKEN_INSTRUCTION, collectPhiValues } from "../lib/phiSafe";
+import {
+  PHI_TOKENS,
+  REBUTTAL_PHI_INSTRUCTION,
+  collectPhiValues,
+  resolveRebuttalEvidentiaryPlaceholders,
+  hasUnresolvedPlaceholders,
+} from "../lib/phiSafe";
 import {
   formatMessageIdHeader,
   getSharedAgentMailboxes,
@@ -713,7 +719,12 @@ async function performSendOutboundMessage(
     });
   }
 
-  const outboundText = args.text;
+  const outboundText = resolveRebuttalEvidentiaryPlaceholders(args.text, claim);
+  if (hasUnresolvedPlaceholders(outboundText)) {
+    throw new Error(
+      `Outbound correspondence for claim ${claim.claimNumber} contains unresolved placeholders. Please review and remove bracketed markers before transmitting.`
+    );
+  }
 
   const correspondenceEmail = formatCorrespondenceEmail(outboundText, {
     claimNumber: claim.claimNumber,
@@ -983,7 +994,7 @@ export const generateAutoReplyDraft = action({
     const systemPrompt = `You are a Board-Certified Physician Appeal Specialist & ERISA Appellate Counsel for ClaimHero.
 You are drafting an evidence-grounded Clinical Rebuttal Addendum in response to an insurance payer's (${payer}) request for additional documentation or clarifying review for Claim #${PHI_TOKENS.claimNumber} (Patient: ${PHI_TOKENS.patientName}).
 
-${PHI_TOKEN_INSTRUCTION}
+${REBUTTAL_PHI_INSTRUCTION}
 
 Prior Appeal Summary: ${appeal?.executiveSummary || "Initial Level 1 ERISA Appeal Brief on file."}
 Clinical Context:
@@ -1043,6 +1054,8 @@ Guidelines:
         })
         .join("\n\n");
     }
+
+    safeDraft = resolveRebuttalEvidentiaryPlaceholders(safeDraft, claim, validEvidences);
 
     if (args.inboundMessageId && safeDraft) {
       try {

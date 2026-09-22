@@ -2012,5 +2012,121 @@ describe("Convex Actions: AgentMail & Mail Dispatcher", () => {
       expect(chatSpy).toHaveBeenCalled();
       chatSpy.mockRestore();
     });
+
+    it("sendPayerCorrespondence: rehydrates [CLAIM_REF] and dated [DATE] before sending", async () => {
+      const mockClaim = {
+        _id: "c1",
+        claimNumber: "CLM-3912-AET-4037",
+        userId: "user_123",
+        status: "under_review",
+        deniedAmount: 2850,
+        patientName: "Michael Patel",
+        serviceDate: "July 18, 2026",
+        patient: { insurancePayer: "Aetna International" },
+        appealContext: {
+          clinicalFacts: {
+            imagingAndDiagnostics:
+              "Weight-bearing plain radiographs (AP/Lateral) completed on 05/20/2026 demonstrated no acute fracture.",
+          },
+        },
+      };
+
+      const mockThread = {
+        thread: {
+          _id: "t1",
+          payerEmail: "appeals@aetna.com",
+          subject: "Re: Formal Medical Appeal",
+        },
+        messages: [],
+      };
+
+      process.env.AGENTMAIL_API_KEY = "test_key";
+      process.env.AGENTMAIL_SENDER_INBOX_ID = "in_send";
+      process.env.AGENTMAIL_SENDER_EMAIL = "send@claimhero.com";
+      const rateLimitSpy = vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      const sendSpy = vi.spyOn(libAgentMail, "sendAgentMailMessage").mockResolvedValue({
+        messageId: "msg_out_123",
+        threadId: "th_out_123",
+      } as any);
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "c1" && !args?.threadId) return Promise.resolve(mockClaim);
+          if (fn === internal.emails.getThreadForClaimInternal) return Promise.resolve(mockThread);
+          if (fn === internal.appeals.getByClaimIdInternal) return Promise.resolve(null);
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockImplementation((fn) => {
+          if (fn === internal.emails.ensureSharedAgentMailboxInternal) {
+            return Promise.resolve({
+              claimInboxId: "in_send",
+              claimEmail: "send@claimhero.com",
+            });
+          }
+          return Promise.resolve("msg_db_123");
+        }),
+      };
+
+      const res = await (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+        claimId: "c1",
+        text: "We acknowledge receipt of your correspondence regarding Claim #[CLAIM_REF]. Specifically the weight-bearing radiographs dated [DATE] satisfy CPB 0171.",
+        humanApproved: true,
+        customRecipient: "appeals@aetna.com",
+      });
+
+      expect(res.success).toBe(true);
+      expect(sendSpy).toHaveBeenCalled();
+      const sentPayload = sendSpy.mock.calls[0][0];
+      // Sent email text must have rehydrated values and zero placeholders
+      expect(sentPayload.text).toContain("regarding Claim #CLM-3912-AET-4037");
+      expect(sentPayload.text).not.toContain("[CLAIM_REF]");
+      expect(sentPayload.text).toContain("weight-bearing radiographs dated 05/20/2026");
+      expect(sentPayload.text).not.toContain("[DATE]");
+
+      sendSpy.mockRestore();
+      rateLimitSpy.mockRestore();
+    });
+
+    it("sendOutboundMessage: fails closed if unresolved placeholder tokens remain", async () => {
+      const rateLimitSpy = vi.spyOn(rateLimiter, "limit").mockResolvedValue({ ok: true } as any);
+      const mockClaim = {
+        _id: "c1",
+        claimNumber: "CLM-3912-AET-4037",
+        userId: "user_123",
+        status: "under_review",
+        deniedAmount: 2850,
+        patientName: "Michael Patel",
+        serviceDate: "July 18, 2026",
+        patient: { insurancePayer: "Aetna International" },
+      };
+
+      const mockThread = {
+        thread: {
+          _id: "t1",
+          payerEmail: "appeals@aetna.com",
+          subject: "Re: Formal Medical Appeal",
+        },
+        messages: [],
+      };
+
+      const mockCtx: any = {
+        runQuery: vi.fn().mockImplementation((fn, args) => {
+          if (args?.claimId === "c1" && !args?.threadId) return Promise.resolve(mockClaim);
+          if (fn === internal.emails.getThreadForClaimInternal) return Promise.resolve(mockThread);
+          return Promise.resolve(null);
+        }),
+        runMutation: vi.fn().mockResolvedValue(null),
+      };
+
+      await expect(
+        (actionMailDispatcher.sendOutboundMessage as any)._handler(mockCtx, {
+          claimId: "c1",
+          text: "Text with [REDACTED SECRET VALUE] that cannot be resolved.",
+          humanApproved: true,
+        })
+      ).rejects.toThrow("contains unresolved placeholders");
+
+      rateLimitSpy.mockRestore();
+    });
   });
 });
