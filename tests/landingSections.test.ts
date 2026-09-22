@@ -53,7 +53,8 @@ describe("TemplateLanding editorial story", () => {
     expect(html).toContain("High-Dollar EOB Review");
     expect(html).toContain("P2P Physician Reviews");
     expect(html).not.toContain("CO-50 Medical Necessity");
-    expect(html).toContain("Eleanor Vance");
+    expect(html).toContain("Cigna Global");
+    expect(html).not.toContain("Eleanor Vance");
     expect(html).toContain("Your Appeal Packet");
     expect(html).toContain("AI Prepares. You Approve.");
     expect(html).toContain("Start Your Appeal.");

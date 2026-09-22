@@ -124,8 +124,8 @@ const STACK_STRIP = [
 ] as const;
 
 const JUDGE_STEPS = [
-  "Open the live app and choose Explore as Anonymous Advocate.",
-  "Open the Eleanor Vance case.",
+  "Click Launch Sentinel, then choose Explore as Anonymous Advocate.",
+  "Open the Cigna Global case.",
   "Follow Your proof, Your letter, then Send and track.",
   "Inspect citations, evidence score, audit trail, and the approval gate.",
 ] as const;
@@ -554,8 +554,8 @@ export function TemplateLanding({
                 Pre-Seeded Cases
               </h3>
               <p className="mb-8 flex-grow text-sm leading-relaxed text-white/70">
-                Explore synthetic high-dollar cases (Eleanor Vance $24,500, Marcus
-                Sterling $18,200, Michael Patel $41,800) with extracted clinical
+                Explore synthetic high-dollar cases (Cigna Global $6,400, GeoBlue
+                $18,200, Aetna International $2,850) with extracted clinical
                 codes, policy evidence, cited drafts, and human approval gates.
               </p>
               <button

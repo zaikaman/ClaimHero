@@ -40,8 +40,8 @@ remaining safe to evaluate with synthetic demo cases.
 ## Try it in 60 seconds
 
 1. Open the [live app](https://kindhearted-elephant-992.convex.site).
-2. Choose **Explore as Anonymous Advocate**.
-3. Open the **Eleanor Vance** case.
+2. Click **Launch Sentinel**, then choose **Explore as Anonymous Advocate**.
+3. Open the **Cigna Global** case.
 4. Follow **Your proof → Your letter → Send & track**.
 5. Inspect the citations, evidence score, audit trail, and approval-gated
    dispatch screen.
