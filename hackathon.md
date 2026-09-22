@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano, text-embedding-3-small
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-22T11:56:30Z
+- **Last updated:** 2026-09-22T11:56:48Z
 
 ## Log
 
@@ -1899,7 +1899,7 @@ Hardened case ingestion, precedent scoring integrity, and appellate studio submi
 - Defaulted `includeDemo` to false across `useClaims.ts` and `CaseRadar.tsx`, and added clear `*includes demo` footnote labels next to portfolio financial totals when demo cases are enabled.
 - Added regression tests in `tests/productionReliabilityHardening.test.ts`, `tests/convexClaimsFull.test.ts`, and `tests/convexP2P.test.ts` (1,314 passed tests across 84 suites) and verified 100% clean typecheck, lint, and production build.
 
-### 2026-09-22 - working tree
+### 2026-09-22 - 98b8cec
 Aligned statutory ERISA failure-to-disclose penalty rate with current DOL inflation-adjusted rate ($164.00/day under 29 C.F.R. § 2575.502c-1) and hardened CPT procedure code resilience across codeless claims:
 - Replaced legacy $110.00/day unadjusted fallback rates in `useLiabilityCalculator.ts` with `DOL_INFLATION_ADJUSTED_DAILY_RATE` ($164.00) in initial state and reset handlers.
 - Added automatic upgrade logic in `useLiabilityCalculator.ts` for pre-existing persisted demo fixtures created with legacy $110 rate so demo claims consistently calculate and display at $164/day.
