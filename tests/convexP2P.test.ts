@@ -271,6 +271,46 @@ describe("Convex Physician P2P Defense Scripts & Live Copilot Sessions", () => {
       expect(mockCtx.db.insert).toHaveBeenCalledWith("p2pScripts", expect.objectContaining({ version: 1, physicianName: "Dr. Amanda Vance" }));
     });
 
+    it("createOrUpdateScript: throws conflict error when expectedVersion does not match latest.version", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockClaim = { _id: "c1", userId: "user_123" };
+      const latestScript = { _id: "sc_1", claimId: "c1", version: 3 };
+      const mockCtx: any = {
+        db: {
+          get: vi.fn().mockResolvedValue(mockClaim),
+          query: vi.fn().mockReturnValue({
+            withIndex: vi.fn().mockReturnValue({
+              order: vi.fn().mockReturnValue({
+                first: vi.fn().mockResolvedValue(latestScript),
+              }),
+            }),
+          }),
+        },
+      };
+
+      await expect(
+        (p2pScripts.createOrUpdateScript as any)._handler(mockCtx, {
+          claimId: "c1",
+          expectedVersion: 2,
+          physicianName: "Dr. Amanda Vance",
+          estimatedCallDuration: "3m",
+          openingStatutoryStatement: "Opening statement",
+          clinicalPolicyCitations: [],
+          disqualificationCounters: [],
+          statutoryDemands: "Demands",
+          condensedCheatSheet: {
+            rapidChecklist: [],
+            keyDiagnosisCodes: [],
+            keyProcedureCodes: [],
+            mustSayPoints: [],
+            doNotConcedePoints: [],
+            closingDemandStatement: "",
+          },
+          fullScriptMarkdown: "# Tele-Script",
+        })
+      ).rejects.toThrow("P2P script revision conflict: expected v2 but latest is v3. Please reload and retry.");
+    });
+
     it("saveScriptEdits: patches markdown or throws if script missing", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
       const mockCtxNotFound: any = { db: { get: vi.fn().mockResolvedValue(null) } };

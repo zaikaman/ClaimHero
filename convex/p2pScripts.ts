@@ -78,6 +78,7 @@ export const listVersions = query({
 
 interface CreateOrUpdateScriptArgs {
   claimId: Id<"claims">;
+  expectedVersion?: number;
   physicianName: string;
   physicianSpecialty?: string;
   medicalDirectorRole?: string;
@@ -117,12 +118,21 @@ async function applyCreateOrUpdateScript(ctx: MutationCtx, args: CreateOrUpdateS
   }
 
   const now = Date.now();
-  const existing = await ctx.db
+  const latest = await ctx.db
     .query("p2pScripts")
-    .withIndex("by_claim", (q) => q.eq("claimId", args.claimId))
-    .collect();
+    .withIndex("by_claimId_and_version", (q) => q.eq("claimId", args.claimId))
+    .order("desc")
+    .first();
 
-  const latest = existing.sort((a, b) => b.version - a.version)[0];
+  // Optimistic concurrency: UI-driven edits may pass the version they read.
+  // If another writer advanced the draft meanwhile, fail fast so the loser
+  // re-reads instead of silently clobbering or forking a duplicate version.
+  if (args.expectedVersion !== undefined && latest && latest.version !== args.expectedVersion) {
+    throw new Error(
+      `P2P script revision conflict: expected v${args.expectedVersion} but latest is v${latest.version}. Please reload and retry.`
+    );
+  }
+
   const nextVersion = latest ? latest.version + 1 : 1;
 
   let scriptId: Id<"p2pScripts">;
@@ -182,6 +192,7 @@ async function applyCreateOrUpdateScript(ctx: MutationCtx, args: CreateOrUpdateS
 export const createOrUpdateScript = mutation({
   args: {
     claimId: v.id("claims"),
+    expectedVersion: v.optional(v.number()),
     physicianName: v.string(),
     physicianSpecialty: v.optional(v.string()),
     medicalDirectorRole: v.optional(v.string()),
@@ -228,6 +239,7 @@ export const createOrUpdateScript = mutation({
 export const createOrUpdateScriptInternal = internalMutation({
   args: {
     claimId: v.id("claims"),
+    expectedVersion: v.optional(v.number()),
     physicianName: v.string(),
     physicianSpecialty: v.optional(v.string()),
     medicalDirectorRole: v.optional(v.string()),

@@ -50,7 +50,7 @@ interface OnboardingWizardProps {
     file: File,
     patientState?: string,
     onProgress?: (progressText: string) => void
-  ) => Promise<DenialExtractionResult & { claimId: string }>;
+  ) => Promise<(DenialExtractionResult & { claimId: string }) | undefined>;
   onParseText: (
     text: string,
     patientState?: string,
@@ -233,7 +233,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     );
   };
 
+  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB limit
+
   const handleFileSelect = (file: File) => {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setErrorMessage("File exceeds the maximum 10MB size limit. Please upload a smaller PDF or image.");
+      setCustomFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
     setCustomFile(file);
     setSelectedCaseId("custom");
     setErrorMessage(null);
@@ -393,6 +403,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         setIsProcessing(false);
         return;
       }
+      if (customFile.size > MAX_FILE_SIZE_BYTES) {
+        setErrorMessage("File exceeds the maximum 10MB size limit. Please upload a smaller PDF or image.");
+        setIsProcessing(false);
+        return;
+      }
       if (!onUploadFile) {
         setIsProcessing(false);
         return;
@@ -401,6 +416,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       setProcessingMessage("Step 1/3: Optical document analysis & clinical entity extraction...");
       try {
         const result = await onUploadFile(customFile, selectedJurisdiction);
+        if (!result) {
+          setIsProcessing(false);
+          return;
+        }
         setExtractedResult({ ...result, pipelineResult: null });
         setContextSubmitted(false);
         setActivePreset(null);
@@ -547,9 +566,21 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 </DialogDescription>
               </div>
             </div>
-            <Badge variant="outline" className="font-mono text-xs px-2.5 py-0.5">
-              {extractedResult ? "Case Review" : `Step ${step} of 3`}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="font-mono text-xs px-2.5 py-0.5">
+                {extractedResult ? "Case Review" : `Step ${step} of 3`}
+              </Badge>
+              {(step === 2 || step === 3) && !extractedResult && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSkip}
+                  className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
+                >
+                  Skip
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Progress Indicators */}

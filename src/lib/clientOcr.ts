@@ -215,6 +215,11 @@ export async function extractDocumentInBrowser(
   fileName?: string,
   onProgress?: (progressText: string) => void
 ): Promise<ClientExtractionResult> {
+  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB limit
+  if ("size" in file && file.size > MAX_FILE_SIZE_BYTES) {
+    throw new Error("File exceeds the maximum 10MB size limit. Please upload a smaller PDF or image.");
+  }
+
   const name = (fileName || (file instanceof File ? file.name : "")).toLowerCase();
   const mime = file.type?.toLowerCase() || "";
 
@@ -241,6 +246,9 @@ export async function extractDocumentInBrowser(
     sourceProvenance = result.sourceProvenance;
   } else {
     // Text / JSON / Markdown
+    if ("size" in file && file.size > MAX_FILE_SIZE_BYTES) {
+      throw new Error("File exceeds the maximum 10MB size limit. Please upload a smaller document.");
+    }
     onProgress?.("Reading text document content...");
     extractedRawText = await file.text();
     sourceProvenance = "client_text";

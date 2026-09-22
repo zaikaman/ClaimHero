@@ -26,7 +26,7 @@ export function useClaims(options?: {
       const saved = localStorage.getItem("claimhero_include_demo");
       if (saved !== null) return saved === "true";
     }
-    return true; // Default to true so demo cases and newly ingested cases are visible
+    return false; // Default to false so real cases are prioritized without demo fixtures
   });
 
   const setIncludeDemo = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
@@ -227,6 +227,11 @@ export function useClaims(options?: {
   // Upload a real file and run in-browser optical extraction (pdf.js / tesseract.js) + optional Textract
   const uploadAndParseDocument = useCallback(
     async (file: File, patientState?: string, onProgress?: (msg: string) => void) => {
+      const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB limit
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        throw new Error("File exceeds the maximum 10MB size limit. Please upload a smaller PDF or image.");
+      }
+
       // 1. In-browser extraction & client-side PHI de-identification
       // Digital PDFs: pdf.js getTextContent() — zero OCR needed, 100% accuracy, zero keys.
       // Scans/photos: tesseract.js recognition compute runs on-device. The original
@@ -241,6 +246,10 @@ export function useClaims(options?: {
         clientResult = await extractDocumentInBrowser(file, file.name, onProgress);
       } catch (ocrErr) {
         console.warn("Client in-browser extraction note:", ocrErr);
+      }
+
+      if (clientResult == null) {
+        return;
       }
 
       // 2. Get upload URL from Convex

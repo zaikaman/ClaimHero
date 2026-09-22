@@ -1319,7 +1319,7 @@ async function applyCreateWithPatient(
   let patientId: Id<"patients">;
 
   const resolvedState = (args.state || matchingPatient?.state || "").trim();
-  if (!resolvedState) {
+  if (!resolvedState || resolvedState.toLowerCase() === "unspecified") {
     throw new Error("Patient state jurisdiction is required to determine the governing Department of Insurance (DOI) statutory clock.");
   }
   const resolvedPayer = (args.insurancePayer || matchingPatient?.insurancePayer || "").trim() || "Unspecified Payer";

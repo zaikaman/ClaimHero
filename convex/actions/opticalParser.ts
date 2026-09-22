@@ -641,7 +641,7 @@ CRITICAL DOCUMENT CLASSIFICATION & VALIDATION RULES:
         groupNumber: resolvedGroupNumber || undefined,
         dateOfBirth: resolvedDob || undefined,
         insurancePayer: extraction.insurancePayer?.trim() || "Unspecified Payer",
-        state: (args.patientState || "").trim() || "Unspecified",
+        state: (args.patientState || "").trim(),
         claimNumber: extraction.claimNumber?.trim() || "",
         serviceDate: resolvedServiceDate,
         denialDate: resolvedDenialDate || undefined,

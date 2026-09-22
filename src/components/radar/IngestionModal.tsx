@@ -93,7 +93,7 @@ interface IngestionModalProps {
     file: File,
     patientState?: string,
     onProgress?: (progressText: string) => void
-  ) => Promise<DenialExtractionResult & { claimId: string }>;
+  ) => Promise<(DenialExtractionResult & { claimId: string }) | undefined>;
   onParseText: (
     text: string,
     patientState?: string,
@@ -437,6 +437,10 @@ export const IngestionModal: React.FC<IngestionModalProps> = ({
       const result = await onUploadFile(selectedFile, patientState, (progressMsg) => {
         setProcessingMessage(isDetailed ? `Step 1/2: ${progressMsg}` : progressMsg);
       });
+      if (!result) {
+        endProcessing();
+        return;
+      }
       prepareContextReview(result);
       endProcessing();
     } catch (err) {

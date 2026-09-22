@@ -218,6 +218,50 @@ describe("Convex Claims CRUD, Financials & Analytics Engine", () => {
       expect(mockDb.insert).toHaveBeenCalledWith("claims", expect.objectContaining({ claimNumber: "CLM-001" }));
     });
 
+    it("createWithPatient: rejects empty or Unspecified patient state jurisdiction", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValue("user_123" as any);
+      const mockDb = createMockDb({
+        get: vi.fn().mockImplementation((id) => {
+          if (id === "user_123") return Promise.resolve({ _id: "user_123", email: "owner@test.com" });
+          return Promise.resolve(null);
+        }),
+      });
+      const mockCtx: any = {
+        db: mockDb,
+        scheduler: { runAfter: vi.fn().mockResolvedValue(undefined) },
+      };
+
+      const basePayload = {
+        patientName: "Jane Doe",
+        patientEmail: "jane@test.com",
+        memberId: "MEM-1",
+        insurancePayer: "UHC",
+        claimNumber: "CLM-001",
+        serviceDate: "2026-01-01",
+        providerName: "Dr. Smith",
+        deniedAmount: 1000,
+        patientOwedAmount: 1000,
+        cptCodes: ["27447"],
+        icd10Codes: ["M17.11"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Not medically necessary",
+      };
+
+      await expect(
+        (claims.createWithPatient as any)._handler(mockCtx, {
+          ...basePayload,
+          state: "Unspecified",
+        })
+      ).rejects.toThrow("Patient state jurisdiction is required to determine the governing Department of Insurance (DOI) statutory clock.");
+
+      await expect(
+        (claims.createWithPatient as any)._handler(mockCtx, {
+          ...basePayload,
+          state: "   ",
+        })
+      ).rejects.toThrow("Patient state jurisdiction is required to determine the governing Department of Insurance (DOI) statutory clock.");
+    });
+
     it("createWithPatient: fails closed for unauthenticated callers without minting a shared sentinel user", async () => {
       vi.mocked(getAuthUserId).mockResolvedValue(null);
       const mockDb = createMockDb();

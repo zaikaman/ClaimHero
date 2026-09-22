@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano, text-embedding-3-small
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-22T04:22:51Z
+- **Last updated:** 2026-09-22T11:21:00Z
 
 ## Log
 
@@ -1879,9 +1879,22 @@ Restored green peer-to-peer (P2P) overturn victory resolution in `convex/actions
 Aligned landing page demo preset copy and quickstart guidance with authentic synthetic fixtures across `src/components/landing/TemplateLanding.tsx`, `README.md`, and `tests/landingSections.test.ts`:
 - Replaced synthetic patient names with insurer names and accurate case amounts in `TemplateLanding.tsx` Pre-Seeded Cases showcase: `Cigna Global $6,400`, `GeoBlue $18,200`, and `Aetna International $2,850`.
 - Updated `JUDGE_STEPS` in `TemplateLanding.tsx` and `Try it in 60 seconds` quickstart in `README.md` to instruct advocates to click `Launch Sentinel` prior to selecting `Explore as Anonymous Advocate`, and to open the `Cigna Global` case instead of a patient name.
-- Updated `tests/landingSections.test.ts` to assert `Cigna Global` presence and absence of patient names in the landing page markup. Verified typecheck and lint.### 2026-09-22 - da7fcb4
+- Updated `tests/landingSections.test.ts` to assert `Cigna Global` presence and absence of patient names in the landing page markup. Verified typecheck and lint.
+
+### 2026-09-22 - da7fcb4
 Made both 3D backdrops render on 100% of devices with production-grade low-end performance (`src/components/landing/UnicornBackground.tsx`, `src/components/ui/Silk.tsx`, `src/components/ui/SilkFallback.tsx`, `src/components/layout/Shell.tsx`, `index.html`):
 - Removed device gating on the landing Unicorn Studio scene: pointer type, viewport width, reduced-motion, and data-saver no longer omit it; only a genuinely missing WebGL context falls back to the always-painted gradient (probe context released via WEBGL_lose_context).
 - Defer scene CDN fetch past first paint via requestIdleCallback (rAF fallback), low-priority script, jsdelivr preconnect, 3-attempt retry with timeouts, and canvas-driven fade-in over the gradient underlay.
 - Hardened the dashboard Silk shader for weak GPUs: adaptive DPR cap (1x constrained / 1.5x desktop), minimal GL context (no MSAA/alpha/depth/stencil, low-power, failIfMajorPerformanceCaveat false), static demand-rendered frame for reduced-motion instead of blank, clamped frame deltas, context-loss auto-remount, error boundary plus gradient fallback, and viewport-sized layer instead of 120vw overscan.
 - Added `tests/webglBackground.test.ts` (6 tests) and updated `README.md` suite count. Verified with 1,310 passing tests across 84 suites, clean typecheck, lint, and production build (Silk async chunk + on-demand three-bundle intact).
+
+### 2026-09-22 - working tree
+Hardened case ingestion, precedent scoring integrity, and appellate studio submission guardrails (`convex/claims.ts`, `convex/actions/opticalParser.ts`, `convex/actions/bulkIntakeWorker.ts`, `convex/actions/precedentMatcher.ts`, `convex/p2pScripts.ts`, `src/components/onboarding/OnboardingWizard.tsx`, `src/components/radar/IngestionModal.tsx`, `src/components/radar/CaseRadar.tsx`, `src/hooks/useClaims.ts`, `src/hooks/useAppealStudio.ts`, `tests/productionReliabilityHardening.test.ts`, `tests/convexClaimsFull.test.ts`, `tests/convexP2P.test.ts`, `README.md`):
+- Closed state jurisdiction bypass in `convex/claims.ts`: rejected empty and "Unspecified" state strings to enforce DOI statutory clock requirements, and removed permissive fallback strings from `opticalParser.ts` and `bulkIntakeWorker.ts`.
+- Eliminated fabricated 0.70 precedent similarity bonus in `convex/actions/precedentMatcher.ts` when no precedent or relevance score is present, defaulting top similarity to 0.
+- Enforced 10MB document size caps across onboarding intake (`OnboardingWizard.tsx`), in-browser OCR reading (`clientOcr.ts`), and claim storage upload pipelines (`useClaims.ts`), halting upload when client OCR fails or is rejected.
+- Added Skip action to steps 2-3 of the onboarding wizard dialog header to prevent user entrapment on auto-opened walkthroughs.
+- Implemented optimistic concurrency `expectedVersion` conflict detection on P2P tele-script drafts in `convex/p2pScripts.ts` using indexed lookups.
+- Added synchronous `useRef` lock guards in `useAppealStudio.ts` preventing duplicate same-tick brief synthesis or tier escalation dispatches.
+- Defaulted `includeDemo` to false across `useClaims.ts` and `CaseRadar.tsx`, and added clear `*includes demo` footnote labels next to portfolio financial totals when demo cases are enabled.
+- Added regression tests in `tests/productionReliabilityHardening.test.ts`, `tests/convexClaimsFull.test.ts`, and `tests/convexP2P.test.ts` (1,314 passed tests across 84 suites) and verified 100% clean typecheck, lint, and production build.

@@ -125,7 +125,7 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
   onNavigateView,
   onDeleteCase,
   onRunAutonomousPipeline,
-  includeDemo = true,
+  includeDemo = false,
   onToggleIncludeDemo,
   initialPayerFilter,
   onClearPayerFilter,
@@ -595,6 +595,11 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
               <Badge variant="outline" className="text-[11px] font-mono">
                 {filtered.length} {filtered.length === 1 ? "Case" : "Cases"}
               </Badge>
+              {includeDemo && (
+                <span className="text-[11px] font-mono text-muted-foreground/80 tracking-tight">
+                  *includes demo
+                </span>
+              )}
             </div>
             <p className="text-muted-foreground text-xs">
               {isDetailed ? "Under active ERISA statutory review" : "Across all your bills"}
@@ -645,6 +650,11 @@ export const CaseRadar: React.FC<CaseRadarProps> = ({
               <Badge variant="secondary" className="text-[11px] font-mono">
                 {avgScore}/100 {isDetailed ? "Avg Readiness" : "Avg strength"}
               </Badge>
+              {includeDemo && (
+                <span className="text-[11px] font-mono text-muted-foreground/80 tracking-tight">
+                  *includes demo
+                </span>
+              )}
             </div>
             <p className="text-muted-foreground text-xs">
               {isDetailed ? `Across ${filtered.length} cross-examined CPBs` : "Won back from insurers"}

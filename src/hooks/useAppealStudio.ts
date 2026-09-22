@@ -86,6 +86,8 @@ export function useAppealStudio(
   const lastSyncedContentRef = useRef<string | null>(null);
   const lastSyncedAtRef = useRef<number>(0);
   const saveInFlightRef = useRef<boolean>(false);
+  const isSynthesizingRef = useRef<boolean>(false);
+  const isEscalatingRef = useRef<boolean>(false);
   const recentOwnSavesRef = useRef<string[]>([]);
   const [pendingRemote, setPendingRemote] = useState<{
     content: string;
@@ -589,11 +591,12 @@ export function useAppealStudio(
       customNotes?: string,
       customSender?: AppealSenderDetails
     ) => {
-      if (isSynthesizing) return;
+      if (isSynthesizing || isSynthesizingRef.current) return;
       if (!claim?._id) {
         throw new Error("No claim selected for appeal synthesis");
       }
 
+      isSynthesizingRef.current = true;
       const targetLevel = customLevel || appealLevel;
       setIsSynthesizing(true);
       try {
@@ -628,6 +631,7 @@ export function useAppealStudio(
         }
         return result;
       } finally {
+        isSynthesizingRef.current = false;
         setIsSynthesizing(false);
       }
     },
@@ -648,8 +652,10 @@ export function useAppealStudio(
   // Escalate to next statutory tier and synthesize escalated legal brief
   const escalateTier = useCallback(
     async (targetLevel: AppealLevel, escalationReason?: string) => {
+      if (isEscalating || isEscalatingRef.current) return;
       if (!claim?._id) throw new Error("No claim selected for tier escalation");
 
+      isEscalatingRef.current = true;
       setIsEscalating(true);
       try {
         await escalateTierMutation({
@@ -663,10 +669,11 @@ export function useAppealStudio(
         const synthResult = await synthesizeAppeal(targetLevel);
         return synthResult;
       } finally {
+        isEscalatingRef.current = false;
         setIsEscalating(false);
       }
     },
-    [claim, senderName, escalateTierMutation, synthesizeAppeal]
+    [claim, senderName, isEscalating, escalateTierMutation, synthesizeAppeal]
   );
 
   // Helper to switch to a specific historical version

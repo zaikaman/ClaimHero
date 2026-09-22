@@ -322,7 +322,7 @@ export function calculateDeterministicRubric(
           ? Math.max(topPrecedent.combinedScore ?? 0, topPrecedent.vectorScore ?? 0)
           : (legalEv?.relevanceScore !== undefined
               ? (legalEv.relevanceScore > 1 ? legalEv.relevanceScore / 100 : legalEv.relevanceScore)
-              : 0.70);
+              : 0);
 
         let similarityBonus = 0;
         if (topSimilarity >= 0.75) {

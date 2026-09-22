@@ -4,7 +4,8 @@ import { validateOcrAppealsEmail } from "../convex/actions/opticalParser";
 import { resolveStatutoryDeadline } from "../convex/lib/dateUtils";
 import { calculateErisaPenalties, getDefaultErisaPenalties } from "../src/lib/liabilityCalculator";
 import { formatWhatHappenedSentence, formatDeadlineSentence } from "../src/lib/plainCopy";
-import { extractTextFromPdf, extractTextFromImage } from "../src/lib/clientOcr";
+import { extractTextFromPdf, extractTextFromImage, extractDocumentInBrowser } from "../src/lib/clientOcr";
+import { calculateDeterministicRubric } from "../convex/actions/precedentMatcher";
 import type { Claim } from "../src/types";
 
 describe("Production Reliability Hardening", () => {
@@ -173,6 +174,39 @@ describe("Production Reliability Hardening", () => {
       await expect(extractTextFromImage(fakeFile)).rejects.toThrow(
         /exceeds the 10MB maximum size limit/
       );
+    });
+
+    it("aborts extractDocumentInBrowser when text or document file exceeds 10MB", async () => {
+      const oversizedBlob = new Blob([new Uint8Array(11 * 1024 * 1024)], { type: "text/plain" });
+      const fakeFile = new File([oversizedBlob], "large_eob.txt", { type: "text/plain" });
+      await expect(extractDocumentInBrowser(fakeFile)).rejects.toThrow(
+        /exceeds the maximum 10MB size limit/
+      );
+    });
+  });
+
+  describe("Precedent Matcher Scoring Integrity", () => {
+    it("does not fabricate 0.70 similarity bonus when legal evidence lacks relevance score", () => {
+      const claim = {
+        cptCodes: ["99214"],
+        denialReasonCode: "CO-50",
+        denialReasonDescription: "Investigational service",
+      };
+      const evidences = [
+        {
+          sourceType: "legal_precedent",
+          citationClause: "IMR Case No. 2024-991",
+          extractedEvidenceMarkdown: "Independent medical review decision overturned insurer denial",
+          // relevanceScore explicitly undefined
+        },
+      ];
+
+      const rubric = calculateDeterministicRubric(claim, evidences, []);
+      const precedentStrength = rubric.scoringBreakdown.find((c) => c.category === "precedent_strength");
+
+      // Without matched precedents or relevanceScore, topSimilarity is 0 -> similarityBonus = 0
+      // Base score is 12 (favorable legalEv), similarityBonus = 0, no code overlap -> score is 12
+      expect(precedentStrength?.score).toBe(12);
     });
   });
 });
