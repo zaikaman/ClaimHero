@@ -13,7 +13,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano, text-embedding-3-small
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-22T12:01:27Z
+- **Last updated:** 2026-09-22T12:35:55Z
 
 ## Log
 
@@ -1911,3 +1911,12 @@ Aligned statutory ERISA failure-to-disclose penalty rate with current DOL inflat
 - Guarded all unguarded `claim.cptCodes` accessors across `EvidenceMatrix.tsx` line 697 (`claim.cptCodes?.map`), `ClinicalResearchConsole.tsx` lines 351, 784, 808, 1036, 1071, 1101, 1132 (`cptCodes.join` and `cptCodes[0]`), and `CasePickerEmptyState.tsx` line 216, preventing client runtime crashes on codeless or draft claims.
 - Added regression tests in `tests/financialErisaCalculator.test.ts`, `tests/liabilityDefaultsEmptyState.test.ts`, `tests/appealStudioUx.test.ts`, `tests/detailMode.test.ts`, and dedicated test suite `tests/codelessClaimsResilience.test.ts` asserting codeless claim rendering, optional chaining, and $164/day penalty demands and stepper/palette labels.
 - Verified 1,323 tests across 85 suites with `npm run verify` (100% clean typecheck, lint, coverage, and production build). Convex features: schema, queries, mutations, actions, crons, scheduled functions, file storage, static hosting.
+
+### 2026-09-22 - 2dd4ca2
+Eliminated de-identification token (`[CLAIM_REF]`) and clinical date placeholder (`[DATE]`) leaks in appeal addendum rebuttals and automated correspondence across `convex/lib/phiSafe.ts`, `convex/actions/mailDispatcher.ts`, `convex/actions/agentMail.ts`, `src/lib/displaySafety.ts`, and communications UI:
+- Added `resolveRebuttalEvidentiaryPlaceholders` resolving claim reference aliases (`[CLAIM_REF]`, `[CLAIM_NUMBER]`, `[DOS]`), prerequisite diagnostic imaging dates from clinical facts, natural fallbacks ("on file prior to service"), and residual bracket stripping.
+- Embedded `REBUTTAL_PHI_INSTRUCTION` into inbound analysis and auto-reply prompts instructing LLM generation to use real claim context rather than bracketed de-identification tokens.
+- Implemented outbound fail-closed transmission gate in `sendOutboundMessage` via `hasUnresolvedPlaceholders` to block sending ungrounded drafts to payers.
+- Added sanitization to inbox draft generation, intake, and rendering in `AgentMailDrawer.tsx` and `SimpleInboxView.tsx`.
+- Expanded test coverage across `tests/phiSafe.test.ts`, `tests/groundedMatcherAndSafeAutoReply.test.ts`, and `tests/actionsAgentMailAndDispatcher.test.ts`, verifying 1,330 passing tests across 85 suites with 100% clean typecheck, lint, and production build. Convex features: actions, queries, mutations, static hosting.
+
