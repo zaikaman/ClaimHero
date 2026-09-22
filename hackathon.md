@@ -1875,7 +1875,7 @@ Restored green peer-to-peer (P2P) overturn victory resolution in `convex/actions
 - Restored precision medical emerald green styling across the guide banner, hero card, reviewer status card (`Reviewer Status:`), closing verbal rebuttal cue (`SAY TO CONCLUDE CALL:`), and encounter EHR addendum launcher in `src/components/p2p/P2PLiveCopilot.tsx`.
 - Verified cleanly with `npm run verify` (1,304 passed tests across 83 suites, 100% typecheck, lint, coverage, and production build). Convex features: actions, queries, mutations, static hosting.
 
-### 2026-09-22 - working tree
+### 2026-09-22 - 1ec7769
 Aligned landing page demo preset copy and quickstart guidance with authentic synthetic fixtures across `src/components/landing/TemplateLanding.tsx`, `README.md`, and `tests/landingSections.test.ts`:
 - Replaced synthetic patient names with insurer names and accurate case amounts in `TemplateLanding.tsx` Pre-Seeded Cases showcase: `Cigna Global $6,400`, `GeoBlue $18,200`, and `Aetna International $2,850`.
 - Updated `JUDGE_STEPS` in `TemplateLanding.tsx` and `Try it in 60 seconds` quickstart in `README.md` to instruct advocates to click `Launch Sentinel` prior to selecting `Explore as Anonymous Advocate`, and to open the `Cigna Global` case instead of a patient name.
