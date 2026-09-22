@@ -13,7 +13,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano, text-embedding-3-small
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-22T12:50:00Z
+- **Last updated:** 2026-09-22T13:27:23Z
 
 ## Log
 
@@ -1920,7 +1920,7 @@ Eliminated de-identification token (`[CLAIM_REF]`) and clinical date placeholder
 - Added sanitization to inbox draft generation, intake, and rendering in `AgentMailDrawer.tsx` and `SimpleInboxView.tsx`.
 - Expanded test coverage across `tests/phiSafe.test.ts`, `tests/groundedMatcherAndSafeAutoReply.test.ts`, and `tests/actionsAgentMailAndDispatcher.test.ts`, verifying 1,330 passing tests across 85 suites with 100% clean typecheck, lint, and production build. Convex features: actions, queries, mutations, static hosting.
 
-### 2026-09-22 - working tree
+### 2026-09-22 - 29248fc
 Aligned Simple mode communication UX with Details mode by docking the AI suggested rebuttal card directly into the chatbox console above the message composer in `SimpleInboxView.tsx`:
 - Relocated the Suggested Response card from stranded isolation above the message timeline card directly into the conversation console between the scrollable message history stream and the quick message composer form.
 - Eliminated the friction where patients reading an incoming insurer reply at the bottom of the message thread had to scroll up past the entire history to approve the response.
@@ -1929,4 +1929,14 @@ Aligned Simple mode communication UX with Details mode by docking the AI suggest
 - Added `onRegenerateDraft` prop support in `SimpleInboxView.tsx` and wired it to `handleGenerateSmartDraft` in `AgentMailDrawer.tsx`.
 - Added test coverage in `tests/simpleInboxUx.test.ts` asserting chatbox docking, DOM order (timeline before suggested response, suggested response before composer), and regenerate action, updating `README.md` to 1,331 passing tests across 85 suites.
 - Verified 100% clean with `npm run verify` (typecheck, lint, 1,331 tests, and production build).
+
+### 2026-09-22 - working tree
+Implemented multi-lingual email reply quote parsing and thread isolation to prevent historical email chains from contaminating payer response analysis, and hardened live DNS MX resolution against CI and network timeouts:
+- Created multi-lingual email reply parser in `convex/lib/emailQuoteParser.ts` stripping attribution lines, Outlook/Exchange headers, RFC-2822 blockquotes, and HTML quote containers while preserving clean inbound text. Hardened attribution matching with date/time and email signatures to prevent false positives on clinical narrative prose and inline lab comparisons.
+- Added `quotedBodyText` and `hasQuotedText` to `emailMessages` table schema in `convex/schema.ts` and mutations in `convex/emails.ts`.
+- Integrated reply parsing into inbound webhook processing (`convex/actions/agentMail.ts`) and draft generation (`convex/actions/mailDispatcher.ts`), isolating clean inquiries for LLM classification and routing questions to `GENERAL_INQUIRY` rather than false adverse `DENIAL_UPHELD`.
+- Added `GENERAL_INQUIRY` counter-rebuttal fallback generator in `convex/lib/adversaryNegotiation.ts` answering patient identification inquiries directly without hostile ERISA IRO escalation.
+- Enhanced `SimpleInboxView.tsx` and `AgentMailDrawer.tsx` to display clean inquiry text and provide an interactive expandable quoted text toggle for email history.
+- Hardened live DNS MX resolution action in `convex/actions/serviceCertificateResolver.ts` with bounded `withTimeout` safeguards (2,500ms on MX queries, 1,000ms on IP lookups) to prevent asynchronous network DNS hangs and runner timeouts in firewalled CI and offline environments.
+- Added unit test coverage in `tests/emailQuoteParser.test.ts` (14 tests) and updated `tests/serviceCertificate.test.ts` with deterministic resolution and fallback mocks, verifying 1,346 passing tests across 86 suites with `npm run verify` (100% clean typecheck, lint, coverage, and production build). Convex features: schema, queries, mutations, actions, HTTP actions, static hosting.
 

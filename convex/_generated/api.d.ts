@@ -48,6 +48,7 @@ import type * as lib_aggregates from "../lib/aggregates.js";
 import type * as lib_appealEmail from "../lib/appealEmail.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_dateUtils from "../lib/dateUtils.js";
+import type * as lib_emailQuoteParser from "../lib/emailQuoteParser.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_erisaEvidence from "../lib/erisaEvidence.js";
 import type * as lib_intakeWorkpool from "../lib/intakeWorkpool.js";
@@ -129,6 +130,7 @@ declare const fullApi: ApiFromModules<{
   "lib/appealEmail": typeof lib_appealEmail;
   "lib/auth": typeof lib_auth;
   "lib/dateUtils": typeof lib_dateUtils;
+  "lib/emailQuoteParser": typeof lib_emailQuoteParser;
   "lib/embeddings": typeof lib_embeddings;
   "lib/erisaEvidence": typeof lib_erisaEvidence;
   "lib/intakeWorkpool": typeof lib_intakeWorkpool;

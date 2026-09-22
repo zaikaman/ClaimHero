@@ -226,6 +226,8 @@ interface InsertMessageArgs {
   subject: string;
   bodyHtml: string;
   bodyText: string;
+  quotedBodyText?: string;
+  hasQuotedText?: boolean;
   hasAttachments: boolean;
   attachments?: Array<{
     storageId: Id<"_storage">;
@@ -301,6 +303,8 @@ async function applyInsertMessage(ctx: MutationCtx, args: InsertMessageArgs): Pr
     subject: args.subject,
     bodyHtml: args.bodyHtml,
     bodyText: args.bodyText,
+    quotedBodyText: args.quotedBodyText,
+    hasQuotedText: args.hasQuotedText ?? Boolean(args.quotedBodyText),
     hasAttachments: args.hasAttachments,
     attachments: args.attachments,
     agentMailMessageId: args.agentMailMessageId,
@@ -387,6 +391,8 @@ export const insertMessage = mutation({
     subject: v.string(),
     bodyHtml: v.string(),
     bodyText: v.string(),
+    quotedBodyText: v.optional(v.string()),
+    hasQuotedText: v.optional(v.boolean()),
     hasAttachments: v.boolean(),
     attachments: v.optional(
       v.array(
@@ -427,6 +433,8 @@ export const insertMessageInternal = internalMutation({
     subject: v.string(),
     bodyHtml: v.string(),
     bodyText: v.string(),
+    quotedBodyText: v.optional(v.string()),
+    hasQuotedText: v.optional(v.boolean()),
     hasAttachments: v.boolean(),
     attachments: v.optional(
       v.array(
@@ -460,6 +468,9 @@ export const insertMessageInternal = internalMutation({
 export const updateMessageAnalysisInternal = internalMutation({
   args: {
     messageId: v.id("emailMessages"),
+    bodyText: v.optional(v.string()),
+    quotedBodyText: v.optional(v.string()),
+    hasQuotedText: v.optional(v.boolean()),
     detectedDetermination: v.optional(v.string()),
     clinicalRationale: v.optional(v.string()),
     missingRecordsRequested: v.optional(v.array(v.string())),
@@ -504,6 +515,8 @@ export const insertInboundMessageInternal = internalMutation({
     subject: v.string(),
     bodyHtml: v.string(),
     bodyText: v.string(),
+    quotedBodyText: v.optional(v.string()),
+    hasQuotedText: v.optional(v.boolean()),
     hasAttachments: v.boolean(),
     attachments: v.optional(
       v.array(
@@ -568,6 +581,8 @@ export const insertInboundMessageInternal = internalMutation({
       subject: args.subject,
       bodyHtml: args.bodyHtml,
       bodyText: args.bodyText,
+      quotedBodyText: args.quotedBodyText,
+      hasQuotedText: args.hasQuotedText ?? Boolean(args.quotedBodyText),
       hasAttachments: args.hasAttachments,
       attachments: args.attachments,
       agentMailMessageId: trimmedId,

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import dns from "dns/promises";
 import {
   getCanonicalMxForDomain,
   computeSha256Hex,
@@ -252,17 +253,38 @@ describe("ERISA Certificate of Electronic Service (Proof of Delivery)", () => {
   });
 
   describe("Live DNS MX Resolver Action (convex/actions/serviceCertificateResolver.ts)", () => {
-    it("resolves MX records via live action or returns canonical fallback", async () => {
-      const result = await (resolveLiveRecipientMx as unknown as { _handler: (ctx: unknown, args: unknown) => Promise<{ exchange: string; priority: number; tlsCipher: string; authentication: { spf: string } }> })._handler({}, {
+    it("resolves MX records via live action with DNS lookup and TLS 1.3 verification", async () => {
+      vi.spyOn(dns, "resolveMx").mockResolvedValueOnce([
+        { exchange: "mxa-00155b01.gslb.pphosted.com", priority: 10 },
+      ]);
+      vi.spyOn(dns, "lookup").mockResolvedValueOnce({ address: "148.163.153.21", family: 4 });
+
+      const result = await (resolveLiveRecipientMx as unknown as { _handler: (ctx: unknown, args: unknown) => Promise<{ exchange: string; priority: number; ipAddress?: string; status: string; tlsCipher: string; authentication: { spf: string } }> })._handler({}, {
+        recipientEmail: "appeals@cigna.com",
+      });
+
+      expect(result).toBeDefined();
+      expect(result.exchange).toBe("mxa-00155b01.gslb.pphosted.com");
+      expect(result.priority).toBe(10);
+      expect(result.ipAddress).toBe("148.163.153.21");
+      expect(result.status).toBe("verified_live");
+      expect(result.tlsCipher).toContain("TLS 1.3");
+      expect(result.authentication.spf).toContain("Pass");
+    });
+
+    it("falls back to canonical registry mapping when DNS lookup fails or times out", async () => {
+      vi.spyOn(dns, "resolveMx").mockRejectedValueOnce(new Error("DNS query timed out"));
+
+      const result = await (resolveLiveRecipientMx as unknown as { _handler: (ctx: unknown, args: unknown) => Promise<{ exchange: string; priority: number; status: string; tlsCipher: string }> })._handler({}, {
         recipientEmail: "appeals@cigna.com",
       });
 
       expect(result).toBeDefined();
       expect(result.exchange).toContain("pphosted.com");
       expect(result.priority).toBe(10);
+      expect(result.status).toBe("canonical_registry");
       expect(result.tlsCipher).toContain("TLS 1.3");
-      expect(result.authentication.spf).toContain("Pass");
-    }, 15000);
+    });
 
     it("handles domain fallback gracefully for non-standard inputs", async () => {
       const result = await (resolveLiveRecipientMx as unknown as { _handler: (ctx: unknown, args: unknown) => Promise<{ exchange: string }> })._handler({}, {

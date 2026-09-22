@@ -21,6 +21,7 @@ import {
 import { requireAuthUser } from "../lib/auth";
 import { rateLimiter } from "../lib/rateLimiter";
 import { isTextractConfigured, extractDocumentWithTextract } from "../lib/textract";
+import { parseEmailReply } from "../lib/emailQuoteParser";
 
 /**
  * Minimum interval between non-victory payer-response alert emails for the
@@ -166,11 +167,17 @@ async function handleInboundClaimReply(
     if (!normalized) throw new Error("AgentMail reply payload could not be validated.");
 
     const subject = normalized.subject || "Adjudication Update";
-    const bodyContent = normalized.text || normalized.html || "";
+    const rawText = normalized.text || "";
+    const rawHtml = normalized.html || "";
+    const parsed = parseEmailReply(rawText, rawHtml);
+    const cleanBodyText = parsed.cleanedText || rawText || rawHtml || "";
+    const quotedBodyText = parsed.quotedText;
+    const hasQuotedText = parsed.hasQuotedContent;
+    const bodyContent = cleanBodyText;
     const sender = normalized.from || "Insurance Payer";
     const lowerFrom = (normalized.from || "").toLowerCase();
     const lowerSubject = subject.toLowerCase();
-    const lowerBody = (normalized.text || normalized.html || "").toLowerCase();
+    const lowerBody = (cleanBodyText || "").toLowerCase();
 
     // Loopback prevention: immediately drop messages originated by ClaimHero's own
     // infrastructure or alert notifications sent to users, BEFORE executing expensive
@@ -244,7 +251,7 @@ async function handleInboundClaimReply(
 
     // 2. Fallback to regex /#CH-\d+/ and [ClaimHero #...] across subject and body
     if (!matchingClaim) {
-      const searchTarget = `${subject} ${bodyContent.slice(0, 2000)}`;
+      const searchTarget = `${subject} ${cleanBodyText} ${(quotedBodyText || "").slice(0, 1000)}`;
       const chMatch =
         searchTarget.match(/#(CH-\d+)/i) ||
         searchTarget.match(/\[ClaimHero\s*#([^\]]+)\]/i) ||
@@ -368,7 +375,8 @@ async function handleInboundClaimReply(
     // Fast heuristic classification for instantaneous sub-second UI rendering.
     // Ordering: approval, then partial settlement, then RFI, then policy
     // conflict, then uphold — mirrors detectAdversaryCountermove().
-    const candidateText = normalized.text || normalized.html || subject || "";
+    // CRITICAL: Evaluate ONLY the sender's clean reply text, never quoted thread history.
+    const candidateText = cleanBodyText || subject || "";
     const lowerText = candidateText.toLowerCase();
 
     const isApprovalFallback = isApprovalDeterminationText(candidateText);
@@ -503,8 +511,10 @@ async function handleInboundClaimReply(
       sender,
       recipient: normalized.recipients[0] || "",
       subject,
-      bodyHtml: normalized.html || `<p>${escapeHtml(normalized.text || "")}</p>`,
-      bodyText: normalized.text || normalized.html || "",
+      bodyHtml: parsed.cleanedHtml || normalized.html || `<p>${escapeHtml(cleanBodyText)}</p>`,
+      bodyText: cleanBodyText,
+      quotedBodyText,
+      hasQuotedText,
       hasAttachments: normalized.attachments.length > 0,
       attachments: storedAttachments.length > 0 ? storedAttachments : undefined,
       agentMailMessageId: normalized.messageId,
@@ -603,13 +613,21 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
     - "POLICY_CONFLICT_CITATION": The payer cites a specific conflicting Clinical Policy Bulletin (CPB) clause or medical-policy exclusion as the basis for denial. Quote the clause in citedPolicyClause.
     - "DENIAL_UPHELD": The payer explicitly affirms/maintains their adverse determination or advises of external review rights.
     - "ACKNOWLEDGMENT_ONLY": A routine automated or administrative receipt acknowledging file intake without substantive clinical determination.
-    - "GENERAL_INQUIRY": General administrative question or status check.
+    - "GENERAL_INQUIRY": General administrative question, identity verification, or status check (e.g., asking for patient name, service date, or case identification).
  2. Extract specific missing clinical documentation or evidence demanded.
  3. If overturned, extract authorized recovery (default to full denied amount $${matchingClaim.deniedAmount}). If partially settled or compromise offered, extract the EXACT dollar figure or percentage explicitly stated by the payer. If the payer extended a partial offer but did NOT specify an amount or percentage, set authorizedSettlementAmount to 0 and settlementProvenance to "unspecified". NEVER fabricate or invent a dollar amount that the payer did not state.
  4. If an attached Explanation of Benefits or settlement agreement is present, incorporate its formal claim decisions into your evaluation.
- 5. For ANY determination other than OVERTURNED_APPROVED (especially PARTIAL_SETTLEMENT_OFFER, POLICY_CONFLICT_CITATION, DENIAL_UPHELD, ADDITIONAL_RECORDS_REQUIRED, or GENERAL_INQUIRY), synthesize a professional, procedurally grounded clinical counter-rebuttal tailored to the countermove: decline discounted settlements and demand full payment with cure path for partial offers; distinguish the cited CPB clause on the facts for policy citations; formally demand Independent Review Organization (IRO) external review citing statutory ERISA 29 C.F.R. § 2560.503-1 rights if the denial is upheld; supply or commit the requested records for RFIs. All drafted rebuttals require human review prior to transmission.
- 6. CRITICAL RULE: If determination is "OVERTURNED_APPROVED" (claim won/approved), set shouldAutoReply to false and set suggestedAutoReplyAddendum to empty string "". For ALL other determinations, set shouldAutoReply to true and provide a non-empty suggestedAutoReplyAddendum.`,
-        userPrompt: `Evaluate the following inbound email from ${sender}:\n\nSubject: ${subject}\n\n${bodyContent}${
+ 5. For ANY determination other than OVERTURNED_APPROVED:
+    - If GENERAL_INQUIRY: Synthesize a polite, cooperative, and direct response addressing their question (such as stating the patient name, date of service, or claim details) and requesting their review. Do NOT draft an adversarial denial challenge for a general question.
+    - If ADDITIONAL_RECORDS_REQUIRED: Commit to or supply the requested documentation under ERISA timelines.
+    - If PARTIAL_SETTLEMENT_OFFER: Decline discounted settlements and demand full payment with cure path.
+    - If POLICY_CONFLICT_CITATION: Distinguish the cited CPB clause on the facts.
+    - If DENIAL_UPHELD: Formally demand Independent Review Organization (IRO) external review citing statutory ERISA 29 C.F.R. § 2560.503-1 rights.
+    All drafted rebuttals require human review prior to transmission.
+ 6. CRITICAL RULE: Base your determination and evaluation SOLELY on the sender's actual new message (under "Sender's Message") and attachments, NEVER on quoted historical emails from earlier in the thread. If determination is "OVERTURNED_APPROVED" (claim won/approved), set shouldAutoReply to false and set suggestedAutoReplyAddendum to empty string "". For ALL other determinations, set shouldAutoReply to true and provide a non-empty suggestedAutoReplyAddendum directly addressing the sender's inquiry.`,
+        userPrompt: `Evaluate the following inbound email from ${sender}:\n\nSubject: ${subject}\n\nSender's Message (New Content):\n"${cleanBodyText}"${
+          quotedBodyText ? `\n\n(Quoted Previous Email Thread Context - Do NOT classify as the payer's current determination):\n"${quotedBodyText.slice(0, 1000)}"` : ""
+        }${
           attachmentTexts.length > 0 ? `\n\n--- Extracted Attachment Content ---\n${attachmentTexts.join("\n\n")}` : ""
         }`,
         schemaName: "InboundAnalysisResult",
@@ -686,6 +704,7 @@ Evaluate the inbound correspondence text AND any attached documents (Explanation
         deniedAmount: matchingClaim.deniedAmount,
         settlementAmount,
         cptCodes: matchingClaim.cptCodes,
+        patientName: matchingClaim.patientName,
       });
     }
     const { resolveRebuttalEvidentiaryPlaceholders } = await import("../lib/phiSafe");

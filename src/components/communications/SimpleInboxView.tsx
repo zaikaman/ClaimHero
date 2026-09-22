@@ -18,11 +18,13 @@ import {
   Paperclip,
   CaretDown,
   CaretUp,
+  CaretRight,
   ArrowDown,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, formatCurrency, cn } from "../../lib/utils";
 import { sanitizeRebuttalDraftDisplay } from "../../lib/displaySafety";
+import { parseEmailReply } from "../../../convex/lib/emailQuoteParser";
 import { SentinelFlowStepper, FlowView } from "../common/SentinelFlowStepper";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -119,6 +121,7 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
   effectiveAppeal,
 }) => {
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(new Set());
+  const [expandedQuotedIds, setExpandedQuotedIds] = useState<Set<string>>(new Set());
   const [showOptionsWhenSent, setShowOptionsWhenSent] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const draftSectionRef = useRef<HTMLDivElement | null>(null);
@@ -156,6 +159,18 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
 
   const toggleMessageExpand = (id: string) => {
     setExpandedMessageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleQuotedExpand = (id: string) => {
+    setExpandedQuotedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -812,39 +827,77 @@ export const SimpleInboxView: React.FC<SimpleInboxViewProps> = ({
                   )}
 
                   {/* Message Body (Collapsible if long) */}
-                  <div className="space-y-1.5">
-                    <div className={cn(
-                      "rounded-lg bg-background/80 border border-border/80 p-3 text-xs text-foreground/90 leading-relaxed whitespace-pre-line transition-all",
-                      !isExpanded && "max-h-24 overflow-hidden relative"
-                    )}>
-                      {msg.bodyText}
-                      {!isExpanded && (msg.bodyText || "").length > 200 && (
-                        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-background to-transparent" />
-                      )}
-                    </div>
+                  {(() => {
+                    const parsedReply = parseEmailReply(msg.bodyText || "");
+                    const cleanText = msg.quotedBodyText ? msg.bodyText : parsedReply.cleanedText;
+                    const quotedText = msg.quotedBodyText || parsedReply.quotedText;
+                    const hasQuoted = Boolean(quotedText && quotedText.trim().length > 0);
+                    const isQuotedExpanded = expandedQuotedIds.has(msg._id);
 
-                    {(msg.bodyText || "").length > 200 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => toggleMessageExpand(msg._id)}
-                        className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1 cursor-pointer"
-                      >
-                        {isExpanded ? (
-                          <>
-                            <CaretUp className="size-3" />
-                            <span>Show less</span>
-                          </>
-                        ) : (
-                          <>
-                            <CaretDown className="size-3" />
-                            <span>Read full message</span>
-                          </>
+                    return (
+                      <div className="space-y-1.5">
+                        <div
+                          className={cn(
+                            "rounded-lg bg-background/80 border border-border/80 p-3 text-xs text-foreground/90 leading-relaxed whitespace-pre-line transition-all",
+                            !isExpanded && (cleanText || "").length > 200 && "max-h-24 overflow-hidden relative"
+                          )}
+                        >
+                          {cleanText}
+                          {!isExpanded && (cleanText || "").length > 200 && (
+                            <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-background to-transparent" />
+                          )}
+                        </div>
+
+                        {(cleanText || "").length > 200 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            onClick={() => toggleMessageExpand(msg._id)}
+                            className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1 cursor-pointer"
+                          >
+                            {isExpanded ? (
+                              <>
+                                <CaretUp className="size-3" />
+                                <span>Show less</span>
+                              </>
+                            ) : (
+                              <>
+                                <CaretDown className="size-3" />
+                                <span>Read full message</span>
+                              </>
+                            )}
+                          </Button>
                         )}
-                      </Button>
-                    )}
-                  </div>
+
+                        {/* Quoted Previous Correspondence Expander */}
+                        {hasQuoted && (
+                          <div className="pt-0.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => toggleQuotedExpand(msg._id)}
+                              className="h-6 px-2 text-[10px] font-mono text-muted-foreground hover:text-foreground/90 gap-1.5 border border-border/50 bg-muted/20 hover:bg-muted/50 cursor-pointer rounded"
+                              title={isQuotedExpanded ? "Hide quoted email history" : "Show quoted email history"}
+                            >
+                              <CaretRight className={cn("size-3 transition-transform duration-200", isQuotedExpanded && "rotate-90")} />
+                              <span>{isQuotedExpanded ? "Hide quoted text" : "••• Show quoted text"}</span>
+                            </Button>
+
+                            {isQuotedExpanded && (
+                              <div className="mt-2 p-2.5 rounded-md border-l-2 border-primary/40 bg-muted/20 text-[11px] font-mono text-muted-foreground/90 leading-relaxed whitespace-pre-line select-text">
+                                <div className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground/60 mb-1.5 flex items-center gap-1">
+                                  <span>Quoted Prior Correspondence</span>
+                                </div>
+                                {quotedText}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Attachments */}
                   {msg.hasAttachments && (

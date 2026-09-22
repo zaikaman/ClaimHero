@@ -292,6 +292,8 @@ export default defineSchema({
     subject: v.string(),
     bodyHtml: v.string(),
     bodyText: v.string(),
+    quotedBodyText: v.optional(v.string()),
+    hasQuotedText: v.optional(v.boolean()),
     hasAttachments: v.boolean(),
     attachments: v.optional(
       v.array(

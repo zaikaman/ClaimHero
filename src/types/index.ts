@@ -392,6 +392,8 @@ export interface EmailMessage {
   subject: string;
   bodyHtml: string;
   bodyText: string;
+  quotedBodyText?: string;
+  hasQuotedText?: boolean;
   hasAttachments: boolean;
   attachments?: Array<{
     storageId: string;

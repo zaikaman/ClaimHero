@@ -6,6 +6,20 @@ import dns from "dns/promises";
 import { getCanonicalMxForDomain, type MxRecordInfo } from "../serviceCertificate";
 
 /**
+ * Utility to bound network DNS resolution so external timeouts, firewalls,
+ * or slow resolvers never block execution or cause indefinite hangs.
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`DNS resolution timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timer);
+  });
+}
+
+/**
  * Live Node.js action that performs real DNS MX resolution for an appellate recipient domain.
  * Proves that the transmission destination maps to an active, authenticated electronic mail exchange.
  */
@@ -22,18 +36,18 @@ export const resolveLiveRecipientMx = action({
     }
 
     try {
-      // 1. Live DNS MX lookup via Node.js dns module
-      const records = await dns.resolveMx(domain);
+      // 1. Live DNS MX lookup via Node.js dns module with bounded 2500ms timeout
+      const records = await withTimeout(dns.resolveMx(domain), 2500);
 
       if (records && records.length > 0) {
         // Sort by lowest priority number (primary preferred exchange)
         const sorted = [...records].sort((a, b) => a.priority - b.priority);
         const primary = sorted[0];
 
-        // 2. Resolve IP address for the primary exchange host
+        // 2. Resolve IP address for the primary exchange host with bounded 1000ms timeout
         let ipAddress: string | undefined;
         try {
-          const lookupResult = await dns.lookup(primary.exchange);
+          const lookupResult = await withTimeout(dns.lookup(primary.exchange), 1000);
           ipAddress = lookupResult.address;
         } catch {
           // IP resolution is optional enrichment
@@ -53,7 +67,7 @@ export const resolveLiveRecipientMx = action({
         };
       }
     } catch {
-      // Fall back to canonical registry mapping if DNS lookup fails or offline
+      // Fall back to canonical registry mapping if DNS lookup fails, times out, or offline
     }
 
     return getCanonicalMxForDomain(domain);

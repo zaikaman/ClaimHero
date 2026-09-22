@@ -308,10 +308,18 @@ export function buildCounterRebuttalFallback(args: {
   deniedAmount?: number;
   settlementAmount?: number;
   cptCodes?: string[];
+  patientName?: string;
 }): string {
   const cptList = args.cptCodes || [];
   const cpts = cptList.length > 0 ? cptList.join(", ") : "billed services";
   switch (args.determination) {
+    case "GENERAL_INQUIRY":
+      return (
+        `We acknowledge your inquiry regarding Claim #${args.claimNumber}. ` +
+        (args.patientName ? `The patient on record is ${args.patientName}. ` : "") +
+        `All documented clinical records and treating provider notes remain on file for your full and fair review under ERISA 29 C.F.R. section 2560.503-1. ` +
+        `Please advise if any specific records or clarifications are required to complete your adjudication.`
+      );
     case "PARTIAL_SETTLEMENT_OFFER": {
       const offered = args.settlementAmount ?? calculatePartialSettlementOffer(args.deniedAmount ?? 0);
       return (

@@ -27,6 +27,7 @@ import {
 import { rateLimiter } from "../lib/rateLimiter";
 import { resolveClaimPatientName, type ClaimStatus } from "../claims";
 import { ensureAppealPdfStored } from "../lib/pdfGenerator";
+import { parseEmailReply } from "../lib/emailQuoteParser";
 import type { ResolvedPayerContact } from "./payerContactResolver";
 import {
   isBlockedEvidence,
@@ -1019,8 +1020,12 @@ Guidelines:
 4. Request timely reconsideration and reprocessing according to plan terms.
 5. Keep the letter structured with a clear salutation, 2-3 focused clinical paragraphs, and a formal closing. Do not use Markdown headings or AI meta-language.`;
 
-    const userPrompt = args.customPayerInquiry
-      ? `The payer sent the following specific inquiry or request:\n"${args.customPayerInquiry}"\n\nGenerate an evidence-grounded Clinical Addendum response addressing this inquiry using only verified clinical facts and indexed policy evidence.`
+    const cleanInquiry = args.customPayerInquiry
+      ? parseEmailReply(args.customPayerInquiry).cleanedText
+      : undefined;
+
+    const userPrompt = cleanInquiry
+      ? `The payer sent the following specific inquiry or request:\n"${cleanInquiry}"\n\nGenerate an evidence-grounded Clinical Addendum response addressing this inquiry using only verified clinical facts and indexed policy evidence.`
       : `Generate an evidence-grounded Clinical Addendum response addressing the adverse determination under ${claim.denialReasonCode || "the plan"}. Ground all clinical statements strictly in the documented clinical facts on file, requesting full and fair review under ERISA 29 C.F.R. § 2560.503-1.`;
 
     const draft = await createChatCompletion({

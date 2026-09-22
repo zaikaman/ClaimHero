@@ -27,6 +27,7 @@ import {
   SealCheck,
   ArrowLeft,
   Lightning,
+  CaretRight,
 } from "@phosphor-icons/react";
 import { Claim, EmailMessage, EmailThread, Appeal } from "../../types";
 import { formatDate, cn } from "../../lib/utils";
@@ -45,6 +46,7 @@ import { soundEffects } from "../../lib/soundEffects";
 import { copyToClipboard } from "../../lib/clipboard";
 import { toast } from "sonner";
 import { sanitizeRebuttalDraftDisplay } from "../../lib/displaySafety";
+import { parseEmailReply } from "../../../convex/lib/emailQuoteParser";
 
 type DispatchMode = "custom_email" | "official_payer";
 
@@ -108,8 +110,21 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
   const [isDismissingDraft, setIsDismissingDraft] = useState(false);
   const [activeAutoDraft, setActiveAutoDraft] = useState<string>("");
   const [extractingStorageIds, setExtractingStorageIds] = useState<Set<string>>(new Set());
+  const [expandedQuotedIds, setExpandedQuotedIds] = useState<Set<string>>(new Set());
   const trackedInboundIdRef = useRef<string | null>(null);
   const evaluatingMessageIdRef = useRef<string | null>(null);
+
+  const toggleQuotedExpand = (id: string) => {
+    setExpandedQuotedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const handleExtractLocally = async (
     messageId: string,
@@ -162,6 +177,7 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     seenMessageIdsRef.current = new Set(messages.map((m) => m._id));
     setIsRedispatchOpen(false);
     setCustomEmail("");
+    setExpandedQuotedIds(new Set());
   }, [claim._id]);
 
   // Real-time message arrival detector (audio chime, toast notification, and container-anchored smooth scroll)
@@ -280,10 +296,12 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     inFlightDraftEvaluations.add(currentInboundId);
     setIsGeneratingDraft(true);
 
+    const cleanInquiry = parseEmailReply(latestInbound.bodyText || "").cleanedText || latestInbound.bodyText;
+
     generateDraftAction({
       claimId: claim._id as Id<"claims">,
       inboundMessageId: currentInboundId as Id<"emailMessages">,
-      customPayerInquiry: latestInbound.bodyText,
+      customPayerInquiry: cleanInquiry,
     })
       .then((res) => {
         if (trackedInboundIdRef.current === currentInboundId && res?.draftText) {
@@ -318,10 +336,11 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
     if (isSynthesizing || !claim._id || !latestInbound) return;
     setIsGeneratingDraft(true);
     try {
+      const cleanInquiry = parseEmailReply(latestInbound.bodyText || "").cleanedText || latestInbound.bodyText;
       const res = await generateDraftAction({
         claimId: claim._id as Id<"claims">,
         inboundMessageId: latestInbound._id as Id<"emailMessages">,
-        customPayerInquiry: customPrompt || latestInbound.bodyText,
+        customPayerInquiry: customPrompt || cleanInquiry,
         forceRegenerate: true,
       });
       if (res?.draftText) {
@@ -1681,9 +1700,46 @@ export const AgentMailDrawer: React.FC<AgentMailDrawerProps> = ({
                       </div>
                     )}
 
-                    <div className="rounded-lg bg-background border border-border p-3 text-xs text-foreground/90 font-mono whitespace-pre-line leading-relaxed">
-                      {msg.bodyText}
-                    </div>
+                    {(() => {
+                      const parsedReply = parseEmailReply(msg.bodyText || "");
+                      const cleanText = msg.quotedBodyText ? msg.bodyText : parsedReply.cleanedText;
+                      const quotedText = msg.quotedBodyText || parsedReply.quotedText;
+                      const hasQuoted = Boolean(quotedText && quotedText.trim().length > 0);
+                      const isQuotedExpanded = expandedQuotedIds.has(msg._id);
+
+                      return (
+                        <div className="space-y-1.5">
+                          <div className="rounded-lg bg-background border border-border p-3 text-xs text-foreground/90 font-mono whitespace-pre-line leading-relaxed">
+                            {cleanText}
+                          </div>
+
+                          {hasQuoted && (
+                            <div className="pt-0.5">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="xs"
+                                onClick={() => toggleQuotedExpand(msg._id)}
+                                className="h-6 px-2 text-[10px] font-mono text-muted-foreground hover:text-foreground/90 gap-1.5 border border-border/50 bg-muted/20 hover:bg-muted/50 cursor-pointer rounded"
+                                title={isQuotedExpanded ? "Hide quoted email history" : "Show quoted email history"}
+                              >
+                                <CaretRight className={cn("size-3 transition-transform duration-200", isQuotedExpanded && "rotate-90")} />
+                                <span>{isQuotedExpanded ? "Hide quoted text" : "••• Show quoted text"}</span>
+                              </Button>
+
+                              {isQuotedExpanded && (
+                                <div className="mt-2 p-2.5 rounded-md border-l-2 border-primary/40 bg-muted/20 text-[11px] font-mono text-muted-foreground/90 leading-relaxed whitespace-pre-line select-text">
+                                  <div className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground/60 mb-1.5 flex items-center gap-1">
+                                    <span>Quoted Prior Correspondence</span>
+                                  </div>
+                                  {quotedText}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {msg.hasAttachments && (
                       <div className="space-y-1.5 pt-1">
