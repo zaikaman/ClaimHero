@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.4-nano, text-embedding-3-small
 - **Started:** 2026-08-26T10:31:25Z
-- **Last updated:** 2026-09-22T04:20:44Z
+- **Last updated:** 2026-09-22T04:22:51Z
 
 ## Log
 
@@ -1879,7 +1879,7 @@ Restored green peer-to-peer (P2P) overturn victory resolution in `convex/actions
 Aligned landing page demo preset copy and quickstart guidance with authentic synthetic fixtures across `src/components/landing/TemplateLanding.tsx`, `README.md`, and `tests/landingSections.test.ts`:
 - Replaced synthetic patient names with insurer names and accurate case amounts in `TemplateLanding.tsx` Pre-Seeded Cases showcase: `Cigna Global $6,400`, `GeoBlue $18,200`, and `Aetna International $2,850`.
 - Updated `JUDGE_STEPS` in `TemplateLanding.tsx` and `Try it in 60 seconds` quickstart in `README.md` to instruct advocates to click `Launch Sentinel` prior to selecting `Explore as Anonymous Advocate`, and to open the `Cigna Global` case instead of a patient name.
-- Updated `tests/landingSections.test.ts` to assert `Cigna Global` presence and absence of patient names in the landing page markup. Verified typecheck and lint.### 2026-09-22 - working tree
+- Updated `tests/landingSections.test.ts` to assert `Cigna Global` presence and absence of patient names in the landing page markup. Verified typecheck and lint.### 2026-09-22 - da7fcb4
 Made both 3D backdrops render on 100% of devices with production-grade low-end performance (`src/components/landing/UnicornBackground.tsx`, `src/components/ui/Silk.tsx`, `src/components/ui/SilkFallback.tsx`, `src/components/layout/Shell.tsx`, `index.html`):
 - Removed device gating on the landing Unicorn Studio scene: pointer type, viewport width, reduced-motion, and data-saver no longer omit it; only a genuinely missing WebGL context falls back to the always-painted gradient (probe context released via WEBGL_lose_context).
 - Defer scene CDN fetch past first paint via requestIdleCallback (rAF fallback), low-priority script, jsdelivr preconnect, 3-attempt retry with timeouts, and canvas-driven fade-in over the gradient underlay.
