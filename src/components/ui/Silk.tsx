@@ -1,6 +1,8 @@
-import React, { forwardRef, useRef, useMemo, useLayoutEffect, useEffect } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import React, { forwardRef, useRef, useMemo, useLayoutEffect, useEffect, useState, useCallback } from 'react';
+import { Canvas, useFrame, useThree, type RootState } from '@react-three/fiber';
 import { Color, Mesh, ShaderMaterial, IUniform } from 'three';
+import { ErrorBoundary } from '../common/ErrorBoundary';
+import { SilkFallback } from './SilkFallback';
 
 const hexToNormalizedRGB = (hex: string): [number, number, number] => {
   const cleaned = hex.replace('#', '');
@@ -60,7 +62,7 @@ void main() {
                   0.4 * sin(5.0 * (tex.x + tex.y +
                                    cos(3.0 * tex.x + 5.0 * tex.y) +
                                    0.02 * tOffset) +
-                           sin(20.0 * (tex.x + tex.y - 0.1 * tOffset)));
+                            sin(20.0 * (tex.x + tex.y - 0.1 * tOffset)));
 
   vec4 col = vec4(uColor, 1.0) * vec4(pattern) - rnd / 15.0 * uNoiseIntensity;
   col.a = 1.0;
@@ -95,7 +97,9 @@ const SilkPlane = forwardRef<Mesh, SilkPlaneProps>(function SilkPlane({ uniforms
     if (ref && 'current' in ref && ref.current) {
       const material = ref.current.material as ShaderMaterial;
       if (material && material.uniforms && material.uniforms.uTime) {
-        material.uniforms.uTime.value += 0.1 * delta;
+        // Clamp tab-switch / jank spikes so the animation resumes smoothly
+        // instead of leaping forward after a long frame gap.
+        material.uniforms.uTime.value += 0.1 * Math.min(delta, 0.05);
       }
     }
   });
@@ -108,6 +112,45 @@ const SilkPlane = forwardRef<Mesh, SilkPlaneProps>(function SilkPlane({ uniforms
   );
 });
 SilkPlane.displayName = 'SilkPlane';
+
+/**
+ * Probe for a real GPU-backed WebGL context. The probe context is released
+ * immediately via WEBGL_lose_context so it never occupies one of the
+ * browser's limited live-context slots on memory-constrained devices.
+ */
+function canCreateWebGLContext(): boolean {
+  try {
+    if (typeof document === 'undefined') return true;
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+    if (!gl) return false;
+    try {
+      (gl.getExtension('WEBGL_lose_context') as { loseContext: () => void } | null)?.loseContext();
+    } catch {
+      // Releasing is best-effort; the probe result still stands.
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Cap the render resolution by device class. Fill rate (pixels shaded per
+ * frame) dominates this full-screen shader's GPU cost: constrained devices
+ * render at 1x and upscale, desktops at most at 1.5x. On a blurred ambient
+ * backdrop under a vignette overlay the difference is imperceptible, while
+ * the frame-time saving on mobile GPUs is substantial.
+ */
+function getCappedDpr(): number {
+  if (typeof window === 'undefined') return 1;
+  const raw = window.devicePixelRatio || 1;
+  const coarse =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches;
+  const smallViewport = window.innerWidth < 768;
+  return Math.min(raw, coarse || smallViewport ? 1 : 1.5);
+}
 
 export interface SilkProps {
   speed?: number;
@@ -132,6 +175,10 @@ export const Silk: React.FC<SilkProps> = ({
   const [isVisible, setIsVisible] = React.useState<boolean>(() => {
     return typeof document !== "undefined" ? document.visibilityState === "visible" : true;
   });
+  const [isReady, setIsReady] = useState<boolean>(false);
+  const [contextEpoch, setContextEpoch] = useState<number>(0);
+  const [webGLCapable] = useState<boolean>(() => canCreateWebGLContext());
+  const [dpr] = useState<number>(() => getCappedDpr());
 
   const prefersReducedMotion = React.useMemo(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -169,11 +216,69 @@ export const Silk: React.FC<SilkProps> = ({
     uniforms.uRotation.value = rotation;
   }, [speed, scale, noiseIntensity, color, rotation, uniforms]);
 
+  // Minimal context: this is a single opaque 2D quad, so MSAA, alpha,
+  // depth, and stencil buy nothing and only cost memory/bandwidth.
+  // `failIfMajorPerformanceCaveat: false` is load-bearing on weak GPUs:
+  // without it, context creation throws on software-fallback devices and
+  // the backdrop would vanish exactly where it is wanted most.
+  const glProps = useMemo(
+    () => ({
+      antialias: false,
+      alpha: false,
+      depth: false,
+      stencil: false,
+      preserveDrawingBuffer: false,
+      failIfMajorPerformanceCaveat: false,
+      powerPreference: 'low-power' as const,
+    }),
+    [],
+  );
+
+  const handleCreated = useCallback((state: RootState) => {
+    setIsReady(true);
+    // If the GPU evicts our context under memory pressure, remount for a
+    // clean context instead of leaving a dead (blank) canvas behind.
+    const el = state.gl.domElement;
+    const onContextLost = (event: Event) => {
+      event.preventDefault();
+      setIsReady(false);
+      setContextEpoch((epoch) => epoch + 1);
+    };
+    el.addEventListener('webglcontextlost', onContextLost);
+  }, []);
+
+  if (!webGLCapable) {
+    return (
+      <div className={className} style={{ width: '100%', height: '100%', ...style }}>
+        <SilkFallback />
+      </div>
+    );
+  }
+
   return (
     <div className={className} style={{ width: '100%', height: '100%', ...style }}>
-      <Canvas dpr={[1, 2]} frameloop={prefersReducedMotion ? "never" : isVisible ? "always" : "never"}>
-        <SilkPlane ref={meshRef} uniforms={uniforms} />
-      </Canvas>
+      <ErrorBoundary fallback={<SilkFallback />}>
+        {/* Static gradient underneath: paints instantly and carries the
+            section until the first WebGL frame lands. */}
+        {!isReady ? <SilkFallback className="absolute inset-0" /> : null}
+        <div
+          className="w-full h-full transition-opacity duration-1000 ease-out"
+          style={{ opacity: isReady ? 1 : 0 }}
+        >
+          <Canvas
+            key={contextEpoch}
+            dpr={dpr}
+            gl={glProps}
+            flat
+            onCreated={handleCreated}
+            // Reduced-motion still renders: `demand` paints one static frame
+            // on mount instead of `never` (which would leave the layer blank).
+            frameloop={prefersReducedMotion ? 'demand' : isVisible ? 'always' : 'never'}
+          >
+            <SilkPlane ref={meshRef} uniforms={uniforms} />
+          </Canvas>
+        </div>
+      </ErrorBoundary>
     </div>
   );
 };

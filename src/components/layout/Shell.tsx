@@ -3,6 +3,8 @@ import { Header } from "./Header";
 import { Sidebar, NavigationView } from "./Sidebar";
 import { Claim } from "../../types";
 import { ShortcutsHelpDialog } from "../common/ShortcutsHelpDialog";
+import { ErrorBoundary } from "../common/ErrorBoundary";
+import { SilkFallback } from "../ui/SilkFallback";
 import { isInputFocused } from "../../lib/shortcuts";
 
 const LazySilk = React.lazy(() => import("../ui/Silk").then((m) => ({ default: m.Silk })));
@@ -89,18 +91,25 @@ export const Shell: React.FC<ShellProps> = ({
 
   return (
     <div className="relative flex h-screen w-full flex-col bg-background text-foreground antialiased overflow-hidden print:h-auto print:overflow-visible">
-      {/* Ambient Silk Shader Dynamic Canvas Background */}
+      {/* Ambient Silk Shader Dynamic Canvas Background.
+          The layer is viewport-sized (rotation is 0, so overscan would only
+          burn fill rate) with a static gradient painted underneath: first
+          paint is instant while the three.js chunk streams in, and the
+          section can never go blank if WebGL fails on a weak GPU. */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none print:hidden">
-        <div className="absolute -top-[10%] -left-[10%] w-[120vw] h-[120vh] opacity-45 dark:opacity-35 transition-opacity duration-700">
-          <Suspense fallback={<div className="w-full h-full bg-background" />}>
-            <LazySilk
-              speed={10}
-              scale={0.9}
-              color="#59677b"
-              noiseIntensity={1}
-              rotation={0}
-            />
-          </Suspense>
+        <div className="absolute inset-0 w-full h-full opacity-45 dark:opacity-35 transition-opacity duration-700">
+          <SilkFallback className="absolute inset-0" />
+          <ErrorBoundary fallback={null}>
+            <Suspense fallback={null}>
+              <LazySilk
+                speed={10}
+                scale={0.9}
+                color="#59677b"
+                noiseIntensity={1}
+                rotation={0}
+              />
+            </Suspense>
+          </ErrorBoundary>
         </div>
         {/* Subtle gradient vignette to preserve high contrast and readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/60 to-background/85" />
